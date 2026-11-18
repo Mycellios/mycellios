@@ -255,6 +255,8 @@ export const LANDING_SEO_PATHS = [
   "/admin",
   "/dashboard",
   "/account",
+  "/terms",
+  "/privacy",
 ] as const;
 
 export function canonicalUrl(page: SeoPage): string {
