@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AgentDownloadAction, suggestedDownload } from "./AgentDownloadAction";
+import { AgentDownloadAction, downloadPlatforms, suggestedDownload } from "./AgentDownloadAction";
 import { AgentProductHero } from "./AgentProductHero";
 
 describe("landing download action", () => {
@@ -20,6 +20,12 @@ describe("landing download action", () => {
     expect(html).toContain('aria-label="Choose a download platform"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain("/releases/");
+  });
+  it("lists both Mac installers by name, desktop systems first and phone apps after", () => {
+    expect(downloadPlatforms.map(p => p.label)).toEqual(["macOS · Apple silicon", "macOS · Intel", "Windows", "Linux · DEB", "Linux · RPM"]);
+    const html = renderToStaticMarkup(<AgentDownloadAction />);
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).not.toContain("agent-download-alternative");
   });
   it("replaces the three feature columns while preserving browser and network entry", () => {
     const html = renderToStaticMarkup(<AgentProductHero header={null} />);

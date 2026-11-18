@@ -10,7 +10,7 @@ import "./desktop-downloads.css";
 export { detectInstaller };
 
 /** Accessible and catalog name of each installer. */
-const platformLabel = (id: string) => id === "windows-x64" ? "Windows" : id === "macos-arm64" ? "Mac (Apple Silicon)" : id === "macos-x64" ? "Mac (Intel)" : id === "fedora-x64" ? "Fedora" : "Linux";
+const platformLabel = (id: string) => id === "windows-x64" ? "Windows" : id === "macos-arm64" ? "macOS · Apple silicon" : id === "macos-x64" ? "macOS · Intel" : id === "fedora-x64" ? "Fedora" : "Linux";
 const recommendedName = (id: InstallerId) => id === "windows-x64" ? "Windows" : id.startsWith("macos-") ? "macOS" : "Linux";
 const formatSize = (bytes: number) => bytes >= 1_000_000_000 ? `${(bytes / 1_000_000_000).toFixed(1)} GB` : `${Math.ceil(bytes / 1_000_000)} MB`;
 
@@ -18,10 +18,10 @@ type Package = { id: InstallerId; path: string; bytes: number };
 type System = "macos" | "windows" | "linux";
 const SYSTEMS: Array<{ id: System; name: string; Icon: typeof Apple; rows: Array<[string, string]>; installers: Array<{ id: InstallerId; label: string; detail: string }>; steps: string }> = [
   { id: "macos", name: "macOS", Icon: Apple,
-    rows: [["System", "macOS 13 or later"], ["Processor", "Apple chip (M1 or newer) or Intel"], ["File", "Disk image (DMG)"]],
+    rows: [["System", "macOS 13 or later"], ["Processor", "Apple silicon or Intel"], ["File", "Disk image (DMG)"]],
     installers: [
-      { id: "macos-arm64", label: "M1 or newer", detail: "Most Macs from 2021 on" },
-      { id: "macos-x64", label: "Intel", detail: "Macs from 2020 and earlier" },
+      { id: "macos-arm64", label: "Apple silicon", detail: "macOS 13+ · Apple silicon" },
+      { id: "macos-x64", label: "Intel", detail: "macOS 13+ · Intel" },
     ],
     steps: "Open the DMG and drag Mycellios Desktop to Applications. This preview is not notarized by Apple yet: if macOS blocks the first opening, open System Settings → Privacy & Security and choose Open Anyway for Mycellios Desktop. Not sure which Mac you have? Apple menu → About This Mac shows Chip (Apple) or Processor (Intel)." },
   { id: "windows", name: "Windows", Icon: Monitor,
@@ -69,7 +69,7 @@ export function DesktopDownloads() {
       <Text className="desktop-intro">Your agents and projects, in one app. Free for Mac, Windows and Linux, with an app for Android. Get the installer for this computer, or choose a system below.</Text>
       {suggested && recommended ? <div className="desktop-suggested">
         <Link variant="primary" size="lg" aria-label={`Download for ${recommendedName(recommended)}, recommended for this computer`} href={desktopLatestDownloadPath(suggested.id)}><Download size={18} aria-hidden="true" />Download for {recommendedName(recommended)}</Link>
-        <Text className="desktop-suggested-detail">{recommended === "macos-arm64" ? "For Macs with an Apple chip (M1 or newer)" : recommended === "macos-x64" ? "For Macs with an Intel processor" : platformLabel(recommended)} · {formatSize(suggested.bytes)}</Text>
+        <Text className="desktop-suggested-detail">{recommended === "macos-arm64" ? "macOS 13+ · Apple silicon" : recommended === "macos-x64" ? "macOS 13+ · Intel" : platformLabel(recommended)} · {formatSize(suggested.bytes)}</Text>
       </div> : null}
       {failed ? <div role="alert"><Text>Downloads could not be checked. Please try again.</Text><Button onClick={() => setAttempt(v => v + 1)}>Try again</Button></div> : null}
     </section>
@@ -105,7 +105,7 @@ export function DesktopDownloads() {
       <Text>Install the app and sign in with your Mycellios account.</Text>
       {fedoraPackage ? <Text>On Fedora, open the RPM with your software installer or run <code>sudo dnf install ./{fedoraPackage.fileName}</code>.</Text> : null}
       <Text>Recent Desktop builds download updates in the background. Signed channels can install when idle. This preview asks you to approve installation through the system installer. Your account, chats and project settings are kept.</Text>
-      <Text>The contribution runtime is included for Windows, Linux and Apple Silicon. Intel Macs can use agents and local projects; compute contribution is not available yet. Joining the network requires your account and permission.</Text>
+      <Text>The contribution runtime is included for Windows, Linux and Apple silicon Macs. Intel Macs can use agents and local projects; compute contribution is not available yet. Joining the network requires your account and permission.</Text>
       {catalog ? <div className="desktop-checksums">{catalog.packages.map(p => <div key={p.id}><Text><strong>{platformLabel(p.id)}</strong> · {p.format} · {Math.ceil(p.bytes / 1_000_000)} MB<code>{p.sha256}</code></Text>{separateSources ? <Link href={(p.source ?? catalog.source).path}>{platformLabel(p.id)} source code and build information</Link> : null}</div>)}{!separateSources ? <Link href={catalog.source.path}>Source code and build information</Link> : null}</div> : null}
       {fedoraPackage ? <div className="desktop-checksums"><Text><strong>Fedora</strong> · RPM · Version {fedoraPackage.version} · {Math.ceil(fedoraPackage.bytes / 1_000_000)} MB<code>{fedoraPackage.sha256}</code></Text><Link href={fedoraPackage.source.path}>Fedora source code and build information</Link></div> : null}
       <footer><Link href="/downloads?product=runtime">Standalone runtime</Link><Link href="https://github.com/Mycellios/mycellios/releases">All releases on GitHub</Link></footer>

@@ -4,7 +4,7 @@ const DOWNLOADS_SCHEMA = "mycellios-public-downloads/1";
 
 export const PUBLIC_DOWNLOAD_OPTIONS = [
   { id: "windows-x64", label: "Windows", detail: "Windows 10/11 · x64", format: "ZIP", path: "/downloads/windows" },
-  { id: "macos-arm64", label: "macOS", detail: "Apple Silicon", format: "TAR.GZ", path: "/downloads/macos-arm64" },
+  { id: "macos-arm64", label: "macOS", detail: "Apple silicon", format: "TAR.GZ", path: "/downloads/macos-arm64" },
   { id: "linux-x64", label: "Linux", detail: "Linux · x64", format: "TAR.GZ", path: "/downloads/linux" },
 ] as const;
 

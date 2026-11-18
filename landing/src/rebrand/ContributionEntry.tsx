@@ -21,8 +21,8 @@ const paths = {
 
 /** Stable public routes resolve to the published native installer, not a pinned release. */
 export const contributionInstallers = {
-  windows: { label: "Windows", shell: "PowerShell", command: "curl.exe -fL https://www.mycellios.com/downloads/windows -o mycellios-node.msi" },
-  mac: { label: "Mac · Apple Silicon", shell: "Terminal", command: "curl -fL https://www.mycellios.com/downloads/macos-arm64 -o mycellios-node.pkg" },
+  windows: { label: "Windows", shell: "PowerShell", note: "Windows 10+ · x64", command: "curl.exe -fL https://www.mycellios.com/downloads/windows -o mycellios-node.msi" },
+  mac: { label: "macOS", shell: "Terminal", note: "macOS 13+ · Apple silicon", command: "curl -fL https://www.mycellios.com/downloads/macos-arm64 -o mycellios-node.pkg" },
 } as const;
 
 /** Uses the existing account-bound worker; this page never starts compute. */
@@ -73,7 +73,7 @@ export function ContributionEntry() {
           <pre tabIndex={0} aria-label={`${installer.shell} download command`}><code>{installer.command}</code></pre>
           <Button variant="ghost" aria-label="Copy download command" onClick={() => void copyCommand()}>{copyStatus === "Command copied" ? <Check size={17} aria-hidden="true" /> : <Copy size={17} aria-hidden="true" />}</Button>
         </div>
-        <Text as="small" role="status" className="contribution-terminal-status">{copyStatus || `Run in ${installer.shell} to download the latest installer.`}</Text>
+        <Text as="small" role="status" className="contribution-terminal-status">{copyStatus || `Run in ${installer.shell} to download the latest installer · ${installer.note}`}</Text>
       </div>
       <Text as="small" className="contribution-terminal-next">Then open the installer and <Link href="/downloads">pair the node with your account</Link>. Installing alone doesn't start earning.</Text>
     </div>

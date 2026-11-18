@@ -86,6 +86,14 @@ The web Agent bundles Geist Variable 5.3.0 from `@fontsource-variable/geist`.
 Copyright 2024 The Geist Project Authors. Its SIL Open Font License 1.1 is
 shipped at `src/agent/apps/web/public/licenses/geist-OFL.txt`.
 
+## Platform brand icons
+
+`landing/src/rebrand/PlatformLogo.tsx` includes the Apple, Windows, Linux and
+Android brand icons from Font Awesome Free 6.7.2. Copyright 2024 Fonticons, Inc.
+(https://fontawesome.com). Licensed under the Creative Commons Attribution 4.0
+International License (https://creativecommons.org/licenses/by/4.0/). The marks
+identify download platforms only and imply no endorsement.
+
 ## Integrated development tooling
 
 Desktop development resources may bundle npm and its bundled dependencies from
