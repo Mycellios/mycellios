@@ -167,3 +167,14 @@ test('event waits qualify the deployed CHECK upgrade and automatic return on a r
  }
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts')));
 });
+
+test('only verified main pushes request a Nucleus deployment, with an OIDC token and no stored secret', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const job = ci.slice(ci.indexOf('  request-deployment:'));
+  assert.match(job, /needs: summary/);
+  assert.match(job, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' && vars\.NUCLEUS_DEPLOY_URL != ''/);
+  assert.match(job, /id-token: write/);
+  assert.match(job, /\/api\/v1\/deployments\/github/);
+  assert.ok(!/secrets\./.test(job));
+  assert.match(ci.slice(0, ci.indexOf('jobs:')), /permissions:\s+contents: read\s*$/m);
+});

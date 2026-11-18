@@ -108,8 +108,13 @@ These rules apply to the complete repository.
   Full suites remain paused. The receipt lists actual checks and NOT RUN items;
   related-test discovery is not proof of complete behavioral coverage. Security,
   auth, billing, migrations, dependencies and native changes retain focused gates.
-  Real release builds, artifact identity, rollback and health checks remain required;
-  this workflow does not deploy or replace the existing release policy.
+  Real release builds, artifact identity, rollback and health checks remain required.
+  Production web/API/coordinator deploys go only through Nucleus: after `CI summary`
+  passes on a main push, the `Request Nucleus deployment` job sends a GitHub OIDC
+  token (no stored secret) and Nucleus verifies the run, builds, promotes, checks
+  `/health` revision and rolls back (nucleus `specs/mycellios-continuous-deploy`).
+  It stays off until the NUCLEUS_DEPLOY_URL variable is set; never deploy from CI
+  directly or through the retired server/Dokploy routes.
   Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
   through the shared queue; do not re-enable the paused full suites implicitly.
 
