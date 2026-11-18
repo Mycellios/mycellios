@@ -14,6 +14,12 @@
   readable errors get a clear message instead of a generic error.
 - A finished reply over 20,000 characters shows its beginning with "Show full message".
 
+### Fixed
+
+- Image generation through Codex works on Windows again. Before, Codex refused to start the
+  image session there, and every request failed with a generic error. When the ChatGPT plan
+  behind Codex reaches its usage limit, the Mico now says so instead of a generic failure.
+
 ### Added
 
 - With "Show a plan before long tasks" on, a Mico shows its plan in a card with Start and
