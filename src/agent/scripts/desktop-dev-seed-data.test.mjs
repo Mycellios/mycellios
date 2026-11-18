@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {MessageBlock} from '@rakazo/contracts';
 import {
   ARCHIVED_BOT, NO_SCALE, SEED_BOTS, SEED_CONVERSATIONS, SEED_FILES, SEED_GROUP, SEED_ROUTINES, SEED_SCRATCHPAD,
   SEED_TICKETS, SeedUsageError, generatedBots, generatedHistory, parseSeedArguments, parseSeedScale, seedCounts, seedPdf,
@@ -18,15 +17,12 @@ test('arguments: options, scale and usage errors', () => {
     assert.throws(() => parseSeedArguments(bad), SeedUsageError);
 });
 
-test('every seeded message block satisfies the message contract', () => {
-  const fileBlock = {kind: 'file', artifactId: 'a1', mimeType: 'text/plain', name: 'x.txt', size: 1};
+// packages/testkit/src/dev-seed-blocks.test.ts validates the blocks against the real contract.
+test('file blocks reference uploaded seed files', () => {
   for (const [thread, rows] of Object.entries(SEED_CONVERSATIONS)) for (const row of rows)
-    for (const block of row.blocks) {
-      if (typeof block.file === 'string') {assert.ok(fileKeys.has(block.file), `${thread}: ${block.file}`); continue;}
-      const parsed = MessageBlock.safeParse(block);
-      assert.ok(parsed.success, `${thread}: ${JSON.stringify(parsed.error?.issues)}`);
-    }
-  assert.ok(MessageBlock.safeParse(fileBlock).success);
+    for (const block of row.blocks)
+      if (typeof block.file === 'string') assert.ok(fileKeys.has(block.file), `${thread}: ${block.file}`);
+      else assert.equal(typeof block.kind, 'string');
 });
 
 test('conversations reference existing bots, earlier replies and real run states', () => {
