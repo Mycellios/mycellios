@@ -263,6 +263,20 @@ npm run dev:local:web      # keep running in another: http://127.0.0.1:5192/app/
 npm run dev:local:status   # read-only readiness and hot-reload probe
 ```
 
+The Desktop app runs from source against its own isolated stack and profile:
+
+```bash
+npm run dev:desktop        # open Mycellios Dev; a new profile starts with seeded data
+npm run dev:seed -- --help # realistic Micos, long chats, files, runs, routines, a Hifa app
+npm run dev:stop           # stop the stack, keeping the profile
+npm run dev:reset          # delete this checkout's profile (stack stopped)
+```
+
+The seed signs in as the profile's throwaway account and writes history with the
+app's own database client. It never reads production data or starts a model run.
+`--scale=bots:N,messages:M` adds generated Micos and long history for list and
+paging bugs; `--dry-run` prints the target and counts without changing anything.
+
 Small visual changes use hot reload without a production build or reinstall.
 See [CONTRIBUTING.md](./CONTRIBUTING.md#fast-iteration-is-the-default) for the
 default feedback loop, focused checks and separate publication requirements.

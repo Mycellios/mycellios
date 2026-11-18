@@ -20,6 +20,8 @@
     "dev:desktop": "node scripts/desktop-dev.mjs",
     "dev:status": "node scripts/desktop-dev.mjs status",
     "dev:stop": "node scripts/desktop-dev.mjs stop",
+    "dev:seed": "node --import tsx scripts/desktop-dev-seed.ts",
+    "dev:reset": "node scripts/desktop-dev.mjs reset",
     "dev:desktop:verify": "node scripts/verify-desktop-dev.mjs",
     "build": "turbo build",
     "check": "turbo check",

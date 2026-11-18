@@ -3,7 +3,7 @@
 import {spawn, execFileSync} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {createServer} from 'node:http';
-import {lstat,mkdir, readFile, writeFile, unlink} from 'node:fs/promises';
+import {lstat,mkdir, readFile, rm, writeFile, unlink} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,7 +19,7 @@ const profile = path.join(profileBase, identity.id);
 const lockFile = path.join(profile, 'stack.json');
 await mkdir(profile, {recursive:true, mode:0o700});
 const action = process.argv[2] ?? 'open';
-if (!['open', 'prepare', 'status', 'stop', '--headless'].includes(action)) throw Error('Use desktop-dev.mjs [open|prepare|status|stop|--headless]');
+if (!['open', 'prepare', 'status', 'stop', 'reset', '--headless'].includes(action)) throw Error('Use desktop-dev.mjs [open|prepare|status|stop|reset|--headless]');
 const preparedOnly=process.argv.includes('--prepared');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function control(record, command) {
@@ -33,11 +33,23 @@ async function control(record, command) {
 }
 let previous;
 try {previous=JSON.parse(await readFile(lockFile,'utf8'));} catch (error) {if (error.code !== 'ENOENT') throw Error('Invalid Dev registry; its contents have been preserved.');}
-if (previous && await control(previous, action === 'stop' ? 'stop' : action === 'status' ? 'status' : 'focus')) {
+if (previous && await control(previous, action === 'stop' ? 'stop' : action === 'status' || action === 'reset' ? 'status' : 'focus')) {
+  if (action === 'reset') throw Error('Mycellios Dev is running. Run npm run dev:stop before resetting it.');
   console.log(action === 'stop' ? 'Mycellios Dev stopping.' : 'Mycellios Dev already running.');
   process.exit(0);
 }
 if (action === 'status' || action === 'stop') {console.log('Mycellios Dev is not running.'); process.exit(action === 'status' ? 1 : 0);}
+if (action === 'reset') {
+  // Deletes only this checkout's profile, and never while one of its processes may still own it.
+  const alive=pid=>{if(!Number.isInteger(pid)||pid<=0)return false;try{process.kill(pid,0);return true;}catch(error){return error.code!=='ESRCH';}};
+  const serverPid=Number(await readFile(path.join(profile,'data','server.lock'),'utf8').catch(()=>'0'));
+  if ((previous && alive(previous.pid)) || alive(serverPid)) throw Error('A Mycellios Dev process still owns this profile. Stop it first; nothing was deleted.');
+  if (path.dirname(profile)!==path.resolve(profileBase) || !path.basename(profile).startsWith('wt-')) throw Error('Unexpected development profile path; nothing was deleted.');
+  console.log(`Deleting the Mycellios Dev profile: ${profile}`);
+  await rm(profile,{recursive:true,force:true});
+  console.log('Done. The next npm run dev:desktop creates and seeds a new profile.');
+  process.exit(0);
+}
 if (previous) {
   // Never kill a stale PID, or steal a lock while its owner may still be preparing.
   let alive=true;
@@ -56,7 +68,7 @@ const children=new Set();
 const controlServer=createServer((req,res)=>{
   if(!authorizedControl(req,record.control,token)||!['/focus','/status','/stop'].includes(req.url)) {res.writeHead(403);res.end();return;}
   if(req.url==='/focus' && phase!=='ready'){res.writeHead(503);res.end();return;}
-  res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({id:identity.id,phase}));
+  res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({id:identity.id,phase,...(record.web?{web:record.web}:{})}));
   if(req.url==='/stop')void stop(0);
   else if(req.url==='/focus'&&appChild?.connected)appChild.send({type:'mycellios-dev-focus'},()=>{});
 });
@@ -172,20 +184,25 @@ try {
   }
   await Promise.all([ready(`http://127.0.0.1:${ports.ready}/ready`,backend),ready(`http://127.0.0.1:${ports.web}/@vite/client`,web)]);
   const url=`http://127.0.0.1:${ports.web}`;
+  // dev:seed finds this stack through the registry and confirms it on the control port.
+  record.web=url;await writeFile(lockFile,JSON.stringify(record),{mode:0o600});
   // This throwaway identity is local to this profile and has no real model keys.
   const accountFile=path.join(profile,'account.json');
   let account;
   try {account=JSON.parse(await readFile(accountFile,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;account={email:'developer@mycellios.invalid',password:randomBytes(32).toString('hex')};}
   const auth=async action=>fetch(`${url}/api/auth/${action}/email`,{method:'POST',redirect:'error',headers:{'content-type':'application/json',origin:url},body:JSON.stringify({...account,name:'Developer'}),signal:AbortSignal.timeout(10000)});
-  let authentication=await auth('sign-in');
+  let authentication=await auth('sign-in'),createdAccount=false;
   if(!authentication.ok) {
     authentication=await auth('sign-up');
     if(!authentication.ok)throw Error('Could not prepare the isolated development account.');
     await writeFile(accountFile,JSON.stringify(account),{flag:'wx',mode:0o600});
+    createdAccount=true;
   }
   const user=(await authentication.json()).user;
   const cookie=authentication.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
   await seedDevelopmentPreview({url,profile,user,cookie});
+  // A profile this launch created starts with realistic data, as npm run dev:seed writes it.
+  if(createdAccount)await run(process.execPath,['--import','tsx','scripts/desktop-dev-seed.ts','--if-missing'],{env:{...env,MYCELLIOS_DEV_HOME:profileBase}});
   let branch='local';
   try{branch=execFileSync('git',['branch','--show-current'],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim()||'detached';}catch{}
   if(action!=='--headless') {
