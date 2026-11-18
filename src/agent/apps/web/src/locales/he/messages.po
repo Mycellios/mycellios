@@ -3483,6 +3483,7 @@ msgid "Never ask"
 msgstr "לא לשאול אף פעם"
 
 #: src/pages/shell/chat-context.tsx
+#: src/pages/shell/chat-model-picker.tsx
 msgid "New"
 msgstr ""
 
@@ -6425,3 +6426,7 @@ msgstr "אחרי {seconds} שניות"
 #: src/pages/settings/MicoBehaviorSettings.tsx
 msgid "Never"
 msgstr "אף פעם"
+
+#: src/pages/shell/chat-model-picker.tsx
+msgid "Older models"
+msgstr "מודלים ישנים יותר"

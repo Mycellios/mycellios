@@ -38,6 +38,8 @@ export type PiCatalogEntry = {
   /** Provider models share one pinned HTTPS models-list base URL. */
   catalogProbe?: boolean;
   live?: true;
+  /** How the model picker shows it: `new` for a recent release, `older` folded. */
+  listing?: "new" | "older";
 };
 
 /**

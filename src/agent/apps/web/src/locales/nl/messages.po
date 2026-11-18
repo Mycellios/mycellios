@@ -3484,6 +3484,7 @@ msgid "Never ask"
 msgstr "Nooit vragen"
 
 #: src/pages/shell/chat-context.tsx
+#: src/pages/shell/chat-model-picker.tsx
 msgid "New"
 msgstr "Nieuw"
 
@@ -6426,3 +6427,7 @@ msgstr "Na {seconds} seconden"
 #: src/pages/settings/MicoBehaviorSettings.tsx
 msgid "Never"
 msgstr "Nooit"
+
+#: src/pages/shell/chat-model-picker.tsx
+msgid "Older models"
+msgstr "Oudere modellen"

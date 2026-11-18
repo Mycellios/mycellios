@@ -81,6 +81,7 @@ import { DEFAULT_OPENROUTER_MODEL_ID } from "./deployment-model.js";
 import { groqInitialRequestWindow, groqRequestContextWindow } from "./groq-request-budget.js";
 import { estimateModelContextTokens, modelContextForAdmission } from "./model-context.js";
 import { IMAGE_RETURNING_COMPUTER_TOOLS } from "./model-vision.js";
+import { modelsDevCatalog } from "./models-dev.js";
 import {
   normalizeOpenAiToolParameters,
   openAiToolParametersNeedNormalization,
@@ -180,6 +181,19 @@ function catalogModels(): Models {
     registerLocalProvider(applyPiModelCompatibility(builtinModels())),
   );
   return catalogModelsCache;
+}
+
+/** How long a run waits for a first models.dev copy before resolving a model Pi does not bundle. */
+const MODELS_DEV_RUN_WAIT_MS = 5_000;
+
+/**
+ * A model that the bundled Pi list lacks resolves through models.dev; a fresh worker has no copy
+ * until its first read, so such a run waits a bounded time for it. Bundled models never wait.
+ */
+async function warmModelsDevFor(model: AgentRunRequest["model"]): Promise<void> {
+  if (model.desktopTransport) return;
+  const bundled = catalogModels().getModel(canonicalPiProviderId(model.provider), model.id);
+  await modelsDevCatalog.read(bundled ? 0 : MODELS_DEV_RUN_WAIT_MS).catch(() => undefined);
 }
 const MAX_PARALLEL_SUBAGENTS = 4;
 const MODEL_PROVIDER_RETRY_DELAYS_MS = [2_000, 8_000, 20_000] as const;
@@ -364,6 +378,7 @@ export class PiAgentRuntime implements AgentRuntime {
       let trackedBudget: ToolCallBudget | undefined;
       let resumeHost: ToolHost | undefined;
       try {
+        await warmModelsDevFor(request.model);
         const selectedModel = resolveRuntimeModel(request.model);
         if (!selectedModel.model) {
           queue.push({

@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type { SecretStore } from "@rakazo/adapter-kit";
-import { canonicalPiProviderId } from "@rakazo/contracts";
+import type { ThinkingLevel } from "@rakazo/contracts";
+import { canonicalPiProviderId, isOpenAiCompatibleProvider } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
+import type { ModelsDevSnapshot } from "./models-dev.js";
 import type { ModelCredentialAuthKind } from "./pi-catalog-availability.js";
 import { LiveCatalogCache, liveModelCatalogEnabled } from "./pi-live-cache.js";
-import { isChatModelId, liveModelSibling } from "./pi-live-model.js";
+import { isChatModelId, liveModelSibling, modelsDevService } from "./pi-live-model.js";
 import type { PiCatalogEntry } from "./pi-models.js";
 import {
   catalogModelLabel,
@@ -14,7 +17,7 @@ import {
   listPiCatalog,
   probeCatalogProviderModels,
 } from "./pi-models.js";
-import { parseModelSecret } from "./pi-oauth.js";
+import { CHATGPT_OAUTH_PROVIDER, parseModelSecret } from "./pi-oauth.js";
 
 /** Credential governing each provider/model slot, shared with the run selection path. */
 export type CatalogSpaceAuth = {
@@ -71,12 +74,50 @@ export function liveCatalogEntry(provider: string, id: string): PiCatalogEntry |
     ...entry,
     id,
     recommended: isRecommendedCatalogModel(provider, id),
-    label: catalogModelLabel(id),
+    // models.dev names the model when it lists it; otherwise the id is all there is.
+    label: model.name && model.name !== id ? model.name : catalogModelLabel(id),
     live: true,
     reasoning: model.reasoning,
-    thinkingLevels: ["off"],
+    thinkingLevels: model.reasoning
+      ? (getSupportedThinkingLevels(model) as ThinkingLevel[])
+      : ["off"],
     images: model.input.includes("image"),
   };
+}
+
+/**
+ * models.dev's agent-ready models of each connected provider that the bundled list lacks, as an
+ * updated Pi would list them. ChatGPT sign-in keeps its account catalog; compatible endpoints,
+ * the managed provider and providers models.dev does not describe are left alone. A provider
+ * with a live models list still filters these through it (`catalogProbe`).
+ */
+export function applyModelsDevCatalog(
+  base: readonly PiCatalogEntry[],
+  auth: CatalogSpaceAuth & { managedProvider?: string },
+  snapshot: ModelsDevSnapshot | undefined,
+): PiCatalogEntry[] {
+  if (!snapshot) return [...base];
+  const present = new Set(base.map((entry) => `${entry.provider}:${entry.id}`));
+  const additions: PiCatalogEntry[] = [];
+  const providers = Object.keys(auth.byProvider).filter(
+    (provider) =>
+      auth.byProvider[provider] !== undefined &&
+      provider !== CHATGPT_OAUTH_PROVIDER &&
+      provider !== auth.managedProvider &&
+      !isOpenAiCompatibleProvider(provider),
+  );
+  for (const provider of providers) {
+    const service = modelsDevService(provider, snapshot);
+    if (!service) continue;
+    for (const listed of snapshot.serviceModels(service)) {
+      if (!listed.agentReady || present.has(`${provider}:${listed.id}`)) continue;
+      // A per-model override that disconnected this slot keeps it out.
+      if (auth.byModel[provider]?.[listed.id] === "disconnected") continue;
+      const entry = liveCatalogEntry(provider, listed.id);
+      if (entry) additions.push(entry);
+    }
+  }
+  return additions.length ? overlayLiveCatalog(base, base, () => undefined, additions) : [...base];
 }
 
 /** Credential slots, including per-model overrides, use the same selection as execution. */

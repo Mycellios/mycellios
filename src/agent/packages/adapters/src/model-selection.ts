@@ -21,7 +21,13 @@ import {
 import type { CodexLiveCatalog, CodexLiveReadOptions } from "./pi-codex-catalog.js";
 import { codexLiveListsModel } from "./pi-codex-catalog.js";
 import { liveCatalogEntry, providerLiveListsModel } from "./pi-live-catalog.js";
-import { listPiCatalog, offeredCatalog, scriptedCatalogEntry } from "./pi-models.js";
+import { modelsDevListsModel } from "./pi-live-model.js";
+import {
+  catalogProviderProbeBaseUrl,
+  listPiCatalog,
+  offeredCatalog,
+  scriptedCatalogEntry,
+} from "./pi-models.js";
 import type { StoredModelSecret } from "./pi-oauth.js";
 import { parseModelSecret } from "./pi-oauth.js";
 
@@ -43,6 +49,14 @@ async function credentialLiveListsModel(
   codex?: CodexLiveCatalog,
 ): Promise<boolean> {
   if (await providerLiveListsModel(prisma, secrets, userId, secretId, provider, modelId))
+    return true;
+  // Without a models list of its own, a provider runs what models.dev lists for it, as an updated
+  // Pi would. ChatGPT sign-in and providers with a live list keep their account's answer.
+  if (
+    provider !== "openai-codex" &&
+    !catalogProviderProbeBaseUrl(provider) &&
+    modelsDevListsModel(provider, modelId)
+  )
     return true;
   if (provider !== "openai-codex" || !codex || !liveCatalogEntry(provider, modelId)) return false;
   const secret = await loadModelSecret(prisma, secrets, userId, secretId);

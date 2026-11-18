@@ -1491,6 +1491,11 @@ export const ModelCatalogEntrySchema = z.object({
   catalogProbe: z.boolean().optional(),
   /** Listed by the provider's live models list but not in the bundled catalog. */
   live: z.literal(true).optional(),
+  /**
+   * How the picker shows it, from models.dev release dates: `new` for a recent release in the
+   * main list, `older` folded under Older models. Omitted for the main list and by older servers.
+   */
+  listing: z.enum(["new", "older"]).optional(),
 });
 export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntrySchema>;
 

@@ -1,6 +1,8 @@
 import { implement, ORPCError } from "@orpc/server";
 import {
   applyCodexLiveCatalog,
+  applyModelListing,
+  applyModelsDevCatalog,
   applyProviderLiveCatalog,
   CHATGPT_OAUTH_PROVIDER,
   CodexCatalogCache,
@@ -16,6 +18,7 @@ import {
   listAvailablePiCatalog,
   McpOAuthBroker,
   modelCredentialAuthKindsForSpace,
+  modelsDevCatalog,
   offeredCatalog,
   providerCatalogCache,
   providerLiveCatalogsForSpace,
@@ -151,8 +154,7 @@ export function createRouterContext(deps: RouterDeps) {
       actor,
       deps.billing?.modelCreditsEnabled ? deps.env.defaultProvider : undefined,
     );
-    const available = listAvailablePiCatalog(auth.byProvider, auth.byModel);
-    const [live, providerLive] = await Promise.all([
+    const [live, providerLive, modelsDev] = await Promise.all([
       codexLiveCatalogsForSpace(deps.prisma, deps.secrets, actor, auth, codexCatalog, {
         // An expired bearer yields no catalog this round; kick the runtime's
         // locked refresh so the next read can see the account's real list.
@@ -166,7 +168,14 @@ export function createRouterContext(deps: RouterDeps) {
         auth,
         deps.providerCatalog ?? providerCatalogCache,
       ),
+      (deps.modelsDev ?? modelsDevCatalog).read(),
     ]);
+    // models.dev adds what an updated Pi would list; live account catalogs then filter it.
+    const available = applyModelsDevCatalog(
+      listAvailablePiCatalog(auth.byProvider, auth.byModel),
+      auth,
+      modelsDev,
+    );
     const codexMerged = live.size > 0 ? applyCodexLiveCatalog(available, auth, live) : available;
     let selected = providerLive.size
       ? await savedCatalogSelections(deps.prisma, actor.userId)
@@ -184,7 +193,14 @@ export function createRouterContext(deps: RouterDeps) {
       )
     )
       selected = await savedCatalogSelections(deps.prisma, actor.userId);
-    return offeredCatalog(merged, selected).map((entry) =>
+    // Saved choices, defaults and backups stay in the main list whatever their release date.
+    if (modelsDev && !selected) selected = await savedCatalogSelections(deps.prisma, actor.userId);
+    const listed = applyModelListing(offeredCatalog(merged, selected), modelsDev, {
+      keep: selected,
+      // The managed catalog has its own network/AntSeed grouping; release dates do not fold it.
+      skipProviders: auth.managedProvider ? [auth.managedProvider] : [],
+    });
+    return listed.map((entry) =>
       entry.provider === auth.managedProvider
         ? {
             ...entry,

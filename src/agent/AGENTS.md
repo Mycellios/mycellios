@@ -1,3 +1,14 @@
+- Model lists follow upstream releases at run time, as OpenBot's auto-updated engines
+  do (behavior reference only; its code is PolyForm Noncommercial and not copied).
+  `models-dev.ts` reads the public models.dev catalog as data only (bounded, cached,
+  last-good copy, off with RAKAZO_LIVE_MODEL_CATALOG=off) and adds agent-ready models
+  of connected providers that bundled Pi lacks, on that provider's own protocol and
+  host. ChatGPT sign-in keeps its account catalog, whose Codex client_version comes
+  from npm with a pinned floor; the managed provider and compatible endpoints are
+  unchanged. `model-listing.ts` sets New/Older from release dates; saved choices stay
+  in the main list and search shows everything. Verify models-dev, model-listing,
+  models-dev-runtime, pi-codex-catalog and chat-model-picker tests.
+
 - Cadencia is a trusted first-party Hifa Store app, not a published HTML bundle.
   Keep imported media, DSP workers, auditioning and codecs browser-local. Limit
   clips to five minutes/250 MiB; preserve source audio rate and one compacted
