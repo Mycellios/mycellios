@@ -13200,3 +13200,15 @@ msgstr "Could not create your team. Try again."
 #: src/pages/Onboarding.tsx
 msgid "Downloading OpenCode…"
 msgstr "Downloading OpenCode…"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Improved"
+msgstr "Improved"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Fixed"
+msgstr "Fixed"
+
+#: src/components/DesktopUpdates.tsx
+msgid "Saving work and restarting…"
+msgstr "Saving work and restarting…"
