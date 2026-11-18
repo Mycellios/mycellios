@@ -2,6 +2,7 @@ import "./settings/settings.css";
 import { ProfileOverview } from "./settings/ProfileOverview";
 import { Disclosure, ExpandedSettings } from "@rakazo/ui-web/components/ui/disclosure";
 import { DesktopCompanionsPanel } from "./settings/DesktopCompanionsPanel";
+import { AppBehaviorPanel } from "./settings/GeneralPreferences";
 import { desktopBridge } from "../lib/desktop";
 import { useLingui } from "@lingui/react/macro";
 import { spaceLabel } from "../lib/space-label";
@@ -27,6 +28,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   PanelTop,
+  Power,
   PanelRight,
   Bot as BotIcon,
   Brain,
@@ -46,7 +48,7 @@ import {
   XIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { ApprovalRulesSettings } from "../components/ApprovalRulesSettings";
 import { useDeveloperMode } from "../lib/developer-mode";
 import { spaceQueries, useQueryUserId, writeSaved } from "../lib/query";
@@ -86,6 +88,8 @@ type NavItem = {
   label: string;
   icon: ComponentType<{ className?: string; strokeWidth?: number }>;
   keywords?: string;
+  /** Account and this computer sections sit under their own heading, as in OpenBot. */
+  group?: "account" | "computer";
 };
 
 export function SettingsOverlay({
@@ -105,7 +109,7 @@ export function SettingsOverlay({
   name,
   usage,
   onUsageOpen,
-  section: requestedSection,
+  section: initialSection,
   onSectionChange,
   onNameSaved,
   timezone,
@@ -144,8 +148,10 @@ export function SettingsOverlay({
     totalTokens?: number | null;
   } | null;
   onUsageOpen: () => void;
+  /** The section to show; a new value moves the open panel there. */
   section: SettingsSection;
-  onSectionChange: (section: SettingsSection) => void;
+  /** Notified after the panel moves; the panel owns its current section. */
+  onSectionChange?: (section: SettingsSection) => void;
   onNameSaved?: () => Promise<void>;
   timezone: string | null;
   onTimezoneChange: (timezone: string) => Promise<void>;
@@ -174,6 +180,18 @@ export function SettingsOverlay({
   const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
   const [search, setSearch] = useState("");
   const userId = useQueryUserId();
+  // Section changes stay inside this panel: lifting them into the shell re-rendered the
+  // whole app (roster, transcript) behind the overlay on every click.
+  const [requestedSection, setRequestedSection] = useState(initialSection);
+  const [shownInitial, setShownInitial] = useState(initialSection);
+  if (shownInitial !== initialSection) {
+    setShownInitial(initialSection);
+    setRequestedSection(initialSection);
+  }
+  const changeSection = (next: SettingsSection) => {
+    setRequestedSection(next);
+    onSectionChange?.(next);
+  };
   const [, setKeepComputerRecovery] = useState(false);
   const recoveryHoldTimer = useRef<number | undefined>(undefined);
   const showComputer = true;
@@ -186,7 +204,8 @@ export function SettingsOverlay({
       ? "general"
       : requestedSection === "usage" ? "profile" : requestedSection;
   const [companionBusy, setCompanionBusy] = useState(false);
-  const panelBusy = memoryBusy || voiceBusy || localVoiceBusy || notificationBusy || companionBusy || formState.busy;
+  const [behaviorBusy, setBehaviorBusy] = useState(false);
+  const panelBusy = memoryBusy || voiceBusy || localVoiceBusy || notificationBusy || companionBusy || behaviorBusy || formState.busy;
   const serverSettings = spaceSettingsSections.has(section);
   const spaceScoped = serverSettings || accountSectionsWithSpaceData.has(section);
   const overrideSetting =
@@ -271,18 +290,24 @@ export function SettingsOverlay({
   ] : [
     { id: "general", label: t`General`, icon: Settings },
     { id: "agents", label: t`Micos`, icon: BotIcon },
-    { id: "profile", label: t`Profile`, icon: UserRound },
     { id: "models", label: t`Models`, icon: Cpu },
     { id: "notifications", label: t`Notifications`, icon: Bell },
     { id: "voice", label: t`Voice`, icon: Volume2 },
-    { id: "dynamic-island" as const, label: t`Mycellios Island`, icon: PanelTop },
-    { id: "agent-dock" as const, label: t`Mico dock`, icon: PanelRight },
     { id: "confirmations", label: t`Approvals`, icon: ShieldCheck },
     ...(developerMode ? [{ id: "logs" as const, label: t`Logs`, icon: ListChecks }] : []),
-    ...(showComputer ? [{ id: "computer" as const, label: t`Computer use`, icon: MousePointer2 }] : []),
-    { id: "billing" as const, label: t`Billing`, icon: CreditCard },
-    { id: "mobile", label: t`Mobile connection`, icon: Smartphone },
-    ...(showUpdates ? [{ id: "updates" as const, label: t`Updates`, icon: CloudDownload }] : []),
+    { id: "profile", label: t`Profile`, icon: UserRound, group: "account" as const },
+    { id: "billing" as const, label: t`Billing`, icon: CreditCard, group: "account" as const },
+    { id: "mobile", label: t`Mobile connection`, icon: Smartphone, group: "account" as const },
+    { id: "app-behavior" as const, label: t`Application behavior`, icon: Power, group: "computer" as const },
+    { id: "dynamic-island" as const, label: t`Mycellios Island`, icon: PanelTop, group: "computer" as const },
+    { id: "agent-dock" as const, label: t`Mico dock`, icon: PanelRight, group: "computer" as const },
+    ...(showComputer ? [{ id: "computer" as const, label: t`Computer use`, icon: MousePointer2, group: "computer" as const }] : []),
+    ...(showUpdates ? [{ id: "updates" as const, label: t`Updates`, icon: CloudDownload, group: "computer" as const }] : []),
+  ];
+  const navGroups = [
+    { id: undefined, label: null },
+    { id: "account" as const, label: t`Account` },
+    { id: "computer" as const, label: t`This computer` },
   ];
   const extraSections = new Set<SettingsSection>(serverSettings ? [] : ["models", "confirmations", "logs"]);
   const visibleItems = navItems.filter((item) =>
@@ -329,7 +354,7 @@ export function SettingsOverlay({
         data-testid={`settings-nav-${item.id}`}
         aria-current={active ? "page" : undefined}
         disabled={panelBusy}
-        onClick={() => leaveSettings(() => onSectionChange(item.id))}
+        onClick={() => leaveSettings(() => changeSection(item.id))}
         className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13.5px] transition-colors disabled:pointer-events-none disabled:opacity-50 ${
           active
             ? "bg-accent text-accent-foreground"
@@ -337,7 +362,7 @@ export function SettingsOverlay({
         }`}
       >
         <Icon className="size-4 shrink-0" strokeWidth={1.75} />
-        <span className="whitespace-nowrap">{item.label}</span>
+        <span className="whitespace-nowrap md:whitespace-normal">{item.label}</span>
       </button>
     );
   }
@@ -434,7 +459,7 @@ export function SettingsOverlay({
                     }
                     if (event.key === "Enter" && visibleItems.length === 1) {
                       event.preventDefault();
-                      leaveSettings(() => onSectionChange(visibleItems[0]!.id));
+                      leaveSettings(() => changeSection(visibleItems[0]!.id));
                     }
                   }}
                   className="h-8 rounded-lg bg-muted/50 ps-8 pe-8 text-xs"
@@ -469,8 +494,15 @@ export function SettingsOverlay({
                 aria-label={settingsTitle}
                 className="flex min-h-0 min-w-0 flex-1 flex-row gap-1 overflow-x-auto py-2 md:h-full md:w-full md:flex-col md:overflow-y-auto md:px-3"
               >
-                {visibleItems.filter(item => !extraSections.has(item.id)).map(renderNavItem)}
-                {visibleItems.filter(item => extraSections.has(item.id)).map(renderNavItem)}
+                {navGroups.map(({ id, label }) => {
+                  const items = visibleItems.filter(item => item.group === id);
+                  if (!items.length) return null;
+                  return <Fragment key={id ?? "main"}>
+                    {label ? <p className="hidden px-2.5 pt-4 pb-1 text-xs font-medium text-muted-foreground md:block">{label}</p> : null}
+                    {items.filter(item => !extraSections.has(item.id)).map(renderNavItem)}
+                    {items.filter(item => extraSections.has(item.id)).map(renderNavItem)}
+                  </Fragment>;
+                })}
                 {!visibleItems.length ? (
                   <p
                     role="status"
@@ -572,7 +604,7 @@ export function SettingsOverlay({
                     onBusyMessageModeChange={onBusyMessageModeChange}
                     onOpen={onOpenMico ? (id) => leaveSettings(() => onOpenMico(id)) : undefined}
                     onSkills={onOpenSkills ? () => leaveSettings(onOpenSkills) : undefined}
-                    onModels={() => leaveSettings(() => onSectionChange("models"))}
+                    onModels={() => leaveSettings(() => changeSection("models"))}
                   />
                 ) : null}
                 {section === "notifications" && botsBlocked ? (
@@ -587,6 +619,7 @@ export function SettingsOverlay({
                   />
                 ) : null}
                 {section === "mobile" ? <MobileSettingsPanel accountId={userId ?? undefined} /> : null}
+                {section === "app-behavior" ? <AppBehaviorPanel onBusyChange={setBehaviorBusy} /> : null}
                 {section === "space" && space ? (
                   <SpaceSettingsPanel
                     key={space.id}
@@ -626,9 +659,9 @@ export function SettingsOverlay({
                       holdComputerRecovery();
                     }}
                     onRecoveryDismissed={releaseComputerRecovery}
-                  /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => onSectionChange("confirmations"))}>{t`Manage approvals`}</Button></div></div>
+                  /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => changeSection("confirmations"))}>{t`Manage approvals`}</Button></div></div>
                 ) : null}
-                {section === "billing" ? <div className="space-y-4"><BillingSettingsPanel enabled={billingEnabled} /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => onSectionChange("usage"))}>{t`View usage`}</Button></div></div> : null}
+                {section === "billing" ? <div className="space-y-4"><BillingSettingsPanel enabled={billingEnabled} /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => changeSection("usage"))}>{t`View usage`}</Button></div></div> : null}
                 {section === "updates" && showUpdates ? (
                   <UpdatesPanel
                     onWhatsNew={onWhatsNew ? () => leaveSettings(onWhatsNew) : undefined}
@@ -666,7 +699,7 @@ export function SettingsOverlay({
                 {section === "voice" ? (
                   <>
                     <VoiceEntryPanel onBusyChange={setLocalVoiceBusy} accountId={userId ?? undefined} previewBotId={shownBots[0]?.id}
-                      onModels={() => leaveSettings(() => onSectionChange("models"))}
+                      onModels={() => leaveSettings(() => changeSection("models"))}
                       spaceId={space?.id ?? currentSpaceId}
                       onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
                     <Disclosure summary={t`Connected voice services`} className="rk-settings-details"

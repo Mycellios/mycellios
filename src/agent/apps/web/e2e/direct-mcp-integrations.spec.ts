@@ -3,6 +3,7 @@ import {
   captureScreenshot,
   completeOnboarding,
   expandAdvancedSection,
+  openIntegrations,
   rpc,
   signup,
 } from "./helpers";
@@ -14,7 +15,7 @@ test("shows directly registered MCP servers in Integrations without catalog conn
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
   await expandAdvancedSection(page.getByTestId("integrations-advanced"));
   await page.getByRole("button", { name: "Manage MCP servers", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Server name", exact: true })).toBeVisible();
@@ -28,7 +29,7 @@ test("shows directly registered MCP servers in Integrations without catalog conn
       secret: "fake-mcp-credential",
     });
   expect(await rpc(page, "connections/list", undefined)).toEqual([]);
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
   const servers = page.getByTestId("registered-mcp-servers");
   await expect(servers.getByText("Dropbox", { exact: true })).toBeVisible();
   await expect(servers.getByText("GitHub", { exact: true })).toBeVisible();

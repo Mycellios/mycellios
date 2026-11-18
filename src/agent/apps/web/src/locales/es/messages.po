@@ -13508,3 +13508,24 @@ msgstr "La lista de chats en pantallas estrechas es más ligera y fácil de reco
 #: src/components/ReleaseNotes.tsx
 msgid "Signing in from Desktop works again. It no longer says that the sign-in request has expired."
 msgstr "Ya se puede iniciar sesión desde la app de escritorio. Ya no dice que el acceso ha caducado."
+
+msgid "Startup and quit"
+msgstr "Inicio y cierre"
+
+msgid "Background"
+msgstr "Segundo plano"
+
+msgid "Open the space and conversation from the previous session."
+msgstr "Abrir el espacio y la conversación de la sesión anterior."
+
+msgid "Keep server connections between launches, so Mycellios opens faster. Quit from the menu to disconnect."
+msgstr "Mantener la conexión con los servidores entre inicios, para que Mycellios se abra más rápido. Sal desde el menú para desconectar."
+
+msgid "Keep tasks active when you close the window."
+msgstr "Mantener las tareas activas al cerrar la ventana."
+
+msgid "Routines run on time while the computer is plugged in. The screen can turn off."
+msgstr "Las rutinas se ejecutan a tiempo mientras el ordenador está conectado a la corriente. La pantalla puede apagarse."
+
+msgid "Keep the computer awake on battery too. The battery drains faster."
+msgstr "Mantener el ordenador activo también con batería. La batería se agota antes."

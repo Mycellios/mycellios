@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { activeBotId, captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
 
-test("opens the Library from the account menu and rail, and previews an existing file", async ({
+test("opens the Library from the rail, and previews an existing file", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
@@ -14,16 +14,13 @@ test("opens the Library from the account menu and rail, and previews an existing
   const sidebar = page.getByTestId("bots-sidebar");
   await expect(sidebar).toBeVisible();
   const rail = page.getByTestId("workspace-rail");
-  await expect(rail.getByRole("button", { name: "Connect apps" })).toBeVisible();
-  await page.getByTestId("user-menu-trigger").click();
-  const artifactsItem = page.getByRole("dialog").getByRole("button", { name: "Library", exact: true });
-  const settingsItem = page.getByRole("button", { name: "Settings", exact: true });
+  // The rail footer follows OpenBot: Hifa Store, Help, Settings, then the server.
+  await expect(rail.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
+  await rail.getByRole("button", { name: "More", exact: true }).click();
+  const artifactsItem = page.getByRole("menuitem", { name: "Library", exact: true });
   await expect(artifactsItem).toBeVisible();
-  await expect(settingsItem).toBeVisible();
-  expect((await artifactsItem.boundingBox())?.y).toBeLessThan(
-    (await settingsItem.boundingBox())?.y ?? 0,
-  );
-  await captureScreenshot(page, testInfo, "account-menu-artifacts");
+  await captureScreenshot(page, testInfo, "rail-more-library");
 
   await artifactsItem.click();
   await expect(page).toHaveURL(/[?&]view=library/);

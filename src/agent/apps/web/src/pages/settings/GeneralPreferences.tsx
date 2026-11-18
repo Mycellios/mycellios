@@ -149,33 +149,36 @@ export function AppBehaviorPanel({ onBusyChange }: { onBusyChange?: (busy: boole
     setBusy(true); setError("");
     try { setValue(await bridge.update(patch)); } catch { setError(t`Could not save this preference.`); } finally { setBusy(false); }
   }
-  return <SettingsGroup title={t`Application behavior`}>
-    {!bridge ? <p className="px-4 py-3 text-sm text-muted-foreground">{t`Computer controls require Mycellios Desktop. Workspace restoration also works on the web.`}</p> : null}
-    {bridge && !value && !error && <p role="status" className="p-4 text-sm text-muted-foreground">{t`Loading…`}</p>}
-    {value && <>
-      {value.launchAtLogin !== null && <SettingsRow label={<Label htmlFor={`${id}-login`}>{t`Open Mycellios at login`}</Label>}
-        description={t`Open the application when you sign in on this computer.`}
-        control={<Switch id={`${id}-login`} disabled={busy || !bridge} checked={value.launchAtLogin} onCheckedChange={launchAtLogin => void save({ launchAtLogin })} />} />}
-      {value.keepRemoteSessions !== undefined ? <SettingsRow label={<Label htmlFor={`${id}-connections`}>{t`Quick server reconnection`}</Label>}
-        description={t`Keep authorized server connections alive when the last window closes. Reopening reuses the running service; Quit disconnects it.`}
-        control={<Switch id={`${id}-connections`} disabled={busy || !bridge} checked={value.keepRemoteSessions} onCheckedChange={keepRemoteSessions=>void save({keepRemoteSessions})} />} /> : null}
-      <SettingsRow label={<Label htmlFor={`${id}-background`}>{t`Keep Mycellios running in the background`}</Label>}
-        description={t`Keep tasks active when you close the window. Use Quit to exit completely.`}
-        control={<Switch id={`${id}-background`} disabled={busy || !bridge} checked={value.keepRunningInBackground} onCheckedChange={keepRunningInBackground => void save({ keepRunningInBackground })} />} />
+  const native = Boolean(bridge && value);
+  const switchRow = (key: string, label: string, description: string, checked: boolean, onChange: (checked: boolean) => void, disabled = false) =>
+    <SettingsRow label={<Label htmlFor={`${id}-${key}`}>{label}</Label>} description={description}
+      control={<Switch id={`${id}-${key}`} disabled={busy || !native || disabled} checked={checked} onCheckedChange={onChange} />} />;
+  return <div className="space-y-6">
+    {!bridge ? <p className="text-sm text-muted-foreground">{t`Computer controls require Mycellios Desktop. Workspace restoration also works on the web.`}</p> : null}
+    {!bridge && desktopBridge() && <p className="text-sm text-muted-foreground">{t`Restart the updated desktop app to manage computer settings here.`}</p>}
+    {bridge && !value && !error && <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p>}
+    <SettingsGroup title={t`Startup and quit`}>
+      {value && value.launchAtLogin !== null && switchRow("login", t`Open Mycellios at login`,
+        t`Open the application when you sign in on this computer.`, value.launchAtLogin, launchAtLogin => void save({ launchAtLogin }))}
+      <SettingsRow label={<Label htmlFor={`${id}-restore`}>{t`Restore the last workspace on startup`}</Label>}
+        description={t`Open the space and conversation from the previous session.`}
+        control={<Switch id={`${id}-restore`} checked={general.restoreLastWorkspace} onCheckedChange={restoreLastWorkspace => {
+          try { setGeneralPreferences({ restoreLastWorkspace }); setError(""); } catch { setError(t`Could not save this preference.`); }
+        }} />} />
+      {value && value.keepRemoteSessions !== undefined && switchRow("connections", t`Quick server reconnection`,
+        t`Keep server connections between launches, so Mycellios opens faster. Quit from the menu to disconnect.`,
+        value.keepRemoteSessions, keepRemoteSessions => void save({ keepRemoteSessions }))}
+    </SettingsGroup>
+    {value && <SettingsGroup title={t`Background`}>
+      {switchRow("background", t`Keep Mycellios running in the background`, t`Keep tasks active when you close the window.`,
+        value.keepRunningInBackground, keepRunningInBackground => void save({ keepRunningInBackground }))}
       {value.keepAwake !== null && <>
-        <SettingsRow label={<Label htmlFor={`${id}-awake`}>{t`Keep the computer awake`}</Label>}
-          description={t`Run routines on time while plugged in. The screen can turn off.`}
-          control={<Switch id={`${id}-awake`} disabled={busy || !bridge} checked={value.keepAwake} onCheckedChange={keepAwake => void save({ keepAwake })} />} />
-        <SettingsRow label={<Label htmlFor={`${id}-battery`}>{t`Also on battery`}</Label>} description={t`Keep the computer awake on battery too. This uses more power.`}
-          control={<Switch id={`${id}-battery`} disabled={busy || !bridge || !value.keepAwake} checked={value.keepAwakeOnBattery} onCheckedChange={keepAwakeOnBattery => void save({ keepAwakeOnBattery })} />} />
+        {switchRow("awake", t`Keep the computer awake`,
+          t`Routines run on time while the computer is plugged in. The screen can turn off.`, value.keepAwake, keepAwake => void save({ keepAwake }))}
+        {switchRow("battery", t`Also on battery`, t`Keep the computer awake on battery too. The battery drains faster.`,
+          value.keepAwakeOnBattery, keepAwakeOnBattery => void save({ keepAwakeOnBattery }), !value.keepAwake)}
       </>}
-    </>}
-    <SettingsRow label={<Label htmlFor={`${id}-restore`}>{t`Restore the last workspace on startup`}</Label>}
-      description={t`Reopen the space and conversation you used last. Explicit chat links always take priority.`}
-      control={<Switch id={`${id}-restore`} checked={general.restoreLastWorkspace} onCheckedChange={restoreLastWorkspace => {
-        try { setGeneralPreferences({ restoreLastWorkspace }); setError(""); } catch { setError(t`Could not save this preference.`); }
-      }} />} />
-    {!bridge && desktopBridge() && <p className="px-4 py-3 text-sm text-muted-foreground">{t`Restart the updated desktop app to manage computer settings here.`}</p>}
-    {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
-  </SettingsGroup>;
+    </SettingsGroup>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+  </div>;
 }

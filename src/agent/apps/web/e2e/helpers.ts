@@ -36,8 +36,14 @@ export async function completeOnboarding(page: Page, testInfo?: TestInfo) {
   const integrations = page.getByRole("heading", { name: "Server integrations", exact: true });
   const firstMico = page.getByTestId("first-mico-setup");
   const team = page.getByTestId("onboarding-team");
+  const choice = page.getByTestId("first-run-choice");
   const companion = page.getByRole("combobox", { name: `Message ${productBrand.companionName}`, exact: true });
-  await integrations.or(firstMico).or(companion).or(team).waitFor({ timeout: 20_000 });
+  await integrations.or(firstMico).or(companion).or(team).or(choice).waitFor({ timeout: 20_000 });
+  if (await choice.isVisible().catch(() => false)) {
+    if (testInfo) await captureScreenshot(page, testInfo, "02-first-run-choice");
+    // E2E has no Mycellios account for free models; the team builder keeps the offline path.
+    await page.goto(page.url().replace(/\/onboarding\/choice.*$/, "/onboarding/team?builder=1"));
+  }
   if (await integrations.isVisible().catch(() => false)) {
     if (testInfo) await captureScreenshot(page, testInfo, "02-connect-apps");
     await page.getByRole("button", { name: "Skip", exact: true }).click();
@@ -215,8 +221,7 @@ export async function openUserSettings(
       await page.getByRole("button", { name: "Switch workspace" }).click();
       await page.getByRole("button", { name: "Space settings", exact: true }).click();
     } else {
-      await page.getByTestId("user-menu-trigger").click();
-      await page.getByRole("button", { name: "Settings", exact: true }).click();
+      await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
     }
   }
   const settings = page.getByTestId("user-settings");
@@ -225,6 +230,30 @@ export async function openUserSettings(
     await settings.getByTestId(`settings-nav-${section}`).click();
   }
   return settings;
+}
+
+/** Desktop reaches Integrations through Hifa Store; the rail has no Connect apps pill. */
+export async function openIntegrations(page: Page) {
+  await page.getByTestId("workspace-rail").getByRole("button", { name: "Hifa Store", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Marketplace sections" })
+    .getByRole("button", { name: "Integrations", exact: true })
+    .click();
+  await expect(page.getByTestId("marketplace-workspace")).toBeVisible();
+}
+
+/** Narrow screens keep the account footer in the navigation's More menu. */
+export async function openMobileFooter(page: Page) {
+  const footer = page.getByTestId("sidebar-footer");
+  if (await footer.isVisible()) return footer;
+  // The closed navigation is aria-hidden, so its More button only resolves once it is open.
+  const more = page.getByTestId("bots-sidebar").getByRole("button", { name: "More", exact: true });
+  if (!(await more.isVisible())) {
+    await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  }
+  await more.click();
+  await expect(footer).toBeVisible();
+  return footer;
 }
 
 /** The connection page for a provider, titled "Connect X" until it is connected and "X" after. */

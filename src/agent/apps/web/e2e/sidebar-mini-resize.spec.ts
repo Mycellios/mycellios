@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
+import { captureScreenshot, completeOnboarding, openIntegrations, rpc, signup } from "./helpers";
 
 test("sidebar rail keeps chats interactive and remembers a dragged width", async ({
   page,
@@ -63,9 +63,10 @@ test("sidebar rail keeps chats interactive and remembers a dragged width", async
     })
     .toBe(true);
   await captureScreenshot(page, testInfo, "sidebar-mini-avatar-rail");
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
-  await expect(page.getByTestId("account-menu-header")).toBeHidden();
-  await page.getByRole("button", { name: "Close integrations", exact: true }).click();
+  // The collapsed sidebar has no account menu; the rail still reaches Integrations.
+  await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
+  await openIntegrations(page);
+  await page.getByRole("button", { name: "Back to chat", exact: true }).click();
   await page.reload();
   await expect(sidebar).toHaveCSS("width", "72px");
   await page.getByTestId("restore-bots-sidebar").click();

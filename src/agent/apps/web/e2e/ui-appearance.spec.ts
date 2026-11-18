@@ -1,6 +1,13 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
+import {
+  captureScreenshot,
+  completeOnboarding,
+  openIntegrations,
+  openMobileFooter,
+  rpc,
+  signup,
+} from "./helpers";
 
 async function captureSidebarSearchSelected(
   page: Page,
@@ -50,8 +57,7 @@ test("account settings appearance control switches to light mode", async ({ page
   await signup(page, `ui-appearance-${stamp}@rakazo.test`, "password12", "Appearance QA");
   await completeOnboarding(page, testInfo);
 
-  await page.getByTestId("user-menu-trigger").click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.getByTestId("user-settings");
   await expect(settings).toBeVisible();
 
@@ -88,8 +94,7 @@ test("account settings appearance control switches to light mode", async ({ page
   await expect(inlinePath).toHaveCSS("color", "rgb(28, 28, 28)");
   await captureScreenshot(page, testInfo, "inline-code-light");
 
-  await page.getByTestId("user-menu-trigger").click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
   await expect(settings).toBeVisible();
   await settings.getByTestId("ui-appearance-dark").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -99,47 +104,59 @@ test("account settings appearance control switches to light mode", async ({ page
   await captureSidebarSearchSelected(page, testInfo, "sidebar-search-selected-dark");
 });
 
-test("workspace rail opens integrations and the account menu", async ({ page }, testInfo) => {
+test("workspace rail footer follows OpenBot and reaches integrations from Hifa Store", async ({
+  page,
+}, testInfo) => {
   await signup(page, `footer-web-${Date.now()}@rakazo.test`, "password12", "Footer Demo");
   await completeOnboarding(page);
-  const footer = page.getByTestId("workspace-rail").getByTestId("sidebar-footer");
-  await expect(footer).toBeVisible();
+  const rail = page.getByTestId("workspace-rail");
+  await expect(rail).toBeVisible();
+  // Desktop has no account footer: no avatar menu, no Connect apps pill, in the rail or the chat sidebar.
+  await expect(page.getByTestId("sidebar-footer")).toHaveCount(0);
+  await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
+  await expect(rail.getByRole("button", { name: "Connect apps", exact: true })).toHaveCount(0);
   const chatSidebar = page.getByTestId("bots-sidebar");
-  await expect(chatSidebar.getByTestId("sidebar-footer")).toHaveCount(0);
   await expect(chatSidebar.getByTestId("mycellios-micos")).toBeVisible();
-  await expect(footer.getByRole("button", { name: "Install update", exact: true })).toHaveCount(0);
-  await footer.getByRole("button", { name: "Connect apps", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Close integrations", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Close integrations", exact: true }).click();
-  await page.getByTestId("user-menu-trigger").click();
-  await expect(page.getByRole("link", { name: "Get the mobile app", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Docs", exact: true })).toBeVisible();
-  await expect(footer.locator('span[aria-hidden="true"] > span')).toHaveCount(3);
-  if (avatarBox && pillBox) {
-    await expect
-      .poll(async () => {
-        const menuBox = await page.locator('[data-slot="popover-content"]').boundingBox();
-        return (
-          menuBox && {
-            x: menuBox.x,
-            width: menuBox.width,
-            gap: avatarBox.y - menuBox.y - menuBox.height,
-          }
-        );
-      })
-      .toEqual({ x: avatarBox.x, width: pillBox.x + pillBox.width - avatarBox.x, gap: 8 });
-  }
-  await captureScreenshot(page, testInfo, "sidebar-footer-menu");
+  const store = rail.getByRole("button", { name: "Hifa Store", exact: true });
+  const help = rail.getByRole("button", { name: "Help", exact: true });
+  const settings = rail.getByRole("button", { name: "Settings", exact: true });
+  const labels = await rail
+    .locator("button[aria-label]")
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+  expect(labels.indexOf("Hifa Store")).toBeGreaterThanOrEqual(0);
+  expect(labels.indexOf("Hifa Store")).toBeLessThan(labels.indexOf("Help"));
+  expect(labels.indexOf("Help")).toBeLessThan(labels.indexOf("Settings"));
+  // Server connections sit below Settings at the very bottom of the rail.
+  const servers = rail
+    .getByTestId("desktop-server-menu")
+    .or(rail.getByRole("button", { name: "Servers", exact: true }))
+    .first();
+  const [storeBox, helpBox, settingsBox, serversBox] = await Promise.all(
+    [store, help, settings, servers].map((control) => control.boundingBox()),
+  );
+  expect(storeBox!.y).toBeLessThan(helpBox!.y);
+  expect(helpBox!.y).toBeLessThan(settingsBox!.y);
+  expect(settingsBox!.y).toBeLessThan(serversBox!.y);
+  await captureScreenshot(page, testInfo, "workspace-rail-footer");
+
+  await help.click();
+  await expect(page.getByTestId("help-menu")).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("help-menu")).toHaveCount(0);
+
+  await openIntegrations(page);
+  await page.getByRole("button", { name: "Back to chat", exact: true }).click();
+  await expect(page.getByTestId("marketplace-workspace")).toHaveCount(0);
+
   await page.getByTestId("minimize-bots-sidebar").click();
-  await expect(footer).toBeInViewport();
-  await expect(page.getByTestId("bots-sidebar")).toHaveCSS("width", "72px");
-  await expect(page.getByTestId("user-menu-trigger")).toBeVisible();
+  await expect(chatSidebar).toHaveCSS("width", "72px");
+  await expect(settings).toBeInViewport();
+  await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
   await page.getByTestId("restore-bots-sidebar").click();
-  await expect(footer).toBeInViewport();
+  await expect(settings).toBeInViewport();
 });
 
-test("sidebar footer keeps the account identity readable and installs a ready desktop update", async ({
+test("mobile navigation footer keeps the account identity readable and a ready desktop update installs", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -180,55 +197,48 @@ test("sidebar footer keeps the account identity readable and installs a ready de
   await completeOnboarding(page);
   await page.request.post("/api/auth/update-user", { data: { name: "Footer Demo" } });
   await page.reload();
-  const footer = page.getByTestId("sidebar-footer");
-  const avatar = page.getByTestId("user-menu-trigger");
   const session = await (await page.request.get("/api/auth/get-session")).json();
-  await expect(avatar).toHaveAccessibleName(`Account menu for ${session.user.name}`);
-  await expect(footer.getByRole("button", { name: "Install update", exact: true })).toBeVisible();
-  // Dismiss the existing update toast so the two footer frames stay focused.
-  await page
-    .getByRole("complementary", { name: "Desktop update" })
-    .getByRole("button", { name: "Later" })
-    .click();
-  await avatar.click();
-  const header = page.getByTestId("account-menu-header");
-  await expect(header).toHaveText(`${session.user.name}${email}`);
-  await expect(page.getByText("New update available", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Install", exact: true })).toHaveCount(0);
-  await expect(footer.locator('span[aria-hidden="true"] > span')).toHaveCount(3);
-  await captureScreenshot(page, testInfo, "sidebar-footer-menu-update");
-  await page.keyboard.press("Escape");
-  await footer.getByRole("button", { name: "Install update", exact: true }).click();
+  // Desktop installs the ready update from the chat sidebar; the rail has no account footer.
+  await expect(page.getByTestId("workspace-rail").getByTestId("sidebar-footer")).toHaveCount(0);
+  const sidebarUpdate = page
+    .getByTestId("bots-sidebar")
+    .getByRole("button", { name: "Install update", exact: true });
+  await expect(sidebarUpdate).toBeVisible();
+  await sidebarUpdate.click();
   await expect(page.locator("html")).toHaveAttribute("data-update-installed", "1");
 
   await page.setViewportSize({ width: 320, height: 900 });
-  await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  const footer = await openMobileFooter(page);
+  const avatar = footer.getByTestId("user-menu-trigger");
+  await expect(avatar).toHaveAccessibleName(`Account menu for ${session.user.name}`);
   await expect(avatar).toBeInViewport();
+  // The phone footer has no update button; updates stay in the navigation's update slot.
+  await expect(footer.getByRole("button", { name: "Install update", exact: true })).toHaveCount(0);
+  await avatar.click();
+  const header = page.getByTestId("account-menu-header");
+  await expect(header).toHaveText(`${session.user.name}${email}`);
+  await captureScreenshot(page, testInfo, "mobile-footer-account-menu");
+  await page.keyboard.press("Escape");
+  await expect(header).toBeHidden();
+  await openMobileFooter(page);
+
   // Font metrics can change the count at this viewport; exact bands are covered below.
   await expect(footer.locator('span[aria-hidden="true"] > span:visible').first()).toBeVisible();
   const pill = footer.getByRole("button", { name: "Connect apps", exact: true });
   const label = pill.locator("span").first();
   expect(await label.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  const controls = [
-    avatar,
-    pill,
-    footer.getByRole("button", { name: "Install update", exact: true }),
-  ];
-  const boxes = await Promise.all(controls.map((control) => control.boundingBox()));
+  const boxes = await Promise.all([avatar, pill].map((control) => control.boundingBox()));
   expect(boxes.every((box) => box?.height === 36 && box.y === boxes[0]?.y)).toBe(true);
   expect(await footer.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  const updateButton = controls[2]!;
-  await updateButton.click();
-  expect(await updateButton.evaluate((el) => el.matches(":focus-visible"))).toBe(false);
   await avatar.click();
   await avatar.click();
   expect(await avatar.evaluate((el) => el.matches(":focus-visible"))).toBe(false);
-  await updateButton.focus();
-  expect(await updateButton.evaluate((el) => el.matches(":focus-visible"))).toBe(false);
+  await pill.focus();
+  expect(await pill.evaluate((el) => el.matches(":focus-visible"))).toBe(false);
   await page.keyboard.press("Tab");
-  await updateButton.focus();
-  expect(await updateButton.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-  await updateButton.evaluate((el) => el.blur());
+  await pill.focus();
+  expect(await pill.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
+  await pill.evaluate((el) => el.blur());
 
   // Width changes must drop marks before taking space from the label or padding.
   // Measure the fixed controls and label, then target the middle of each band.
@@ -266,7 +276,7 @@ test("sidebar footer keeps the account identity readable and installs a ready de
     }
   }
   await footer.evaluate((el) => el.style.removeProperty("width"));
-  // A translation wider than the pill must still leave room for the update control.
+  // A translation wider than the pill must still truncate inside the footer.
   await label.evaluate((el) => {
     el.textContent = "Connecter des applications";
   });
@@ -284,8 +294,8 @@ test("sidebar footer keeps the account identity readable and installs a ready de
   expect(await footer.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 
   await page.setViewportSize({ width: 740, height: 320 });
-  await avatar.click();
-  const menu = page.locator('[data-slot="popover-content"]');
+  await (await openMobileFooter(page)).getByTestId("user-menu-trigger").click();
+  const menu = page.locator('[data-slot="popover-content"]').filter({ has: header });
   await expect
     .poll(async () => {
       const box = await menu.boundingBox();
@@ -303,7 +313,7 @@ test("sidebar footer keeps the account identity readable and installs a ready de
   await expect(page.getByTestId("user-settings")).toBeVisible();
 });
 
-test("footer app marks follow the integrations overlay", async ({ page }) => {
+test("mobile footer app marks follow the integrations overlay", async ({ page }) => {
   await signup(page, `footer-apps-${Date.now()}@rakazo.test`, "password12", "Footer Demo");
   await completeOnboarding(page);
   let connected = true;
@@ -342,23 +352,39 @@ test("footer app marks follow the integrations overlay", async ({ page }) => {
       },
     });
   });
-  const footer = page.getByTestId("sidebar-footer");
-  await footer.getByRole("button", { name: "Connect apps", exact: true }).click();
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
-  await page.getByRole("button", { name: "Close integrations", exact: true }).click();
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
+  // App marks only appear in the phone navigation footer; desktop actions stay in the rail.
+  const desktop = { width: 1280, height: 720 };
+  const phone = { width: 390, height: 844 };
+  const expectFooterMark = async (src: string | null) => {
+    await page.setViewportSize(phone);
+    const marks = (await openMobileFooter(page)).locator("img");
+    if (src) await expect(marks).toHaveAttribute("src", src);
+    else await expect(marks).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    // Returning to desktop closes the phone navigation.
+    await page.setViewportSize(desktop);
+  };
+  const backToChat = async () => {
+    await page.getByRole("button", { name: "Back to chat", exact: true }).click();
+    await expect(page.getByTestId("marketplace-workspace")).toHaveCount(0);
+  };
+  await page.setViewportSize(phone);
+  await (await openMobileFooter(page)).getByRole("button", { name: "Connect apps", exact: true }).click();
+  await expect(page.getByTestId("marketplace-workspace")).toBeVisible();
+  await page.setViewportSize(desktop);
+  await backToChat();
+  await expectFooterMark(logo);
   failCatalog = true;
-  await footer.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
   await expect(page.getByText("Could not reach the server", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Close integrations", exact: true }).click();
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
+  await backToChat();
+  await expectFooterMark(logo);
   failCatalog = false;
   connected = false;
-  await footer.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
+  await backToChat();
   // Disconnected catalog entries remain available as suggestions.
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
-  await page.getByRole("button", { name: "Close integrations", exact: true }).click();
-  await expect(footer.getByRole("button", { name: "Connect apps", exact: true })).toBeVisible();
+  await expectFooterMark(logo);
   failCatalog = true;
   const failedRefresh = page.waitForResponse(
     (response) => response.url().includes("connections/catalog") && response.status() === 503,
@@ -370,7 +396,7 @@ test("footer app marks follow the integrations overlay", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Duplicate", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Chief copy/ }).first()).toBeVisible();
   await failedRefresh;
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
+  await expectFooterMark(logo);
   failCatalog = false;
   failConnections = true;
   const failedConnections = page.waitForResponse(
@@ -383,7 +409,7 @@ test("footer app marks follow the integrations overlay", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Duplicate", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Chief copy copy/ }).first()).toBeVisible();
   await failedConnections;
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
+  await expectFooterMark(logo);
   failConnections = false;
   for (const name of [/^Chief copy copy/, /^Chief copy/, /^Chief/]) {
     const bot = page.getByRole("button", { name }).first();
@@ -392,13 +418,14 @@ test("footer app marks follow the integrations overlay", async ({ page }) => {
     await expect(bot).toBeHidden();
   }
   await page.reload();
-  await expect(footer.locator("img")).toHaveAttribute("src", logo);
+  await expectFooterMark(logo);
   listed = false;
-  await footer.getByRole("button", { name: "Connect apps", exact: true }).click();
-  await expect(footer.locator("img")).toHaveCount(0);
+  await openIntegrations(page);
+  await backToChat();
+  await expectFooterMark(null);
 });
 
-test("sidebar list fades above the transparent footer and keeps the last row reachable", async ({
+test("sidebar list fades above the credits foot and keeps the last row reachable", async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -415,7 +442,9 @@ test("sidebar list fades above the transparent footer and keeps the last row rea
   }
   await page.reload();
   const sidebar = page.getByTestId("bots-sidebar");
-  const footer = page.getByTestId("sidebar-footer");
+  // Desktop has no account footer; the chat list ends above the credits block.
+  await expect(page.getByTestId("sidebar-footer")).toHaveCount(0);
+  const foot = sidebar.getByTestId("mycellios-micos");
   const list = sidebar.locator(".rk-scroll").first();
   const lastRow = list.getByRole("button", { name: /^Demo chat 19/ }).first();
   await expect(lastRow).toHaveCount(1);
@@ -423,8 +452,7 @@ test("sidebar list fades above the transparent footer and keeps the last row rea
     await page.evaluate((theme) => localStorage.setItem("rakazo.uiAppearance", theme), theme);
     await page.reload();
     await expect(lastRow).toHaveCount(1);
-    await expect(footer).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(footer).toHaveCSS("background-image", "none");
+    await expect(foot).toBeVisible();
     await list.evaluate((el) => (el.scrollTop = (el.scrollHeight - el.clientHeight) / 2));
     await expect
       .poll(() =>
@@ -432,12 +460,12 @@ test("sidebar list fades above the transparent footer and keeps the last row rea
       )
       .toBeGreaterThan(20);
     const listBox = await list.boundingBox();
-    const avatarBox = await page.getByTestId("user-menu-trigger").boundingBox();
-    expect(listBox!.y + listBox!.height).toBeLessThan(avatarBox!.y);
+    const footBox = await foot.boundingBox();
+    expect(listBox!.y + listBox!.height).toBeLessThan(footBox!.y);
     // Disabling animations fast-forwards the scroll timeline and removes its fade.
-    const screenshotPath = testInfo.outputPath(`sidebar-footer-scrolled-${theme}.png`);
+    const screenshotPath = testInfo.outputPath(`sidebar-list-scrolled-${theme}.png`);
     await page.screenshot({ path: screenshotPath, animations: "allow" });
-    await testInfo.attach(`sidebar-footer-scrolled-${theme}`, {
+    await testInfo.attach(`sidebar-list-scrolled-${theme}`, {
       contentType: "image/png",
       path: screenshotPath,
     });
@@ -451,6 +479,6 @@ test("sidebar list fades above the transparent footer and keeps the last row rea
     await expect(lastRow).toBeFocused();
     await expect(lastRow).toBeInViewport();
     const rowBox = await lastRow.boundingBox();
-    expect(rowBox!.y + rowBox!.height).toBeLessThan(avatarBox!.y);
+    expect(rowBox!.y + rowBox!.height).toBeLessThan(footBox!.y);
   }
 });

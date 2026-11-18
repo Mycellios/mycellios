@@ -14,16 +14,16 @@ import {
   CalendarClock,
   ChartArea,
   Archive,
-  LayoutGrid,
   ListTodo,
   MoreHorizontal,
   Pin,
   Settings,
+  Store,
   SquareKanban,
   Waypoints,
   Workflow,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { MycelliosWordmark } from "../../components/MycelliosBrand";
 import { desktopBridge, desktopHidesTitleBar, windowChromeKind } from "../../lib/desktop";
@@ -66,7 +66,6 @@ type WorkspaceRailProps = {
   onModels?: () => void;
   onWhatsNew?: () => void;
   onBoard?: () => void;
-  accountControls?: ReactNode;
 };
 
 export function WorkspaceRail(props: WorkspaceRailProps) {
@@ -217,23 +216,6 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
               </Button>
             </IconTooltip>
           ))}
-        {props.onApps ? (
-          <IconTooltip label={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="app-no-drag rk-rail-button"
-              aria-label="Hifa Store"
-              aria-disabled={!storeAvailable || undefined}
-              title={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}
-              style={!storeAvailable ? { opacity: 0.5, cursor: "default" } : undefined}
-              aria-current={props.apps ? "page" : undefined}
-              onClick={storeAvailable ? props.onApps : undefined}
-            >
-              <LayoutGrid size={19} strokeWidth={1.6} aria-hidden="true" />
-            </Button>
-          </IconTooltip>
-        ) : null}
         {pages
           .filter((page) => page.id !== "tasks" && pins.includes(page.id))
           .map(({ id, label, icon: Icon, action, current, unavailable }) => (
@@ -316,6 +298,23 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       </div>
       <div className="mt-auto flex flex-col items-center gap-1 pb-2">
         {props.onModels ? <ProviderQuota scope={props.scope} onModels={props.onModels} onUsage={props.onUsage} /> : null}
+        {props.onApps ? (
+          <IconTooltip label={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="app-no-drag rk-rail-button"
+              aria-label="Hifa Store"
+              aria-disabled={!storeAvailable || undefined}
+              title={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}
+              style={!storeAvailable ? { opacity: 0.5, cursor: "default" } : undefined}
+              aria-current={props.apps ? "page" : undefined}
+              onClick={storeAvailable ? props.onApps : undefined}
+            >
+              <Store size={19} strokeWidth={1.6} aria-hidden="true" />
+            </Button>
+          </IconTooltip>
+        ) : null}
         <HelpMenu onWhatsNew={props.onWhatsNew ?? props.onSettings} />
         <IconTooltip label={t`Settings`}>
           <Button
@@ -329,7 +328,6 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
           </Button>
         </IconTooltip>
         <ServerConnections rail />
-        {props.accountControls}
       </div>
     </nav>
   );

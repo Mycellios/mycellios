@@ -3,6 +3,7 @@ import {
   activeBotId,
   captureScreenshot,
   completeOnboarding,
+  openIntegrations,
   openUserSettings,
   rpc,
   signup,
@@ -105,13 +106,14 @@ test("settings shell is two-pane and deep-links Models Memory Voice Usage", asyn
   await signup(page, `settings-shell-${stamp}@rakazo.test`, "password12", userName);
   await completeOnboarding(page);
 
-  await page.getByTestId("user-menu-trigger").click();
-  const menu = page.locator('[data-slot="popover-content"]');
-  await expect(menu.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
-  await expect(menu.getByRole("button", { name: "Usage", exact: true })).toBeVisible();
-  await expect(menu.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
-  await captureScreenshot(page, testInfo, "settings-account-menu-lean");
-  await page.keyboard.press("Escape");
+  // Desktop has no account menu: Settings sits in the rail footer, as in OpenBot.
+  const rail = page.getByTestId("workspace-rail");
+  await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
+  const order = await rail.locator("button[aria-label]").evaluateAll((buttons) =>
+    buttons.map((button) => button.getAttribute("aria-label")),
+  );
+  expect(order.indexOf("Hifa Store")).toBeLessThan(order.indexOf("Settings"));
+  await captureScreenshot(page, testInfo, "settings-rail-footer");
 
   const settings = await openUserSettings(page);
   await expect(settings.getByTestId("settings-nav")).toBeVisible();
@@ -281,10 +283,11 @@ test("shell overlays open from the URL and keep it in sync", async ({ page }, te
   await expect(settings).toHaveCount(0);
   await expect(page).toHaveURL((url) => url.pathname === botPath && url.search === "");
 
-  const apps = page.getByPlaceholder("Search apps");
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
-  await expect(apps).toBeVisible();
-  await expect(page).toHaveURL((url) => url.searchParams.has("integrations"));
+  // Integrations open inside Hifa Store, whose section lives in the URL.
+  await openIntegrations(page);
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get("view") === "marketplace" && url.searchParams.get("market") === "apps",
+  );
 });
 
 test("usage lists spend per model", async ({ page }, testInfo) => {
