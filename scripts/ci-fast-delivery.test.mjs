@@ -168,13 +168,20 @@ test('event waits qualify the deployed CHECK upgrade and automatic return on a r
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts')));
 });
 
-test('only verified main pushes request a Nucleus deployment, with an OIDC token and no stored secret', () => {
-  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const job = ci.slice(ci.indexOf('  request-deployment:'));
-  assert.match(job, /needs: summary/);
-  assert.match(job, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' && vars\.NUCLEUS_DEPLOY_URL != ''/);
-  assert.match(job, /id-token: write/);
-  assert.match(job, /\/api\/v1\/deployments\/github/);
-  assert.ok(!/secrets\./.test(job));
-  assert.match(ci.slice(0, ci.indexOf('jobs:')), /permissions:\s+contents: read\s*$/m);
+test('deployments are requested only from main pushes after the exact commit passes CI, with OIDC and no stored secret', () => {
+  const deploy = readFileSync('.github/workflows/deploy.yml', 'utf8');
+  assert.match(deploy, /^on:\n {2}push:\n {4}branches: \[main\]\n\nconcurrency:/m);
+  assert.ok(!deploy.includes('pull_request'));
+  assert.ok(!deploy.includes('secrets.'));
+  assert.ok(!deploy.includes('self-hosted'));
+  const images = deploy.slice(deploy.indexOf('  publish-images:'), deploy.indexOf('  request-deployment:'));
+  assert.ok(images.includes("if: vars.NUCLEUS_DEPLOY_URL != ''"));
+  assert.ok(images.includes('runs-on: ubuntu-latest') && images.includes('packages: write'));
+  assert.ok(images.includes(':sha-${{ github.sha }}'));
+  assert.ok(images.includes('org.opencontainers.image.revision=${{ github.sha }}'));
+  const request = deploy.slice(deploy.indexOf('  request-deployment:'));
+  assert.ok(request.includes('needs: publish-images') && request.includes('id-token: write'));
+  assert.ok(request.indexOf('check_name=CI%20summary') < request.indexOf('/api/v1/deployments/github'));
+  assert.ok(request.includes('"completed success"'));
+  assert.ok(!readFileSync('.github/workflows/ci.yml', 'utf8').includes('deployments/github'));
 });

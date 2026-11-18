@@ -49,31 +49,3 @@ jobs:
           path: build/desktop-downloads/web
           if-no-files-found: error
           retention-days: 14
-
-  # Asks Nucleus to deploy this exact main revision after CI passes. Nucleus verifies the
-  # GitHub OIDC token and the CI result itself, then builds, promotes, health-checks and rolls
-  # back. Off until the NUCLEUS_DEPLOY_URL repository variable is set.
-  request-deployment:
-    name: Request Nucleus deployment
-    needs: summary
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.NUCLEUS_DEPLOY_URL != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Request the deployment of this revision
-        env:
-          NUCLEUS_DEPLOY_URL: ${{ vars.NUCLEUS_DEPLOY_URL }}
-          AUDIENCE: ${{ vars.NUCLEUS_DEPLOY_AUDIENCE || 'nucleus-deployments' }}
-        run: |
-          set -euo pipefail
-          case "$NUCLEUS_DEPLOY_URL" in https://*) ;; *) echo "NUCLEUS_DEPLOY_URL must use HTTPS" >&2; exit 1 ;; esac
-          token="$(curl -fsS --max-time 20 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r '.value')"
-          echo "::add-mask::$token"
-          status="$(curl -sS --max-time 60 -o response.json -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer $token" "${NUCLEUS_DEPLOY_URL%/}/api/v1/deployments/github")"
-          cat response.json; echo
-          case "$status" in 200|202) ;; *) echo "Nucleus refused the deployment request ($status)" >&2; exit 1 ;; esac
