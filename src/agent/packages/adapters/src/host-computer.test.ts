@@ -374,6 +374,63 @@ describe("native host computer transport", () => {
     expect(await readdir(home.pathFor("test-bot"))).toEqual(["result.bin"]);
   });
 
+  it("seeds a PC workspace with large files in verified pieces and never sends excluded paths", async () => {
+    const pcHome = path.join(root, "desktop-computers", computer.id.slice("desktop-".length));
+    const large = new Uint8Array(9 * 1024 * 1024 + 3).map((_, index) => index % 251);
+    async function* files() {
+      yield { path: "repo/.git/objects/pack/pack-1.pack", content: new Uint8Array([1, 2, 3]) };
+      yield { path: "repo/data/large.bin", content: large };
+      yield { path: "notes.md", content: new TextEncoder().encode("notes") };
+    }
+    await client.importWorkspace(computer, files(), context);
+    expect(Buffer.compare(await readFile(path.join(pcHome, "repo/data/large.bin")), Buffer.from(large))).toBe(0);
+    expect(await readFile(path.join(pcHome, "notes.md"), "utf8")).toBe("notes");
+    await expect(readFile(path.join(pcHome, "repo/.git/objects/pack/pack-1.pack"))).rejects.toThrow();
+    expect(await readdir(path.join(root, "transfer-staging"))).toEqual([]);
+  });
+
+  it("leaves a large file out instead of failing on a PC without piece support", async () => {
+    const pcHome = path.join(root, "desktop-computers", computer.id.slice("desktop-".length));
+    vi.spyOn(client, "environment").mockResolvedValue({ platform: "win32", home: "", shell: "" });
+    async function* files() {
+      yield { path: "large.bin", content: new Uint8Array(9 * 1024 * 1024) };
+      yield { path: "notes.md", content: new TextEncoder().encode("notes") };
+    }
+    await client.importWorkspace(computer, files(), context);
+    expect(await readFile(path.join(pcHome, "notes.md"), "utf8")).toBe("notes");
+    await expect(readFile(path.join(pcHome, "large.bin"))).rejects.toThrow();
+  });
+
+  it("refuses an assembled file whose checksum does not match", async () => {
+    const one = (client as unknown as { one(input: unknown, context: unknown): Promise<unknown> }).one.bind(client);
+    await expect(
+      one(
+        {
+          method: "writeFileChunk",
+          botId: computer.botId,
+          file: { path: "wrong.bin", offset: 0, size: 3, sha256: "0".repeat(64), content: Buffer.from([1, 2, 3]).toString("base64") },
+        },
+        context,
+      ),
+    ).rejects.toThrow("Local computer operation failed");
+    await expect(
+      readFile(path.join(root, "desktop-computers", computer.id.slice("desktop-".length), "wrong.bin")),
+    ).rejects.toThrow();
+  });
+
+  it("keeps the saved copy of paths a PC never sends", async () => {
+    const home = new LocalAgentHomeStore(path.join(root, "saved"));
+    await client.writeFile(computer, { path: "repo/README.md", content: new TextEncoder().encode("pc") }, context);
+    await client.writeFile(computer, { path: "repo/.git/HEAD", content: new TextEncoder().encode("pc head") }, context);
+    await checkpointComputerWorkspace(home, client, "test-bot", computer, context);
+    await expect(readFile(path.join(home.pathFor("test-bot"), "repo/.git/HEAD"))).rejects.toThrow();
+    await mkdir(path.join(home.pathFor("test-bot"), "repo/.git"), { recursive: true });
+    await writeFile(path.join(home.pathFor("test-bot"), "repo/.git/HEAD"), "saved head");
+    await checkpointComputerWorkspace(home, client, "test-bot", computer, context);
+    expect(await readFile(path.join(home.pathFor("test-bot"), "repo/.git/HEAD"), "utf8")).toBe("saved head");
+    expect(await readFile(path.join(home.pathFor("test-bot"), "repo/README.md"), "utf8")).toBe("pc");
+  });
+
   it.each(["revoke", "cancel"])(
     "%s owns background children after their shell request finishes",
     async (action) => {
@@ -553,4 +610,21 @@ it.each([
   const client=new HostComputerSandbox("","",transport);
   await expect(client.environment({id:"host",botId:"test-bot",kind:"desktop",providerRef:"/home"},context)).rejects.toThrow(message);
   expect(transport).toHaveBeenCalledTimes(1);
+});
+
+it("drains a completed result instead of cancelling the relay before the PC acknowledges it", async () => {
+  let cancelled = false;
+  const encoder = new TextEncoder();
+  const transport = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(JSON.stringify({ value: { platform: "win32", home: "", shell: "" } }) + "\n" + JSON.stringify({ done: true }) + "\n"));
+      // The relay closes only after the PC's final acknowledgement arrives.
+      setTimeout(() => controller.close(), 20);
+    },
+    cancel() { cancelled = true; },
+  })));
+  const client = new HostComputerSandbox("", "", transport);
+  await expect(client.environment({ id: "host", botId: "test-bot", kind: "desktop", providerRef: "/home" }, context))
+    .resolves.toMatchObject({ platform: "win32" });
+  expect(cancelled).toBe(false);
 });

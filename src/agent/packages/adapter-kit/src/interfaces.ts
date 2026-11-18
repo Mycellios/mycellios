@@ -325,11 +325,12 @@ export interface AgentHomeStore {
   /**
    * Paths are relative to `directory`; a missing or linked directory exports nothing.
    * `skipHidden` leaves out hidden entries at the top of the directory, also behind links.
+   * `include` selects files by path before their content is read.
    */
   exportHome(
     botId: string,
     context: AdapterContext,
-    options?: { directory?: string; skipHidden?: boolean },
+    options?: { directory?: string; skipHidden?: boolean; include?: (path: string) => boolean },
   ): AsyncIterable<PortableFile>;
   readFile(
     botId: string,

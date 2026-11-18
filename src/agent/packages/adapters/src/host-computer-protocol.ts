@@ -3,6 +3,8 @@ import { z } from "zod";
 
 export const HOST_COMPUTER_MAX_BYTES = 12 * 1024 * 1024;
 export const HOST_COMPUTER_MAX_FILE_BYTES = 8 * 1024 * 1024;
+/** Largest workspace file moved in verified pieces (writeFileChunk). */
+export const HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES = 100 * 1024 * 1024;
 const file = z.object({
   path: z.string().max(4096),
   content: z.string().max(HOST_COMPUTER_MAX_BYTES),
@@ -63,10 +65,24 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
     maxBytes: z.number().int().positive().max(HOST_COMPUTER_MAX_FILE_BYTES).optional(),
   }),
   z.object({ ...base, method: z.literal("writeFile"), file }),
+  z.object({
+    ...base,
+    method: z.literal("writeFileChunk"),
+    file: z.object({
+      path: z.string().max(4096),
+      offset: z.number().int().min(0),
+      size: z.number().int().min(0).max(HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES),
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      content: z.string().max(HOST_COMPUTER_MAX_BYTES),
+      executable: z.boolean().optional(),
+    }),
+  }),
 ]);
 export type HostComputerRequest = z.infer<typeof hostComputerRequest>;
 export interface HostComputerEnvironment {
   durableCommands?: boolean;
+  /** The host accepts writeFileChunk for workspace files larger than one request. */
+  chunkedWrites?: boolean;
   platform: string;
   home: string;
   shell: string;

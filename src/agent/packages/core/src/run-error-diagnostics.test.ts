@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { desktopDiagnosticMessage, DESKTOP_FAILURE_CODES } from "@rakazo/contracts";
 import {
+  desktopSetupInterruptedMessage,
   desktopRunDiagnosticText,
   isUncertainDesktopRun,
   normalizeRunError,
@@ -41,4 +42,14 @@ it("copies only fixed legacy information and rejects arbitrary provider errors",
   )!;
   expect(JSON.parse(value)).toMatchObject({ runId: null, code: "unknown_legacy_interruption" });
   expect(value).not.toContain("private.test");
+});
+
+it("reports a computer setup failure after Desktop dispatch as an uncertain interruption", () => {
+  const message = desktopSetupInterruptedMessage("Local computer request is too large.");
+  expect(message).toBe(
+    "Desktop turn interrupted while preparing its computer: Local computer request is too large. Check what the Mico already did, then send a new message.",
+  );
+  expect(isUncertainDesktopRun(message)).toBe(true);
+  expect(userRunError(Error(message))).toBe(message);
+  expect(normalizeRunError(message)).toMatchObject({ kind: "interrupted" });
 });

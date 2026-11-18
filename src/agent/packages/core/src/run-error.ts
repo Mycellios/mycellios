@@ -178,6 +178,17 @@ export type RunErrorKind =
 export const DESKTOP_RUN_INTERRUPTED_ERROR =
   "Desktop execution interrupted; check existing results before retrying";
 
+const DESKTOP_SETUP_INTERRUPTED_PREFIX = "Desktop turn interrupted while preparing its computer: ";
+
+/**
+ * A computer setup that failed after the turn reached the PC. The turn may have
+ * changed local files, so it is reported with its reason and never replayed.
+ */
+export function desktopSetupInterruptedMessage(reason: string): string {
+  const detail = reason.trim().replace(/[.s]+$/u, "") || "unknown error";
+  return `${DESKTOP_SETUP_INTERRUPTED_PREFIX}${detail}. Check what the Mico already did, then send a new message.`;
+}
+
 /** A deploy drained the worker before this turn finished. Safe to retry when it produced no output. */
 export const RUN_INTERRUPTED_BY_MAINTENANCE_ERROR =
   "Backend maintenance in progress. This turn was interrupted; retry in a minute.";
@@ -198,11 +209,16 @@ const UNCERTAIN_DESKTOP_RUN = new Set([
   "The account model stream was interrupted. Check existing results before retrying.",
 ]);
 
+const isUncertainDesktopText = (text: string) =>
+  UNCERTAIN_DESKTOP_RUN.has(text) ||
+  text.startsWith(DESKTOP_SETUP_INTERRUPTED_PREFIX) ||
+  !!parseDesktopDiagnostic(text);
+
 /** A Desktop dispatch with an uncertain outcome may have acted without reporting the result. */
 export function isUncertainDesktopRun(details: string | null | undefined): boolean {
   if (!details) return false;
   const fallback = parseModelFallbackFailure(details.trim());
-  const uncertain = (text: string) => UNCERTAIN_DESKTOP_RUN.has(text.trim()) || !!parseDesktopDiagnostic(text.trim());
+  const uncertain = (text: string) => isUncertainDesktopText(text.trim());
   return uncertain(fallback?.primaryError ?? details) ||
     (fallback?.backups.some(backup => uncertain(backup.reason)) ?? false);
 }
@@ -271,7 +287,7 @@ export function normalizeRunError(
       kind: "maintenance",
     };
   }
-  if (UNCERTAIN_DESKTOP_RUN.has(trimmed) || parseDesktopDiagnostic(trimmed)) {
+  if (isUncertainDesktopText(trimmed)) {
     return {
       summary: translate("Desktop could not confirm the result. Review what it already did before continuing."),
       details,
