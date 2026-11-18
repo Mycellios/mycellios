@@ -40,7 +40,7 @@ try{
     const menu=page.locator('#agent-download-platforms');await menu.waitFor();
     for(const [name,id] of [['macOS · Apple silicon','macos-arm64'],['macOS · Intel','macos-x64'],['Windows','windows-x64'],['Linux · DEB','linux-x64'],['Linux · RPM','fedora-x64']]){
       const link=menu.getByRole('menuitem',{name:new RegExp('^'+name)});
-      assert.equal(await link.count(),1,name);assert.equal(await link.locator('svg').count(),1,name);
+      assert.equal(await link.count(),1,name);await link.locator('svg').first().waitFor();assert.equal(await link.locator('svg').count(),1,name);
       assert.equal(await link.getAttribute('href'),`/downloads/desktop/latest/${id}`,'An already open page must resolve the newest verified installer');
       assert.equal(await link.getAttribute('download'),null,'Do not pin an old filename across a release');
     }

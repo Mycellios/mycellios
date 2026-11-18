@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowDownToLine, ChevronDown } from "lucide-react";
 import { desktopLatestDownloadPath, isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../../src/contracts/desktop-downloads";
 import { Button, Link } from "../ui/primitives";
 import { detectInstaller, type InstallerId } from "../detect-installer";
-import { PlatformLogo, type PlatformLogoId } from "./PlatformLogo";
+import type { PlatformLogoId } from "./PlatformLogo";
 import "./agent-download-action.css";
 
 /**
@@ -18,6 +18,12 @@ export const downloadPlatforms = [
   { id: "linux-x64", system: "linux", label: "Linux · DEB" },
   { id: "fedora-x64", system: "linux", label: "Linux · RPM" },
 ] as const satisfies ReadonlyArray<{ id: InstallerId; system: PlatformLogoId; label: string }>;
+
+// The brand paths (Linux alone is ~6.6 KB) stay out of the landing route bundle budget.
+const PlatformLogoChunk = lazy(() => import("./PlatformLogo").then(module => ({ default: module.PlatformLogo })));
+function PlatformLogo({ platform }: { platform: PlatformLogoId }) {
+  return <Suspense fallback={<span className="agent-download-logo-slot" aria-hidden="true" />}><PlatformLogoChunk platform={platform} /></Suspense>;
+}
 
 const ANDROID = "android";
 type MenuPlatform = InstallerId | typeof ANDROID;
