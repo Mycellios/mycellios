@@ -138,6 +138,8 @@ export interface SpaceKeyRecord {
 export type SpaceSource =
   | "local_memory_reviews"
   | "hosted_webs"
+  | "hosted_web_data"
+  | "hosted_web_snapshots"
   | "threads"
   | "messages"
   | "events"
@@ -168,6 +170,8 @@ export interface RowContext {
 export const ROW_OWNER: Record<SpaceSource, string> = {
   local_memory_reviews:"userId",
   hosted_webs: "userId",
+  hosted_web_data: "userId",
+  hosted_web_snapshots: "userId",
   threads: "userId",
   messages: "threadId",
   events: "threadId",
@@ -183,6 +187,8 @@ const COLUMNS = `id, "spaceId", version, "masterKeyId", "wrappedKey"`;
 const ROW_CONTEXT: Record<SpaceSource, string> = {
   local_memory_reviews:`SELECT "spaceId", "userId" AS owner FROM local_memory_reviews WHERE id = $1`,
   hosted_webs: `SELECT "spaceId", "userId" AS owner FROM hosted_webs WHERE id = $1`,
+  hosted_web_data: `SELECT "spaceId", "userId" AS owner FROM hosted_web_data WHERE id = $1`,
+  hosted_web_snapshots: `SELECT "spaceId", "userId" AS owner FROM hosted_web_snapshots WHERE id = $1`,
   threads: `SELECT "spaceId", "userId" AS owner FROM threads WHERE id = $1`,
   events: `SELECT "spaceId", "threadId" AS owner FROM events WHERE id = $1`,
   memory_documents: `SELECT "spaceId", "userId" AS owner FROM memory_documents WHERE id = $1`,

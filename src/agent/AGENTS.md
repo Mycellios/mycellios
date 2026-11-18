@@ -159,7 +159,15 @@
   independent Integrations/Micos/Skills sections and the separate paused routine
   and workflow gates. New app implementations ship as independent static bundles,
   outside the host repository, through the existing owner-scoped publication API.
-  Verify hifa-store and MarketplaceWorkspace tests.
+  Verify hifa-store and MarketplaceWorkspace tests. A published revision may carry
+  only owner-granted `downloads` (`allow-downloads`) and `storage` (host data
+  bridge, no header) capabilities; never add `allow-same-origin`, popups, forms,
+  navigation or device permissions to hosted content. App data stays in
+  `hosted_web_data`, scoped by the host to app/user/Space/preview; the bridge must
+  answer only its own iframe. Draft saves, Mico edits and restores record encrypted
+  snapshots in `hosted_web_snapshots` (newest 50); restore never publishes.
+  Check hosted-webs capabilities/bridge/DraftHistory tests and
+  scripts/verify-hosted-webs-db.ts on embedded PostgreSQL.
   Routines UI is also paused by default; `VITE_MYCELLIOS_ROUTINES=true` explicitly
   reactivates it. Keep rail/overflow entries visible with Coming soon, and gate
   direct routine links/editors before mounting them. The computer panel shows the

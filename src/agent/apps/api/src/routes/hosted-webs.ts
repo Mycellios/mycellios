@@ -1,11 +1,13 @@
 import { ORPCError } from "@orpc/server";
 import { ANTSEED_RADAR_HTML } from "../hosted-webs/antseed-template.js";
 import { createWebPreview } from "../hosted-webs/preview.js";
+import { hostedWebDataService } from "../hosted-webs/data.js";
 import { hostedWebService } from "../hosted-webs/service.js";
 import type { RouterContext } from "./context.js";
 
 export function hostedWebRoutes({ deps, authed }: RouterContext) {
   const service = hostedWebService(deps.prisma);
+  const data = hostedWebDataService(deps.prisma);
   return {
     webs: {
       agent: authed.webs.agent.handler(({ context, input }) =>
@@ -56,6 +58,22 @@ export function hostedWebRoutes({ deps, authed }: RouterContext) {
           },
         }),
       ),
+      history: {
+        list: authed.webs.history.list.handler(({ context, input }) =>
+          service.history(context.actor, input.id),
+        ),
+        restore: authed.webs.history.restore.handler(({ context, input }) =>
+          service.restore(context.actor, input.id, input.snapshotId, input.version),
+        ),
+      },
+      data: {
+        get: authed.webs.data.get.handler(({ context, input }) => data.get(context.actor, input)),
+        set: authed.webs.data.set.handler(({ context, input }) => data.set(context.actor, input)),
+        delete: authed.webs.data.delete.handler(({ context, input }) =>
+          data.delete(context.actor, input),
+        ),
+        list: authed.webs.data.list.handler(({ context, input }) => data.list(context.actor, input)),
+      },
       preview: authed.webs.preview.handler(async ({ context, input }) => {
         const draft = await service.draft(context.actor, input.id);
         if (draft.version !== input.version)

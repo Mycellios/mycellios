@@ -1,7 +1,7 @@
 import type { ConnectorTool } from "@rakazo/adapter-kit";
 import { HostedWebBundle } from "@rakazo/contracts";
 import { admitStaticBundle } from "@rakazo/core/node/hosted-web-bundle";
-import { runAsTenant, type PrismaClient } from "@rakazo/db";
+import { recordHostedWebSnapshot, runAsTenant, type PrismaClient } from "@rakazo/db";
 import { z } from "zod";
 
 const readInput = z
@@ -31,7 +31,7 @@ export const hostedAppTools: ConnectorTool[] = [
   {
     name: "app_write",
     description:
-      "Save one complete UTF-8 file to the assigned app's private draft. Read its current version first and pass expectedVersion. Preserves other files and updates the live preview; never publishes. On version conflict read again before editing. HTML/CSS/JS static apps only, no secrets or backend. Use this tool, not shell/file tools, to edit the hosted app.",
+      "Save one complete UTF-8 file to the assigned app's private draft. Read its current version first and pass expectedVersion. Preserves other files and updates the live preview; never publishes. On version conflict read again before editing. HTML/CSS/JS static apps only, no secrets or backend. Apps run in an opaque sandbox: no cookies, localStorage, IndexedDB, workers or screen capture. If the owner grants storage, persist per-user data by posting {type:'mycellios.storage', id, op:'get'|'set'|'delete'|'list', key, value, prefix} to parent and awaiting the reply with the same id (keys [A-Za-z0-9_.:/-], 1 MB per value, 5 MB per user). Use this tool, not shell/file tools, to edit the hosted app.",
     inputSchema: z.toJSONSchema(writeInput),
     readOnly: false,
   },
@@ -163,7 +163,9 @@ export async function executeHostedAppTool(
         path: write.path,
         base64: Buffer.from(write.content, "utf8").toString("base64"),
       };
-      const { bundle: admitted } = admitStaticBundle({
+      // A Mico edits files only; owner-granted capabilities stay as they were.
+      const { bundle: admitted, digest, bytes } = admitStaticBundle({
+        ...(bundle.capabilities ? { capabilities: bundle.capabilities } : {}),
         files: [...bundle.files.filter((f) => f.path !== file.path), file],
       });
       if (context.signal?.aborted) throw new Error("App edit cancelled.");
@@ -190,6 +192,18 @@ export async function executeHostedAppTool(
         throw new Error(
           "App version conflict: read the current draft before editing again.",
         );
+      await recordHostedWebSnapshot(tx, {
+        siteId: row.id,
+        userId: context.userId,
+        spaceId: context.spaceId,
+        version: row.version + 1,
+        source: "mico",
+        title: write.title ?? row.title,
+        summary: write.summary ?? row.summary,
+        bundle: admitted,
+        digest,
+        bytes,
+      });
       return {
         saved: true,
         version: row.version + 1,

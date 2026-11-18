@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { HOSTED_WEB_LIMITS, HostedWebBundle, HOSTED_WEB_COVER_FILES } from "@rakazo/contracts";
+import {
+  HOSTED_WEB_CAPABILITIES,
+  HOSTED_WEB_LIMITS,
+  HostedWebBundle,
+  HOSTED_WEB_COVER_FILES,
+  type HostedWebCapability,
+} from "@rakazo/contracts";
 
 const TYPES: Record<string, string> = {
   html: "text/html; charset=utf-8",
@@ -78,7 +84,11 @@ export function admitStaticBundle(raw: unknown) {
     .sort((a, b) => a.path.localeCompare(b.path, "en"));
   if (!files.some((file) => file.path === "index.html"))
     throw new Error("The website needs an index.html at its root.");
-  const bundle = { files };
+  // Canonical order; omit an empty grant so existing bundles keep their digests.
+  const granted = HOSTED_WEB_CAPABILITIES.filter((name) => parsed.capabilities?.includes(name));
+  if (granted.length !== (parsed.capabilities?.length ?? 0))
+    throw new Error("Duplicate app capability.");
+  const bundle: HostedWebBundle = granted.length ? { capabilities: granted, files } : { files };
   const digest = createHash("sha256").update(JSON.stringify(bundle)).digest("hex");
   return { bundle, digest, bytes };
 }
@@ -91,6 +101,8 @@ export const STATIC_WEB_CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
+  // Play bundled or in-memory media (an app's own blob: URLs); never remote streams.
+  "media-src 'self' blob: data:",
   "connect-src https:",
   "worker-src 'none'",
   "frame-src 'none'",
@@ -100,16 +112,43 @@ export const STATIC_WEB_CSP = [
   "frame-ancestors *",
 ].join("; ");
 
-export function staticResponse(body: BodyInit | null, type: string, status = 200) {
+const BASE_PERMISSIONS =
+  "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), clipboard-read=(), clipboard-write=()";
+
+/** Exact capability names granted by a frozen bundle; anything unexpected grants nothing. */
+export function bundleCapabilities(bundle: unknown): HostedWebCapability[] {
+  const raw = (bundle as { capabilities?: unknown } | null)?.capabilities;
+  return Array.isArray(raw)
+    ? HOSTED_WEB_CAPABILITIES.filter((name) => raw.includes(name))
+    : [];
+}
+
+/**
+ * Only the sandbox token for each granted capability changes. Same-origin, forms,
+ * popups, navigation, workers, frames and device permissions stay closed.
+ */
+export function staticWebHeaders(capabilities: readonly HostedWebCapability[] = []) {
+  const csp = capabilities.includes("downloads")
+    ? STATIC_WEB_CSP.replace("sandbox allow-scripts", "sandbox allow-scripts allow-downloads")
+    : STATIC_WEB_CSP;
+  return { csp, permissions: BASE_PERMISSIONS };
+}
+
+export function staticResponse(
+  body: BodyInit | null,
+  type: string,
+  status = 200,
+  capabilities: readonly HostedWebCapability[] = [],
+) {
+  const { csp, permissions } = staticWebHeaders(capabilities);
   return new Response(body, {
     status,
     headers: {
       "Content-Type": type,
-      "Content-Security-Policy": STATIC_WEB_CSP,
+      "Content-Security-Policy": csp,
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
-      "Permissions-Policy":
-        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), clipboard-read=(), clipboard-write=()",
+      "Permissions-Policy": permissions,
       "Cache-Control": "no-store",
       "Access-Control-Allow-Origin": "*",
       "Cross-Origin-Resource-Policy": "cross-origin",

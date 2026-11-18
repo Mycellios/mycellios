@@ -29,6 +29,29 @@ Mico tool permissions are granted to a published website.
   are stored. Trends use those actual visits, never seeded popularity.
 - Clones copy a published revision into an independent owned draft. Editing or
   unpublishing a clone cannot mutate the source. Owners can unpublish their site.
+- An owner may grant one optional capability, `downloads`, stored in the bundle
+  JSON and frozen into the published revision digest. Only that revision's
+  responses and the Hifa Store/preview iframe add `allow-downloads`; the stable
+  redirect grants nothing, clones start without it and Mico edits preserve it.
+  Unknown names are rejected. Screen capture is not offered: Chromium rejects
+  `getDisplayMedia` from the required opaque origin, and `allow-same-origin` is
+  never granted to hosted content.
+- `storage` changes no header. It enables the host bridge: the Hifa Store page
+  answers `{type:"mycellios.storage", id, op, key, value, prefix}` messages only
+  from the exact iframe it rendered, scoped by the host to (app, user, Space,
+  preview). Rows live in `hosted_web_data` (Space-encrypted, forced RLS, deleted
+  with the app), limited to 1 MiB per value, 1,000 keys and 5 MiB per user/app.
+  The grant is read from the exact published revision (visitors) or saved draft
+  (owner preview, separate namespace). Replies use target `*` because the frame
+  origin is opaque; an app that navigates its own frame only exposes its own
+  data. Verify with `scripts/verify-hosted-webs-db.ts` and the bridge tests.
+- Every saved draft version (owner save, Mico `app_write`, restore) is recorded
+  in `hosted_web_snapshots`: Space-encrypted, immutable, owner-only (forced
+  RLS), skipped when unchanged, pruned to the newest 50 within 64 MiB per app and
+  deleted with the app. Restore is a CAS-guarded new draft version; it never
+  publishes and the UI refuses it over unsaved local edits.
+- The base CSP allows `media-src 'self' blob: data:` so apps can play their own
+  bundled or in-memory media; remote media sources stay blocked.
 - Limits: 20 sites/account/Space, 100 retained revisions/site, 100 files/bundle,
   1 MiB/file and 4 MiB decoded total. No ZIP extraction or arbitrary backends in v1.
 
