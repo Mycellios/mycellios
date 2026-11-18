@@ -21,7 +21,7 @@ const MB = 1024 * 1024;
  */
 export function hostedWebFilesConfig(
   env: Record<string, string | undefined>,
-  artifacts: Pick<ArtifactStore, "describe">,
+  artifacts: Pick<ArtifactStore, "describe"> | undefined,
   maxUploadSizeBytes = HOSTED_WEB_FILE_DEFAULTS.fileBytes,
 ): HostedWebFilesConfig {
   const megabytes = (raw: string | undefined, fallback: number) => {
@@ -31,7 +31,7 @@ export function hostedWebFilesConfig(
   return {
     available:
       env.MYCELLIOS_HOSTED_WEB_FILES_ENABLED === "true" &&
-      artifacts.describe().id === "object-artifacts",
+      artifacts?.describe().id === "object-artifacts",
     fileBytes: Math.min(
       megabytes(env.MYCELLIOS_HOSTED_WEB_FILE_MAX_MB, HOSTED_WEB_FILE_DEFAULTS.fileBytes),
       maxUploadSizeBytes,

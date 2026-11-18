@@ -10,7 +10,7 @@ export function hostedWebRoutes({ deps, authed }: RouterContext) {
   const filesConfig = hostedWebFilesConfig(
     process.env,
     deps.artifacts,
-    deps.env.maxUploadSizeBytes,
+    deps.env?.maxUploadSizeBytes,
   );
   const files = hostedWebFilesService(deps.prisma, deps.artifacts, filesConfig);
   // Account deletion may finish after its own sweep; catch those objects later.
