@@ -1820,6 +1820,21 @@
   Preserve native draft/call/work guards and explicit install consent; waiting
   for those guards must not cover the chat with a full-screen update dialog.
 
+- A PC workspace belongs to that PC, as OpenBot keeps a workspace on its own host
+  (behavior reference only, no copied code). Provisioning seeds the saved server copy
+  only into a workspace the PC has just created (ref.fresh); never overwrite files on
+  the PC. Transfers in both directions leave out `isWorkspaceTransferExcluded` paths
+  (.git, node_modules, .env*, private keys, archives); a desktop checkpoint keeps the
+  saved copy's own excluded paths. Files above one request move as ordered
+  writeFileChunk pieces with a whole-file SHA-256, assembled outside the workspace and
+  written through the contained write; hosts advertise this as environment
+  chunkedWrites, and older hosts leave the file out instead of failing the copy.
+  A completed host result drains until the relay closes; closing early cancels the
+  operation and drops the PC's final acknowledgement. A setup failure after a turn
+  reached the PC (onDesktopRunDispatched) fails with desktopSetupInterruptedMessage;
+  never requeue a dispatched Desktop turn. Verify workspace-transfer, host-computer,
+  computer-lifecycle, run-error-diagnostics and executor-lazy-computer tests.
+
 - Durable native command receipts preserve identity, not an implicit one-hour timeout.
   Shell defaults retain the configured bounded budget. Recognized read-only search
   pipelines start at 45 seconds. Identified project scopes may extend only on new

@@ -54,6 +54,8 @@ import { removeOwnedWorkspaceChildren } from "./desktop-workspace-cleanup.js";
 import { hostCommandEnvironment } from "./sandbox-command-environment.js";
 import { gitBashPath } from "./native-shell.js";
 import { NativeCommandJournal } from "./native-command-journal.js";
+import { HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES } from "./host-computer-protocol.js";
+import { isWorkspaceTransferExcluded } from "./workspace-transfer.js";
 
 const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 
@@ -440,6 +442,41 @@ export class DesktopSandboxProvider implements SandboxProvider {
     } finally {
       await handle.close();
     }
+  }
+
+  /**
+   * Assembles a large workspace file from ordered pieces. Pieces stay in a private
+   * staging file named only by a digest, outside the workspace; the verified whole
+   * file then goes through the same contained write as any other file.
+   */
+  async writeFileChunk(
+    computer: ComputerRef,
+    file: { path: string; offset: number; size: number; sha256: string; content: Uint8Array; executable?: boolean },
+  ) {
+    const box = this.requiredBox(computer);
+    if (file.size > HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES)
+      throw new Error(`computer file exceeds ${HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES} bytes`);
+    const end = file.offset + file.content.byteLength;
+    if (end > file.size) throw new Error("The file piece exceeds the declared size");
+    const staging = path.resolve(this.opts.root ?? path.join(process.cwd(), "data"), "transfer-staging");
+    await mkdir(staging, { recursive: true });
+    if (file.offset === 0) await removeAbandonedTransferPieces(staging);
+    const part = path.join(
+      staging,
+      `${createHash("sha256").update(JSON.stringify([box.home, file.path, file.size, file.sha256])).digest("hex")}.part`,
+    );
+    const handle = await open(part, file.offset === 0 ? "w" : "r+", 0o600);
+    try {
+      if (file.content.byteLength) await handle.write(file.content, 0, file.content.byteLength, file.offset);
+    } finally {
+      await handle.close();
+    }
+    if (end < file.size) return;
+    const content = new Uint8Array(await readFile(part));
+    await unlink(part).catch(() => undefined);
+    if (content.byteLength !== file.size || createHash("sha256").update(content).digest("hex") !== file.sha256)
+      throw new Error("The transferred file did not match its checksum");
+    await this.writeFile(computer, { path: file.path, content, executable: file.executable });
   }
 
   async *exportWorkspace(computer: ComputerRef): AsyncIterable<PortableFile> {
@@ -871,6 +908,19 @@ function hasErrorCode(error: unknown, code: string): error is NodeJS.ErrnoExcept
   return error instanceof Error && "code" in error && error.code === code;
 }
 
+/** Pieces of a transfer that stopped part-way are removed after this long. */
+const ABANDONED_TRANSFER_MS = 30 * 60_000;
+
+async function removeAbandonedTransferPieces(staging: string) {
+  const now = Date.now();
+  for (const name of await readdir(staging).catch(() => [] as string[])) {
+    if (!name.endsWith(".part")) continue;
+    const file = path.join(staging, name);
+    const info = await stat(file).catch(() => undefined);
+    if (info && now - info.mtimeMs > ABANDONED_TRANSFER_MS) await unlink(file).catch(() => undefined);
+  }
+}
+
 async function* walkDesktopWorkspace(
   home: string,
   directory: string,
@@ -879,6 +929,8 @@ async function* walkDesktopWorkspace(
   const target = await localWorkspaceTarget(home, directory, true);
   for (const entry of await readdir(target, { withFileTypes: true })) {
     const relative = normalizeWorkspacePath(directory ? `${directory}/${entry.name}` : entry.name);
+    // Repository internals, dependency trees, secrets and archives stay on this PC.
+    if (isWorkspaceTransferExcluded(relative)) continue;
     const child = await localWorkspaceTarget(home, relative, true).catch(() => null);
     if (!child) continue;
     const info = await stat(child);

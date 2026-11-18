@@ -197,6 +197,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
     try {
       const wire = encodeRequest(await fitDesktopRequest(request));
       dispatched = true;
+      context.onDesktopRunDispatched?.();
       const response = await this.options.transport({ method: "agentRun", botId: request.botId, runId: request.runId, sessionId, segmentId: desktopAgentSegmentId(request), request: wire, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
       // No fallback after dispatch: a lost response can conceal real local effects.
       for await (const raw of desktopAgentFrames(response, signal)) {

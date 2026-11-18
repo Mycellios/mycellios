@@ -1120,6 +1120,55 @@ describe("computer provisioning", () => {
     },
   );
 
+  it.each([
+    { fresh: false, restored: false },
+    { fresh: true, restored: true },
+  ])(
+    "lets a PC own its workspace: seeds it only when the PC created it (fresh=$fresh)",
+    async ({ fresh, restored }) => {
+      const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-provision-pc-owner-"));
+      const home = new LocalAgentHomeStore(dataDir);
+      const sandbox = new FakeSandboxProvider();
+      const ref = {
+        ...(await sandbox.provision({ botId: "bot-1", homePath: dataDir }, context)),
+        kind: "desktop" as const,
+        providerRef: "host:bot-1",
+        fresh,
+      };
+      vi.spyOn(sandbox, "provision").mockResolvedValue(ref);
+      const importWorkspace = vi.spyOn(sandbox, "importWorkspace");
+      const prisma = {
+        botSkillPin: { findMany: vi.fn(async () => []) },
+        agentSkill: { findMany: vi.fn(async () => []) },
+        secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        computer: {
+          findUniqueOrThrow: vi.fn().mockResolvedValue({
+            id: "computer-1",
+            homeKey: "bot-1",
+            providerRef: null,
+            kind: "docker",
+            scope: "dedicated",
+            state: "stopped",
+            controlLeaseId: null,
+            updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+          }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+      } as unknown as PrismaClient;
+      try {
+        await home.writeFile("bot-1", "notes/server.txt", "server copy", context);
+        await provisionComputer(
+          { prisma, sandbox, home, jobs: {} as JobPublisher, events: {} as ThreadEvents, dataDir },
+          "computer-1",
+          context,
+        );
+        expect(importWorkspace).toHaveBeenCalledTimes(restored ? 1 : 0);
+      } finally {
+        await rm(dataDir, { recursive: true, force: true });
+      }
+    },
+  );
+
   const savedAt = new Date("2024-01-01T00:20:00.000Z");
   it.each([
     {

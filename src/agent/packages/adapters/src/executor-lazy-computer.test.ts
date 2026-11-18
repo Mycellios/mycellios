@@ -45,6 +45,7 @@ async function runRoutine(
     onRunStarted?: () => void;
     missingComputer?: boolean;
     preflightClaimLost?: boolean;
+    desktopDispatched?: boolean;
   } = {},
 ) {
   const attachment: Extract<MessageBlock, { kind: "file" | "image" }> = {
@@ -70,7 +71,11 @@ async function runRoutine(
   };
   const toolResults: unknown[] = [];
   const steeringInputs: unknown[] = [];
-  const runtimeRun = vi.fn(async function* (request: AgentRunRequest) {
+  const runtimeRun = vi.fn(async function* (
+    request: AgentRunRequest,
+    context?: { onDesktopRunDispatched?: () => void },
+  ) {
+    if (options.desktopDispatched) context?.onDesktopRunDispatched?.();
     if (options.steering && !options.steeringAfterFirst) {
       steeringInputs.push(...((await request.claimSteering?.([])) ?? []));
     }
@@ -606,6 +611,23 @@ describe("run computer provisioning", () => {
       "Run setup failed; retrying",
     );
     expect(provisionComputer).toHaveBeenCalledOnce();
+  });
+
+  it("reports a setup failure after the turn reached the PC instead of replaying it", async () => {
+    provisionComputer.mockRejectedValue(new Error("Local computer request is too large"));
+
+    const { finalizeRun, enqueue } = await runRoutine([{ name: "list_files", args: { path: "" } }], {
+      desktopDispatched: true,
+    });
+
+    expect(finalizeRun).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        outcome: "failed",
+        error:
+          "Desktop turn interrupted while preparing its computer: Local computer request is too large. Check what the Mico already did, then send a new message.",
+      }),
+    );
+    expect(enqueue).not.toHaveBeenCalled();
   });
 
   it("fails the run instead of retrying once setup has failed too many times in a row", async () => {

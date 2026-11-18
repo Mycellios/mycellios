@@ -10,6 +10,7 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@rakazo/adapter-kit";
 import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
+import { getLogger } from "@rakazo/logging";
 import { describeDesktopSandbox } from "./desktop-sandbox.js";
 import { projectLeaseOwner } from "./project-execution.js";
 import type {
@@ -20,8 +21,34 @@ import type {
 import {
   HOST_COMPUTER_MAX_BYTES,
   HOST_COMPUTER_MAX_FILE_BYTES,
+  HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES,
   hostComputerDeadlineMs,
 } from "./host-computer-protocol.js";
+import {
+  isWorkspaceTransferExcluded,
+  workspaceTransferDigest,
+  workspaceTransferPieces,
+} from "./workspace-transfer.js";
+
+/** How long a completed result waits for the transport to close on its own. */
+export const HOST_COMPUTER_COMPLETION_DRAIN_MS = 10_000;
+
+async function drainCompletedResponse(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<undefined>((resolve) => {
+    timer = setTimeout(resolve, HOST_COMPUTER_COMPLETION_DRAIN_MS, undefined);
+  });
+  try {
+    while (true) {
+      const next = await Promise.race([reader.read(), expired]);
+      if (!next || next.done) return;
+    }
+  } catch {
+    // The result is already complete; a late transport error cannot change it.
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Authenticated native host transport. Commands are never retried after a lost response. */
 export class HostComputerSandbox implements SandboxProvider {
@@ -115,6 +142,10 @@ export class HostComputerSandbox implements SandboxProvider {
             continue;
           }
           if ("done" in frame) {
+            // The relay ends the response only after the PC acknowledges its final
+            // chunk. Closing earlier reads as a cancellation and drops that
+            // acknowledgement, so a complete result is drained, never cancelled.
+            await drainCompletedResponse(reader);
             return;
           }
           yield frame.value;
@@ -229,12 +260,60 @@ export class HostComputerSandbox implements SandboxProvider {
       yield { ...file, content: new Uint8Array(Buffer.from(file.content, "base64")) };
     }
   }
+  /** Sends one file larger than a single request as ordered, checksummed pieces. */
+  private async writeFileInPieces(computer: ComputerRef, file: PortableFile, context: AdapterContext) {
+    const sha256 = workspaceTransferDigest(file.content);
+    for (const piece of workspaceTransferPieces(file.content))
+      await this.one(
+        {
+          method: "writeFileChunk",
+          botId: computer.botId,
+          file: {
+            path: file.path,
+            offset: piece.offset,
+            size: file.content.byteLength,
+            sha256,
+            content: Buffer.from(piece.content).toString("base64"),
+            ...(file.executable ? { executable: true } : {}),
+          },
+        },
+        context,
+      );
+  }
+  /**
+   * Seeds a PC workspace from the server copy. Excluded paths never travel and large
+   * files move in pieces when the PC supports them. A refused file (such as a path
+   * outside the workspace) still aborts the copy so it can be retried.
+   */
   async importWorkspace(
     computer: ComputerRef,
     files: AsyncIterable<PortableFile>,
     context: AdapterContext,
   ) {
-    for await (const file of files) await this.writeFile(computer, file, context);
+    let chunkedWrites: boolean | undefined;
+    const skipped = { excluded: 0, tooLarge: 0 };
+    for await (const file of files) {
+      if (isWorkspaceTransferExcluded(file.path)) {
+        skipped.excluded++;
+        continue;
+      }
+      if (file.content.byteLength <= HOST_COMPUTER_MAX_FILE_BYTES) {
+        await this.writeFile(computer, file, context);
+        continue;
+      }
+      chunkedWrites ??=
+        (await this.environment(computer, context).catch(() => undefined))?.chunkedWrites === true;
+      if (!chunkedWrites || file.content.byteLength > HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES) {
+        skipped.tooLarge++;
+        continue;
+      }
+      await this.writeFileInPieces(computer, file, context);
+    }
+    if (skipped.excluded || skipped.tooLarge)
+      getLogger().warn("computer.workspace_import_skipped", {
+        "workspace.skipped.excluded": skipped.excluded,
+        "workspace.skipped.too_large": skipped.tooLarge,
+      });
   }
   snapshot(computer: ComputerRef, context: AdapterContext) {
     return this.one<{ id: string; createdAt: string }>(
