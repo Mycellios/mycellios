@@ -16,6 +16,8 @@ import {
   hostComputerRequest,
 } from "./host-computer-protocol.js";
 
+const isFileWrite = (method: string | undefined) => method === "writeFile" || method === "writeFileChunk";
+
 /** No renderer receives the credential. Docker reaches this listener through its host gateway. */
 export async function startHostComputerServer(options: {
   root: string;
@@ -241,6 +243,7 @@ export async function startHostComputerServer(options: {
         "execute",
         "readFile",
         "writeFile",
+        "writeFileChunk",
         "listFiles",
         "exportWorkspace",
         "workspaceDirectories",
@@ -298,6 +301,7 @@ export async function startHostComputerServer(options: {
       case "environment":
         yield {
           ...(await provider.environment()),
+          chunkedWrites: true,
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
@@ -411,6 +415,16 @@ export async function startHostComputerServer(options: {
       case "writeFile": {
         const target = await fileTarget(input.file.path);
         await target.provider.writeFile(target.computer, {
+          ...input.file,
+          path: target.path,
+          content: Buffer.from(input.file.content, "base64"),
+        });
+        yield null;
+        break;
+      }
+      case "writeFileChunk": {
+        const target = await fileTarget(input.file.path);
+        await target.provider.writeFileChunk(target.computer, {
           ...input.file,
           path: target.path,
           content: Buffer.from(input.file.content, "base64"),
@@ -547,14 +561,14 @@ export async function startHostComputerServer(options: {
     async prepareUpdate() {
       updating = true;
       for (const [controller, notice] of updateNotices)
-        if (active.get(controller)?.method !== "writeFile") notice();
+        if (!isFileWrite(active.get(controller)?.method)) notice();
       for (const provider of providers.values()) provider.cancelAllCommands();
       const deadline = Date.now() + 15_000;
       const settle = Promise.all([...providers.values()].map(provider => provider.settleCommands()));
       let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
         await Promise.race([settle, new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("Local commands are still stopping")), 15_000); })]);
-        while ([...active.values()].some(work => work?.method === "writeFile")) {
+        while ([...active.values()].some(work => isFileWrite(work?.method))) {
           if (Date.now() >= deadline) throw new Error("A file write is still finishing");
           await new Promise(resolve => setTimeout(resolve, 25));
         }
@@ -571,7 +585,7 @@ export async function startHostComputerServer(options: {
     hasActiveWork: () =>
       [...providers.values()].some(provider => provider.hasActiveCommands()) ||
       [...active.values()].some(
-        (work) => work?.method === "execute" || work?.method === "writeFile" || work?.method === "agentRun" || work?.method === "agentMessage",
+        (work) => work?.method === "execute" || isFileWrite(work?.method) || work?.method === "agentRun" || work?.method === "agentMessage",
       ),
     setEnabled(value: boolean, interrupt = true) {
       enabled = value;

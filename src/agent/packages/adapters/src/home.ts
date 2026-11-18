@@ -106,7 +106,11 @@ export class LocalAgentHomeStore implements AgentHomeStore {
   async *exportHome(
     botId: string,
     _context: AdapterContext,
-    { directory = "", skipHidden = false }: { directory?: string; skipHidden?: boolean } = {},
+    {
+      directory = "",
+      skipHidden = false,
+      include,
+    }: { directory?: string; skipHidden?: boolean; include?: (path: string) => boolean } = {},
   ): AsyncIterable<PortableFile> {
     await this.waitForBotWrite(botId);
     await this.recoverInterruptedCommit(botId);
@@ -119,7 +123,7 @@ export class LocalAgentHomeStore implements AgentHomeStore {
     const expected = safeJoin(home, directory);
     const root = await resolveExportPath(expected);
     if (root !== expected) return;
-    yield* walkFiles(root, root, skipHidden);
+    yield* walkFiles(root, root, skipHidden, "", new Set(), include);
   }
 
   async readFile(
@@ -489,6 +493,7 @@ async function* walkFiles(
   skipHidden: boolean,
   outputPath = "",
   visited = new Set<string>(),
+  include?: (path: string) => boolean,
 ): AsyncGenerator<PortableFile> {
   const resolvedCurrent = await exportTarget(root, current, skipHidden);
   if (!resolvedCurrent || visited.has(resolvedCurrent)) return;
@@ -501,8 +506,9 @@ async function* walkFiles(
     if (!full) continue;
     const info = await stat(full);
     if (info.isDirectory()) {
-      yield* walkFiles(root, full, skipHidden, portablePath, visited);
+      yield* walkFiles(root, full, skipHidden, portablePath, visited, include);
     } else if (info.isFile()) {
+      if (include && !include(portablePath)) continue;
       const { content, mode } = await readTraversalFile(root, full, skipHidden);
       yield {
         path: portablePath,

@@ -130,6 +130,7 @@ import {
   unattendedTriggerToolRequiresApproval,
   userRunError,
   userTurnMessageForRun,
+  desktopSetupInterruptedMessage,
 } from "@rakazo/core";
 import { normalizedHttpUrl, sitesInText, urlSite } from "@rakazo/core/egress";
 import {
@@ -3883,6 +3884,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       let leaseValid = true;
       let desktopUpdateRequested = false;
       let desktopUpdateDispatched = false;
+      // Once a turn reaches the PC it may have local effects; it is never replayed.
+      let desktopRunDispatched = false;
       let runCompleted = false;
       let lastLeaseCheckAt = 0;
       let retainComputerLease = false;
@@ -4100,6 +4103,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
+          onDesktopRunDispatched: () => { desktopRunDispatched = true; },
           ...connectedContext(connectedPlugins),
           connectedProviders: connectedComposio.map((row) => row.provider),
         };
@@ -9446,6 +9450,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
           redactSecrets(text, runSecrets),
         );
         if (!computerBusy) getLogger().error("run setup failed", reportedSetupError);
+        // A setup failure after the turn reached the PC is an interruption, not a
+        // retryable setup: requeueing would replay a turn that may have changed files.
+        if (desktopRunDispatched) {
+          const bot = await deps.prisma.bot.findUnique({
+            where: { id: run.botId },
+            select: { name: true },
+          });
+          await failRunBeforeTurn(
+            deps,
+            run,
+            bot?.name ?? "",
+            { attemptId: attempt.id, workerId, fence },
+            desktopSetupInterruptedMessage(setupMessage),
+          );
+          return;
+        }
         // The job reconciler re-enqueues a queued run whose job ran out of attempts, so a
         // setup that fails every time would retry forever. End the run instead.
         if (

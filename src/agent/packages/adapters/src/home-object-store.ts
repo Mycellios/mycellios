@@ -96,7 +96,7 @@ export class ObjectAgentHomeStore extends LocalAgentHomeStore {
   override async *exportHome(
     botId: string,
     context: AdapterContext,
-    options?: { directory?: string; skipHidden?: boolean },
+    options?: { directory?: string; skipHidden?: boolean; include?: (path: string) => boolean },
   ): AsyncGenerator<PortableFile> {
     await this.hydrate(botId);
     yield* super.exportHome(botId, context, options);

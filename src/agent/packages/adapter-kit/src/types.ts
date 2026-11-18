@@ -27,6 +27,8 @@ export interface AdapterContext {
   signal: AbortSignal;
   /** Native-only planned restart notification; never part of a wire request. */
   onComputerUpdate?: (dispatched?: boolean) => void;
+  /** Native-only: the turn reached the PC, so it can no longer be replayed. Never on the wire. */
+  onDesktopRunDispatched?: () => void;
   /** Connected external accounts available to this run, including their owning connector. */
   connectedConnections?: ConnectedConnector[];
   /** @deprecated Prefer connectedConnections so providers with the same app slug cannot collide. */

@@ -385,7 +385,9 @@ export async function provisionComputer(
       !existing.providerRef ||
       existing.providerRef !== ref.providerRef ||
       existing.kind !== ref.kind;
-    if (replacement) {
+    // A PC workspace belongs to that PC: the server copy only seeds a workspace the
+    // PC has just created, and never overwrites files already on the PC.
+    if (replacement && (ref.kind !== "desktop" || ref.fresh === true)) {
       await onProgress?.("restoring");
       await restoreComputerWorkspace(deps.home, deps.sandbox, existing.homeKey, ref, context);
     }

@@ -14,6 +14,7 @@ import { parseScreenLeaseId } from "@rakazo/core";
 import { browserProfilePathForScreen } from "@rakazo/core/node/desktop-runtime";
 import type { PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { isWorkspaceTransferExcluded } from "./workspace-transfer.js";
 import { normalizeWorkspacePath, teamBotWorkspaceDirectory } from "./computer-support.js";
 import { LocalAgentHomeStore } from "./home.js";
 
@@ -340,6 +341,12 @@ export async function checkpointComputerWorkspace(
   try {
     for await (const file of sandbox.exportWorkspace(computer, context)) {
       await writePortableFile(staging, file);
+    }
+    // A PC never sends paths excluded from transfers (repositories, dependencies,
+    // secrets, archives). Keep the saved copy's own versions instead of losing them.
+    if (computer.kind === "desktop") {
+      for await (const file of home.exportHome(homeKey, context, { include: isWorkspaceTransferExcluded }))
+        await writePortableFile(staging, file);
     }
     for (const folder of (await excludedFolders?.()) ?? []) {
       await rm(path.join(staging, folder), { recursive: true, force: true });
