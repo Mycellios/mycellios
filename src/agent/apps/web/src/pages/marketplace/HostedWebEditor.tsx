@@ -278,9 +278,28 @@ export function WebEditor({
   // Preview data is kept apart from visitors' data; the server checks the saved draft.
   useAppStorageBridge(
     previewFrame,
-    granted.includes("storage") ? { id: draft.id, preview: true } : null,
-    client.webs.data,
+    {
+      id: draft.id,
+      preview: true,
+      storage: granted.includes("storage"),
+      files: granted.includes("files"),
+    },
+    client.webs,
   );
+  // Large files stay unavailable until the operator enables them on the server.
+  const [filesAvailable, setFilesAvailable] = useState(false);
+  useEffect(() => {
+    let live = true;
+    client.webs.files
+      ?.status()
+      .then((status) => {
+        if (live) setFilesAvailable(status.available);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [client]);
   const file = draft.bundle.files.find((file) => file.path === selected);
   const editable = /\.(html|css|m?js|json|txt|svg)$/i.test(selected);
   return (
@@ -521,16 +540,23 @@ export function WebEditor({
               </div>
               <fieldset className="hw-capabilities">
                 <legend>Permisos del navegador</legend>
-                {HOSTED_WEB_CAPABILITIES.map((name) => (
-                  <label key={name} htmlFor={`${editorId}-cap-${name}`}>
-                    <Switch
-                      id={`${editorId}-cap-${name}`}
-                      checked={granted.includes(name)}
-                      onCheckedChange={(on) => grant(name, on)}
-                    />
-                    {CAPABILITY_LABELS[name]}
-                  </label>
-                ))}
+                {HOSTED_WEB_CAPABILITIES.map((name) => {
+                  // An existing grant can always be removed; a new one needs availability.
+                  const unavailable =
+                    name === "files" && !filesAvailable && !granted.includes(name);
+                  return (
+                    <label key={name} htmlFor={`${editorId}-cap-${name}`}>
+                      <Switch
+                        id={`${editorId}-cap-${name}`}
+                        checked={granted.includes(name)}
+                        disabled={unavailable}
+                        onCheckedChange={(on) => grant(name, on)}
+                      />
+                      {CAPABILITY_LABELS[name]}
+                      {unavailable ? <small>No disponible por ahora</small> : null}
+                    </label>
+                  );
+                })}
                 <small>
                   Solo para esta app. Se aplican al publicar y quien la abra los
                   verá en la ficha.

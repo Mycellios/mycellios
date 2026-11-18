@@ -82,7 +82,11 @@ Published revisions remain immutable and separate.
 2. Draft history — **implemented**. Migration
    `20261118190000_hosted_web_snapshots`; the editor's "Historial de versiones"
    lists and restores snapshots.
-3. Object-store files bridge.
+3. Object-store files bridge — **implemented, unavailable by default** so users
+   cannot fill the server with large videos. Enabling it needs
+   `MYCELLIOS_HOSTED_WEB_FILES_ENABLED=true` plus configured object storage, and
+   an explicit operator decision on quotas/cost. Migration
+   `20261118210000_hosted_web_files`.
 4. Isolated origin behind config (operator domain decision pending), then screen
    capture and workers for apps on it.
 

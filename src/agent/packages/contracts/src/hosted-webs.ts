@@ -17,7 +17,8 @@ export const HostedWebSlug = z
 // Screen capture is deliberately absent: Chromium rejects getDisplayMedia from the
 // opaque origin this sandbox requires, and allow-same-origin is never granted.
 // `storage` changes no header: it enables the host's per-user data bridge.
-export const HOSTED_WEB_CAPABILITIES = ["downloads", "storage"] as const;
+// `files` (large per-user files) stays unavailable unless the operator enables it.
+export const HOSTED_WEB_CAPABILITIES = ["downloads", "storage", "files"] as const;
 export const HostedWebCapability = z.enum(HOSTED_WEB_CAPABILITIES);
 export type HostedWebCapability = z.infer<typeof HostedWebCapability>;
 export const HostedWebBundle = z
@@ -113,6 +114,43 @@ export const HostedWebDataEntry = z.object({
 });
 export const HostedWebDataUsage = z.object({
   keys: z.number().int().nonnegative(),
+  bytes: z.number().int().nonnegative(),
+});
+/**
+ * Large per-user files for apps (videos, images). Off by default: the operator must
+ * set MYCELLIOS_HOSTED_WEB_FILES_ENABLED=true and configure object storage.
+ */
+export const HOSTED_WEB_FILE_DEFAULTS = {
+  fileBytes: 25 * 1024 * 1024,
+  quotaBytes: 250 * 1024 * 1024,
+  files: 200,
+} as const;
+const fileTarget = { id: z.string().uuid(), preview: z.boolean() };
+export const HostedWebFileName = HostedWebDataKey;
+export const HostedWebFileRef = z.object({ ...fileTarget, name: HostedWebFileName }).strict();
+export const HostedWebFilePut = z
+  .object({
+    ...fileTarget,
+    name: HostedWebFileName,
+    mimeType: z.string().max(120).regex(/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i),
+    // Hard ceiling; the server applies the smaller configured per-file limit.
+    contentBase64: z.string().max(Math.ceil((HOSTED_WEB_FILE_DEFAULTS.fileBytes * 4) / 3) + 4),
+  })
+  .strict();
+export const HostedWebFileEntry = z.object({
+  name: HostedWebFileName,
+  mimeType: z.string(),
+  bytes: z.number().int().nonnegative(),
+  createdAt: z.string(),
+});
+export const HostedWebFilesStatus = z.object({
+  available: z.boolean(),
+  fileBytes: z.number().int().nonnegative(),
+  quotaBytes: z.number().int().nonnegative(),
+  files: z.number().int().nonnegative(),
+});
+export const HostedWebFilesUsage = z.object({
+  files: z.number().int().nonnegative(),
   bytes: z.number().int().nonnegative(),
 });
 /** One private draft snapshot; restoring creates a new draft version. */

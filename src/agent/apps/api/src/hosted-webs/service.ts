@@ -20,7 +20,10 @@ import type * as z from "zod";
 import { admitStaticBundle } from "./bundle.js";
 
 type Save = z.infer<typeof HostedWebSave>;
-export function hostedWebService(db: PrismaClient) {
+export function hostedWebService(
+  db: PrismaClient,
+  options: { filesAvailable?: boolean } = {},
+) {
   const where = (actor: Actor, id?: string) => ({
     userId: actor.userId,
     spaceId: actor.spaceId,
@@ -163,6 +166,7 @@ export function hostedWebService(db: PrismaClient) {
       source: HostedWebSnapshotSource = "manual",
     ) {
       const { bundle, digest, bytes } = admitted(input.bundle);
+      const grantsFiles = bundle.capabilities?.includes("files") ?? false;
       return scoped(actor, async () => {
         try {
           await db.$transaction(async (tx) => {
@@ -171,6 +175,15 @@ export function hostedWebService(db: PrismaClient) {
             const previous = await tx.hostedWeb.findFirst({
               where: where(actor, input.id),
             });
+            // A new `files` grant needs the operator switch; an existing one may stay.
+            if (
+              grantsFiles &&
+              !options.filesAvailable &&
+              !(previous && HostedWebBundle.parse(previous.draftBundle).capabilities?.includes("files"))
+            )
+              throw new ORPCError("BAD_REQUEST", {
+                message: "Guardar archivos no está disponible por ahora.",
+              });
             if (!previous) {
               if (input.version !== 0) throw new ORPCError("NOT_FOUND");
               if (

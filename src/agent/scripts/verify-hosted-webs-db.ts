@@ -21,6 +21,11 @@ import { ANTSEED_RADAR_HTML } from "../apps/api/src/hosted-webs/antseed-template
 import { hostedWebHttp } from "../apps/api/src/hosted-webs/http.js";
 import { createWebPreview } from "../apps/api/src/hosted-webs/preview.js";
 import { hostedWebDataService } from "../apps/api/src/hosted-webs/data.js";
+import {
+  hostedWebFilesConfig,
+  hostedWebFilesService,
+  sweepHostedWebFiles,
+} from "../apps/api/src/hosted-webs/files.js";
 import { hostedWebService } from "../apps/api/src/hosted-webs/service.js";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
@@ -94,7 +99,9 @@ try {
         "utf8",
       ),
     );
-    await sql.query("DROP TABLE IF EXISTS hosted_web_data, hosted_web_snapshots CASCADE");
+    await sql.query(
+      "DROP TABLE IF EXISTS hosted_web_data, hosted_web_snapshots, hosted_web_files, hosted_web_file_tombstones CASCADE",
+    );
     await sql.query(
       await readFile(
         "packages/db/prisma/migrations/20261118170000_hosted_web_data/migration.sql",
@@ -104,6 +111,12 @@ try {
     await sql.query(
       await readFile(
         "packages/db/prisma/migrations/20261118190000_hosted_web_snapshots/migration.sql",
+        "utf8",
+      ),
+    );
+    await sql.query(
+      await readFile(
+        "packages/db/prisma/migrations/20261118210000_hosted_web_files/migration.sql",
         "utf8",
       ),
     );
@@ -695,6 +708,104 @@ try {
   assert.equal(await system.hostedWebSnapshot.count({ where: { siteId: historyId } }), 0);
   checks.push(
     "each saved draft version (manual, Mico, restore) is snapshotted encrypted and immutable; unchanged saves are skipped; restore is CAS-guarded, owner-only and never publishes; history keeps the newest 50 and is deleted with the app",
+  );
+  // Large app files: off by default, never on local disk, scoped, bounded, cleaned up.
+  const objects = new Map<string, { spaceId: string; bytes: Uint8Array }>();
+  const objectStore = {
+    describe: () => ({ id: "object-artifacts", contractVersion: "1", adapterVersion: "test", capabilities: { stream: true } }),
+    put: async (artifact: { bytes: Uint8Array }, ctx: { spaceId: string }) => {
+      const key = `object:${randomUUID()}`;
+      objects.set(key, { spaceId: ctx.spaceId, bytes: artifact.bytes });
+      return { id: key, hash: "" };
+    },
+    get: async (key: string, ctx: { spaceId: string }) => {
+      const row = objects.get(key);
+      if (!row || row.spaceId !== ctx.spaceId) throw new Error("missing object");
+      return row.bytes;
+    },
+    remove: async (key: string) => {
+      objects.delete(key);
+    },
+  };
+  const localStore = { ...objectStore, describe: () => ({ ...objectStore.describe(), id: "local-artifacts" }) };
+  assert.equal(hostedWebFilesConfig({}, objectStore).available, false, "off by default");
+  assert.equal(
+    hostedWebFilesConfig({ MYCELLIOS_HOSTED_WEB_FILES_ENABLED: "true" }, localStore).available,
+    false,
+    "never on the server's local disk",
+  );
+  const tight = {
+    ...hostedWebFilesConfig({ MYCELLIOS_HOSTED_WEB_FILES_ENABLED: "true", MYCELLIOS_HOSTED_WEB_FILES_QUOTA_MB: "1", MYCELLIOS_HOSTED_WEB_FILE_MAX_MB: "9999" }, objectStore, 1024 * 1024),
+    files: 3,
+  };
+  assert.ok(tight.available && tight.quotaBytes === 1024 * 1024 && tight.fileBytes === 1024 * 1024);
+  const filesApp = await service.save(owner, {
+    id: randomUUID(), version: 0, slug: "files-test", title: "Files test", summary: "", bundle,
+  });
+  await assert.rejects(
+    service.save(owner, { ...filesApp, bundle: { ...bundle, capabilities: ["files"] } }),
+    /no está disponible/,
+    "a new files grant needs the operator switch",
+  );
+  const enabledService = hostedWebService(prisma, { filesAvailable: true });
+  const filesDraft = await enabledService.save(owner, { ...filesApp, bundle: { ...bundle, capabilities: ["files"] } });
+  await service.save(owner, { ...filesDraft, title: "Kept grant" });
+  const fileTarget = { id: filesApp.id, preview: false };
+  const off = hostedWebFilesService(prisma, objectStore as never, hostedWebFilesConfig({}, objectStore));
+  const filesSvc = hostedWebFilesService(prisma, objectStore as never, tight);
+  const b64 = (text: string) => Buffer.from(text).toString("base64");
+  await assert.rejects(
+    off.put(foreign, { ...fileTarget, name: "a.txt", mimeType: "text/plain", contentBase64: b64("x") }),
+    /no está disponible/,
+  );
+  assert.equal(objects.size, 0, "a refused upload stores nothing");
+  await assert.rejects(
+    filesSvc.put(foreign, { ...fileTarget, name: "a.txt", mimeType: "text/plain", contentBase64: b64("x") }),
+    "unpublished apps accept no visitor files",
+  );
+  const pub = await service.draft(owner, filesApp.id);
+  await service.publish(owner, filesApp.id, pub.version);
+  await filesSvc.put(foreign, { ...fileTarget, name: "clips/a.mp4", mimeType: "video/mp4", contentBase64: b64("visitor-video") });
+  await filesSvc.put(owner, { ...fileTarget, name: "clips/a.mp4", mimeType: "video/mp4", contentBase64: b64("owner-video") });
+  assert.equal(Buffer.from((await filesSvc.get(foreign, { ...fileTarget, name: "clips/a.mp4" })).contentBase64, "base64").toString(), "visitor-video");
+  assert.equal(Buffer.from((await off.get(owner, { ...fileTarget, name: "clips/a.mp4" })).contentBase64, "base64").toString(), "owner-video", "existing files stay readable when switched off");
+  await assert.rejects(filesSvc.get(crossSpace, { ...fileTarget, name: "clips/a.mp4" }));
+  await assert.rejects(
+    filesSvc.put(foreign, { ...fileTarget, name: "big.bin", mimeType: "application/octet-stream", contentBase64: Buffer.alloc(1024 * 1024 + 1).toString("base64") }),
+    /supera/,
+  );
+  await filesSvc.put(foreign, { ...fileTarget, name: "half.bin", mimeType: "application/octet-stream", contentBase64: Buffer.alloc(700 * 1024).toString("base64") });
+  await assert.rejects(
+    filesSvc.put(foreign, { ...fileTarget, name: "half2.bin", mimeType: "application/octet-stream", contentBase64: Buffer.alloc(400 * 1024).toString("base64") }),
+    /MB de archivos/,
+  );
+  await filesSvc.put(foreign, { ...fileTarget, name: "c.txt", mimeType: "text/plain", contentBase64: b64("c") });
+  await assert.rejects(
+    filesSvc.put(foreign, { ...fileTarget, name: "d.txt", mimeType: "text/plain", contentBase64: b64("d") }),
+    /máximo de archivos/,
+  );
+  const before = objects.size;
+  await filesSvc.put(foreign, { ...fileTarget, name: "c.txt", mimeType: "text/plain", contentBase64: b64("c2") });
+  await sweepHostedWebFiles(prisma, objectStore);
+  assert.equal(objects.size, before, "a replaced file's old object is removed");
+  assert.deepEqual((await filesSvc.list(foreign, fileTarget)).entries.map((e) => e.name), ["c.txt", "clips/a.mp4", "half.bin"]);
+  await filesSvc.delete(foreign, { ...fileTarget, name: "half.bin" });
+  await sweepHostedWebFiles(prisma, objectStore);
+  assert.equal(objects.size, before - 1);
+  assert.equal(
+    await runAsTenant(foreign, () => prisma.hostedWebFileTombstone.count()),
+    0,
+    "tombstones are not readable from a tenant context",
+  );
+  const fileRows = await asSystem(prisma, "inspect file rows").hostedWebFile.findMany({ where: { siteId: filesApp.id } });
+  assert.ok(fileRows.every((row) => row.storageKey.startsWith("object:") && /^[0-9a-f]{64}$/.test(row.sha256)));
+  await system.hostedWeb.delete({ where: { id: filesApp.id } });
+  assert.equal(await system.hostedWebFileTombstone.count(), 3, "app deletion queues every visitor's objects");
+  assert.equal(await sweepHostedWebFiles(prisma, objectStore), 3);
+  assert.equal(objects.size, 0);
+  assert.equal(await system.hostedWebFileTombstone.count(), 0);
+  checks.push(
+    "app files are off by default and never use local disk; new grants need the operator switch; scoped per user/Space, size/quota/count bounded, refused uploads store nothing, replaced/deleted/cascaded objects are removed from storage",
   );
   assert.equal((await listHostedWebs(prisma, null, "discover")).length, 0);
   await service.publish(owner, id, edited.version);

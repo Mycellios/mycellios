@@ -166,6 +166,9 @@
   `hosted_web_data`, scoped by the host to app/user/Space/preview; the bridge must
   answer only its own iframe. Draft saves, Mico edits and restores record encrypted
   snapshots in `hosted_web_snapshots` (newest 50); restore never publishes.
+  Large app files (`files`) stay unavailable unless the operator sets
+  MYCELLIOS_HOSTED_WEB_FILES_ENABLED=true with object storage; never local disk,
+  never raise the 25 MiB/250 MiB defaults, keep tombstone cleanup for every delete.
   Check hosted-webs capabilities/bridge/DraftHistory tests and
   scripts/verify-hosted-webs-db.ts on embedded PostgreSQL.
   Routines UI is also paused by default; `VITE_MYCELLIOS_ROUTINES=true` explicitly

@@ -31,7 +31,7 @@ export const hostedAppTools: ConnectorTool[] = [
   {
     name: "app_write",
     description:
-      "Save one complete UTF-8 file to the assigned app's private draft. Read its current version first and pass expectedVersion. Preserves other files and updates the live preview; never publishes. On version conflict read again before editing. HTML/CSS/JS static apps only, no secrets or backend. Apps run in an opaque sandbox: no cookies, localStorage, IndexedDB, workers or screen capture. If the owner grants storage, persist per-user data by posting {type:'mycellios.storage', id, op:'get'|'set'|'delete'|'list', key, value, prefix} to parent and awaiting the reply with the same id (keys [A-Za-z0-9_.:/-], 1 MB per value, 5 MB per user). Use this tool, not shell/file tools, to edit the hosted app.",
+      "Save one complete UTF-8 file to the assigned app's private draft. Read its current version first and pass expectedVersion. Preserves other files and updates the live preview; never publishes. On version conflict read again before editing. HTML/CSS/JS static apps only, no secrets or backend. Apps run in an opaque sandbox: no cookies, localStorage, IndexedDB, workers or screen capture. If the owner grants storage, persist per-user data by posting {type:'mycellios.storage', id, op:'get'|'set'|'delete'|'list', key, value, prefix} to parent and awaiting the reply with the same id (keys [A-Za-z0-9_.:/-], 1 MB per value, 5 MB per user). Large files (op 'file.put'|'file.get'|'file.delete'|'file.list') need the separate files grant, which is usually unavailable; handle its error. Use this tool, not shell/file tools, to edit the hosted app.",
     inputSchema: z.toJSONSchema(writeInput),
     readOnly: false,
   },

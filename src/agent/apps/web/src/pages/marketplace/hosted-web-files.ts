@@ -17,6 +17,7 @@ export const issue = (error: unknown) =>
 export const CAPABILITY_LABELS = {
   downloads: "Descargar archivos",
   storage: "Guardar datos de cada usuario",
+  files: "Guardar archivos grandes (vídeos, imágenes)",
 } as const;
 /**
  * The iframe sandbox intersects the server's CSP sandbox: both must allow a token.

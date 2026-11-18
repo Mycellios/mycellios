@@ -29,6 +29,7 @@ model HostedWeb {
   views HostedWebView[]
   data HostedWebData[]
   snapshots HostedWebSnapshot[]
+  files HostedWebFile[]
   @@index([spaceId, userId])
   @@unique([id, userId, spaceId])
   @@map("hosted_webs")
@@ -119,6 +120,36 @@ model HostedWebSnapshot {
   @@map("hosted_web_snapshots")
 }
 
+/// Per-user app file metadata; the bytes are sealed in the artifact object store.
+model HostedWebFile {
+  id String @id
+  siteId String
+  userId String
+  spaceId String
+  preview Boolean
+  name String
+  mimeType String
+  bytes Int
+  sha256 String
+  storageKey String
+  createdAt DateTime @default(now())
+  site HostedWeb @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@unique([siteId, userId, spaceId, preview, name])
+  @@index([spaceId, userId])
+  @@map("hosted_web_files")
+}
+
+/// Sealed objects still to remove after their file rows were deleted.
+model HostedWebFileTombstone {
+  storageKey String @id
+  spaceId String
+  userId String
+  createdAt DateTime @default(now())
+  @@map("hosted_web_file_tombstones")
+}
+
 model HostedWebView {
   siteId String
   day String
@@ -152,6 +183,7 @@ model User {
   hostedWebPins HostedWebPin[]
   hostedWebData HostedWebData[]
   hostedWebSnapshots HostedWebSnapshot[]
+  hostedWebFiles HostedWebFile[]
   inboxTasks InboxTask[]
   workflows Workflow[]
   workflowExecutions WorkflowExecution[]
@@ -419,6 +451,7 @@ model Space {
   hostedWebPins HostedWebPin[]
   hostedWebData HostedWebData[]
   hostedWebSnapshots HostedWebSnapshot[]
+  hostedWebFiles HostedWebFile[]
   inboxTasks InboxTask[]
   workflows Workflow[]
   workflowExecutions WorkflowExecution[]

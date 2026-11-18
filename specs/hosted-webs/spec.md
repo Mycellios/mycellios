@@ -50,6 +50,16 @@ Mico tool permissions are granted to a published website.
   RLS), skipped when unchanged, pruned to the newest 50 within 64 MiB per app and
   deleted with the app. Restore is a CAS-guarded new draft version; it never
   publishes and the UI refuses it over unsaved local edits.
+- `files` (large per-user files) is **unavailable by default**. It requires
+  `MYCELLIOS_HOSTED_WEB_FILES_ENABLED=true` and the object artifact store; it never
+  writes to the server's local disk. While unavailable, new grants and uploads are
+  refused (existing files stay readable/deletable). Limits: 25 MiB per file
+  (also capped by the deployment upload limit), 250 MiB and 200 files per user
+  per app; `MYCELLIOS_HOSTED_WEB_FILE_MAX_MB`/`MYCELLIOS_HOSTED_WEB_FILES_QUOTA_MB`
+  can only lower them. Metadata lives in `hosted_web_files` (forced RLS); bytes
+  are sealed per Space. Every deleted row (replace, delete, app/user/Space
+  cascade) leaves a tombstone whose object is removed by the sweep (on file
+  writes, account/Space deletion and every 30 minutes).
 - The base CSP allows `media-src 'self' blob: data:` so apps can play their own
   bundled or in-memory media; remote media sources stay blocked.
 - Limits: 20 sites/account/Space, 100 retained revisions/site, 100 files/bundle,
