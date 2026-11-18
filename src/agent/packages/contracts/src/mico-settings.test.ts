@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { effectiveMicoSettings, MicoSettingsUpdate } from "./mico-settings.js";
+import { effectiveMicoSettings, MICO_ACCOUNT_INSTRUCTIONS_MAX_LENGTH, MicoSettingsUpdate } from "./mico-settings.js";
 
 it("defaults to denied automation and preserves explicit overrides", () => {
   expect(effectiveMicoSettings({}, {})).toEqual({ localScripts: false, agentNewChat: false, showPlan: false, gitCoauthor: true });
@@ -16,6 +16,14 @@ it("accepts response styles only in owned defaults without changing automation f
   expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).responseStyle).toBe("classic");
   expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).localScripts).toBe(true);
   expect(MicoSettingsUpdate.safeParse({revision: 1, kind: "defaults", patch: {responseStyle: "verbose"}}).success).toBe(false);
+});
+
+it("bounds owner instructions to account defaults, never per-Mico overrides", () => {
+  const text = "x".repeat(MICO_ACCOUNT_INSTRUCTIONS_MAX_LENGTH);
+  expect(MicoSettingsUpdate.parse({ revision: 1, kind: "defaults", patch: { accountInstructions: text } })).toMatchObject({ patch: { accountInstructions: text } });
+  expect(MicoSettingsUpdate.safeParse({ revision: 1, kind: "defaults", patch: { accountInstructions: `${text}x` } }).success).toBe(false);
+  expect(MicoSettingsUpdate.safeParse({ revision: 1, kind: "bot", botId: "b", key: "accountInstructions", value: true }).success).toBe(false);
+  expect(effectiveMicoSettings({ accountInstructions: "Reply in English.", showPlan: true }, { showPlan: false })).toMatchObject({ accountInstructions: "Reply in English.", showPlan: false });
 });
 
 it("validates bounded memory-review policy only in owned defaults",()=>{

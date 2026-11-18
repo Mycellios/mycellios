@@ -19,7 +19,7 @@ export const settingsKeywords: Record<string, string> = {
     "profile account name email password passkeys sso security delete usage cost tokens balance credits activity streak calendar statistics share models messages perfil cuenta nombre correo contraseña seguridad eliminar uso costes consumo creditos saldo actividad racha calendario estadisticas compartir modelos mensajes",
   notifications:
     "notifications alerts permission previews sound pause completion task click notificaciones avisos alertas permisos vista previa sonido pausa finalizacion tarea clic",
-  agents: "agents micos skills marketplace bots models connections queue steer instructions modelos conexiones mensajes tarea cola instrucciones habilidades scripts automation automatizacion plan nuevos chats commits coauthor",
+  agents: "agents micos skills marketplace bots models connections queue steer instructions modelos conexiones mensajes tarea cola instrucciones habilidades scripts automation automatizacion plan nuevos chats commits coauthor language idioma preferences preferencias",
   models:
     "models providers accounts api key oauth defaults backup reasoning tokens modelos proveedores cuentas claves predeterminado respaldo razonamiento límites",
   voice: "voice speech audio microphone transcription voz habla audio micrófono transcripción",

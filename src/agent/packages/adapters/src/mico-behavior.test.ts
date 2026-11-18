@@ -22,6 +22,15 @@ it("co-author instructions preserve the human author and require authorized comm
   expect(micoBehaviorInstructions({ gitCoauthor: false }, {})).not.toContain("Co-authored-by:");
 });
 
+it("delivers owner preferences to every Mico below its own instructions", () => {
+  expect(micoBehaviorInstructions({}, {})).not.toContain("<owner_preferences>");
+  expect(micoBehaviorInstructions({ accountInstructions: "  \n " }, {})).not.toContain("<owner_preferences>");
+  const text = micoBehaviorInstructions({ accountInstructions: "  Reply in English.\nAlways plan first.  " }, { showPlan: false });
+  expect(text).toContain("<owner_preferences>\nReply in English.\nAlways plan first.\n</owner_preferences>");
+  expect(text).toContain("unless this Mico's private instructions or the owner's current request say otherwise");
+  expect(text).toContain("never authorize an action");
+});
+
 it("delivers the chosen style with the same safety and explicit plan preferences", () => {
   const classic = micoBehaviorInstructions({responseStyle: "classic", showPlan: true}, {});
   expect(classic).toContain("Answer directly without announcing setup");

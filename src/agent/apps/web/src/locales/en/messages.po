@@ -13115,3 +13115,15 @@ msgstr "Could not copy the link. Try again."
 
 msgid "Retry copy"
 msgstr "Retry copy"
+
+msgid "Instructions for all Micos"
+msgstr "Instructions for all Micos"
+
+msgid "Added to every conversation with your Micos, for example the language to reply in or habits like planning first. A Mico's own instructions take precedence when they conflict."
+msgstr "Added to every conversation with your Micos, for example the language to reply in or habits like planning first. A Mico's own instructions take precedence when they conflict."
+
+msgid "Always reply in English. Before a long task, share a short plan."
+msgstr "Always reply in English. Before a long task, share a short plan."
+
+msgid "Discard"
+msgstr "Discard"
