@@ -13529,3 +13529,67 @@ msgstr "Las rutinas se ejecutan a tiempo mientras el ordenador está conectado a
 
 msgid "Keep the computer awake on battery too. The battery drains faster."
 msgstr "Mantener el ordenador activo también con batería. La batería se agota antes."
+
+#: src/pages/Onboarding.tsx
+msgid "Create your AI team."
+msgstr "Crea tu equipo de IA."
+
+#: src/pages/Onboarding.tsx
+msgid "Choose the AI for your Micos."
+msgstr "Elige la IA de tus Micos."
+
+#: src/pages/Onboarding.tsx
+msgid "No AI subscription."
+msgstr "Sin suscripción de IA."
+
+#: src/pages/Onboarding.tsx
+msgid "Use my AI subscription"
+msgstr "Usar mi suscripción de IA"
+
+#: src/pages/Onboarding.tsx
+msgid "ChatGPT or Claude"
+msgstr "ChatGPT o Claude"
+
+#: src/pages/Onboarding.tsx
+msgid "Share which screens you use. Never chats or files."
+msgstr "Comparte qué pantallas usas. Nunca chats ni archivos."
+
+#: src/pages/Onboarding.tsx
+msgid "Opening…"
+msgstr "Abriendo…"
+
+#: src/pages/Onboarding.tsx
+msgid "ChatGPT, Claude or Mycellios"
+msgstr "ChatGPT, Claude o Mycellios"
+
+#: src/pages/Onboarding.tsx
+msgid "OpenAI, Anthropic, OpenRouter and more"
+msgstr "OpenAI, Anthropic, OpenRouter y más"
+
+#: src/pages/Onboarding.tsx
+msgid "Use free models"
+msgstr "Usar modelos gratuitos"
+
+#: src/pages/Onboarding.tsx
+msgid "Recommended"
+msgstr "Recomendado"
+
+#: src/pages/Onboarding.tsx
+msgid "Connect your subscription"
+msgstr "Conecta tu suscripción"
+
+#: src/pages/Onboarding.tsx
+msgid "Your subscription"
+msgstr "Tu suscripción"
+
+#: src/pages/Onboarding.tsx
+msgid "On this computer"
+msgstr "En este ordenador"
+
+#: src/pages/Onboarding.tsx
+msgid "Could not create your team. Try again."
+msgstr "No se ha podido crear tu equipo. Inténtalo de nuevo."
+
+#: src/pages/Onboarding.tsx
+msgid "Downloading OpenCode…"
+msgstr "Descargando OpenCode…"

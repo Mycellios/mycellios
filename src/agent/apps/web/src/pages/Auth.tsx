@@ -20,13 +20,11 @@ import { fetchAuthCapabilities } from "../lib/auth-capabilities";
 import { clearSpaceSelection } from "../lib/rpc";
 import { runSsoFlow } from "../lib/sso-flow";
 import { authErrorText, credentialIssueText } from "../lib/user-error";
+import { PRIVACY_URL, TERMS_URL } from "../lib/legal-links";
 
 type AuthMode = "in" | "up" | "forgot";
 
 const fieldClass = "mt-2 h-12 rounded-xl px-4 text-base md:text-base";
-// Public legal pages. Both must exist on www.mycellios.com before release.
-const TERMS_URL = "https://www.mycellios.com/terms";
-const PRIVACY_URL = "https://www.mycellios.com/privacy";
 const CODE_LENGTH = 6;
 export const submitClass = "mt-3 h-12 w-full rounded-xl text-base";
 

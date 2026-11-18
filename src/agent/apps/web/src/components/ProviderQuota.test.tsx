@@ -13,7 +13,7 @@ vi.mock("@rakazo/ui-web", () => ({
   PopoverTrigger: ({ openOnHover: _, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { openOnHover: boolean }) => <button {...props} />,
   Button: ({ variant: _, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant: string }) => <button {...props} />,
 }));
-import { ProviderQuota } from "./ProviderQuota";
+import { ProviderQuota, railRings } from "./ProviderQuota";
 let root: Root, container: HTMLDivElement;
 const usage = vi.fn(), models = vi.fn();
 function account(): AccountPlanLimit { return { credentialId: "native:codex", provider: "openai-codex", label: "ChatGPT", authKind: "oauth", plan: "plus", status: "available", checkedAt: new Date().toISOString(), measuredAt: new Date().toISOString(), retryAt: null, reason: null, windows: [{ id: "weekly", label: "Weekly", usedPercent: 8, durationMinutes: 10080, resetsAt: new Date(Date.now() + 6 * 86400000).toISOString(), model: null }] }; }
@@ -36,6 +36,21 @@ it("never presents an expired measurement as fresh remaining quota", async () =>
   mocks.native.mockResolvedValue({ ...account(), measuredAt: new Date(Date.now() - 121000).toISOString() }); await render();
   expect(container.querySelector('[role="progressbar"]')?.hasAttribute("aria-valuenow")).toBe(false);
   expect(container.textContent).toContain("Awaiting refresh");
+});
+it("shows one rail ring for every account that reports quota, like Codex and Claude together", async () => {
+  const claude = { ...account(), credentialId: "claude-oauth", provider: "anthropic", label: "Claude" };
+  const unmeasured = { ...account(), credentialId: "stale", measuredAt: new Date(Date.now() - 121000).toISOString() };
+  mocks.native.mockResolvedValue(account()); mocks.planLimits.mockResolvedValue({ accounts: [claude, unmeasured] }); await render();
+  const trigger = container.querySelector('[data-testid="provider-quota-trigger"]')!;
+  expect(trigger.querySelectorAll('[data-testid="provider-quota-ring"]').length).toBe(2);
+  expect(trigger.querySelector('img[src$="openai-black.svg"]')).not.toBeNull();
+  expect(trigger.querySelector('[data-testid="provider-quota-more"]')).toBeNull();
+});
+it("keeps the accounts with the least left and counts the rest when the rail is full", () => {
+  const rows = [90, 10, 50, 70, 30].map((used, i) => ({ ...account(), credentialId: `a${i}`, windows: [{ ...account().windows[0]!, usedPercent: used }] }));
+  const { shown, more } = railRings(rows, Date.now());
+  expect(shown.map((row) => row.credentialId)).toEqual(["a0", "a2", "a3"]);
+  expect(more).toBe(2);
 });
 it("provides account setup without inventing an allowance for an API key", async () => {
   mocks.planLimits.mockResolvedValue({ accounts: [{ ...account(), status: "unsupported", windows: [] }] }); await render();
