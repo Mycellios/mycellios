@@ -20,6 +20,7 @@ const StatsDashboard = lazy(() => import("./StatsDashboard").then((module) => ({
 const PricingPage = lazy(() => import("./rebrand/PricingPage").then((module) => ({ default: module.PricingPage })));
 const ComparePage = lazy(() => import("./rebrand/ComparePage").then((module) => ({ default: module.ComparePage })));
 const GuidePage = lazy(() => import("./rebrand/GuidePage").then((module) => ({ default: module.GuidePage })));
+const LegalPage = lazy(() => import("./rebrand/LegalPage").then((module) => ({ default: module.LegalPage })));
 const ChangelogPage = lazy(() => import("./rebrand/ChangelogPage").then((module) => ({ default: module.ChangelogPage })));
 const EarnStudio = lazy(() => import("./rebrand/EarnStudio").then((module) => ({ default: module.EarnStudio })));
 const SporeStudio = lazy(() => import("./rebrand/SporeStudio").then((module) => ({ default: module.SporeStudio })));
@@ -104,6 +105,7 @@ const page = surface === "stats" ? <StatsDashboard />
   : surface === "pricing" ? <PricingPage />
   : surface === "compare" ? <ComparePage />
   : surface === "changelog" ? <ChangelogPage />
+  : surface === "terms" || surface === "privacy" ? <LegalPage kind={surface} />
   : isEarn ? <EarnStudio />
   : isSpore ? <SporeStudio />
   : isNetwork ? <NetworkPage />

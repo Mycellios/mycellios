@@ -356,7 +356,7 @@ export function SidebarRoster({
                     <BotAvatar
                       color={item.chat.color}
                       identity={item.chat.id}
-                      size={mini ? 46 : compact ? 38 : 52}
+                      size={mini ? 46 : compact ? 38 : mobile ? 46 : 52}
                       status={item.chat.status}
                       unread={Boolean(item.chat.unread)}
                     />
@@ -502,7 +502,7 @@ export function SidebarRoster({
                             <span
                               dir="auto"
                               data-roster-bot-name={item.kind === "bot" ? "" : undefined}
-                              className={`min-w-0 truncate text-foreground ${mobile ? "text-base" : "text-body2"} ${
+                              className={`min-w-0 truncate text-foreground ${mobile ? "text-[15px]" : "text-body2"} ${
                                 mobile || item.chat.unread ? "font-semibold" : "font-medium"
                               }`}
                             >

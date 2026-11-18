@@ -13388,3 +13388,123 @@ msgstr "Al continuar, aceptas las <0>Condiciones del servicio</0> y confirmas qu
 #: src/pages/Auth.tsx
 msgid "Create your account and get {SPORE_WELCOME_REWARD} Spore and 0.20 Credits."
 msgstr "Crea tu cuenta y recibe {SPORE_WELCOME_REWARD} Spore y 0,20 créditos."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Your data is used only to provide Mycellios. We never sell it."
+msgstr "Tus datos solo se usan para darte Mycellios. Nunca los vendemos."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Fixed"
+msgstr "Corregido"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Full changelog"
+msgstr "Registro de cambios completo"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Hide fixes"
+msgstr "Ocultar correcciones"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Show {count} fixes"
+msgstr "Mostrar {count} correcciones"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Updated from {fromVersion} to {toVersion}"
+msgstr "Actualizado de {fromVersion} a {toVersion}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Version {toVersion}"
+msgstr "Versión {toVersion}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "No new features in this version"
+msgstr "Esta versión no trae novedades"
+
+#: src/components/ReleaseNotes.tsx
+msgid "This version has no notes to show here. The full changelog shows all changes."
+msgstr "Esta versión no tiene notas que mostrar aquí. El registro de cambios completo recoge todos los cambios."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Do this after the update"
+msgstr "Haz esto después de actualizar"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Searches adapt their time to the task. A search that keeps finding new results can run for up to three minutes, and scans of your whole home folder are refused before they start."
+msgstr "Las búsquedas ajustan su tiempo a la tarea. Una búsqueda que sigue encontrando resultados puede durar hasta tres minutos, y los rastreos de toda tu carpeta personal se rechazan antes de empezar."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Micos can wait for an event and continue the same conversation when it arrives. You no longer need to ask again after a long wait."
+msgstr "Los Micos pueden esperar un evento y seguir la misma conversación cuando llega. Ya no hace falta volver a pedírselo tras una espera larga."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Copy a link to the current conversation to share it when you report a problem. It is in the Mico menu when Developer mode is on."
+msgstr "Copia un enlace a la conversación actual para compartirlo al informar de un problema. Está en el menú del Mico con el modo desarrollador activado."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Status replies are shorter. A Mico leads with the result, what blocks it and the next step."
+msgstr "Las respuestas de estado son más breves. El Mico empieza por el resultado, lo que lo bloquea y el siguiente paso."
+
+#: src/components/ReleaseNotes.tsx
+msgid "A command without its own time limit no longer waits for up to an hour. Searches stop after 45 seconds and suggest a narrower folder."
+msgstr "Un comando sin límite de tiempo propio ya no espera hasta una hora. Las búsquedas se detienen a los 45 segundos y proponen una carpeta más concreta."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Desktop keeps the reason when it is interrupted, so a problem can be diagnosed."
+msgstr "La app de escritorio guarda el motivo cuando se interrumpe, para poder diagnosticar el problema."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Typing in the chat keeps its focus while the dock or another window updates in the background."
+msgstr "Al escribir en el chat ya no se pierde el foco cuando el dock u otra ventana se actualiza en segundo plano."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Windows keep their position after an update."
+msgstr "Las ventanas mantienen su posición tras una actualización."
+
+#: src/components/ReleaseNotes.tsx
+msgid "The floating dock no longer opens empty."
+msgstr "El dock flotante ya no se abre vacío."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Windows show the Mycellios icon in the taskbar."
+msgstr "Las ventanas muestran el icono de Mycellios en la barra de tareas."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Create Mico teams. Micos in a team work together on the same request."
+msgstr "Crea equipos de Micos. Los Micos de un equipo trabajan juntos en la misma petición."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Each new Mico gets its own isolated computer on the server."
+msgstr "Cada Mico nuevo tiene su propio ordenador aislado en el servidor."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Publish your apps in Hifa Store."
+msgstr "Publica tus apps en Hifa Store."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Your provider and chat stay selected while you look at Credit and provider options."
+msgstr "Tu proveedor y tu chat siguen seleccionados mientras miras las opciones de créditos y proveedores."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Tasks gathers the separate conversations of your Micos, with pins and reminders. Reminders do not run a model or use Credits."
+msgstr "Tareas reúne las conversaciones sueltas de tus Micos, con fijados y recordatorios. Los recordatorios no ejecutan ningún modelo ni gastan créditos."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Micos keep essential notes and can save memory for one Mico or one conversation only."
+msgstr "Los Micos guardan notas esenciales y pueden recordar cosas solo para un Mico o una conversación."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Desktop updates on macOS and Linux arrive as soon as they are ready."
+msgstr "Las actualizaciones de la app de escritorio en macOS y Linux llegan en cuanto están listas."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Signing in is simpler, with fewer fields and less text."
+msgstr "Iniciar sesión es más sencillo, con menos campos y menos texto."
+
+#: src/components/ReleaseNotes.tsx
+msgid "The chat list on narrow screens is lighter and easier to scan."
+msgstr "La lista de chats en pantallas estrechas es más ligera y fácil de recorrer."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Signing in from Desktop works again. It no longer says that the sign-in request has expired."
+msgstr "Ya se puede iniciar sesión desde la app de escritorio. Ya no dice que el acceso ha caducado."

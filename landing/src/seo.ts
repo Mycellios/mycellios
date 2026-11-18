@@ -108,6 +108,9 @@ const guidePages = Object.fromEntries([...GUIDE_INDEXES, ...MARKETING_GUIDES].ma
 
 const basePages = {
   ...guidePages,
+  // Draft legal pages stay out of search results until legal review.
+  "/terms": privatePage("Terms of Service | Mycellios", "The terms that govern your use of Mycellios.", "/terms", "Terms of Service"),
+  "/privacy": privatePage("Privacy Policy | Mycellios", "How Mycellios processes your personal data and the choices you have.", "/privacy", "Privacy Policy"),
   ...comparisonPages,
   "/pricing": extraPage("AI Credits, costs & pricing | Mycellios", "Understand Mycellios Credits and optional model providers. Estimate your own provider and hosting costs, and check current model prices before use.", "/pricing", { heading: "Understand your AI costs", paragraphs: ["Mycellios supports your own model connections and an optional managed provider using Credits. One Credit corresponds to one USD for paid top-ups. Managed pricing includes the complete upstream cost plus a 4% Mycellios service fee.", "The provider-cost calculator is a separate estimate from your own inputs, not a live model quote or a subscription purchase. Check your wallet and the chosen model's price before paid work."], links: [{ href: "/guides/models-and-credits", label: "How models and Credits work" }, { href: "/guides/contribute-compute", label: "Earn Credits from verified work" }] }),
   "/compare": extraPage("Compare AI agent apps | Mycellios", "Compare Mycellios with other agent apps, with original guidance and current product sources.", "/compare", { heading: "Find your kind of agent", paragraphs: ["Explore workspaces, personal assistants and coding agents.", "Compare how they run, what they connect to and how you pay. Start with your own task rather than a universal ranking."], links: MARKETING_COMPARISONS.map(([slug, name]) => ({ href: `/compare/${slug}`, label: slug === "best-ai-agent-apps" ? name : `Mycellios vs ${name}` })) }),

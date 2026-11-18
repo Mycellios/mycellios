@@ -1,7 +1,7 @@
 import { marketingPageRedirect } from "../../src/contracts/marketing-pages.js";
 import { MARKETING_GUIDE_PATHS } from "../../src/contracts/marketing-guides.js";
 
-export type LandingSurface = "landing" | "network" | "panel" | "stats" | "pricing" | "compare" | "changelog" | "guide";
+export type LandingSurface = "landing" | "network" | "panel" | "stats" | "pricing" | "compare" | "changelog" | "guide" | "terms" | "privacy";
 
 export type PanelView =
   | "overview"
@@ -98,6 +98,8 @@ export function resolveLandingSurface(pathname: string, search: string, hostname
   if ((["stats.mycellios.com", "stats.localhost"].includes(hostname) && pathname === "/") || pathname === "/stats" || (pathname === "/dashboard" && view === null)) return "stats";
   if (pathname === "/pricing") return "pricing";
   if (pathname === "/changelog") return "changelog";
+  if (pathname === "/terms") return "terms";
+  if (pathname === "/privacy") return "privacy";
   if (pathname === "/compare" || pathname.startsWith("/compare/")) return "compare";
   if (pathname === "/network" && (view === null || view === "globe")) return "network";
   if (PANEL_PATHS.has(pathname)) return "panel";

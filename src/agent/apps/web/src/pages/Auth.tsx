@@ -8,6 +8,7 @@ import {
 } from "@rakazo/core";
 import { Button, Input, InputOTP, InputOTPGroup, InputOTPSlot, Label } from "@rakazo/ui-web";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Lock } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthMushroomMark } from "../components/AuthMushroom";
 import { BrandLaunch } from "../components/BrandLaunch";
@@ -469,7 +470,13 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                 </p>
               )}
               {mode !== "forgot" && !codeStep ? (
-                <p className="mt-6 max-w-[320px] text-center text-xs leading-relaxed text-muted-foreground">
+                <p className="mt-8 flex max-w-[320px] items-start justify-center gap-1.5 text-center text-xs leading-relaxed text-muted-foreground">
+                  <Lock className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                  <Trans>Your data is used only to provide Mycellios. We never sell it.</Trans>
+                </p>
+              ) : null}
+              {mode !== "forgot" && !codeStep ? (
+                <p className="mt-3 max-w-[320px] text-center text-xs leading-relaxed text-muted-foreground">
                   <Trans>
                     By continuing, you accept the{" "}
                     <a href={TERMS_URL} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">

@@ -88,3 +88,7 @@ html { scrollbar-gutter:stable; --marketing-motion-fast:180ms; --marketing-motio
 .marketing-footer-made > span { display:inline-flex; color:#b38a43; }
 .marketing-footer-made svg { fill:currentColor; }
 @media(max-width:600px) { .marketing-footer-meta { width:100%; margin-left:0; justify-content:space-between; } }
+
+.marketing-footer-legal { display: flex; gap: 14px; }
+.marketing-footer-legal a { font-size: 12px; color: inherit; opacity: .75; }
+.marketing-footer-legal a:hover { opacity: 1; }
