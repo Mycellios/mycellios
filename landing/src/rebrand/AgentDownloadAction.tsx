@@ -24,7 +24,7 @@ type MenuPlatform = InstallerId | typeof ANDROID;
 const SYSTEM_NAMES: Record<PlatformLogoId, string> = { macos: "macOS", windows: "Windows", linux: "Linux", android: "Android" };
 const systemOf = (id: MenuPlatform): PlatformLogoId => id === ANDROID ? "android" : downloadPlatforms.find(p => p.id === id)!.system;
 
-export function suggestedDownload(platform: string) {
+export function suggestedDownload(platform: string): { id: InstallerId | undefined; label: string | undefined } {
   if (/android|iphone|ipad/i.test(platform)) return { id: undefined, label: undefined };
   if (/win/i.test(platform)) return { id: "windows-x64", label: "Windows" };
   // The user agent alone cannot identify the Mac's CPU; detectInstaller adds hints.
