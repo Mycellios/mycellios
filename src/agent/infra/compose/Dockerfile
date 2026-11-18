@@ -7,6 +7,7 @@ COPY --chmod=755 . /repo/
 # Shared contracts consume the Agent workspace's own dependency graph. node_modules is a
 # real directory (the native source provenance skips it but rejects a symlinked one).
 RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --ignore-scripts --no-audit --no-fund \
+    && (cd /repo && npm ci --ignore-scripts --no-audit --no-fund) \
     && mkdir /repo/src/contracts/node_modules \
     && ln -s /repo/src/agent/node_modules/* /repo/src/agent/node_modules/.bin /repo/src/contracts/node_modules/ \
     && npm rebuild @prisma/engines \
