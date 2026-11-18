@@ -79,7 +79,7 @@ function useDesktopUpdates() {
     if ((action === "install" || action === "forceInstall") && desktopUpdateHasCall()) endDesktopUpdateCall();
     if (action === "check") setConfirmedCheck(null);
     try {
-      if (action === "install" && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
+      if ((action === "install" || action === "forceInstall") && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
       const method = action === "cancelInstall" && state?.relaunchPending ? "cancelRestart" : action;
       const result = await bridge[method]?.();
       if (!result) throw new Error("Update action is unavailable");
@@ -140,8 +140,10 @@ export function useSidebarUpdate() {
     state: updates?.state ?? null,
     callActive: updates?.callActive ?? false,
     error: updates?.message ?? null,
+    // Like OpenBot, an explicit Restart restarts now: native work is checkpointed
+    // instead of leaving the update waiting. Unsaved drafts and calls still block it.
     install: () => {
-      void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
+      void updates?.act(updates?.forceAvailable ? "forceInstall" : "install");
     },
     download: () => { void updates?.act("download"); },
     check: () => { void updates?.act("check"); },
@@ -179,7 +181,8 @@ export function DesktopSidebarUpdate() {
   const label = failed && !handedOff ? update.error ?? t`Update needs attention`
     : handedOff ? update.error ?? t`Update ready to install`
     : state.automaticRestartAt ? t`Updating shortly`
-    : waiting ? state.waitingFor === "unsaved_work" ? t`Save changes or finish the call to restart.` : t`Update waiting`
+    : waiting ? state.waitingFor === "unsaved_work" ? t`Save changes or finish the call to restart.`
+      : state.restartMode === "now" ? t`Saving work and restarting…` : t`Update waiting`
     : ready ? t`Update ready to install` : t`New update available`;
   // One action per phase. Postponing keeps the downloaded update and uses the native cancellation guard.
   const actionLabel = waiting ? t`Later` : failed && !handedOff ? t`Try again` : ready ? t`Install update` : t`Download update`;
@@ -216,7 +219,7 @@ export function DesktopUpdateSection() {
         <Button
           variant="outline"
           disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now")) || downloading || state.phase === "checking"}
-          onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
+          onClick={() => void act(ready && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
         >
           {state.installAction === "system-installer" && ready && updates.callActive ? <Trans>End call to update</Trans>
             : state.installAction === "system-installer" && ready ? <Trans>Open installer</Trans>
