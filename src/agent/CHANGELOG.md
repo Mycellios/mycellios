@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-18
+
+### Fixed
+
+- Use each Mycellios model's own context window and output limit. Before, DeepSeek and other
+  AntSeed models shared the network's smaller default window, so a Mico with computer tools
+  could stop with "This model's context window is too small".
+
 ## [0.5.0] - 2026-11-18
 
 ### Added
