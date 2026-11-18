@@ -16,7 +16,7 @@ const catalog = () => ({
 describe("Desktop downloads", () => {
   it("distinguishes Intel and Apple Silicon without removing supported downloads", () => {
     const html=renderToStaticMarkup(<DesktopDownloads />);
-    expect(html).toContain('Download for Mac (Intel)');expect(html).toContain('Download for Mac (Apple Silicon)');expect(html).toContain('macOS 13 or later');
+    expect(html).toContain('Download for macOS · Intel');expect(html).toContain('Download for macOS · Apple silicon');expect(html).toContain('macOS 13 or later');
     expect(html).not.toContain('Intel Macs are not supported');
   });
   it("recommends the visitor's installer without jargon-only Mac choices", async () => {
@@ -30,7 +30,7 @@ describe("Desktop downloads", () => {
     expect(await detectInstaller(nav("Mozilla/5.0 (Linux; Android 14)"))).toBe("");
     expect(await detectInstaller(nav("Mozilla/5.0 (X11; Fedora; Linux x86_64)"))).toBe("fedora-x64");
     const html = renderToStaticMarkup(<DesktopDownloads />);
-    expect(html).toContain(">M1 or newer<"); expect(html).toContain("About This Mac");
+    expect(html).toContain(">Apple silicon<"); expect(html).toContain("About This Mac");
     expect(html).not.toMatch(/<details[^>]* open/);
   });
   it("waits for the release catalog before offering the Fedora download", () => {

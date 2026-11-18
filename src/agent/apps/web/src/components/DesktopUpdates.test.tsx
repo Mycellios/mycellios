@@ -113,6 +113,14 @@ it("waits for unsaved work and preserves explicit checkpointed restart of native
   await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Restart now")!.click());
   expect(bridge.forceInstall).toHaveBeenCalledOnce();
 });
+it("restarts now from the sidebar instead of leaving the update waiting for idle", async () => {
+  fixture.state.supportsForceRestart = true;
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
+  expect(bridge.forceInstall).toHaveBeenCalledOnce(); expect(bridge.install).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("Saving work and restarting…");
+  expect(host.textContent).not.toContain("Update waiting");
+});
 it("keeps audio running until the user requests restart and ends it before handoff", async () => {
   fixture.call = true; await render(); expect(gate()).toBeNull(); expect(endCall).not.toHaveBeenCalled();
   const restart = host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!;
