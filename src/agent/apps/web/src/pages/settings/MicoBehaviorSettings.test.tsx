@@ -12,6 +12,7 @@ vi.mock("@rakazo/ui-web", () => ({
   BotAvatar: () => null,
   Button: ({ children, variant: _, size: __, ...props }: Record<string, unknown> & { children: ReactNode }) => <button {...props}>{children}</button>,
   Input: (props: Record<string, unknown>) => <input {...props} />,
+  Textarea: (props: Record<string, unknown>) => <textarea {...props} />,
   Switch: ({ checked, onCheckedChange, ...props }: Record<string, unknown> & { checked: boolean; onCheckedChange: (value: boolean) => void }) => <button {...props} role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)} />,
   OptionSelect: ({ options, value, onValueChange, ...props }: Record<string, unknown> & { options: { value: string; label: string }[]; value: string; onValueChange: (value: string) => void }) => <select {...props} value={value} onChange={event => onValueChange(event.target.value)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
 }));
@@ -70,4 +71,39 @@ it("saves the response style with revision protection and displays the returned 
   await act(async()=>{select.value="classic";select.dispatchEvent(new Event("change",{bubbles:true}));});
   expect(updateMicos).toHaveBeenCalledWith({kind:"defaults",revision:1,patch:{responseStyle:"classic"}});
   expect(select.value).toBe("classic");
+});
+
+async function type(area: HTMLTextAreaElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, value);
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const button = (text: string) => [...el.querySelectorAll("button")].find(item => item.textContent === text)!;
+it("keeps an unsaved account instruction draft across subviews and reports it until saved", async () => {
+  let state = initial();
+  const updateMicos = vi.fn(async (input) => { state = { ...state, revision: state.revision + 1, defaults: { ...state.defaults, ...input.patch } }; return state; });
+  mocked.client = { preferences: { micos: vi.fn(async () => state), updateMicos } } as unknown as RpcClient;
+  const dirty = vi.fn();
+  await act(async () => root.render(<MicoBehaviorSettings bots={bots} onBusyChange={busy} onDirtyChange={dirty} />));
+  const area = () => el.querySelector<HTMLTextAreaElement>('textarea[aria-label="Instructions for all Micos"]')!;
+  expect(area().value).toBe(""); expect(button("Save").disabled).toBe(true);
+  await type(area(), "Reply in English.");
+  expect(dirty).toHaveBeenLastCalledWith(true);
+  await open("Show a plan"); await act(async () => button("Back to Micos").click());
+  expect(area().value).toBe("Reply in English.");
+  await act(async () => button("Save").click());
+  expect(updateMicos).toHaveBeenLastCalledWith({ kind: "defaults", revision: 1, patch: { accountInstructions: "Reply in English." } });
+  expect(area().value).toBe("Reply in English."); expect(dirty).toHaveBeenLastCalledWith(false);
+  await type(area(), "Changed"); await act(async () => button("Discard").click());
+  expect(area().value).toBe("Reply in English."); expect(dirty).toHaveBeenLastCalledWith(false);
+});
+it("keeps the account instruction draft when saving fails", async () => {
+  const updateMicos = vi.fn().mockRejectedValue(new Error("conflict"));
+  mocked.client = { preferences: { micos: vi.fn(async () => initial()), updateMicos } } as unknown as RpcClient;
+  await render();
+  const area = el.querySelector<HTMLTextAreaElement>('textarea[aria-label="Instructions for all Micos"]')!;
+  await type(area, "Always plan first."); await act(async () => button("Save").click());
+  expect(el.querySelector('[role="alert"]')?.textContent).toContain("Could not save");
+  expect(el.querySelector<HTMLTextAreaElement>('textarea[aria-label="Instructions for all Micos"]')!.value).toBe("Always plan first.");
 });

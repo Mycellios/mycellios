@@ -13508,3 +13508,15 @@ msgstr "La lista de chats en pantallas estrechas es más ligera y fácil de reco
 #: src/components/ReleaseNotes.tsx
 msgid "Signing in from Desktop works again. It no longer says that the sign-in request has expired."
 msgstr "Ya se puede iniciar sesión desde la app de escritorio. Ya no dice que el acceso ha caducado."
+
+msgid "Instructions for all Micos"
+msgstr "Instrucciones para todos los Micos"
+
+msgid "Added to every conversation with your Micos, for example the language to reply in or habits like planning first. A Mico's own instructions take precedence when they conflict."
+msgstr "Se añaden a todas las conversaciones con tus Micos, por ejemplo el idioma en que deben responder o hábitos como planificar primero. Si chocan, mandan las instrucciones propias de cada Mico."
+
+msgid "Always reply in English. Before a long task, share a short plan."
+msgstr "Responde siempre en inglés. Antes de una tarea larga, comparte un plan breve."
+
+msgid "Discard"
+msgstr "Descartar"

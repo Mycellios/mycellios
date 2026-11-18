@@ -17,8 +17,10 @@ export function MicosSettingsPanel({
   onModels,
   onBusyMessageModeChange,
   onBusyChange,
+  onDirtyChange,
 }: {
   bots?: Bot[];
+  onDirtyChange?: (dirty: boolean) => void;
   onOpen?: (id: string) => void;
   onSkills?: () => void;
   onModels?: () => void;
@@ -63,7 +65,7 @@ export function MicosSettingsPanel({
   }
   return (
     <div className="rk-settings-panel space-y-6">
-      <MicoBehaviorSettings bots={bots} onBusyChange={setPolicySaving} />
+      <MicoBehaviorSettings bots={bots} onBusyChange={setPolicySaving} onDirtyChange={onDirtyChange} />
       <SettingsGroup title={t`Preferences`}>
         <SettingsRow label={t`Models and connections`} description={t`Choose a provider once. Your Micos use it automatically.`}
           control={<Button variant="outline" size="sm" disabled={!onModels || saving} onClick={onModels}>{t`Manage`}</Button>} />

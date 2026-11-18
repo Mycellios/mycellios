@@ -171,6 +171,8 @@ export function SettingsOverlay({
   const [localVoiceBusy, setLocalVoiceBusy] = useState(false);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [formState, setFormState] = useState({ busy: false, dirty: false });
+  // The Micos section reports busy separately; it only adds its unsaved instruction draft.
+  const micosDirty = useCallback((dirty: boolean) => setFormState(current => current.dirty === dirty ? current : { ...current, dirty }), []);
   const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
   const [search, setSearch] = useState("");
   const userId = useQueryUserId();
@@ -569,6 +571,7 @@ export function SettingsOverlay({
                   <MicosSettingsPanel
                     bots={shownBots}
                     onBusyChange={setCompanionBusy}
+                    onDirtyChange={micosDirty}
                     onBusyMessageModeChange={onBusyMessageModeChange}
                     onOpen={onOpenMico ? (id) => leaveSettings(() => onOpenMico(id)) : undefined}
                     onSkills={onOpenSkills ? () => leaveSettings(onOpenSkills) : undefined}

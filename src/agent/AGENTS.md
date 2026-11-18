@@ -139,6 +139,11 @@
   active workspace in the sidebar header. Keep server management out of the
   desktop workspace picker; mobile retains server access in its navigation menu.
 
+- Instructions for all Micos are owner-written account Mico defaults
+  (accountInstructions, at most 4,000 characters), never per-Mico overrides or a
+  model tool. mico-behavior.ts delivers them in every run below the Mico's own
+  instructions, which win on conflict; they never authorize approval-gated actions.
+  The Settings draft survives subviews and failed saves and uses the leave guard.
 - Mico response style (natural by default, or classic) is stored in account
   Mico defaults and delivered on each run. Checkpoint resumes use current supplied
   instructions, preserving visible history/tool results and dropping old signed

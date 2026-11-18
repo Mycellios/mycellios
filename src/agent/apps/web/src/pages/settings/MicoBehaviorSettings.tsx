@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { DEFAULT_MEMORY_REVIEW_POLICY, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
-import { BotAvatar, Button, Input, OptionSelect, Switch } from "@rakazo/ui-web";
+import { DEFAULT_MEMORY_REVIEW_POLICY, effectiveMicoSettings, MICO_ACCOUNT_INSTRUCTIONS_MAX_LENGTH, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
+import { BotAvatar, Button, Input, OptionSelect, Switch, Textarea } from "@rakazo/ui-web";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import { desktopBridge } from "../../lib/desktop";
 import type { RpcClient } from "../../lib/rpc";
 
-export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBusyChange: (value: boolean) => void }) {
+export function MicoBehaviorSettings({ bots, onBusyChange, onDirtyChange }: { bots: Bot[]; onBusyChange: (value: boolean) => void; onDirtyChange?: (dirty: boolean) => void }) {
   const { t } = useLingui(), client = useSpaceRpc();
   const active = useRef(client); active.current = client;
   const [loaded, setLoaded] = useState<{ client: RpcClient; state: MicoSettingsState } | null>(null);
@@ -19,9 +19,16 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
   const [hostBusy, setHostBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   const state = loaded?.client === client ? loaded.state : null;
+  // An unsaved edit of the account instructions; null while showing the saved text.
+  const [instructionsDraft, setInstructionsDraft] = useState<string | null>(null);
+  const savedInstructions = state?.defaults.accountInstructions ?? "";
+  const instructionsDirty = state !== null && instructionsDraft !== null && instructionsDraft !== savedInstructions;
+  const reportDirty = useRef(onDirtyChange); reportDirty.current = onDirtyChange;
+  useEffect(() => { reportDirty.current?.(instructionsDirty); }, [instructionsDirty]);
+  useEffect(() => () => reportDirty.current?.(false), []);
   useEffect(() => { onBusyChange(saving || hostBusy); return () => onBusyChange(false); }, [saving, hostBusy, onBusyChange]);
   useEffect(() => {
-    let gone = false; setView(null); setSearch(""); setError("");
+    let gone = false; setView(null); setSearch(""); setError(""); setInstructionsDraft(null);
     void client.preferences.micos().then(state => { if (!gone) setLoaded({ client, state }); }, () => { if (!gone) setError(t`Could not load Mico preferences.`); });
     return () => { gone = true; };
   }, [client, retry]);
@@ -34,16 +41,18 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
   const rows = bots.filter(bot => state?.bots.some(item => item.id === bot.id));
   const total = rows.length;
   async function save(change: Omit<Extract<MicoSettingsUpdate, { kind: "defaults" }>, "revision"> | Omit<Extract<MicoSettingsUpdate, { kind: "bot" }>, "revision"> | Omit<Extract<MicoSettingsUpdate, { kind: "all" }>, "revision">) {
-    if (!state || lock.current) return;
+    if (!state || lock.current) return false;
     const source = client; lock.current = true; setSaving(true); setError("");
     try {
       const next = await source.preferences.updateMicos({ ...change, revision: state.revision });
       if (active.current === source) setLoaded({ client: source, state: next });
+      return active.current === source;
     } catch {
       if (active.current === source) {
         setError(t`Could not save. Preferences may have changed elsewhere. Review them and try again.`);
         try { const next = await source.preferences.micos(); if (active.current === source) setLoaded({ client: source, state: next }); } catch { if (active.current === source) setLoaded(null); }
       }
+      return false;
     } finally { lock.current = false; setSaving(false); }
   }
   const chosen = settings.find(item => item.key === view);
@@ -73,6 +82,12 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
         control={<OptionSelect aria-label={t`Response style`} value={state.defaults.responseStyle ?? "natural"} disabled={saving}
           options={[{ value: "natural", label: t`Natural` }, { value: "classic", label: t`Classic` }]}
           onValueChange={value => { if (value === "natural" || value === "classic") void save({ kind: "defaults", patch: { responseStyle: value } }); }} />} /></SettingsGroup>
+      <AccountInstructions value={instructionsDraft ?? savedInstructions} dirty={instructionsDirty} saving={saving}
+        onChange={setInstructionsDraft} onDiscard={() => setInstructionsDraft(null)}
+        onSave={async () => {
+          const accountInstructions = instructionsDraft ?? savedInstructions;
+          if (await save({ kind: "defaults", patch: { accountInstructions } })) setInstructionsDraft(current => current === accountInstructions ? null : current);
+        }} />
       <SettingsGroup title={t`Local memory`}>
         {memoryUsage?<SettingsRow label={t`Reserved today`} description={t`Daily budget resets at 00:00 UTC.`}
           control={<span className="text-sm tabular-nums">{new Intl.NumberFormat(undefined,{maximumFractionDigits:6}).format(memoryUsage.reservedMicrounits/1_000_000)} {t`Credits`}{memoryUsage.pending ? ` · ${memoryUsage.pending} ${t`Pending reviews`}`:""}</span>} />:null}
@@ -97,6 +112,25 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
         control={<Switch aria-label={t`Mention Mycellios in commits`} checked={state.defaults.gitCoauthor} disabled={saving} onCheckedChange={gitCoauthor => void save({ kind: "defaults", patch: { gitCoauthor } })} />} /></SettingsGroup>
     </>}
   </div>;
+}
+
+/** One owner-written text for all Micos. The parent keeps the draft across subviews and other saves. */
+function AccountInstructions({ value, dirty, saving, onChange, onDiscard, onSave }: { value: string; dirty: boolean; saving: boolean; onChange: (text: string) => void; onDiscard: () => void; onSave: () => Promise<void> }) {
+  const { t } = useLingui();
+  return <SettingsGroup title={t`Instructions for all Micos`}>
+    <div className="space-y-3 px-4 py-3">
+      <p className="text-sm text-muted-foreground">{t`Added to every conversation with your Micos, for example the language to reply in or habits like planning first. A Mico's own instructions take precedence when they conflict.`}</p>
+      <Textarea aria-label={t`Instructions for all Micos`} value={value} maxLength={MICO_ACCOUNT_INSTRUCTIONS_MAX_LENGTH} rows={5} disabled={saving}
+        placeholder={t`Always reply in English. Before a long task, share a short plan.`} onChange={event => onChange(event.target.value)} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-xs tabular-nums text-muted-foreground">{value.length} / {MICO_ACCOUNT_INSTRUCTIONS_MAX_LENGTH}</span>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" disabled={saving || !dirty} onClick={onDiscard}>{t`Discard`}</Button>
+          <Button size="sm" disabled={saving || !dirty} onClick={() => void onSave()}>{t`Save`}</Button>
+        </div>
+      </div>
+    </div>
+  </SettingsGroup>;
 }
 
 function LocalScriptsSettings({ scope, onBusyChange }: { scope: RpcClient; onBusyChange: (value: boolean) => void }) {
