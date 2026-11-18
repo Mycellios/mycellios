@@ -19,6 +19,7 @@ import {
   isSecretAskBlock,
   messageReaction,
   messagingChannelId,
+  planCardResumeText,
   QUEUE_HOLDING_RUN_STATUSES,
   releasedTakeoverComputerBlocks,
   resolveAskChoice,
@@ -249,6 +250,11 @@ export interface AnswerRunInput {
   username?: string;
   /** Turns down a pending secret request; only the run's user can, and nothing is stored. */
   dismiss?: boolean;
+  /**
+   * Set only by the server's plan auto-start job, never from a client request: presses Start
+   * on a plan card whose wait has passed.
+   */
+  autoStart?: boolean;
 }
 
 /** What request_secret returns to the bot once the user dismissed its card. */
@@ -756,6 +762,9 @@ async function commitAnswerRunInput(
     (block) => block.kind === "ask" && block.status !== "answered",
   );
   if (pendingAsk?.kind !== "ask") return null;
+  // Only a plan card answers by itself, and only after its wait has passed.
+  if (input.autoStart && (!pendingAsk.plan?.autoStartAt || Date.parse(pendingAsk.plan.autoStartAt) > Date.now()))
+    return null;
   const approvalAsk = isApprovalAskBlock(pendingAsk);
   const secretAsk = isSecretAskBlock(pendingAsk);
   const choiceAsk = !approvalAsk && !secretAsk && Boolean(pendingAsk.actions?.length);
@@ -965,7 +974,14 @@ async function commitAnswerRunInput(
         prompt: resumePrompt(
           { ...run, trigger: resumedTrigger },
           pendingAsk.text,
-          selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
+          pendingAsk.plan
+            ? planCardResumeText({
+                choiceId: selectedChoice?.id,
+                choiceLabel: resumeLabel,
+                answer: input.answer,
+                autoStarted: input.autoStart,
+              })
+            : selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
         ),
       },
     });
@@ -979,6 +995,9 @@ async function commitAnswerRunInput(
           status: "answered" as const,
           answer: recordedAnswer,
           ...(dismissed ? { dismissed: true as const } : {}),
+          ...(input.autoStart && block.kind === "ask" && block.plan
+            ? { plan: { ...block.plan, autoStarted: true as const } }
+            : {}),
           ...(editedInstructions !== undefined && pendingAsk.instructionUpdate
             ? {
                 instructionUpdate: { ...pendingAsk.instructionUpdate, after: editedInstructions },

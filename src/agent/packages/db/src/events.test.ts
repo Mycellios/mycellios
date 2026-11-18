@@ -4565,3 +4565,60 @@ it("drains explicit queued messages one at a time in FIFO order", async () => {
   expect(tx.steeringMessage.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["queued-1"] }, runId: null }, data: { runId: "next", claimedAt: null } });
   expect(tx.run.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceMessageId: "message-1", trigger: "follow_up" }) });
 });
+
+describe("answerRunInput plan card", () => {
+  function planTx(autoStartAt: string) {
+    return {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [{
+            kind: "ask", text: "On it: fixing the build.", status: "pending",
+            actions: [{ id: "start", label: "Start" }, { id: "cancel", label: "Cancel" }],
+            plan: { steps: [{ label: "First", text: "Read logs" }], autoStartAt },
+          }],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({ botId: "bot-2", trigger: "user", userId: "user-1" }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ status: "queued", createdAt: new Date("2026-08-16T12:00:00.000Z"), threadId: "thread-1" }),
+      },
+      task: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }) },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({ ...event(data.seq), type: data.type })),
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    };
+  }
+  const input = { spaceId: "workspace-1", threadId: "thread-1", runId: "run-1", messageId: "message-1", answeredByUserId: "user-1", answer: "start", autoStart: true };
+
+  it("refuses to start a plan by itself before its wait has passed", async () => {
+    const tx = planTx(new Date(Date.now() + 60_000).toISOString());
+    const prisma = { $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) } as unknown as PrismaClient;
+    await expect(answerRunInput(prisma, input)).resolves.toBe(false);
+    expect(tx.run.updateMany).not.toHaveBeenCalled();
+    expect(tx.message.update).not.toHaveBeenCalled();
+  });
+
+  it("starts the plan once the wait has passed and records that nobody answered", async () => {
+    const tx = planTx(new Date(Date.now() - 1_000).toISOString());
+    const prisma = { $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) } as unknown as PrismaClient;
+    await expect(answerRunInput(prisma, input)).resolves.toBe(true);
+    const prompt = (tx.task.updateMany.mock.calls[0]?.[0] as { data: { prompt: string } }).data.prompt;
+    expect(prompt).toContain("started by itself");
+    const blocks = (tx.message.update.mock.calls[0]?.[0] as { data: { blocks: Array<{ answer?: string; plan?: { autoStarted?: true } }> } }).data.blocks;
+    expect(blocks[0]).toMatchObject({ answer: "start", plan: { autoStarted: true } });
+  });
+
+  it("tells the Mico not to start when the user cancels", async () => {
+    const tx = planTx(new Date(Date.now() + 60_000).toISOString());
+    const prisma = { $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) } as unknown as PrismaClient;
+    await expect(answerRunInput(prisma, { ...input, answer: "cancel", autoStart: undefined })).resolves.toBe(true);
+    const prompt = (tx.task.updateMany.mock.calls[0]?.[0] as { data: { prompt: string } }).data.prompt;
+    expect(prompt).toContain("Do not start the work");
+  });
+});

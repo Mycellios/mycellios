@@ -24,8 +24,8 @@ it("co-author instructions preserve the human author and require authorized comm
 
 it("delivers the chosen style with the same safety and explicit plan preferences", () => {
   const classic = micoBehaviorInstructions({responseStyle: "classic", showPlan: true}, {});
-  expect(classic).toContain("Answer directly without announcing setup");
-  expect(classic).not.toContain("Before tools, give one short line");
+  expect(classic).toContain("Skip setup narration");
+  expect(classic).not.toContain("start with one line in your own words");
   expect(classic).toContain("Before a long");
-  expect(micoBehaviorInstructions({}, {})).toContain("Before tools, give one short line");
+  expect(micoBehaviorInstructions({}, {})).toContain("start with one line in your own words");
 });

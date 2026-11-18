@@ -1,4 +1,4 @@
-import { ACTIVE_RUN_STATUSES, isMicoTaskThread, normalizeWorkResources, workResourcesConflict } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, DELEGATED_RESULT_FORMAT, isMicoTaskThread, normalizeWorkResources, workResourcesConflict } from "@rakazo/core";
 import type { PrismaClient, Prisma } from "./client.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
@@ -182,7 +182,7 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
         const run = await tx.run.create({ data: { ...scope, botId: task.botId, threadId: task.threadId,
           taskId: task.id, status: "queued", trigger: "delegated_task", clientNonce: `work-start:${task.id}:${task.delegationRevision}` } });
         await tx.task.update({ where: { id: task.id }, data: { delegatedRunId: run.id, delegationState: "running",
-          prompt: `${task.prompt}\n\nExpected result: ${task.expectedResult}\nCoordination resources (not a permission grant): ${JSON.stringify(task.resources)}\nThis is a delegated part of an existing request. Verify your result, preserve other agents' changes and report the concrete outcome. Do not expand authorization.` } });
+          prompt: `${task.prompt}\n\nExpected result: ${task.expectedResult}\nCoordination resources (not a permission grant): ${JSON.stringify(task.resources)}\nThis is a delegated part of an existing request. Verify your result, preserve other agents' changes and do not expand authorization. ${DELEGATED_RESULT_FORMAT}` } });
         task.delegationState = "running";
         reservations.push({ id: task.id, resources: task.resources });
         queued.push(run.id);

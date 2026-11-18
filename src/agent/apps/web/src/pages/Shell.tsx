@@ -226,6 +226,7 @@ import {
 } from "../lib/right-panel-state";
 import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } from "../lib/rpc";
 import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
+import { ResponseStyleContext, useSavedResponseStyle } from "../lib/response-style";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
 import { MicoTaskTabs } from "../components/MicoTaskTabs";
 import { MessagePinsContext, PinnedMessagesButton, useMessagePins } from "../components/PinnedMessages";
@@ -416,6 +417,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const manualMicoSetup = useLocation().state?.manualMicoSetup === true;
   const [shellSpaceId] = useState(() => initialSpaceId ?? selectedSpaceId());
   const rpc = useSpaceRpc();
+  const responseStyle = useSavedResponseStyle(rpc);
   const session = authClient.useSession();
   const userId = session.data?.user.id;
   const floatingChat = desktopBridge()?.chatWindow?.kind === "floating";
@@ -4439,7 +4441,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               </Button>
             </div>
           ) : (
-            <MessagePinsContext.Provider value={messagePins.actions}><Transcript
+            <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><Transcript
               headerTabs={false}
               conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}
@@ -4541,7 +4543,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   setSearchParams(next);
                 }
               }}
-            /></MessagePinsContext.Provider>
+            /></MessagePinsContext.Provider></ResponseStyleContext.Provider>
           )}
         </div>
         {active || activeGroup ? (

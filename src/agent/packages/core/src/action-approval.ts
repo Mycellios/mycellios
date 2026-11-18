@@ -186,6 +186,7 @@ export function unattendedTriggerToolRequiresApproval(
  * and taints the run. New tools taint by default.
  */
 const OWN_STATE_RESULT_TOOLS = new Set([
+  "acknowledge_request",
   "app_write",
   "ask_user",
   "connect_app",

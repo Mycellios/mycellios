@@ -13136,3 +13136,43 @@ msgstr "Routines run on time while the computer is plugged in. The screen can tu
 
 msgid "Keep the computer awake on battery too. The battery drains faster."
 msgstr "Keep the computer awake on battery too. The battery drains faster."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "Show full message"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "The Mico stopped before it finished the task. Ask it to continue."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "{done} of {total} tasks done"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "Started (nobody answered in time)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "Start · {left} s"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "Start the plan by itself"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "After {seconds} seconds"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "Never"

@@ -6386,3 +6386,43 @@ msgstr "साइन इन हो रहा है…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "थोड़ा समय लग रहा है."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "पूरा संदेश दिखाएँ"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "Mico काम पूरा करने से पहले रुक गया। उससे जारी रखने को कहें।"
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {{names} के साथ # संदेश} other {{names} के साथ # संदेश}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "{total} में से {done} काम पूरे"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "शुरू हुआ (किसी ने समय पर जवाब नहीं दिया)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "शुरू करें · {left} से."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "लंबे काम से पहले Mico अपनी योजना शुरू करें और रद्द करें वाले कार्ड में दिखाता है। जवाब न मिलने पर वह खुद शुरू हो सकता है। सरल जवाब सीधे रहते हैं।"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "योजना अपने आप शुरू करें"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "{seconds} सेकंड बाद"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "कभी नहीं"

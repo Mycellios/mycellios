@@ -22,6 +22,7 @@ const payloadSchemas = {
   }),
   "skill.teaching-expire": z.object({ skillId: z.string().min(1) }),
   "call.expire": z.object({ threadId: z.string().min(1), callId: z.string().min(1) }),
+  "plan.autostart": z.object({ runId: z.string().min(1) }),
   "history.compact": z.object({ threadId: z.string().min(1) }),
   "memory.review": z.object({ threadId: z.string().min(1) }),
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
@@ -146,6 +147,16 @@ export function callExpireJob(threadId: string, callId: string, availableAt: Dat
     payload: { threadId, callId },
     availableAt,
     replaceKey: `call.expire:${callId}`,
+  };
+}
+
+/** Presses Start on a run's plan card once its wait has passed, if nobody answered first. */
+export function planAutoStartJob(runId: string, availableAt: Date): BackgroundJob {
+  return {
+    name: "plan.autostart",
+    payload: { runId },
+    availableAt,
+    replaceKey: `plan.autostart:${runId}`,
   };
 }
 

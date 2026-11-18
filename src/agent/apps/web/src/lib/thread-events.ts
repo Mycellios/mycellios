@@ -28,6 +28,7 @@ import {
   takeLiveMessage,
   updateCloudAgentMessages,
   upsertMessageById,
+  withLivePlan,
 } from "@rakazo/core";
 
 const runTriggers = new Set<string>(RUN_TRIGGERS);
@@ -484,13 +485,16 @@ export function reduceThreadSnapshot(
     const liveId = progressMessageId(event);
     const { previous, remaining } = takeLiveMessage(prev.messages, liveId);
     const label = typeof event.payload.label === "string" ? event.payload.label : undefined;
-    const blocks = observeToolEvent(
-      reduceLiveMessageBlocks(previous?.blocks ?? [], {
-        type: "tool",
-        name: String(event.payload.name ?? ""),
-        label,
-      }),
-      { type: event.type, payload: event.payload, createdAt: event.createdAt },
+    const blocks = withLivePlan(
+      observeToolEvent(
+        reduceLiveMessageBlocks(previous?.blocks ?? [], {
+          type: "tool",
+          name: String(event.payload.name ?? ""),
+          label,
+        }),
+        { type: event.type, payload: event.payload, createdAt: event.createdAt },
+      ),
+      event.payload,
     );
     const next: ThreadMessage = {
       id: liveId,
@@ -570,6 +574,7 @@ export function reduceThreadSnapshot(
       botId: event.botId,
       runId: event.runId,
       callId: typeof event.payload.callId === "string" ? event.payload.callId : known?.callId,
+      ...(event.payload.progress === true || known?.progress ? { progress: true as const } : {}),
       ...replyMetadata(event.payload, known),
       createdAt: known?.createdAt ?? event.createdAt,
     };

@@ -6385,3 +6385,43 @@ msgstr "로그인하는 중…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "조금 더 걸리고 있습니다."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "전체 메시지 보기"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "Mico가 작업을 마치기 전에 멈췄습니다. 계속하라고 요청하세요."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, other {{names}와(과)의 메시지 #개}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "작업 {total}개 중 {done}개 완료"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "시작됨 (제시간에 응답이 없었습니다)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "시작 · {left}초"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "긴 작업 전에 Mico가 시작과 취소가 있는 카드로 계획을 보여 줍니다. 응답이 없으면 자동으로 시작할 수 있습니다. 간단한 답변은 그대로 바로 합니다."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "계획 자동 시작"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "{seconds}초 후"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "안 함"

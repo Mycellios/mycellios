@@ -13529,3 +13529,43 @@ msgstr "Las rutinas se ejecutan a tiempo mientras el ordenador está conectado a
 
 msgid "Keep the computer awake on battery too. The battery drains faster."
 msgstr "Mantener el ordenador activo también con batería. La batería se agota antes."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "Mostrar el mensaje completo"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "El Mico se detuvo antes de terminar la tarea. Pídele que continúe."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {# mensaje con {names}} other {# mensajes con {names}}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "{done} de {total} tareas hechas"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "Iniciado (nadie respondió a tiempo)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "Empezar · {left} s"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "Antes de una tarea larga, el Mico muestra su plan en una tarjeta con Empezar y Cancelar. Si no respondes, puede empezar solo. Las respuestas simples siguen siendo directas."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "Empezar el plan solo"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "A los {seconds} segundos"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "Nunca"

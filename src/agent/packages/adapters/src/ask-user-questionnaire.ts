@@ -1,4 +1,6 @@
 import { AgentQuestions } from "@rakazo/contracts";
+import { PLAN_CARD_TOOL } from "@rakazo/core";
+import { planCardQuestionnaire } from "./plan-card.js";
 
 /** Same form payload for API and native models; old string choices remain compatible. */
 export function askUserQuestionnaire(args: Record<string, unknown>) {
@@ -33,4 +35,16 @@ function normalizeOptions(value: unknown) {
       id: string; label: string; description?: string;
     };
   });
+}
+
+const PAUSING_ASK_TOOLS = new Set(["ask_user", PLAN_CARD_TOOL]);
+
+/** Tools that pause the turn on a card until the user answers. */
+export function isPausingAskTool(name: string): boolean {
+  return PAUSING_ASK_TOOLS.has(name);
+}
+
+/** The ask event for a pausing tool: an ask_user form or a plan card. */
+export function pausingQuestionnaire(name: string, args: Record<string, unknown>) {
+  return name === PLAN_CARD_TOOL ? planCardQuestionnaire(args) : askUserQuestionnaire(args);
 }

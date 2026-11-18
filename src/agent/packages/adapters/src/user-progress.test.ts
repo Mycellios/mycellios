@@ -10,6 +10,7 @@ import {
   extractNarrationText,
   finalBlocksAfterMidTurnProgress,
   isProgressMessageTruncated,
+  isRedundantProgressNote,
   isUserProgressClientNonce,
   MID_TURN_PROGRESS_MAX_PER_RUN,
   MID_TURN_PROGRESS_MIN_TURN_AGE_MS,
@@ -18,6 +19,15 @@ import {
   USER_PROGRESS_MESSAGE_MAX_LENGTH,
   userProgressClientNonce,
 } from "./user-progress.js";
+
+describe("isRedundantProgressNote", () => {
+  it("drops filler and notes the turn already showed, ignoring spacing", () => {
+    expect(isRedundantProgressNote("x", [])).toBe(true);
+    expect(isRedundantProgressNote("…", [])).toBe(true);
+    expect(isRedundantProgressNote("Checking  the logs.", ["Checking the logs."])).toBe(true);
+    expect(isRedundantProgressNote("Checking the build.", ["Checking the logs."])).toBe(false);
+  });
+});
 
 describe("clampUserProgressMessage", () => {
   it("trims and rejects empty text", () => {

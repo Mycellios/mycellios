@@ -122,7 +122,7 @@ describe("completionNotificationPreview", () => {
       "Created Projects-CoS as a Project",
     );
     const preview = completionNotificationPreview(`${"word ".repeat(50)}**end**`);
-    expect(preview).toHaveLength(180);
+    expect(preview).toHaveLength(200);
     expect(preview).not.toContain("*");
     expect(preview.startsWith("word word")).toBe(true);
     expect(completionNotificationPreview("**  **")).toBe("");

@@ -1,6 +1,6 @@
-import { askUserQuestionnaire } from "./ask-user-questionnaire.js";
+import { isPausingAskTool, pausingQuestionnaire } from "./ask-user-questionnaire.js";
 import { randomUUID } from "node:crypto";
-import { withConversationStyle } from "./conversation-style.js";
+import { turnStyleReminder, withConversationStyle } from "./conversation-style.js";
 import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation, workContinuationEnabled } from "./work-continuation.js";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
@@ -1086,7 +1086,7 @@ export class PiAgentRuntime implements AgentRuntime {
                 if (!tool) throw new Error("Pending checkpoint tool is no longer available");
                 const interaction =
                   call.id === restored.pendingToolCallId &&
-                  (call.name === "ask_user" || call.name === "request_takeover");
+                  (isPausingAskTool(call.name) || call.name === "request_takeover");
                 let result: AgentToolResult<JsonValue | undefined>;
                 try {
                   signal.throwIfAborted();
@@ -1211,7 +1211,10 @@ export class PiAgentRuntime implements AgentRuntime {
                   0,
                 ),
             });
-            await agent.prompt(initialPrompt, images?.length ? images : undefined);
+            // OpenBot pattern: repeat the natural style's first line in front of each user turn.
+            const reminder = request.allowSilentEmpty || request.script
+              || request.usageOperationKind === "compaction" ? null : turnStyleReminder(systemPrompt);
+            await agent.prompt(reminder ? `${reminder}\n\n${initialPrompt}` : initialPrompt, images?.length ? images : undefined);
           }
         } finally {
           try {
@@ -2012,8 +2015,8 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
                   terminate: true,
                 };
               }
-              if (tool.name === "ask_user") {
-                const questionnaire = askUserQuestionnaire(args);
+              if (isPausingAskTool(tool.name)) {
+                const questionnaire = pausingQuestionnaire(tool.name, args);
                 host.pausePending = true;
                 host.queue.push({
                   type: "ask",

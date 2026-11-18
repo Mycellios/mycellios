@@ -17,6 +17,7 @@ import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { runAsSystem, runAsTenant } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { settleCallRequest } from "./call-request.js";
+import { autoStartPlan } from "./plan-autostart.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";
 import { pollCloudAgent } from "./cloud-agent-poll.js";
 import { expireComputerControl } from "./computer-control.js";
@@ -173,6 +174,9 @@ export function createBackgroundJobHandlers(deps: {
     }),
     "call.expire": asOwner(thread, async (payload) => {
       await settleCallRequest(deps, { ...payload, from: ["ringing"], status: "missed" });
+    }),
+    "plan.autostart": asOwner(run, async (payload) => {
+      await autoStartPlan(deps, payload.runId);
     }),
     "cloud_agent.poll": asOwner(cloudAgent, async (payload) => {
       await pollCloudAgent(

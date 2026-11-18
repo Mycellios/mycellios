@@ -6386,3 +6386,43 @@ msgstr "Выполняется вход…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "Это занимает больше времени."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "Показать сообщение целиком"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "Mico остановился, не закончив задачу. Попросите его продолжить."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {# сообщение с {names}} few {# сообщения с {names}} many {# сообщений с {names}} other {# сообщения с {names}}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "Выполнено задач: {done} из {total}"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "Запущено (никто не ответил вовремя)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "Начать · {left} с"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "Перед долгой задачей Mico показывает план в карточке с кнопками «Начать» и «Отмена». Без ответа он может начать сам. Простые ответы остаются прямыми."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "Начинать план самостоятельно"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "Через {seconds} с"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "Никогда"

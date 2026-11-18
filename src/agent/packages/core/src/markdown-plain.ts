@@ -204,6 +204,33 @@ export function truncatedPlainText(markdown: string, maxChars: number): string {
   return truncatePlainText(plainTextFromMarkdown(markdown), maxChars);
 }
 
+const LEAD_SOURCE = 2_000;
+const LEAD_TARGET = 140;
+const LEAD_MAX = 200;
+
+/**
+ * The lead of a reply for a notification: from its first 2,000 characters, leave out code, tables
+ * and headings, then keep whole sentences up to about 140 characters (always the first sentence),
+ * as one plain line of at most 200 characters.
+ */
+export function notificationLead(markdown: string): string {
+  const prose: string[] = [];
+  let fenced = false;
+  for (const line of markdown.slice(0, LEAD_SOURCE).split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) { fenced = !fenced; continue; }
+    if (fenced || /^\s*#{1,6}\s/.test(line) || /^\s*\|/.test(line) || /^( {4}|\t)/.test(line)) continue;
+    prose.push(line);
+  }
+  const plain = plainTextFromMarkdown(prose.join("\n"), { maxSource: Infinity }).replace(/\s+/gu, " ").trim();
+  const sentences = plain.match(/[^.!?。！？]+(?:[.!?。！？]+["')\]]*|$)\s*/gu) ?? [plain];
+  let lead = "";
+  for (const sentence of sentences) {
+    if (lead && (lead + sentence).trim().length > LEAD_TARGET) break;
+    lead += sentence;
+  }
+  return truncatePlainText(lead.trim() || plain, LEAD_MAX);
+}
+
 /** Shorten plain text without splitting a surrogate pair. */
 export function truncatePlainText(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;

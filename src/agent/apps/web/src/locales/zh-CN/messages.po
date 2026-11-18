@@ -6385,3 +6385,43 @@ msgstr "正在登录…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "比平时久了一点。"
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "显示完整消息"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "Mico 在完成任务前停止了。请让它继续。"
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, other {与 {names} 的 # 条消息}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "已完成 {done}/{total} 项任务"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "已开始（无人及时回复）"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "开始 · {left} 秒"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "在长任务之前，Mico 会在带有“开始”和“取消”的卡片中展示计划。若无人回复，它可以自动开始。简单回复仍然直接给出。"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "自动开始计划"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "{seconds} 秒后"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "从不"

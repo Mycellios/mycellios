@@ -131,6 +131,17 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     answer: z.string().optional(),
     /** A secret request the user dismissed instead of answering. */
     dismissed: z.literal(true).optional(),
+    /**
+     * A plan card (acknowledge_request): the steps the Mico will take, shown under the ask text.
+     * The server answers "start" by itself at autoStartAt when nobody answers first.
+     */
+    plan: z
+      .object({
+        steps: z.array(z.object({ label: z.string().max(24), text: z.string().max(200) })).min(1).max(4),
+        autoStartAt: z.string().optional(),
+        autoStarted: z.literal(true).optional(),
+      })
+      .optional(),
     actions: z
       .array(
         z.object({
@@ -219,6 +230,15 @@ export const MessageBlock = z.discriminatedUnion("kind", [
       commandStartedAt: z.string().optional(), commandFinishedAt: z.string().optional(),
     })).max(16).optional(),
     durationMs: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    /** The turn's latest work plan (update_work_plan), shown as a task list above the answer. */
+    kind: z.literal("plan"),
+    explanation: z.string().max(240).optional(),
+    steps: z.array(z.object({
+      title: z.string().max(240),
+      status: z.enum(["pending", "running", "done"]),
+    })).max(12),
   }),
   z.object({
     kind: z.literal("subagent"),
@@ -420,6 +440,8 @@ export const ThreadMessageSchema = z.object({
   runId: Id.optional(),
   /** Set when the message was sent from a live voice call; groups one call's transcript. */
   callId: z.string().optional(),
+  /** Set on a bot's durable mid-turn progress note: not the turn's answer, and it has no actions. */
+  progress: z.literal(true).optional(),
   createdAt: z.string(),
 });
 export type ThreadMessage = z.infer<typeof ThreadMessageSchema>;

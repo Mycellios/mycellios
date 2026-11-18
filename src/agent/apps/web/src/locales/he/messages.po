@@ -6385,3 +6385,43 @@ msgstr "נכנסים…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "זה לוקח קצת יותר זמן."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "הצגת ההודעה המלאה"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "ה-Mico עצר לפני שסיים את המשימה. בקשו ממנו להמשיך."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {הודעה אחת עם {names}} other {# הודעות עם {names}}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "{done} מתוך {total} משימות הושלמו"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "התחיל (אף אחד לא ענה בזמן)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "התחלה · {left} שנ׳"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "לפני משימה ארוכה, ה-Mico מציג את התוכנית שלו בכרטיס עם התחלה וביטול. בלי תשובה הוא יכול להתחיל לבד. תשובות פשוטות נשארות ישירות."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "להתחיל את התוכנית לבד"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "אחרי {seconds} שניות"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "אף פעם"

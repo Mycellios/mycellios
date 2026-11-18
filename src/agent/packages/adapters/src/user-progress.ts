@@ -1,5 +1,5 @@
 import type { MessageBlock } from "@rakazo/contracts";
-import { isToolActivityBlock } from "@rakazo/core";
+import { isToolActivityBlock, isUserProgressClientNonce, USER_PROGRESS_CLIENT_NONCE_PREFIX } from "@rakazo/core";
 
 /**
  * Keep mid-turn progress beats short; prefer a few high-signal updates. Mid-turn
@@ -12,6 +12,17 @@ export const MID_TURN_PROGRESS_MIN_TURN_AGE_MS = 60_000;
 
 /** Cap on durable interim chat messages (message_user + promoted narration) per run. */
 export const MID_TURN_PROGRESS_MAX_PER_RUN = 3;
+
+/**
+ * Whether a progress note adds nothing: fewer than two letters or digits, or the same text (apart
+ * from spacing) as a note this turn already showed. Such a note stays out of the chat.
+ */
+export function isRedundantProgressNote(text: string, shown: readonly string[]): boolean {
+  const key = (value: string) => value.replace(/\s+/gu, " ").trim();
+  const note = key(text);
+  if ((note.match(/[\p{L}\p{N}]/gu)?.length ?? 0) < 2) return true;
+  return shown.some((earlier) => key(earlier) === note);
+}
 
 /**
  * Whether the run may post another durable interim chat message right now.
@@ -74,8 +85,7 @@ export function assistantTurnSeparator(previous: string, next: string): string {
  * as a durable mid-turn message. Tool/step blocks stay for the final publish.
  */
 
-/** clientNonce prefix for mid-turn progress messages (reconciler uses this). */
-export const USER_PROGRESS_CLIENT_NONCE_PREFIX = "user-progress:";
+export { isUserProgressClientNonce, USER_PROGRESS_CLIENT_NONCE_PREFIX };
 
 export function userProgressClientNonce(runId: string, index = 0): string {
   // Include entropy so a resumed executor turn cannot reuse an earlier nonce
@@ -83,9 +93,6 @@ export function userProgressClientNonce(runId: string, index = 0): string {
   return `${USER_PROGRESS_CLIENT_NONCE_PREFIX}${runId}:${index}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function isUserProgressClientNonce(clientNonce: string | null | undefined): boolean {
-  return Boolean(clientNonce?.startsWith(USER_PROGRESS_CLIENT_NONCE_PREFIX));
-}
 
 export function extractNarrationText(
   segments: readonly MessageBlock[],

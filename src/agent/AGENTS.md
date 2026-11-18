@@ -151,6 +151,36 @@
   visible; never enforce brevity by truncating replies or lowering output limits.
   Check the focused conversation-style/Mico behavior tests and provider delivery
   fixtures; a fake provider verifies delivery, not a live model's compliance.
+- Mico replies follow OpenBot's natural/classic behavior. OpenBot is PolyForm
+  Noncommercial: use it as a behavior reference only and write every prompt, label
+  and line of code in our own words. Pi repeats the natural first-line rule as a
+  `<mycellios_turn_style>` block before each user turn (not for scripts, silent runs
+  or compaction). Delegated work answers with DELEGATED_RESULT_FORMAT (Status/Result/
+  Evidence/Unblock) and the requester retells only the outcome, naming the teammate.
+  In natural style the web transcript (`lib/natural-turn.ts`, MessageView) shows the
+  notes written between steps as small action-free lines without filler or repeats,
+  one merged steps summary, then the complete answer; a live answer is held until the
+  turn completes, and a finished turn with nothing after its last step answers with
+  its latest note. Durable progress messages skip filler and repeats
+  (isRedundantProgressNote) and carry `progress: true` (from the user-progress
+  nonce) so natural style draws them as action-free notes. Classic keeps the earlier
+  transcript. Two or more consecutive Mico-to-Mico receipts fold into one
+  "N messages with …" row (peer-exchange-groups); jumps open the row first. Pi and
+  native runtimes both repeat the turn-style reminder. update_work_plan becomes a
+  `plan` block leading the final message (PlanDisclosure: folded "{done} of {total}
+  tasks done"). With showPlan on, direct user runs get `acknowledge_request`: a
+  pausing ask with a `plan` field, fixed start/alternative/cancel answers and a
+  server `plan.autostart` job after the owner's planAutoStartSeconds (default 10; null
+  waits for a person) that answers only through the fenced commit with the internal
+  autoStart flag, never from client input. reconcilePlanAutoStarts restores lost jobs.
+  update_work_plan also travels on agent.tool.called so the live task list stays open
+  (withLivePlan in web and core projections). The Android host and PWA use the web
+  transcript; the legacy Expo preview shows plan-card steps on its ask card.
+  Unknown run errors show their own text only when short and not technical or vague;
+  WORK_INCOMPLETE has its own sentence. Notifications use notificationLead (whole
+  leading sentences, 200 characters). Verify natural-turn, message-view,
+  peer-exchange-groups, PlanCard, plan-card, user-progress, run-error,
+  markdown-plain, conversation-style and bot-messages tests.
 
 - The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
   Hifa Store is available by default for the independent app launch.
@@ -1059,8 +1089,8 @@
 - A running computer does not prove its screen is connected. Offer screen retry and
   confirmed recovery separately, preserving the recovery dialog during background refreshes.
 
-- Keep transcript progress live: stream the reply as it arrives unless the user
-  saved streaming off, and show the current step with its specific command, path
+- Keep transcript progress live: in classic style stream the reply as it arrives
+  unless the user saved streaming off (natural holds the answer until complete), and show the current step with its specific command, path
   or query plus live output in an open timeline. Unknown worker health stays
   visibly unconfirmed; folding details must never cancel, retry or restart a task.
   Keep the latest projected action visible, scoped to the active run and labelled
@@ -1810,8 +1840,10 @@
   Do not shorten output
   with post-processing or reduce model effort to simulate speed. Text progress publishes
   immediately first, then coalesces at 80 ms, with final/tool-boundary flushes retained.
-  Long replies use the same disclosure for plain text and mixed blocks. Keep streamed
-  answers expanded on completion and reveal search/quote targets without losing text.
+  Long replies use the same disclosure for plain text and mixed blocks: over 20,000
+  characters a finished reply shows its first 3,000 (cut at a line end past halfway)
+  with Show full message. Classic keeps streamed answers expanded on completion;
+  natural folds them. Reveal search/quote targets without losing text.
 
 - Agent clarification uses ask_user and the inline questionnaire: up to three short
   questions, optional option descriptions and multiple selection, free text and Skip.
