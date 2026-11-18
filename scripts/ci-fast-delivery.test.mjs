@@ -170,12 +170,13 @@ test('event waits qualify the deployed CHECK upgrade and automatic return on a r
 
 test('deployments are requested only from main pushes after the exact commit passes CI, with OIDC and no stored secret', () => {
   const deploy = readFileSync('.github/workflows/deploy.yml', 'utf8');
-  assert.match(deploy, /^on:\n {2}push:\n {4}branches: \[main\]\n\nconcurrency:/m);
+  assert.match(deploy, /^on:\n {2}push:\n {4}branches: \[main\]\n/m);
+  assert.ok(deploy.includes("if: github.event_name == 'push'"), 'manual runs publish images but never request a deployment');
   assert.ok(!deploy.includes('pull_request'));
   assert.ok(!deploy.includes('secrets.'));
   assert.ok(!deploy.includes('self-hosted'));
   const images = deploy.slice(deploy.indexOf('  publish-images:'), deploy.indexOf('  request-deployment:'));
-  assert.ok(images.includes("if: vars.NUCLEUS_DEPLOY_URL != ''"));
+  assert.ok(images.includes("if: github.ref == 'refs/heads/main' && (vars.NUCLEUS_DEPLOY_URL != '' || github.event_name == 'workflow_dispatch')"));
   assert.ok(images.includes('runs-on: ubuntu-latest') && images.includes('packages: write'));
   assert.ok(images.includes(':sha-${{ github.sha }}'));
   assert.ok(images.includes('org.opencontainers.image.revision=${{ github.sha }}'));
