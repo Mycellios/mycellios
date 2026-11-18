@@ -1,18 +1,20 @@
 FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d4350ea9c3d9494a
-WORKDIR /app
-COPY --chmod=755 src/agent/ .
-COPY --chmod=755 src/contracts/ /contracts/
-# The API imports this dependency-free helper as ../../../../core from apps/api/src.
-COPY --chmod=755 src/core/event-demo-agent-ticket.ts /core/event-demo-agent-ticket.ts
-# Shared contracts are outside /app; they consume this same owned dependency graph.
+# Agent lives in the Mycellios monorepo and imports root modules by relative path
+# (src/contracts, src/core, scripts/, and the web build hashes the native source tree).
+# Keep the monorepo layout so those paths resolve exactly as in CI.
+WORKDIR /repo/src/agent
+COPY --chmod=755 . /repo/
+# Shared contracts consume the Agent workspace's own dependency graph.
 RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --ignore-scripts --no-audit --no-fund \
-    && ln -s /app/node_modules /contracts/node_modules \
+    && ln -s /repo/src/agent/node_modules /repo/src/contracts/node_modules \
     && npm rebuild @prisma/engines \
     && npm run generate --workspace @rakazo/db \
     && npm run build --workspace @rakazo/api --workspace @rakazo/worker
 ARG APP_BASE_PATH=/
 RUN APP_BASE_PATH=$APP_BASE_PATH RAKAZO_ALLOW_DEV_SECRETS=1 npm run build --workspace @rakazo/web
-RUN install -d -m 750 -o node -g node /data /app/apps/web/node_modules/.vite-temp /app/apps/web/asset-archive
+# Existing runtime configurations and tools refer to /app.
+RUN ln -s /repo/src/agent /app \
+    && install -d -m 750 -o node -g node /data /repo/src/agent/apps/web/node_modules/.vite-temp /repo/src/agent/apps/web/asset-archive
 ARG GIT_SHA
 ENV NODE_ENV=production
 ENV GIT_SHA=$GIT_SHA
