@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, openNewSpace, signup } from "./helpers";
+import {
+  captureScreenshot,
+  completeOnboarding,
+  openIntegrations,
+  openNewSpace,
+  signup,
+} from "./helpers";
 
 test("a failed overlay chunk keeps the shell and the draft, and Refresh loads it", async ({
   page,
@@ -13,7 +19,7 @@ test("a failed overlay chunk keeps the shell and the draft, and Refresh loads it
 
   const pluginsChunk = /\/pages\/PluginsOverlay\.tsx/;
   await page.route(pluginsChunk, (route) => route.fulfill({ status: 404 }));
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
 
   const failed = page.getByRole("alertdialog", { name: "Could not load" });
   await expect(failed).toBeVisible();
@@ -24,7 +30,7 @@ test("a failed overlay chunk keeps the shell and the draft, and Refresh loads it
   await expect(composer).toHaveValue("Keep this draft");
 
   await page.unroute(pluginsChunk);
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
   // The reload keeps ?integrations, so the overlay opens on its own once the chunk loads.
   await failed.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(page.getByPlaceholder("Search apps")).toBeVisible();
@@ -107,13 +113,10 @@ for (const overlay of ["settings", "integrations"] as const) {
       { times: 1 },
     );
     const reloaded = page.waitForEvent("load");
-    if (overlay === "settings") await page.getByTestId("user-menu-trigger").click();
-    await page
-      .getByRole("button", {
-        name: overlay === "settings" ? "Settings" : "Connect apps",
-        exact: true,
-      })
-      .click();
+    // Settings opens from the rail; integrations open from Hifa Store or a link, so use the URL.
+    if (overlay === "settings")
+      await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
+    else await page.goto(`${originalUrl}${originalUrl.includes("?") ? "&" : "?"}integrations`);
     await reloaded;
     await expect(opened).toBeVisible();
     await expect(page).toHaveURL(
@@ -190,7 +193,7 @@ test("a failed integrations load offers Retry instead of an empty catalog", asyn
       },
     });
   });
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
 
   const retry = page.getByRole("button", { name: "Retry", exact: true });
   await expect(retry).toBeVisible();

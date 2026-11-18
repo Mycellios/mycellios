@@ -12,7 +12,9 @@ export function settingsMatch(item: { label: string; keywords?: string }, query:
 }
 export const settingsKeywords: Record<string, string> = {
   general:
-    "appearance theme language timezone sidebar density developer enter shortcut interface size agent steps stream tool images logo color background font compact actions external links startup login awake battery restore workspace analytics privacy telemetry metrics server reconnection tipografia fuente colores fondo logotipo acciones compactas enlaces externos iniciar sesion segundo plano suspension bateria restaurar analitica privacidad metricas reconexion servidores general apariencia tema idioma zona horaria densidad desarrollar teclado atajo tamaño interfaz pasos agente respuestas herramientas imágenes",
+    "appearance theme language timezone sidebar density developer enter shortcut interface size agent steps stream tool images logo color background font compact actions external links analytics privacy telemetry metrics tipografia fuente colores fondo logotipo acciones compactas enlaces externos analitica privacidad metricas general apariencia tema idioma zona horaria densidad desarrollar teclado atajo tamaño interfaz pasos agente respuestas herramientas imágenes",
+  "app-behavior":
+    "application behavior startup quit login open background awake sleep battery restore workspace server reconnection comportamiento aplicacion inicio cierre iniciar sesion abrir segundo plano activo suspension bateria restaurar espacio trabajo reconexion servidores equipo",
   "dynamic-island": "dynamic island idle display size width height isla dinamica reposo pantalla ancho alto tamaño",
   "agent-dock": "mico dock position screen agents results automatic hide edge strip floating chat window panel posicion pantalla resultados ocultar borde flotante ventana",
   profile:

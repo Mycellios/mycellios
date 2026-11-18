@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, signup } from "./helpers";
+import { captureScreenshot, completeOnboarding, openIntegrations, signup } from "./helpers";
 
 test("integration setup failures show actionable copy without provider details", async ({
   page,
@@ -44,7 +44,7 @@ test("integration setup failures show actionable copy without provider details",
   });
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
-  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await openIntegrations(page);
   await page.getByRole("textbox", { name: "Search apps", exact: true }).fill("X");
   await page.locator("#integration-list").getByRole("button", { name: "Add", exact: true }).click();
   const alert = page.getByRole("alert");
@@ -90,8 +90,7 @@ test("signup never grants server authority and settings contain only account con
   ] as const) {
     expect((await page.request.post(`/rpc/${path}`, { data: { json: input } })).status()).toBe(403);
   }
-  await page.getByTestId("user-menu-trigger").click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByTestId("user-settings")).toBeVisible();
   await expect(page.getByRole("link", { name: "Server integrations", exact: true })).toBeHidden();
   await expect(page.getByTestId("settings-nav-updates")).toBeHidden();

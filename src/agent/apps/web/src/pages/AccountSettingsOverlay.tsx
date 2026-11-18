@@ -1,4 +1,4 @@
-import { AppearanceExtras, ConversationExtras, AppBehaviorPanel, DevicePrivacySettings, ExternalLinksPreference } from "./settings/GeneralPreferences";
+import { AppearanceExtras, ConversationExtras, DevicePrivacySettings, ExternalLinksPreference } from "./settings/GeneralPreferences";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AccountSecurity } from "@rakazo/contracts";
 import {
@@ -181,14 +181,13 @@ export function GeneralSettingsPanels({
   );
   const passkeysSupported = usePasskeysSupported();
   const [timezonePending, setTimezonePending] = useState(false);
-  const [nativePending, setNativePending] = useState(false);
   const [externalLinksPending, setExternalLinksPending] = useState(false);
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
   const deviceTimezone = localTimezone();
   const dirtyName = editingName && nameDraft.trim() !== displayName(name, "");
   useEffect(() => {
-    onFormStateChange?.({ busy: namePending || timezonePending || nativePending || externalLinksPending || signingOut, dirty: dirtyName });
-  }, [onFormStateChange, namePending, timezonePending, nativePending, externalLinksPending, dirtyName, signingOut]);
+    onFormStateChange?.({ busy: namePending || timezonePending || externalLinksPending || signingOut, dirty: dirtyName });
+  }, [onFormStateChange, namePending, timezonePending, externalLinksPending, dirtyName, signingOut]);
   useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
 
   function chooseLocale(next: UiLocalePreference) {
@@ -369,7 +368,6 @@ export function GeneralSettingsPanels({
         <ConversationExtras />
         <ExternalLinksPreference onBusyChange={setExternalLinksPending} />
       </SettingsGroup>
-      <AppBehaviorPanel onBusyChange={setNativePending} />
       <DevicePrivacySettings />
 
       <Disclosure alwaysVisible

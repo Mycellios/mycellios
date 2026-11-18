@@ -13115,3 +13115,24 @@ msgstr "Could not copy the link. Try again."
 
 msgid "Retry copy"
 msgstr "Retry copy"
+
+msgid "Startup and quit"
+msgstr "Startup and quit"
+
+msgid "Background"
+msgstr "Background"
+
+msgid "Open the space and conversation from the previous session."
+msgstr "Open the space and conversation from the previous session."
+
+msgid "Keep server connections between launches, so Mycellios opens faster. Quit from the menu to disconnect."
+msgstr "Keep server connections between launches, so Mycellios opens faster. Quit from the menu to disconnect."
+
+msgid "Keep tasks active when you close the window."
+msgstr "Keep tasks active when you close the window."
+
+msgid "Routines run on time while the computer is plugged in. The screen can turn off."
+msgstr "Routines run on time while the computer is plugged in. The screen can turn off."
+
+msgid "Keep the computer awake on battery too. The battery drains faster."
+msgstr "Keep the computer awake on battery too. The battery drains faster."

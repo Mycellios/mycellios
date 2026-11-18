@@ -36,13 +36,6 @@ test("legacy opaque names never appear in navigation, account, chats or Activity
     await db.space.update({ where: { id: me.spaceId }, data: { name: "__SpaceTok1__" } });
     await page.goto(`/app/${bot.id}`);
     await expect(page.getByPlaceholder("Message Bot")).toBeVisible();
-    const accountTrigger = page.getByTestId("user-menu-trigger");
-    await expect(accountTrigger).toHaveAccessibleName(`Account menu for ${email}`);
-    await accountTrigger.click();
-    await expect(page.getByTestId("account-menu-header")).toContainText(email);
-    await expectReadableNames(page.locator("body"));
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("account-menu-header")).toBeHidden();
     await expectReadableNames(page.locator("body"));
     await captureScreenshot(page, testInfo, "readable-names-sidebar-chat");
     await openUserSettings(page);
@@ -63,24 +56,13 @@ test("legacy opaque names never appear in navigation, account, chats or Activity
     await nameInput.press("Enter");
     await expect(accountCard.getByRole("alert")).toHaveText("Could not update name");
     await expect(nameInput).toHaveValue("💬");
-    await expect(page.getByTestId("user-menu-trigger")).toHaveAttribute(
-      "aria-label",
-      `Account menu for ${email}`,
-    );
     await nameInput.fill("  Alex Rivera  ");
     await nameInput.press("Enter");
     await expect(nameInput).toBeHidden();
     await expect(accountCard).toContainText("Alex Rivera");
-    await expect(page.getByTestId("user-menu-trigger")).toHaveAttribute(
-      "aria-label",
-      "Account menu for Alex Rivera",
-    );
     await captureScreenshot(page, testInfo, "readable-names-account-saved");
     await page.reload();
-    await expect(page.getByTestId("user-menu-trigger")).toHaveAttribute(
-      "aria-label",
-      "Account menu for Alex Rivera",
-    );
+    await expect(page.getByTestId("account-card")).toContainText("Alex Rivera");
     await page.keyboard.press("Escape");
     await page.goto(`/app/g/${group.id}`);
     await expect(page.getByPlaceholder("Message Group")).toBeVisible();

@@ -243,6 +243,7 @@ import { MarketplaceWorkspace } from "./marketplace/MarketplaceWorkspace";
 import { hifaStoreEnabled } from "../lib/hifa-store";
 import { marketplaceTab, type MarketplaceTab } from "./marketplace/catalog";
 import { WorkspaceRail } from "./shell/workspace-rail";
+import { FrozenWhileCovered } from "./shell/frozen-while-covered";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
 import { ChatHeaderTools, ChatToolsPanel, MobileChatActions } from "./shell/chat-tools-panel";
@@ -4188,8 +4189,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onModels={isMobileSidebar ? undefined : () => openSettings("models")}
         onWhatsNew={() => setReleaseNotesOpen(true)}
         onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
-        accountControls={!isMobileSidebar ? sidebarFooter(undefined, true) : undefined}
       />}
+      <FrozenWhileCovered covered={overlay?.kind === "settings"}>
       {!floatingChat && ((!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen) ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
         side={document.documentElement.dir === "rtl" ? "right" : "left"}
@@ -4647,6 +4648,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         ) : null}
         </>}
       </main>
+      </FrozenWhileCovered>
 
       {Object.entries(sideQuestionTargets).map(([key, target]) => <SideQuestion key={key} {...target} enterToSend={enterToSend}
         active={key === asideKey && target.visible && !libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
@@ -4677,6 +4679,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         return sent.runId;
       }} inspectPreparation={runId => rpc.threads.projectPreparation({ botId: active!.id, runId })}
       cancelPreparation={runId => rpc.threads.stopProjectPreparation({ botId: active!.id, runId })} />
+      <FrozenWhileCovered covered={overlay?.kind === "settings"}>
       <ResizableSidePanel
         open={Boolean(!reviewWorkspace?.open && panel && (active || activeGroup || panel === "import-agent"))}
         panel={panel ?? "closed"}
@@ -4888,6 +4891,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           </div>
         ) : null}
       </ResizableSidePanel>
+      </FrozenWhileCovered>
 
       <Suspense fallback={null}>
         {spaceMenu ? (
@@ -5135,7 +5139,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             usage={usage}
             onUsageOpen={refreshUsage}
             section={overlay.section}
-            onSectionChange={(section) => setOverlay({ ...overlay, section })}
             billingEnabled={bootstrapMe?.billingEnabled === true}
             sandboxProvider={bootstrapMe?.sandboxProvider}
             onSandboxProviderChange={(sandboxProvider) =>

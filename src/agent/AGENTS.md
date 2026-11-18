@@ -1330,8 +1330,13 @@
   First-party onboarding starts with the signed-in Mycellios account and owned
   contribution credits; AntSeed remains an explicit alternative requiring the user's
   own key. Never fall back to another payer or provider when native credit access fails.
-  Empty accounts enter the team builder even when a default model is configured.
+  Empty accounts see one OpenBot-style first-run choice (FirstRunChoice): free
+  models (recommended) connect Mycellios and make a zero-priced catalog model the
+  main role when one exists; a subscription goes to ChatGPT/Claude sign-in or an
+  installed Codex/Claude Code/OpenCode. Both create the default team without model
+  calls; analytics stays opt-in. The team builder remains at /onboarding/team.
   Explicit role/audience/start choices create bounded templates without model calls.
+  Verify with scripts/verify-onboarding-team-ui.mjs.
   Preserve configured providers and Space-scoped spawn keys on retries; setup
   profiles use bots.createProfile so creation never starts automatic inference
   and older servers fail before creating a profile. Keep the
@@ -1477,8 +1482,14 @@
   mobile layout. Verify mobile-sidebar-swipe.spec.ts.
   On desktop, keep search visible below the expanded sidebar header. The search
   icon in the collapsed sidebar expands it and focuses the same field.
-  Keep account and integration controls in the workspace rail and place credits
-  and compute contribution at the foot of the chat sidebar.
+  The desktop rail footer follows OpenBot, top to bottom: usage, Hifa Store,
+  Help, Settings and the server menu last. It has no account avatar or app
+  marks; sign-out lives in Settings > Profile, integrations in Hifa Store, and
+  the account footer remains in the mobile navigation. Place credits and compute
+  contribution at the foot of the chat sidebar.
+- The full-viewport Settings panel owns its current section. Keep the roster,
+  transcript and side panel frozen behind it (FrozenWhileCovered) so section
+  changes do not re-render the hidden app; they catch up on close.
 - The transcript follows geometry changes only while the reader is at the end.
   Preserve history and explicit reply jumps, and animate only newly appended
   messages when motion is enabled. Verify chat-progress-messages.spec.ts.

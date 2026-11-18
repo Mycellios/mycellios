@@ -266,8 +266,7 @@ test("changes and recovers an email password", async ({ page }, testInfo) => {
     "sidebar-search",
   );
 
-  await page.getByTestId("user-menu-trigger").click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.getByTestId("user-settings");
   await expect(settings).toBeVisible();
   await expect(settings.getByLabel("Current password")).toHaveCount(0);
@@ -378,8 +377,7 @@ test("password-off account settings hide password changes and retain password de
       },
     }),
   );
-  await page.getByTestId("user-menu-trigger").click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.getByTestId("user-settings");
   await expect(settings).toBeVisible();
   await expect(settings.getByRole("button", { name: "Change password", exact: true })).toHaveCount(

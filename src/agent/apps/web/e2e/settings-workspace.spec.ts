@@ -101,8 +101,7 @@ test("unified settings persist real local changes, guard drafts and keep every s
     await expect(page.getByRole("combobox", { name: /^Message/ })).toBeVisible();
     const composer = page.getByRole("combobox", { name: /^Message/ });
     await composer.fill("Preserve settings draft.");
-    await page.getByTestId("user-menu-trigger").click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
     const settings = page.getByTestId("user-settings");
     const nav = page.getByTestId("settings-nav");
     const desktopViewport = page.viewportSize()!;
@@ -270,8 +269,7 @@ test("unified settings persist real local changes, guard drafts and keep every s
     await expect(page.getByTestId("release-notes-dialog")).toBeVisible();
     await page.getByRole("button", { name: "Got it", exact: true }).click();
     await expect(composer).toHaveValue("Preserve settings draft.");
-    await page.getByTestId("user-menu-trigger").click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
     await page.getByTestId("settings-nav-agents").click();
     await settings.getByRole("button", { name: "Manage", exact: true }).first().click();
     await expect(page.getByTestId("user-settings")).not.toBeVisible();
