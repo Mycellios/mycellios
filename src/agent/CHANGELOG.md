@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-18
+
+### Added
+
+- The sign-in page says how your data is used and links to the Terms of Service and the
+  Privacy Policy, now published as drafts at /terms and /privacy.
+
+### Changed
+
+- What's new shows every version since your last update, grouped into New, Improved and Fixed.
+  Long fix lists start closed, and the dialog links to the full changelog.
+- The chat list on narrow screens uses smaller avatars and names.
+
+### Fixed
+
+- Restart in the update notice now restarts Mycellios right away instead of leaving the
+  update waiting. Running local tasks are saved and resume after the restart; unsaved
+  changes and calls still ask you first.
+
 ## [0.4.0] - 2026-11-17
 
 ### Added
