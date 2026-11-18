@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as receiptDelay } from "node:timers/promises";
 import type { ManagedCatalogDiscovery, ManagedModel } from "../contracts/managed-provider.js";
+import { MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
 import { managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest, type ManagedTextResult } from "./managed-openrouter.js";
 import { readManagedTextStream } from "./managed-text-stream.js";
@@ -165,6 +166,8 @@ export class ManagedAntseedGateway {
         candidates.sort((a, b) => b.quality - a.quality || a.seller.localeCompare(b.seller));
         if (candidates[0]) {
           const {quality: _quality, ...offer} = candidates[0];
+          // Overhead covers the quote allowance with the 256-message maximum framing.
+          offer.public = {...offer.public, ...managedTextLimits(offer.context, offer.output, 8192 + 256 * 64)};
           offers.set(publicId, offer); entry.available = true; entry.reason = "ready"; entry.pricing = offer.public.pricing;
         }
       } catch { /* Invalid discovery entries cannot authorize spend. */ }
@@ -198,7 +201,7 @@ export class ManagedAntseedGateway {
     const body = {...request, model: offer.seller + "@" + (offer.service ?? "deepseek-v4-flash"), store: false, max_tokens: output,
       ...(request.stream ? {stream_options: {include_usage: true}} : {})};
     const bytes = Buffer.byteLength(JSON.stringify(body)), inputBound = bytes + 8192 + request.messages.length * 64;
-    if (bytes > 131072 || inputBound + output > offer.context) throw new Error("managed_request_too_large");
+    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || inputBound + output > offer.context) throw new Error("managed_request_too_large");
     // The gateway rounds its own upper bound to USDC micro-units. Cover that ceil as well.
     const rawUsd = tokenCost(offer.inputCap ?? INPUT_CAP, offer.outputCap ?? OUTPUT_CAP, inputBound, output);
     const micro = managedCharge(rawUsd, 0).upstreamMicrounits;

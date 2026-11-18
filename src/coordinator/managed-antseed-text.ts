@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ManagedCatalogDiscovery, ManagedModel } from "../contracts/managed-provider.js";
+import { MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
 import { managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest, type ManagedTextResult } from "./managed-openrouter.js";
 import { readManagedTextStream } from "./managed-text-stream.js";
@@ -144,7 +145,7 @@ export class ManagedAntseedText {
           return delta < 0n ? -1 : delta > 0n ? 1 : `${a.seller}/${a.provider}`.localeCompare(`${b.seller}/${b.provider}`);
         });
         const selected = candidates[0];
-        if (selected) { offers.set(publicId, selected); entry.available = true; entry.reason = "ready"; entry.pricing = selected.public.pricing; }
+        if (selected) { selected.public = { ...selected.public, ...managedTextLimits(selected.context, selected.maxOutput, 4096) }; offers.set(publicId, selected); entry.available = true; entry.reason = "ready"; entry.pricing = selected.public.pricing; }
       } catch { /* Invalid catalog entries stay unavailable. */ }
     }
     this.offers = offers; this.discovered = discovered; this.refreshedAt = Date.now();
@@ -173,7 +174,7 @@ export class ManagedAntseedText {
         || typeof fn.name !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(fn.name);
     }))) throw new Error("managed_server_tools_not_allowed");
     const bytes = Buffer.byteLength(JSON.stringify(request)), output = request.max_tokens ?? Math.min(256, offer.maxOutput);
-    if (bytes > 131072 || !Number.isSafeInteger(output) || output < 1 || output > offer.maxOutput || bytes + 4096 + output > offer.context)
+    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || !Number.isSafeInteger(output) || output < 1 || output > offer.maxOutput || bytes + 4096 + output > offer.context)
       throw new Error("managed_request_too_large");
     const maximumUsd = tokenCost(offer.input, offer.output, bytes + 4096, output), fundingCostBasisPoints = this.funding ?? 0;
     return { offer, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, fundingCostBasisPoints).totalMicrounits,

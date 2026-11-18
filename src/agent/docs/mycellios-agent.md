@@ -197,6 +197,10 @@ Publication configuration, prepared but not applied to production:
 4. Set the initial connection limits with `DEFAULT_MODEL_MAX_TOKENS` and
    `DEFAULT_MODEL_CONTEXT_WINDOW` based on the model and admitted hardware.
    Users can subsequently edit their saved connection through the existing UI.
+   Catalog routes that publish `context_length` (and `max_output_tokens`) in
+   `/models`, such as managed AntSeed and OpenRouter models, run with those
+   per-model bounds instead; the connection values remain the fallback and
+   the saved output limit stays a ceiling.
 5. Validate HTTPS login, denied/replayed callbacks, own-account balance and a
    funded completion on the actual deployment before opening public traffic.
    Private-instance qualification does not establish that a production OAuth

@@ -32,6 +32,23 @@ export interface ManagedModel {
     fundingCostBasisPoints?: number;
     estimate?:"maximum";
   };
+  /** Token-equivalent admission bounds of this route, from managedTextLimits. */
+  context_length?: number;
+  max_input_tokens?: number;
+  max_output_tokens?: number;
+}
+/** Requests above this many JSON bytes are refused before any paid upstream call. */
+export const MANAGED_TEXT_MAX_REQUEST_BYTES = 131_072;
+/**
+ * Clients estimate tokens; quotes bound input by JSON bytes. Publishing a token
+ * budget at 0.28 tokens per byte keeps an admitted estimate under both the byte
+ * cap and the route context (counted as bytes plus the route overhead), so a
+ * client can plan without changing the conservative paid admission bound.
+ */
+export function managedTextLimits(contextTokens: number, maxOutput: number, overhead: number) {
+  const bytes = Math.min(MANAGED_TEXT_MAX_REQUEST_BYTES, contextTokens - overhead - maxOutput);
+  const input = Math.max(0, Math.floor(bytes * 0.28));
+  return { context_length: input + maxOutput, max_input_tokens: input, max_output_tokens: maxOutput };
 }
 
 export interface ManagedCharge {

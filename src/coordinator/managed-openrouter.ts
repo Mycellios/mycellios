@@ -1,4 +1,5 @@
 import type { ManagedModel } from "../contracts/managed-provider.js";
+import { MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
 import { addUsd, managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { readManagedTextStream } from "./managed-text-stream.js";
 
@@ -122,6 +123,7 @@ export class ManagedOpenRouter {
         offers.set(id, { upstreamId: row.id, inputUsd: upper.input, outputUsd: upper.output,requestUsd:upper.request,
           contextLength: Number(row.context_length), public: { id, name: typeof row.name === "string" ? row.name : row.id,
             modality: "text", owned_by: "mycellios", processing: "external",
+            ...managedTextLimits(Number(row.context_length), 8192, 4096),
             pricing: { currency: "credits", serviceFeeBasisPoints: 400,
               input: markedUpUnitPrice(upper.input,funding), output: markedUpUnitPrice(upper.output,funding), unit: "token",
               request:markedUpUnitPrice(upper.request,funding),fundingCostBasisPoints:funding,
@@ -159,7 +161,7 @@ export class ManagedOpenRouter {
     const bytes = Buffer.byteLength(JSON.stringify(request));
     const output = request.max_tokens ?? 256;
     const input = bytes + 4096; // Byte-token upper bound plus serialization allowance, not reported usage.
-    if (bytes > 131_072 || !Number.isSafeInteger(output) || output < 1 || output > 8192 || input + output > offer.contextLength)
+    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || !Number.isSafeInteger(output) || output < 1 || output > 8192 || input + output > offer.contextLength)
       throw new Error("managed_request_too_large");
     const maximumUsd = addUsd(tokenCost(offer.inputUsd, offer.outputUsd, input, output),offer.requestUsd);
     const fundingCostBasisPoints=this.fundingCostBasisPoints??0;
