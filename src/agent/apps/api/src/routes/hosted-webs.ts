@@ -2,11 +2,20 @@ import { ORPCError } from "@orpc/server";
 import { ANTSEED_RADAR_HTML } from "../hosted-webs/antseed-template.js";
 import { createWebPreview } from "../hosted-webs/preview.js";
 import { hostedWebDataService } from "../hosted-webs/data.js";
+import { hostedWebFilesConfig, hostedWebFilesService } from "../hosted-webs/files.js";
 import { hostedWebService } from "../hosted-webs/service.js";
 import type { RouterContext } from "./context.js";
 
 export function hostedWebRoutes({ deps, authed }: RouterContext) {
-  const service = hostedWebService(deps.prisma);
+  const filesConfig = hostedWebFilesConfig(
+    process.env,
+    deps.artifacts,
+    deps.env?.maxUploadSizeBytes,
+  );
+  const files = hostedWebFilesService(deps.prisma, deps.artifacts, filesConfig);
+  // Account deletion may finish after its own sweep; catch those objects later.
+  setInterval(() => void files.sweep().catch(() => undefined), 30 * 60 * 1000).unref();
+  const service = hostedWebService(deps.prisma, { filesAvailable: filesConfig.available });
   const data = hostedWebDataService(deps.prisma);
   return {
     webs: {
@@ -65,6 +74,15 @@ export function hostedWebRoutes({ deps, authed }: RouterContext) {
         restore: authed.webs.history.restore.handler(({ context, input }) =>
           service.restore(context.actor, input.id, input.snapshotId, input.version),
         ),
+      },
+      files: {
+        status: authed.webs.files.status.handler(() => files.status()),
+        put: authed.webs.files.put.handler(({ context, input }) => files.put(context.actor, input)),
+        get: authed.webs.files.get.handler(({ context, input }) => files.get(context.actor, input)),
+        delete: authed.webs.files.delete.handler(({ context, input }) =>
+          files.delete(context.actor, input),
+        ),
+        list: authed.webs.files.list.handler(({ context, input }) => files.list(context.actor, input)),
       },
       data: {
         get: authed.webs.data.get.handler(({ context, input }) => data.get(context.actor, input)),

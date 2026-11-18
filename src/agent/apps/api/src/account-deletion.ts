@@ -11,6 +11,7 @@ import {
   recordComputerRunEnd,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { sweepHostedWebFiles } from "./hosted-webs/files.js";
 import type { SpaceDeletionDeps } from "./space-deletion.js";
 
 /**
@@ -99,6 +100,10 @@ export async function deleteAccountContent(deps: SpaceDeletionDeps, userId: stri
     }),
   );
 
+  // Hifa Store app files this account left behind (as visitor or app owner).
+  await sweepHostedWebFiles(deps.prisma, deps.artifacts, 500).catch((error) =>
+    getLogger().error("app file cleanup", error),
+  );
   for (const spaceId of leaving) {
     const deleted = await deleteSpaceLeavingWithAccount(deps.prisma, { spaceId, userId });
     if (!deleted) continue;

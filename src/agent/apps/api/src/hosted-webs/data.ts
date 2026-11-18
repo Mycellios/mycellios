@@ -1,10 +1,47 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { type Actor, HOSTED_WEB_DATA_LIMITS } from "@rakazo/contracts";
+import { type Actor, HOSTED_WEB_DATA_LIMITS, type HostedWebCapability } from "@rakazo/contracts";
 import { type PrismaClient, runAsSystem, runAsTenant } from "@rakazo/db";
 import { bundleCapabilities } from "./bundle.js";
 
-type Target = { id: string; preview: boolean };
+export type AppTarget = { id: string; preview: boolean };
+type Target = AppTarget;
+const DENIED: Record<HostedWebCapability, string> = {
+  downloads: "Esta app no tiene permiso para descargar archivos.",
+  storage: "Esta app no tiene permiso para guardar datos.",
+  files: "Esta app no tiene permiso para guardar archivos.",
+};
+
+/**
+ * The grant comes from the exact published revision (visitors) or the caller's own
+ * saved draft (owner preview); never from the request. Call inside runAsTenant.
+ */
+export async function requireAppCapability(
+  db: PrismaClient,
+  actor: Actor,
+  target: AppTarget,
+  capability: HostedWebCapability,
+) {
+  const granted = target.preview
+    ? await db.hostedWeb
+        .findFirst({
+          where: { id: target.id, userId: actor.userId, spaceId: actor.spaceId },
+          select: { draftBundle: true },
+        })
+        .then((row) => (row ? bundleCapabilities(row.draftBundle) : null))
+    : await runAsSystem(
+        "hosted web data: read the capabilities of the exact published revision",
+        async () => {
+          const [row] = await db.$queryRaw<Array<{ bundle: unknown }>>`
+            SELECT r.bundle FROM hosted_webs w
+            JOIN hosted_web_revisions r ON r.id=w."publishedRevisionId" AND r."siteId"=w.id
+            WHERE w.id=${target.id} LIMIT 1`;
+          return row ? bundleCapabilities(row.bundle) : null;
+        },
+      );
+  if (!granted) throw new ORPCError("NOT_FOUND");
+  if (!granted.includes(capability)) throw new ORPCError("FORBIDDEN", { message: DENIED[capability] });
+}
 /** Stored as `{ v }` so arrays, null and primitives seal as one encrypted value. */
 type Stored = { v: unknown };
 
@@ -20,30 +57,6 @@ export function hostedWebDataService(db: PrismaClient) {
     spaceId: actor.spaceId,
     preview: target.preview,
   });
-  async function admit(actor: Actor, target: Target) {
-    const granted = target.preview
-      ? await db.hostedWeb
-          .findFirst({
-            where: { id: target.id, userId: actor.userId, spaceId: actor.spaceId },
-            select: { draftBundle: true },
-          })
-          .then((row) => (row ? bundleCapabilities(row.draftBundle) : null))
-      : await runAsSystem(
-          "hosted web data: read the capabilities of the exact published revision",
-          async () => {
-            const [row] = await db.$queryRaw<Array<{ bundle: unknown }>>`
-              SELECT r.bundle FROM hosted_webs w
-              JOIN hosted_web_revisions r ON r.id=w."publishedRevisionId" AND r."siteId"=w.id
-              WHERE w.id=${target.id} LIMIT 1`;
-            return row ? bundleCapabilities(row.bundle) : null;
-          },
-        );
-    if (!granted) throw new ORPCError("NOT_FOUND");
-    if (!granted.includes("storage"))
-      throw new ORPCError("FORBIDDEN", {
-        message: "Esta app no tiene permiso para guardar datos.",
-      });
-  }
   // Same membership fence as the app service, then RLS on every statement.
   const scoped = async <T>(actor: Actor, target: Target, fn: () => Promise<T>) =>
     runAsTenant(actor, async () => {
@@ -51,7 +64,7 @@ export function hostedWebDataService(db: PrismaClient) {
         where: { spaceId_userId: { spaceId: actor.spaceId, userId: actor.userId } },
       });
       if (!member) throw new ORPCError("FORBIDDEN");
-      await admit(actor, target);
+      await requireAppCapability(db, actor, target, "storage");
       return fn();
     });
   const usage = async (actor: Actor, target: Target) => {

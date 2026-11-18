@@ -95,8 +95,15 @@ export function HostedWebs({
   const siteFrame = useRef<HTMLIFrameElement>(null);
   useAppStorageBridge(
     siteFrame,
-    open?.capabilities?.includes("storage") ? { id: open.id, preview: false } : null,
-    client.webs.data,
+    open
+      ? {
+          id: open.id,
+          preview: false,
+          storage: open.capabilities?.includes("storage") ?? false,
+          files: open.capabilities?.includes("files") ?? false,
+        }
+      : null,
+    client.webs,
   );
   useEffect(() => {
     alive.current = true;

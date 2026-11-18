@@ -19,6 +19,7 @@ import {
   SPACE_DELETION_CLAIM_TIMEOUT_MS,
   SpaceDeletionInProgressError,
 } from "@rakazo/db";
+import { sweepHostedWebFiles } from "./hosted-webs/files.js";
 import { getLogger } from "@rakazo/logging";
 
 /** Bound for one bot or sandbox teardown. Providers may ignore the abort signal,
@@ -176,6 +177,9 @@ export async function deleteSpaceWithContent(
     for (const result of cleanup) {
       if (result.status === "rejected") getLogger().error("space file cleanup", result.reason);
     }
+    await sweepHostedWebFiles(deps.prisma, deps.artifacts, 500).catch((error) =>
+      getLogger().error("app file cleanup", error),
+    );
     return { activeSpaceId: deleted.id };
   } catch (error) {
     if (signal?.aborted) claimReleasable = false;

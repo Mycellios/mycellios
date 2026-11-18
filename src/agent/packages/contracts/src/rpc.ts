@@ -7,6 +7,11 @@ import {
   HostedWebDataSet,
   HostedWebDataUsage,
   HostedWebDraft,
+  HostedWebFileEntry,
+  HostedWebFilePut,
+  HostedWebFileRef,
+  HostedWebFilesStatus,
+  HostedWebFilesUsage,
   HostedWebSave,
   HostedWebSnapshot,
 } from "./hosted-webs.js";
@@ -249,6 +254,15 @@ export const appContract = {
       restore: oc
         .input(z.object({ id: z.string().uuid(), snapshotId: z.string().uuid(), version: z.number().int().positive() }).strict())
         .output(HostedWebDraft),
+    },
+    files: {
+      status: oc.output(HostedWebFilesStatus),
+      put: oc.input(HostedWebFilePut).output(HostedWebFilesUsage),
+      get: oc.input(HostedWebFileRef).output(z.object({ mimeType: z.string(), contentBase64: z.string() })),
+      delete: oc.input(HostedWebFileRef).output(HostedWebFilesUsage),
+      list: oc
+        .input(z.object({ id: z.string().uuid(), preview: z.boolean() }).strict())
+        .output(z.object({ entries: z.array(HostedWebFileEntry), usage: HostedWebFilesUsage })),
     },
     data: {
       get: oc.input(HostedWebDataGet).output(z.object({ found: z.boolean(), value: z.json().nullable() })),
