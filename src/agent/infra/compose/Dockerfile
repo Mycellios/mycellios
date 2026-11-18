@@ -2,6 +2,8 @@ FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d43
 WORKDIR /app
 COPY --chmod=755 src/agent/ .
 COPY --chmod=755 src/contracts/ /contracts/
+# The API imports this dependency-free helper as ../../../../core from apps/api/src.
+COPY --chmod=755 src/core/event-demo-agent-ticket.ts /core/event-demo-agent-ticket.ts
 # Shared contracts are outside /app; they consume this same owned dependency graph.
 RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --ignore-scripts --no-audit --no-fund \
     && ln -s /app/node_modules /contracts/node_modules \
