@@ -12,7 +12,7 @@ i18n.load(locale, locale === "es" ? spanish : {});
 i18n.activate(locale);
 createRoot(document.getElementById("root")!).render(
   <I18nProvider i18n={i18n}>
-    <MemoryRouter initialEntries={["/onboarding"]}>
+    <MemoryRouter initialEntries={[new URLSearchParams(location.search).get("start") ?? "/onboarding"]}>
       <Routes>
         <Route path="/onboarding/:step?" element={<OnboardingPage />} />
         <Route path="/app/:botId?" element={<p data-testid="team-created">Profiles ready</p>} />

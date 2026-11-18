@@ -13,6 +13,7 @@ import {
   type TeamStart,
 } from "./team-catalog";
 import { useTeamCopy } from "./team-copy";
+import { BackLink, ChoiceList, ChoiceRow, OnboardingHeading } from "./onboarding-ui";
 
 type Phase =
   | { kind: "describe" }
@@ -104,6 +105,19 @@ export function TeamBuilder({
   const questions = phase.kind === "question" ? questionsFor() : [];
   const question = questions[phase.kind === "question" ? phase.index : 0];
 
+  const optionRows = (
+    ids: readonly string[],
+    label: (id: string) => string,
+    selected: string | null,
+    pick: (id: string) => void,
+  ) => (
+    <ChoiceList className="mt-3">
+      {ids.map((id) => (
+        <ChoiceRow key={id} title={label(id)} pressed={selected === id} onClick={() => pick(id)} />
+      ))}
+    </ChoiceList>
+  );
+
   return (
     <div data-testid="onboarding-team">
       {phase.kind === "describe" ? (
@@ -119,8 +133,7 @@ export function TeamBuilder({
             setPhase({ kind: "question", index: 0, description: text });
           }}
         >
-          <h1 className="text-[32px] font-medium text-foreground">{copy.heading}</h1>
-          <p className="mt-4 text-muted-foreground">{copy.intro}</p>
+          <OnboardingHeading title={copy.heading} description={copy.intro} />
           <Textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
@@ -128,50 +141,35 @@ export function TeamBuilder({
             aria-label={copy.heading}
             rows={4}
             maxLength={2000}
-            className="mt-4"
+            className="mt-8 rounded-xl bg-card px-4 py-3"
             disabled={busy}
           />
-          <Button type="submit" className="mt-4 w-full" disabled={busy || !description.trim()}>
+          <Button type="submit" size="lg" className="mt-3 w-full" disabled={busy || !description.trim()}>
             {t`Continue`}
           </Button>
-          <p className="mt-3 text-sm text-muted-foreground">{copy.setupCost}</p>
-          <Disclosure summary={copy.gallery} className="mt-8" contentClassName="mt-3 grid gap-3">
-            {TEAM_SECTORS.map((id) => {
-              const item = copy.sectors[id];
-              const roster = membersFor({
-                description: description.trim(),
-                sector: id,
-                audience: "me",
-                start: "drafts",
-              });
-              return (
-                <div key={id} className="rounded-md border border-border p-3">
-                  <p className="font-medium text-foreground">{item.name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.summary}</p>
-                  <p className="mt-2 text-sm text-foreground">
-                    {roster.map((member) => member.name).join(", ")}
-                  </p>
-                  <Button
-                    type="button"
-                    className="mt-3"
+          <p className="mt-3 text-center text-sm text-muted-foreground">{copy.setupCost}</p>
+          <Disclosure summary={copy.gallery} className="mt-8" contentClassName="mt-3">
+            <ChoiceList>
+              {TEAM_SECTORS.map((id) => {
+                const item = copy.sectors[id];
+                const roster = membersFor({ description: description.trim(), sector: id, audience: "me", start: "drafts" });
+                return (
+                  <ChoiceRow
+                    key={id}
+                    title={item.name}
+                    detail={
+                      <>
+                        {item.summary}
+                        <span className="mt-1 block text-foreground/80">{roster.map((member) => member.name).join(", ")}</span>
+                      </>
+                    }
                     aria-label={`${copy.putToWork}: ${item.name}`}
                     disabled={busy}
-                    onClick={() =>
-                      void create(
-                        membersFor({
-                          description: description.trim(),
-                          sector: id,
-                          audience: "me",
-                          start: "drafts",
-                        }),
-                      )
-                    }
-                  >
-                    {busy ? copy.creating : copy.putToWork}
-                  </Button>
-                </div>
-              );
-            })}
+                    onClick={() => void create(roster)}
+                  />
+                );
+              })}
+            </ChoiceList>
           </Disclosure>
         </form>
       ) : null}
@@ -181,12 +179,9 @@ export function TeamBuilder({
             event.preventDefault();
             if (busy) return;
             const text = phase.description;
-            const pickedSector = question === "sector" ? sector : null;
-            const pickedAudience = question === "audience" ? audience : null;
-            const pickedStart = question === "start" ? start : null;
-            if (question === "sector" && !pickedSector) return;
-            if (question === "audience" && !pickedAudience) return;
-            if (question === "start" && !pickedStart) return;
+            if (question === "sector" && !sector) return;
+            if (question === "audience" && !audience) return;
+            if (question === "start" && !start) return;
             const nextIndex = phase.index + 1;
             if (nextIndex < questions.length) {
               setPhase({ kind: "question", index: nextIndex, description: text });
@@ -200,58 +195,35 @@ export function TeamBuilder({
             });
           }}
         >
-          <h1 className="text-[32px] font-medium text-foreground">{copy.questionsIntro}</h1>
-          <p className="mt-4 break-words text-muted-foreground">{phase.description}</p>
-          <fieldset className="mt-6 grid gap-2">
+          <BackLink
+            onClick={() => {
+              setError(null);
+              if (phase.index === 0) setPhase({ kind: "describe" });
+              else setPhase({ kind: "question", index: phase.index - 1, description: phase.description });
+            }}
+          >
+            {t`Back`}
+          </BackLink>
+          <div className="mt-4">
+            <OnboardingHeading title={copy.questionsIntro} description={<span className="break-words">{phase.description}</span>} />
+          </div>
+          <fieldset className="mt-8">
             <legend className="text-sm font-medium text-foreground">
-              {question === "sector"
-                ? copy.closest
-                : question === "audience"
-                  ? copy.who
-                  : copy.first}
+              {question === "sector" ? copy.closest : question === "audience" ? copy.who : copy.first}
             </legend>
             {question === "sector"
-              ? TEAM_SECTORS.map((id) => (
-                  <Button
-                    key={id}
-                    type="button"
-                    variant={sector === id ? "default" : "outline"}
-                    aria-pressed={sector === id}
-                    onClick={() => setSector(id)}
-                  >
-                    {copy.sectors[id].name}
-                  </Button>
-                ))
+              ? optionRows(TEAM_SECTORS, (id) => copy.sectors[id as TeamSector].name, sector, (id) => setSector(id as TeamSector))
               : null}
             {question === "audience"
-              ? TEAM_AUDIENCES.map((id) => (
-                  <Button
-                    key={id}
-                    type="button"
-                    variant={audience === id ? "default" : "outline"}
-                    aria-pressed={audience === id}
-                    onClick={() => setAudience(id)}
-                  >
-                    {copy.audiences[id]}
-                  </Button>
-                ))
+              ? optionRows(TEAM_AUDIENCES, (id) => copy.audiences[id as TeamAudience], audience, (id) => setAudience(id as TeamAudience))
               : null}
             {question === "start"
-              ? TEAM_STARTS.map((id) => (
-                  <Button
-                    key={id}
-                    type="button"
-                    variant={start === id ? "default" : "outline"}
-                    aria-pressed={start === id}
-                    onClick={() => setStart(id)}
-                  >
-                    {copy.starts[id]}
-                  </Button>
-                ))
+              ? optionRows(TEAM_STARTS, (id) => copy.starts[id as TeamStart], start, (id) => setStart(id as TeamStart))
               : null}
           </fieldset>
           <Button
             type="submit"
+            size="lg"
             className="mt-6 w-full"
             disabled={
               (question === "sector" && !sector) ||
@@ -261,61 +233,11 @@ export function TeamBuilder({
           >
             {t`Continue`}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="mt-3"
-            onClick={() => {
-              setError(null);
-              if (phase.index === 0) setPhase({ kind: "describe" });
-              else
-                setPhase({
-                  kind: "question",
-                  index: phase.index - 1,
-                  description: phase.description,
-                });
-            }}
-          >
-            {t`Back`}
-          </Button>
         </form>
       ) : null}
       {phase.kind === "proposal" && proposal ? (
         <div>
-          <h1 className="text-[32px] font-medium text-foreground">{copy.proposal}</h1>
-          <p className="mt-4 text-muted-foreground">
-            {copy.sectors[phase.sector].summary} {copy.credits}
-          </p>
-          <p className="mt-3 text-sm text-muted-foreground">{copy.setupCost}</p>
-          <ul className="mt-4 grid gap-3">
-            {proposal.map((member) => (
-              <li key={member.id} className="rounded-md border border-border p-3">
-                <p className="font-medium text-foreground">{member.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{member.title}</p>
-              </li>
-            ))}
-          </ul>
-          <Button
-            type="button"
-            className="mt-6 w-full"
-            disabled={busy}
-            onClick={() => void create(proposal)}
-          >
-            {busy ? copy.creating : copy.putToWork}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-3 w-full"
-            disabled={busy}
-            onClick={() => onUseProvider(proposal)}
-          >
-            {copy.ownProvider}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="mt-3"
+          <BackLink
             disabled={busy}
             onClick={() => {
               setError(null);
@@ -323,32 +245,51 @@ export function TeamBuilder({
             }}
           >
             {t`Back`}
+          </BackLink>
+          <div className="mt-4">
+            <OnboardingHeading
+              title={copy.proposal}
+              description={`${copy.sectors[phase.sector].summary} ${copy.credits}`}
+            />
+          </div>
+          <ul className="mt-8 w-full overflow-hidden rounded-xl border border-border bg-card [&>*+*]:border-t [&>*+*]:border-border">
+            {proposal.map((member) => (
+              <li key={member.id} className="px-4 py-3">
+                <p className="font-semibold text-foreground">{member.name}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{member.title}</p>
+              </li>
+            ))}
+          </ul>
+          <Button type="button" size="lg" className="mt-6 w-full" disabled={busy} onClick={() => void create(proposal)}>
+            {busy ? copy.creating : copy.putToWork}
           </Button>
+          <p className="mt-3 text-center text-sm text-muted-foreground">{copy.setupCost}</p>
+          <div className="mt-4 flex justify-center">
+            <Button type="button" variant="link" className="h-auto px-0 text-muted-foreground" disabled={busy} onClick={() => onUseProvider(proposal)}>
+              {copy.ownProvider}
+            </Button>
+          </div>
         </div>
       ) : null}
       {error ? (
-        <div className="mt-4" role="alert" ref={alertRef}>
+        <div className="mt-4 rounded-xl border border-destructive/30 px-4 py-3" role="alert" ref={alertRef}>
           <p className="text-sm text-destructive">
             {error === "credits" ? copy.creditsUnavailable : copy.createFailed}
           </p>
           {error === "credits" ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-3"
-              onClick={() => onUseProvider(attempt ?? proposal)}
-            >
+            <Button type="button" variant="outline" className="mt-3" onClick={() => onUseProvider(attempt ?? proposal)}>
               {copy.ownProvider}
             </Button>
           ) : null}
         </div>
       ) : null}
       {phase.kind === "describe" ? (
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button type="button" variant="ghost" disabled={busy} onClick={() => void singleMico()}>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <Button type="button" variant="link" className="h-auto px-0 text-muted-foreground" disabled={busy} onClick={() => void singleMico()}>
             {copy.singleMico}
           </Button>
-          <Button type="button" variant="ghost" disabled={busy} onClick={() => onUseProvider(null)}>
+          <span aria-hidden="true">·</span>
+          <Button type="button" variant="link" className="h-auto px-0 text-muted-foreground" disabled={busy} onClick={() => onUseProvider(null)}>
             {copy.ownProvider}
           </Button>
         </div>

@@ -29,7 +29,10 @@ try {
   const page = await browser.newPage({ viewport: { width: 1100, height: 840 } });
   page.on("pageerror", error => errors.push(error.message));
   let needsModel = false, unavailable = false, oldServer = false, interrupted = false;
-  let bots = [], connects = 0, creates = [], normalCreates = 0;
+  const codexOnly = [{ id: "codex", name: "Codex", available: true }];
+  let engineList = codexOnly, installs = 0;
+  let bots = [], connects = 0, creates = [], normalCreates = 0, mycelliosModels = [], enables = [], roles = [];
+  const mycelliosConnection = { id: "fixture-mycellios", provider: "openai-compatible", label: "Mycellios", baseUrl: "https://www.mycellios.com/v1", modelId: "fixture-paid", enabledModelIds: ["fixture-paid"], hasKey: true };
   await page.route("**/*", async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin !== origin) { unexpected.push(url.origin); return route.abort(); }
@@ -42,12 +45,19 @@ try {
     const result = json => route.fulfill({ json: { json } });
     switch (rpc) {
       case "me": return result({ userId: "fixture-owner", spaceId: "fixture-space", needsSignupSurvey: false, needsModel, billingEnabled: false, defaultProvider: needsModel ? null : "fixture-personal", defaultModel: needsModel ? null : "fixture-model" });
-      case "models/list": case "models/mycelliosModels": return result([]);
+      case "models/list": return result([
+        { provider: "openai-codex", providerName: "ChatGPT", id: "fixture-codex", label: "Fixture Codex", billing: "Subscription", auth: "oauth", subscription: true, signIn: "device-code", oauthLabel: "Sign in with ChatGPT" },
+        { provider: "anthropic", providerName: "Anthropic", id: "fixture-claude", label: "Fixture Claude", billing: "Subscription", auth: "both", subscription: true, signIn: "auth-url", oauthLabel: "Sign in with Claude" },
+      ]);
+      case "models/mycelliosModels": return result(mycelliosModels);
+      case "models/connect": { const input = request.postDataJSON().json; enables.push(input); return result({ ...mycelliosConnection, enabledModelIds: input.enabledModelIds }); }
+      case "models/setRole": { const input = request.postDataJSON().json; roles.push(input); return result({ primary: input.primary, backups: [] }); }
       case "bots/list": return result(bots);
-      case "engines/list": return result([{ id: "codex", name: "Codex", available: true }]);
+      case "engines/list": return result(engineList);
+      case "engines/installOpenCode": installs++; engineList = engineList.map(engine => engine.id === "opencode" ? { ...engine, available: true, canInstall: false } : engine); return result({ installed: true });
       case "models/connectMycellios":
         connects++;
-        if (!unavailable) { needsModel = false; return result({}); }
+        if (!unavailable) { needsModel = false; return result(mycelliosConnection); }
         return route.fulfill({ status: 503, json: { json: { defined: false, code: "SERVICE_UNAVAILABLE", status: 503, message: "Synthetic unavailable account" } } });
       case "bots/create": normalCreates++; return route.abort();
       case "bots/createProfile": {
@@ -63,9 +73,61 @@ try {
       default: unexpected.push(rpc); return route.abort();
     }
   });
-  async function open(query = "") { await page.goto(origin + "/__onboarding_team" + query); await expect(page.getByTestId("onboarding-team")).toBeVisible(); }
+  async function open(query = "") {
+    await page.goto(origin + "/__onboarding_team?start=" + encodeURIComponent("/onboarding/team?builder=1") + query.replace("?", "&"));
+    await expect(page.getByTestId("onboarding-team")).toBeVisible();
+  }
   async function gallery() { await page.getByRole("button", { name: "Or start from a role", exact: true }).click(); }
   async function createSEO() { await gallery(); await page.getByRole("button", { name: "Create and open this team: SEO", exact: true }).click(); }
+  // First run asks one question. Free models connect Mycellios, select a zero-priced model and open the team.
+  needsModel = true;
+  mycelliosModels = [
+    { provider: "openai-compatible", id: "fixture-paid", label: "Paid", billing: "Credits", mycelliosPricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, input: "1", output: "2" } },
+    { provider: "openai-compatible", id: "fixture-free", label: "Free", billing: "0 Credits", mycelliosPricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 0, input: "0", output: "0" } },
+  ];
+  for (const lang of ["es", "en"]) {
+    await page.goto(origin + "/__onboarding_team" + (lang === "es" ? "?lang=es" : ""));
+    await expect(page.getByTestId("first-run-choice")).toBeVisible();
+    await page.screenshot({ path: path.join(output, `first-run-choice${lang === "es" ? "-es" : ""}.png`) });
+  }
+  // A saved team-builder address from an older first run still lands on the single choice.
+  await page.goto(origin + "/__onboarding_team?start=/onboarding/team");
+  await expect(page.getByTestId("first-run-choice")).toBeVisible();
+  await expect(page.getByTestId("onboarding-team")).toHaveCount(0);
+  await page.getByRole("button", { name: "Use free models", exact: true }).click();
+  await expect(page.getByTestId("team-created")).toBeVisible();
+  assert.equal(connects, 1);
+  assert.deepEqual(enables.map(input => input.enabledModelIds), [["fixture-paid", "fixture-free"]]);
+  assert.equal(roles.length, 1);
+  assert.deepEqual(roles[0].primary, { provider: "openai-compatible", modelId: "fixture-free", credentialId: "fixture-mycellios" });
+  assert(bots.length >= 2 && creates.every(input => !input.agentEngine && input.expectedUserId === "fixture-owner"));
+  proof.freeModelsStart = true;
+  // Without a Mycellios account the free start never blocks: installed OpenCode, a managed download, or no engine.
+  for (const [engines, expected, downloads] of [
+    [[...codexOnly, { id: "opencode", name: "OpenCode", available: true }], "opencode", 0],
+    [[...codexOnly, { id: "opencode", name: "OpenCode", available: false, canInstall: true }], "opencode", 1],
+    [codexOnly, undefined, 0],
+  ]) {
+    bots = []; creates = []; installs = 0; unavailable = true; needsModel = true; engineList = engines;
+    await page.goto(origin + "/__onboarding_team");
+    await page.getByRole("button", { name: "Use free models", exact: true }).click();
+    await expect(page.getByTestId("team-created")).toBeVisible();
+    assert.equal(installs, downloads);
+    assert(bots.length >= 2 && creates.every(input => input.agentEngine === expected));
+  }
+  unavailable = false; engineList = codexOnly;
+  proof.freeStartNeverBlocks = true;
+  bots = []; creates = []; connects = 0; enables = []; roles = []; mycelliosModels = [];
+  // A subscription goes straight to its connection, then opens the same team on it.
+  await page.goto(origin + "/__onboarding_team");
+  await page.getByRole("button", { name: "Use my AI subscription", exact: true }).click();
+  await page.screenshot({ path: path.join(output, "subscription-step.png") });
+  await page.getByRole("button", { name: "Codex", exact: true }).click();
+  await expect(page.getByTestId("team-created")).toBeVisible();
+  assert.equal(connects, 0); assert.equal(roles.length, 0);
+  assert(bots.length >= 2 && creates.every(input => input.agentEngine === "codex"));
+  proof.subscriptionStart = true;
+  bots = []; creates = []; needsModel = false;
   // A configured personal model still reaches the team builder and is never replaced.
   await open();
   await expect(page.getByText("Creating your team uses no credits. You choose when to start.", { exact: true })).toBeVisible();
@@ -117,7 +179,6 @@ try {
   }
   await page.getByRole("button", { name: "Use your own provider", exact: true }).click();
   await page.getByRole("button", { name: "Use my account", exact: true }).click();
-  await page.getByRole("button", { name: "Use an installed agent", exact: true }).click();
   await page.getByRole("button", { name: "Codex", exact: true }).click();
   await expect(page.getByTestId("team-created")).toBeVisible();
   assert.equal(bots.length, 3); assert.equal(connects, connectionsBeforeNativeChoice);
@@ -131,6 +192,13 @@ try {
   await page.screenshot({ path: path.join(output, "team-first-run-es-mobile.png") });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });
   await page.screenshot({ path: path.join(output, "team-first-run-es-mobile-dark.png") });
+  // The connection step uses the same grouped rows and a single back link.
+  await page.setViewportSize({ width: 1100, height: 840 });
+  await page.getByRole("button", { name: "Usa tu propio proveedor", exact: true }).click();
+  await expect(page.getByTestId("connection-path")).toBeVisible();
+  await page.screenshot({ path: path.join(output, "connection-path-es-dark.png") });
+  await page.getByRole("button", { name: "Poner una clave API", exact: true }).click();
+  await page.screenshot({ path: path.join(output, "connection-key-es-dark.png") });
   assert.deepEqual(unexpected, []); assert.deepEqual(errors, []);
   proof.passed = true;
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2));
