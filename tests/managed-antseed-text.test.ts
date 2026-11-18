@@ -51,6 +51,15 @@ describe("managed AntSeed catalog and receipts",()=>{
     expect(JSON.stringify(adapter.catalog())).not.toContain(operatorSecret);
     vi.useFakeTimers();vi.advanceTimersByTime(60001);expect(adapter.catalog()).toEqual([]);
   });
+  it("publishes token bounds that a client can fill without exceeding the byte admission",async()=>{
+    const f=antseedFixture(),adapter=new ManagedAntseedText(operatorSecret,["*"],f.transport,0);
+    await adapter.refresh();
+    const [model]=adapter.catalog();
+    expect(model).toMatchObject({context_length:41451,max_input_tokens:33259,max_output_tokens:8192});
+    // Lowercase prose is the densest text for the Agent estimate: 0.3 tokens per byte.
+    const content="a".repeat(Math.floor(model!.max_input_tokens!/0.3));
+    expect(()=>adapter.quote({...input,messages:[{role:"user",content}],max_tokens:model!.max_output_tokens!})).not.toThrow();
+  });
   it("does not advertise paid offers with unknown supplier fees, protocol or extra unit charges",async()=>{
     const f=antseedFixture(),adapter=new ManagedAntseedText(operatorSecret,["*"],f.transport);
     await adapter.refresh();expect(adapter.catalog()).toEqual([]);

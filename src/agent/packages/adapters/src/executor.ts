@@ -5,7 +5,8 @@ import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
-import { effectiveMicoSettings } from "@rakazo/contracts";
+import { effectiveMicoSettings, isMycelliosBaseUrl } from "@rakazo/contracts";
+import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
@@ -2848,6 +2849,8 @@ function runtimeFallbackModel(runtime: AgentRuntime) {
 }
 
 export interface ExecutorDeps {
+  /** Per-model Mycellios catalog limits; defaults to a cached read-only catalog lookup. */
+  mycelliosModelLimits?: typeof readMycelliosModelLimits;
   maxUploadSizeBytes?: number;
   contextStrategy?: AgentContextStrategy;
   prisma: PrismaClient;
@@ -11055,7 +11058,7 @@ async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMateria
     args[7] = { ...args[7], requireStoredSecret: false };
   }
   const credential = args[3];
-  const material = await resolveModelKeyMaterial(...args);
+  const material = await withMycelliosModelLimits(deps, args[5], await resolveModelKeyMaterial(...args));
   const deployment = resolveDeploymentModel();
   // Local and compatible endpoints can intentionally be keyless. Host auth is
   // allowed only for the deployment provider that explicitly opted into it.
@@ -11075,6 +11078,35 @@ async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMateria
   const callObserver =
     !credential && billingEnabled ? await hostedModelCreditObserver(deps.prisma, scope) : undefined;
   return { ...material, apiKey: material.apiKey ?? runtimeKey, callObserver };
+}
+
+/**
+ * A Mycellios connection serves models with different windows under one saved
+ * connection. The catalog publishes each route's own admission bounds, so use
+ * them instead of the connection-wide default; saved output limits stay ceilings.
+ */
+async function withMycelliosModelLimits<T extends { apiKey?: string; baseUrl?: string; contextWindow?: number; maxTokens?: number }>(
+  deps: ExecutorDeps,
+  modelId: string,
+  material: T,
+): Promise<T> {
+  if (!material.apiKey || !isMycelliosBaseUrl(material.baseUrl)) return material;
+  const limits = await (deps.mycelliosModelLimits ?? readMycelliosModelLimits)(
+    material.baseUrl!,
+    material.apiKey,
+    modelId,
+  );
+  if (!limits) return material;
+  const maxTokens = Math.min(
+    material.maxTokens ?? limits.maxTokens ?? Number.POSITIVE_INFINITY,
+    limits.maxTokens ?? Number.POSITIVE_INFINITY,
+    limits.contextWindow - 1,
+  );
+  return {
+    ...material,
+    contextWindow: limits.contextWindow,
+    ...(Number.isFinite(maxTokens) ? { maxTokens } : {}),
+  };
 }
 
 async function resolveModelKeyMaterial(
