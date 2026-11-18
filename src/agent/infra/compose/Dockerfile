@@ -4,9 +4,11 @@ FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d43
 # Keep the monorepo layout so those paths resolve exactly as in CI.
 WORKDIR /repo/src/agent
 COPY --chmod=755 . /repo/
-# Shared contracts consume the Agent workspace's own dependency graph.
+# Shared contracts consume the Agent workspace's own dependency graph. node_modules is a
+# real directory (the native source provenance skips it but rejects a symlinked one).
 RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --ignore-scripts --no-audit --no-fund \
-    && ln -s /repo/src/agent/node_modules /repo/src/contracts/node_modules \
+    && mkdir /repo/src/contracts/node_modules \
+    && ln -s /repo/src/agent/node_modules/* /repo/src/agent/node_modules/.bin /repo/src/contracts/node_modules/ \
     && npm rebuild @prisma/engines \
     && npm run generate --workspace @rakazo/db \
     && npm run build --workspace @rakazo/api --workspace @rakazo/worker
