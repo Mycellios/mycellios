@@ -1,0 +1,104 @@
+name: Deploy through Nucleus
+
+# Production deploys go only through Nucleus (nodecodex-org/nucleus,
+# specs/mycellios-continuous-deploy). For each push to main this workflow builds the
+# commit's images on GitHub-hosted runners, waits until that exact commit's CI summary
+# succeeds, then asks Nucleus to deploy it with a GitHub OIDC token. Nucleus verifies the
+# token and the checks itself, then promotes, checks /health and rolls back. Off until the
+# NUCLEUS_DEPLOY_URL repository variable is set. Never runs for pull requests.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-images:
+    name: Publish ${{ matrix.image }} image
+    if: vars.NUCLEUS_DEPLOY_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: coordinator
+            dockerfile: Dockerfile.coordinator
+            revision-arg: DEPLOY_REVISION
+          - image: agent
+            dockerfile: src/agent/infra/compose/Dockerfile
+            revision-arg: GIT_SHA
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Name the GHCR repository
+        id: name
+        run: echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.name.outputs.repository }}:sha-${{ github.sha }}
+          build-args: ${{ matrix.revision-arg }}=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  request-deployment:
+    name: Request Nucleus deployment
+    needs: publish-images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      checks: read
+      id-token: write
+    steps:
+      - name: Wait for this commit's CI summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 80); do
+            result="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?check_name=CI%20summary&per_page=100" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.id) | last | "\(.status) \(.conclusion)"')"
+            case "$result" in
+              "completed success") echo "CI summary succeeded"; exit 0 ;;
+              completed*) echo "CI summary did not succeed ($result); nothing is deployed" >&2; exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "CI summary did not finish in time" >&2
+          exit 1
+      - name: Request the deployment of this revision
+        env:
+          NUCLEUS_DEPLOY_URL: ${{ vars.NUCLEUS_DEPLOY_URL }}
+          AUDIENCE: ${{ vars.NUCLEUS_DEPLOY_AUDIENCE || 'nucleus-deployments' }}
+        run: |
+          set -euo pipefail
+          case "$NUCLEUS_DEPLOY_URL" in https://*) ;; *) echo "NUCLEUS_DEPLOY_URL must use HTTPS" >&2; exit 1 ;; esac
+          token="$(curl -fsS --max-time 20 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r '.value')"
+          echo "::add-mask::$token"
+          status="$(curl -sS --max-time 60 -o response.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $token" "${NUCLEUS_DEPLOY_URL%/}/api/v1/deployments/github")"
+          cat response.json; echo
+          case "$status" in 200|202) ;; *) echo "Nucleus refused the deployment request ($status)" >&2; exit 1 ;; esac
