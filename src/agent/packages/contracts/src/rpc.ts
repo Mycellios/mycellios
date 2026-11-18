@@ -1,4 +1,15 @@
-import { HostedWebAgent, HostedWebCard, HostedWebDraft, HostedWebSave } from "./hosted-webs.js";
+import {
+  HostedWebAgent,
+  HostedWebCard,
+  HostedWebDataEntry,
+  HostedWebDataGet,
+  HostedWebDataList,
+  HostedWebDataSet,
+  HostedWebDataUsage,
+  HostedWebDraft,
+  HostedWebSave,
+  HostedWebSnapshot,
+} from "./hosted-webs.js";
 import { MicoSettingsState, MicoSettingsUpdate } from "./mico-settings.js";
 import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
 import { ReferralOwnerInput, ReferralInviteSchema, ReferralRedemptionSchema } from "./referrals.js";
@@ -233,6 +244,18 @@ export const appContract = {
     clone: oc.input(z.object({ id: z.string(), newId: z.string().uuid() })).output(HostedWebDraft),
     antseed: oc.input(z.object({ id: z.string().uuid() })).output(HostedWebDraft),
     preview: oc.input(z.object({ id: z.string(), version: z.number().int().positive() })).output(z.object({ path: z.string(), expiresAt: z.string() })),
+    history: {
+      list: oc.input(z.object({ id: z.string().uuid() })).output(z.array(HostedWebSnapshot)),
+      restore: oc
+        .input(z.object({ id: z.string().uuid(), snapshotId: z.string().uuid(), version: z.number().int().positive() }).strict())
+        .output(HostedWebDraft),
+    },
+    data: {
+      get: oc.input(HostedWebDataGet).output(z.object({ found: z.boolean(), value: z.json().nullable() })),
+      set: oc.input(HostedWebDataSet).output(HostedWebDataUsage),
+      delete: oc.input(HostedWebDataGet).output(HostedWebDataUsage),
+      list: oc.input(HostedWebDataList).output(z.object({ entries: z.array(HostedWebDataEntry), usage: HostedWebDataUsage })),
+    },
   },
   analytics: { screen: oc.input(AnalyticsScreenInput.extend({ installationId: z.string().uuid().optional(), linkAccount: z.boolean().optional() }).strict()).output(z.object({ ok: z.literal(true) })) },
   aiConsent: {

@@ -8,6 +8,11 @@ on:
       - "src/economy/welcome-credits.ts"
       - "tests/managed-purchases.postgres.test.ts"
       - ".github/workflows/settings-release-qualification.yml"
+      - "src/agent/apps/api/src/hosted-webs/**"
+      - "src/agent/packages/db/src/hosted-webs.ts"
+      - "src/agent/packages/db/src/content-keys.ts"
+      - "src/agent/packages/db/prisma/migrations/*hosted_web*/**"
+      - "src/agent/scripts/verify-hosted-webs-db.ts"
   workflow_dispatch:
 permissions:
   contents: read

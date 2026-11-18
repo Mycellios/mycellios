@@ -1,4 +1,5 @@
-import type { Actor, HostedWebCard } from "@rakazo/contracts";
+import { randomUUID } from "node:crypto";
+import { type Actor, HOSTED_WEB_CAPABILITIES, type HostedWebCard } from "@rakazo/contracts";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { Prisma } from "./generated/prisma/client.js";
 import { runAsSystem } from "./row-security.js";
@@ -30,6 +31,7 @@ export async function listHostedWebs(
           updatedAt: Date;
           forkedFrom: string | null;
           coverPath:Exclude<HostedWebCard["coverPath"],undefined>; coverRevisionId:string|null;
+          capabilities: unknown;
         }>
       >(Prisma.sql`
     SELECT w.id,w.slug,
@@ -42,7 +44,8 @@ export async function listHostedWebs(
       (w."userId"=${user} AND w."spaceId"=${space}) AS owned,
       COALESCE(r."createdAt",w."updatedAt") AS "updatedAt", w."forkedFrom",
       (SELECT f->>'path' FROM jsonb_array_elements(r.bundle->'files') f WHERE f->>'path' IN ('mycellios-cover.png','mycellios-cover.jpg','mycellios-cover.webp') ORDER BY f->>'path' LIMIT 1) AS "coverPath",
-      r.id AS "coverRevisionId"
+      r.id AS "coverRevisionId",
+      COALESCE(r.bundle->'capabilities','[]'::jsonb) AS capabilities
     FROM hosted_webs w LEFT JOIN hosted_web_revisions r ON r.id=w."publishedRevisionId" AND r."siteId"=w.id
     WHERE (r.id IS NOT NULL OR (${filter} IN ('mine','pinned') AND w."userId"=${user} AND w."spaceId"=${space}))
       AND (${filter}<>'mine' OR (w."userId"=${user} AND w."spaceId"=${space}))
@@ -52,7 +55,14 @@ export async function listHostedWebs(
       COALESCE(r."createdAt",w."updatedAt") DESC,w.id LIMIT 100
   `),
   );
-  return rows.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() }));
+  return rows.map((row) => ({
+    ...row,
+    updatedAt: row.updatedAt.toISOString(),
+    // Only the published revision's grants are public; unknown values grant nothing.
+    capabilities: Array.isArray(row.capabilities)
+      ? HOSTED_WEB_CAPABILITIES.filter((name) => (row.capabilities as unknown[]).includes(name))
+      : [],
+  }));
 }
 
 export async function publishedHostedWeb(db: PrismaClient, slug: string, revisionId?: string) {
@@ -75,4 +85,61 @@ export async function publishedHostedWeb(db: PrismaClient, slug: string, revisio
       return row ?? null;
     },
   );
+}
+
+export const HOSTED_WEB_HISTORY = { snapshots: 50, bytes: 64 * 1024 * 1024 } as const;
+export type HostedWebSnapshotSource = "manual" | "mico" | "restore";
+
+/**
+ * Records the draft as saved at `version`, inside the caller's transaction (after
+ * its CAS update), then prunes the oldest snapshots beyond 50 or 64 MiB. An
+ * unchanged bundle/title/summary is not recorded again.
+ */
+export async function recordHostedWebSnapshot(
+  tx: Pick<Prisma.TransactionClient, "hostedWebSnapshot">,
+  snapshot: {
+    siteId: string;
+    userId: string;
+    spaceId: string;
+    version: number;
+    source: HostedWebSnapshotSource;
+    title: string;
+    summary: string;
+    bundle: unknown;
+    digest: string;
+    bytes: number;
+  },
+) {
+  const latest = await tx.hostedWebSnapshot.findFirst({
+    where: { siteId: snapshot.siteId },
+    orderBy: { version: "desc" },
+    select: { digest: true, title: true, summary: true },
+  });
+  if (
+    latest?.digest === snapshot.digest &&
+    latest.title === snapshot.title &&
+    latest.summary === snapshot.summary
+  )
+    return;
+  await tx.hostedWebSnapshot.create({
+    data: { id: randomUUID(), ...snapshot, bundle: snapshot.bundle as Prisma.InputJsonValue },
+  });
+  const rows = await tx.hostedWebSnapshot.findMany({
+    where: { siteId: snapshot.siteId },
+    orderBy: { version: "desc" },
+    select: { id: true, bytes: true },
+  });
+  let kept = 0;
+  let bytes = 0;
+  const drop: string[] = [];
+  for (const row of rows) {
+    // The newest snapshot is always kept, even if it alone is large.
+    if (kept > 0 && (kept >= HOSTED_WEB_HISTORY.snapshots || bytes + row.bytes > HOSTED_WEB_HISTORY.bytes))
+      drop.push(row.id);
+    else {
+      kept++;
+      bytes += row.bytes;
+    }
+  }
+  if (drop.length) await tx.hostedWebSnapshot.deleteMany({ where: { id: { in: drop } } });
 }

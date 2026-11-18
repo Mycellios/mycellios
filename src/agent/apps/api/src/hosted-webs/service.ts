@@ -8,9 +8,11 @@ import {
   type HostedWebSave,
 } from "@rakazo/contracts";
 import {
+  type HostedWebSnapshotSource,
   listHostedWebs,
   type PrismaClient,
   publishedHostedWeb,
+  recordHostedWebSnapshot,
   runAsSystem,
   runAsTenant,
 } from "@rakazo/db";
@@ -154,8 +156,13 @@ export function hostedWebService(db: PrismaClient) {
       query: string,
     ) => scoped(actor, () => listHostedWebs(db, actor, filter, query)),
     draft: (actor: Actor, id: string) => scoped(actor, () => draft(actor, id)),
-    async save(actor: Actor, input: Save, forkedFrom: string | null = null) {
-      const { bundle } = admitted(input.bundle);
+    async save(
+      actor: Actor,
+      input: Save,
+      forkedFrom: string | null = null,
+      source: HostedWebSnapshotSource = "manual",
+    ) {
+      const { bundle, digest, bytes } = admitted(input.bundle);
       return scoped(actor, async () => {
         try {
           await db.$transaction(async (tx) => {
@@ -185,6 +192,17 @@ export function hostedWebService(db: PrismaClient) {
                   forkedFrom,
                 },
               });
+              await recordHostedWebSnapshot(tx, {
+                siteId: input.id,
+                ...where(actor),
+                version: 1,
+                source,
+                title: input.title,
+                summary: input.summary,
+                bundle,
+                digest,
+                bytes,
+              });
             } else {
               if (previous.publishedRevisionId && previous.slug !== input.slug)
                 throw new ORPCError("BAD_REQUEST", {
@@ -205,6 +223,17 @@ export function hostedWebService(db: PrismaClient) {
                   message:
                     "This draft changed elsewhere. Reload it before saving.",
                 });
+              await recordHostedWebSnapshot(tx, {
+                siteId: input.id,
+                ...where(actor),
+                version: input.version + 1,
+                source,
+                title: input.title,
+                summary: input.summary,
+                bundle,
+                digest,
+                bytes,
+              });
             }
           });
         } catch (error) {
@@ -287,6 +316,52 @@ export function hostedWebService(db: PrismaClient) {
         if (!result) throw new ORPCError("NOT_FOUND");
         return result;
       }),
+    history: (actor: Actor, id: string) =>
+      scoped(actor, async () => {
+        const site = await db.hostedWeb.findFirst({
+          where: where(actor, id),
+          select: { version: true },
+        });
+        if (!site) throw new ORPCError("NOT_FOUND");
+        const rows = await db.hostedWebSnapshot.findMany({
+          where: { siteId: id, ...where(actor) },
+          orderBy: { version: "desc" },
+          select: { id: true, version: true, source: true, title: true, createdAt: true, bytes: true },
+        });
+        return rows.map((row) => ({
+          ...row,
+          source: row.source as HostedWebSnapshotSource,
+          createdAt: row.createdAt.toISOString(),
+          current: row.version === site.version,
+        }));
+      }),
+    /** Restores a snapshot as a new draft version; never publishes. */
+    async restore(actor: Actor, id: string, snapshotId: string, version: number) {
+      return scoped(actor, async () => {
+        const snapshot = await db.hostedWebSnapshot.findFirst({
+          where: { id: snapshotId, siteId: id, ...where(actor) },
+        });
+        if (!snapshot) throw new ORPCError("NOT_FOUND");
+        const current = await draft(actor, id);
+        if (current.version !== version)
+          throw new ORPCError("CONFLICT", {
+            message: "This draft changed elsewhere. Reload it before restoring.",
+          });
+        return this.save(
+          actor,
+          {
+            id,
+            version,
+            slug: current.slug,
+            title: snapshot.title,
+            summary: snapshot.summary,
+            bundle: HostedWebBundle.parse(snapshot.bundle),
+          },
+          null,
+          "restore",
+        );
+      });
+    },
     unpublish: (actor: Actor, id: string) =>
       scoped(actor, async () => {
         const result = await db.hostedWeb.updateMany({
@@ -346,7 +421,8 @@ export function hostedWebService(db: PrismaClient) {
             slug: `web-${newId}`,
             title: `${source.title.slice(0, 65)} (copia)`,
             summary: source.summary,
-            bundle: HostedWebBundle.parse(source.bundle),
+            // A clone starts without browser rights; its new owner grants them explicitly.
+            bundle: { files: HostedWebBundle.parse(source.bundle).files },
           },
           slug!,
         );

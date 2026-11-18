@@ -2,7 +2,13 @@ import { createHmac } from "node:crypto";
 import { HostedWebSlug } from "@rakazo/contracts";
 import { listHostedWebs, type PrismaClient, publishedHostedWeb, runAsSystem } from "@rakazo/db";
 import { type Context, Hono } from "hono";
-import { admitStaticBundle, staticFilePath, staticFileType, staticResponse } from "./bundle.js";
+import {
+  admitStaticBundle,
+  bundleCapabilities,
+  staticFilePath,
+  staticFileType,
+  staticResponse,
+} from "./bundle.js";
 import { readWebPreview } from "./preview.js";
 
 const escapeHtml = (value: string) =>
@@ -66,8 +72,11 @@ export function hostedWebHttp(
     const path =
       !requestedFile || requestedFile.endsWith("/") ? `${requestedFile}index.html` : requestedFile;
     if (!staticFilePath(path)) return staticResponse("Not found", "text/plain", 404);
-    const file = admitStaticBundle(site.bundle).bundle.files.find((file) => file.path === path);
+    const frozen = admitStaticBundle(site.bundle).bundle;
+    const file = frozen.files.find((file) => file.path === path);
     if (!file) return staticResponse("Not found", "text/plain", 404);
+    // Rights come only from this exact frozen revision; the stable-URL redirect grants none.
+    const capabilities = bundleCapabilities(frozen);
     // Pin relative CSS/module/image requests to the same frozen revision as the document.
     // The stable share URL always chooses the latest publication; withdrawal gates every version.
     if (!versioned && /\.html$/i.test(path)) {
@@ -100,6 +109,8 @@ export function hostedWebHttp(
     return staticResponse(
       c.req.method === "HEAD" ? null : Buffer.from(file.base64, "base64"),
       staticFileType(file.path)!,
+      200,
+      capabilities,
     );
   });
   app.on(["GET", "HEAD"], "/api/web-preview/:token/*", async (c) => {
@@ -138,6 +149,8 @@ export function hostedWebHttp(
     return staticResponse(
       c.req.method === "HEAD" ? null : Buffer.from(file.base64, "base64"),
       staticFileType(file.path)!,
+      200,
+      bundleCapabilities(preview.bundle),
     );
   });
   app.all("/api/published-webs/*", () => staticResponse("Not found", "text/plain", 404));

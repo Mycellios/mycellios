@@ -17,6 +17,27 @@ vi.mock("@rakazo/ui-web", () => ({
   Textarea: (props: object) => <textarea {...props} />,
   NativeSelect: (props: object) => <select {...props} />,
   NativeSelectOption: (props: object) => <option {...props} />,
+  Disclosure: ({ summary, children }: { summary: ReactNode; children: ReactNode }) => (
+    <section>
+      <h3>{summary}</h3>
+      {children}
+    </section>
+  ),
+  Switch: ({
+    checked,
+    onCheckedChange,
+    ...props
+  }: {
+    checked: boolean;
+    onCheckedChange: (on: boolean) => void;
+  }) => (
+    <input
+      type="checkbox"
+      {...props}
+      checked={checked}
+      onChange={(event) => onCheckedChange(event.target.checked)}
+    />
+  ),
 }));
 vi.mock("../tasks/TaskComposer", () => ({
   TaskAgentSelect: () => <span>Mico selector</span>,
@@ -146,4 +167,41 @@ it("preserves dirty manual source when a remote draft changes", async () => {
   expect(editor.value).toBe("<h1>My manual edit</h1>");
   expect(webs.draft).not.toHaveBeenCalled();
   expect(host.textContent).toContain("Tus cambios locales se conservan");
+});
+it("keeps owner-granted capabilities through code edits and sends them on save", async () => {
+  const webs = (await mount()) as Awaited<ReturnType<typeof mount>> & {
+    save?: ReturnType<typeof vi.fn>;
+  };
+  webs.save = vi.fn().mockImplementation((input) =>
+    Promise.resolve({ ...initial, ...input, version: 2 }),
+  );
+  await act(async () => {
+    [...host.querySelectorAll("button")]
+      .find((b) => b.textContent === "Código y archivos")!
+      .click();
+  });
+  const downloads = host.querySelector<HTMLInputElement>('input[id$="-cap-downloads"]')!;
+  expect(downloads.checked).toBe(false);
+  await act(async () => downloads.click());
+  expect(downloads.checked).toBe(true);
+  const editor = host.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!.call(editor, "<h1>Edited</h1>");
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => {
+    [...host.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("Guardar borrador"))!
+      .click();
+  });
+  expect(webs.save).toHaveBeenCalledWith(
+    expect.objectContaining({
+      bundle: expect.objectContaining({ capabilities: ["downloads"] }),
+    }),
+  );
+  await act(async () => downloads.click());
+  expect(downloads.checked).toBe(false);
 });

@@ -1,11 +1,12 @@
 import { StoreAppHeader } from "./StoreAppHeader";
-import {HOSTED_WEB_COVER_FILES,HOSTED_WEB_LIMITS,type Bot,type HostedWebAgent,type HostedWebDraft} from "@rakazo/contracts";
+import {HOSTED_WEB_CAPABILITIES,HOSTED_WEB_COVER_FILES,HOSTED_WEB_LIMITS,type Bot,type HostedWebAgent,type HostedWebCapability,type HostedWebDraft} from "@rakazo/contracts";
 import {AppCoverEditor,type CoverImage} from "./AppCover";
 import {
   Button,
   Input,
   NativeSelect,
   NativeSelectOption,
+  Switch,
   Textarea,
 } from "@rakazo/ui-web";
 import { ArrowUpRight, Eye, RefreshCw, Upload, ImagePlus } from "lucide-react";
@@ -16,9 +17,18 @@ import {
   writeWebEditor,
 } from "../../lib/hosted-web-editor-state";
 import type { createSpaceRpc } from "../../lib/rpc";
-import { decode, encode, issue, publishedWebPath } from "./hosted-web-files";
+import {
+  CAPABILITY_LABELS,
+  decode,
+  encode,
+  hostedFrameAttributes,
+  issue,
+  publishedWebPath,
+} from "./hosted-web-files";
 import { TaskAgentSelect } from "../tasks/TaskComposer";
 import { HostedAppChat } from "./HostedAppChat";
+import { useAppStorageBridge } from "./app-storage-bridge";
+import { DraftHistory } from "./DraftHistory";
 
 type EditorProps = {
   scope: string;
@@ -137,6 +147,7 @@ export function WebEditor({
   }, [client, initial.id, saved]);
   const picker = useRef<HTMLInputElement>(null);
   const folder = useRef<HTMLInputElement>(null);
+  const previewFrame = useRef<HTMLIFrameElement>(null);
   const alive = useRef(true);
   useEffect(() => {
     writeWebEditor(scope, { draft, dirty, selected, busy });
@@ -241,7 +252,7 @@ export function WebEditor({
           "Incluye index.html en la raíz de la selección o de la carpeta.",
         );
       if (alive.current) {
-        change({ bundle: { files: entries } });
+        change({ bundle: { ...draft.bundle, files: entries } });
         setSelected("index.html");
       }
     });
@@ -254,8 +265,22 @@ export function WebEditor({
       files.push({path:HOSTED_WEB_COVER_FILES[image.mimeType],base64:image.contentBase64});
     }
     if(files.length>HOSTED_WEB_LIMITS.files)throw new Error("La app ya tiene el máximo de archivos.");
-    change({bundle:{files}});setNotice("Carátula preparada. Guarda y publica la app para actualizarla en el catálogo.");
+    change({bundle:{...draft.bundle,files}});setNotice("Carátula preparada. Guarda y publica la app para actualizarla en el catálogo.");
   }
+  const granted = draft.bundle.capabilities ?? [];
+  function grant(name: HostedWebCapability, on: boolean) {
+    const next = HOSTED_WEB_CAPABILITIES.filter((value) =>
+      value === name ? on : granted.includes(value),
+    );
+    const { capabilities: _previous, ...rest } = draft.bundle;
+    change({ bundle: next.length ? { ...rest, capabilities: next } : rest });
+  }
+  // Preview data is kept apart from visitors' data; the server checks the saved draft.
+  useAppStorageBridge(
+    previewFrame,
+    granted.includes("storage") ? { id: draft.id, preview: true } : null,
+    client.webs.data,
+  );
   const file = draft.bundle.files.find((file) => file.path === selected);
   const editable = /\.(html|css|m?js|json|txt|svg)$/i.test(selected);
   return (
@@ -494,6 +519,23 @@ export function WebEditor({
                   </small>
                 </label>
               </div>
+              <fieldset className="hw-capabilities">
+                <legend>Permisos del navegador</legend>
+                {HOSTED_WEB_CAPABILITIES.map((name) => (
+                  <label key={name} htmlFor={`${editorId}-cap-${name}`}>
+                    <Switch
+                      id={`${editorId}-cap-${name}`}
+                      checked={granted.includes(name)}
+                      onCheckedChange={(on) => grant(name, on)}
+                    />
+                    {CAPABILITY_LABELS[name]}
+                  </label>
+                ))}
+                <small>
+                  Solo para esta app. Se aplican al publicar y quien la abra los
+                  verá en la ficha.
+                </small>
+              </fieldset>
               <div className="hw-files-bar">
                 <label className="hw-file-choice" htmlFor={`${editorId}-file`}>
                   Archivo
@@ -553,6 +595,7 @@ export function WebEditor({
                   onChange={(event) =>
                     change({
                       bundle: {
+                        ...draft.bundle,
                         files: draft.bundle.files.map((file) =>
                           file.path === selected
                             ? { ...file, base64: encode(event.target.value) }
@@ -569,6 +612,21 @@ export function WebEditor({
                 </p>
               )}
             </fieldset>
+            <DraftHistory
+              client={client}
+              draft={draft}
+              dirty={dirty}
+              disabled={busy || working}
+              onRestored={(next, from) => {
+                setDraft(next);
+                setDirty(false);
+                setPreview("");
+                setRemoteChanged(false);
+                setNotice(
+                  `Versión ${from.version} restaurada como v${next.version}. Todavía no cambia la app publicada.`,
+                );
+              }}
+            />
           </div>
           <div className="hw-editor-preview" hidden={panel === "code"}>
             <div className="hw-preview-bar">
@@ -583,9 +641,10 @@ export function WebEditor({
             </div>
             {preview ? (
               <iframe
+                ref={previewFrame}
                 title="Vista previa privada de la app"
                 src={preview}
-                sandbox="allow-scripts"
+                {...hostedFrameAttributes(granted)}
                 referrerPolicy="no-referrer"
               />
             ) : (

@@ -20,6 +20,7 @@ import EmbeddedPostgres from "embedded-postgres";
 import { ANTSEED_RADAR_HTML } from "../apps/api/src/hosted-webs/antseed-template.js";
 import { hostedWebHttp } from "../apps/api/src/hosted-webs/http.js";
 import { createWebPreview } from "../apps/api/src/hosted-webs/preview.js";
+import { hostedWebDataService } from "../apps/api/src/hosted-webs/data.js";
 import { hostedWebService } from "../apps/api/src/hosted-webs/service.js";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
@@ -90,6 +91,19 @@ try {
     await sql.query(
       await readFile(
         "packages/db/prisma/migrations/20261111220000_hosted_web_agents/migration.sql",
+        "utf8",
+      ),
+    );
+    await sql.query("DROP TABLE IF EXISTS hosted_web_data, hosted_web_snapshots CASCADE");
+    await sql.query(
+      await readFile(
+        "packages/db/prisma/migrations/20261118170000_hosted_web_data/migration.sql",
+        "utf8",
+      ),
+    );
+    await sql.query(
+      await readFile(
+        "packages/db/prisma/migrations/20261118190000_hosted_web_snapshots/migration.sql",
         "utf8",
       ),
     );
@@ -550,6 +564,10 @@ try {
       toolContext,
     ),
   );
+  assert.ok(
+    (await service.history(owner, appDraft.id)).some((row) => row.source === "mico"),
+    "Mico edits are recorded in the draft history",
+  );
   await service.unpublish(owner, appDraft.id);
   checks.push(
     "assigned Mico/run/thread edits encrypted draft and live preview; unassigned, foreign, cross-Space, archived, stopped and revoked access denied; CAS preserves manual edits; public revision unchanged",
@@ -559,6 +577,124 @@ try {
   assert.equal((await request(firstVersionPath)).status, 404);
   checks.push(
     "document and relative asset URLs retain the same revision across publication; withdrawal revokes historical version URLs",
+  );
+  // Per-user app data: capability-gated, caller-scoped, encrypted, quota-bound.
+  const data = hostedWebDataService(prisma);
+  const storageApp = await service.save(owner, {
+    id: randomUUID(),
+    version: 0,
+    slug: "storage-test",
+    title: "Storage test",
+    summary: "Synthetic",
+    bundle,
+  });
+  const live = { id: storageApp.id, preview: false };
+  const draftTarget = { id: storageApp.id, preview: true };
+  await assert.rejects(data.set(owner, { ...draftTarget, key: "p", value: 1 }), /permiso/);
+  const granted = await service.save(owner, {
+    ...storageApp,
+    version: storageApp.version,
+    bundle: { ...bundle, capabilities: ["storage"] },
+  });
+  await data.set(owner, { ...draftTarget, key: "p", value: { draft: true } });
+  await assert.rejects(data.get(foreign, { ...draftTarget, key: "p" }));
+  await assert.rejects(data.get(owner, { ...live, key: "p" }), "unpublished apps have no visitor data");
+  await service.publish(owner, granted.id, granted.version);
+  const secret = "synthetic-project-secret-zoom-42";
+  await data.set(foreign, { ...live, key: "projects/a", value: { secret, list: [1, 2] } });
+  await data.set(owner, { ...live, key: "projects/a", value: "owner copy" });
+  assert.deepEqual((await data.get(foreign, { ...live, key: "projects/a" })).value, {
+    secret,
+    list: [1, 2],
+  });
+  assert.equal((await data.get(owner, { ...live, key: "projects/a" })).value, "owner copy");
+  assert.deepEqual((await data.get(owner, { ...draftTarget, key: "p" })).value, { draft: true });
+  assert.equal((await data.get(owner, { ...live, key: "p" })).found, false);
+  assert.equal((await data.get(crossSpace, { ...live, key: "projects/a" })).found, false);
+  await data.set(foreign, { ...live, key: "projects/b_x", value: null });
+  assert.deepEqual(
+    (await data.list(foreign, { ...live, prefix: "projects/b_" })).entries.map((e) => e.key),
+    ["projects/b_x"],
+  );
+  assert.deepEqual(await data.get(foreign, { ...live, key: "projects/b_x" }), {
+    found: true,
+    value: null,
+  });
+  const raw = await asSystem(prisma, "inspect sealed app data").$queryRaw<
+    Array<{ value: unknown }>
+  >`SELECT value FROM hosted_web_data`;
+  assert.ok(raw.length >= 4 && !JSON.stringify(raw).includes(secret));
+  assert.equal(
+    await runAsTenant(owner, () =>
+      prisma.$queryRaw<Array<{ n: number }>>`SELECT count(*)::int AS n FROM hosted_web_data WHERE "userId"=${foreign.userId}`,
+    ).then((rows) => rows[0]!.n),
+    0,
+    "RLS hides other users' app data even from the app owner",
+  );
+  const big = "x".repeat(900 * 1024);
+  for (let i = 0; i < 5; i++) await data.set(foreign, { ...live, key: `big/${i}`, value: big });
+  await assert.rejects(data.set(foreign, { ...live, key: "big/5", value: big }), /5 MB/);
+  await data.set(foreign, { ...live, key: "big/0", value: "small" });
+  await assert.rejects(data.set(foreign, { ...live, key: "huge", value: "x".repeat(1024 * 1024 + 1) }), /1 MB/);
+  const revoked = await service.save(owner, { ...granted, version: granted.version, bundle });
+  await service.publish(owner, revoked.id, revoked.version);
+  await assert.rejects(data.get(foreign, { ...live, key: "projects/a" }), /permiso/);
+  await system.hostedWeb.delete({ where: { id: storageApp.id } });
+  assert.equal(
+    await system.hostedWebData.count({ where: { siteId: storageApp.id } }),
+    0,
+  );
+  checks.push(
+    "app data requires the storage capability on the exact draft/published revision, is scoped per user/Space and preview, sealed at rest, hidden by RLS, quota-bound and deleted with the app",
+  );
+  // Draft history: every saved version is kept, restorable, private and bounded.
+  const historyId = randomUUID();
+  const page = (text: string) => ({
+    files: [{ path: "index.html", base64: Buffer.from(`<h1>${text}</h1>`).toString("base64") }],
+  });
+  let current = await service.save(owner, {
+    id: historyId,
+    version: 0,
+    slug: "history-test",
+    title: "History v1",
+    summary: "",
+    bundle: page("history-secret-v1"),
+  });
+  current = await service.save(owner, { ...current, title: "History v2", bundle: page("v2") });
+  const unchanged = await service.save(owner, { ...current, bundle: page("v2") });
+  let history = await service.history(owner, historyId);
+  assert.deepEqual(
+    history.map((row) => [row.version, row.title, row.current]),
+    [[2, "History v2", false], [1, "History v1", false]],
+    "an unchanged save adds no snapshot",
+  );
+  assert.equal(unchanged.version, 3);
+  await assert.rejects(service.history(foreign, historyId));
+  await assert.rejects(service.restore(foreign, historyId, history[1]!.id, unchanged.version));
+  await assert.rejects(service.restore(owner, historyId, history[1]!.id, 1), /changed/);
+  const restored = await service.restore(owner, historyId, history[1]!.id, unchanged.version);
+  assert.equal(restored.title, "History v1");
+  assert.match(Buffer.from(restored.bundle.files[0]!.base64, "base64").toString(), /history-secret-v1/);
+  history = await service.history(owner, historyId);
+  assert.deepEqual(history[0], { ...history[0]!, version: 4, source: "restore", current: true });
+  const sealed = await asSystem(prisma, "inspect sealed draft history").$queryRaw<
+    Array<{ bundle: unknown }>
+  >`SELECT bundle FROM hosted_web_snapshots WHERE "siteId"=${historyId}`;
+  assert.ok(sealed.length === 3 && !JSON.stringify(sealed).includes(page("history-secret-v1").files[0]!.base64));
+  await assert.rejects(
+    asSystem(prisma, "try to mutate a snapshot").hostedWebSnapshot.updateMany({
+      where: { siteId: historyId },
+      data: { title: "mutated" },
+    }),
+  );
+  for (let i = 0; i < 52; i++) current = await service.save(owner, { ...(await service.draft(owner, historyId)), bundle: page(`bulk-${i}`) });
+  history = await service.history(owner, historyId);
+  assert.equal(history.length, 50, "history keeps the newest 50 snapshots");
+  assert.equal(history[0]!.current, true);
+  await system.hostedWeb.delete({ where: { id: historyId } });
+  assert.equal(await system.hostedWebSnapshot.count({ where: { siteId: historyId } }), 0);
+  checks.push(
+    "each saved draft version (manual, Mico, restore) is snapshotted encrypted and immutable; unchanged saves are skipped; restore is CAS-guarded, owner-only and never publishes; history keeps the newest 50 and is deleted with the app",
   );
   assert.equal((await listHostedWebs(prisma, null, "discover")).length, 0);
   await service.publish(owner, id, edited.version);

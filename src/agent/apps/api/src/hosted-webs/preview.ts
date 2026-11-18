@@ -20,7 +20,8 @@ export function createWebPreview(
   version: number,
   bundle: HostedWebBundle,
 ) {
-  const { bytes } = admitStaticBundle(bundle);
+  const { bytes, bundle: admitted } = admitStaticBundle(bundle);
+  bundle = admitted;
   const now = Date.now();
   for (const [key, row] of previews) if (row.expires <= now) previews.delete(key);
   let total = [...previews.values()].reduce((sum, row) => sum + row.bytes, 0);

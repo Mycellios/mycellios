@@ -70,6 +70,7 @@ describe("static website admission", () => {
       /allow-same-origin|allow-forms|allow-popups|allow-top-navigation/,
     );
     expect(STATIC_WEB_CSP).toContain("worker-src 'none'");
+    expect(STATIC_WEB_CSP).toContain("media-src 'self' blob: data:;");
     const response = staticResponse("not found", "text/plain", 404);
     expect(response.headers.get("content-security-policy")).toBe(STATIC_WEB_CSP);
     expect(response.headers.get("set-cookie")).toBeNull();

@@ -10,8 +10,22 @@ export const HOSTED_WEB_LIMITS = {
 export const HostedWebSlug = z
   .string()
   .regex(/^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$/);
+/**
+ * Optional browser rights an owner grants one frozen revision. Absent means none;
+ * the sandbox still never gains same-origin, forms, popups or navigation.
+ */
+// Screen capture is deliberately absent: Chromium rejects getDisplayMedia from the
+// opaque origin this sandbox requires, and allow-same-origin is never granted.
+// `storage` changes no header: it enables the host's per-user data bridge.
+export const HOSTED_WEB_CAPABILITIES = ["downloads", "storage"] as const;
+export const HostedWebCapability = z.enum(HOSTED_WEB_CAPABILITIES);
+export type HostedWebCapability = z.infer<typeof HostedWebCapability>;
 export const HostedWebBundle = z
   .object({
+    capabilities: z
+      .array(HostedWebCapability)
+      .max(HOSTED_WEB_CAPABILITIES.length)
+      .optional(),
     files: z
       .array(
         z
@@ -41,6 +55,7 @@ export const HostedWebCard = z.object({
   forkedFrom: z.string().nullable(),
   coverPath:z.enum(["mycellios-cover.png","mycellios-cover.jpg","mycellios-cover.webp"]).nullable().optional(),
   coverRevisionId:z.string().uuid().nullable().optional(),
+  capabilities: z.array(HostedWebCapability).optional(),
 });
 export const HostedWebDraft = z.object({
   id: z.string(),
@@ -68,6 +83,49 @@ export const HostedWebSave = z
     bundle: HostedWebBundle,
   })
   .strict();
+/**
+ * Per-user app data, reached only through the Hifa Store host bridge. The app never
+ * sees the session or user: the host scopes every call to (app, user, Space).
+ */
+export const HOSTED_WEB_DATA_LIMITS = {
+  keys: 1000,
+  valueBytes: 1024 * 1024,
+  totalBytes: 5 * 1024 * 1024,
+  listPage: 200,
+} as const;
+export const HostedWebDataKey = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z0-9_.:/-]+$/);
+const dataTarget = { id: z.string().uuid(), preview: z.boolean() };
+export const HostedWebDataGet = z.object({ ...dataTarget, key: HostedWebDataKey }).strict();
+export const HostedWebDataSet = z
+  .object({ ...dataTarget, key: HostedWebDataKey, value: z.json() })
+  .strict();
+export const HostedWebDataList = z
+  .object({ ...dataTarget, prefix: z.string().max(200).regex(/^[A-Za-z0-9_.:/-]*$/).default("") })
+  .strict();
+export const HostedWebDataEntry = z.object({
+  key: HostedWebDataKey,
+  bytes: z.number().int().nonnegative(),
+  updatedAt: z.string(),
+});
+export const HostedWebDataUsage = z.object({
+  keys: z.number().int().nonnegative(),
+  bytes: z.number().int().nonnegative(),
+});
+/** One private draft snapshot; restoring creates a new draft version. */
+export const HostedWebSnapshot = z.object({
+  id: z.string().uuid(),
+  version: z.number().int().positive(),
+  source: z.enum(["manual", "mico", "restore"]),
+  title: z.string(),
+  createdAt: z.string(),
+  bytes: z.number().int().nonnegative(),
+  current: z.boolean(),
+});
+export type HostedWebSnapshot = z.infer<typeof HostedWebSnapshot>;
 export type HostedWebBundle = z.infer<typeof HostedWebBundle>;
 export type HostedWebCard = z.infer<typeof HostedWebCard>;
 export type HostedWebDraft = z.infer<typeof HostedWebDraft>;

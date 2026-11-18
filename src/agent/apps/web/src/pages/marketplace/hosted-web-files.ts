@@ -13,3 +13,19 @@ export const issue = (error: unknown) =>
   error instanceof Error
     ? error.message
     : "No se pudo completar la operación. Vuelve a intentarlo.";
+
+export const CAPABILITY_LABELS = {
+  downloads: "Descargar archivos",
+  storage: "Guardar datos de cada usuario",
+} as const;
+/**
+ * The iframe sandbox intersects the server's CSP sandbox: both must allow a token.
+ * Without grants this stays exactly `allow-scripts`.
+ */
+export function hostedFrameAttributes(capabilities: readonly string[] | undefined) {
+  return {
+    sandbox: capabilities?.includes("downloads")
+      ? "allow-scripts allow-downloads"
+      : "allow-scripts",
+  };
+}

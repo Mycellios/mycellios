@@ -23,9 +23,16 @@ import {
 import { createSpaceRpc, selectedSpaceId } from "../../lib/rpc";
 import "./hosted-webs.css";
 import { StoreAppCard } from "./StoreAppCard";
+import { useAppStorageBridge } from "./app-storage-bridge";
 import { FirstPartyApps, matchingFirstPartyApps } from "./FirstPartyApps";
 import { WebEditor } from "./HostedWebEditor";
-import { encode, issue, publishedWebPath } from "./hosted-web-files";
+import {
+  CAPABILITY_LABELS,
+  encode,
+  hostedFrameAttributes,
+  issue,
+  publishedWebPath,
+} from "./hosted-web-files";
 
 type Filter = "discover" | "trending" | "pinned" | "mine";
 const VideoEditor = lazy(() => import("./VideoEditor").then(module => ({default: module.VideoEditor})));
@@ -85,6 +92,12 @@ export function HostedWebs({
   const [open, setOpen] = useState<HostedWebCard | null>(null);
   const [refresh, setRefresh] = useState(0);
   const alive = useRef(true);
+  const siteFrame = useRef<HTMLIFrameElement>(null);
+  useAppStorageBridge(
+    siteFrame,
+    open?.capabilities?.includes("storage") ? { id: open.id, preview: false } : null,
+    client.webs.data,
+  );
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -252,12 +265,19 @@ export function HostedWebs({
             </p>
           )}
           <iframe
+            ref={siteFrame}
             className="hw-site-frame"
             title={open.title}
             src={publishedWebPath(open.slug)}
-            sandbox="allow-scripts"
+            {...hostedFrameAttributes(open.capabilities)}
             referrerPolicy="no-referrer"
           />
+          {open.capabilities?.length ? (
+            <p className="hw-source">
+              Permisos de esta app:{" "}
+              {open.capabilities.map((name) => CAPABILITY_LABELS[name]).join(" · ")}
+            </p>
+          ) : null}
           {open.title === "Antseed Radar" && (
             <p className="hw-source">
               Datos públicos de Antseed.{" "}
