@@ -114,7 +114,14 @@ These rules apply to the complete repository.
   runners into GHCR as `sha-<commit>` with the OCI revision label, waits for that
   commit's `CI summary`, then sends a GitHub OIDC token (no stored secret). Nucleus
   and its worker re-verify the checks, pull by digest, promote, check `/health`
-  revision and roll back (nucleus `specs/mycellios-continuous-deploy`). `ci.yml`
+  revision and roll back (nucleus `specs/mycellios-continuous-deploy`). The first
+  target is the coordinator only: its `/health` must keep returning `revision`
+  (baked from the `DEPLOY_REVISION` build arg) and its critical routes are `/`
+  (landing) and `/downloads/` (308 to the installers); keep both under 400. Agent
+  is not deployed by Nucleus yet: its public `/health` is a constant `{ ok: true }`
+  by design (revision only on `/internal/health`, 404 behind the proxy) and its
+  own `updater` still writes its compose, so do not route Agent through Nucleus
+  until both are resolved. `ci.yml`
   stays read-only. Off until the NUCLEUS_DEPLOY_URL variable is set; never use
   self-hosted runners on this public repository or the retired server/Dokploy routes.
   Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
