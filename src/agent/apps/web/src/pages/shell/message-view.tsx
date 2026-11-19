@@ -10,6 +10,10 @@ import { ArtifactFileCard } from "../../components/ArtifactFileCard";
 import { AskCard } from "../../components/AskCard";
 import { CollaborationMarker } from "../../components/ai/CollaborationMarker";
 import { CloudAgentCard } from "../../components/CloudAgentCard";
+import {
+  generatedImageArtifactIds,
+  ImageGenerationCard,
+} from "../../components/ImageGenerationCard";
 import { SubagentCard } from "../../components/SubagentCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
@@ -66,6 +70,7 @@ export const MessageView = memo(function MessageView({
   onOpenImportSetup,
   onOpenImport,
   showToolActivity,
+  runEnded = false,
   showFullText = false,
   textWasStreamed = false,
   hideHoverActions = false,
@@ -107,6 +112,8 @@ export const MessageView = memo(function MessageView({
   /** Opens the agent importer (from Chief's first-run focus card). */
   onOpenImport?: () => void;
   showToolActivity: boolean;
+  /** The message's run is no longer active, so nothing it started is still in progress. */
+  runEnded?: boolean;
   /** A search or quote jump must reveal the complete target. */
   showFullText?: boolean;
   textWasStreamed?: boolean;
@@ -138,6 +145,7 @@ export const MessageView = memo(function MessageView({
     [message.blocks, mentions],
   );
   const visibleNarrationBlocks = renderableMessageBlocks(blocks, showToolActivity);
+  const generatedImages = useMemo(() => generatedImageArtifactIds(blocks), [blocks]);
   const renderMention = useCallback((id: string) => {
     const block = mentions?.find((bot) => bot.botId === id);
     return block ? (
@@ -489,6 +497,26 @@ export const MessageView = memo(function MessageView({
               </div>
             );
           }
+          if (block.kind === "image_generation") {
+            const picture = blocks.find(
+              (candidate) =>
+                candidate.kind === "image" && candidate.artifactId === block.artifactId,
+            );
+            return (
+              <div key={i} className="flex justify-start">
+                <ImageGenerationCard
+                  block={
+                    runEnded && block.status === "generating"
+                      ? { ...block, status: "interrupted" }
+                      : block
+                  }
+                  target={artifactTarget}
+                  name={picture?.kind === "image" ? picture.name : undefined}
+                />
+              </div>
+            );
+          }
+          if (block.kind === "image" && generatedImages.has(block.artifactId)) return null;
           if (block.kind === "image") {
             return (
               <div

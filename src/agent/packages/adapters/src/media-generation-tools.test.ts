@@ -1,4 +1,5 @@
 import type { AdapterContext } from "@rakazo/adapter-kit";
+import { MediaGenerationError } from "@rakazo/adapter-kit";
 import { ATTACHMENT_MAX_BYTES } from "@rakazo/contracts";
 import { toolRequiresApproval } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
@@ -212,9 +213,10 @@ describe("bot media tools", () => {
       expect(poll).not.toHaveBeenCalled();
       expect(attach).not.toHaveBeenCalled();
       expect(publish).toHaveBeenCalledWith(
-        expect.objectContaining({ artifactId: artifact.id }),
+        [expect.objectContaining({ artifactId: artifact.id })],
         row.id,
         artifact.id,
+        undefined,
       );
     },
   );
@@ -273,5 +275,144 @@ describe("bot media tools", () => {
     expect(await generateMediaFromTool(options)).toHaveProperty("error");
     expect(await generateMediaFromTool(options)).toHaveProperty("error");
     expect(attach).not.toHaveBeenCalled();
+  });
+});
+
+describe("image generation card", () => {
+  function withCard() {
+    const base = setup();
+    base.externalEffect.create.mockResolvedValue({
+      ...base.row,
+      status: "media_submitting",
+      request: { tool: "generate_image", prompt: "a fox", aspectRatio: "portrait" },
+      result: { provider: "fake" },
+    });
+    const card = {
+      start: vi.fn().mockResolvedValue("card-message"),
+      settle: vi.fn().mockResolvedValue(undefined),
+    };
+    const options = {
+      ...base.options,
+      args: { prompt: "a fox", aspect_ratio: "portrait" } as Record<string, unknown>,
+      card,
+    };
+    return { ...base, options, card };
+  }
+
+  it("shows the card before generating and finishes it in place", async () => {
+    const { options, card, provider, publish, externalEffect } = withCard();
+    const generate = vi.spyOn(provider, "generateImage");
+    expect(await generateMediaFromTool(options)).toEqual({
+      status: "completed",
+      artifactId: "artifact",
+    });
+    expect(card.start).toHaveBeenCalledWith({
+      kind: "image_generation",
+      status: "generating",
+      aspectRatio: "portrait",
+      prompt: "a fox",
+    });
+    expect(card.start.mock.invocationCallOrder[0]).toBeLessThan(
+      generate.mock.invocationCallOrder[0]!,
+    );
+    expect(generate).toHaveBeenCalledWith({ prompt: "a fox", aspectRatio: "portrait" }, context);
+    expect(externalEffect.updateMany).toHaveBeenCalledWith({
+      where: { id: "local-job", result: { equals: { provider: "fake" } } },
+      data: { result: { provider: "fake", messageId: "card-message" } },
+    });
+    // The fake provider returns a 1×1 PNG: the card records the real size and shape.
+    expect(publish).toHaveBeenCalledWith(
+      [
+        {
+          kind: "image_generation",
+          status: "completed",
+          prompt: "a fox",
+          artifactId: "artifact",
+          aspectRatio: "square",
+          width: 1,
+          height: 1,
+        },
+        { kind: "image", artifactId: "artifact", name: "generated.png" },
+      ],
+      "local-job",
+      "artifact",
+      "card-message",
+    );
+    expect(card.settle).not.toHaveBeenCalled();
+  });
+
+  it("marks the card failed with a provider explanation", async () => {
+    const { options, card, provider, publish } = withCard();
+    const failure = new MediaGenerationError("authentication");
+    failure.message = "Sign in to Codex on your computer.";
+    vi.spyOn(provider, "generateImage").mockRejectedValue(failure);
+    expect(await generateMediaFromTool(options)).toEqual({
+      error: "Sign in to Codex on your computer.",
+    });
+    expect(card.settle).toHaveBeenCalledWith(
+      "card-message",
+      {
+        kind: "image_generation",
+        status: "failed",
+        aspectRatio: "portrait",
+        prompt: "a fox",
+        error: "Sign in to Codex on your computer.",
+      },
+      false,
+    );
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("keeps generic provider codes out of the card text", async () => {
+    const { options, card, provider } = withCard();
+    vi.spyOn(provider, "generateImage").mockRejectedValue(
+      new MediaGenerationError("provider_failure"),
+    );
+    await generateMediaFromTool(options);
+    expect(card.settle.mock.calls[0]?.[1]).not.toHaveProperty("error");
+  });
+
+  it("marks the card interrupted when the run stops", async () => {
+    const { options, card, provider } = withCard();
+    const controller = new AbortController();
+    vi.spyOn(provider, "generateImage").mockImplementation(async () => {
+      controller.abort();
+      throw new Error("aborted");
+    });
+    await expect(
+      generateMediaFromTool({ ...options, context: { ...context, signal: controller.signal } }),
+    ).rejects.toThrow();
+    expect(card.settle).toHaveBeenCalledWith(
+      "card-message",
+      expect.objectContaining({ status: "interrupted" }),
+      true,
+    );
+  });
+
+  it("settles an unfinished earlier card instead of leaving it spinning", async () => {
+    const { options, card, externalEffect, provider } = withCard();
+    externalEffect.findFirst.mockResolvedValue({
+      id: "local-job",
+      status: "media_submitting",
+      request: { prompt: "a fox", aspectRatio: "landscape" },
+      result: { provider: "fake", messageId: "card-message" },
+    });
+    const generate = vi.spyOn(provider, "generateImage");
+    expect(await generateMediaFromTool({ ...options, recoverOnly: true })).toBeUndefined();
+    expect(card.settle).toHaveBeenCalledWith(
+      "card-message",
+      expect.objectContaining({ status: "interrupted", aspectRatio: "landscape" }),
+      false,
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown aspect ratio before reserving", async () => {
+    const { options, externalEffect, card } = withCard();
+    expect(
+      await generateMediaFromTool({ ...options, args: { prompt: "a fox", aspect_ratio: "wide" } }),
+    ).toHaveProperty("error");
+    expect(externalEffect.create).not.toHaveBeenCalled();
+    expect(card.start).not.toHaveBeenCalled();
   });
 });

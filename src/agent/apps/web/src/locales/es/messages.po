@@ -13656,3 +13656,39 @@ msgstr "No se ha podido crear tu equipo. Inténtalo de nuevo."
 #: src/pages/Onboarding.tsx
 msgid "Downloading OpenCode…"
 msgstr "Descargando OpenCode…"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Generating image"
+msgstr "Generando imagen"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Image generation stopped"
+msgstr "Generación de imagen detenida"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Image generation failed"
+msgstr "Generación de imagen fallida"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Generated image"
+msgstr "Imagen generada"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "The image was not finished."
+msgstr "La imagen no se terminó."
+
+#: src/components/ImageGenerationCard.tsx
+msgid "The image could not be generated."
+msgstr "No se pudo generar la imagen."
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Open generated image"
+msgstr "Abrir imagen generada"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "{0} × {1}"
+msgstr "{0} × {1}"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Could not download the image. Try again."
+msgstr "No se pudo descargar la imagen. Inténtalo de nuevo."

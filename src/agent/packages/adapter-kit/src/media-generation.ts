@@ -1,6 +1,8 @@
+import type { ImageAspectRatio } from "@rakazo/contracts";
 import type { AdapterContext } from "./types.js";
 
-export type MediaGenerationInput = { prompt: string };
+/** `aspectRatio` applies to images; providers treat a missing value as square. */
+export type MediaGenerationInput = { prompt: string; aspectRatio?: ImageAspectRatio };
 export type GeneratedMedia = {
   bytes: Uint8Array;
   mimeType: "image/png" | "video/mp4";

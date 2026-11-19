@@ -610,7 +610,7 @@ export const Transcript = memo(function Transcript({
           const messageReactions = reactionView.reactions.get(message.id);
           const wrapMessage = (content: ReactNode) =>
             compactMessages && !peerReceipt && !message.id.startsWith("progress:") &&
-            message.blocks.some((block) => block.kind === "text" || block.kind === "file" || block.kind === "image" || block.kind === "ask")
+            message.blocks.some((block) => block.kind === "text" || block.kind === "file" || block.kind === "image" || block.kind === "image_generation" || block.kind === "ask")
               ? <MessageTouchActions message={message} onReply={onReply} onMarkUnread={onMarkUnread}
                   markedUnread={message.id === markedUnreadMessageId} onReact={onReact} onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}>{content}</MessageTouchActions>
               : content;
@@ -693,6 +693,7 @@ export const Transcript = memo(function Transcript({
                       onOpenImportSetup={onOpenImportSetup}
                       onOpenImport={onOpenImport}
                       showToolActivity={messageToolActivity}
+                      runEnded={Boolean(message.runId) && (!running || Boolean(activeRun && activeRun.id !== message.runId))}
                       showFullText={scrollRequest?.messageId === message.id}
                       textWasStreamed={Boolean(message.runId && streamedTextRuns.has(`${message.threadId}:${message.runId}`))}
                       hideHoverActions={compactMessages}

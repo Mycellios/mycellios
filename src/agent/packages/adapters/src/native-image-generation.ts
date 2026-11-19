@@ -50,7 +50,11 @@ export class NativeComputerImageProvider implements MediaGenerationProvider {
     const computer = await this.options.computer();
     const environment = await this.options.sandbox.environment?.(computer, context);
     const nonce = randomBytes(16).toString("hex");
-    const encoded = Buffer.from(JSON.stringify({ prompt: parsed.data.prompt, nonce })).toString(
+    const encoded = Buffer.from(JSON.stringify({
+        prompt: parsed.data.prompt,
+        nonce,
+        aspectRatio: parsed.data.aspectRatio ?? "square",
+      })).toString(
       "base64",
     );
     const executionContext = {

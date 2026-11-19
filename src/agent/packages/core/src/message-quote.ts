@@ -144,7 +144,8 @@ export function messageReplyExcerpt(blocks: MessageBlock[], role: string): strin
 
 function replyBlockText(block: MessageBlock): string {
   switch (block.kind) {
-    case "context_reset": return "";
+    case "context_reset":
+      return "";
     case "text":
     case "ask":
     case "channel_message":
@@ -183,6 +184,8 @@ function replyBlockText(block: MessageBlock): string {
     case "image":
     case "file":
       return block.name || blocksToAgentHistoryText([block]);
+    case "image_generation":
+      return block.prompt ?? "";
   }
 }
 

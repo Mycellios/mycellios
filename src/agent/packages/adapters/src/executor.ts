@@ -5875,24 +5875,66 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     },
                   },
                 ),
-              publish: async (block, jobId, artifactId) => {
+              publish: async (blocks, jobId, artifactId, messageId) => {
                 const committed = await deps.prisma.$transaction(async (tx) => {
                   // Commit completion with the message so a restarted poll cannot post twice.
                   const claimed = await tx.externalEffect.updateMany({
                     where: { id: jobId, status: { not: "media_completed" } },
                     data: {
                       status: "media_completed",
-                      result: { provider: mediaGeneration.id, artifactId },
+                      result: {
+                        provider: mediaGeneration.id,
+                        artifactId,
+                        ...(messageId ? { messageId } : {}),
+                      },
                     },
                   });
                   if (!claimed.count) return null;
-                  return persistMessageInTransaction(tx, run, "bot", [block]);
+                  // The card turns into the finished picture in place; a card that was already
+                  // settled (or lost) leaves the picture as a new message instead.
+                  const replaced = messageId
+                    ? await replaceGeneratingImageCard(tx, run, messageId, blocks, false)
+                    : null;
+                  return (
+                    replaced ??
+                    persistMessageInTransaction(
+                      tx,
+                      run,
+                      "bot",
+                      blocks.filter((block) => block.kind !== "image_generation"),
+                    )
+                  );
                 });
                 if (committed)
                   await deps.events
                     .notify(run.threadId, committed.eventSeq, committed.firstResponseRunId)
                     .catch(() => undefined);
               },
+              card:
+                name === "generate_image"
+                  ? {
+                      start: async (block) => {
+                        const committed = await withTransactionRetry(() =>
+                          deps.prisma.$transaction((tx) =>
+                            persistMessageInTransaction(tx, run, "bot", [block]),
+                          ),
+                        );
+                        await deps.events
+                          .notify(run.threadId, committed.eventSeq, committed.firstResponseRunId)
+                          .catch(() => undefined);
+                        return committed.message.id;
+                      },
+                      settle: async (messageId, block, cancelled) => {
+                        const committed = await deps.prisma.$transaction((tx) =>
+                          replaceGeneratingImageCard(tx, run, messageId, [block], cancelled),
+                        );
+                        if (committed)
+                          await deps.events
+                            .notify(run.threadId, committed.eventSeq)
+                            .catch(() => undefined);
+                      },
+                    }
+                  : undefined,
             });
           };
           const settleToolUncertainty = async (effectId: string, toolName: string) => {
@@ -10868,6 +10910,42 @@ async function persistMessageInTransaction(
     eventSeq: event.seq,
     firstResponseRunId: event.firstResponse ? run.id : undefined,
   };
+}
+
+/**
+ * Replaces a still-generating image card with its outcome and tells the thread.
+ * Compare-and-set on the card status, so a late settle never undoes a finished picture.
+ */
+async function replaceGeneratingImageCard(
+  tx: Prisma.TransactionClient,
+  run: { id: string; spaceId: string; threadId: string; botId: string },
+  messageId: string,
+  blocks: MessageBlock[],
+  allowCancelledRun: boolean,
+) {
+  const updated = await tx.message.updateMany({
+    where: {
+      id: messageId,
+      threadId: run.threadId,
+      runId: run.id,
+      AND: [
+        { blocks: { path: ["0", "kind"], equals: "image_generation" } },
+        { blocks: { path: ["0", "status"], equals: "generating" } },
+      ],
+    },
+    data: { blocks: blocks as Prisma.InputJsonValue },
+  });
+  if (updated.count !== 1) return null;
+  const event = await appendEventInTransaction(tx, {
+    spaceId: run.spaceId,
+    threadId: run.threadId,
+    botId: run.botId,
+    runId: run.id,
+    type: "thread.message.updated",
+    allowCancelledRun,
+    payload: { messageId, role: "bot", blocks },
+  });
+  return { message: { id: messageId }, eventSeq: event.seq, firstResponseRunId: undefined };
 }
 
 /** Provider tool IDs are unique only within a run, never across users or workflows. */

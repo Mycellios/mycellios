@@ -228,10 +228,17 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "generate_image",
     description:
-      "Generate one image from a prompt and attach it to chat, using the configured media provider or Codex on the connected computer. Uses that account's limits and may incur charges. Do not retry failed submissions automatically.",
+      "Generate one image from a prompt, using the configured media provider or Codex on the connected computer. The chat shows the image as it is made, so do not attach it again or describe it in detail afterwards. Uses that account's limits and may incur charges. Do not retry failed submissions automatically.",
     inputSchema: {
       type: "object",
-      properties: { prompt: { type: "string", minLength: 1, maxLength: 4000 } },
+      properties: {
+        prompt: { type: "string", minLength: 1, maxLength: 4000 },
+        aspect_ratio: {
+          type: "string",
+          enum: ["square", "portrait", "landscape"],
+          description: "Picture shape; square when omitted.",
+        },
+      },
       required: ["prompt"],
     },
     readOnly: false,
