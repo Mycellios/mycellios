@@ -22,6 +22,8 @@ const action = process.argv[2] ?? 'open';
 if (!['open', 'prepare', 'status', 'stop', 'reset', '--headless'].includes(action)) throw Error('Use desktop-dev.mjs [open|prepare|status|stop|reset|--headless]');
 const preparedOnly=process.argv.includes('--prepared');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+// The Desktop launcher reads these lines to show progress and size its deadline.
+const reportPhase = name => console.log(`MYCELLIOS_DEV_PHASE ${name}`);
 async function control(record, command) {
   if (record.id !== identity.id || !Number.isInteger(record.control) || record.control < 1024 || record.control > 65535 || !/^[a-f0-9]{64}$/.test(record.token)) return false;
   try {
@@ -137,11 +139,15 @@ try {
   async function prepare(folder,name,generate=false) {
     const fingerprint=await preparationFingerprint(folder),stamp=path.join(preparation,`${name}.json`);
     let previous;try{previous=JSON.parse(await readFile(stamp,'utf8'));}catch{}
-    if(previous?.fingerprint===fingerprint && previous?.node===process.versions.node && await installedDevelopmentDependencies(folder))return;
+    // Native modules follow the Node major (ABI), not the patch: the Desktop launcher's
+    // bundled Node and a terminal's Node must not reinstall each other's dependencies.
+    const major=version=>String(version??'').split('.')[0];
+    if(previous?.fingerprint===fingerprint && major(previous?.node)===major(process.versions.node) && await installedDevelopmentDependencies(folder))return;
     if(preparedOnly)throw Error('Development inputs changed. Run npm run dev:desktop -- prepare first.');
     if(previous || !await installedDevelopmentDependencies(folder)) {
       if(await lstat(path.join(folder,'node_modules')).then(info=>info.isSymbolicLink(),()=>false))
         throw Error('The reused dependency cache differs. It has been preserved; use an owned installation.');
+      reportPhase('installing');
       await run(process.execPath,[npm,'ci','--include=dev','--no-audit','--no-fund'],{cwd:folder});
     }
     if(generate)await run(process.execPath,[npm,'run','db:generate']);
@@ -164,18 +170,21 @@ try {
     }catch{}
     if(!cached) {
       if(preparedOnly)throw Error('Development sources changed. Run npm run dev:desktop -- prepare first.');
+      reportPhase('building');
       await run(process.execPath,['scripts/build.mjs'],{cwd:path.join(root,'apps/desktop')});
       const inputs=await releaseInputs(root);
       await writeFile(desktopStamp,JSON.stringify({...inputs,entryHash:createHash('sha256').update(await readFile(desktopEntry)).digest('hex')}),{mode:0o600});
     }
     try{require('electron');}catch{
       if(preparedOnly)throw Error('The Electron runtime is missing. Prepare development first.');
+      reportPhase('installing');
       await run(process.execPath,[require.resolve('electron/install.js')]);
     }
   }
   if(action==='prepare') {
     await prepareDesktop();console.log('MYCELLIOS_DEV_PREPARED');await stop(0);
   }
+  reportPhase('starting');
   const backend=launch(process.execPath,['scripts/project-local.mjs','backend'],{stdio:['ignore','inherit','inherit','ipc']});
   const web=launch(process.execPath,['scripts/project-local.mjs','web'],{stdio:['ignore','inherit','inherit','ipc']});
   for(const [role,child] of [['backend',backend],['web',web]]) {
@@ -207,6 +216,7 @@ try {
   try{branch=execFileSync('git',['branch','--show-current'],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim()||'detached';}catch{}
   if(action!=='--headless') {
     await prepareDesktop();
+    reportPhase('opening');
     const electron=require('electron');
     appChild=launch(electron,[path.join(root,'apps/desktop')],{windowsHide:false,env:{...env,RAKAZO_WEB_URL:url,RAKAZO_LOCAL_WEB_URL:url,RAKAZO_PERFORMANCE_USER_DATA:path.join(profile,'app'),MYCELLIOS_DEV_ACCOUNT:accountFile,MYCELLIOS_DEV_BRANCH:branch,MYCELLIOS_DEV_HUE:String(identity.hue)},stdio:['ignore','inherit','inherit','ipc']});
     appChild.once('error',()=>void stop(1));appChild.once('exit',()=>void stop(0));

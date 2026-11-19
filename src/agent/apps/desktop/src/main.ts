@@ -2018,6 +2018,12 @@ app.whenReady().then(async () => {
     },
   });
   ipcMain.handle("desktop.development.open",(event,botId:unknown)=>developmentLauncher.open(event,botId));
+  const developmentOwner=(event:Electron.IpcMainInvokeEvent)=>Boolean(mainWindow && event.sender===mainWindow.webContents && event.senderFrame===event.sender.mainFrame);
+  ipcMain.handle("desktop.development.status",event=>developmentOwner(event)?developmentLauncher.status():null);
+  ipcMain.handle("desktop.development.stop",event=>{
+    if(!developmentOwner(event))throw Error("Stop Dev from the main app window.");
+    return developmentLauncher.stop();
+  });
   app.once("before-quit",()=>developmentLauncher.dispose());
   ipcMain.handle("desktop.computer.project", async (event, botId: unknown) => {
     if ((!isManagedComputerRequest(event) && !isCloudComputerRequest(event)) || !hostComputer?.isEnabled() ||
