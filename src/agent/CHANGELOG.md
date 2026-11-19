@@ -6,6 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-19
+
+### Added
+
+- Hifa Store app owners can let their app save each visitor's own data (for example
+  a project's settings) in their account. The app never sees who the visitor is,
+  each person only sees their own data, and the app's card shows that it can save.
+- Hifa Store app owners can let their app download the files it creates, such as an
+  exported video. Apps without this permission still cannot download anything.
+- The app editor keeps the last 50 versions of each draft, including your Mico's
+  edits, under "Historial de versiones". Restoring one makes it a new draft version
+  and never changes the published app.
+- Hifa Store apps can ask to keep large files for each person, such as videos or
+  images. This stays unavailable for now: the editor shows it as "No disponible
+  por ahora" and nothing can be uploaded until a server operator turns it on.
+- New accounts start with one question: use free models, or connect your ChatGPT or Claude
+  subscription. Free models open your team on a free Mycellios model. Without a Mycellios
+  account they use OpenCode on this computer, and the team still opens if neither is available.
+- The subscription step lists Codex, Claude Code and OpenCode installed on this computer
+  next to ChatGPT and Claude sign-in.
+- The rail shows a usage ring for each connected account that reports its plan limits, such
+  as ChatGPT and Claude together, instead of only one.
+
+### Changed
+
+- Hifa Store apps can play video and audio that they include or create in the
+  browser. Before, any video in an app stayed blank.
+- Settings switch sections without delay. The app behind the full-screen Settings panel no longer
+  redraws on every click.
+- The bottom of the left rail now shows, from top to bottom: usage, Hifa Store, Help, Settings and
+  your server. Sign out is in Settings > Profile and connected apps are in Hifa Store > Integrations.
+- Startup, background and keep-awake options have their own Settings section, "Application
+  behavior", under the new "This computer" group. "Account" groups Profile, Billing and Mobile
+  connection.
+- Setup screens use one simpler layout: a centered title, grouped choices and one main button.
+  The step-by-step team questions are no longer part of first run.
+
+### Fixed
+
+- A Mico working on your PC no longer stops when its workspace holds a large file. Its
+  workspace now belongs to the PC: Mycellios only copies the saved files into a new PC
+  workspace, sends large files in verified pieces, and never copies `.git`, `node_modules`,
+  `.env` files, private keys or archives between machines.
+- If preparing the Mico's computer fails after the task reached your PC, the chat now says
+  why, instead of retrying it and showing a misleading "connection changed" error.
+- Desktop no longer reports finished operations as interrupted.
+
+### Self-host upgrade notes
+
+- Apply the database migrations `20261118170000_hosted_web_data` and
+  `20261118190000_hosted_web_snapshots` before starting this version.
+- Apply the database migration `20261118210000_hosted_web_files` before starting
+  this version. Large app files stay off unless you set
+  `MYCELLIOS_HOSTED_WEB_FILES_ENABLED=true` and configure object storage
+  (`OBJECT_STORAGE_*`); they are never stored on the server's local disk.
+  `MYCELLIOS_HOSTED_WEB_FILE_MAX_MB` and `MYCELLIOS_HOSTED_WEB_FILES_QUOTA_MB` can
+  lower the limits of 25 MB per file and 250 MB per person per app.
+
 ## [0.5.1] - 2026-11-18
 
 ### Fixed
