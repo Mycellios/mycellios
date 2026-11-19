@@ -12690,6 +12690,33 @@ msgstr "Open Mycellios Dev"
 msgid "Preparing Mycellios Dev…"
 msgstr "Preparing Mycellios Dev…"
 
+msgid "Installing dependencies…"
+msgstr "Installing dependencies…"
+
+msgid "Building Mycellios Dev…"
+msgstr "Building Mycellios Dev…"
+
+msgid "Starting services…"
+msgstr "Starting services…"
+
+msgid "Opening window…"
+msgstr "Opening window…"
+
+msgid "Mycellios Dev is running"
+msgstr "Mycellios Dev is running"
+
+msgid "Stop Mycellios Dev"
+msgstr "Stop Mycellios Dev"
+
+msgid "Mycellios Dev logs"
+msgstr "Mycellios Dev logs"
+
+msgid "Could not stop Mycellios Dev."
+msgstr "Could not stop Mycellios Dev."
+
+msgid "No output yet."
+msgstr "No output yet."
+
 msgid "Could not open Mycellios Dev. Try again."
 msgstr "Could not open Mycellios Dev. Try again."
 

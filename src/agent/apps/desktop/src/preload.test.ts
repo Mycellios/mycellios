@@ -91,9 +91,11 @@ describe("desktop preload bridge", () => {
     const { invoke, on, off, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
     expect(bridge.development?.isDevelopment).toBe(false);
-    expect(Object.keys(bridge.development!).sort()).toEqual(["identity", "isDevelopment", "open"]);
+    expect(Object.keys(bridge.development!).sort()).toEqual(["identity", "isDevelopment", "open", "status", "stop"]);
     await bridge.development!.open("mico");
     expect(invoke).toHaveBeenCalledWith("desktop.development.open", "mico");
+    await bridge.development!.status!();
+    expect(invoke).toHaveBeenCalledWith("desktop.development.status");
     invoke.mockClear();
     const request = { id: "page", url: "http://localhost:3000", bounds: {x:600,y:100,width:500,height:500} };
     await bridge.preview!.show(request);

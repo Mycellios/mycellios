@@ -152,7 +152,14 @@ export interface RakazoDesktop {
   development?: {
     isDevelopment?: boolean;
     identity?: {branch:string;hue:number};
-    open?: (botId?: string) => Promise<{ opened: boolean; error?: string }>;
+    open?: (botId?: string) => Promise<{ opened: boolean; error?: string; stopped?: boolean }>;
+    /** The Dev stack of this Desktop and its recent output; null outside the main window. */
+    status?: () => Promise<
+      | { state: "preparing"; phase: "preparing" | "installing" | "building" | "starting" | "opening"; startedAt: number; logs: string }
+      | { state: "running" | "stopped"; logs: string }
+      | null
+    >;
+    stop?: () => Promise<{ stopped: boolean }>;
     state?: () => Promise<{ active: boolean }>;
     connect?: (botId: string) => Promise<void>;
     onChanged?: (listener: (state: { active: boolean }) => void) => () => void;

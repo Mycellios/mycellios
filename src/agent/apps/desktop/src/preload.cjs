@@ -8,7 +8,7 @@ try {
 }catch{}
 
 contextBridge.exposeInMainWorld("rakazoDesktop", {
-  development: {isDevelopment: Boolean(developmentIdentity), identity:developmentIdentity, open: botId => ipcRenderer.invoke("desktop.development.open",botId)},
+  development: {isDevelopment: Boolean(developmentIdentity), identity:developmentIdentity, open: botId => ipcRenderer.invoke("desktop.development.open",botId), status: () => ipcRenderer.invoke("desktop.development.status"), stop: () => ipcRenderer.invoke("desktop.development.stop")},
   videoEdit: { request: input => ipcRenderer.invoke("desktop.apps.video-edit", input) },
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url), updateIdentity: (url, identity) => ipcRenderer.invoke("desktop.servers.updateIdentity", url, identity) },
