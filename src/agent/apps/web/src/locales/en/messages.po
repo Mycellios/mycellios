@@ -13278,3 +13278,39 @@ msgstr "Fixed"
 #: src/components/DesktopUpdates.tsx
 msgid "Saving work and restarting…"
 msgstr "Saving work and restarting…"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Generating image"
+msgstr "Generating image"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Image generation stopped"
+msgstr "Image generation stopped"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Image generation failed"
+msgstr "Image generation failed"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Generated image"
+msgstr "Generated image"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "The image was not finished."
+msgstr "The image was not finished."
+
+#: src/components/ImageGenerationCard.tsx
+msgid "The image could not be generated."
+msgstr "The image could not be generated."
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Open generated image"
+msgstr "Open generated image"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "{0} × {1}"
+msgstr "{0} × {1}"
+
+#: src/components/ImageGenerationCard.tsx
+msgid "Could not download the image. Try again."
+msgstr "Could not download the image. Try again."

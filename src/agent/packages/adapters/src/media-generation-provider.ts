@@ -7,13 +7,32 @@ import type {
   MediaVideoJob,
 } from "@rakazo/adapter-kit";
 import { MediaGenerationError } from "@rakazo/adapter-kit";
-import { ATTACHMENT_MAX_BYTES } from "@rakazo/contracts";
+import type { ImageAspectRatio } from "@rakazo/contracts";
+import { ATTACHMENT_MAX_BYTES, IMAGE_ASPECT_RATIOS } from "@rakazo/contracts";
 import { z } from "zod";
 import { FAKE_VIDEO_BASE64 } from "./fake-media-assets.js";
 import type { ResolveHostname } from "./web-ssrf.js";
 import { fetchSafeWebBytes } from "./web-ssrf.js";
 
-export const mediaPromptSchema = z.object({ prompt: z.string().trim().min(1).max(4000) });
+export const mediaPromptSchema = z.object({
+  prompt: z.string().trim().min(1).max(4000),
+  aspectRatio: z.enum(IMAGE_ASPECT_RATIOS).optional(),
+});
+/** The model-facing generate_image/generate_video arguments. */
+export const mediaToolInputSchema = z
+  .object({
+    prompt: z.string().trim().min(1).max(4000),
+    aspect_ratio: z.enum(IMAGE_ASPECT_RATIOS).optional(),
+  })
+  .transform(({ prompt, aspect_ratio }) => ({
+    prompt,
+    ...(aspect_ratio ? { aspectRatio: aspect_ratio } : {}),
+  }));
+const FAL_IMAGE_SIZE: Record<ImageAspectRatio, string> = {
+  square: "square",
+  portrait: "portrait_4_3",
+  landscape: "landscape_4_3",
+};
 export function validateGeneratedMedia(
   output: GeneratedMedia,
   mimeType: GeneratedMedia["mimeType"],
@@ -149,7 +168,11 @@ export class FalMediaGenerationProvider implements MediaGenerationProvider {
         prompt: parsed.data.prompt,
         ...(video
           ? { num_frames: 65, frames_per_second: 16, resolution: "480p" }
-          : { num_images: 1, image_size: "square", output_format: "png" }),
+          : {
+              num_images: 1,
+              image_size: FAL_IMAGE_SIZE[parsed.data.aspectRatio ?? "square"],
+              output_format: "png",
+            }),
       }),
     );
     if (!job.success) throw new MediaGenerationError("provider_failure");

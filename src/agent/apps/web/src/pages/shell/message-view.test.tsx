@@ -9,7 +9,9 @@ import type { ResponseStyle } from "../../lib/response-style";
 import { ResponseStyleContext } from "../../lib/response-style";
 import { MessageView } from "./message-view";
 
-vi.mock("../../lib/rpc", () => ({ rpc: {} }));
+vi.mock("../../lib/rpc", () => ({
+  rpc: { artifacts: { get: () => new Promise(() => undefined) } },
+}));
 
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
@@ -55,7 +57,7 @@ function renderMessage(
   blocks: ThreadMessage["blocks"],
   peerBot: PeerBot,
   mentions?: ReturnType<typeof planner>[],
-  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean } = {},
+  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean; runEnded?: boolean } = {},
 ) {
   const onOpenBot = vi.fn();
   const message: ThreadMessage = {
@@ -88,6 +90,7 @@ function renderMessage(
         onSpeak={vi.fn()}
         onOpenComputer={vi.fn()}
         showToolActivity={options.showToolActivity ?? false}
+        runEnded={options.runEnded}
         showFullText={options.showFullText}
         textWasStreamed={options.textWasStreamed}
         onReply={vi.fn()}
@@ -263,4 +266,37 @@ it("keeps an exact short answer exact without appending headings or tool activit
   renderMessage([{ kind: "text", text: "Listo" }], missingBot);
   expect(container.querySelector('[data-testid="message-bot-bubble"]')?.textContent).toBe("Listo");
   expect(container.querySelector('[data-testid="tool-activity"]')).toBeNull();
+});
+
+it("draws a generated image as one card instead of also showing its plain attachment", () => {
+  renderMessage(
+    [
+      {
+        kind: "image_generation",
+        status: "completed",
+        aspectRatio: "square",
+        prompt: "a fox",
+        artifactId: "artifact",
+      },
+      { kind: "image", artifactId: "artifact", mimeType: "image/png", name: "fox.png" },
+    ],
+    missingBot,
+  );
+  expect(container.querySelectorAll(".rk-image-gen")).toHaveLength(1);
+  expect(container.textContent).toContain("a fox");
+  expect(container.textContent).not.toContain("fox.png");
+});
+
+it("shows a card still marked generating as stopped once its run has ended", () => {
+  const blocks: ThreadMessage["blocks"] = [
+    { kind: "image_generation", status: "generating", aspectRatio: "square", prompt: "a fox" },
+  ];
+  renderMessage(blocks, missingBot);
+  expect(container.querySelector(".rk-image-gen")?.getAttribute("data-status")).toBe(
+    "generating",
+  );
+  renderMessage(blocks, missingBot, undefined, { runEnded: true });
+  expect(container.querySelector(".rk-image-gen")?.getAttribute("data-status")).toBe(
+    "interrupted",
+  );
 });

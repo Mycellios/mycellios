@@ -5,6 +5,15 @@ import { AgentQuestions } from "./questionnaire.js";
 import { Id } from "./ids.js";
 import { McpTransportSchema } from "./mcp.js";
 
+export const IMAGE_ASPECT_RATIOS = ["square", "portrait", "landscape"] as const;
+export type ImageAspectRatio = (typeof IMAGE_ASPECT_RATIOS)[number];
+export const IMAGE_GENERATION_STATUSES = [
+  "generating",
+  "completed",
+  "failed",
+  "interrupted",
+] as const;
+
 export const ProductEventType = z.enum([
   "thread.message.created",
   "thread.cleared",
@@ -314,6 +323,21 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     mimeType: z.string(),
     name: z.string(),
     size: z.number().int().nonnegative(),
+  }),
+  /**
+   * A generate_image call, shown as one card from the moment generation starts.
+   * A completed card is followed by the plain `image` block of the same artifact,
+   * so clients without this card still show the picture.
+   */
+  z.object({
+    kind: z.literal("image_generation"),
+    status: z.enum(IMAGE_GENERATION_STATUSES),
+    aspectRatio: z.enum(IMAGE_ASPECT_RATIOS),
+    prompt: z.string().max(4000).optional(),
+    artifactId: Id.optional(),
+    width: z.number().int().positive().max(65_535).optional(),
+    height: z.number().int().positive().max(65_535).optional(),
+    error: z.string().max(500).optional(),
   }),
   z.object({
     kind: z.literal("handoff"),

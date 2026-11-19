@@ -5,18 +5,37 @@ import type {
   MediaVideoJob,
 } from "@rakazo/adapter-kit";
 import { MediaGenerationError } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
+import type { ImageAspectRatio, MessageBlock } from "@rakazo/contracts";
 import { messageBlockForArtifact } from "@rakazo/core";
 import type { ExternalEffect, PrismaClient } from "@rakazo/db";
 import { z } from "zod";
-import { mediaPromptSchema, validateGeneratedMedia } from "./media-generation-provider.js";
+import { imageAspectRatioOf, pngPixelSize } from "./image-generation-card.js";
+import {
+  mediaPromptSchema,
+  mediaToolInputSchema,
+  validateGeneratedMedia,
+} from "./media-generation-provider.js";
 
 const JOB_KIND = "media_generation_job";
 const savedJob = z.object({
   provider: z.string(),
   jobId: z.string().optional(),
   artifactId: z.string().optional(),
+  /** The chat message holding the image_generation card, once it is shown. */
+  messageId: z.string().optional(),
 });
+type ImageGenerationBlock = Extract<MessageBlock, { kind: "image_generation" }>;
+const savedRequest = z.object({
+  prompt: z.string().optional(),
+  aspectRatio: z.enum(["square", "portrait", "landscape"]).optional(),
+});
+
+/** A provider error worth showing on the card; generic codes stay localized in the client. */
+function cardError(error: unknown): string | undefined {
+  if (!(error instanceof MediaGenerationError) || error.message.startsWith("Media generation:"))
+    return undefined;
+  return error.message.slice(0, 500);
+}
 export async function generateMediaFromTool(options: {
   name: "generate_image" | "generate_video";
   args: Record<string, unknown>;
@@ -32,12 +51,56 @@ export async function generateMediaFromTool(options: {
     name: string,
     job: { id: string; result: { provider: string; jobId?: string } },
   ) => Promise<{ artifactId: string; block: MessageBlock }>;
-  publish: (block: MessageBlock, jobId: string, artifactId: string) => Promise<unknown>;
+  /** Posts the finished media, replacing the image card message when there is one. */
+  publish: (
+    blocks: MessageBlock[],
+    jobId: string,
+    artifactId: string,
+    messageId?: string,
+  ) => Promise<unknown>;
+  /** Shows and settles the image card. Omitted where there is no chat to show it in. */
+  card?: {
+    start: (block: ImageGenerationBlock) => Promise<string>;
+    settle: (messageId: string, block: ImageGenerationBlock, cancelled: boolean) => Promise<void>;
+  };
 }) {
   const { provider, prisma, context, run, args } = options;
   const video = options.name === "generate_video";
   if (!(video ? provider.capabilities.video : provider.capabilities.images))
     return { error: "Media generation is unavailable." };
+  // The image card: shown once a submission is reserved, then settled exactly once here.
+  let card: { messageId: string; prompt?: string; aspectRatio: ImageAspectRatio } | undefined;
+  const settleCard = async (
+    status: "failed" | "interrupted",
+    error?: string,
+    cancelled = false,
+  ) => {
+    const shown = card;
+    card = undefined;
+    if (!shown || !options.card) return;
+    await options.card
+      .settle(
+        shown.messageId,
+        {
+          kind: "image_generation",
+          status,
+          aspectRatio: shown.aspectRatio,
+          ...(shown.prompt ? { prompt: shown.prompt } : {}),
+          ...(error ? { error } : {}),
+        },
+        cancelled,
+      )
+      .catch(() => undefined);
+  };
+  const cardFor = (reservation: ExternalEffect, messageId: string | undefined) => {
+    if (video || !messageId) return undefined;
+    const request = savedRequest.safeParse(reservation.request);
+    return {
+      messageId,
+      prompt: request.success ? request.data.prompt : undefined,
+      aspectRatio: (request.success && request.data.aspectRatio) || "square",
+    };
+  };
   try {
     if (
       args.jobId !== undefined &&
@@ -92,6 +155,9 @@ export async function generateMediaFromTool(options: {
               jobId: prior.id,
               status: prior.status === "media_failed" ? "failed" : "queued",
             };
+          // The earlier attempt never finished here: its card cannot keep spinning.
+          card = cardFor(prior, saved.success ? saved.data.messageId : undefined);
+          await settleCard("interrupted");
           if (options.recoverOnly) return undefined;
           return {
             jobId: prior.id,
@@ -101,8 +167,12 @@ export async function generateMediaFromTool(options: {
       }
       if (!reservation) {
         if (options.recoverOnly) return undefined;
-        const input = mediaPromptSchema.safeParse(args);
-        if (!input.success) return { error: "A prompt of 1–4000 characters is required." };
+        const input = mediaToolInputSchema.safeParse(args);
+        if (!input.success)
+          return {
+            error:
+              "A prompt of 1–4000 characters is required; aspect_ratio is square, portrait or landscape.",
+          };
         // A unique slot makes the per-run cap durable even across concurrent calls/restarts.
         for (let slot = 0; slot < 2; slot++) {
           try {
@@ -116,6 +186,7 @@ export async function generateMediaFromTool(options: {
                 request: {
                   tool: options.name,
                   prompt: input.data.prompt,
+                  ...(video ? {} : { aspectRatio: input.data.aspectRatio ?? "square" }),
                   executionId: options.executionId,
                 },
                 result: { provider: provider.id },
@@ -129,15 +200,42 @@ export async function generateMediaFromTool(options: {
         }
         if (!reservation)
           return { error: "Media generation limit reached (two submissions per run)." };
+        if (!video && options.card) {
+          const messageId = await options.card.start({
+            kind: "image_generation",
+            status: "generating",
+            aspectRatio: input.data.aspectRatio ?? "square",
+            prompt: input.data.prompt,
+          });
+          // Remember the card with the reservation so recovery settles the same message.
+          const result = { provider: provider.id, messageId };
+          await prisma.externalEffect.updateMany({
+            where: { id: reservation.id, result: { equals: { provider: provider.id } } },
+            data: { result },
+          });
+          reservation = { ...reservation, result };
+        }
       }
     }
     const saved = savedJob.parse(reservation.result);
+    card = cardFor(reservation, saved.messageId);
     if (saved.artifactId) {
       const artifact = await prisma.artifact.findFirst({
         where: { id: saved.artifactId, spaceId: run.spaceId, userId: run.userId, botId: run.botId },
       });
-      if (!artifact) return { error: "Generated attachment is unavailable." };
-      await options.publish(messageBlockForArtifact(artifact), reservation.id, artifact.id);
+      if (!artifact) {
+        await settleCard("failed");
+        return { error: "Generated attachment is unavailable." };
+      }
+      const block = messageBlockForArtifact(artifact);
+      await options.publish(
+        card && block.kind === "image"
+          ? [{ ...completedCard(card), artifactId: artifact.id }, block]
+          : [block],
+        reservation.id,
+        artifact.id,
+        card?.messageId,
+      );
       return { status: "completed", artifactId: artifact.id };
     }
     if (video && typeof args.jobId === "string") {
@@ -168,7 +266,7 @@ export async function generateMediaFromTool(options: {
           : await provider.generateVideo(mediaPromptSchema.parse(args), context)
         : {
             status: "completed" as const,
-            output: await provider.generateImage(mediaPromptSchema.parse(args), context),
+            output: await provider.generateImage(mediaToolInputSchema.parse(args), context),
           };
     } catch (error) {
       if (polling)
@@ -209,13 +307,39 @@ export async function generateMediaFromTool(options: {
       `generated-${reservation.id}.${video ? "mp4" : "png"}`,
       {
         id: reservation.id,
-        result: { provider: provider.id, ...("id" in output ? { jobId: output.id } : {}) },
+        result: {
+          provider: provider.id,
+          ...("id" in output ? { jobId: output.id } : {}),
+          ...(saved.messageId ? { messageId: saved.messageId } : {}),
+        },
       },
     );
-    await options.publish(attached.block, reservation.id, attached.artifactId);
+    const size = video ? null : pngPixelSize(output.output.bytes);
+    await options.publish(
+      card && attached.block.kind === "image"
+        ? [
+            {
+              ...completedCard(card),
+              artifactId: attached.artifactId,
+              ...(size
+                ? { aspectRatio: imageAspectRatioOf(size), width: size.width, height: size.height }
+                : {}),
+            },
+            attached.block,
+          ]
+        : [attached.block],
+      reservation.id,
+      attached.artifactId,
+      card?.messageId,
+    );
+    card = undefined;
     return { status: "completed", artifactId: attached.artifactId };
   } catch (error) {
-    context.signal.throwIfAborted();
+    if (context.signal.aborted) {
+      await settleCard("interrupted", undefined, true);
+      context.signal.throwIfAborted();
+    }
+    await settleCard("failed", cardError(error));
     return {
       error:
         error instanceof MediaGenerationError
@@ -223,4 +347,16 @@ export async function generateMediaFromTool(options: {
           : "Media generation failed. Submission may have been accepted; do not retry automatically.",
     };
   }
+}
+
+function completedCard(card: {
+  prompt?: string;
+  aspectRatio: ImageAspectRatio;
+}): ImageGenerationBlock {
+  return {
+    kind: "image_generation",
+    status: "completed",
+    aspectRatio: card.aspectRatio,
+    ...(card.prompt ? { prompt: card.prompt } : {}),
+  };
 }

@@ -2016,7 +2016,10 @@ budget. Provider 429 responses are returned without automatic retries. Outputs
 must fit both the 10 MiB media ceiling and the configured attachment limit;
 larger outputs are rejected.
 
-Images use existing inline chat rendering. MP4 files can be previewed with native
+An image appears in chat as a card as soon as its submission is reserved; it shows the
+requested shape (`aspect_ratio`: square, portrait or landscape) while the provider
+works, then becomes the finished picture, or records the failure or the stopped run. The
+finished message also keeps the plain image attachment for older clients. MP4 files can be previewed with native
 video controls on web and Electron and opened/downloaded through the existing
 native file flow on mobile. No new mobile player or settings screen is required.
 

@@ -1,0 +1,208 @@
+/* Image generation card: a dotted canvas with a drifting glow while the picture is
+   made, then the picture itself at its real proportions. Colours come from the
+   shared semantic tokens. */
+
+.rk-image-gen {
+  display: grid;
+  width: min(420px, 100%);
+  min-width: 0;
+  gap: 8px;
+  justify-items: start;
+}
+
+.rk-image-gen-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  background: var(--muted);
+}
+
+.rk-image-gen-canvas,
+.rk-image-gen-picture {
+  position: absolute;
+  inset: 0;
+}
+
+.rk-image-gen-canvas {
+  display: grid;
+  place-items: center;
+  transition: opacity 260ms ease;
+}
+
+.rk-image-gen-canvas-hidden {
+  opacity: 0;
+}
+
+.rk-image-gen-dots,
+.rk-image-gen-glow {
+  position: absolute;
+  inset: 3px;
+  background-repeat: space;
+  background-size: 12px 12px;
+}
+
+.rk-image-gen-dots {
+  background-image: radial-gradient(circle, var(--muted-foreground) 0.75px, transparent 1.25px);
+  opacity: 0.25;
+}
+
+/* Brighter dots seen through a soft window that wanders over the canvas. */
+.rk-image-gen-glow {
+  background-image: radial-gradient(circle, var(--foreground) 1.1px, transparent 1.6px);
+  -webkit-mask-image: radial-gradient(ellipse closest-side, var(--foreground) 0%, transparent 100%);
+  mask-image: radial-gradient(ellipse closest-side, var(--foreground) 0%, transparent 100%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 70% 60%;
+  mask-size: 70% 60%;
+  -webkit-mask-position: 20% 25%;
+  mask-position: 20% 25%;
+  animation:
+    rk-image-gen-wander 5s ease-in-out infinite,
+    rk-image-gen-pulse 2s ease-in-out infinite;
+}
+
+.rk-image-gen-canvas-hidden .rk-image-gen-glow {
+  animation: none;
+}
+
+.rk-image-gen-failure-mark {
+  width: 26px;
+  height: 26px;
+  color: var(--destructive);
+}
+
+.rk-image-gen-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+  background: var(--muted);
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.rk-image-gen-picture-ready {
+  opacity: 1;
+}
+
+.rk-image-gen-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.rk-image-gen-actions {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  inset-inline-end: 8px;
+  display: flex;
+  gap: 2px;
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--background);
+  color: var(--foreground);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.rk-image-gen-stage:is(:hover, :focus-within) .rk-image-gen-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .rk-image-gen-actions {
+    opacity: 1;
+  }
+}
+
+.rk-image-gen-meta {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 19px;
+}
+
+.rk-image-gen-label {
+  color: var(--foreground);
+  font-weight: 550;
+}
+
+.rk-image-gen-size {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.rk-image-gen-size::before {
+  margin-inline: 0.4em;
+  content: "·";
+}
+
+.rk-image-gen-error {
+  color: var(--destructive);
+}
+
+.rk-image-gen-prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@keyframes rk-image-gen-wander {
+  0%,
+  100% {
+    -webkit-mask-position: 20% 25%;
+    mask-position: 20% 25%;
+    -webkit-mask-size: 70% 60%;
+    mask-size: 70% 60%;
+  }
+  25% {
+    -webkit-mask-position: 80% 30%;
+    mask-position: 80% 30%;
+    -webkit-mask-size: 55% 65%;
+    mask-size: 55% 65%;
+  }
+  50% {
+    -webkit-mask-position: 70% 80%;
+    mask-position: 70% 80%;
+    -webkit-mask-size: 65% 55%;
+    mask-size: 65% 55%;
+  }
+  75% {
+    -webkit-mask-position: 25% 75%;
+    mask-position: 25% 75%;
+    -webkit-mask-size: 60% 70%;
+    mask-size: 60% 70%;
+  }
+}
+
+@keyframes rk-image-gen-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rk-image-gen-glow {
+    animation: none;
+  }
+  .rk-image-gen-canvas,
+  .rk-image-gen-picture,
+  .rk-image-gen-actions {
+    transition: none;
+  }
+}
