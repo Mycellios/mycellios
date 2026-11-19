@@ -1,4 +1,6 @@
+import { PeerExchangeSummary } from "../../components/ai/PeerExchangeSummary";
 import { joinMessageBubbles } from "../../lib/message-bubble-group";
+import { peerExchanges } from "../../lib/peer-exchange-groups";
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { NewChatDivider } from "../../components/composer/NewChatDivider";
 import { i18n } from "@lingui/core";
@@ -226,6 +228,24 @@ export const Transcript = memo(function Transcript({
   );
   const separatorIds = useMemo(() => timeSeparatorIds(shownMessages), [shownMessages]);
   const threadItems = useMemo(() => groupVoiceChats(reactionView.visibleMessages), [reactionView.visibleMessages]);
+  // Runs of messages between Micos fold into one row until the reader opens them.
+  const exchangeOf = useMemo(() => peerExchanges(threadItems), [threadItems]);
+  const [openExchanges, setOpenExchanges] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleExchange = useCallback((key: string) => {
+    following.current = false;
+    autoScrolling.current = false;
+    setOpenExchanges((open) => {
+      const next = new Set(open);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }, []);
+  // A jump to a folded member opens its row first; the scroll effect then finds the message.
+  useLayoutEffect(() => {
+    const key = scrollRequest && exchangeOf.get(scrollRequest.messageId)?.key;
+    if (!key) return;
+    setOpenExchanges((open) => (open.has(key) ? open : new Set(open).add(key)));
+  }, [scrollRequest, exchangeOf]);
   const showResponseCost = useSyncExternalStore(
     subscribeResponseCost,
     getResponseCostVisible,
@@ -556,6 +576,32 @@ export const Transcript = memo(function Transcript({
             message.id.startsWith("progress:") &&
             (message.id === `progress:${activeRun.id}` || message.runId === activeRun.id));
           if (!messageHasVisibleBlocks(message.blocks, messageToolActivity)) return null;
+          const exchange = exchangeOf.get(message.id);
+          const exchangeOpen = exchange ? openExchanges.has(exchange.key) : false;
+          const exchangeSummary = exchange && exchange.key === message.id ? (
+            <PeerExchangeSummary
+              count={exchange.memberIds.length}
+              peers={exchange.peers}
+              locale={i18n.locale || "en"}
+              open={exchangeOpen}
+              onToggle={() => toggleExchange(exchange.key)}
+            />
+          ) : null;
+          if (exchange && !exchangeOpen) {
+            if (!exchangeSummary) return null;
+            const holdsUnread = exchange.memberIds.some((id) => id === unreadDividerId);
+            return (
+              <Fragment key={message.id}>
+                {compactMessageActions && separatorIds.has(message.id) ? (
+                  <TimeSeparator createdAt={message.createdAt} locale={i18n.locale || "en"} />
+                ) : null}
+                {holdsUnread ? <UnreadDivider afterSeparator={separatorIds.has(message.id)} /> : null}
+                <div data-message-id={message.id} data-message-role={message.role} className="relative py-0.5">
+                  {exchangeSummary}
+                </div>
+              </Fragment>
+            );
+          }
           const before = threadItems[itemIndex - 1];
           const after = threadItems[itemIndex + 1];
           const joinsPrevious = joinMessageBubbles(before?.kind === "message" ? before.message : undefined, message, separatorIds.has(message.id) || message.id === unreadDividerId);
@@ -576,6 +622,7 @@ export const Transcript = memo(function Transcript({
               {message.id === unreadDividerId ? (
                 <UnreadDivider afterSeparator={separatorIds.has(message.id)} />
               ) : null}
+              {exchangeSummary}
               <div
                 data-message-id={message.id}
                 data-message-role={message.role}

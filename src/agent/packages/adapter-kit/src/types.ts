@@ -649,6 +649,8 @@ export type AgentRuntimeEvent =
       text: string;
       detail?: string;
       actions?: Array<{ id: string; label: string }>;
+      /** A plan card's steps (acknowledge_request); the executor adds its auto-start time. */
+      plan?: { steps: Array<{ label: string; text: string }> };
     }
   | { type: "takeover"; reason: string; executionId?: string }
   | ({
@@ -735,6 +737,7 @@ export interface BackgroundJobPayloads {
   "skill.teaching-expire": { skillId: string };
   /** The bot's call rang out: mark it missed if nobody answered. */
   "call.expire": { threadId: string; callId: string };
+  "plan.autostart": { runId: string };
   "history.compact": { threadId: string };
   "memory.review": { threadId: string };
   "messaging.deliver": { runId?: string };

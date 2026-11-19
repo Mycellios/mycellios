@@ -4188,6 +4188,19 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
                   {askBlock.detail}
                 </Text>
               ) : null}
+              {askBlock.plan ? (
+                // A plan card's steps; its Start, alternative and Cancel are the actions below.
+                <View style={{ marginTop: 8, gap: 4 }}>
+                  {askBlock.plan.steps.map((step, index) => (
+                    <Text key={index} style={{ color: tokens.foreground, ...typeScale.secondary }}>
+                      <Text style={{ color: tokens.mutedForeground, fontWeight: fontWeight.medium }}>
+                        {step.label}{" "}
+                      </Text>
+                      {step.text}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
               {askBlock.status === "answered" ? (
                 <Text
                   {...actionProps}

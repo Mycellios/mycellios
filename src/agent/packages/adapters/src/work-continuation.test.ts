@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest';
 import type {AgentRunRequest} from '@rakazo/adapter-kit';
-import {WorkContinuation,withWorkContinuation,workContinuationEnabled,WORK_PLAN_TOOL,toolFailed} from './work-continuation.js';
+import {WorkContinuation,withWorkContinuation,workContinuationEnabled,workPlanBlock,WORK_PLAN_TOOL,toolFailed} from './work-continuation.js';
 it('restores the work plan and continuation budget across runtime instances',async()=>{
  let snapshot:unknown;
  const first=new WorkContinuation();first.configure(undefined,async value=>{snapshot=value;});
@@ -122,4 +122,9 @@ it('keeps pure chat requests unchanged and accepts an explicit final failure rep
  const request={instructions:'Original',tools:[]} as unknown as AgentRunRequest;
  expect(withWorkContinuation(request,new WorkContinuation())).toBe(request);
  const state=new WorkContinuation();state.failed();expect(state.next('The requested action failed because the service is unavailable.')).toBeUndefined();
+});
+
+it('turns a work plan into the chat task list, dropping invalid steps and redacting text',()=>{
+  expect(workPlanBlock({explanation:'Deploy',steps:[{id:'a',title:'Read sk-secret',status:'done'},{id:'b',title:'',status:'done'},{id:'c',title:'Ship',status:'later'}]},text=>text.replace('sk-secret','[redacted]'))).toEqual({kind:'plan',explanation:'Deploy',steps:[{title:'Read [redacted]',status:'done'}]});
+  expect(workPlanBlock({steps:[]})).toBeUndefined();
 });

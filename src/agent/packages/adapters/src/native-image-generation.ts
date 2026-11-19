@@ -18,11 +18,15 @@ function nativeFailure(code: unknown): MediaGenerationError {
       ? "authentication"
       : code === "output_limit"
         ? "output_limit"
-        : "provider_failure",
+        : code === "usage_limit"
+          ? "rate_limit"
+          : "provider_failure",
   );
   error.message =
     code === "authentication"
       ? "Image generation needs Codex signed in with your ChatGPT account on the connected computer."
+      : code === "usage_limit"
+        ? "The ChatGPT plan used by Codex on the connected computer reached its usage limit. Images work again when the limit resets; do not resubmit automatically."
       : code === "not_installed"
         ? "Install Codex on your connected computer and sign in with ChatGPT to generate images."
         : code === "output_limit"

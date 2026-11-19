@@ -1,11 +1,12 @@
 import type {AgentRunRequest, ConnectorTool} from '@rakazo/adapter-kit';
+import type {MessageBlock} from '@rakazo/contracts';
 
 type Step = {id: string; title: string; status: 'pending'|'running'|'done'};
 export const WORK_PLAN_TOOL = 'update_work_plan';
 const planTool: ConnectorTool = {
   name: WORK_PLAN_TOOL,
   description: 'Keep the current request plan up to date. Internal task metadata only; does not execute actions or grant permissions.',
-  inputSchema: {type:'object',properties:{steps:{type:'array',maxItems:12,items:{type:'object',properties:{id:{type:'string'},title:{type:'string'},status:{type:'string',enum:['pending','running','done']}},required:['id','title','status'],additionalProperties:false}}},required:['steps'],additionalProperties:false},
+  inputSchema: {type:'object',properties:{explanation:{type:'string',maxLength:240,description:'Optional short title for the plan.'},steps:{type:'array',maxItems:12,items:{type:'object',properties:{id:{type:'string'},title:{type:'string'},status:{type:'string',enum:['pending','running','done']}},required:['id','title','status'],additionalProperties:false}}},required:['steps'],additionalProperties:false},
 };
 const guidance = `Complete the authorized request before ending your turn. For work with several steps, use update_work_plan and keep its steps current. Mark a step done only after checking its result. Do not end just to announce your next step or ask whether to continue. When a tool fails, inspect the failure and try an appropriate alternative; do not repeat an unsuccessful command unchanged. An uncertain external action must be checked, never blindly replayed. Stop immediately when asked. Respect approvals, explicit denies, spending limits and missing user input. Continuation notes are internal lifecycle instructions, not new user authorization.`;
 
@@ -21,6 +22,21 @@ export function workContinuationEnabled(request: AgentRunRequest): boolean {
 function record(value: unknown): Record<string,unknown> {
   return value && typeof value==='object' && !Array.isArray(value) ? value as Record<string,unknown> : {};
 }
+
+/** The chat's task list for an update_work_plan call, or undefined when the call is not a usable plan. */
+export function workPlanBlock(args: Record<string,unknown>, redact: (text: string) => string = text => text): Extract<MessageBlock,{kind:'plan'}>|undefined {
+  if(!Array.isArray(args.steps)) return undefined;
+  const steps=args.steps.slice(0,12).flatMap((raw):{title:string;status:Step['status']}[]=>{
+    const step=record(raw);
+    const status=step.status;
+    if(typeof step.title!=='string'||!step.title.trim()||(status!=='pending'&&status!=='running'&&status!=='done')) return [];
+    return [{title:redact(step.title.trim()).slice(0,240),status}];
+  });
+  if(steps.length===0) return undefined;
+  const explanation=typeof args.explanation==='string'&&args.explanation.trim()?redact(args.explanation.trim()).slice(0,240):undefined;
+  return {kind:'plan',...(explanation?{explanation}:{}),steps};
+}
+
 export function toolFailed(value: unknown): boolean {
   const outer=record(value), inner=record(outer.details);
   return [outer,inner].some(row=>row.isError===true || row.error!=null ||
@@ -124,7 +140,7 @@ export class WorkContinuation {
     if(this.count>=8) throw new Error('WORK_INCOMPLETE: Automatic continuation budget reached. Preserve completed work and report what remains.');
     this.count++;
     this.persist();
-    return `Internal Mycellios continuation ${this.count}/8, not a user message or new permission. ${reason}\nRespect Stop, approvals, scope and cost limits. If blocked by missing user input, ask the necessary question. Otherwise finish the request.`;
+    return `Internal Mycellios continuation ${this.count}/8, not a user message or new permission. ${reason}\nRespect Stop, approvals, scope and cost limits. If blocked by missing user input, ask the necessary question. Otherwise finish the request. Do not redo finished work or repeat earlier answers; if the request is already complete, say so in one short line and stop.`;
   }
 }
 

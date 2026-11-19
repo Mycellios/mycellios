@@ -5,12 +5,16 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { ResponseStyle } from "../../lib/response-style";
+import { ResponseStyleContext } from "../../lib/response-style";
 import { MessageView } from "./message-view";
 
 vi.mock("../../lib/rpc", () => ({ rpc: {} }));
 
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
+  Plural: ({ value, one, other }: { value: number; one: string; other: string }) =>
+    (value === 1 ? one : other).replace("#", String(value)),
   useLingui: () => ({
     t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw(strings, ...values),
   }),
@@ -51,7 +55,7 @@ function renderMessage(
   blocks: ThreadMessage["blocks"],
   peerBot: PeerBot,
   mentions?: ReturnType<typeof planner>[],
-  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"] } = {},
+  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean } = {},
 ) {
   const onOpenBot = vi.fn();
   const message: ThreadMessage = {
@@ -60,10 +64,11 @@ function renderMessage(
     seq: 1,
     role: options.role ?? "bot",
     createdAt: new Date().toISOString(),
+    ...(options.progress ? { progress: true as const } : {}),
     blocks,
   };
   act(() =>
-    root.render(
+    root.render(<ResponseStyleContext.Provider value={options.style ?? "classic"}>
       <MessageView
         artifactTarget={{ botId: "parent" }}
         canAnswer={false}
@@ -82,13 +87,13 @@ function renderMessage(
         speaking={false}
         onSpeak={vi.fn()}
         onOpenComputer={vi.fn()}
-        showToolActivity={false}
+        showToolActivity={options.showToolActivity ?? false}
         showFullText={options.showFullText}
         textWasStreamed={options.textWasStreamed}
         onReply={vi.fn()}
         onMarkUnread={vi.fn()}
         onReact={vi.fn()}
-      />,
+      /></ResponseStyleContext.Provider>,
     ),
   );
   const mention = container.querySelector<HTMLElement>('[data-testid="bot-mention"]')!;
@@ -155,7 +160,7 @@ it("names the bot once across a reply's text blocks", () => {
 it("folds a long plain assistant answer and expands it without losing its ending", () => {
   const text = "A useful complete paragraph. ".repeat(1000) + "Final finding.";
   renderMessage([{ kind: "text", text }], missingBot);
-  const more = [...container.querySelectorAll("button")].find(button => button.textContent === "Show more")!;
+  const more = [...container.querySelectorAll("button")].find(button => button.textContent === "Show full message")!;
   expect(more.getAttribute("aria-expanded")).toBe("false");
   expect(container.textContent).not.toContain("Final finding.");
   act(() => more.click());
@@ -168,12 +173,12 @@ it("does not fold or hold back a long answer while it is streaming", () => {
   const text = "Streaming words. ".repeat(1500);
   renderMessage([{ kind: "progress", text }], missingBot, undefined, { id: "progress:run" });
   expect(container.textContent).toContain(text.trim());
-  expect(container.textContent).not.toContain("Show more");
+  expect(container.textContent).not.toContain("Show full message");
 });
 
 it("reveals the full answer for a search or quote jump", () => {
   renderMessage([{ kind: "text", text: "Searchable answer. ".repeat(1500) }], missingBot, undefined, { showFullText: true });
-  expect(container.textContent).not.toContain("Show more");
+  expect(container.textContent).not.toContain("Show full message");
 });
 
 it("keeps a streamed reply expanded after completion and lets the reader fold it", () => {
@@ -181,7 +186,77 @@ it("keeps a streamed reply expanded after completion and lets the reader fold it
   const less = [...container.querySelectorAll("button")].find(button => button.textContent === "Show less")!;
   expect(less.getAttribute("aria-expanded")).toBe("true");
   act(() => less.click());
-  expect(less.textContent).toBe("Show more");
+  expect(less.textContent).toBe("Show full message");
+});
+
+const step = (label: string) => ({ kind: "steps" as const, steps: [{ label, count: 1 }], durationMs: 1000 });
+
+it("draws a natural turn as short notes, one steps summary and the answer", () => {
+  renderMessage([
+    { kind: "text", text: "Checking the deploy logs." },
+    step("Read logs"),
+    { kind: "text", text: "Checking the deploy logs." },
+    { kind: "text", text: "." },
+    step("Ran build"),
+    { kind: "text", text: "The image build fails; I need the registry token." },
+  ], missingBot, undefined, { style: "natural", showToolActivity: true });
+  const notes = [...container.querySelectorAll('[data-testid="message-progress-note"]')].map(note => note.textContent);
+  expect(notes).toEqual(["Checking the deploy logs."]);
+  expect(container.querySelectorAll('[data-testid="tool-activity-line"]')).toHaveLength(1);
+  expect(container.querySelector('[data-testid="message-bot-bubble"]')?.textContent)
+    .toBe("The image build fails; I need the registry token.");
+});
+
+it("holds a natural answer until the turn is complete", () => {
+  renderMessage([
+    { kind: "text", text: "Looking at the logs." },
+    step("Read logs"),
+    { kind: "progress", text: "The build fai" },
+  ], missingBot, undefined, { id: "progress:run", style: "natural" });
+  expect(container.textContent).toContain("Looking at the logs.");
+  expect(container.textContent).not.toContain("The build fai");
+  expect(container.querySelector('[data-testid="message-bot-bubble"]')).toBeNull();
+});
+
+it("answers a finished natural turn with its latest note when nothing follows the last step", () => {
+  renderMessage([
+    { kind: "text", text: "Reading the config." },
+    { kind: "text", text: "The config is valid." },
+    step("Read config"),
+  ], missingBot, undefined, { style: "natural" });
+  expect(container.querySelector('[data-testid="message-bot-bubble"]')?.textContent).toBe("The config is valid.");
+  expect([...container.querySelectorAll('[data-testid="message-progress-note"]')].map(note => note.textContent))
+    .toEqual(["Reading the config."]);
+});
+
+it("folds a finished turn's task list and counts a running step as pending", () => {
+  renderMessage([
+    { kind: "plan", explanation: "Fix the deploy", steps: [
+      { title: "Read logs", status: "done" },
+      { title: "Fix build", status: "done" },
+      { title: "Redeploy", status: "running" },
+    ] },
+    { kind: "text", text: "Deploy fixed." },
+  ], missingBot, undefined, { style: "natural" });
+  const plan = container.querySelector('[data-testid="plan"]');
+  expect(plan?.textContent).toContain("Fix the deploy");
+  expect(plan?.textContent).toContain("2 of 3 tasks done");
+  expect(plan?.querySelector('[data-status="pending"]')?.textContent).toBe("Redeploy");
+  expect(container.querySelector('[data-testid="message-bot-bubble"]')?.textContent).toBe("Deploy fixed.");
+});
+
+it("draws a durable progress message as a note without actions in the natural style", () => {
+  renderMessage([{ kind: "text", text: "Still checking the build." }], missingBot, undefined, { style: "natural", progress: true });
+  expect([...container.querySelectorAll('[data-testid="message-progress-note"]')].map(note => note.textContent))
+    .toEqual(["Still checking the build."]);
+  expect(container.querySelector('[data-testid="message-bot-bubble"]')).toBeNull();
+  expect(container.querySelector('[data-testid="message-hover-actions"]')).toBeNull();
+});
+
+it("folds a finished natural answer even when it was watched while streaming", () => {
+  renderMessage([{ kind: "text", text: "Long report line.\n".repeat(2000) }], missingBot, undefined, { style: "natural", textWasStreamed: true });
+  const more = [...container.querySelectorAll("button")].find(button => button.textContent === "Show full message");
+  expect(more?.getAttribute("aria-expanded")).toBe("false");
 });
 
 it("keeps an exact short answer exact without appending headings or tool activity", () => {

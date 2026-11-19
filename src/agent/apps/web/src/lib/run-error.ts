@@ -102,6 +102,12 @@ export const translateRunError: RunErrorTranslator = (message, values) => {
         message: "{provider} denied access to this model.",
         values,
       });
+    case "The Mico stopped before it finished the task. Ask it to continue.":
+      return i18n._({
+        id: "The Mico stopped before it finished the task. Ask it to continue.",
+        message: "The Mico stopped before it finished the task. Ask it to continue.",
+        values,
+      });
     case "The model returned an unusable response. Try again.":
       return i18n._({
         id: "The model returned an unusable response. Try again.",

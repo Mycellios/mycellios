@@ -69,7 +69,7 @@ export function privateNotification(message: NotificationMessage, previews: bool
   return {
     title: previews ? clean(message.title, 80) : "Mycellios",
     body: previews
-      ? clean(message.body, 180)
+      ? clean(message.body, 200)
       : {
           completion: "Your Mico has finished. Open the chat to see the result.",
           failure: "Your Mico needs attention. Open the chat for details.",

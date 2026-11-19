@@ -1855,7 +1855,7 @@ describe("Pi runtime ordered model fallback", () => {
   });
 
   it("uses a small-context backup when the actual input and configured output fit", async () => {
-    const smallContextBackup = model("provider-small", "small-context", 2_048);
+    const smallContextBackup = model("provider-small", "small-context", 2_560);
     providerState.models.set(
       `${smallContextBackup.provider}/${smallContextBackup.id}`,
       smallContextBackup as unknown as Record<string, unknown>,
@@ -2573,7 +2573,7 @@ describe("Pi runtime account request ceilings", () => {
       requests.push(summary ? "summary" : "answer");
       expect(target.contextWindow).toBe(6800);
       expect(estimateModelContextTokens(context) + options.maxTokens).toBeLessThan(8000);
-      if (!summary) expect(payload).toContain('"text":"test"');
+      if (!summary) expect(payload).toContain('</mycellios_turn_style>\\n\\ntest"');
       return stream(target, message(target, [{ type: "text", text: summary ? "Earlier context summarized." : "Ready" }], "stop"));
     });
     const events = await run(input);

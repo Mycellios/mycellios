@@ -1,6 +1,6 @@
-import { askUserQuestionnaire } from "./ask-user-questionnaire.js";
+import { isPausingAskTool, pausingQuestionnaire } from "./ask-user-questionnaire.js";
 import { nativeCodexQuota } from "./native-codex-quota.js";
-import { withConversationStyle } from "./conversation-style.js";
+import { turnStyleReminder, withConversationStyle } from "./conversation-style.js";
 import { prepareOpenCodeProfile } from "./opencode-profile.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -439,8 +439,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       queue.push({ type: "tool", name, args, executionId });
       const startedAt = Date.now();
       let value: unknown;
-      if (name === "ask_user") {
-        const questionnaire = askUserQuestionnaire(args);
+      if (isPausingAskTool(name)) {
+        const questionnaire = pausingQuestionnaire(name, args);
         paused = true;
         queue.push({
           type: "ask",
@@ -499,7 +499,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           if (pending) {
             if (
               request.resumeToolResult &&
-              (pending.name === "ask_user" || pending.name === "request_takeover")
+              (isPausingAskTool(pending.name) || pending.name === "request_takeover")
             ) {
               transcript.push({
                 role: "toolResult",
@@ -520,6 +520,10 @@ export class NativeAgentRuntime implements AgentRuntime {
         const steering = await request.claimSteering?.([]);
         if (steering?.length)
           prompt += `\n\nUser follow-ups:\n${steering.map((item) => item.text).join("\n\n")}`;
+        // The natural style's first-line rule travels with each turn, as in the Pi runtime.
+        const reminder = request.allowSilentEmpty || request.script
+          ? null : turnStyleReminder(request.instructions ?? "");
+        if (reminder) prompt = `${reminder}\n\n${prompt}`;
         if (signal.aborted) return;
         const startPrompt = sessionId
           ? prompt

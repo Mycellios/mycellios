@@ -196,6 +196,7 @@ export function narrateTool(toolName: string): string | null {
     [/^save_shared_memory$/, "saving shared memory"],
     [/^attach_file$/, "attaching a file"],
     [/^request_takeover$/, "asking you to take over"],
+    [/^acknowledge_request$/, "sharing a plan"],
   ];
   for (const [pattern, phrase] of verbs) {
     if (pattern.test(bare)) return phrase;

@@ -1,5 +1,17 @@
 import { COMPUTER_RATE_LIMIT_ERROR, desktopDiagnosticRunId, parseDesktopDiagnostic } from "@rakazo/contracts";
 import { stuckWorkStatusMessages } from "./stuck-work.js";
+import { isTechnicalErrorMessage } from "./user-error.js";
+
+/** Paths, SQL states and database error codes are implementation details, not copy. */
+const TECHNICAL_DETAIL = /(?:^|[\s(])(?:[A-Za-z]:\\|~?\/(?:[\w.-]+\/)+)|\bhttps?:\/\/|\bSQLSTATE\b|\bP\d{4}\b|\b(?:SQLITE|PG|ER)_[A-Z_]+\b|\[path\]|\b(?:trace|request)[ _-]?id\b|\btrace\b/i;
+/** Vague placeholders say less than the generic sentence. */
+const UNINFORMATIVE = /^(?:(?:an? )?(?:unknown|unexpected|internal) error|error|failed|something (?:unexpected happened|went wrong)|an error (?:occurred|has occurred))[.!]?$/i;
+
+/** An unknown error message short and plain enough to show as it is (at most 400 characters). */
+function isReadableErrorText(text: string): boolean {
+  return text.length > 0 && text.length <= 400 && !text.includes("\n") &&
+    !UNINFORMATIVE.test(text) && !isTechnicalErrorMessage(text) && !TECHNICAL_DETAIL.test(text);
+}
 
 export const MISSING_TOOL_FINAL_RESPONSE_ERROR =
   "The tools finished, but the model did not write a final answer. Rephrase the request and try again.";
@@ -452,7 +464,9 @@ export function normalizeRunError(
     /insufficient[_ ](?:quota|balance)|credits?|funds|spend|budget|billing|openrouter_key_limit/i.test(
       signals,
     );
-  if (status === 413 && shortRateWindow && /\brequest too large\b/i.test(message)) {
+  if (/^WORK_INCOMPLETE:/.test(trimmed)) {
+    summary = translate("The Mico stopped before it finished the task. Ask it to continue.");
+  } else if (status === 413 && shortRateWindow && /\brequest too large\b/i.test(message)) {
     kind = "context";
     recovery = "model";
     summary = translate("{provider} rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model.", { provider });
@@ -614,6 +628,9 @@ export function normalizeRunError(
     summary = translate("The model returned an unusable response. Try again.");
   } else if (status !== undefined && status >= 500) {
     summary = translate("{provider} returned a server error.", { provider });
+  } else if (status === undefined && isReadableErrorText(trimmed)) {
+    // A short message written for people says more than the generic sentence.
+    summary = trimmed;
   }
   return {
     summary,

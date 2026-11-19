@@ -577,6 +577,24 @@ it.each([
   expect(error.period).toBe(period);
 });
 
+describe("normalizeRunError plain copy", () => {
+  it("shows a short message written for people instead of the generic sentence", () => {
+    expect(normalizeRunError("The calendar has no free slot this week.").summary)
+      .toBe("The calendar has no free slot this week.");
+  });
+
+  it("keeps technical or vague text behind the generic sentence", () => {
+    for (const text of ["Unknown error", "Failed at C:\\work\\app.ts", "SQLSTATE 23505 duplicate key", "x".repeat(401)]) {
+      expect(normalizeRunError(text).summary).toBe("The model provider returned an error.");
+    }
+  });
+
+  it("explains an unfinished task in one sentence", () => {
+    expect(normalizeRunError("WORK_INCOMPLETE: Automatic continuation budget reached.").summary)
+      .toBe("The Mico stopped before it finished the task. Ask it to continue.");
+  });
+});
+
 describe("isModelRequiredSendError", () => {
   it.each([
     MODEL_REQUIRED_SEND_ERROR,

@@ -88,6 +88,7 @@ describe("native computer image generation", () => {
   it.each([
     [{ error: "authentication" }, 1, "ChatGPT"],
     [{ error: "not_installed" }, 1, "Install Codex"],
+    [{ error: "usage_limit" }, 1, "reached its usage limit"],
     [{ nonce: "another-call", mimeType: "image/png", data: png }, 0, "did not complete"],
     [
       { mimeType: "image/png", data: Buffer.from("not an image").toString("base64") },

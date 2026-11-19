@@ -1,6 +1,21 @@
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { activeBotId, captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
+
+/** Consecutive messages between Micos fold into one row; open every folded row in the transcript. */
+async function openPeerExchanges(transcript: Locator) {
+  const closed = transcript.locator('[data-testid="peer-exchange"] button[aria-expanded="false"]');
+  while (await closed.count()) await closed.first().click();
+}
+
+/** Waits for a peer chip, opening folded runs of peer messages as they appear. */
+async function expectPeerChip(transcript: Locator, chip: Locator, count?: number, timeout = 60_000) {
+  await expect(async () => {
+    await openPeerExchanges(transcript);
+    if (count === undefined) await expect(chip.first()).toBeVisible({ timeout: 1_000 });
+    else await expect(chip).toHaveCount(count, { timeout: 1_000 });
+  }).toPass({ timeout });
+}
 
 test("shows peer chips in transcript and opens view-only peer chat", async ({ page }, testInfo) => {
   const stamp = Date.now();
@@ -50,7 +65,7 @@ test("shows peer chips in transcript and opens view-only peer chat", async ({ pa
     .getByTestId("peer-receipt-chip")
     .filter({ hasText: "Researcher" })
     .first();
-  await expect(chip).toBeVisible({ timeout: 30_000 });
+  await expectPeerChip(transcript, chip, undefined, 30_000);
   await expect(chip.getByText(/Messaged|Message from/)).toBeVisible();
   await expect(chip).toHaveAccessibleName(/Messaged Researcher|Message from Researcher/);
   await expect(chip.locator(".rakazo-bot-avatar")).toBeVisible();
@@ -142,6 +157,7 @@ async function openFoldedPeerReply(page: Page, name: string, testInfo: TestInfo)
   const transcript = page.getByTestId("transcript");
   await expect(transcript.getByText(relayText)).toBeVisible({ timeout: 60_000 });
   await expect(transcript.getByText("messaging that bot now.")).toBeVisible();
+  await openPeerExchanges(transcript);
   await expect(
     transcript.getByTestId("peer-receipt-chip").filter({ hasText: "Messaged Researcher" }),
   ).toBeVisible();
@@ -156,9 +172,10 @@ async function openFoldedPeerReply(page: Page, name: string, testInfo: TestInfo)
   // Researcher's reply to Chief's request is bot-to-bot work: it folds in Researcher's chat.
   await page.goto(`/app/${researcher.id}`);
   const composer = page.getByRole("combobox", { name: "Message Researcher" });
-  await expect(
+  await expectPeerChip(
+    transcript,
     transcript.getByTestId("peer-receipt-chip").filter({ hasText: "Message from Chief" }),
-  ).toBeVisible({ timeout: 60_000 });
+  );
   const reply = transcript.getByText(foldedReplyText);
   await expect(reply).toHaveCount(0);
   return { researcher, chiefComposer, composer, transcript, reply };
@@ -274,9 +291,11 @@ test("folds a peer run's reply under its marker and keeps its ask inline", async
   await expect(
     researcherTranscript.locator("p").filter({ hasText: /^Which city should I use\?$/ }),
   ).toBeVisible({ timeout: 60_000 });
-  await expect(
+  await expectPeerChip(
+    researcherTranscript,
     researcherTranscript.getByTestId("peer-receipt-chip").filter({ hasText: "Message from Chief" }),
-  ).toHaveCount(2);
+    2,
+  );
   await expect(researcherTranscript.getByText("i need a decision before i continue.")).toHaveCount(
     0,
   );
@@ -369,6 +388,7 @@ test("answers a message sent while the bot works on another bot's request", asyn
   ).toBeVisible({
     timeout: 30_000,
   });
+  await openPeerExchanges(chiefTranscript);
   await expect(
     chiefTranscript.getByTestId("peer-receipt-chip").filter({ hasText: "Message from Researcher" }),
   ).toHaveCount(0);

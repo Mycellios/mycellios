@@ -1,4 +1,5 @@
 import type { MessageBlock, ThreadMessage } from "@rakazo/contracts";
+import { MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
 import { cloudAgentBlockFromPayload } from "./cloud-agent.js";
 import { preserveIdentitySource } from "./identity-source.js";
 import { observeToolEvent } from "./tool-observations.js";
@@ -116,7 +117,10 @@ export function projectMessages(
         type: "tool",
         name: String(payload.name ?? ""),
       });
-      live.blocks = observeToolEvent(live.blocks, { type: event.type, payload, createdAt });
+      live.blocks = withLivePlan(
+        observeToolEvent(live.blocks, { type: event.type, payload, createdAt }),
+        payload,
+      );
       live.meta = {
         ...live.meta,
         seq: event.seq,
@@ -495,6 +499,19 @@ export function appendToolCallSegment(
     return [...segments.slice(0, -1), { ...last, steps }];
   }
   return [...segments, { kind: "steps", steps }];
+}
+
+/**
+ * The live turn's task list: a plan carried by a tool event replaces the earlier one and leads
+ * the live message, so the list stays open and current while the Mico works.
+ */
+export function withLivePlan(
+  blocks: readonly MessageBlock[],
+  payload: Record<string, unknown> | undefined,
+): MessageBlock[] {
+  const parsed = MessageBlockSchema.safeParse(payload?.plan);
+  if (!parsed.success || parsed.data.kind !== "plan") return [...blocks];
+  return [parsed.data, ...blocks.filter((block) => block.kind !== "plan")];
 }
 
 export function humanizeToolName(name: string): string {

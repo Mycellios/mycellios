@@ -8,6 +8,7 @@ import { getLogger } from "@rakazo/logging";
 import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
 import { reconcileCallRequests } from "./call-request.js";
+import { reconcilePlanAutoStarts } from "./plan-autostart.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
@@ -146,6 +147,7 @@ export function createJobReconciler(
       const auxiliary = await Promise.allSettled(
         [
           () => reconcileCallRequests(deps),
+          () => reconcilePlanAutoStarts(deps),
           () => reconcileWorkflowExecutions(deps.prisma, deps.jobs),
           () => reconcileComputerRuns(deps.prisma),
           () => deps.sandbox ? reconcileWorkStops({ ...deps, sandbox: deps.sandbox }) : undefined,

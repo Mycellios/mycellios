@@ -6,6 +6,7 @@ import {
   isBackgroundInputBlock,
   isBackgroundRunTrigger,
   isPeerReceiptBlocks,
+  isUserProgressClientNonce,
 } from "@rakazo/core";
 import { messageReplyPreview } from "@rakazo/core/message-quote";
 import type { Prisma, PrismaClient } from "@rakazo/db";
@@ -291,6 +292,7 @@ function toThreadMessage(row: {
     replyPreview,
     runId: row.runId ?? undefined,
     callId: callIdFromClientNonce(row.clientNonce),
+    ...(row.role === "bot" && isUserProgressClientNonce(row.clientNonce) ? { progress: true as const } : {}),
     createdAt: row.createdAt.toISOString(),
   };
 }

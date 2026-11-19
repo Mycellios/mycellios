@@ -6386,3 +6386,43 @@ msgstr "Bezig met aanmelden…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "Dit duurt iets langer."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "Volledig bericht tonen"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "De Mico stopte voordat de taak klaar was. Vraag hem om door te gaan."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {# bericht met {names}} other {# berichten met {names}}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "{done} van {total} taken klaar"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "Gestart (niemand antwoordde op tijd)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "Starten · {left} s"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "Voor een lange taak toont de Mico zijn plan in een kaart met Starten en Annuleren. Zonder antwoord kan hij vanzelf beginnen. Eenvoudige antwoorden blijven direct."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "Plan vanzelf starten"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "Na {seconds} seconden"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "Nooit"

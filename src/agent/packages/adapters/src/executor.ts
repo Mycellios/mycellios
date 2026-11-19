@@ -5,7 +5,8 @@ import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
-import { effectiveMicoSettings, isMycelliosBaseUrl } from "@rakazo/contracts";
+import { planCardTool } from "./plan-card.js";
+import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, readMicoDefaults } from "@rakazo/contracts";
 import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
@@ -53,6 +54,7 @@ import {
   routineJobKey,
   routineRetryJob,
   routineWakeupJob,
+  planAutoStartJob,
   runContinueJob,
   SandboxRateLimitError,
   TransientModelError,
@@ -113,6 +115,7 @@ import {
   newSiteOutcome,
   nextFence,
   nextRoutineRunDateAcross,
+  notificationLead,
   outboundSiteGate,
   plainTextFromMarkdown,
   planActionGate,
@@ -125,7 +128,6 @@ import {
   toolRequiresApproval,
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
-  truncatedPlainText,
   truncatePlainText,
   unattendedTriggerToolRequiresApproval,
   userRunError,
@@ -529,11 +531,13 @@ import {
   extractNarrationText,
   finalBlocksAfterMidTurnProgress,
   isProgressMessageTruncated,
+  isRedundantProgressNote,
   isUserProgressClientNonce,
   messageUserMaxLength,
   midTurnProgressBudgetAllows,
   userProgressClientNonce,
 } from "./user-progress.js";
+import { WORK_PLAN_TOOL, workPlanBlock } from "./work-continuation.js";
 import { createWebProvider } from "./web-provider-factory.js";
 import { webFetchFromTool, webSearchFromTool } from "./web-tools.js";
 
@@ -616,7 +620,7 @@ const MAX_MODEL_FILE_BYTES = 250_000;
 const TURN_ATTACHMENT_UNAVAILABLE =
   "An attachment in this message could not be loaded. Tell the user the attachment was unavailable and do not guess its contents.";
 const STEERING_ATTACHMENT_UNAVAILABLE = TURN_ATTACHMENT_UNAVAILABLE;
-const BUILTIN_AGENT_TOOL_NAMES = new Set([...builtinAgentTools.map((tool) => tool.name), agentNewChatTool.name]);
+const BUILTIN_AGENT_TOOL_NAMES = new Set([...builtinAgentTools.map((tool) => tool.name), agentNewChatTool.name, planCardTool.name]);
 
 /**
  * Avoid an expensive remote workspace export when a turn never touched the computer. A failed
@@ -4544,8 +4548,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           for (const name of COMPUTER_REQUIRED_TOOL_NAMES) disabledBuiltinTools.add(name);
         }
         const micoOwner = await deps.prisma.user.findUniqueOrThrow({ where: { id: run.userId }, select: { micoDefaults: true } });
+        const savedPlanWait = readMicoDefaults(micoOwner.micoDefaults).planAutoStartSeconds;
+        const planWaitSeconds = savedPlanWait === undefined ? DEFAULT_PLAN_AUTO_START_SECONDS : savedPlanWait;
         const builtins = [
           ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).agentNewChat && run.trigger === "user" && thread.botId === bot.id && !thread.groupId && !disabledBuiltinTools.has("start_new_chat") ? [agentNewChatTool] : []),
+          // The plan card follows the Mico's "Show a plan before long tasks" preference in direct user chats.
+          ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).showPlan && run.trigger === "user" && thread.botId === bot.id && !thread.groupId ? [planCardTool] : []),
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled: deps.ticketBoardEnabled,
             phoneCallsEnabled: deps.phoneCallsEnabled,
@@ -4810,6 +4818,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let assembled = "";
         let currentTextSegment = "";
         let messageSegments: MessageBlock[] = [];
+        // The latest update_work_plan of this turn, shown as a task list above the answer.
+        let latestPlan: Extract<MessageBlock, { kind: "plan" }> | undefined;
         // Terminal subagent rows are published as their own messages (not appended to
         // messageSegments). Treat that like tool/step durable activity so we do not invent
         // an empty-run "done." completion afterward.
@@ -4958,6 +4968,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return;
           }
           assembled = "";
+          if (isRedundantProgressNote(narration, midTurnUserTexts)) return;
           await publishMessage(
             deps,
             run,
@@ -8881,6 +8892,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ...(option.description ? { description: redactSecrets(option.description, runSecrets) } : {}),
                 })),
               }));
+              // A plan card starts by itself when nobody answers within the owner's wait;
+              // a wait of null leaves it for a person.
+              const planAutoStartAt = event.plan && planWaitSeconds !== null
+                ? new Date(Date.now() + planWaitSeconds * 1000)
+                : undefined;
+              const safePlan = event.plan
+                ? {
+                    steps: event.plan.steps.map((step) => ({
+                      label: redactSecrets(step.label, runSecrets),
+                      text: redactSecrets(step.text, runSecrets),
+                    })),
+                    ...(planAutoStartAt ? { autoStartAt: planAutoStartAt.toISOString() } : {}),
+                  }
+                : undefined;
               await workspaceCheckpoint.flush();
               await persistTurnCheckpoint(event.executionId);
               await settleRunningHelpers();
@@ -8900,12 +8925,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     status: "pending",
                     actions: safeActions,
                     ...(safeQuestions ? { questions: safeQuestions } : {}),
+                    ...(safePlan ? { plan: safePlan } : {}),
                   },
                 ],
                 // Keep unredacted labels on the run for resume; message blocks stay redacted.
                 offeredActions: event.actions,
               });
               if (!paused) return;
+              if (planAutoStartAt) {
+                await deps.jobs
+                  .enqueue(planAutoStartJob(runId, planAutoStartAt))
+                  .catch((error) => getLogger().error("plan auto-start enqueue", error));
+              }
               if (paused.continuationRunId) {
                 await deps.jobs
                   .enqueue(runContinueJob(paused.continuationRunId))
@@ -8929,7 +8960,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               await publishMidTurnNarration();
               if (assembled.trim()) {
                 const narration = clampUserProgressMessage(redactSecrets(assembled, runSecrets));
-                if (narration && canPublishDurableNarration()) {
+                if (narration && isRedundantProgressNote(narration, midTurnUserTexts)) {
+                  // Filler or a repeat of a note this turn already showed.
+                } else if (narration && canPublishDurableNarration()) {
                   await publishMessage(
                     deps,
                     run,
@@ -8985,6 +9018,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
               return;
             } else if (event.type === "tool") {
+              if (event.name === WORK_PLAN_TOOL) {
+                latestPlan = workPlanBlock(event.args, (text) => redactSecrets(text, runSecrets)) ?? latestPlan;
+              }
               // Preserve event ordering when the throttle still holds recent narration: the
               // client must see that text before the tool call it describes.
               await flushProgress();
@@ -9004,7 +9040,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 botId: bot.id,
                 type: "agent.tool.called",
                 runId,
-                payload: { name: event.name, executionId: event.executionId, label: toolLabel },
+                payload: {
+                  name: event.name,
+                  executionId: event.executionId,
+                  label: toolLabel,
+                  // The live task list follows each plan update while the turn runs.
+                  ...(event.name === WORK_PLAN_TOOL && latestPlan ? { plan: latestPlan } : {}),
+                },
               });
               pendingTools.push({ name: event.name, label: toolLabel });
               tryFlushPendingTools();
@@ -9222,12 +9264,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               skipEmptyFallback: publishedTerminalSubagent || publishedMidTurnUserMessage,
             });
           }
-          const blocks = handedOff
+          const finalBlocks = handedOff
             ? []
             : finalBlocksAfterMidTurnProgress(
                 redactBlocks(completionBlocks, runSecrets),
                 publishedMidTurnUserMessage || runAllowsSilentEmpty(run.trigger),
               );
+          // The turn's task list leads its final message; a silent turn stays silent.
+          const blocks = latestPlan && finalBlocks.length > 0 ? [latestPlan, ...finalBlocks] : finalBlocks;
           const text = handedOff
             ? ""
             : redactSecrets(completionNotificationBody(silentReply.assembled, blocks), runSecrets);
@@ -10545,11 +10589,11 @@ export function completionNotificationBody(assembled: string, blocks: MessageBlo
     .join("");
 }
 
-const COMPLETION_NOTIFICATION_MAX_CHARS = 180;
+const SECRET_ASK_NOTIFICATION_MAX_CHARS = 180;
 
-/** Push body: Markdown stripped, then truncated so a cut cannot land inside a marker. */
+/** Push body: the lead of the reply, as whole sentences on one plain line. */
 export function completionNotificationPreview(text: string): string {
-  return truncatedPlainText(text, COMPLETION_NOTIFICATION_MAX_CHARS);
+  return notificationLead(text);
 }
 
 /** A secret card can ask for a code or a login, so the title stays generic and the label short. */
@@ -10558,7 +10602,7 @@ export function secretAskNotification(botName: string, label: string, runSecrets
   const text = plainTextFromMarkdown(redactSecrets(label, runSecrets), { maxSource: Infinity });
   const body = truncatePlainText(
     redactSecrets(text, runSecrets),
-    COMPLETION_NOTIFICATION_MAX_CHARS,
+    SECRET_ASK_NOTIFICATION_MAX_CHARS,
   );
   return { title: `${botName} needs an answer`, body };
 }
@@ -10816,6 +10860,7 @@ async function persistMessageInTransaction(
       role,
       blocks,
       callId: callIdFromClientNonce(clientNonce),
+      ...(role === "bot" && isUserProgressClientNonce(clientNonce) ? { progress: true } : {}),
     },
   });
   return {

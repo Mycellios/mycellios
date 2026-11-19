@@ -75,7 +75,7 @@ describe("notification policy and privacy", () => {
       true,
     );
     expect(value.body).not.toMatch(/secret-value|secret-auth|sk-secretkey/);
-    expect(value.body.length).toBeLessThanOrEqual(180);
+    expect(value.body.length).toBeLessThanOrEqual(200);
   });
   it("requires valid subscription key sizes", () => {
     expect(

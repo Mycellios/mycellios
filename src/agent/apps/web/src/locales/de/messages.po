@@ -6386,3 +6386,43 @@ msgstr "Anmeldung läuft…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "Das dauert etwas länger."
+
+#: src/pages/shell/message-view.tsx
+msgid "Show full message"
+msgstr "Ganze Nachricht anzeigen"
+
+#: src/lib/run-error.ts
+msgid "The Mico stopped before it finished the task. Ask it to continue."
+msgstr "Der Mico hat aufgehört, bevor die Aufgabe fertig war. Bitte ihn, weiterzumachen."
+
+#: src/components/ai/PeerExchangeSummary.tsx
+msgid "{count, plural, one {# message with {names}} other {# messages with {names}}}"
+msgstr "{count, plural, one {# Nachricht mit {names}} other {# Nachrichten mit {names}}}"
+
+#: src/components/PlanDisclosure.tsx
+msgid "{done} of {total} tasks done"
+msgstr "{done} von {total} Aufgaben erledigt"
+
+#: src/components/PlanCard.tsx
+msgid "Started (nobody answered in time)"
+msgstr "Gestartet (niemand hat rechtzeitig geantwortet)"
+
+#: src/components/PlanCard.tsx
+msgid "Start · {left} s"
+msgstr "Starten · {left} s"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct."
+msgstr "Vor einer langen Aufgabe zeigt der Mico seinen Plan in einer Karte mit Starten und Abbrechen. Ohne Antwort kann er von selbst starten. Einfache Antworten bleiben direkt."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Start the plan by itself"
+msgstr "Plan selbst starten"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "After {seconds} seconds"
+msgstr "Nach {seconds} Sekunden"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Never"
+msgstr "Nie"

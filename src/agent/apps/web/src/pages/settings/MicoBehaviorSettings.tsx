@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { DEFAULT_MEMORY_REVIEW_POLICY, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
+import { DEFAULT_MEMORY_REVIEW_POLICY, DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
 import { BotAvatar, Button, Input, OptionSelect, Switch } from "@rakazo/ui-web";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import { desktopBridge } from "../../lib/desktop";
 import type { RpcClient } from "../../lib/rpc";
+import { announceResponseStyle } from "../../lib/response-style";
 
 export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBusyChange: (value: boolean) => void }) {
   const { t } = useLingui(), client = useSpaceRpc();
@@ -28,7 +29,7 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
   const settings: { key: MicoBehaviorKey; title: string; description: string }[] = [
     { key: "localScripts", title: t`Local scripts`, description: t`Allow scripts on an authorized computer to send messages, run routines, answer questions and allow or deny individual approval requests.` },
     { key: "agentNewChat", title: t`Mico starts new chats`, description: t`In a long personal chat, the Mico can save handoff notes and start fresh context after finishing its task. History is kept.` },
-    { key: "showPlan", title: t`Show a plan before long tasks`, description: t`Ask the Mico to share a short plan before a long task. Simple replies stay direct. This does not grant permission to act.` },
+    { key: "showPlan", title: t`Show a plan before long tasks`, description: t`Before a long task, the Mico shows its plan in a card with Start and Cancel. Without an answer it can start by itself. Simple replies stay direct.` },
   ];
   const modes = [{ value: "inherit", label: t`Use default` }, { value: "on", label: t`Enabled` }, { value: "off", label: t`Disabled` }];
   const rows = bots.filter(bot => state?.bots.some(item => item.id === bot.id));
@@ -39,6 +40,7 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
     try {
       const next = await source.preferences.updateMicos({ ...change, revision: state.revision });
       if (active.current === source) setLoaded({ client: source, state: next });
+      if (change.kind === "defaults" && change.patch.responseStyle) announceResponseStyle(change.patch.responseStyle);
     } catch {
       if (active.current === source) {
         setError(t`Could not save. Preferences may have changed elsewhere. Review them and try again.`);
@@ -67,6 +69,15 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
             onValueChange={value => void save({ kind: "bot", botId: bot.id, key: chosen.key, value: value === "inherit" ? null : value === "on" })} />} />;
       })}{!rows.length && <p className="px-4 py-3 text-sm text-muted-foreground">{t`No Micos in this space.`}</p>}</SettingsGroup>
       {chosen.key === "localScripts" && <LocalScriptsSettings scope={client} onBusyChange={setHostBusy} />}
+      {chosen.key === "showPlan" && <SettingsGroup><SettingsRow label={t`Start the plan by itself`}
+        control={<OptionSelect aria-label={t`Start the plan by itself`} disabled={saving}
+          value={state.defaults.planAutoStartSeconds === null ? "never" : String(state.defaults.planAutoStartSeconds ?? DEFAULT_PLAN_AUTO_START_SECONDS)}
+          options={[...([5, 10, 30, 60] as const).map(seconds => ({ value: String(seconds), label: t`After ${seconds} seconds` })), { value: "never", label: t`Never` }]}
+          onValueChange={value => {
+            const seconds = value === "never" ? null : Number(value);
+            if (seconds === null || seconds === 5 || seconds === 10 || seconds === 30 || seconds === 60)
+              void save({ kind: "defaults", patch: { planAutoStartSeconds: seconds } });
+          }} />} /></SettingsGroup>}
     </> : <>
       <SettingsGroup title={t`Conversation`}><SettingsRow label={t`Response style`}
         description={t`Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail.`}

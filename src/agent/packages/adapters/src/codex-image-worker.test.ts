@@ -17,10 +17,12 @@ async function fixture(
     failed?: boolean;
     stale?: boolean;
     savedPath?: string;
+    usageLimit?: boolean;
   } = {},
 ) {
   const methods: string[] = [],
-    spawned: string[][] = [];
+    spawned: string[][] = [],
+    requests: { method: string; params: Record<string, unknown> }[] = [];
   const child = Object.assign(new EventEmitter(), {
     stdin: Object.assign(new EventEmitter(), {
       destroyed: false,
@@ -31,8 +33,11 @@ async function fixture(
         const message = JSON.parse(line);
         if (!message.id) return;
         methods.push(message.method);
+        requests.push({ method: message.method, params: message.params });
         const result =
-          message.method === "account/read"
+          message.method === "config/read"
+            ? { config: { mcp_servers: { github: { command: "github-mcp" } } } }
+            : message.method === "account/read"
             ? { account: { type: options.account ?? "chatgpt" } }
             : message.method === "model/list"
               ? { data: [{ id: "model", model: "model", isDefault: true }] }
@@ -51,6 +56,21 @@ async function fixture(
               params: { threadId: "thread", turn: { id: "turn" } },
             }) + "\n",
           );
+          if (options.usageLimit) {
+            child.stdout.emit(
+              "data",
+              JSON.stringify({
+                method: "error",
+                params: {
+                  threadId: "thread",
+                  turnId: "turn",
+                  willRetry: false,
+                  error: { message: "You've hit your usage limit.", codexErrorInfo: "usageLimitExceeded" },
+                },
+              }) + "\n",
+            );
+            return;
+          }
           const item = {
             id: "image",
             type: "imageGeneration",
@@ -129,17 +149,26 @@ async function fixture(
       return nativeRequire(name);
     },
   });
-  return { result: JSON.parse(output), methods, spawned, exit: fakeProcess.exitCode };
+  return { result: JSON.parse(output), methods, requests, spawned, exit: fakeProcess.exitCode };
 }
 describe("native image protocol", () => {
   it("requires the current successful thread and turn and emits only its PNG", async () => {
     const f = await fixture();
     expect(f.result).toMatchObject({ nonce: "a".repeat(32), mimeType: "image/png", data: png });
     expect(f.exit).toBe(0);
-    expect(f.spawned[0]).toContain("mcp_servers={}");
-    expect(f.spawned[0]).toContain("shell_tool");
-    expect(f.spawned[0]).toContain("apps");
-    expect(f.spawned[0]).toContain("plugins");
+    // Codex's built-in read-only sandbox, with image generation as the only tool and each of the
+    // user's MCP servers off.
+    const thread = f.requests.find((request) => request.method === "thread/start")?.params as {
+      sandbox: string;
+      config: { features: Record<string, boolean>; mcp_servers: Record<string, unknown>; web_search: string };
+    };
+    expect(thread.sandbox).toBe("read-only");
+    expect(thread).not.toHaveProperty("permissions");
+    expect(thread.config.features).toMatchObject({
+      image_generation: true, shell_tool: false, unified_exec: false, apps: false, plugins: false, view_image: false,
+    });
+    expect(thread.config.mcp_servers).toEqual({ github: { enabled: false } });
+    expect(thread.config.web_search).toBe("disabled");
     expect(f.methods.filter((m) => m === "turn/start")).toHaveLength(1);
   });
   it("does not use an API-key account or start a billed turn after authentication refusal", async () => {
@@ -155,6 +184,11 @@ describe("native image protocol", () => {
       expect(f.result).not.toHaveProperty("data");
     },
   );
+  it("reports a spent ChatGPT plan instead of a failed generation", async () => {
+    const f = await fixture({ usageLimit: true });
+    expect(f.result).toEqual({ nonce: "a".repeat(32), error: "usage_limit" });
+    expect(f.methods.filter((m) => m === "turn/start")).toHaveLength(1);
+  });
   it("never reads an arbitrary provider-supplied path", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "image-path-fixture-"));
     try {

@@ -21,6 +21,9 @@ import {
 import { SkillDraftCard } from "../../components/teach/SkillDraftCard";
 import type { ArtifactTarget } from "../../lib/artifact-open";
 import { messageProviderLabel } from "../../lib/messaging";
+import { PlanDisclosure } from "../../components/PlanDisclosure";
+import { naturalTurnLayout } from "../../lib/natural-turn";
+import { useResponseStyle } from "../../lib/response-style";
 import {
   isToolOnlyNarration,
   renderableMessageBlocks,
@@ -118,9 +121,10 @@ export const MessageView = memo(function MessageView({
     message.role === "bot" &&
     message.blocks.length > 0 &&
     message.blocks.every(
-      (block) => block.kind === "text" || block.kind === "progress" || block.kind === "steps",
+      (block) => block.kind === "text" || block.kind === "progress" || block.kind === "steps" || block.kind === "plan",
     );
   const isLive = message.id.startsWith("progress:");
+  const naturalStyle = useResponseStyle() === "natural" && message.role === "bot";
   const quoteMessageId = message.id.includes(":") ? undefined : message.id;
   // Only what is drawn names the mentioned bots; copy, quote, and speech keep the original text.
   const blocks = useMemo(
@@ -196,6 +200,60 @@ export const MessageView = memo(function MessageView({
       onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}
     />
   );
+  if (isNarration && naturalStyle) {
+    // Natural style: the short notes the agent wrote between steps, one steps summary, then the
+    // complete answer. The notes and the summary carry no actions; the answer keeps them.
+    const turn = naturalTurnLayout(blocks, isLive);
+    // A durable mid-turn progress message is a note too: it is never the answer.
+    const layout = message.progress
+      ? { ...turn, notes: [...turn.notes, ...turn.answer.map((block) => block.text.trim())], answer: [] }
+      : turn;
+    const steps = layout.steps && shouldRenderToolCard(layout.steps, showToolActivity) ? layout.steps : null;
+    const planBlock = blocks.find((block) => block.kind === "plan");
+    if (layout.notes.length === 0 && !steps && !planBlock && layout.answer.length === 0) return null;
+    return (
+      <>
+        {messageContext}
+        {layout.notes.map((note, i) => (
+          <div
+            key={`note-${i}`}
+            data-testid="message-progress-note"
+            className="max-w-[74%] min-w-0 ps-1 text-sm text-muted-foreground"
+            dir="auto"
+          >
+            <ChatMarkdown renderMention={renderMention}>{note}</ChatMarkdown>
+          </div>
+        ))}
+        {planBlock ? <PlanDisclosure block={planBlock} live={isLive} /> : null}
+        {steps ? (
+          <StandaloneToolActivity
+            live={isLive}
+            steps={steps.steps}
+            stepCount={toolStepCount(steps.steps)}
+            durationMs={steps.durationMs}
+          />
+        ) : null}
+        {layout.answer.length > 0 ? (
+          <div className="relative w-fit max-w-full [@media(hover:none)]:w-full">
+            <div className="flex w-fit max-w-full justify-start [@media(hover:none)]:w-full">
+              <div
+                data-testid="message-bot-bubble"
+                className="rk-message-bubble max-w-full space-y-2.5 rounded-[20px] px-3.5 py-2.5 text-body1 text-foreground"
+                dir="auto"
+              >
+                {layout.answer.map((block, i) => (
+                  <div key={i} data-quote-message-id={block.kind === "text" ? quoteMessageId : undefined}>
+                    <CollapsibleMessageText text={block.text} showFull={showFullText} renderMention={renderMention} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {hoverActions}
+          </div>
+        ) : null}
+      </>
+    );
+  }
   if (isNarration) {
     if (visibleNarrationBlocks.length === 0) return null;
     if (isToolOnlyNarration(message.blocks, showToolActivity)) {
@@ -236,6 +294,7 @@ export const MessageView = memo(function MessageView({
                     </ToolActivityDisclosure>
                   );
                 }
+                if (block.kind === "plan") return <PlanDisclosure key={i} block={block} live={isLive} />;
                 if (block.kind === "text" || block.kind === "progress") {
                   return (
                     <div
@@ -273,6 +332,7 @@ export const MessageView = memo(function MessageView({
             );
           }
           if (isToolActivityBlock(block)) return null;
+          if (block.kind === "plan") return <PlanDisclosure key={i} block={block} live={isLive} />;
           if (block.kind === "handoff") {
             const from = memberName?.(block.fromBotId) ?? t`bot`;
             const to = memberName?.(block.toBotId) ?? t`bot`;
@@ -649,7 +709,8 @@ function CollapsibleMessageText({
   if (!collapsible) return <ChatMarkdown streaming={streaming} renderMention={renderMention}>{text}</ChatMarkdown>;
   // Bound actual Markdown work, not just its CSS height. Copy/quote still use the original message.
   const boundary = text.lastIndexOf("\n", 3000);
-  const preview = text.slice(0, boundary > 1800 ? boundary : 3000).trimEnd();
+  // Cut at a line end when one falls in the second half of the preview.
+  const preview = text.slice(0, boundary > 1500 ? boundary : 3000).trimEnd();
   return (
     <div>
       <ChatMarkdown renderMention={renderMention}>{expanded ? text : preview}</ChatMarkdown>
@@ -661,7 +722,7 @@ function CollapsibleMessageText({
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
-        {expanded ? <Trans>Show less</Trans> : <Trans>Show more</Trans>}
+        {expanded ? <Trans>Show less</Trans> : <Trans>Show full message</Trans>}
       </Button>
     </div>
   );

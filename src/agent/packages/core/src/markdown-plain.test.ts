@@ -1,5 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import { plainTextFromMarkdown, truncatedPlainText } from "./markdown-plain.js";
+import { notificationLead, plainTextFromMarkdown, truncatedPlainText } from "./markdown-plain.js";
+
+describe("notificationLead", () => {
+  it("keeps whole leading sentences and leaves out headings, code and tables", () => {
+    const reply = "## Status\nThe build passed. Deploy is waiting for your approval. The full logs, timings and every artifact checksum of this release follow below for anyone who wants them.\n\n```sh\nnpm run build\n```\n| a | b |\n|---|---|";
+    expect(notificationLead(reply)).toBe("The build passed. Deploy is waiting for your approval.");
+    expect(notificationLead("```sh\nrm\n```\n# Title\nOnly prose.")).toBe("Only prose.");
+  });
+
+  it("always keeps the first sentence on one line, capped at 200 characters", () => {
+    const lead = notificationLead(`${"word ".repeat(80)}end. Second.`);
+    expect(lead.length).toBeLessThanOrEqual(200);
+    expect(lead).not.toContain("Second");
+    expect(notificationLead("Line one\nline two.")).toBe("Line one line two.");
+  });
+});
 
 describe("plainTextFromMarkdown", () => {
   it("reads only a bounded preview of the source unless the caller raises the limit", () => {

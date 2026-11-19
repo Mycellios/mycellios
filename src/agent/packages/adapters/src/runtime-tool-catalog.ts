@@ -8,6 +8,7 @@ export const RUNTIME_TOOL_GUIDANCE =
 
 /** Everyday tools stay visible without a discovery round trip, like OpenBot's core set. */
 const CORE_TOOL_NAMES = new Set([
+  "acknowledge_request",
   "ask_user",
   "remember",
   "list_fleet",
