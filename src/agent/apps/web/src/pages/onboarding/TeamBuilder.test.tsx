@@ -20,6 +20,7 @@ vi.mock("@rakazo/ui-web", () => ({
   ),
   Textarea: (props: ComponentProps<"textarea">) => <textarea {...props} />,
   Disclosure: ({ summary, children }: { summary: ReactNode; children: ReactNode }) => <details><summary>{summary}</summary>{children}</details>,
+  cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
 }));
 
 import { TeamBuilder } from "./TeamBuilder";

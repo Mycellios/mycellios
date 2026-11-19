@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import type { AccountPlanLimits } from "@rakazo/contracts";
+import type { AccountPlanLimit, AccountPlanLimits, PlanLimitWindow } from "@rakazo/contracts";
 import { Button, Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@rakazo/ui-web";
 import { ChevronDown, Gauge } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -110,6 +110,7 @@ function QuotaContent({
     accounts[0];
   const windows = !error ? ringWindows(account, now) : [];
   const remaining = windows.length ? Math.min(...windows.map(remainingQuota)) : null;
+  const rings = compact && !error ? railRings(accounts, now) : null;
   const name = account ? providerName(account.provider) : t`Model accounts`;
   const summary =
     remaining === null ? t`Quota unavailable` : t`${Math.round(remaining)}% remaining`;
@@ -146,49 +147,22 @@ function QuotaContent({
         aria-keyshortcuts={compact ? "ArrowDown" : undefined}
         aria-label={compact ? t`Usage` : `${t`Subscription quota`}: ${name} · ${summary}`}
         title={compact ? undefined : `${name} · ${summary}`}
-        className={`app-no-drag relative flex shrink-0 items-center rounded-lg outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${compact ? "size-10 justify-center" : "mx-3 gap-2 px-2 py-1.5 text-sm"}`}
+        className={`app-no-drag relative flex shrink-0 items-center rounded-lg outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${compact ? "min-h-10 w-10 flex-col justify-center gap-1 py-[3px]" : "mx-3 gap-2 px-2 py-1.5 text-sm"}`}
       >
-        <span className="relative grid size-[34px] shrink-0 place-items-center">
-          <svg className="absolute inset-0" viewBox="0 0 34 34" aria-hidden="true">
-            {(windows.length ? windows : [null]).map((window, index) => {
-              const radius = 15.5 - index * 4;
-              const perimeter = 2 * Math.PI * radius;
-              return (
-                <g key={window?.id ?? "unknown"}>
-                  <circle
-                    cx="17"
-                    cy="17"
-                    r={radius}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeOpacity=".12"
-                    strokeWidth="2"
-                  />
-                  {window ? (
-                    <circle
-                      cx="17"
-                      cy="17"
-                      r={radius}
-                      fill="none"
-                      stroke={remainingQuota(window) >= 30 ? "#22c55e" : quotaColor(remainingQuota(window))}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeDasharray={`${(perimeter * remainingQuota(window)) / 100} ${perimeter}`}
-                      transform="rotate(-90 17 17)"
-                    />
-                  ) : null}
-                </g>
-              );
-            })}
-          </svg>
-          {account ? (
-            <span className="grid size-3.5 place-items-center [&_img]:size-3.5 [&_span]:size-3.5 [&_svg]:size-3.5">
-              <ProviderLogo name={name} providerId={account.provider} />
-            </span>
-          ) : (
-            <Gauge size={15} className="text-muted-foreground" />
-          )}
-        </span>
+        {rings?.shown.length ? (
+          <>
+            {rings.shown.map((row) => (
+              <QuotaRing key={row.credentialId} account={row} windows={ringWindows(row, now)} />
+            ))}
+            {rings.more ? (
+              <span data-testid="provider-quota-more" className="grid size-[34px] place-items-center rounded-full border-2 border-foreground/12 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                +{rings.more}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <QuotaRing account={account} windows={windows} />
+        )}
         {!compact ? (
           <>
             <span className="flex-1 text-start">{t`Subscription quota`}</span>
@@ -295,5 +269,57 @@ function QuotaContent({
         ) : null}
       </PopoverContent>
     </Popover>
+  );
+}
+
+const RAIL_RING_LIMIT = 4;
+
+/**
+ * The rail shows one ring per account that reports a fresh allowance. When they do not fit, the
+ * accounts with the least left stay, in their order, and a "+N" mark counts the rest.
+ */
+export function railRings(accounts: AccountPlanLimit[], now: number) {
+  const measured = accounts.filter((row) => ringWindows(row, now).length > 0);
+  if (measured.length <= RAIL_RING_LIMIT) return { shown: measured, more: 0 };
+  const left = (row: AccountPlanLimit) => Math.min(...ringWindows(row, now).map(remainingQuota));
+  const kept = new Set([...measured].sort((a, b) => left(a) - left(b)).slice(0, RAIL_RING_LIMIT - 1));
+  return { shown: measured.filter((row) => kept.has(row)), more: measured.length - kept.size };
+}
+
+function QuotaRing({ account, windows }: { account: AccountPlanLimit | undefined; windows: PlanLimitWindow[] }) {
+  return (
+    <span data-testid="provider-quota-ring" className="relative grid size-[34px] shrink-0 place-items-center">
+      <svg className="absolute inset-0" viewBox="0 0 34 34" aria-hidden="true">
+        {(windows.length ? windows : [null]).map((window, index) => {
+          const radius = 15.5 - index * 4;
+          const perimeter = 2 * Math.PI * radius;
+          return (
+            <g key={window?.id ?? "unknown"}>
+              <circle cx="17" cy="17" r={radius} fill="none" stroke="currentColor" strokeOpacity=".12" strokeWidth="2" />
+              {window ? (
+                <circle
+                  cx="17"
+                  cy="17"
+                  r={radius}
+                  fill="none"
+                  stroke={remainingQuota(window) >= 30 ? "#22c55e" : quotaColor(remainingQuota(window))}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(perimeter * remainingQuota(window)) / 100} ${perimeter}`}
+                  transform="rotate(-90 17 17)"
+                />
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+      {account ? (
+        <span className="grid size-3.5 place-items-center [&_img]:size-3.5 [&_span]:size-3.5 [&_svg]:size-3.5">
+          <ProviderLogo name={providerName(account.provider)} providerId={account.provider} />
+        </span>
+      ) : (
+        <Gauge size={15} className="text-muted-foreground" />
+      )}
+    </span>
   );
 }

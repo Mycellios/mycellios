@@ -45,7 +45,7 @@ import {
 } from "@rakazo/ui-web";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ModelPreflightFeedback,
   modelPreflightTestingLabel,
@@ -53,6 +53,7 @@ import {
 import { ModelHeadersEditor } from "../components/ModelHeadersEditor";
 import { ModelPicker } from "./model-settings/model-picker";
 import { MycelliosWordmark } from "../components/MycelliosBrand";
+import { ProviderLogo } from "../components/ProviderLogo";
 import { PageLoading } from "../components/PageLoading";
 import { SignupSurvey } from "../components/SignupSurvey";
 import { appPath } from "../lib/app-path";
@@ -73,8 +74,14 @@ import { useModelOAuthSignIn } from "../lib/use-model-oauth-signin";
 import { errorText } from "../lib/user-error";
 import { CompatibleKeyField } from "./model-settings/compatible-key-field";
 import { OnboardingImport } from "./onboarding-import";
-import { createOnboardingTeam, type OnboardingTeamMember } from "./onboarding/create-onboarding-team";
+import { createOnboardingTeam, draftOnboardingTeam, type OnboardingTeamMember } from "./onboarding/create-onboarding-team";
+import { useTeamCopy } from "./onboarding/team-copy";
+import { enableCompatibleModel } from "./model-settings/enable-compatible-model";
+import { isFreeMycelliosModel } from "../lib/free-models";
 import { TeamBuilder } from "./onboarding/TeamBuilder";
+import { FirstRunChoice, PlanLogos } from "./onboarding/FirstRunChoice";
+import { BackLink, ChoiceList, ChoiceRow, OnboardingHeading } from "./onboarding/onboarding-ui";
+import { getGeneralPreferences, setGeneralPreferences } from "../lib/general-preferences";
 import { TeamCreditsError } from "./onboarding/team-catalog";
 import { InstalledAgentOnboarding } from "./shell/agent-engine-settings";
 
@@ -96,6 +103,11 @@ const MAIN_PROVIDER_OPTIONS: ReadonlyArray<{ provider: string; auth?: ProviderAu
 function providerOptionValue(provider: string, auth?: ProviderAuth): string {
   return auth ? `${provider}:${auth}` : provider;
 }
+/** The plans the first-run subscription step offers, in the same order as the choice logos. */
+const SUBSCRIPTIONS = [
+  { name: "ChatGPT", provider: "openai-codex", option: "openai-codex" },
+  { name: "Claude", provider: "anthropic", option: "anthropic:sign-in" },
+] as const;
 const FIRST_BOT_NAME = productBrand.companionName;
 const FIRST_BOT_LOCK = "rakazo:onboarding-first-bot";
 
@@ -121,12 +133,26 @@ export function OnboardingPage() {
   const fieldId = useId();
   // The URL holds the survey and model steps, so /onboarding/survey and /onboarding/model open directly.
   const { step: routeStep } = useParams();
-  const linkedStep = routeStep === "survey" || routeStep === "model" || routeStep === "team" ? routeStep : undefined;
+  const { search } = useLocation();
+  // The team builder is no longer part of first run. A saved /onboarding/team address goes
+  // through the first-run choice; only an explicit ?builder=1 opens the builder.
+  const linkedStep =
+    routeStep === "survey" || routeStep === "model" || routeStep === "choice" ||
+    (routeStep === "team" && new URLSearchParams(search).get("builder") === "1")
+      ? routeStep
+      : undefined;
   const [surveyDone, setSurveyDone] = useState(false);
   const step = surveyDone ? "loading" : (linkedStep ?? "loading");
   const [billingEnabled, setBillingEnabled] = useState(false);
   // The step after the survey; null until me loads.
-  const [afterSurvey, setAfterSurvey] = useState<"model" | "team" | "bot" | null>(null);
+  const [afterSurvey, setAfterSurvey] = useState<"model" | "choice" | "bot" | null>(null);
+  // "Use my AI subscription" on the first-run choice: connect a plan, then build the team on it.
+  const [planFirst, setPlanFirst] = useState(false);
+  const [startingFree, setStartingFree] = useState(false);
+  const [choiceError, setChoiceError] = useState("");
+  const [choiceStatus, setChoiceStatus] = useState("");
+  const teamCopy = useTeamCopy();
+  const [analytics, setAnalytics] = useState(() => getGeneralPreferences().productAnalytics);
   const [mycelliosSignIn, setMycelliosSignIn] = useState<boolean | null>(null);
   const [connectingMycellios, setConnectingMycellios] = useState(false);
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
@@ -205,7 +231,7 @@ export function OnboardingPage() {
         setupOwnerRef.current = { userId: me.userId, spaceId: me.spaceId };
         setBillingEnabled(me.billingEnabled);
         setCatalog(models);
-        const next = bots.length === 0 ? "team" : me.needsModel ? "model" : "bot";
+        const next = bots.length === 0 ? "choice" : me.needsModel ? "model" : "bot";
         setAfterSurvey(next);
         if (!linkedStep) goTo(me.needsSignupSurvey ? "survey" : next);
       })
@@ -227,9 +253,9 @@ export function OnboardingPage() {
     goTo(afterSurvey);
   }, [surveyDone, afterSurvey]);
 
-  function goTo(next: "survey" | "model" | "team" | "bot") {
+  function goTo(next: "survey" | "choice" | "model" | "team" | "bot") {
     const imported = importedBotRef.current;
-    navigate(next === "bot" ? (imported ? `/app/${imported.id}` : "/app") : `/onboarding/${next}`, {
+    navigate(next === "bot" ? (imported ? `/app/${imported.id}` : "/app") : next === "team" ? "/onboarding/team?builder=1" : `/onboarding/${next}`, {
       replace: true,
       ...(next === "bot" && !imported ? { state: { manualMicoSetup: true } } : {}),
     });
@@ -280,6 +306,86 @@ export function OnboardingPage() {
     }
   }
   finishAfterModelRef.current = finishAfterModel;
+
+  /** The team every first run starts with; it can be changed later like any other Micos. */
+  function defaultTeam() {
+    const answers = { sector: "operations", audience: "me", start: "drafts" } as const;
+    return draftOnboardingTeam("", answers, {
+      member: (id) => teamCopy.members[id],
+      audience: teamCopy.audiences[answers.audience],
+      start: teamCopy.starts[answers.start],
+    });
+  }
+
+  /**
+   * "Use free models" must always get the user in. Mycellios with a zero-priced main model comes first.
+   * Without a Mycellios account (or during an outage) the installed OpenCode runs its anonymous free
+   * models, downloaded first when the operator allows it, as OpenBot does. Failing both, the team still
+   * opens and the chat offers the model connection. Only a failed team creation stops here.
+   */
+  async function startFree() {
+    if (startingFree) return;
+    const owner = setupOwnerRef.current;
+    if (!owner) return;
+    setStartingFree(true);
+    setChoiceError("");
+    setChoiceStatus("");
+    const scoped = rpcForSpace(owner.spaceId);
+    let engine: CreateBotInput["agentEngine"];
+    if (!(await startOnMycellios(scoped, owner))) engine = await freeOpenCode(scoped);
+    try {
+      try {
+        await finishTeam(defaultTeam(), engine);
+      } catch (cause) {
+        // An engine this server refuses must not block the start: the same team runs without it.
+        if (!engine) throw cause;
+        await finishTeam(defaultTeam());
+      }
+    } catch {
+      setChoiceStatus("");
+      setChoiceError(t`Could not create your team. Try again.`);
+      setStartingFree(false);
+    }
+  }
+
+  async function startOnMycellios(scoped: ReturnType<typeof rpcForSpace>, owner: { userId: string; spaceId: string }) {
+    let connection;
+    try {
+      connection = await scoped.models.connectMycellios();
+    } catch {
+      return false;
+    }
+    // A missing free model or a refused role leaves Mycellios connected on its own default.
+    try {
+      const free = (await scoped.models.mycelliosModels()).find(isFreeMycelliosModel);
+      if (free) {
+        connection = await enableCompatibleModel(scoped, owner.spaceId, connection, free.id, t`This connection has reached its enabled model limit.`);
+        await scoped.models.setRole({
+          role: "main",
+          expectedUserId: owner.userId,
+          primary: { provider: free.provider, modelId: free.id, credentialId: connection.id },
+        });
+      }
+    } catch {
+      // Keep going: the connection itself works.
+    }
+    return true;
+  }
+
+  async function freeOpenCode(scoped: ReturnType<typeof rpcForSpace>): Promise<CreateBotInput["agentEngine"]> {
+    try {
+      const openCode = (await scoped.engines.list()).find((engine) => engine.id === "opencode");
+      if (openCode?.available) return "opencode";
+      if (!openCode?.canInstall) return undefined;
+      setChoiceStatus(t`Downloading OpenCode…`);
+      await scoped.engines.installOpenCode();
+      return "opencode";
+    } catch {
+      return undefined;
+    } finally {
+      setChoiceStatus("");
+    }
+  }
 
   const providers = useMemo(() => {
     const seen = new Map<string, ModelCatalogEntry>();
@@ -652,9 +758,9 @@ export function OnboardingPage() {
   if (step === "loading") return <PageLoading />;
 
   return (
-    <div className="min-h-full bg-background px-6 py-12">
-      <div className="mx-auto w-full max-w-[560px]">
-        <div className="mb-8">
+    <div className="min-h-full bg-background px-4 py-10 sm:px-6 sm:py-14">
+      <div className="mx-auto w-full max-w-[480px]">
+        <div className="mb-10 flex justify-center">
           <MycelliosWordmark />
         </div>
         {step === "survey" && !importing ? (
@@ -711,6 +817,32 @@ export function OnboardingPage() {
             </p>
           </div>
         ) : null}
+        {step === "choice" ? (
+          <FirstRunChoice
+            analytics={analytics}
+            onAnalyticsChange={(enabled) => {
+              try {
+                setGeneralPreferences({ productAnalytics: enabled });
+                setAnalytics(enabled);
+              } catch {
+                setAnalytics(getGeneralPreferences().productAnalytics);
+              }
+            }}
+            loading={startingFree}
+            error={choiceError}
+            status={choiceStatus}
+            onStartFree={() => void startFree()}
+            onUsePlan={() => {
+              setPlanFirst(true);
+              setChoiceError("");
+              pendingTeamRef.current = defaultTeam();
+              setAdvancedSetup(false);
+              selectProvider("openai-codex");
+              setConnectionPath("account");
+              goTo("model");
+            }}
+          />
+        ) : null}
         {step === "team" ? (
           <TeamBuilder
             onCreate={createTeam}
@@ -729,18 +861,35 @@ export function OnboardingPage() {
         ) : null}
         {step === "model" ? (
           <div>
-            {providerSetup ? <Button variant="ghost" className="mb-4 px-0" disabled={savingModel} onClick={() => { cancelOAuthAttempt(); goTo("team"); }}>
-              {t`Back to your team`}
-            </Button> : null}
-            <h1 className="text-[32px] font-medium text-foreground">
-              <Trans>Set up your assistant</Trans>
-            </h1>
-            {connectionPath === null ? <div className="mt-6 grid gap-3" data-testid="connection-path">
-              <p className="text-muted-foreground">{t`Choose how to connect. Mycellios handles the model setup for you.`}</p>
-              <Button onClick={() => { setAdvancedSetup(false); if (mycelliosSignIn === true) selectProvider(OPENAI_COMPATIBLE_PROVIDER_ID, productBrand.apiBaseUrl); else selectProvider("openai-codex"); setConnectionPath("account"); }}>{t`Use my account`}</Button>
-              <Button variant="outline" onClick={() => { setAdvancedSetup(true); selectProvider("opencode-go"); setConnectionPath("key"); }}>{t`Use an API key`}</Button>
-            </div> : <Button variant="ghost" className="mt-3" onClick={() => setConnectionPath(null)}>{t`Back`}</Button>}
-            <div hidden={connectionPath === null}>
+            {connectionPath !== null && !planFirst ? (
+              <BackLink disabled={savingModel} onClick={() => { cancelOAuthAttempt(); setConnectionPath(null); }}>{t`Back`}</BackLink>
+            ) : planFirst ? (
+              <BackLink disabled={savingModel} onClick={() => { cancelOAuthAttempt(); setPlanFirst(false); goTo("choice"); }}>{t`Back`}</BackLink>
+            ) : providerSetup ? (
+              <BackLink disabled={savingModel} onClick={() => { cancelOAuthAttempt(); goTo("team"); }}>{t`Back to your team`}</BackLink>
+            ) : null}
+            <div className="mt-4">
+              <OnboardingHeading
+                title={planFirst ? <Trans>Connect your subscription</Trans> : <Trans>Set up your assistant</Trans>}
+                description={connectionPath === null ? t`Choose how to connect. Mycellios handles the model setup for you.` : undefined}
+              />
+            </div>
+            {connectionPath === null ? <ChoiceList className="mt-8" data-testid="connection-path">
+              <ChoiceRow
+                title={t`Use my account`}
+                detail={t`ChatGPT, Claude or Mycellios`}
+                trailing={<PlanLogos />}
+                aria-label={t`Use my account`}
+                onClick={() => { setAdvancedSetup(false); if (mycelliosSignIn === true) selectProvider(OPENAI_COMPATIBLE_PROVIDER_ID, productBrand.apiBaseUrl); else selectProvider("openai-codex"); setConnectionPath("account"); }}
+              />
+              <ChoiceRow
+                title={t`Use an API key`}
+                detail={t`OpenAI, Anthropic, OpenRouter and more`}
+                aria-label={t`Use an API key`}
+                onClick={() => { setAdvancedSetup(true); selectProvider("opencode-go"); setConnectionPath("key"); }}
+              />
+            </ChoiceList> : null}
+            <div hidden={connectionPath === null} className={planFirst ? "mt-2" : "mt-8 rounded-xl border border-border bg-card p-5"}>
             {connectionPath === "account" ? (
               <InstalledAgentOnboarding
                 onSelect={async (agentEngine) => {
@@ -919,7 +1068,27 @@ export function OnboardingPage() {
                     <Trans>Back to simple setup</Trans>
                   </Button>
                 ) : null}
-                <div className="mt-8 block text-sm font-medium text-foreground">
+                {planFirst ? (
+                  <section className="mt-6">
+                    <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+                      <Trans>Your subscription</Trans>
+                    </h2>
+                    <ChoiceList>
+                      {SUBSCRIPTIONS.map((plan) => (
+                        <ChoiceRow
+                          key={plan.provider}
+                          title={plan.name}
+                          aria-label={plan.name}
+                          pressed={provider === plan.provider}
+                          trailing={<span className="grid size-4 place-items-center [&_img]:size-4 [&_span]:size-4 [&_svg]:size-4"><ProviderLogo name={plan.name} providerId={plan.provider} /></span>}
+                          disabled={oauthPending}
+                          onClick={() => selectProvider(plan.option)}
+                        />
+                      ))}
+                    </ChoiceList>
+                  </section>
+                ) : null}
+                <div className="block text-sm font-medium text-foreground" hidden={planFirst}>
                   <span>
                     <Trans>Provider</Trans>
                   </span>
@@ -987,7 +1156,7 @@ export function OnboardingPage() {
                 </div>
                 {provider ? (
                   <>
-                    <div className="mt-6 block text-sm text-foreground">
+                    <div className="mt-6 block text-sm text-foreground" hidden={planFirst && !isOpenAiCompatible}>
                       {isOpenAiCompatible ? (
                         <>
                           {null}
@@ -1325,6 +1494,8 @@ export function OnboardingPage() {
                           </div>
                         ) : (
                           <Button
+                            size="lg"
+                            className="w-full"
                             disabled={oauthPending}
                             onClick={() => beginSelectedSubscriptionSignIn()}
                           >
@@ -1424,8 +1595,8 @@ export function OnboardingPage() {
                   </p>
                 ) : null}
                 {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-                <div className="mt-6 flex gap-3">
-                  <Button disabled={!canSaveModel} onClick={() => void saveModel()}>
+                <div className="mt-6 flex flex-col gap-2" hidden={planFirst && subscriptionSignIn}>
+                  <Button size="lg" className="w-full" disabled={!canSaveModel} onClick={() => void saveModel()}>
                     <Trans>Continue</Trans>
                   </Button>
                   {billingEnabled ? (
