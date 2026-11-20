@@ -6,6 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-20
+
+### Security
+
+- Desktop's PC command executor now accepts connections only from this computer. Before, other
+  devices on the same network could reach it, although they still needed its private key.
+  Installations that still use the older Docker setup keep the previous behaviour.
+- The local Desktop server rejects requests addressed to any name other than this computer, which
+  blocks web pages that try to reach it through DNS rebinding.
+- Account actions refuse requests that the browser marks as coming from another site, in addition
+  to the existing cookie protection.
+- Desktop now protects the local server's identity, which holds the local database password and the
+  key that encrypts saved conversations, with the system's secret store: Windows DPAPI, the macOS
+  Keychain or the Linux keyring. Before, it was a plain file in the profile folder. Existing
+  installations are converted on the next start without changing any data. On Linux without a
+  keyring, the key stays in a file only your user can read, as before.
+
+### Added
+
+- With "Show a plan before long tasks" on, a Mico shows its plan in a card with Start and
+  Cancel before a long task. Without an answer it starts by itself after 10 seconds; the
+  setting can change the wait (5 to 60 seconds) or make it always wait for you.
+- While a Mico works, its task list stays open and updates with each step.
+- With developer mode on, the Mycellios Dev entry shows its state: the current step and
+  elapsed time while it prepares, and "Mycellios Dev is running" once it is open. A stop
+  button ends it, and a logs button shows its recent output.
+- Generating an image in a chat now shows a card straight away, in the shape the Mico
+  asked for, with a moving dotted canvas while the picture is made. The finished image
+  replaces it at its real proportions, with its size, the prompt and buttons to download
+  it or open it full size. A failed or stopped generation stays visible on the card with
+  the reason.
+- Micos can ask for a square, portrait or landscape image.
+- A Mico that edits an app can hand parts of it to other Micos: the teammates it delegates
+  to can read and edit the same app draft, and Micos working on different files of the app
+  can save at the same time without overwriting each other. Publishing still needs your
+  explicit action.
+
+### Changed
+
+- Micos answer in short chat messages: the result first, in about 60 words, without run
+  numbers, hashes or logs unless you ask for them.
+- In the natural response style, a chat turn shows the Mico's short notes between steps,
+  one folded steps line and then the complete answer, instead of an answer that grows
+  while it streams. Repeated or empty notes no longer appear, and progress notes on long
+  tasks have no message actions. Classic keeps the earlier view.
+- A Mico that delegates work tells you the outcome in its own words instead of forwarding
+  the other Mico's report. Delegated work answers with a short status, result and evidence.
+- Several messages in a row between Micos fold into one "N messages with …" line.
+- A Mico's task list shows as a folded "{done} of {total} tasks done" line above its answer.
+- Notifications show the first whole sentences of a reply, and unfinished tasks or short
+  readable errors get a clear message instead of a generic error.
+- A finished reply over 20,000 characters shows its beginning with "Show full message".
+- "Use free models" starts new accounts on Mycellios Free, which spreads conversations over
+  every free model Mycellios has checked can use tools, and moves on by itself when one stops
+  being available. It never falls back to a paid model: when no free model is available, it
+  says so and leaves the subscription option open.
+
+### Fixed
+
+- Image generation through Codex works on Windows again. Before, Codex refused to start the
+  image session there, and every request failed with a generic error. When the ChatGPT plan
+  behind Codex reaches its usage limit, the Mico now says so instead of a generic failure.
+- Opening Mycellios Dev for the first time no longer stops after 10 minutes while it
+  installs dependencies, which made every attempt start the installation again.
+- Opening Mycellios Dev again from the same chat while it prepares joins that launch
+  instead of failing.
+- Mycellios Dev no longer reinstalls a checkout's dependencies only because Desktop and the
+  terminal use different patch versions of Node.
+
 ## [0.6.0] - 2026-11-19
 
 ### Added
