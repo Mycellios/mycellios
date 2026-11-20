@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { rateLimitKeyGenerator } from "./rate-limit-key.js";
 import { eventAgentAccess } from "./event-demo-agent-access.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
@@ -484,14 +484,12 @@ export async function createCoordinator(
     });
   });
 
-  const rateLimitTrustedProxies = new Set(config.rateLimitTrustedProxies ?? []);
   await app.register(rateLimit, {
     global: true,
     max: options.globalRateLimitMax ?? 600,
     timeWindow: "1 minute",
     hook: "onRequest",
-    keyGenerator: (request) =>
-      rateLimitClientKey(request.ip, request.headers["x-forwarded-for"], rateLimitTrustedProxies),
+    keyGenerator: rateLimitKeyGenerator(config.rateLimitTrustedProxies),
   });
   const apiAccessEnabled = config.apiAccessEnabled ?? false;
   const isAccountNodeRoute = (path: string): boolean =>
@@ -506,9 +504,7 @@ export async function createCoordinator(
     reply.header("X-Frame-Options", "DENY");
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
-    // Browsers ignore this header on plain HTTP, so loopback development is unaffected.
-    // Subdomains are deliberately not included: they may host separate services.
-    reply.header("Strict-Transport-Security", "max-age=31536000");
+    reply.header("Strict-Transport-Security", "max-age=31536000"); // ignored on plain HTTP
     const path = request.url.split("?", 1)[0] ?? request.url;
     if (path.startsWith("/v1/") || path.startsWith("/public/v1/")) {
       reply.header("Access-Control-Allow-Origin", "*");
@@ -5405,23 +5401,6 @@ const PROXY_FORWARD_HEADERS = [
  * look local. Any forwarding header means we cannot tell who is really
  * calling, so local-only routes must refuse rather than guess.
  */
-/**
- * Global rate-limit bucket. Behind a declared reverse proxy, every request shares the
- * proxy's address, so the limit would apply to all clients together. Only for those
- * declared peers, use the last X-Forwarded-For hop: the address the proxy itself saw.
- * Earlier hops are client-supplied and are never trusted.
- */
-export function rateLimitClientKey(
-  peer: string,
-  forwardedFor: string | string[] | undefined,
-  trustedProxies: ReadonlySet<string>,
-): string {
-  if (!trustedProxies.has(peer) || forwardedFor === undefined) return peer;
-  const header = Array.isArray(forwardedFor) ? forwardedFor.join(",") : forwardedFor;
-  const hop = header.split(",").map((value) => value.trim()).filter(Boolean).at(-1);
-  return hop && isIP(hop) ? hop : peer;
-}
-
 export function isTrustedLocalRequest(request: FastifyRequest): boolean {
   if (!isLoopbackAddress(request.ip)) return false;
   return !PROXY_FORWARD_HEADERS.some((header) => request.headers[header] !== undefined);

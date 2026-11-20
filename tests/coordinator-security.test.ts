@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkerCapabilities } from "../src/contracts/types.js";
-import { createCoordinator, rateLimitClientKey, type CoordinatorRuntime } from "../src/coordinator/server.js";
+import { createCoordinator, type CoordinatorRuntime } from "../src/coordinator/server.js";
+import { rateLimitClientKey } from "../src/coordinator/rate-limit-key.js";
 import { SupabaseAuthService } from "../src/coordinator/supabase-auth.js";
 import { workerRegistrationDigest } from "../src/core/worker-admission-digest.js";
 import {
