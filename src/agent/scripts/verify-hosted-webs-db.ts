@@ -581,6 +581,135 @@ try {
     (await service.history(owner, appDraft.id)).some((row) => row.source === "mico"),
     "Mico edits are recorded in the draft history",
   );
+  // Team work: a Mico delegated from the bound request edits the same draft; no one else does.
+  await system.run.update({
+    where: { id: run.id },
+    data: { status: "completed" },
+  });
+  const team = (await service.assignAgent(owner, appDraft.id, botA.id))!;
+  const leadTask = await system.task.create({
+    data: {
+      ...owner,
+      botId: botA.id,
+      threadId: team.threadId,
+      prompt: "Synthetic team request",
+      status: "running",
+      delegationState: "waiting",
+    },
+  });
+  const leadRun = await system.run.create({
+    data: {
+      ...owner,
+      botId: botA.id,
+      threadId: team.threadId,
+      taskId: leadTask.id,
+      status: "running",
+      trigger: "user",
+    },
+  });
+  const delegated = async (resources: string[]) => {
+    const thread = await system.thread.create({
+      data: {
+        ...owner,
+        taskBotId: botB.id,
+        projectKey: `work:${leadTask.id}`,
+        taskKey: `delegation:${randomUUID()}`,
+        title: "Synthetic delegated part",
+      },
+    });
+    const childTask = await system.task.create({
+      data: {
+        ...owner,
+        botId: botB.id,
+        threadId: thread.id,
+        prompt: "Synthetic delegated part",
+        status: "running",
+        parentTaskId: leadTask.id,
+        delegationRootId: leadTask.id,
+        delegationKey: randomUUID(),
+        delegationState: "running",
+        expectedResult: "Synthetic result",
+        resources,
+      },
+    });
+    const childRun = await system.run.create({
+      data: {
+        ...owner,
+        botId: botB.id,
+        threadId: thread.id,
+        taskId: childTask.id,
+        status: "running",
+        trigger: "delegated_task",
+      },
+    });
+    await system.task.update({
+      where: { id: childTask.id },
+      data: { delegatedRunId: childRun.id },
+    });
+    return {
+      task: childTask,
+      context: { ...owner, botId: botB.id, runId: childRun.id },
+    };
+  };
+  const styles = await delegated(["site:styles.css"]);
+  const pageWork = await delegated(["site:index.html"]);
+  const leadContext = { ...owner, botId: botA.id, runId: leadRun.id };
+  const teamRead = await executeHostedAppTool(prisma, "app_read", { path: "index.html" }, pageWork.context);
+  const pageHash = "sha256" in teamRead ? teamRead.sha256 : undefined;
+  assert.match(pageHash ?? "", /^[0-9a-f]{64}$/);
+  assert.ok("files" in teamRead && teamRead.files.every((f) => /^[0-9a-f]{64}$/.test(f.sha256)));
+  const teamVersion = teamRead.version;
+  // Two teammates write different files from the same version: both are kept.
+  await executeHostedAppTool(prisma, "app_write", {
+    path: "styles.css", content: "h1{color:teal}", expectedVersion: teamVersion, expectedFileSha256: "absent",
+  }, styles.context);
+  const pageWrite = await executeHostedAppTool(prisma, "app_write", {
+    path: "index.html", content: "<h1>Team draft</h1>", expectedVersion: teamVersion, expectedFileSha256: pageHash,
+  }, pageWork.context);
+  assert.equal(pageWrite.version, teamVersion + 2);
+  const teamDraft = await service.draft(owner, appDraft.id);
+  const text = (path: string) => Buffer.from(teamDraft.bundle.files.find((f) => f.path === path)!.base64, "base64").toString("utf8");
+  assert.equal(text("styles.css"), "h1{color:teal}");
+  assert.equal(text("index.html"), "<h1>Team draft</h1>");
+  // A stale file hash, a repeated "absent" or a stale version without a hash never overwrite.
+  await assert.rejects(executeHostedAppTool(prisma, "app_write", {
+    path: "index.html", content: "<h1>Lost</h1>", expectedVersion: pageWrite.version, expectedFileSha256: pageHash,
+  }, pageWork.context), /version conflict/);
+  await assert.rejects(executeHostedAppTool(prisma, "app_write", {
+    path: "styles.css", content: "h1{}", expectedVersion: pageWrite.version, expectedFileSha256: "absent",
+  }, styles.context), /version conflict/);
+  await assert.rejects(executeHostedAppTool(prisma, "app_write", {
+    path: "styles.css", content: "h1{}", expectedVersion: teamVersion,
+  }, leadContext), /version conflict/);
+  assert.equal((await executeHostedAppTool(prisma, "app_read", {}, leadContext)).version, pageWrite.version);
+  // A run that is not the started run of a live child of this request has no access.
+  const strayTask = await system.task.create({
+    data: { ...owner, botId: botB.id, threadId: pageWork.task.threadId, prompt: "Synthetic unrelated", status: "running" },
+  });
+  const strayRun = await system.run.create({
+    data: { ...owner, botId: botB.id, threadId: pageWork.task.threadId, taskId: strayTask.id, status: "running", trigger: "user" },
+  });
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...owner, botId: botB.id, runId: strayRun.id }));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...styles.context, ...foreign }));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...styles.context, ...crossSpace }));
+  await system.task.update({ where: { id: styles.task.id }, data: { paused: true } });
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, styles.context));
+  await system.task.update({ where: { id: styles.task.id }, data: { paused: false, workStopPending: true } });
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, styles.context));
+  await system.task.update({ where: { id: leadTask.id }, data: { delegationState: "cancelled" } });
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
+  await system.task.update({ where: { id: leadTask.id }, data: { delegationState: "waiting" } });
+  await executeHostedAppTool(prisma, "app_read", {}, pageWork.context);
+  await system.bot.update({ where: { id: botB.id }, data: { archivedAt: new Date() } });
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
+  await system.bot.update({ where: { id: botB.id }, data: { archivedAt: null } });
+  // Reassigning or removing the app's Mico revokes the whole delegated tree at once.
+  await service.assignAgent(owner, appDraft.id, null);
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, leadContext));
+  checks.push(
+    "delegated Micos of the bound request share its draft; different files from one version are both kept, stale file hashes and versions are rejected; unrelated, foreign, cross-Space, paused, stopping, cancelled, archived and revoked access denied",
+  );
   await service.unpublish(owner, appDraft.id);
   checks.push(
     "assigned Mico/run/thread edits encrypted draft and live preview; unassigned, foreign, cross-Space, archived, stopped and revoked access denied; CAS preserves manual edits; public revision unchanged",

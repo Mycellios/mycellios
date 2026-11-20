@@ -1486,7 +1486,7 @@ export const builtinAgentTools: ConnectorTool[] = [
     description: "Delegate a concrete part of the current authorized request to another owned Mico. Creates a durable child task with an expected result and resource/dependency reservations. Use this for work; message_bot is for information. After delegating, end this turn; verified terminal results wake the parent automatically. Never poll or expand permissions.",
     inputSchema: { type: "object", properties: {
       bot_id: { type: "string" }, instruction: { type: "string" }, expected_result: { type: "string" },
-      resources: { type: "array", items: { type: "string" }, maxItems: 16, description: "host (safe default), browser, or workspace:<absolute path>. Coordination only; no permissions granted." },
+      resources: { type: "array", items: { type: "string" }, maxItems: 16, description: "host (safe default), browser, workspace:<absolute path>, or site:<app file> for the files of the app assigned to this conversation (e.g. site:index.html), so teammates can edit different app files at the same time. Coordination only; no permissions granted." },
       dependencies: { type: "array", items: { type: "string" }, maxItems: 16 },
     }, required: ["bot_id", "instruction", "expected_result"] },
   },

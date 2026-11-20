@@ -22,8 +22,19 @@ describe("work resource reservations", () => {
     expect(workResourcesConflict(["host"], parent)).toBe(true);
     expect(workResourcesConflict(["browser"], parent)).toBe(false);
   });
+  it("reserves hosted app files so team members can edit different files at once", () => {
+    const page = normalizeWorkResources(["site:index.html"]);
+    expect(page).toEqual(["site:index.html"]);
+    expect(workResourcesConflict(page, normalizeWorkResources(["site:styles.css"]))).toBe(false);
+    expect(workResourcesConflict(page, normalizeWorkResources(["site:index.html"]))).toBe(true);
+    expect(workResourcesConflict(normalizeWorkResources(["site:assets/"]), normalizeWorkResources(["site:assets/logo.svg"]))).toBe(true);
+    expect(workResourcesConflict(normalizeWorkResources(["site:app"]), normalizeWorkResources(["site:app.js"]))).toBe(false);
+    expect(workResourcesConflict(normalizeWorkResources(["site:c"]), normalizeWorkResources(["workspace:/c"]))).toBe(false);
+    expect(workResourcesConflict(["host"], page)).toBe(true);
+  });
   it("rejects relative paths, traversal and oversized resource requests", () => {
-    for (const input of [["workspace:relative"], ["workspace:C:/app/../other"], ["unknown"], Array(17).fill("host")])
+    for (const input of [["workspace:relative"], ["workspace:C:/app/../other"], ["unknown"], Array(17).fill("host"),
+      ["site:"], ["site:/index.html"], ["site:../secret"], ["site:a//b"], ["site:a b.html"], ["site:" + "a".repeat(513)]])
       expect(() => normalizeWorkResources(input)).toThrow();
   });
 });

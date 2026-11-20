@@ -249,7 +249,11 @@
   conversation. app_read/app_write resolve from the actual run and binding;
   recheck membership, assignment, bot and run before accessing the encrypted
   draft. CAS prevents lost edits. Reassignment revokes prior access; tools never
-  publish. Reuse thread streaming and TaskComposer; preview follows saved draft
+  publish. A Mico delegated from the bound request reaches the same draft only
+  through its exact live started child run (specs/mico-team-build/spec.md); paused,
+  stopping, cancelled or archived work and other requests are refused. Optional
+  per-file expectedFileSha256 lets teammates write different files concurrently;
+  site:<file> delegation resources serialise teammates on the same file. Reuse thread streaming and TaskComposer; preview follows saved draft
   versions without overwriting dirty manual edits.
   Local qualification is not public production publication.
 
