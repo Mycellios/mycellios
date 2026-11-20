@@ -4,7 +4,9 @@ import { Hono } from "hono";
 /**
  * `/health` is public liveness, so it stays a constant body. Deployment details are for
  * operators on the API port; a reverse proxy adds forwarding headers, so a request that
- * carries them came through the public edge and gets no details.
+ * carries them came through the public edge and gets no details. `/ready` adds only the
+ * deployed revision, as the coordinator's public health does: Nucleus deploys check that the
+ * new commit is the one being served.
  */
 export function healthRoutes(
   details: () => Record<string, unknown>,
@@ -26,11 +28,18 @@ export function healthRoutes(
     return inFlight;
   };
   app.get("/ready", async (c) => {
-    const degraded = details().degraded === true;
+    const current = details();
+    const degraded = current.degraded === true;
+    const revision = typeof current.revision === "string" ? current.revision : null;
     const databaseUp = database ? await withinDeadline(probe(database)) : true;
     const ok = !degraded && databaseUp;
     return c.json(
-      { ok, degraded, ...(databaseUp ? {} : { database: "unreachable" }) },
+      {
+        ok,
+        degraded,
+        ...(revision ? { revision } : {}),
+        ...(databaseUp ? {} : { database: "unreachable" }),
+      },
       ok ? 200 : 503,
     );
   });
