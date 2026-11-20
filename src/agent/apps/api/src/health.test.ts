@@ -76,6 +76,23 @@ describe("health routes", () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
 
+  it("reports only the deployed revision on public readiness", async () => {
+    const response = await app.request("/ready", {
+      headers: { "x-forwarded-for": "203.0.113.7" },
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      degraded: false,
+      revision: "abc123",
+    });
+    const unknown = healthRoutes(() => ({ revision: null }));
+    await expect((await unknown.request("/ready")).json()).resolves.toEqual({
+      ok: true,
+      degraded: false,
+    });
+  });
+
   it("serves details to direct requests on the API port", async () => {
     const response = await app.request("/internal/health");
     expect(response.status).toBe(200);
