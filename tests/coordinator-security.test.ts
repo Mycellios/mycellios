@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkerCapabilities } from "../src/contracts/types.js";
-import { createCoordinator, type CoordinatorRuntime } from "../src/coordinator/server.js";
+import { createCoordinator, rateLimitClientKey, type CoordinatorRuntime } from "../src/coordinator/server.js";
 import { SupabaseAuthService } from "../src/coordinator/supabase-auth.js";
 import { workerRegistrationDigest } from "../src/core/worker-admission-digest.js";
 import {
@@ -457,6 +457,36 @@ describe("public coordinator security boundaries", () => {
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["strict-transport-security"]).toBe("max-age=31536000");
+  });
+
+  it("limits proxied clients separately only behind a declared proxy", async () => {
+    const runtime = await createCoordinator({
+      host: "127.0.0.1",
+      port: 0,
+      databasePath: ":memory:",
+      requestTimeoutMs: 1_000,
+      rateLimitTrustedProxies: ["127.0.0.1"],
+    }, { logger: false, globalRateLimitMax: 1 });
+    runtimes.push(runtime);
+    const from = (client: string) => runtime.app.inject({
+      method: "GET",
+      url: "/health",
+      remoteAddress: "127.0.0.1",
+      headers: { "x-forwarded-for": `198.51.100.99, ${client}` },
+    });
+
+    expect((await from("203.0.113.1")).statusCode).toBe(200);
+    expect((await from("203.0.113.2")).statusCode).toBe(200);
+    expect((await from("203.0.113.1")).statusCode).toBe(429);
+  });
+
+  it("ignores forwarded addresses from undeclared peers", () => {
+    const trusted = new Set(["10.0.0.2"]);
+    expect(rateLimitClientKey("203.0.113.9", "198.51.100.1", trusted)).toBe("203.0.113.9");
+    expect(rateLimitClientKey("10.0.0.2", "198.51.100.1, 203.0.113.5", trusted)).toBe("203.0.113.5");
+    expect(rateLimitClientKey("10.0.0.2", "not-an-address", trusted)).toBe("10.0.0.2");
+    expect(rateLimitClientKey("10.0.0.2", undefined, trusted)).toBe("10.0.0.2");
   });
 
   it("rate limits every HTTP route at the coordinator boundary", async () => {

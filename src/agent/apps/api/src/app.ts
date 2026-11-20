@@ -896,6 +896,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     }),
   );
   app.use("/rpc/*", async (c, next) => {
+    if (!isSameSiteRpcRequest(c.req.raw, env)) {
+      return c.json({ error: "cross_site_request_rejected" }, 403);
+    }
     const session = await requestSession(c.req.raw);
     const actor = session?.actor ?? null;
     if (actor) {
@@ -1399,6 +1402,34 @@ export function isTrustedOrigin(
     [env.webOrigin, env.apiUrl, env.authUrl, ...MOBILE_AUTH_ORIGINS].flatMap(originVariants),
   );
   return allowed.has(origin);
+}
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * CSRF defence for cookie-authenticated RPC writes, beyond SameSite=Lax: a sibling
+ * subdomain counts as same-site, so it would still send the session cookie. A state-changing
+ * request is refused only when the browser itself marks it as coming from another site
+ * (Sec-Fetch-Site, or an Origin naming another host) and that origin is not trusted for CORS.
+ * Native apps and other non-browser clients send neither header and are unaffected.
+ */
+export function isSameSiteRpcRequest(
+  request: Request,
+  env: Pick<AppEnv, "webOrigin" | "apiUrl" | "authUrl">,
+): boolean {
+  if (SAFE_METHODS.has(request.method.toUpperCase())) return true;
+  const site = request.headers.get("sec-fetch-site");
+  if (site === "same-origin" || site === "none") return true;
+  const origin = request.headers.get("origin");
+  if (origin && origin !== "null" && isTrustedOrigin(origin, env)) return true;
+  if (site === "same-site" || site === "cross-site") return false;
+  if (!origin) return true;
+  if (origin === "null") return false;
+  try {
+    return new URL(origin).host === request.headers.get("host");
+  } catch {
+    return false;
+  }
 }
 
 function isLoopbackHost(host: string): boolean {

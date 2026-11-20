@@ -283,7 +283,21 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     });
     app.get("*", serveStatic({ path: join(config.webRoot, "index.html") }));
     const sockets = new Set<Socket>();
-    const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: config.port });
+    // A browser may resolve an attacker's domain to 127.0.0.1 (DNS rebinding); those
+    // requests keep the attacker's Host. Only this listener's loopback names, and the
+    // validated project-preview origins, address the local server.
+    const allowedHosts = localServerHosts(config.port, [
+      config.projectPreview?.webOrigin,
+      config.projectPreview?.authOrigin,
+    ]);
+    const server = serve({
+      fetch: (request, env) =>
+        allowedHosts.has(request.headers.get("host")?.toLowerCase() ?? "")
+          ? app.fetch(request, env)
+          : new Response(null, { status: 421 }),
+      hostname: "127.0.0.1",
+      port: config.port,
+    });
     server.on("connection", (socket) => {
       sockets.add(socket);
       socket.once("close", () => sockets.delete(socket));
@@ -303,4 +317,11 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     await close().catch(() => diagnostic("database-cleanup-failed"));
     throw error;
   }
+}
+
+/** Host header values that address the loopback local server. */
+export function localServerHosts(port: number, extraOrigins: Array<string | undefined> = []): Set<string> {
+  const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+  for (const origin of extraOrigins) if (origin) hosts.add(new URL(origin).host);
+  return hosts;
 }
