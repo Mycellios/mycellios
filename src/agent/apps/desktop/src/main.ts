@@ -25,7 +25,7 @@ import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, safeStorage, session, shell, utilityProcess } from "electron";
 import { startDesktopDiagnostics, recordDesktopDiagnostic, desktopDiagnosticsText, desktopExceptionFields, type DesktopDiagnostics } from "./diagnostics.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
@@ -46,6 +46,7 @@ import { startDesktopExecutor } from "./executor-startup.js";
 import { ContributionRuntime, mayManageContribution } from "./contribution-runtime.js";
 import { DesktopRelayClient } from "./desktop-relay.js";
 import { desktopProjectPolicy } from "./project-preview-policy.js";
+import { loadLocalDataKey, localIdentityIsProtected } from "./local-data-key.js";
 import { LocalNativeStackController } from "./local-native-stack.js";
 import { saveLocalComputerHost } from "./local-settings.js";
 import {
@@ -1534,8 +1535,22 @@ app.whenReady().then(async () => {
     },
   });
   if (nativeLocalStack) {
+    const localDataDir = path.join(userDataDir, "local-data");
+    let localDataKey: string | undefined;
+    try {
+      localDataKey = await loadLocalDataKey({
+        userDataDir,
+        platform: process.platform,
+        store: safeStorage,
+        protectedDataExists: await localIdentityIsProtected(localDataDir),
+      });
+    } catch (error) {
+      // Unprotected data still starts as before; protected data reports that its key is
+      // unavailable from the local server instead of starting an empty installation.
+      reportDesktopError(error, "desktop.startup");
+    }
     localStack = new LocalNativeStackController({
-      dataDir: path.join(userDataDir, "local-data"),
+      dataDir: localDataDir,
       stackDir: stackDir(userDataDir),
       webRoot: app.isPackaged
         ? path.join(process.resourcesPath, "web")
@@ -1550,6 +1565,7 @@ app.whenReady().then(async () => {
             ...nativeEnvironment(),
             NODE_ENV: "production",
             RAKAZO_LOCAL_SERVER_CONFIG: configFile,
+            ...(localDataKey ? { RAKAZO_LOCAL_DATA_KEY: localDataKey } : {}),
           },
           serviceName: "Local agent server",
           stdio: "pipe",

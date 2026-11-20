@@ -1897,3 +1897,14 @@
   Preserve explicit build/install deadlines, command journals and Credit admission.
   Verify shell-command-budget, search-progress, adaptive-search-runtime,
   shell-command-stream and native-command-recovery tests.
+
+- The managed local server's identity.json (database password, content encryption
+  key) is AES-256-GCM sealed with a 32-byte key that Desktop wraps through Electron
+  safeStorage (DPAPI/Keychain/libsecret) in local-data-key.json, with an owner-only
+  file fallback when no real store exists (Linux basic_text). Pass the key only in
+  the utility process environment and delete it before spawning children; never
+  write it to server.json. Never regenerate a key or identity while protected data
+  exists, never overwrite an unreadable key record, and replace plaintext only after
+  its sealed copy reads back. Missing keys fail the local server instead of starting
+  an empty installation. Verify local-identity-protection and local-data-key tests;
+  qualify real OS stores (including macOS prompts after unsigned updates) per platform.

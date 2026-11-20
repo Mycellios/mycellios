@@ -1,5 +1,4 @@
 import { execFile, spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -14,6 +13,7 @@ import { InMemoryRealtimeFanout, migrateJobQueue } from "@rakazo/adapters";
 import { provisionRuntimeRole } from "@rakazo/db";
 import EmbeddedPostgres from "embedded-postgres";
 import { createApp } from "./app.js";
+import { localIdentity } from "./local-identity-protection.js";
 
 export interface DesktopLocalConfig {
   dataDir: string;
@@ -38,39 +38,6 @@ export async function freeLocalPort(): Promise<number> {
   if (!address || typeof address === "string")
     throw new Error("Could not allocate local database port");
   return address.port;
-}
-
-type Identity = {
-  databasePassword: string;
-  appPassword: string;
-  authSecret: string;
-  encryptionKey: string;
-  screenProxySecret: string;
-};
-async function localIdentity(dataDir: string): Promise<Identity> {
-  await mkdir(dataDir, { recursive: true, mode: 0o700 });
-  const file = join(dataDir, "identity.json");
-  try {
-    const identity = JSON.parse(await readFile(file, "utf8")) as Identity;
-    if (
-      !Object.values(identity).every(
-        (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value),
-      ) ||
-      Object.keys(identity).length !== 5
-    )
-      throw new Error("Invalid local identity");
-    return identity;
-  } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT"))
-      throw error;
-    const identity = Object.fromEntries(
-      ["databasePassword", "appPassword", "authSecret", "encryptionKey", "screenProxySecret"].map(
-        (key) => [key, randomBytes(32).toString("hex")],
-      ),
-    ) as Identity;
-    await writeFile(file, JSON.stringify(identity), { mode: 0o600, flag: "wx" });
-    return identity;
-  }
 }
 
 async function runFile(
@@ -102,7 +69,8 @@ async function runFile(
 }
 
 /** Uses PostgreSQL's existing schema and RLS; no lossy conversion to a second database engine. */
-export async function startDesktopLocalServer(config: DesktopLocalConfig) {
+/** `dataKey` comes from Desktop's OS secret store and is never written to the config file. */
+export async function startDesktopLocalServer(config: DesktopLocalConfig, dataKey?: Buffer) {
   const diagnostic = (phase: string) => {
     if (process.env.MYCELLIOS_LOCAL_SERVER_DIAGNOSTICS === "1")
       console.log(JSON.stringify({ localServerPhase: phase }));
@@ -117,7 +85,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     if (config.projectPreview.authOrigin && (config.projectPreview.authOrigin !== "http://127.0.0.1:5188" || config.projectPreview.webOrigin !== "http://127.0.0.1:5192"))
       throw new Error("Invalid dedicated local authentication callback");
   }
-  const identity = await localIdentity(config.dataDir);
+  const identity = await localIdentity(config.dataDir, dataKey);
   const databasePort = await freeLocalPort();
   const lockFile = join(config.dataDir, "server.lock");
   let recovering = false;
