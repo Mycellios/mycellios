@@ -157,6 +157,7 @@ import {
 } from "./content-hub.js";
 import { registerPublicDownloadRoutes } from "./public-download-routes.js";
 import { registerCanonicalLandingHostRedirect, registerLandingEntryRoutes } from "./landing-entry-routes.js";
+import { ContentSecurityPolicyHeader } from "./content-security-policy.js";
 import { SupabaseAuthService } from "./supabase-auth.js";
 import {
   DeploymentControlPlane,
@@ -496,11 +497,12 @@ export async function createCoordinator(
     path === "/v1/nodes"
     || path.startsWith("/v1/nodes/")
     || path.startsWith("/v1/node-ownership-transfers/");
+  const contentSecurityPolicy = new ContentSecurityPolicyHeader();
   app.addHook("onRequest", async (request, reply) => {
     // The public UI and mobile worker must never be embeddable as drive-by
-    // compute. Apply the policy to static and dynamic responses so it remains
-    // true even when a reverse proxy does not add security headers.
-    reply.header("Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'self'");
+    // compute or run injected scripts. Apply the policy to every response so it
+    // remains true even when a reverse proxy does not add security headers.
+    reply.header("Content-Security-Policy", contentSecurityPolicy.header());
     reply.header("X-Frame-Options", "DENY");
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -992,6 +994,7 @@ export async function createCoordinator(
     runtimeMetadata.root,
   );
   if (mobileAssetsPath) {
+    contentSecurityPolicy.addRoot(mobileAssetsPath);
     await app.register(staticFiles, {
       root: mobileAssetsPath,
       prefix: "/browser/",
@@ -5242,6 +5245,7 @@ export async function createCoordinator(
       : {}),
   });
   if (landingAssetsPath) {
+    contentSecurityPolicy.addRoot(landingAssetsPath);
     await app.register(staticFiles, {
       root: landingAssetsPath,
       prefix: "/",

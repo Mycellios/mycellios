@@ -4,8 +4,10 @@ import {createServer} from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from '../src/agent/node_modules/@playwright/test/index.mjs';
+import {ContentSecurityPolicyHeader} from '../src/coordinator/content-security-policy.ts';
 
 const root=path.resolve('landing-dist');
+const csp=new ContentSecurityPolicyHeader();csp.addRoot(root);// the coordinator's production policy
 const version='0.0.1',sha256='a'.repeat(64);
 const file=(id,format,extension)=>({id,format,version,fileName:`Mycellios-${id}.${extension}`,path:`/downloads/desktop/releases/${version}/Mycellios-${id}.${extension}`,bytes:100,sha256});
 const catalog={schema:'mycellios-desktop-downloads/1',version,runtimeVersion:version,channel:'preview',automaticUpdates:false,
@@ -20,7 +22,7 @@ const server=createServer(async(req,res)=>{
     const target=path.resolve(root,'.'+decodeURIComponent(url.pathname));
     assert(target===root||target.startsWith(root+path.sep));
     const file=(await stat(target)).isDirectory()?path.join(target,'index.html'):target;
-    res.setHeader('Content-Type',types[path.extname(file)]??'application/octet-stream');res.setHeader('Cache-Control','no-store');res.end(await readFile(file));
+    res.setHeader('Content-Type',types[path.extname(file)]??'application/octet-stream');res.setHeader('Cache-Control','no-store');res.setHeader('Content-Security-Policy',csp.header());res.end(await readFile(file));
   }catch{res.statusCode=404;res.end('Fixture resource unavailable');}
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -32,6 +34,7 @@ try{
     const context=await browser.newContext({viewport,reducedMotion:'reduce'});
     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+    page.on('console',m=>{if(/Content Security Policy/i.test(m.text()))errors.push(m.text());});
     await page.goto(origin,{waitUntil:'networkidle'});
     await page.getByRole('heading',{name:'Meet Mycellios',exact:true}).waitFor();
     await page.locator('#mycellios-loader').waitFor({state:'detached'});
