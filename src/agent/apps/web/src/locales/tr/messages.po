@@ -3483,6 +3483,7 @@ msgid "Never ask"
 msgstr "Asla sorma"
 
 #: src/pages/shell/chat-context.tsx
+#: src/pages/shell/chat-model-picker.tsx
 msgid "New"
 msgstr ""
 
@@ -6425,3 +6426,7 @@ msgstr "{seconds} saniye sonra"
 #: src/pages/settings/MicoBehaviorSettings.tsx
 msgid "Never"
 msgstr "Asla"
+
+#: src/pages/shell/chat-model-picker.tsx
+msgid "Older models"
+msgstr "Eski modeller"

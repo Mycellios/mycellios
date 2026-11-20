@@ -12,13 +12,20 @@ import type { StoredModelSecret } from "./pi-oauth.js";
 import { CHATGPT_OAUTH_PROVIDER, oauthCredentialAccountId, parseModelSecret } from "./pi-oauth.js";
 
 /**
- * The ChatGPT backend reports which Codex models a subscription account can call.
- * fx resolves `client_version` from npm `@openai/codex@latest`; we pin a recent
- * CLI release (0.159.3 includes GPT-6.1 Sol) so reads stay deterministic — bump
- * the constant to ask the backend for a newer compatibility view.
+ * The ChatGPT backend reports which Codex models a subscription account can call,
+ * filtered by the `client_version` the caller claims. Like OpenBot (fx), we
+ * resolve that version from npm `@openai/codex@latest` so models released after
+ * our last deploy show up on their own. The pinned release is the floor: it is
+ * used whenever npm cannot be read, and a registry answer older than it is ignored.
  */
 export const CODEX_MODELS_ENDPOINT = "https://chatgpt.com/backend-api/codex/models";
-const CODEX_CLIENT_VERSION = "0.159.3";
+export const CODEX_NPM_LATEST_ENDPOINT = "https://registry.npmjs.org/@openai/codex/latest";
+export const PINNED_CODEX_CLIENT_VERSION = "0.170.0";
+
+const CODEX_VERSION_TIMEOUT_MS = 5_000;
+const CODEX_VERSION_MAX_BYTES = 256 * 1024;
+const CODEX_VERSION_TTL_MS = 6 * 60 * 60_000;
+const CODEX_VERSION_FAILURE_TTL_MS = 10 * 60_000;
 
 const CODEX_CATALOG_TIMEOUT_MS = 12_000;
 const CODEX_CATALOG_HARD_DEADLINE_MS = CODEX_CATALOG_TIMEOUT_MS + 10_000;
@@ -90,8 +97,10 @@ export async function fetchCodexCatalog(
   accessToken: string,
   accountId: string,
   fetchImpl: typeof fetch = fetch,
+  clientVersion: string = PINNED_CODEX_CLIENT_VERSION,
 ): Promise<CodexCatalogResult> {
-  const url = `${CODEX_MODELS_ENDPOINT}?client_version=${CODEX_CLIENT_VERSION}`;
+  const version = isReleaseVersion(clientVersion) ? clientVersion : PINNED_CODEX_CLIENT_VERSION;
+  const url = `${CODEX_MODELS_ENDPOINT}?client_version=${version}`;
   let response: Response;
   try {
     response = await fetchImpl(url, {
@@ -124,9 +133,12 @@ export async function fetchCodexCatalog(
   return models ? { status: "ok", models } : { status: "error", reason: "malformed" };
 }
 
-async function readBoundedText(response: Response): Promise<string | undefined> {
+async function readBoundedText(
+  response: Response,
+  maxBytes: number = CODEX_CATALOG_MAX_BYTES,
+): Promise<string | undefined> {
   const declared = Number(response.headers.get("content-length") ?? 0);
-  if (declared > CODEX_CATALOG_MAX_BYTES) {
+  if (declared > maxBytes) {
     await response.body?.cancel().catch(() => undefined);
     return undefined;
   }
@@ -140,7 +152,7 @@ async function readBoundedText(response: Response): Promise<string | undefined> 
       const { done, value } = await reader.read();
       if (done) break;
       bytes += value.byteLength;
-      if (bytes > CODEX_CATALOG_MAX_BYTES) {
+      if (bytes > maxBytes) {
         await reader.cancel().catch(() => undefined);
         return undefined;
       }
@@ -152,6 +164,103 @@ async function readBoundedText(response: Response): Promise<string | undefined> 
     return undefined;
   }
 }
+
+/** Plain `major.minor.patch` release; prereleases and build tags are not advertised. */
+function isReleaseVersion(value: string): boolean {
+  return /^\d{1,6}\.\d{1,6}\.\d{1,6}$/.test(value);
+}
+
+function compareReleaseVersions(a: string, b: string): number {
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** Read `version` from npm's `@openai/codex@latest` manifest; undefined on any failure. */
+export async function fetchLatestCodexClientVersion(
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | undefined> {
+  let response: Response;
+  try {
+    response = await fetchImpl(CODEX_NPM_LATEST_ENDPOINT, {
+      headers: { accept: "application/json" },
+      redirect: "error",
+      signal: AbortSignal.timeout(CODEX_VERSION_TIMEOUT_MS),
+    });
+  } catch {
+    return undefined;
+  }
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
+  const text = await readBoundedText(response, CODEX_VERSION_MAX_BYTES);
+  if (text === undefined) return undefined;
+  try {
+    const version = (JSON.parse(text) as { version?: unknown } | null)?.version;
+    return typeof version === "string" && isReleaseVersion(version) ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Caches the newest Codex client version for catalog reads. Never throws and
+ * never answers below the pinned floor or a version it already saw; failures
+ * retry after a short TTL and concurrent misses share one registry request.
+ */
+export class CodexClientVersionResolver {
+  private readonly fetchImpl: typeof fetch;
+  private readonly now: () => number;
+  private readonly ttlMs: number;
+  private readonly failureTtlMs: number;
+  private readonly floor: string;
+  private cached: { version: string; expiresAt: number } | undefined;
+  private inflight: Promise<string> | undefined;
+
+  constructor(
+    opts: {
+      fetch?: typeof fetch;
+      now?: () => number;
+      ttlMs?: number;
+      failureTtlMs?: number;
+      floor?: string;
+    } = {},
+  ) {
+    this.fetchImpl = opts.fetch ?? fetch;
+    this.now = opts.now ?? Date.now;
+    this.ttlMs = opts.ttlMs ?? CODEX_VERSION_TTL_MS;
+    this.failureTtlMs = opts.failureTtlMs ?? CODEX_VERSION_FAILURE_TTL_MS;
+    this.floor = opts.floor ?? PINNED_CODEX_CLIENT_VERSION;
+  }
+
+  resolve(): Promise<string> {
+    const cached = this.cached;
+    if (cached && cached.expiresAt > this.now()) return Promise.resolve(cached.version);
+    this.inflight ??= this.refresh(cached?.version).finally(() => {
+      this.inflight = undefined;
+    });
+    return this.inflight;
+  }
+
+  private async refresh(previous: string | undefined): Promise<string> {
+    const latest = await fetchLatestCodexClientVersion(this.fetchImpl).catch(() => undefined);
+    const known = previous ?? this.floor;
+    const version = latest && compareReleaseVersions(latest, known) > 0 ? latest : known;
+    this.cached = {
+      version,
+      expiresAt: this.now() + (latest ? this.ttlMs : this.failureTtlMs),
+    };
+    return version;
+  }
+}
+
+/** Process-wide resolver for catalog caches that use the real network. */
+const sharedCodexClientVersion = new CodexClientVersionResolver();
 
 const INVALID = Symbol("invalid-codex-catalog");
 
@@ -237,10 +346,17 @@ export class CodexCatalogCache implements CodexLiveCatalog {
   private readonly cache: LiveCatalogCache<CodexCatalogModel>;
   private readonly fetchImpl: typeof fetch;
   private readonly enabledOverride: boolean | undefined;
+  private readonly clientVersion: () => Promise<string>;
+  /**
+   * `clientVersion` defaults to the shared npm-backed resolver. A caller that
+   * injects its own `fetch` owns the transport, so it gets the pinned version
+   * unless it also supplies a resolver.
+   */
   constructor(
     opts: {
       enabled?: boolean;
       fetch?: typeof fetch;
+      clientVersion?: () => Promise<string>;
       now?: () => number;
       ttlMs?: number;
       failureTtlMs?: number;
@@ -251,6 +367,11 @@ export class CodexCatalogCache implements CodexLiveCatalog {
   ) {
     this.enabledOverride = opts.enabled;
     this.fetchImpl = opts.fetch ?? fetch;
+    this.clientVersion =
+      opts.clientVersion ??
+      (opts.fetch
+        ? async () => PINNED_CODEX_CLIENT_VERSION
+        : () => sharedCodexClientVersion.resolve());
     this.cache = new LiveCatalogCache({
       now: opts.now,
       ttlMs: opts.ttlMs ?? CATALOG_TTL_MS,
@@ -277,7 +398,13 @@ export class CodexCatalogCache implements CodexLiveCatalog {
           return { attempted: false };
         }
         if (!accessToken) return { attempted: false };
-        const result = await fetchCodexCatalog(accessToken, account.accountId, this.fetchImpl);
+        const clientVersion = await this.clientVersion().catch(() => PINNED_CODEX_CLIENT_VERSION);
+        const result = await fetchCodexCatalog(
+          accessToken,
+          account.accountId,
+          this.fetchImpl,
+          clientVersion,
+        );
         return { attempted: true, models: result.status === "ok" ? result.models : undefined };
       },
       opts?.waitMs,

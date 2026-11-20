@@ -5,10 +5,14 @@ import type { CodexCatalogModel, CodexCatalogSpaceAuth } from "./pi-codex-catalo
 import {
   applyCodexLiveCatalog,
   CODEX_MODELS_ENDPOINT,
+  CODEX_NPM_LATEST_ENDPOINT,
   CodexCatalogCache,
+  CodexClientVersionResolver,
   codexLiveCatalogsForSpace,
   codexLiveListsModel,
   fetchCodexCatalog,
+  fetchLatestCodexClientVersion,
+  PINNED_CODEX_CLIENT_VERSION,
   parseCodexCatalog,
 } from "./pi-codex-catalog.js";
 import { listPiCatalog } from "./pi-models.js";
@@ -74,12 +78,26 @@ describe("fetchCodexCatalog", () => {
     expect(result.status).toBe("ok");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0]!;
-    expect(String(url)).toBe(`${CODEX_MODELS_ENDPOINT}?client_version=0.159.3`);
+    expect(String(url)).toBe(
+      `${CODEX_MODELS_ENDPOINT}?client_version=${PINNED_CODEX_CLIENT_VERSION}`,
+    );
     const headers = new Headers(init?.headers);
     expect(headers.get("authorization")).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(headers.get("chatgpt-account-id")).toBe(ACCOUNT_ID);
     expect(headers.get("originator")).toBe("rakazo");
     expect(headers.get("accept")).toBe("application/json");
+  });
+
+  it("asks for a resolved client version and rejects malformed ones", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => okResponse(catalogPayload([])));
+    await fetchCodexCatalog(ACCESS_TOKEN, ACCOUNT_ID, fetchImpl, "0.171.2");
+    await fetchCodexCatalog(ACCESS_TOKEN, ACCOUNT_ID, fetchImpl, "0.171.2&x=1");
+    expect(String(fetchImpl.mock.calls[0]![0])).toBe(
+      `${CODEX_MODELS_ENDPOINT}?client_version=0.171.2`,
+    );
+    expect(String(fetchImpl.mock.calls[1]![0])).toBe(
+      `${CODEX_MODELS_ENDPOINT}?client_version=${PINNED_CODEX_CLIENT_VERSION}`,
+    );
   });
 
   it("returns typed http failures with the status code", async () => {
@@ -145,6 +163,71 @@ describe("fetchCodexCatalog", () => {
     const result = await fetchCodexCatalog(ACCESS_TOKEN, ACCOUNT_ID, fetchImpl);
     expect(JSON.stringify(result)).not.toContain(ACCESS_TOKEN);
     expect(JSON.stringify(result)).not.toContain(ACCOUNT_ID);
+  });
+});
+
+describe("fetchLatestCodexClientVersion", () => {
+  it("reads the version from npm's latest manifest without credentials", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => okResponse({ version: "0.171.0" }));
+    await expect(fetchLatestCodexClientVersion(fetchImpl)).resolves.toBe("0.171.0");
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(String(url)).toBe(CODEX_NPM_LATEST_ENDPOINT);
+    const headers = new Headers(init?.headers);
+    expect(headers.get("authorization")).toBeNull();
+  });
+
+  it("returns undefined for failures, prereleases and malformed payloads", async () => {
+    const cases: Array<() => Promise<Response>> = [
+      async () => new Response("nope", { status: 503 }),
+      async () => okResponse({ version: "0.172.0-alpha.1" }),
+      async () => okResponse({ version: 172 }),
+      async () => okResponse("not json"),
+      async () => {
+        throw new Error("offline");
+      },
+    ];
+    for (const respond of cases) {
+      await expect(fetchLatestCodexClientVersion(respond)).resolves.toBeUndefined();
+    }
+  });
+});
+
+describe("CodexClientVersionResolver", () => {
+  it("caches the npm version and shares concurrent misses", async () => {
+    let now = 0;
+    const fetchImpl = vi.fn<typeof fetch>(async () => okResponse({ version: "9.0.0" }));
+    const resolver = new CodexClientVersionResolver({ fetch: fetchImpl, now: () => now });
+    const [first, second] = await Promise.all([resolver.resolve(), resolver.resolve()]);
+    expect([first, second]).toEqual(["9.0.0", "9.0.0"]);
+    now += 60_000;
+    await expect(resolver.resolve()).resolves.toBe("9.0.0");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the pinned floor and never moves below it or a seen version", async () => {
+    let now = 0;
+    let reply: () => Promise<Response> = async () => {
+      throw new Error("offline");
+    };
+    const resolver = new CodexClientVersionResolver({
+      fetch: () => reply(),
+      now: () => now,
+      ttlMs: 1_000,
+      failureTtlMs: 1_000,
+    });
+    await expect(resolver.resolve()).resolves.toBe(PINNED_CODEX_CLIENT_VERSION);
+
+    reply = async () => okResponse({ version: "0.1.0" });
+    now += 2_000;
+    await expect(resolver.resolve()).resolves.toBe(PINNED_CODEX_CLIENT_VERSION);
+
+    reply = async () => okResponse({ version: "9.1.0" });
+    now += 2_000;
+    await expect(resolver.resolve()).resolves.toBe("9.1.0");
+
+    reply = async () => new Response("nope", { status: 500 });
+    now += 2_000;
+    await expect(resolver.resolve()).resolves.toBe("9.1.0");
   });
 });
 
@@ -292,6 +375,19 @@ describe("CodexCatalogCache", () => {
       ),
     );
   }
+
+  it("asks the backend with the resolved client version", async () => {
+    const fetchImpl = listFetch();
+    const cache = new CodexCatalogCache({
+      enabled: true,
+      fetch: fetchImpl,
+      clientVersion: async () => "9.2.0",
+    });
+    await cache.read("user-1", account());
+    expect(String(fetchImpl.mock.calls[0]![0])).toBe(
+      `${CODEX_MODELS_ENDPOINT}?client_version=9.2.0`,
+    );
+  });
 
   it("serves a fresh entry without refetching inside the TTL", async () => {
     let now = 1_000_000;
@@ -561,7 +657,8 @@ describe("CodexCatalogCache", () => {
 
     // A cold miss returns immediately instead of waiting on the network.
     expect(await cache.read("user-1", account(), { waitMs: 0 })).toBeUndefined();
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    // The revalidation resolves the client version before it fetches the catalog.
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
     // The kicked revalidation keeps running; a later zero-wait read sees it.
     resolveFetch?.(

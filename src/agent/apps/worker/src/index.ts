@@ -1,5 +1,5 @@
 import { reconcileLocalMemoryReviews } from "@rakazo/adapters";
-import { tailnetServiceFromEnv } from "@rakazo/adapters";
+import { modelsDevCatalog, tailnetServiceFromEnv } from "@rakazo/adapters";
 import { reconcileTaskReminders, WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@rakazo/adapter-kit";
@@ -271,6 +271,8 @@ async function main() {
   const webPush = new WebPushService(prisma, resolveEncryptionKey(process.env), jobs, webPushConfig(process.env));
   const notifications = notificationChannels(nativeNotifications, webPush);
   const localMemory = new MarkdownMemoryStore(prisma);
+  // models.dev describes models newer than the bundled Pi list; warm it in the background.
+  void modelsDevCatalog.read(0);
   const executor = createRunExecutor({
     maxUploadSizeBytes: uploadSizeFromEnv(process.env),
     prisma,

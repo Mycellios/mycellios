@@ -3484,6 +3484,7 @@ msgid "Never ask"
 msgstr "確認しない"
 
 #: src/pages/shell/chat-context.tsx
+#: src/pages/shell/chat-model-picker.tsx
 msgid "New"
 msgstr "新規"
 
@@ -6426,3 +6427,7 @@ msgstr "{seconds} 秒後"
 #: src/pages/settings/MicoBehaviorSettings.tsx
 msgid "Never"
 msgstr "しない"
+
+#: src/pages/shell/chat-model-picker.tsx
+msgid "Older models"
+msgstr "以前のモデル"

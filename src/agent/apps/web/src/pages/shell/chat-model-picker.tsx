@@ -66,6 +66,7 @@ export function ChatModelPicker({
   const imagesHintId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [olderOpen, setOlderOpen] = useState<ReadonlySet<string>>(() => new Set());
   const providers = [...new Set([...Object.keys(providerIds ?? {}), ...choices.flatMap((choice) => choice.providerLabel ? [choice.providerLabel] : [])])];
   const [provider, setProvider] = useState(() =>
     initialProvider ?? choices.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? null,
@@ -122,6 +123,25 @@ export function ChatModelPicker({
     if (!next) setQuery("");
   }
 
+  // Older models fold under one row per section; a search and the current choice show them.
+  const searching = query.trim() !== "";
+  const folded = (choice: ChatModelChoice) =>
+    !searching && choice.listing === "older" && choice.key !== value;
+  function olderCount(data: readonly ChatModelChoice[]) {
+    return data.filter(folded).length;
+  }
+  function visibleChoices(section: string, data: readonly ChatModelChoice[]) {
+    return olderOpen.has(section) ? data : data.filter((choice) => !folded(choice));
+  }
+  function toggleOlder(section: string) {
+    setOlderOpen((current) => {
+      const next = new Set(current);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  }
+
   const options = (
     <Command
       id={inline ? id : undefined}
@@ -144,7 +164,7 @@ export function ChatModelPicker({
             {section.key === "mycellios-network" && section.data.length === 0 && mycelliosCatalogReady ? (
               <p role="status" className="px-2.5 py-2 text-xs text-muted-foreground">{t`No chat models available right now.`}</p>
             ) : null}
-            {section.data.map((choice) => (
+            {visibleChoices(section.key, section.data).map((choice) => (
               <CommandItem
                 key={choice.key}
                 aria-label={choice.label}
@@ -171,6 +191,9 @@ export function ChatModelPicker({
                 {inline && choice.key && choice.key === defaultKey ? (
                   <span className="shrink-0 rounded-full bg-accent px-1.5 text-[11px] text-muted-foreground">{t`Default`}</span>
                 ) : null}
+                {choice.listing === "new" ? (
+                  <span className="shrink-0 rounded-full bg-accent px-1.5 text-[11px] text-muted-foreground">{t`New`}</span>
+                ) : null}
                 {unavailableKeys.has(choice.key) ? <span className="shrink-0 text-xs text-muted-foreground">{t`Unavailable`}</span> : null}
                 {choice.images === false ? (
                   <span className="shrink-0 text-muted-foreground">
@@ -179,6 +202,26 @@ export function ChatModelPicker({
                 ) : null}
               </CommandItem>
             ))}
+            {olderCount(section.data) > 0 ? (
+              <CommandItem
+                value={`older-models:${section.key}`}
+                aria-label={t`Older models`}
+                aria-expanded={olderOpen.has(section.key)}
+                className={inline
+                  ? "min-h-7 gap-2 rounded-md px-2.5 py-1 text-sm text-muted-foreground [&>svg:last-child]:hidden"
+                  : "text-muted-foreground"}
+                onSelect={() => toggleOlder(section.key)}
+              >
+                <ChevronDownIcon
+                  aria-hidden
+                  className={`size-3.5 shrink-0 transition-transform ${olderOpen.has(section.key) ? "" : "-rotate-90"}`}
+                />
+                <span className="min-w-0 flex-1 truncate">{t`Older models`}</span>
+                {olderOpen.has(section.key) ? null : (
+                  <span className="shrink-0 text-xs">{olderCount(section.data)}</span>
+                )}
+              </CommandItem>
+            ) : null}
           </CommandGroup>
         ))}
       </CommandList>

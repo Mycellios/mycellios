@@ -201,6 +201,33 @@ describe("ChatModelPicker", () => {
     expect(options()).toHaveLength(0);
   });
 
+  it("folds older models under one row, marks new ones and shows all while searching", () => {
+    const list = choices(11).map((choice, index): ChatModelChoice => {
+      if (index === 1) return { ...choice, listing: "new" };
+      if (index >= 9) return { ...choice, listing: "older" };
+      return choice;
+    });
+    render(list, "openrouter::vendor/model-10");
+    act(() => container.querySelector<HTMLButtonElement>("button#model")!.click());
+    const labels = () => options().map((option) => option.getAttribute("aria-label"));
+    // Model 10 is older but selected, so it stays; Models 9 and 11 fold.
+    expect(labels()).not.toContain("Model 11 (OpenRouter)");
+    expect(labels()).toContain("Model 10 (OpenRouter)");
+    expect(labels().at(-1)).toBe("Older models");
+    expect(options().at(-1)?.textContent).toBe("Older models2");
+    expect(options()[1]?.textContent).toBe("Model 1New");
+
+    search("Model 11");
+    expect(labels()).toEqual(["Model 11 (OpenRouter)"]);
+    search("");
+    act(() => (options().at(-1) as HTMLElement).click());
+    expect(labels()).toContain("Model 11 (OpenRouter)");
+    expect(options().at(-1)?.getAttribute("aria-expanded")).toBe("true");
+    act(() => (options().at(-1) as HTMLElement).click());
+    expect(labels()).not.toContain("Model 11 (OpenRouter)");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("says when nothing matches", () => {
     render(choices(11), "");
     act(() => container.querySelector<HTMLButtonElement>("button#model")!.click());

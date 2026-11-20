@@ -133,6 +133,8 @@ export type ConnectedModelChoice = {
   modelLabel?: string;
   /** The catalog says whether the model reads images; unknown for free-form ids. */
   images?: boolean;
+  /** `new` for a recent release; `older` folds under Older models. */
+  listing?: "new" | "older";
 };
 
 type CatalogModelRef = {
@@ -143,6 +145,7 @@ type CatalogModelRef = {
   providerName?: string;
   placeholder?: boolean;
   images?: boolean;
+  listing?: "new" | "older";
 };
 
 type CredentialModelRef = {
@@ -234,6 +237,7 @@ function catalogChoices(providerModels: readonly CatalogModelRef[]): ConnectedMo
       providerLabel: entry.providerName ?? entry.provider,
       modelLabel: entry.label,
       images: entry.images,
+      ...(entry.listing ? { listing: entry.listing } : {}),
     };
   });
 }
@@ -342,6 +346,8 @@ export type ChatModelChoice = {
   title?: string;
   detail?: string;
   images?: boolean;
+  /** `new` for a recent release; `older` folds under Older models. */
+  listing?: "new" | "older";
 };
 
 /** Filter on full labels before shortening rows; saved/default choices stay first. */

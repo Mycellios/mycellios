@@ -1,7 +1,7 @@
 import { eventDemoAgentKey } from "../../../../core/event-demo-agent-ticket.js";
 import { EventDemoAgent, DEMO_AGENT_HEADER } from "./event-demo-agent.js";
 import { hostedWebHttp } from "./hosted-webs/http.js";
-import { tailnetServiceFromEnv } from "@rakazo/adapters";
+import { modelsDevCatalog, tailnetServiceFromEnv } from "@rakazo/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
@@ -567,6 +567,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   // One cache serves models.list, selection validation, and run-time model
   // resolution alike, so a list call warms the run path in this process.
   const codexCatalog = new CodexCatalogCache();
+  // models.dev describes models newer than the bundled Pi list; warm it in the background.
+  void modelsDevCatalog.read(0);
   const executor = createRunExecutor({
     billingEnabled: modelCreditsEnabled,
     maxUploadSizeBytes: env.maxUploadSizeBytes,

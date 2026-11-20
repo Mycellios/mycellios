@@ -3522,6 +3522,7 @@ msgid "Never ask"
 msgstr "No preguntar nunca"
 
 #: src/pages/shell/chat-context.tsx
+#: src/pages/shell/chat-model-picker.tsx
 msgid "New"
 msgstr "Nuevo"
 
@@ -13696,3 +13697,7 @@ msgstr "{0} × {1}"
 #: src/components/ImageGenerationCard.tsx
 msgid "Could not download the image. Try again."
 msgstr "No se pudo descargar la imagen. Inténtalo de nuevo."
+
+#: src/pages/shell/chat-model-picker.tsx
+msgid "Older models"
+msgstr "Modelos anteriores"

@@ -21,6 +21,7 @@ import type {
   McpOAuthBroker,
   MemoryProviderResolver,
   MessagingInstallations,
+  ModelsDevCatalog,
   PiOAuthLogins,
   ProviderCatalogCache,
   PushTokenStore,
@@ -87,6 +88,8 @@ export interface RouterDeps {
   /** Live Codex catalog seam; defaults to the shared per-process cache. */
   codexCatalog?: CodexLiveCatalog;
   providerCatalog?: ProviderCatalogCache;
+  /** models.dev catalog seam; defaults to the shared per-process copy. */
+  modelsDev?: ModelsDevCatalog;
   /** HTTP transport for model connection checks and catalog probes. */
   modelConnectionFetch?: typeof fetch;
   /** One real request proving a newly keyed model can serve agents; absent skips it. */
