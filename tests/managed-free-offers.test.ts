@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import { ManagedAntseedText } from "../src/coordinator/managed-antseed-text.js";
 import { ManagedAntseedGateway } from "../src/coordinator/managed-antseed-gateway.js";
@@ -94,7 +95,99 @@ function gateway() {
   return { adapter, posts, exhaust: () => { exhausted = true; } };
 }
 
+/** A buyer whose listed free sellers each answer, or refuse once added to `refused`. */
+function refusingSidecar(data: unknown[]) {
+  const refused = new Set<string>(), probes: string[] = [], chats: string[] = [];
+  const transport = vi.fn<typeof fetch>(async (url, init) => {
+    const u = new URL(String(url));
+    if (u.pathname === "/_antseed/attributed-spend") return Response.json({ bootId: "boot", cursor: 0, oldestSeq: 1, events: [] });
+    if (u.pathname === "/v1/models") return Response.json({ data });
+    if (u.pathname !== "/v1/chat/completions" || init?.method !== "POST") throw new Error("unexpected fixture route");
+    const body = JSON.parse(String(init.body)), seller = String(body.model).split("@")[0]!;
+    (body.tools ? probes : chats).push(seller);
+    if (refused.has(seller)) return refusal("free_tier_exhausted");
+    return body.tools ? toolCall() : Response.json({ id: "chat", choices: [{ index: 0, finish_reason: "stop",
+      message: { role: "assistant", content: "Hi" } }], usage: { prompt_tokens: 3, completion_tokens: 2 } });
+  });
+  return { adapter: new ManagedAntseedText(operatorSecret, ["*"], transport, 0), refused, probes, chats };
+}
+
+/** The gateway-key equivalent: free sellers answer with their own signed zero-cost ledger row. */
+function refusingGateway(data: unknown[]) {
+  const refused = new Set<string>(), chats: string[] = [], rows = new Map<string, Record<string, unknown>>();
+  const transport = vi.fn<typeof fetch>(async (url, init) => {
+    const u = new URL(String(url));
+    if (u.pathname === "/console/api/auth/api-key")
+      return Response.json({ kind: "key", me: { key: { id: "key-fixture" } } }, { headers: { "set-cookie": "antseed_session=fixture; Path=/console" } });
+    if (u.pathname === "/console/api/requests") {
+      const row = rows.get(u.searchParams.get("q") ?? "");
+      return Response.json({ requests: row ? [row] : [], nextBefore: null });
+    }
+    if (u.pathname === "/v1/models") return Response.json({ data }, { headers: { "x-mycellios-cost-contract": "token-bounded-v2" } });
+    if (u.pathname !== "/v1/chat/completions" || init?.method !== "POST") throw new Error("unexpected fixture route");
+    const body = JSON.parse(String(init.body)), [seller, service] = String(body.model).split("@") as [string, string];
+    if (!body.tools) chats.push(seller);
+    if (refused.has(seller)) return refusal("free_tier_exhausted");
+    if (body.tools) return toolCall();
+    const nonce = new Headers(init.headers).get("x-antseed-end-user")!, tag = "gw_" + randomUUID();
+    rows.set(nonce, { tag, keyId: "key-fixture", endUser: nonce, model: service, sellerPeerId: seller, method: "POST",
+      path: "/v1/chat/completions", finishedAt: Date.now(), status: 200, inputTokens: 3, cachedInputTokens: 0, outputTokens: 2,
+      spent: "0", servedFree: true });
+    return Response.json({ id: "chat", choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: "Hi" } }],
+      usage: { prompt_tokens: 3, completion_tokens: 2 } }, { headers: { "x-antseed-peer-id": seller, "x-antseed-gateway-tag": tag } });
+  });
+  return { adapter: new ManagedAntseedGateway(gatewayKey, "http://127.0.0.1:8379", ["*"], 2, transport, "token-bounded-v2"), refused, chats };
+}
+
 describe("free AntSeed offers", () => {
+  it("serves a refused free request on a reserve seller of the same model, never on its paid seller", async () => {
+    const other = "8".repeat(40), glm = network()[0]!;
+    const { adapter, refused, probes, chats } = refusingSidecar([{ ...glm, peers: [...glm.peers,
+      peer(other, "glm-flash", { health: { status: "healthy" } }), priced(paid, "glm-flash", 2)] }]);
+    await adapter.refresh();
+    await vi.waitFor(() => expect(probes).toEqual([forge]));
+    expect(adapter.quote(chat("glm-flash")).body.model).toBe(forge + "@glm-flash");
+    refused.add(forge);
+    expect((await adapter.execute(adapter.quote(chat("glm-flash")), undefined, async () => {})).usd).toBe("0");
+    expect(chats).toEqual([forge, other]);
+    // The reserve now serves the model, and it is probed in turn.
+    expect(adapter.quote(chat("glm-flash")).body.model).toBe(other + "@glm-flash");
+    await vi.waitFor(() => expect(probes).toEqual([forge, other]));
+    // With every free seller refusing, the request fails instead of moving to the paid seller.
+    refused.add(other);
+    await expect(adapter.execute(adapter.quote(chat("glm-flash")), undefined, async () => {})).rejects.toThrow("managed_free_tier_exhausted");
+    expect(chats).toEqual([forge, other, other]);
+    expect(() => adapter.quote(chat("glm-flash"))).toThrow("managed_model_unavailable");
+  });
+
+  it("serves a refused request on a reserve free seller through a bounded gateway key as well", async () => {
+    const other = "8".repeat(40), glm = network()[0]!;
+    const { adapter, refused, chats } = refusingGateway([{ ...glm, peers: [...glm.peers, peer(other, "glm-flash", { health: { status: "healthy" } })] }]);
+    await adapter.refresh();
+    expect(adapter.quote(chat("glm-flash")).body.model).toBe(forge + "@glm-flash");
+    refused.add(forge);
+    expect((await adapter.execute(adapter.quote(chat("glm-flash")), undefined, async () => {})).usd).toBe("0");
+    expect(chats).toEqual([forge, other]);
+    expect(adapter.quote(chat("glm-flash")).body).toMatchObject({ model: other + "@glm-flash", mycellios_cost_bounds: { input: "0", output: "0" } });
+  });
+
+  it("moves a refused free-model request to another verified free route within the same request", async () => {
+    const other = "8".repeat(40), [glm] = network();
+    const { adapter, refused, probes, chats } = refusingSidecar([glm, { id: "qwen-free", name: "Qwen", type: "text",
+      peers: [peer(other, "qwen-free", { health: { status: "healthy" } })] }]);
+    await adapter.refresh();
+    await vi.waitFor(() => expect(probes.sort()).toEqual([forge, other].sort()));
+    const first = String(adapter.quote(free as never).body.model).split("@")[0]!;
+    refused.add(first);
+    const result = await adapter.execute(adapter.quote(free as never), undefined, async () => {});
+    expect(result.usd).toBe("0");
+    expect(chats).toEqual([first, first === forge ? other : forge]);
+    // At most FREE_REFUSAL_RETRIES further routes: a request never loops over the whole pool.
+    refused.add(forge); refused.add(other);
+    await expect(adapter.execute(adapter.quote(free as never), undefined, async () => {})).rejects.toThrow();
+    expect(chats).toHaveLength(3);
+  });
+
   it("derives a market capability price only from several paid sellers", () => {
     const market = marketReferencePrices([...network(), { id: "solo", type: "text", peers: [priced(paid, "solo", 9)] }]);
     expect(market.get("rival")).toBe(3);
@@ -177,6 +270,14 @@ describe("free AntSeed offers", () => {
     expect(pickFreeRoute(pool, later)).toBe(pickFreeRoute(pool, opening(4)));
     // When a route leaves the pool its conversations move to the remaining ones.
     expect(pool.slice(1)).toContain(pickFreeRoute(pool.slice(1), opening(4)));
+    // Only the conversations of a route that leaves move; a joining route takes some and moves no others.
+    const before = Array.from({ length: 60 }, (_, n) => pickFreeRoute(pool, opening(n))!.public.id);
+    const smaller = pool.filter(r => r.public.id !== "b");
+    Array.from({ length: 60 }, (_, n) => pickFreeRoute(smaller, opening(n))!.public.id)
+      .forEach((id, n) => { if (before[n] !== "b") expect(id).toBe(before[n]); });
+    const larger = [...pool, route("d", 1, 900)];
+    Array.from({ length: 60 }, (_, n) => pickFreeRoute(larger, opening(n))!.public.id)
+      .forEach((id, n) => { if (id !== "d") expect(id).toBe(before[n]); });
   });
 
   it("reads older buyers that only list the combined catalog", async () => {
