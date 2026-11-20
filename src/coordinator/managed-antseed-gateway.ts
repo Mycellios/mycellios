@@ -7,7 +7,8 @@ import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest
 import { readManagedTextStream } from "./managed-text-stream.js";
 import { FREE_PROBE_REQUEST, FreeOfferCooldown, FreeOfferProbes, compareFreeRoutes, freeAllowanceRefusal, freeOfferLimits,
   freeOfferSignals, freeOfferStakersOnly, freeProbePassed, freeRequestFits, freeTextLimits, freeRouteModel, freeRoutePool,
-  marketReferencePrices, pickFreeRoute, FREE_ROUTE_ID, type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
+  marketReferencePrices, pickFreeRoute, FREE_REFUSAL_RETRIES, FREE_RESERVE_SELLERS, FREE_ROUTE_ID,
+  type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
 
 const TTL = 60_000;
 const INPUT_CAP = "0.0000005", OUTPUT_CAP = "0.000001";
@@ -29,6 +30,8 @@ function priceBound(value: unknown) {
 export interface AntseedGatewayQuote {
   offer: Offer; body: Record<string, unknown> & {max_tokens: number}; maximumUsd: string;
   maximumMicrounits: number; fundingCostBasisPoints: number; expiresAt: number; billingContext: unknown;
+  /** The caller's request, so a free seller's refusal can be quoted again on another free route. */
+  request: ManagedTextRequest;
 }
 interface Job {
   kind: "antseed-gateway-v1"; keyId: string; nonce: string; offer: Offer; tag?: string;
@@ -46,6 +49,8 @@ export class ManagedAntseedGateway {
   private refreshedAt = 0;
   private refreshing: Promise<void> | undefined;
   private offers = new Map<string, Offer>();
+  /** Other free sellers of each free model, best first, promoted when the current one refuses. */
+  private reserves = new Map<string, Offer[]>();
   private discovered: ManagedCatalogDiscovery[] = [];
   private readonly cooldown = new FreeOfferCooldown();
   private readonly probes = new FreeOfferProbes();
@@ -115,7 +120,8 @@ export class ManagedAntseedGateway {
     if (!Array.isArray(data.data) || data.data.length > 10000) throw new Error("antseed_catalog_invalid");
     const hasLiteralDeepseek = data.data.some(v => v?.id === "deepseek-v4-flash");
     const market = marketReferencePrices(data.data);
-    const offers = new Map<string, Offer>(), discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
+    const offers = new Map<string, Offer>(), reserves = new Map<string, Offer[]>();
+    const discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
     for (const raw of data.data) {
       try {
         const row = object(raw);
@@ -191,16 +197,17 @@ export class ManagedAntseedGateway {
         // among free sellers the probed and eligible lead, otherwise reputation decides.
         candidates.sort((a, b) => Number(b.free) - Number(a.free) || (a.free && b.free ? compareFreeRoutes(a, b, this.probes) : 0)
           || b.quality - a.quality || a.seller.localeCompare(b.seller));
+        // Overhead covers the quote allowance with the 256-message maximum framing.
+        const sized = ({quality: _quality, ...offer}: typeof candidates[number]): Offer => ({...offer, public: {...offer.public,
+          ...(offer.free ? freeTextLimits(offer.context, offer.output) : managedTextLimits(offer.context, offer.output, 8192 + 256 * 64))}});
         if (candidates[0]) {
-          const {quality: _quality, ...offer} = candidates[0];
-          // Overhead covers the quote allowance with the 256-message maximum framing.
-          offer.public = {...offer.public, ...(offer.free ? freeTextLimits(offer.context, offer.output)
-            : managedTextLimits(offer.context, offer.output, 8192 + 256 * 64))};
+          const offer = sized(candidates[0]);
           offers.set(publicId, offer); entry.available = true; entry.reason = "ready"; entry.pricing = offer.public.pricing;
+          if (offer.free) reserves.set(publicId, candidates.slice(1).filter(c => c.free).slice(0, FREE_RESERVE_SELLERS).map(sized));
         }
       } catch { /* Invalid discovery entries cannot authorize spend. */ }
     }
-    this.offers = offers; this.discovered = discovered; this.refreshedAt = Date.now();
+    this.offers = offers; this.reserves = reserves; this.discovered = discovered; this.refreshedAt = Date.now();
     this.qualifyFreeRoutes();
   }
   /** Background tool-call probes of the strongest free routes; the catalog never waits for them. */
@@ -269,24 +276,30 @@ export class ManagedAntseedGateway {
     const rawUsd = tokenCost(offer.inputCap ?? INPUT_CAP, offer.outputCap ?? OUTPUT_CAP, inputBound, output);
     const micro = managedCharge(rawUsd, 0).upstreamMicrounits;
     const maximumUsd = tokenCost("0.000001", "0", micro, 0);
-    return {offer, body: this.contract === "token-bounded-v2" ? {...body, mycellios_cost_bounds: {version: 2, input: offer.inputMillion!, output: offer.outputMillion!}} : body, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, this.funding).totalMicrounits,
+    return {offer, request, body: this.contract === "token-bounded-v2" ? {...body, mycellios_cost_bounds: {version: 2, input: offer.inputMillion!, output: offer.outputMillion!}} : body, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, this.funding).totalMicrounits,
       fundingCostBasisPoints: this.funding, expiresAt: this.refreshedAt + TTL,
       billingContext: {contract: this.contract, seller: offer.seller, provider: offer.provider,
         input: offer.inputCap ?? INPUT_CAP, output: offer.outputCap ?? OUTPUT_CAP, keyId: this.session?.keyId}};
   }
-  async execute(q: AntseedGatewayQuote, chunk?: (v: Record<string, unknown>) => void, submitted?: (job: unknown) => Promise<void>): Promise<ManagedTextResult> {
-    if (!submitted || q.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
+  async execute(quote: AntseedGatewayQuote, chunk?: (v: Record<string, unknown>) => void, submitted?: (job: unknown) => Promise<void>): Promise<ManagedTextResult> {
+    if (!submitted || quote.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
     const signal = AbortSignal.timeout(120_000), auth = await this.authenticate(signal);
-    if ((q.billingContext as any).keyId !== auth.keyId) throw new Error("antseed_payer_changed");
-    const job: Job = {kind: "antseed-gateway-v1", keyId: auth.keyId, nonce: "mycellios-" + randomUUID(), offer: q.offer};
-    await submitted(job); // Durable intent before the single potentially billable POST.
-    const r = await this.request("/v1/chat/completions", signal, {method: "POST",
-      headers: {authorization: "Bearer " + this.key, "content-type": "application/json", "x-antseed-end-user": job.nonce,
-        "x-antseed-provider": q.offer.provider}, body: JSON.stringify(q.body)}).catch((error: unknown) => {
-      const refusal = (error as {refusal?: FreeRefusal}).refusal;
-      if (q.offer.free && refusal) this.retire(q.offer, refusal);
-      throw error;
-    });
+    if ((quote.billingContext as any).keyId !== auth.keyId) throw new Error("antseed_payer_changed");
+    let q = quote, job!: Job, r!: Response;
+    for (let attempt = 0; ; attempt++) {
+      job = {kind: "antseed-gateway-v1", keyId: auth.keyId, nonce: "mycellios-" + randomUUID(), offer: q.offer};
+      await submitted(job); // Durable intent before the single potentially billable POST.
+      try {
+        r = await this.request("/v1/chat/completions", signal, {method: "POST",
+          headers: {authorization: "Bearer " + this.key, "content-type": "application/json", "x-antseed-end-user": job.nonce,
+            "x-antseed-provider": q.offer.provider}, body: JSON.stringify(q.body)});
+        break;
+      } catch (error) {
+        const next = this.afterFreeRefusal(q, error, attempt);
+        if (!next || (next.billingContext as any).keyId !== auth.keyId) throw error;
+        q = next;
+      }
+    }
     const tag = r.headers.get("x-antseed-gateway-tag"), seller = r.headers.get("x-antseed-peer-id");
     if ((tag !== null && !/^gw_[a-f0-9-]{36}$/.test(tag)) || seller !== q.offer.seller) {await r.body?.cancel(); throw new Error("antseed_attribution_missing");}
     // Gateway 0.1.196 forwards the seller header but omits its own request tag.
@@ -310,11 +323,33 @@ export class ManagedAntseedGateway {
     }
     throw new Error("antseed_receipt_pending");
   }
-  /** The seller refused before any work: rest it so the next refresh picks another free route. */
+  /**
+   * A free seller's explicit allowance refusal (HTTP 429) means it did no work and charged nothing.
+   * Rest it and, a bounded number of times, quote the same request again: on a reserve seller of the
+   * same model, or for the stable free model on another pool route. Only another exact-zero route
+   * qualifies; any other failure, and any priced route, is never retried.
+   */
+  private afterFreeRefusal(q: AntseedGatewayQuote, error: unknown, attempt: number): AntseedGatewayQuote | undefined {
+    const refusal = (error as {refusal?: FreeRefusal}).refusal;
+    if (!q.offer.free || !refusal) return undefined;
+    this.retire(q.offer, refusal);
+    if (attempt >= FREE_REFUSAL_RETRIES) return undefined;
+    try {
+      const next = this.quote(q.request);
+      return next.offer.free && next.maximumMicrounits === 0 ? next : undefined;
+    } catch { return undefined; }
+  }
+  /** The seller refused before any work: rest it and promote a reserve seller of the same model. */
   private retire(offer: Offer, refusal: FreeRefusal) {
     this.cooldown.block(offer.seller, offer.service ?? "", refusal);
-    const current = this.offers.get(offer.public.id);
-    if (current?.seller === offer.seller && current.service === offer.service) this.offers.delete(offer.public.id);
+    const id = offer.public.id, current = this.offers.get(id);
+    if (current?.seller !== offer.seller || current.service !== offer.service) return;
+    const reserves = (this.reserves.get(id) ?? []).filter(o => !this.cooldown.blocked(o.seller, o.service ?? ""));
+    const next = reserves.shift();
+    this.reserves.set(id, reserves);
+    if (!next) { this.offers.delete(id); return; }
+    this.offers.set(id, next);
+    this.qualifyFreeRoutes();
   }
   async recover(value: unknown, signal = AbortSignal.timeout(12_000)): Promise<ManagedTextResult | null> {
     const job = object(value) as Job;

@@ -469,7 +469,12 @@ These rules apply to the complete repository.
   `mycellios/managed/free` model that spreads conversations over routes passing the
   coordinator's own zero-priced tool-call probe, ranked by market signals (never a
   hardcoded model), rest exhausted or staked-only sellers, keep
-  the per-account free daily cap and never fall back to a priced offer. AntSeed is
+  the per-account free daily cap and never fall back to a priced offer. Conversations
+  map to pool routes by rendezvous hashing, so pool changes move only the affected
+  conversations. Each free model keeps a few reserve free sellers; an explicit 429
+  allowance refusal rests the seller, promotes a reserve and may quote the same
+  request again on another exact-zero route (FREE_REFUSAL_RETRIES), never on a
+  priced one and never after any other failure. AntSeed is
   the only free route: an OpenRouter upstream never offers its zero-priced models
   (`free_requires_antseed`). Check tests/managed-free-offers.test.ts,
   tests/managed-provider.test.ts and the isolated managed-purchases suite.

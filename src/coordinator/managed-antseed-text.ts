@@ -6,7 +6,8 @@ import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest
 import { readManagedTextStream } from "./managed-text-stream.js";
 import { FREE_PROBE_REQUEST, FreeOfferCooldown, FreeOfferProbes, compareFreeRoutes, freeAllowanceRefusal, freeOfferLimits,
   freeOfferSignals, freeOfferStakersOnly, freeProbePassed, freeRequestFits, freeTextLimits, freeRouteModel, freeRoutePool,
-  marketReferencePrices, pickFreeRoute, FREE_ROUTE_ID, type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
+  marketReferencePrices, pickFreeRoute, FREE_REFUSAL_RETRIES, FREE_RESERVE_SELLERS, FREE_ROUTE_ID,
+  type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
 
 const TTL = 60_000;
 const object = (value: unknown): Record<string, any> => {
@@ -44,12 +45,16 @@ export type AntseedTextQuote = {
   offer: Offer; maximumUsd: string; maximumMicrounits: number; expiresAt: number;
   fundingCostBasisPoints: number; body: Record<string, unknown> & {max_tokens: number};
   billingContext: unknown;
+  /** The caller's request, so a free seller's refusal can be quoted again on another free route. */
+  request: ManagedTextRequest;
 };
 
 /** Dedicated operator buyer sidecar. Customers never receive its identity or control secret. */
 export class ManagedAntseedText {
   readonly provider = "antseed";
   private offers = new Map<string, Offer>();
+  /** Other free sellers of each free model, best first, promoted when the current one refuses. */
+  private reserves = new Map<string, Offer[]>();
   private discovered: ManagedCatalogDiscovery[] = [];
   private refreshedAt = 0;
   private refreshing: Promise<void> | null = null;
@@ -108,7 +113,8 @@ export class ManagedAntseedText {
     const body = await this.json(listing, signal);
     const market = marketReferencePrices(Array.isArray(body.data) ? body.data : []);
     if (!Array.isArray(body.data) || body.data.length > 10000) throw new Error("antseed_catalog_invalid");
-    const offers = new Map<string, Offer>(), discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
+    const offers = new Map<string, Offer>(), reserves = new Map<string, Offer[]>();
+    const discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
     for (const value of body.data) {
       try {
         const row = object(value);
@@ -168,12 +174,16 @@ export class ManagedAntseedText {
           return delta < 0n ? -1 : delta > 0n ? 1 : compareFreeRoutes(a, b, this.probes)
             || `${a.seller}/${a.provider}`.localeCompare(`${b.seller}/${b.provider}`);
         });
-        const selected = candidates[0];
-        if (selected) { selected.public = { ...selected.public, ...(selected.free ? freeTextLimits(selected.context, selected.maxOutput)
-          : managedTextLimits(selected.context, selected.maxOutput, 4096)) }; offers.set(publicId, selected); entry.available = true; entry.reason = "ready"; entry.pricing = selected.public.pricing; }
+        const sized = (offer: Offer): Offer => ({ ...offer, public: { ...offer.public, ...(offer.free
+          ? freeTextLimits(offer.context, offer.maxOutput) : managedTextLimits(offer.context, offer.maxOutput, 4096)) } });
+        const selected = candidates[0] && sized(candidates[0]);
+        if (selected) {
+          offers.set(publicId, selected); entry.available = true; entry.reason = "ready"; entry.pricing = selected.public.pricing;
+          if (selected.free) reserves.set(publicId, candidates.slice(1).filter(c => c.free).slice(0, FREE_RESERVE_SELLERS).map(sized));
+        }
       } catch { /* Invalid catalog entries stay unavailable. */ }
     }
-    this.offers = offers; this.discovered = discovered; this.refreshedAt = Date.now();
+    this.offers = offers; this.reserves = reserves; this.discovered = discovered; this.refreshedAt = Date.now();
     this.qualifyFreeRoutes();
   }
   /** Background tool-call probes of the strongest free routes; the catalog never waits for them. */
@@ -243,26 +253,32 @@ export class ManagedAntseedText {
     if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || !Number.isSafeInteger(output) || output < 1 || output > offer.maxOutput || !fits)
       throw new Error("managed_request_too_large");
     const maximumUsd = tokenCost(offer.input, offer.output, bytes + 4096, output), fundingCostBasisPoints = this.funding ?? 0;
-    return { offer, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, fundingCostBasisPoints).totalMicrounits,
+    return { offer, request, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, fundingCostBasisPoints).totalMicrounits,
       fundingCostBasisPoints, expiresAt: this.refreshedAt + TTL,
       billingContext: {seller:offer.seller,provider:offer.provider,service:offer.service,input:offer.input,cached:offer.cached,output:offer.output},
       body: { ...request, model: `${offer.seller}@${offer.service}`, store: false, max_tokens: output,
         ...(request.stream ? { stream_options: { include_usage: true } } : {}) } };
   }
-  async execute(q: AntseedTextQuote, chunk?: (value: Record<string, unknown>) => void,
+  async execute(quote: AntseedTextQuote, chunk?: (value: Record<string, unknown>) => void,
     submitted?: (job: unknown) => Promise<void>): Promise<ManagedTextResult> {
-    if (!submitted || q.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
-    const signal = AbortSignal.timeout(120_000), baseline = await this.feed(0, signal);
-    const job: AntseedTextJob = { kind: "antseed-text-v1", bootId: baseline.bootId, cursor: baseline.cursor,
-      tag: randomUUID(), requestId: randomUUID(), offer: q.offer };
-    // This durable intent must succeed BEFORE a possibly billable POST.
-    await submitted(job);
-    const response = await this.request("/v1/chat/completions", signal, q.body, this.routeHeaders(q.offer, job.requestId, job.tag))
-      .catch((error: unknown) => {
-        const refusal = (error as { refusal?: FreeRefusal }).refusal;
-        if (q.offer.free && refusal) this.retire(q.offer, refusal);
-        throw error;
-      });
+    if (!submitted || quote.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
+    const signal = AbortSignal.timeout(120_000);
+    let q = quote, job!: AntseedTextJob, response!: Response;
+    for (let attempt = 0; ; attempt++) {
+      const baseline = await this.feed(0, signal);
+      job = { kind: "antseed-text-v1", bootId: baseline.bootId, cursor: baseline.cursor,
+        tag: randomUUID(), requestId: randomUUID(), offer: q.offer };
+      // This durable intent must succeed BEFORE a possibly billable POST.
+      await submitted(job);
+      try {
+        response = await this.request("/v1/chat/completions", signal, q.body, this.routeHeaders(q.offer, job.requestId, job.tag));
+        break;
+      } catch (error) {
+        const next = this.afterFreeRefusal(q, error, attempt);
+        if (!next) throw error;
+        q = next;
+      }
+    }
     const value = object(q.body.stream ? await readManagedTextStream(response, signal, parseManagedProviderJson, q.offer.public.id, chunk)
       : await this.json(response, signal, 4_194_304));
     const usage = object(value.usage);
@@ -275,11 +291,33 @@ export class ManagedAntseedText {
     // A late signature is recovered by GET-only reconciliation, never another inference.
     const result = await this.recover(job); if (!result) throw new Error("antseed_receipt_pending"); return result;
   }
-  /** The seller refused before any work: rest it so the next refresh picks another free route. */
+  /**
+   * A free seller's explicit allowance refusal (HTTP 429) means it did no work and charged nothing.
+   * Rest it and, a bounded number of times, quote the same request again: on a reserve seller of the
+   * same model, or for the stable free model on another pool route. Only another exact-zero route
+   * qualifies; any other failure, and any priced route, is never retried.
+   */
+  private afterFreeRefusal(q: AntseedTextQuote, error: unknown, attempt: number): AntseedTextQuote | undefined {
+    const refusal = (error as { refusal?: FreeRefusal }).refusal;
+    if (!q.offer.free || !refusal) return undefined;
+    this.retire(q.offer, refusal);
+    if (attempt >= FREE_REFUSAL_RETRIES) return undefined;
+    try {
+      const next = this.quote(q.request);
+      return next.offer.free && next.maximumMicrounits === 0 ? next : undefined;
+    } catch { return undefined; }
+  }
+  /** The seller refused before any work: rest it and promote a reserve seller of the same model. */
   private retire(offer: Offer, refusal: FreeRefusal) {
     this.cooldown.block(offer.seller, offer.service, refusal);
-    const current = this.offers.get(offer.public.id);
-    if (current?.seller === offer.seller && current.service === offer.service) this.offers.delete(offer.public.id);
+    const id = offer.public.id, current = this.offers.get(id);
+    if (current?.seller !== offer.seller || current.service !== offer.service) return;
+    const reserves = (this.reserves.get(id) ?? []).filter(o => !this.cooldown.blocked(o.seller, o.service));
+    const next = reserves.shift();
+    this.reserves.set(id, reserves);
+    if (!next) { this.offers.delete(id); return; }
+    this.offers.set(id, next);
+    this.qualifyFreeRoutes();
   }
   async recover(value: unknown): Promise<ManagedTextResult | null> {
     const job = object(value) as AntseedTextJob;

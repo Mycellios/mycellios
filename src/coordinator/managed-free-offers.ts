@@ -154,13 +154,18 @@ export function freeRoutePool<T extends FreeRoute>(offers: Iterable<T>, probes: 
 }
 /**
  * Spreads conversations over the pool. The choice depends only on the opening of the
- * conversation, so a quote and its execution agree and one conversation keeps its model
- * while that model stays in the pool.
+ * conversation and each route's own model id (rendezvous hashing), so a quote and its execution
+ * agree and a conversation keeps its model while that model stays in the pool: routes joining or
+ * leaving move only the conversations they gain or lose, never the rest.
  */
-export function pickFreeRoute<T>(pool: readonly T[], request: { messages?: unknown }): T | undefined {
-  if (!pool.length) return undefined;
-  const opening = Array.isArray(request.messages) ? request.messages.slice(0, 2) : [];
-  return pool[createHash("sha256").update(JSON.stringify(opening)).digest().readUInt32BE(0) % pool.length];
+export function pickFreeRoute<T extends { public: { id: string } }>(pool: readonly T[], request: { messages?: unknown }): T | undefined {
+  const opening = JSON.stringify(Array.isArray(request.messages) ? request.messages.slice(0, 2) : []);
+  let best: T | undefined, bestWeight = -1n;
+  for (const route of pool) {
+    const weight = createHash("sha256").update(opening).update("\0").update(route.public.id).digest().readBigUInt64BE(0);
+    if (weight > bestWeight || (weight === bestWeight && best && route.public.id < best.public.id)) { best = route; bestWeight = weight; }
+  }
+  return best;
 }
 /** The stable, recommended free model. Its limits fit every route it may use. */
 export function freeRouteModel(pool: readonly unknown[], fundingCostBasisPoints: number): ManagedModel | null {
@@ -177,6 +182,11 @@ export function compareFreeRoutes(a: { signals?: FreeOfferSignals | null }, b: {
     : [probes.result(s.key)?.ok ? 1 : 0, s.eligible ? 1 : 0, s.reputation];
   return compareFreeScores(rank(a.signals), rank(b.signals));
 }
+
+/** Other free sellers of the same model kept ready, so a refused seller is replaced at once. */
+export const FREE_RESERVE_SELLERS = 2;
+/** Free routes one request may try after sellers refused it before any work (exact zero cost). */
+export const FREE_REFUSAL_RETRIES = 2;
 
 /** Sellers refused before any work leave the catalog for a while; staked-only pools for a day. */
 export class FreeOfferCooldown {
