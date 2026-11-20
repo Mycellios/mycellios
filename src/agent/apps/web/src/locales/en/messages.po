@@ -13337,3 +13337,30 @@ msgstr "Update Mycellios to continue"
 #: src/components/DesktopUpdates.tsx
 msgid "This server needs version {minimum} or later. You have {current}."
 msgstr "This server needs version {minimum} or later. You have {current}."
+
+msgid "Share link"
+msgstr "Share link"
+
+msgid "Anyone with the link can open the version you share, without signing in."
+msgstr "Anyone with the link can open the version you share, without signing in."
+
+msgid "The link shows version {0}."
+msgstr "The link shows version {0}."
+
+msgid "Share version {version} instead"
+msgstr "Share version {version} instead"
+
+msgid "Stop sharing"
+msgstr "Stop sharing"
+
+msgid "Create link"
+msgstr "Create link"
+
+msgid "Could not update the link. Try again."
+msgstr "Could not update the link. Try again."
+
+msgid "Could not copy the link. Select it and copy it."
+msgstr "Could not copy the link. Select it and copy it."
+
+msgid "Could not load the link. Try again."
+msgstr "Could not load the link. Try again."

@@ -1,6 +1,7 @@
 import { eventDemoAgentKey } from "../../../../core/event-demo-agent-ticket.js";
 import { EventDemoAgent, DEMO_AGENT_HEADER } from "./event-demo-agent.js";
 import { hostedWebHttp } from "./hosted-webs/http.js";
+import { artifactShareHttp } from "./artifact-shares.js";
 import { modelsDevCatalog, tailnetServiceFromEnv } from "@rakazo/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { ORPCError, onError } from "@orpc/server";
@@ -752,6 +753,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   app.use("*", requestLogging(logger));
   app.use("*", clientIpMiddleware(clientIp, env.clientIpHeader));
   app.route("/", hostedWebHttp(prisma, env.screenProxySecret, requestClientIp));
+  // Owner-shared artifacts: sessionless, sandboxed, before CORS and auth like published webs.
+  app.route("/", artifactShareHttp(prisma, artifacts));
   app.use(
     "*",
     cors({

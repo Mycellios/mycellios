@@ -60,6 +60,16 @@
   request. Verify hosted-app-presence, web-presence, preview-locator, TeamPresence
   tests and scripts/verify-hosted-webs-db.ts.
 
+- Artifact share links follow specs/artifact-share-links/spec.md. Only the owner
+  creates, moves or revokes a link from the Library (`artifacts.share/unshare`);
+  Micos have no share or publish tool. One unguessable token per artifact family,
+  pinned to the version shared; revocation and artifact deletion end it. The
+  public `/api/shared/<token>` route is sessionless, mounted before CORS/auth,
+  reads in system context and keeps every response under `SHARED_ARTIFACT_CSP`
+  (opaque origin, no network, no forms, noindex). Render inline only the listed
+  safe types; everything else downloads. Verify artifact-shares and
+  ArtifactShareButton tests plus scripts/verify-artifact-shares-db.ts.
+
 - PC app control (`pc_windows`, `pc_snapshot`, `pc_act`) follows
   specs/desktop-accessibility-control/spec.md. Desktop runs the pinned agent-desktop
   CLI (`app-control-runner.ts`, SHA-256 verified before every call, Windows x64 only)
