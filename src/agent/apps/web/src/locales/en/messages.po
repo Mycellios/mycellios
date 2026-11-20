@@ -11458,6 +11458,12 @@ msgstr "Choose each Mico’s computer from its chat tools. A configured environm
 msgid "Not confirmed"
 msgstr "Not confirmed"
 
+msgid "Use apps on this PC"
+msgstr "Use apps on this PC"
+
+msgid "Micos can read your open windows and use buttons, menus and fields. Each action asks for approval."
+msgstr "Micos can read your open windows and use buttons, menus and fields. Each action asks for approval."
+
 msgid "Check connection"
 msgstr "Check connection"
 

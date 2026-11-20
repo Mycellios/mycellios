@@ -52,3 +52,17 @@ it("keeps server setup instructions out of ordinary settings", async () => {
   expect(host.querySelector('[data-testid="setup-guidance"]')).toBeNull();
   expect(host.textContent).toContain("Computer tools need setup");
 });
+it("offers the app control switch only when Desktop ships it, and changes it only on request", async () => {
+  const setAppControl = vi.fn(async (enabled: boolean) => ({ available: true, enabled }));
+  mocks.bridge = { computer: { appControl: vi.fn(async () => ({ available: true, enabled: false })), setAppControl } };
+  await render();
+  expect(host.textContent).toContain("Use apps on this PC");
+  expect(setAppControl).not.toHaveBeenCalled();
+  await act(async () => (host.querySelector('[aria-label="Use apps on this PC"]') as HTMLElement).click());
+  expect(setAppControl).toHaveBeenCalledWith(true);
+});
+it("hides app control when the component is not available", async () => {
+  mocks.bridge = { computer: { appControl: vi.fn(async () => ({ available: false, enabled: false })) } };
+  await render();
+  expect(host.textContent).not.toContain("Use apps on this PC");
+});

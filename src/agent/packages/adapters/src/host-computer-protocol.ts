@@ -1,5 +1,6 @@
 import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
 import { z } from "zod";
+import { appControlRequest } from "./app-control.js";
 
 export const HOST_COMPUTER_MAX_BYTES = 12 * 1024 * 1024;
 export const HOST_COMPUTER_MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -58,6 +59,7 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
     targetRunId: z.string().min(1).max(256),
   }),
   z.object({ ...base, method: z.literal("listFiles"), path: z.string().max(4096) }),
+  z.object({ ...base, method: z.literal("appControl"), request: appControlRequest }),
   z.object({
     ...base,
     method: z.literal("readFile"),
@@ -91,6 +93,8 @@ export interface HostComputerEnvironment {
   projectRoot?:boolean;
   projectSessionId?:string;
   taskIsolation?: "worktree-v1";
+  /** The owner allowed accessibility control of this PC's applications. */
+  appControl?: boolean;
 }
 export type HostComputerFrame<T> =
   | { value: T }

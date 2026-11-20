@@ -3,6 +3,9 @@ import type { ActionApprovalRule as StoredActionApprovalRule } from "@rakazo/con
 const APPROVAL_EXEMPT_TOOLS = new Set([
   "computer_observe",
   "computer_act",
+  // Reading the owner's own windows; acting on them (pc_act) always asks.
+  "pc_windows",
+  "pc_snapshot",
   "browser_navigate",
   "browser_snapshot",
   "browser_act",
@@ -32,6 +35,7 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
 ]);
 
 const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
+  "pc_act",
   "generate_image",
   "generate_video",
   "delete_bot",

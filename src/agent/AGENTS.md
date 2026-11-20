@@ -60,6 +60,19 @@
   request. Verify hosted-app-presence, web-presence, preview-locator, TeamPresence
   tests and scripts/verify-hosted-webs-db.ts.
 
+- PC app control (`pc_windows`, `pc_snapshot`, `pc_act`) follows
+  specs/desktop-accessibility-control/spec.md. Desktop runs the pinned agent-desktop
+  CLI (`app-control-runner.ts`, SHA-256 verified before every call, Windows x64 only)
+  from resources/app-control with a minimal environment and a private state folder
+  that the CLI itself creates. It is offered only while the owner's separate native
+  opt-in is on (bound to host consent, cleared on revocation) and never to routines,
+  webhooks, takeovers or project sessions. Text goes on stdin; never pass --headed.
+  pc_act always asks for approval; only refs from the host's own snapshots are
+  accepted and Mycellios, password managers and security prompts are refused.
+  Report an action as done only when the result is confirmed. Verify app-control,
+  host-app-control, executor-readonly-approval and windows-installer tests; unit
+  fixtures do not qualify a real installed Desktop session.
+
 - read_video follows OpenBot's video reading (behavior reference only; its code is
   PolyForm Noncommercial and not copied). `packages/adapters/src/video-reader.ts` runs
   in the worker: a pinned yt-dlp verified by SHA-256 before use, site extractors only

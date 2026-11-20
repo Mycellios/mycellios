@@ -257,6 +257,50 @@ export const builtinAgentTools: ConnectorTool[] = [
     readOnly: false,
   },
   {
+    name: "pc_windows",
+    description:
+      "List the open windows of applications on the user's own PC, with their window ids. Use it before pc_snapshot. Some applications (Mycellios itself, password managers, system security prompts) are never listed.",
+    inputSchema: {
+      type: "object",
+      properties: { app: { type: "string", maxLength: 128, description: "Only this application's windows." } },
+    },
+    readOnly: true,
+  },
+  {
+    name: "pc_snapshot",
+    description:
+      "Read one window of the user's PC as an accessibility tree: buttons, menus, fields and text, each actionable element with a ref. No screenshot or vision is needed. Refs belong to this snapshot only. For large windows pass skeleton:true first, then a region's ref as root.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        window_id: { type: "string", pattern: "^w-\\d+$" },
+        root: { type: "string", description: "Ref of a region from an earlier snapshot of this window." },
+        skeleton: { type: "boolean" },
+      },
+      required: ["window_id"],
+    },
+    readOnly: true,
+  },
+  {
+    name: "pc_act",
+    description:
+      "Act on one element of the user's PC by ref from the latest pc_snapshot, without moving their mouse. Actions: click, set_value (text), clear, select (text: option), toggle, check, uncheck, expand, collapse, scroll_to, focus. Or press a key combination in a window with keys and window_id (for example ctrl+s); prefer menus and buttons over shortcuts. An action is done only when the result says confirmed:true; otherwise take a new pc_snapshot and check before continuing. Never retry an action whose result is uncertain.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ref: { type: "string" },
+        action: {
+          type: "string",
+          enum: ["click", "set_value", "clear", "select", "toggle", "check", "uncheck", "expand", "collapse", "scroll_to", "focus"],
+        },
+        text: { type: "string", maxLength: 16384 },
+        keys: { type: "string", maxLength: 64 },
+        window_id: { type: "string", pattern: "^w-\\d+$" },
+      },
+    },
+    readOnly: false,
+  },
+  {
     name: "computer_observe",
     description:
       "Capture the current screen of this bot's computer. Returns frame metadata and an image. Observe before coordinate-based actions and whenever another actor may have changed the desktop.",

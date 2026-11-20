@@ -76,3 +76,19 @@ test('actual builder config keeps voice settings without merging the legacy reso
   }finally{await rm(root,{recursive:true,force:true});}
 });
 
+
+test('ships the app control CLI only when it matches its published digest', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'mycellios-app-control-'));
+  try {
+    const runtimeMsi = path.join(root, 'runtime.msi'); const bytes = Buffer.from('fixture');
+    await writeFile(runtimeMsi, bytes);
+    const runtimeSha256 = createHash('sha256').update(bytes).digest('hex');
+    const binary = path.join(root, 'agent-desktop-win32-x64.exe'); const cli = Buffer.from('cli');
+    await writeFile(binary, cli);
+    await writeFile(binary + '.sha256', createHash('sha256').update(cli).digest('hex') + '\n');
+    const config = await prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256, output: path.join(root, 'out'), version: '0.3.5', appControlBinary: binary });
+    assert.deepEqual(config.extraResources.find(x => x.to === 'app-control/agent-desktop-win32-x64.exe'), { from: binary, to: 'app-control/agent-desktop-win32-x64.exe' });
+    await writeFile(binary, Buffer.from('tampered'));
+    await assert.rejects(prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256, output: path.join(root, 'out'), version: '0.3.5', appControlBinary: binary }), /hash mismatch/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

@@ -546,6 +546,7 @@ import {
 import { WORK_PLAN_TOOL, workPlanBlock } from "./work-continuation.js";
 import { createWebProvider } from "./web-provider-factory.js";
 import { webFetchFromTool, webSearchFromTool } from "./web-tools.js";
+import { APP_CONTROL_TOOL_NAMES, appControlRequest } from "./app-control.js";
 import { readVideoFromTool, sharedVideoReader } from "./video-reader.js";
 import type { VideoReader } from "./video-reader.js";
 import { videoTranscriberFor } from "./video-transcriber.js";
@@ -591,6 +592,8 @@ function connectorTrustKeys(
 const PASSED_EFFECT_STATUSES = ["approved", "executing", "uncertain", "completed"];
 const READ_ONLY_AGENT_TOOLS = new Set([
   "app_read",
+  "pc_windows",
+  "pc_snapshot",
   "command_status",
   "work_status",
   "computer_observe",
@@ -4545,7 +4548,32 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
         const pageBrowserAllowed =
           !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
+        const hostEnvironment =
+          computerKind === "desktop"
+            ? await deps.sandbox
+                .environment?.(
+                  {
+                    id: storedComputer.providerRef ?? storedComputer.id,
+                    botId: storedComputer.homeKey,
+                    kind: "desktop",
+                    providerRef: storedComputer.providerRef ?? "",
+                  },
+                  {
+                    ...context,
+                    signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]),
+                  },
+                )
+                .catch(() => undefined)
+            : undefined;
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+        // App control needs the owner's separate consent on the connected PC (reported by
+        // its environment). Never offer it to unattended, channel or isolated work: snapshots
+        // carry the owner's private window content.
+        const appControlAllowed =
+          computerKind === "desktop" && hostEnvironment?.appControl === true && !routineConversation &&
+          !isolatedProjectRun && !heldForTakeover && !context.projectSessionId && run.trigger !== "webhook" &&
+          !messagingChannelRun && !isBackgroundRunTrigger(run.trigger);
+        if (!appControlAllowed) for (const name of APP_CONTROL_TOOL_NAMES) disabledBuiltinTools.add(name);
         // The normal user takeover panel controls the assigned computer, not the
         // separate server workspace. Keep that control off this run.
         if (cloudComputer) disabledBuiltinTools.add("request_takeover");
@@ -4772,23 +4800,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
           computerKind,
           disabledBuiltinTools,
         );
-        const hostEnvironment =
-          computerKind === "desktop"
-            ? await deps.sandbox
-                .environment?.(
-                  {
-                    id: storedComputer.providerRef ?? storedComputer.id,
-                    botId: storedComputer.homeKey,
-                    kind: "desktop",
-                    providerRef: storedComputer.providerRef ?? "",
-                  },
-                  {
-                    ...context,
-                    signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]),
-                  },
-                )
-                .catch(() => undefined)
-            : undefined;
         if(context.projectSessionId && (computerKind!=="desktop"||hostEnvironment?.projectSessionId!==context.projectSessionId)){
           await failRunBeforeModel("Connect this Mico task to its local project on the current PC before editing. No other computer workspace will be used.",false);return;
         }
@@ -6163,6 +6174,26 @@ export function createRunExecutor(deps: ExecutorDeps) {
               output: outcome.error ? redactSecrets(outcome.error, runSecrets) : "",
               ...(outcome.bytes === undefined ? {} : { bytes: outcome.bytes }),
             });
+          if ((APP_CONTROL_TOOL_NAMES as readonly string[]).includes(name)) {
+            if (heldForTakeover) {
+              return { error: DESKTOP_HELD_FOR_TAKEOVER_MESSAGE };
+            }
+            const appControl = deps.sandbox.appControl;
+            if (!appControl) return { error: "App control is only available on a connected PC." };
+            const request = appControlRequest.safeParse(
+              name === "pc_windows"
+                ? { op: "windows", ...(args.app ? { app: args.app } : {}) }
+                : name === "pc_snapshot"
+                  ? { op: "snapshot", windowId: args.window_id, ...(args.root ? { root: args.root } : {}), ...(args.skeleton === true ? { skeleton: true } : {}) }
+                  : args.keys !== undefined
+                    ? { op: "press", windowId: args.window_id, keys: args.keys }
+                    : { op: "act", ref: args.ref, action: args.action, ...(args.text !== undefined ? { text: args.text } : {}) },
+            );
+            if (!request.success)
+              return { error: name === "pc_act" ? "pc_act needs ref and action, or keys and window_id." : `Invalid ${name} arguments.` };
+            if (name === "pc_act") workspaceCheckpoint.markDirty();
+            return finish(await appControl(await getRunComputer("tool", name), request.data, context));
+          }
           if (name === "computer_observe") {
             if (heldForTakeover) {
               return { error: DESKTOP_HELD_FOR_TAKEOVER_MESSAGE };
@@ -10115,6 +10146,7 @@ const COMPUTER_REQUIRED_TOOL_NAMES = new Set<string>([
   "computer_act",
   "render_plot",
   "request_takeover",
+  ...APP_CONTROL_TOOL_NAMES,
 ]);
 
 function builtinOffered(disabled: ReadonlySet<string> | undefined, name: string): boolean {

@@ -97,6 +97,8 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     chooseProject: (botId) => ipcRenderer.invoke("desktop.computer.chooseProject", botId),
     project: (botId) => ipcRenderer.invoke("desktop.computer.project", botId),
     projectAvailable: () => ipcRenderer.invoke("desktop.computer.projectAvailable"),
+    appControl: () => ipcRenderer.invoke("desktop.computer.appControl"),
+    setAppControl: (value) => ipcRenderer.invoke("desktop.computer.setAppControl", value),
     onConfigure: (listener) => {
       const handler = () => listener();
       ipcRenderer.on("desktop.computer.configure", handler);

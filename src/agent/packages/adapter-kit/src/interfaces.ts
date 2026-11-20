@@ -108,13 +108,18 @@ export interface SandboxProvider {
   environment?(
     computer: ComputerRef,
     context: AdapterContext,
-  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1" } | undefined>;
+  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean } | undefined>;
   /** Optional live browser on the same leased screen as observe/act. */
   pageBrowser?(
     computer: ComputerRef,
     request: PageBrowserCommand,
     context: AdapterContext,
   ): Promise<PageBrowserResult>;
+  /**
+   * Accessibility control of the applications on the owner's own PC. Only the Desktop host
+   * implements it, and only while the owner's separate consent is on; it validates requests.
+   */
+  appControl?(computer: ComputerRef, request: Record<string, unknown>, context: AdapterContext): Promise<unknown>;
   /** Allocate or reconnect the computer, returning its reference before fallible setup. */
   provision(
     request: {

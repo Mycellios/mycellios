@@ -12141,6 +12141,12 @@ msgstr "Elige el equipo de cada Mico en las herramientas de su chat. Tener un en
 msgid "Not confirmed"
 msgstr "Sin confirmar"
 
+msgid "Use apps on this PC"
+msgstr "Usar apps de este PC"
+
+msgid "Micos can read your open windows and use buttons, menus and fields. Each action asks for approval."
+msgstr "Los Micos pueden leer tus ventanas abiertas y usar botones, menús y campos. Cada acción pide aprobación."
+
 msgid "Check connection"
 msgstr "Comprobar conexión"
 

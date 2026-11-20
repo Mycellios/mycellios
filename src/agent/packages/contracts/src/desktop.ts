@@ -190,6 +190,10 @@ export interface RakazoDesktop {
     prepareTask?: (request: { botId: string; taskThreadId: string }) => Promise<void>;
     project?: (botId: string) => Promise<DesktopMicoFolder | null>;
     projectAvailable?: () => Promise<boolean>;
+    /** Accessibility control of this PC's apps: shipped component and the owner's opt-in. */
+    appControl?: () => Promise<{ available: boolean; enabled: boolean }>;
+    /** Turning it on shows a native confirmation; the result is the state afterwards. */
+    setAppControl?: (enabled: boolean) => Promise<{ available: boolean; enabled: boolean }>;
     onConfigure: (listener: () => void) => () => void;
   };
   /** Optional for compatibility with older desktop releases. */
