@@ -177,6 +177,7 @@ export * from "./web-limits.js";
 export * from "./web-provider-factory.js";
 export * from "./web-ssrf.js";
 export * from "./web-tools.js";
+export * from "./video-reader.js";
 export * from "./work-stop-reconciler.js";
 export * from "./workflows.js";
 

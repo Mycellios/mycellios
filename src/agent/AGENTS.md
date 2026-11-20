@@ -49,6 +49,18 @@
 
 # AGENTS.md
 
+- read_video follows OpenBot's video reading (behavior reference only; its code is
+  PolyForm Noncommercial and not copied). `packages/adapters/src/video-reader.ts` runs
+  in the worker: a pinned yt-dlp verified by SHA-256 before use, site extractors only
+  (`default,-generic`), a public-address check before any command, 500 MB/720p and
+  15-minute bounds, a private temporary folder removed afterwards, and ffmpeg for
+  frames and audio (the compose image installs it; without it the tool returns text
+  only). Captions come first; speech uses only the owner's Voice connection
+  (`video-transcriber.ts`), never another payer. It shares web_fetch's per-site
+  approval through `SITE_FETCH_TOOL_NAMES`. Page text is untrusted data. Verify
+  video-reader, approval-ask, action-approval and executor tests; fixtures do not
+  qualify a real download.
+
 - Silent delivery does not disable continuation of durable authorized work in Pi
   or native runtimes. Keep scripts, ephemeral setup/retrieval/compaction and
   one-shot internal generations outside that loop. Retain persisted continuation

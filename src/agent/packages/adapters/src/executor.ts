@@ -134,7 +134,13 @@ import {
   userTurnMessageForRun,
   desktopSetupInterruptedMessage,
 } from "@rakazo/core";
-import { normalizedHttpUrl, sitesInText, urlSite } from "@rakazo/core/egress";
+import {
+  isSiteFetchTool,
+  normalizedHttpUrl,
+  SITE_FETCH_TOOL_NAMES,
+  sitesInText,
+  urlSite,
+} from "@rakazo/core/egress";
 import {
   approvalEffectKey,
   isToolEffectIdempotencyKey,
@@ -540,6 +546,9 @@ import {
 import { WORK_PLAN_TOOL, workPlanBlock } from "./work-continuation.js";
 import { createWebProvider } from "./web-provider-factory.js";
 import { webFetchFromTool, webSearchFromTool } from "./web-tools.js";
+import { readVideoFromTool, sharedVideoReader } from "./video-reader.js";
+import type { VideoReader } from "./video-reader.js";
+import { videoTranscriberFor } from "./video-transcriber.js";
 
 /**
  * The connection a connector call reaches, for read trust. Installed APIs are told apart by their
@@ -603,6 +612,7 @@ const READ_ONLY_AGENT_TOOLS = new Set([
   "skill_read",
   "web_search",
   "web_fetch",
+  "read_video",
   "browser_snapshot",
   "list_secrets",
   "cloud_agent_status",
@@ -2891,6 +2901,8 @@ export interface ExecutorDeps {
   listConnectedPluginSlugs?: (userId: string) => Promise<string[]>;
   /** Builtin web_search / web_fetch. Defaults to keyless HTTP when omitted. */
   web?: WebProvider;
+  /** Builtin read_video. Defaults to the pinned yt-dlp and the host's ffmpeg. */
+  videoReader?: VideoReader;
   mediaGeneration?: MediaGenerationProvider;
   /** Page browser (DOM refs) on the bot computer. Defaults to the sandbox live browser when supported. */
   browser?: BrowserProvider;
@@ -3185,6 +3197,7 @@ export function isTerminalModelSetupError(error: unknown): boolean {
 export function createRunExecutor(deps: ExecutorDeps) {
   const contextStrategy = deps.contextStrategy ?? DEFAULT_CONTEXT_STRATEGY;
   const web = deps.web ?? createWebProvider();
+  const videoReader = deps.videoReader ?? sharedVideoReader();
   const configuredMediaGeneration = deps.mediaGeneration ?? createMediaGenerationProvider();
   const browser = deps.browser ?? createBrowserProvider(undefined, { sandbox: deps.sandbox });
   const cloudAgent = deps.cloudAgent;
@@ -4643,7 +4656,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const loadTrustedSites = () => {
           trustedSitesPromise ??= deps.prisma.externalEffect
             .findMany({
-              where: { runId, kind: "web_fetch", status: { in: PASSED_EFFECT_STATUSES } },
+              where: {
+                runId,
+                kind: { in: [...SITE_FETCH_TOOL_NAMES] },
+                status: { in: PASSED_EFFECT_STATUSES },
+              },
               select: { request: true },
             })
             .then(async (rows) => {
@@ -5418,9 +5435,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const connectorProviders = connectedPlugins.map((plugin) => plugin.provider);
           const connectorKind = connectorKindFromToolName(name, connectorProviders);
           const fetchUrl =
-            name === "web_fetch" ? normalizedHttpUrl(String(args.url ?? "")) : undefined;
+            isSiteFetchTool(name) ? normalizedHttpUrl(String(args.url ?? "")) : undefined;
           const fetchSite = fetchUrl ? urlSite(fetchUrl) : undefined;
-          if (name === "web_fetch" && !fetchSite) return { error: "url must be an http(s) URL" };
+          if (isSiteFetchTool(name) && !fetchSite) return { error: "url must be an http(s) URL" };
           if (fetchUrl && fetchUrl.length > MAX_FETCH_URL_LENGTH)
             return { error: `url must be at most ${MAX_FETCH_URL_LENGTH} characters` };
           // The card, the stored effect and the request all use the URL the gate checked.
@@ -6942,6 +6959,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "web_fetch") {
             return finish(await webFetchFromTool(web, context, args));
+          }
+          if (name === "read_video") {
+            return finish(
+              await readVideoFromTool(videoReader, context, args, () =>
+                videoTranscriberFor(deps, { userId: run.userId, spaceId: run.spaceId }, context),
+              ),
+            );
           }
           if (PAGE_BROWSER_TOOL_NAMES.has(name)) {
             if (heldForTakeover) {
@@ -10219,6 +10243,12 @@ function webLookupClause(disabled?: ReadonlySet<string>): string | undefined {
   return undefined;
 }
 
+function videoClause(disabled?: ReadonlySet<string>): string | undefined {
+  return builtinOffered(disabled, "read_video")
+    ? "When the user shares a video link or asks what a video shows, use read_video to watch it before answering."
+    : undefined;
+}
+
 function pageWorkClause(
   pageBrowserAllowed: boolean,
   disabled?: ReadonlySet<string>,
@@ -10333,6 +10363,7 @@ function toolUsageLine(parts: {
   const clauses = [
     pageWorkClause(parts.pageBrowserAllowed, disabled),
     webLookupClause(disabled),
+    videoClause(disabled),
     ...secretGuidance(disabled),
     builtinOffered(disabled, "connect_app")
       ? "Use connect_app when an app needs connecting or the user asks to connect one, then wait for them."

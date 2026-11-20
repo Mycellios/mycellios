@@ -26,6 +26,7 @@ const CORE_TOOL_NAMES = new Set([
   "request_takeover",
   "web_search",
   "web_fetch",
+  "read_video",
 ]);
 
 /** Page schemas, never permissions. Actual calls retain their original executor. */

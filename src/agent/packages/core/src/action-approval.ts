@@ -76,6 +76,7 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "scratchpad_list",
   "skill_read",
   "web_fetch",
+  "read_video",
   "web_search",
 ]);
 
