@@ -1,7 +1,7 @@
 import {stageContributionComponent} from './contribution-component.mjs';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { lstat, mkdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {writeStandaloneInstallerConfig} from './standalone-installer-config.mjs';
 import {compactResourceLayout} from './compact-resource-layout.mjs';
@@ -13,7 +13,18 @@ export async function writeStandaloneWindowsConfig(desktopRoot, overrides, outpu
   return writeStandaloneInstallerConfig(desktopRoot,overrides,output,'windows-installer-config.json');
 }
 
-export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity, separateRuntime=false }) {
+/** The pinned agent-desktop CLI must match the digest its locked package publishes beside it. */
+export async function verifyAppControlBinary(file) {
+  const info = await lstat(file);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error('App control binary must be a regular file');
+  const expected = (await readFile(file + '.sha256', 'utf8')).trim().split(/s+/)[0];
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  if (!/^[a-f0-9]{64}$/.test(expected) || hash.digest('hex') !== expected) throw new Error('App control binary hash mismatch');
+  return { from: path.resolve(file), to: 'app-control/' + path.basename(file) };
+}
+
+export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity, separateRuntime=false, appControlBinary }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid Desktop version');
   if (!/^[a-f0-9]{64}$/.test(runtimeSha256)) throw new Error('A pinned runtime hash is required');
   const info = await lstat(runtimeMsi);
@@ -26,6 +37,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
   await writeFile(manifest, JSON.stringify({ schema: 'mycellios-desktop-runtime/1', file: 'mycellios-runtime.msi', sha256: runtimeSha256 }, null, 2));
   if(separateRuntime)manifest=await stageContributionComponent({file:runtimeMsi,sha256:runtimeSha256,output,extension:'msi'});
   const agentRoot = path.resolve(desktopRoot, '../..');
+  const appControl = appControlBinary ? await verifyAppControlBinary(appControlBinary) : undefined;
   const repository = path.resolve(agentRoot, '../..');
   return {
     beforePack: path.join(desktopRoot, 'scripts/verify-release.cjs'),
@@ -49,6 +61,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-GPL-3.0.txt' },
       { from: path.join(agentRoot, 'LICENSE'), to: 'licenses/Agent-upstream-Apache-2.0.txt' },
       { from: path.join(repository, 'THIRD_PARTY.md'), to: 'licenses/THIRD_PARTY.md' },
+      ...(appControl ? [appControl] : []),
       ...(!separateRuntime ? [{ from: path.resolve(runtimeMsi), to: 'contribution/mycellios-runtime.msi' }] : []),
       { from: manifest, to: 'contribution/runtime.json' },
       { from: path.join(desktopRoot, 'scripts/install-runtime.ps1'), to: 'contribution/install-runtime.ps1' },

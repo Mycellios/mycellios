@@ -173,6 +173,13 @@ export class HostComputerSandbox implements SandboxProvider {
       context,
     );
   }
+  appControl(computer: ComputerRef, request: Record<string, unknown>, context: AdapterContext) {
+    // The host validates the request shape; the server only forwards it.
+    return this.one<unknown>(
+      { method: "appControl", botId: computer.botId, request } as unknown as HostComputerRequest,
+      context,
+    );
+  }
   commandStatus(computer: ComputerRef, commandId: string | undefined, context: AdapterContext) {
     return this.one({ method: "commandStatus", botId: computer.botId, commandId }, context);
   }

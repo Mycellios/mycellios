@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AdapterContext, AgentRuntime, ComputerRef } from "@rakazo/adapter-kit";
+import { AppControlRunner } from "./app-control-runner.js";
 import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { safeNativeCommandError } from "./native-command-journal.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
@@ -16,6 +17,8 @@ import {
   hostComputerRequest,
 } from "./host-computer-protocol.js";
 
+export { appControlBinary } from "./app-control-runner.js";
+
 const isFileWrite = (method: string | undefined) => method === "writeFile" || method === "writeFileChunk";
 
 /** No renderer receives the credential. Docker reaches this listener through its host gateway. */
@@ -25,9 +28,13 @@ export async function startHostComputerServer(options: {
   port?: number;
   hostname?: string;
   agentRuntime?: AgentRuntime;
+  /** Pinned accessibility runner; offered only while the owner's separate consent is on. */
+  appControl?: { binary: string; sha256: string; stateDir: string };
 }) {
   if (!/^[a-f0-9]{64}$/.test(options.token)) throw new Error("Invalid local computer credential");
   let enabled = false;
+  let appControlAllowed = false;
+  const appControl = options.appControl ? new AppControlRunner(options.appControl) : undefined;
   let updating = false;
   const agentHost = options.agentRuntime ? new DesktopAgentHost(options.agentRuntime) : undefined;
   // Only the native folder picker can grant projects; this map has no HTTP write method.
@@ -49,6 +56,9 @@ export async function startHostComputerServer(options: {
   >();
   const updateNotices = new Map<AbortController, () => void>();
   const providers = new Map<string, DesktopSandboxProvider>();
+  // Isolated project conversations never share the screen with other work.
+  const appControlOffered = (projectSessionId: string | undefined) =>
+    Boolean(appControl) && appControlAllowed && !projectSessionId;
   function providerFor(botId: string) {
     let provider = providers.get(botId);
     if (!provider) {
@@ -306,7 +316,13 @@ export async function startHostComputerServer(options: {
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
           ...(input.projectSessionId ? { taskIsolation: "worktree-v1" } : {}),
+          ...(appControlOffered(input.projectSessionId) ? { appControl: true } : {}),
         };
+        break;
+      case "appControl":
+        yield appControlOffered(input.projectSessionId)
+          ? await appControl!.run(input.request, context.signal)
+          : { ok: false, code: "APP_CONTROL_OFF", error: "Using apps on this PC is turned off. The owner can turn it on in Mycellios Desktop settings." };
         break;
       case "provision": {
         const result = await provider.provision({ botId: computer.botId, homePath: "" }, context);
@@ -558,6 +574,10 @@ export async function startHostComputerServer(options: {
         : null;
     },
     isEnabled: () => enabled && !updating,
+    setAppControlAllowed(value: boolean) {
+      appControlAllowed = value;
+    },
+    appControlAvailable: () => Boolean(appControl),
     async prepareUpdate() {
       updating = true;
       for (const [controller, notice] of updateNotices)

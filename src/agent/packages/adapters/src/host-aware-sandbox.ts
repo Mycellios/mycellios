@@ -70,12 +70,20 @@ export function createRunSandbox(
 
 export class HostAwareSandbox implements SandboxProvider {
   readonly pageBrowser?: SandboxProvider["pageBrowser"];
+  readonly appControl?: SandboxProvider["appControl"];
 
   constructor(
     private readonly isolated: SandboxProvider,
     private readonly host: SandboxProvider,
     private readonly hostEnabled: (context?: AdapterContext) => Promise<boolean>,
   ) {
+    if (host.appControl) {
+      this.appControl = (computer, request, context) => {
+        const provider = this.route(computer);
+        if (!provider.appControl) throw new Error("App control is only available on a connected PC.");
+        return provider.appControl(computer, request, context);
+      };
+    }
     if (isolated.pageBrowser || host.pageBrowser) {
       this.pageBrowser = (computer, request, context) => {
         const provider = this.route(computer);

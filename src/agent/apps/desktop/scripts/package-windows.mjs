@@ -18,7 +18,9 @@ const output = argument('--out') ?? path.join(root, 'release');
 const buildIdentity = await writeBuildIdentity(root, output);
 const development = await stageDevelopmentResources(root);
 const compact = await stageCompactResources(root, development, output);
-const config = await prepareWindowsInstaller({separateRuntime:!process.argv.includes('--bundle-runtime'), desktopRoot: root, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity });
+// Accessibility control of the user's apps (specs/desktop-accessibility-control).
+const appControlBinary = path.resolve(root, '../../node_modules/agent-desktop/bin/agent-desktop-win32-x64.exe');
+const config = await prepareWindowsInstaller({separateRuntime:!process.argv.includes('--bundle-runtime'), desktopRoot: root, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity, appControlBinary });
 const configFile = await writeStandaloneWindowsConfig(root,config,output);
 await withWindowsCopyRetry(async () => {
   const { Arch, build, Platform } = await import('electron-builder');

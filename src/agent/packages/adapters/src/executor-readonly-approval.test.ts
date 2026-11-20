@@ -100,7 +100,10 @@ function fixture({
   secondResource = false,
   routines = [] as { name: string; prompt: string }[],
   connectedApps = [] as string[],
+  pcAppControl,
 }: {
+  /** A connected PC whose environment reports the owner's app control opt-in (or not). */
+  pcAppControl?: boolean;
   /** Apps connected through Composio. */
   connectedApps?: string[];
   /** The bot's routines, as the owner wrote them. */
@@ -234,6 +237,7 @@ function fixture({
   const liveBot = { fleetManagement };
   let outsideSteering = false;
   let offeredTools: string[] = [];
+  const appControl = vi.fn(async () => ({ ok: true, confirmed: true, data: {} }));
   const prisma = {
     botSkillPin: { findMany: vi.fn(async () => []) },
 
@@ -261,7 +265,10 @@ function fixture({
         disabledBuiltinTools,
         fleetManagement,
         computerId: "computer-1",
-        computer: { id: "computer-1", scope: "dedicated" },
+        computer:
+          pcAppControl === undefined
+            ? { id: "computer-1", scope: "dedicated" }
+            : { id: "computer-1", scope: "dedicated", kind: "desktop", homeKey: "bot-home", providerRef: "host:bot-home" },
       })),
       update: vi.fn(async ({ data }: { data: Record<string, unknown> }) =>
         Object.assign(instructionState, data),
@@ -475,7 +482,15 @@ function fixture({
         catalog ? resolveCatalogCall(call, catalogEntries([tool])) : undefined,
       execute,
     },
-    sandbox: { describe: () => ({ capabilities: { graphical: false } }) },
+    sandbox: {
+      describe: () => ({ capabilities: { graphical: false } }),
+      ...(pcAppControl === undefined
+        ? {}
+        : {
+            environment: async () => ({ platform: "win32", home: "C:/Users/test", shell: "powershell.exe", ...(pcAppControl ? { appControl: true } : {}) }),
+            appControl,
+          }),
+    },
     memory: {
       read: async (request: { scope: string; path?: string }) => {
         const documents =
@@ -526,6 +541,7 @@ function fixture({
       outsideSteering = value;
     },
     offeredTools: () => offeredTools,
+    appControl,
     cancelAtInstructionCommit() {
       transactionalPrisma.$queryRaw.mockImplementation(async (...values: unknown[]) => {
         if (String(values[0]).includes("FROM threads")) run.status = "cancelled";
@@ -2363,3 +2379,30 @@ vi.mock("@rakazo/db", async (load) => ({
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));
+
+describe("app control on the owner's PC", () => {
+  it("offers PC app tools only when the connected PC reports the owner's opt-in", async () => {
+    const on = fixture({ name: "pc_windows", builtin: true, pcAppControl: true });
+    on.setCalls([{ name: "pc_windows", args: {}, executionId: "call-1" }]);
+    await on.run();
+    expect(on.offeredTools()).toEqual(expect.arrayContaining(["pc_windows", "pc_snapshot", "pc_act"]));
+    expect(on.appControl).toHaveBeenCalledWith(expect.anything(), { op: "windows" }, expect.anything());
+    const off = fixture({ name: "pc_windows", builtin: true, pcAppControl: false });
+    await off.run();
+    expect(off.offeredTools()).not.toContain("pc_act");
+  });
+
+  it("never offers PC app tools to routine runs", async () => {
+    const f = fixture({ name: "pc_windows", builtin: true, pcAppControl: true, trigger: "routine" });
+    await f.run();
+    expect(f.offeredTools()).not.toContain("pc_snapshot");
+  });
+
+  it("asks before acting on an app and does not act while waiting", async () => {
+    const f = fixture({ name: "pc_act", builtin: true, readOnly: false, pcAppControl: true });
+    f.setCalls([{ name: "pc_act", args: { ref: "@s34h3jfj94wwtx:e1", action: "click" }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.appControl).not.toHaveBeenCalled();
+    expect(f.results.some(isApprovalPausedResult)).toBe(true);
+  });
+});

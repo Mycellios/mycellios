@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button, Switch } from "@rakazo/ui-web";
 import { CircleAlert, CircleCheck, LoaderCircle, MousePointer2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ComputersUnavailableHint } from "../../components/ComputersUnavailableHint";
@@ -27,6 +27,7 @@ export function ComputerSettingsPanel({ sandboxProvider, onSandboxProviderChange
   const callbacks = useRef({ onSandboxProviderChange, onRecoveryDismissed });
   callbacks.current = { onSandboxProviderChange, onRecoveryDismissed };
   const native = !!desktopBridge()?.computer;
+  const appControl = useAppControl();
   async function check(manual = false) {
     if (locked.current) return;
     locked.current = true; const id = ++request.current; setPhase("checking"); setProvider(null);
@@ -62,8 +63,28 @@ export function ComputerSettingsPanel({ sandboxProvider, onSandboxProviderChange
         control={<span className="inline-flex items-center gap-2 text-sm text-muted-foreground"><MousePointer2 aria-hidden size={15} />{native ? t`Mycellios Desktop` : t`Web app`}</span>} />
       <SettingsRow label={t`Mico work environment`} description={t`Choose each Mico’s computer from its chat tools. A configured environment does not confirm a screen connection.`}
         control={<span className="text-sm text-muted-foreground">{provider && phase !== "checking" ? provider === "none" || provider === "" ? t`Not configured` : provider === "fake" ? t`Test environment` : sandboxProviderLabel(provider) : t`Not confirmed`}</span>} />
+      {appControl.state?.available && <SettingsRow label={t`Use apps on this PC`} description={t`Micos can read your open windows and use buttons, menus and fields. Each action asks for approval.`}
+        control={<Switch aria-label={t`Use apps on this PC`} checked={appControl.state.enabled} disabled={appControl.busy} onCheckedChange={value => void appControl.set(value)} />} />}
       <SettingsRow label={t`Check connection`} description={t`Refresh the status without restarting tasks or changing permissions.`} control={<Button variant="outline" size="sm" disabled={phase === "checking"} onClick={() => void check(true)}>{phase === "checking" ? t`Checking…` : t`Check again`}</Button>} />
     </SettingsGroup>
     {phase === "unavailable" && showTechnicalDetails && <ComputersUnavailableHint sandboxProvider={provider} showRetry={false} showTechnicalDetails className="text-sm text-muted-foreground" />}
   </div>;
+}
+
+/** Reads the native opt-in without requesting anything; only the switch asks Desktop to change it. */
+function useAppControl() {
+  const [state, setState] = useState<{ available: boolean; enabled: boolean }>();
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void desktopBridge()?.computer?.appControl?.().then(next => { if (live) setState(next); }, () => undefined);
+    return () => { live = false; };
+  }, []);
+  async function set(value: boolean) {
+    const change = desktopBridge()?.computer?.setAppControl;
+    if (!change) return;
+    setBusy(true);
+    try { setState(await change(value)); } catch { /* Keep the confirmed state. */ } finally { setBusy(false); }
+  }
+  return { state, busy, set };
 }

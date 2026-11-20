@@ -42,6 +42,7 @@ import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
 import { createDesktopAgentEngine } from "@rakazo/adapters/desktop-agent-engine";
+import { appControlBinary } from "@rakazo/adapters/host-computer-server";
 import { startDesktopExecutor } from "./executor-startup.js";
 import { ContributionRuntime, mayManageContribution } from "./contribution-runtime.js";
 import { DesktopRelayClient } from "./desktop-relay.js";
@@ -1495,7 +1496,7 @@ app.whenReady().then(async () => {
   // connect over 127.0.0.1; other machines on the network must not reach the executor.
   const hostComputerListen = nativeLocalStack ? { hostname: "127.0.0.1" } : {};
   for (;;) {
-    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine, hostComputerListen), {
+    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine, hostComputerListen, appControlComponent()), {
       // A development launcher may have exited and closed stderr. Report through
       // the desktop reporter so a diagnostic cannot itself throw EPIPE.
       report: code => reportDesktopError(new Error(`Desktop executor startup failed (${code})`), "desktop.startup"),
@@ -1971,6 +1972,25 @@ app.whenReady().then(async () => {
       requestingComputerAccess = false;
     }
   });
+  ipcMain.handle("desktop.computer.appControl", (event) => {
+    if (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) throw new Error("Unavailable");
+    return hostComputer?.appControl() ?? { available: false, enabled: false };
+  });
+  ipcMain.handle("desktop.computer.setAppControl", async (event, value: unknown) => {
+    if (typeof value !== "boolean" || !hostComputer || (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)))
+      throw new Error("Unavailable");
+    if (value) {
+      // Only a native confirmation turns it on; the page can ask, never grant.
+      const result = await dialog.showMessageBox(mainWindow!, {
+        type: "warning", title: "Let Micos use your apps?", message: "Let Micos use the apps on this computer?",
+        detail: "Micos can read the windows of your open apps and press buttons, choose menu items and fill in fields. Each action asks for your approval unless you allowed it. They never control Mycellios, password managers or system security prompts. You can turn this off at any time.",
+        buttons: ["Cancel", "Allow"], defaultId: 0, cancelId: 0, noLink: true,
+      });
+      if (result.response !== 1) return hostComputer.appControl();
+    }
+    await hostComputer.setAppControl(value);
+    return hostComputer.appControl();
+  });
   ipcMain.handle("desktop.computer.projectAvailable", async (event) => {
     if (isManagedComputerRequest(event)) return true;
     // Show the native connection action before consent or network readiness.
@@ -2443,3 +2463,12 @@ app.on("will-quit", event => {
   }
 });
 
+/** The pinned accessibility component shipped with this build, if any. */
+function appControlComponent() {
+  const pin = appControlBinary(process.platform, process.arch);
+  if (!pin) return undefined;
+  const binary = app.isPackaged
+    ? path.join(process.resourcesPath, "app-control", pin.file)
+    : path.join(app.getAppPath(), "../../node_modules/agent-desktop/bin", pin.file);
+  return existsSync(binary) ? { binary, sha256: pin.sha256 } : undefined;
+}

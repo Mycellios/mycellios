@@ -19,10 +19,13 @@ export async function prepareHostComputer(
   userDataDir: string,
   agentRuntime?: AgentRuntime,
   listen: { hostname?: string } = {},
+  /** Pinned accessibility component, when this build ships one for the platform. */
+  appControlComponent?: { binary: string; sha256: string },
 ) {
   const configFile = path.join(userDataDir, "host-computer.json");
   const consentFile = path.join(userDataDir, "host-computer-consent");
   const accountConsentFile = path.join(userDataDir, "host-computer-account-consent");
+  const appControlConsentFile = path.join(userDataDir, "app-control-consent");
   let rememberedAccount = await readPrivateFile(accountConsentFile, 128);
   const raw = await readPrivateFile(configFile, 1024);
   let token = randomBytes(32).toString("hex");
@@ -36,7 +39,15 @@ export async function prepareHostComputer(
     /* Invalid local configuration is replaced. */
   }
   let server: Awaited<ReturnType<typeof startHostComputerServer>>;
-  const options = { root: path.join(userDataDir, "computers"), token, agentRuntime, ...listen };
+  const options = {
+    root: path.join(userDataDir, "computers"),
+    token,
+    agentRuntime,
+    ...listen,
+    ...(appControlComponent
+      ? { appControl: { ...appControlComponent, stateDir: path.join(userDataDir, "app-control") } }
+      : {}),
+  };
   try {
     server = await startHostComputerServer({ ...options, port });
   } catch (error) {
@@ -58,6 +69,16 @@ export async function prepareHostComputer(
   let active = false;
   let consentIntent = 0;
   let consentWrites: Promise<void> = Promise.resolve();
+  // A separate opt-in, bound to the current host consent: revoking PC access also ends it.
+  let appControlOn = allowed && (await readPrivateFile(appControlConsentFile, 128)) === token;
+  server.setAppControlAllowed(appControlOn);
+  function setAppControl(value: boolean) {
+    appControlOn = value;
+    server.setAppControlAllowed(value);
+    const write = consentWrites.then(() => writePrivateFile(appControlConsentFile, value ? token : ""));
+    consentWrites = write.catch(() => undefined);
+    return write;
+  }
   function persistConsent(value: string, account?: string) {
     const write = consentWrites.then(async () => {
       await writePrivateFile(consentFile, value);
@@ -109,7 +130,16 @@ export async function prepareHostComputer(
       rememberedAccount = null;
       server.setEnabled(false);
       server.clearProjects();
+      appControlOn = false;
+      server.setAppControlAllowed(false);
       await persistConsent("", "");
+      await setAppControl(false);
+    },
+    appControl: () => ({ available: server.appControlAvailable(), enabled: appControlOn && allowed }),
+    async setAppControl(value: boolean) {
+      if (value && (!allowed || !server.appControlAvailable()))
+        throw new Error("Allow access to this PC first.");
+      await setAppControl(value);
     },
     close: server.close,
   };

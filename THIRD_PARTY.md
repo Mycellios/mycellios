@@ -94,6 +94,14 @@ Android brand icons from Font Awesome Free 6.7.2. Copyright 2024 Fonticons, Inc.
 International License (https://creativecommons.org/licenses/by/4.0/). The marks
 identify download platforms only and imply no endorsement.
 
+## agent-desktop
+
+Windows Desktop installers include the `agent-desktop` 1.3.1 command-line binary
+(Vercel Labs, [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop),
+Apache-2.0), used unmodified for opt-in accessibility control of the owner's own
+applications. Its SHA-256 is pinned and verified when packaging and before every
+use.
+
 ## Integrated development tooling
 
 Desktop development resources may bundle npm and its bundled dependencies from
