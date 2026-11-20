@@ -15,6 +15,7 @@ import type { MinimumClientBuilds } from "@rakazo/contracts";
 import {
   DEFAULT_MODEL_CONTEXT_WINDOW,
   DEFAULT_MODEL_MAX_TOKENS,
+  DESKTOP_VERSION_PATTERN,
   MAX_MODEL_CONTEXT_WINDOW,
   MAX_MODEL_MAX_TOKENS,
   parseMinimumClientBuilds,
@@ -40,6 +41,8 @@ export interface AppEnv {
   breachedPasswordCheck?: boolean;
   oidc?: OidcConfig;
   mycelliosSso?: boolean;
+  /** Desktop releases below this version are asked to update before continuing. */
+  desktopMinimumVersion?: string;
   /** Operator-approved speech replicas with current physical contribution evidence. */
   mycelliosNetworkSpeechIdentityIds?: string[];
   mycelliosNetworkTranscriptionIdentityIds?: string[];
@@ -231,6 +234,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     throw new Error("AUTH_SESSION_DURATION_SECONDS must be between one and ninety days");
   if (source.MYCELLIOS_SSO_ENABLED === "true" && !oidc)
     throw new Error("Mycellios account connection requires OIDC");
+  const desktopMinimumVersion = optional(source.MYCELLIOS_DESKTOP_MINIMUM_VERSION);
+  if (desktopMinimumVersion !== undefined && !DESKTOP_VERSION_PATTERN.test(desktopMinimumVersion))
+    throw new Error("MYCELLIOS_DESKTOP_MINIMUM_VERSION must be a major.minor.patch version");
   const sandboxProvider = resolveSandboxProvider(source);
   const cloudAgentProvider = resolveCloudAgentProvider(source);
   const deploymentModel = resolveDeploymentModel(source);
@@ -240,6 +246,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     breachedPasswordCheck: source.AUTH_BREACHED_PASSWORD_CHECK_ENABLED === "true",
     oidc,
     mycelliosSso: source.MYCELLIOS_SSO_ENABLED === "true" && Boolean(oidc),
+    desktopMinimumVersion,
     defaultModelMaxTokens,
     defaultModelContextWindow,
     nodeEnv: source.NODE_ENV ?? "",

@@ -1892,6 +1892,12 @@
   download links in update settings, not stacked beneath the sidebar action.
   Preserve native draft/call/work guards and explicit install consent; waiting
   for those guards must not cover the chat with a full-screen update dialog.
+  The one exception is a server-required release, as in OpenBot (behavior reference
+  only): MYCELLIOS_DESKTOP_MINIMUM_VERSION reaches Desktop through the public auth
+  capabilities, reread every six hours. Below it, DesktopRequiredUpdate covers the
+  app with the same guarded download/restart actions and a one-hour Not now; it
+  never installs on its own. A missing or unreachable minimum requires nothing.
+  Verify DesktopUpdates and API env tests.
 
 - A PC workspace belongs to that PC, as OpenBot keeps a workspace on its own host
   (behavior reference only, no copied code). Provisioning seeds the saved server copy

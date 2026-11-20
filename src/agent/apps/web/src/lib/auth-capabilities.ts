@@ -27,8 +27,11 @@ export function fetchAuthCapabilities(): Promise<AuthCapabilities> {
   return capabilitiesRequest;
 }
 
-/** Public deployment capabilities, bounded in time and size so a stalled API cannot hang the UI. */
-async function loadAuthCapabilities(): Promise<AuthCapabilities> {
+/**
+ * Public deployment capabilities, bounded in time and size so a stalled API cannot hang the UI.
+ * Long-lived clients call this directly to notice a changed deployment without the shared cache.
+ */
+export async function loadAuthCapabilities(): Promise<AuthCapabilities> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

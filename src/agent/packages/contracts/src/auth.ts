@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+/** A Desktop release version, `major.minor.patch` without prerelease or build suffixes. */
+export const DESKTOP_VERSION_PATTERN = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
+
+/** Whether `version` is an older Desktop release than `minimum`; unreadable versions never are. */
+export function isBelowDesktopMinimum(version: string, minimum: string): boolean {
+  if (!DESKTOP_VERSION_PATTERN.test(version) || !DESKTOP_VERSION_PATTERN.test(minimum)) return false;
+  const current = version.split(".").map(Number);
+  const required = minimum.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (current[index] !== required[index]) return current[index]! < required[index]!;
+  }
+  return false;
+}
+
 export const authCapabilitiesSchema = z.object({
   sso: z
     .object({
@@ -18,6 +32,12 @@ export const authCapabilitiesSchema = z.object({
   passkeyRpId: z.string().min(1).nullable().optional(),
   /** Native apps this domain vouches for; omitted by older servers, which means none. */
   nativePasskeys: z.object({ ios: z.boolean(), android: z.boolean() }).optional(),
+  /** Desktop releases below this version must update before continuing; omitted or null means none. */
+  desktopMinimumVersion: z
+    .string()
+    .regex(DESKTOP_VERSION_PATTERN)
+    .nullable()
+    .optional(),
 });
 export type AuthCapabilities = z.infer<typeof authCapabilitiesSchema>;
 
