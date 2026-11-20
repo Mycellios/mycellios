@@ -5,10 +5,12 @@ import {
   sign,
 } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
   renameSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
@@ -103,11 +105,12 @@ export function loadOrCreateWorkerAdmissionCredential(
   path: string,
 ): WorkerAdmissionCredential {
   if (existsSync(path)) {
+    restrictToOwner(path);
     return parseWorkerAdmissionCredential(
       JSON.parse(readFileSync(path, "utf8")) as unknown,
     );
   }
-  mkdirSync(dirname(path), { recursive: true });
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const credential = generateWorkerAdmissionCredential();
   const temporary = `${path}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(credential)}\n`, {
@@ -117,6 +120,20 @@ export function loadOrCreateWorkerAdmissionCredential(
   });
   renameSync(temporary, path);
   return credential;
+}
+
+/**
+ * Older installations may have created the private key with a permissive umask.
+ * Narrow it to the owner on POSIX; a key owned by another user is left alone.
+ */
+export function restrictToOwner(path: string, platform: NodeJS.Platform = process.platform): void {
+  if (platform === "win32") return;
+  try {
+    const stats = statSync(path);
+    if ((stats.mode & 0o077) !== 0) chmodSync(path, stats.mode & 0o700);
+  } catch {
+    // Reading the key still decides whether this worker can start.
+  }
 }
 
 function decodeCanonicalBase64Url(value: string): Buffer {
