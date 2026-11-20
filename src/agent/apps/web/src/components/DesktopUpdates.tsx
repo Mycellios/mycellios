@@ -1,13 +1,44 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { productBrand, type DesktopUpdateState } from "@rakazo/contracts";
+import { isBelowDesktopMinimum, productBrand, type DesktopUpdateState } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { UpdateNotice } from "./UpdateNotice";
+import { fetchAuthCapabilities, loadAuthCapabilities } from "../lib/auth-capabilities";
 import { desktopBridge } from "../lib/desktop";
 import { canRestartDesktop, canShowDesktopUpdate, desktopUpdateHasCall, endDesktopUpdateCall } from "../lib/desktop-update-work";
 import { playUpdateMycelium } from "../lib/update-mycelium";
 
 const UPDATE_DISK_SPACE_MESSAGE = "Free at least 6 GB of disk space before restarting to update.";
+/** How often a long-running Desktop session rereads the server's minimum version. */
+const MINIMUM_VERSION_REFRESH_MS = 6 * 60 * 60 * 1000;
+/** "Not now" hides a required update for this long, so unsaved work can be finished. */
+export const REQUIRED_UPDATE_SNOOZE_MS = 60 * 60 * 1000;
+
+/** The server's minimum Desktop version, read at start and again every few hours. */
+function useDesktopMinimumVersion(enabled: boolean) {
+  const [minimum, setMinimum] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function read(first: boolean) {
+      try {
+        const capabilities = await (first ? fetchAuthCapabilities() : loadAuthCapabilities());
+        if (!stopped) setMinimum(capabilities.desktopMinimumVersion ?? null);
+      } catch {
+        // An unreachable server keeps the last known minimum; it never invents one.
+      } finally {
+        if (!stopped) timer = setTimeout(() => void read(false), MINIMUM_VERSION_REFRESH_MS);
+      }
+    }
+    void read(true);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [enabled]);
+  return minimum;
+}
 
 function updateRequiresAttention(state: DesktopUpdateState | null) {
   return Boolean(state?.availableVersion && ["available", "downloading", "ready", "checking", "error"].includes(state.phase));
@@ -31,6 +62,11 @@ function useDesktopUpdates() {
   const [callActive, setCallActive] = useState(false);
   const pending = useRef(false);
   const revision = useRef(0);
+  const minimumVersion = useDesktopMinimumVersion(Boolean(bridge));
+  const required = Boolean(
+    minimumVersion && state && isBelowDesktopMinimum(state.currentVersion, minimumVersion),
+  );
+  const checkedForMinimum = useRef<string | null>(null);
   const chatWindow = desktopBridge()?.chatWindow;
   useEffect(() => {
     const onPrepare = bridge?.onPrepare ?? chatWindow?.onPrepare;
@@ -103,6 +139,13 @@ function useDesktopUpdates() {
       setBusy(false);
     }
   }
+  // A required update looks for the release at once instead of waiting for the next background check.
+  useEffect(() => {
+    if (!required || !minimumVersion || checkedForMinimum.current === minimumVersion) return;
+    if (state?.phase !== "idle" || state.availableVersion) return;
+    checkedForMinimum.current = minimumVersion;
+    void act("check");
+  });
   const message = error ?? (
     state?.relaunchError ? t`Could not complete the update. Try again.` : state?.handoffComplete
       ? t`Opened the system installer. Restart Mycellios when it finishes.`
@@ -114,7 +157,8 @@ function useDesktopUpdates() {
         ? t`Could not complete the update. Try again.`
       : state?.message ?? null
   );
-  return { state, busy, message, act, confirmedCheck, safeToInterrupt, callActive, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
+  return { state, busy, message, act, confirmedCheck, safeToInterrupt, callActive, required, minimumVersion,
+    forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
 }
 
 const UpdatesContext = createContext<ReturnType<typeof useDesktopUpdates> | null>(null);
@@ -122,7 +166,92 @@ export function useDesktopUpdateSettings() { return useContext(UpdatesContext); 
 
 export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   const updates = useDesktopUpdates();
-  return <UpdatesContext.Provider value={updates}>{children}</UpdatesContext.Provider>;
+  return <UpdatesContext.Provider value={updates}>{children}<DesktopRequiredUpdate /></UpdatesContext.Provider>;
+}
+
+/**
+ * A server can require a newer Desktop release. The screen covers the app and offers the same
+ * guarded download/restart actions; "Not now" hides it briefly so unsaved work can be finished.
+ */
+export function DesktopRequiredUpdate() {
+  const { t } = useLingui();
+  const updates = useContext(UpdatesContext);
+  const update = useSidebarUpdate();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [snoozedUntil, setSnoozedUntil] = useState(0);
+  const [, setWoke] = useState(0);
+  const state = updates?.state ?? null;
+  const open = Boolean(updates?.required && state && Date.now() >= snoozedUntil);
+  useEffect(() => {
+    if (!snoozedUntil) return;
+    const timer = setTimeout(() => setWoke((value) => value + 1), Math.max(0, snoozedUntil - Date.now()));
+    return () => clearTimeout(timer);
+  }, [snoozedUntil]);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal?.();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+  if (!updates?.required || !state || !updates.minimumVersion) return null;
+  const minimum = updates.minimumVersion;
+  const current = state.currentVersion;
+  const ready = state.phase === "ready";
+  const working = state.phase === "checking" || state.phase === "downloading" || state.installPending === true;
+  const percent = typeof state.percent === "number" && Number.isFinite(state.percent)
+    ? Math.max(0, Math.min(100, Math.round(state.percent))) : null;
+  const action = ready ? (state.installAction === "system-installer" ? t`Open installer`
+      : update.callActive ? t`End call and restart` : t`Restart to update`)
+    : state.phase === "available" ? t`Download update`
+    : state.phase === "downloading" ? (percent === null ? t`Downloading…` : `${percent}%`)
+    : state.phase === "checking" ? t`Checking…`
+    : t`Check for updates`;
+  const onAction = ready ? update.install : state.phase === "available" ? update.download : update.check;
+  return (
+    <dialog
+      ref={dialogRef}
+      data-desktop-update-gate
+      data-testid="desktop-required-update"
+      aria-labelledby="desktop-required-update-title"
+      onCancel={(event) => event.preventDefault()}
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-background p-6 text-foreground backdrop:bg-background"
+    >
+      <div className="mx-auto flex h-full max-w-sm flex-col items-center justify-center gap-4 text-center">
+        <h2 id="desktop-required-update-title" className="text-heading2 font-medium">
+          <Trans>Update Mycellios to continue</Trans>
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {t`This server needs version ${minimum} or later. You have ${current}.`}
+        </p>
+        {state.installPending ? (
+          <p role="status" className="text-sm text-muted-foreground"><PendingRestart state={state} /></p>
+        ) : updates.message ? (
+          <p role="status" className="text-sm text-muted-foreground">{updates.message}</p>
+        ) : null}
+        <Button disabled={updates.busy || working || state.handoffComplete === true} onClick={onAction}>
+          {action}
+        </Button>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            onClick={() => setSnoozedUntil(Date.now() + REQUIRED_UPDATE_SNOOZE_MS)}
+          >
+            <Trans>Not now</Trans>
+          </Button>
+          {(state.phase === "idle" || state.phase === "error" || state.handoffComplete) && (
+            <a
+              href={new URL("/downloads/desktop", productBrand.apiBaseUrl).href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground underline underline-offset-4"
+            >
+              <Trans>Download the latest version</Trans>
+            </a>
+          )}
+        </div>
+      </div>
+    </dialog>
+  );
 }
 
 function PendingRestart({ state }: { state: DesktopUpdateState }) {

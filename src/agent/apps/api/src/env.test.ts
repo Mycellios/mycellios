@@ -319,6 +319,16 @@ describe("OIDC environment", () => {
     for (const value of ["0", "86399", "7776001", "NaN", "1.5"])
       expect(() => loadEnv({ ...base, AUTH_SESSION_DURATION_SECONDS: value })).toThrow(/one and ninety days/);
   });
+  it("reads an optional Desktop minimum version and refuses malformed values", () => {
+    expect(loadEnv(base).desktopMinimumVersion).toBeUndefined();
+    expect(
+      loadEnv({ ...base, MYCELLIOS_DESKTOP_MINIMUM_VERSION: "0.3.60" }).desktopMinimumVersion,
+    ).toBe("0.3.60");
+    for (const value of ["0.3", "v0.3.60", "0.3.60-beta", "01.2.3"])
+      expect(() => loadEnv({ ...base, MYCELLIOS_DESKTOP_MINIMUM_VERSION: value })).toThrow(
+        /MYCELLIOS_DESKTOP_MINIMUM_VERSION/,
+      );
+  });
   const oidc = {
     OIDC_ISSUER: "https://identity.example.test",
     OIDC_CLIENT_ID: "fake-client",

@@ -786,6 +786,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       billing: Boolean(billing),
       passkeyRpId: auth.passkeyRpId,
       nativePasskeys: nativePasskeys(env, auth.passkeyRpId),
+      desktopMinimumVersion: env.desktopMinimumVersion ?? null,
     } satisfies AuthCapabilities);
   });
   mountAppAssociation(app, env);

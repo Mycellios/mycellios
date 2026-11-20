@@ -13701,3 +13701,11 @@ msgstr "No se pudo descargar la imagen. Inténtalo de nuevo."
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "Modelos anteriores"
+
+#: src/components/DesktopUpdates.tsx
+msgid "Update Mycellios to continue"
+msgstr "Actualiza Mycellios para continuar"
+
+#: src/components/DesktopUpdates.tsx
+msgid "This server needs version {minimum} or later. You have {current}."
+msgstr "Este servidor necesita la versión {minimum} o posterior. Tienes la {current}."

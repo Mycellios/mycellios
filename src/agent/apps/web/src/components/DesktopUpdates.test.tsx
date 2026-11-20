@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DesktopUpdateState } from "@rakazo/contracts";
+import { isBelowDesktopMinimum } from "@rakazo/contracts";
 const fixture = vi.hoisted(() => ({ state: {} as DesktopUpdateState, safe: true, call: false }));
 const bridge = vi.hoisted(() => ({
   state: vi.fn(async () => ({ ...fixture.state })),
@@ -16,6 +17,11 @@ const bridge = vi.hoisted(() => ({
   onPrepare: vi.fn(() => () => {}),
 }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: () => ({ update: bridge }) }));
+const server = vi.hoisted(() => ({ minimum: null as string | null }));
+vi.mock("../lib/auth-capabilities", () => {
+  const read = async () => ({ desktopMinimumVersion: server.minimum });
+  return { fetchAuthCapabilities: read, loadAuthCapabilities: read };
+});
 const endCall = vi.hoisted(() => vi.fn(() => { fixture.call = false; }));
 vi.mock("../lib/desktop-update-work", () => ({
   canRestartDesktop: () => fixture.safe && !fixture.call,
@@ -25,12 +31,12 @@ vi.mock("../lib/desktop-update-work", () => ({
 }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (strings: TemplateStringsArray) => strings[0] }), Trans: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@rakazo/ui-web", () => ({ Button: (props: ComponentProps<"button">) => <button {...props} /> }));
-import { DesktopSidebarUpdate, DesktopUpdateSection, DesktopUpdatesProvider } from "./DesktopUpdates";
+import { DesktopSidebarUpdate, DesktopUpdateSection, DesktopUpdatesProvider, REQUIRED_UPDATE_SNOOZE_MS } from "./DesktopUpdates";
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   vi.clearAllMocks(); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  fixture.safe = true; fixture.call = false;
+  fixture.safe = true; fixture.call = false; server.minimum = null;
   fixture.state = { phase: "ready", currentVersion: "0.3.33", availableVersion: "0.3.35", percent: 100, message: null, checkedAt: null };
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function (this: HTMLDialogElement) { this.setAttribute("open", ""); } });
   Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function (this: HTMLDialogElement) { this.removeAttribute("open"); } });
@@ -196,4 +202,41 @@ it("keeps manual download recovery in update settings instead of competing sideb
   const settings = host.querySelector('[data-testid="desktop-update-settings"]')!;
   expect(settings.textContent).toContain("Download failed");
   expect(settings.querySelector("a")?.href).toBe("https://www.mycellios.com/downloads/desktop");
+});
+
+it("covers the app when the server requires a newer release and restarts through the guarded action", async () => {
+  server.minimum = "0.3.34";
+  await render();
+  expect(gate()?.dataset.testid).toBe("desktop-required-update");
+  expect(gate()?.textContent).toContain("Update Mycellios to continue");
+  await act(async () => [...gate()!.querySelectorAll("button")].find(b => b.textContent === "Restart to update")!.click());
+  expect(bridge.install).toHaveBeenCalledOnce();
+});
+
+it("looks for the required release at once and lets the owner postpone it briefly", async () => {
+  server.minimum = "0.4.0";
+  fixture.state = { ...fixture.state, phase: "idle", availableVersion: null, percent: null };
+  await render();
+  expect(bridge.check).toHaveBeenCalledOnce();
+  await refresh(); await refresh();
+  expect(bridge.check).toHaveBeenCalledOnce();
+  expect(gate()?.querySelector('a[href$="/downloads/desktop"]')).not.toBeNull();
+  await act(async () => [...gate()!.querySelectorAll("button")].find(b => b.textContent === "Not now")!.click());
+  expect(gate()).toBeNull();
+  await act(async () => { await vi.advanceTimersByTimeAsync(REQUIRED_UPDATE_SNOOZE_MS); });
+  expect(gate()?.dataset.testid).toBe("desktop-required-update");
+});
+
+it("compares release numbers numerically and ignores unreadable versions", () => {
+  expect(isBelowDesktopMinimum("0.3.9", "0.3.10")).toBe(true);
+  expect(isBelowDesktopMinimum("0.10.0", "0.9.9")).toBe(false);
+  expect(isBelowDesktopMinimum("1.0.0", "1.0.0")).toBe(false);
+  expect(isBelowDesktopMinimum("dev", "1.0.0")).toBe(false);
+});
+
+it("leaves current and newer releases alone", async () => {
+  server.minimum = "0.3.33";
+  await render();
+  expect(gate()).toBeNull();
+  expect(bridge.check).not.toHaveBeenCalled();
 });
