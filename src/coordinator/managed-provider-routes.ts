@@ -90,7 +90,9 @@ export async function handleManagedChat(request: FastifyRequest, reply: import("
   } catch (error) {
     if (!streaming) return failure(reply, error);
     if (!reply.raw.destroyed && !reply.raw.writableEnded) {
-      reply.raw.write('data: {"error":{"code":"managed_request_failed","message":"Mycellios could not complete this request."}}\n\n'); reply.raw.end();
+      const code = error instanceof Error && Object.hasOwn(FREE_LIMIT_MESSAGES, error.message) ? error.message : "managed_request_failed";
+      const message = FREE_LIMIT_MESSAGES[code] ?? "Mycellios could not complete this request.";
+      reply.raw.write(`data: ${JSON.stringify({ error: { code, message } })}\n\n`); reply.raw.end();
     }
   }
 }
@@ -100,10 +102,16 @@ function parse(body: unknown): ManagedTextRequest {
   if (typeof value.model !== "string" || !Array.isArray(value.messages)) throw new Error("managed_request_invalid");
   return value as ManagedTextRequest;
 }
+/** Free allowances are expected limits, not failures: tell the person what happens next. */
+const FREE_LIMIT_MESSAGES: Record<string, string> = {
+  managed_free_daily_limit_reached: "You have used today's free Mycellios messages. They renew at 00:00 UTC, or choose another model.",
+  managed_free_tier_exhausted: "This free model is busy right now. Try again in a few minutes or choose another model.",
+};
 function failure(reply: import("fastify").FastifyReply, error: unknown) {
   const message = error instanceof Error ? error.message : "";
   // Never echo provider responses, SQL errors, credentials or request content.
   const code = /^(managed_[a-z_]+|insufficient_contribution_credits)$/.test(message) ? message : "managed_request_failed";
+  if (Object.hasOwn(FREE_LIMIT_MESSAGES, code)) return reply.code(429).send({ error: { code, message: FREE_LIMIT_MESSAGES[code] } });
   const status = code === "insufficient_contribution_credits" ? 402 : /conflict|price_changed|expired/.test(code) ? 409 : 400;
   return reply.code(status).send({ error: { code, message: "Mycellios could not accept this request. No new paid request was retried." } });
 }

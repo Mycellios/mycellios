@@ -12,6 +12,8 @@ export interface ManagedProviderConfig {
   dailyLimitMicrounits: number;
   /** Lifetime funded envelope, including unresolved reservations; never resets at midnight. */
   totalLimitMicrounits?: number;
+  /** Zero-priced requests one account may start per UTC day (shared upstream allowance). */
+  freeDailyRequests?: number;
   /** Effective supplier funding fee, including minimums. Unknown costs disable paid admission. */
   fundingCostBasisPoints?: number;
   mediaEnabled?:boolean;
@@ -46,6 +48,9 @@ export function readManagedProviderConfig(env: NodeJS.ProcessEnv): ManagedProvid
   const funding=env.MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS===undefined?undefined:Number(env.MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS);
   if(funding!==undefined&&(!env.MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS?.trim()||!Number.isSafeInteger(funding)||funding<0||funding>100000))throw new Error("managed_funding_cost_invalid");
   if (upstream === "antseed-gateway" && funding !== undefined && total === undefined) throw new Error("managed_funded_envelope_required");
+  const free = env.MYCELLIOS_MANAGED_FREE_DAILY_REQUESTS === undefined ? undefined : Number(env.MYCELLIOS_MANAGED_FREE_DAILY_REQUESTS);
+  if (free !== undefined && (!env.MYCELLIOS_MANAGED_FREE_DAILY_REQUESTS?.trim() || !Number.isSafeInteger(free) || free < 0 || free > 100_000))
+    throw new Error("managed_free_daily_requests_invalid");
   if(textRoutes!==undefined&&(!Array.isArray(textRoutes)||!textRoutes.length||textRoutes.length>100))throw new Error("managed_configuration_invalid");
   if (upstream !== "openrouter" && env.MYCELLIOS_MANAGED_MEDIA_ENABLED === "true") throw new Error("managed_antseed_media_not_qualified");
   if (upstream === "antseed-gateway" && (!env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_BASE_URL
@@ -55,6 +60,7 @@ export function readManagedProviderConfig(env: NodeJS.ProcessEnv): ManagedProvid
     antseedGatewayContract:env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT!} : {antseedControlSecret:key}), modelAllowlist: models as string[], requestLimitMicrounits: limit, dailyLimitMicrounits: daily,
     mediaOffers,mediaEnabled:env.MYCELLIOS_MANAGED_MEDIA_ENABLED==="true",walletTopups:env.MYCELLIOS_WALLET_TOPUPS_ENABLED==="true",...(funding===undefined?{}:{fundingCostBasisPoints:funding}),
     ...(total === undefined ? {} : {totalLimitMicrounits: total}),
+    ...(free === undefined ? {} : {freeDailyRequests: free}),
     ...(textRoutes?{textRoutes}:{}),
     ...(env.MYCELLIOS_MANAGED_ANTSEED_EDIT_ENABLED==="true"?{antseedEditControlSecret:requiredControl(env)}:{}) };
 }

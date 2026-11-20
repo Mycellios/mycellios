@@ -54,12 +54,17 @@ export function managedPurchasesAccessSchemaSql(runtimeRole: string): string {
   GRANT SELECT,INSERT,UPDATE ON economic_managed_purchases TO "${runtimeRole}";`;
 }
 
+/** Free managed requests one account may start per UTC day unless the operator configures another limit. */
+export const DEFAULT_FREE_DAILY_REQUESTS = 50;
+
 /** One budget shared with native inference, but external purchases have distinct accounting. */
 export class ManagedPurchases {
   private promotions: PromotionalCredits | null = null;
   constructor(private readonly db: MeshDatabase, private readonly wallet: ContributionCreditWallet,
     private readonly dailyLimitMicrounits: number, private readonly totalLimitMicrounits?: number,
-    private readonly eventBudget?: ManagedEventBudget) {
+    private readonly eventBudget?: ManagedEventBudget,
+    private readonly freeDailyRequests = DEFAULT_FREE_DAILY_REQUESTS) {
+    if (!Number.isSafeInteger(freeDailyRequests) || freeDailyRequests < 0) throw new Error("managed_budget_invalid");
     if (!Number.isSafeInteger(dailyLimitMicrounits) || dailyLimitMicrounits < 1) throw new Error("managed_budget_invalid");
     if (totalLimitMicrounits !== undefined && (!Number.isSafeInteger(totalLimitMicrounits) || totalLimitMicrounits < 1)) throw new Error("managed_budget_invalid");
     if (eventBudget && (!/^[a-z0-9-]{8,64}$/.test(eventBudget.campaignId) || !Number.isSafeInteger(eventBudget.maximumMicrounits)
@@ -98,6 +103,7 @@ export class ManagedPurchases {
       }
       await this.assertAdmitting(input.provider);
       const now = Date.now();
+      if (usdAtoms(input.maximumUsd) === 0n) await this.assertFreeAllowance(input.accountId, now);
       const budget = await managedAdmissionBudget(this.db, input.accountId, now, this.dailyLimitMicrounits, this.eventBudget);
       if (budget.used + amount > budget.limit) throw new Error("managed_operator_budget_exceeded");
       if (this.totalLimitMicrounits !== undefined) {
@@ -120,6 +126,15 @@ export class ManagedPurchases {
           input.provider, input.model, input.maximumUsd, now, funding);
       return { id: input.usageId, replay: false };
     });
+  }
+  /**
+   * Zero-priced upstream allowances are shared by every account through one operator buyer.
+   * Bound each account per UTC day; refused (released) attempts do not count.
+   */
+  async assertFreeAllowance(accountId: string, now = Date.now()) {
+    const row = await this.db.raw.prepare(`SELECT COUNT(*) AS used FROM economic_managed_purchases
+      WHERE account_id=? AND maximum_usd='0' AND created_at>=? AND state<>'released'`).get(accountId, now - now % 86_400_000);
+    if (Number(row?.used ?? 0) >= this.freeDailyRequests) throw new Error("managed_free_daily_limit_reached");
   }
   async assertAdmitting(provider:string) {
     if(await this.db.raw.prepare("SELECT 1 FROM economic_managed_purchases WHERE provider=? AND safety_stop=true LIMIT 1").get(provider))

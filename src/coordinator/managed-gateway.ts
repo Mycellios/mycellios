@@ -5,6 +5,7 @@ import type { ManagedPurchases } from "../economy/managed-purchases.js";
 import type { ManagedOpenRouter, ManagedTextRequest, ManagedTextResult } from "./managed-openrouter.js";
 import type { ChatCompletionRequest } from "../contracts/types.js";
 import type { ManagedModel } from "../contracts/managed-provider.js";
+import { usdAtoms } from "../economy/managed-pricing.js";
 export interface GatewayQuote { maximumUsd:string; maximumMicrounits:number; expiresAt:number; body:{max_tokens?:number};provider?:string;fundingCostBasisPoints?:number;billingContext?:unknown }
 export interface GatewayProvider<R,Q,C> {
  provider:string; ensureFresh():Promise<void>; catalog():C[]; quote(request:R):Q;
@@ -34,6 +35,8 @@ export class ManagedGateway<R extends {model:string}=ManagedTextRequest,Q extend
     await this.provider.ensureFresh();
     const quote = this.provider.quote(request);
     await this.purchases.assertAdmitting(quote.provider??this.provider.provider);
+    // Refuse before a stream opens, so the caller sees a clear daily-limit answer.
+    if (usdAtoms(quote.maximumUsd) === 0n) await this.purchases.assertFreeAllowance(accountId);
     if (quote.maximumMicrounits > this.requestLimitMicrounits) throw new Error("managed_operator_budget_exceeded");
     const value = { accountId, digest: sha256CanonicalEvidence(request), maximum: quote.maximumMicrounits,
       expires: Math.min(quote.expiresAt, Date.now() + 60_000), executionDigest: sha256CanonicalEvidence({body:quote.body,fundingCostBasisPoints:quote.fundingCostBasisPoints??0,billingContext:quote.billingContext??null}) };
@@ -100,7 +103,14 @@ export class ManagedGateway<R extends {model:string}=ManagedTextRequest,Q extend
       },privatePayload);
       await this.purchases.recordReceipt(reservation.id, accountId, result.receiptId, result);
       return await this.finish(reservation.id, accountId, result);
-    } catch {
+    } catch (error) {
+      // A zero-maximum request refused by its seller's exhausted free allowance did no work and
+      // cannot carry a charge. Release it and say so; another free route may serve the next request.
+      if (usdAtoms(quote.maximumUsd) === 0n && error instanceof Error && error.message === "managed_free_tier_exhausted") {
+        await this.purchases.release(reservation.id, accountId, true);
+        await this.usage.failUsage(reservation.id, "managed_free_tier_exhausted");
+        throw error;
+      }
       // Timeout, rejected response or missing actual-cost receipt: retain the hold for reconciliation.
       // Never retry a paid POST, invent usage, or mark this account's pending purchase as refunded.
       await this.purchases.uncertain(reservation.id);

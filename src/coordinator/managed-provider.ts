@@ -40,7 +40,7 @@ export async function initializeManagedProvider(config: CoordinatorConfig, datab
   if(config.managedProvider.mediaOffers?.length)throw new Error("managed_media_cost_contract_not_qualified");
   if (!config.apiAccessEnabled || !wallet) throw new Error("managed_provider_requires_accounts_and_credit_funding");
   const purchases = new ManagedPurchases(database, wallet, config.managedProvider.dailyLimitMicrounits,
-    config.managedProvider.totalLimitMicrounits, eventDemoBudget(config.eventDemo));
+    config.managedProvider.totalLimitMicrounits, eventDemoBudget(config.eventDemo), config.managedProvider.freeDailyRequests);
   await purchases.initialize();
   const settings = config.managedProvider;
   const upstream = settings.upstream ?? "antseed";

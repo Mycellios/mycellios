@@ -36,6 +36,8 @@ export interface ManagedModel {
   context_length?: number;
   max_input_tokens?: number;
   max_output_tokens?: number;
+  /** The best currently free route, chosen from upstream signals. Clients may start new accounts on it. */
+  recommended?: true;
 }
 /** Requests above this many JSON bytes are refused before any paid upstream call. */
 export const MANAGED_TEXT_MAX_REQUEST_BYTES = 131_072;

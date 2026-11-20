@@ -464,6 +464,13 @@ These rules apply to the complete repository.
   Gateway API keys use the separate `antseed-gateway` adapter and its scoped
   receipt session, never the local buyer control-secret field. Run its gateway
   tests too. Keep models without an enforceable upstream cost contract disabled.
+  Exact-zero AntSeed offers are the free route: skip stakers-only sellers, assume a
+  bounded window when undeclared, start accounts on the stable recommended
+  `mycellios/managed/free` model that spreads conversations over routes passing the
+  coordinator's own zero-priced tool-call probe, ranked by market signals (never a
+  hardcoded model), rest exhausted or staked-only sellers, keep
+  the per-account free daily cap and never fall back to a priced offer. Check
+  tests/managed-free-offers.test.ts and the isolated managed-purchases suite.
   `token-bounded-v2` expands only verified text/tool offers behind an advertised
   gateway reservation contract. Preserve `deepseek-bounded-v1` and recovery of
   its existing jobs. The protected operator key requires bounded paid admission;

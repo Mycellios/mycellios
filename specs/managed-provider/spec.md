@@ -142,6 +142,39 @@ Unknown effective supplier funding fees block paid models; zero must be an
 explicit operator choice based on its actual funding arrangement, not the old
 OpenRouter 550-basis-point fixture assumption.
 
+Exact-zero offers (input, cached input and output all zero, no unit charges) are
+the free route behind the Agent's "Use free models" start. They cannot charge, so
+they need no funding cost and may omit capabilities: an undeclared window is
+assumed to be 32,768 tokens with 4,096 output tokens, and admission checks the
+estimated request tokens against that window instead of the paid byte bound. An
+explicit `toolUse: false` still excludes the offer. Sellers whose free allowance is
+`stakersOnly` are never selected, because the operator buyer holds no stake.
+New accounts start on one stable, recommended model, `mycellios/managed/free`
+("Mycellios Free"), never on a named upstream model. It spreads conversations over
+the pool of free routes the coordinator verified itself, keyed by the opening of
+the conversation so a quote and its execution agree and a conversation keeps its
+route while it stays in the pool; when a route leaves, its conversations move to
+the remaining ones. Its limits fit every pooled route. Gateways such as the pinned
+production one publish only prices, reputation and optional capabilities, so the
+coordinator qualifies routes itself: every two hours it sends a zero-priced tool
+call to at most eight of the strongest eligible free routes (failures are retried
+after one hour), and the pool holds those that answered with the tool call within
+15 seconds. Before any probe finishes, untried eligible routes stand in; with no
+route left the free model is unavailable rather than priced. Eligible means not staked-only, at least a 32,768-token window
+and, when published, healthy, at least 90 percent success and a first token within
+ten seconds. Strength is the model's published reference output price or, without
+one, the median output price of at least three paid sellers of the same model in
+the catalog; then measured latency, per-address free allowance and reputation. A
+seller that fails the probe rests 15 minutes so another seller of that model is
+tried. A seller that answers `free_tier_exhausted` or `stake_required` did no work:
+its zero hold is released, the request fails with `managed_free_tier_exhausted` and
+the seller rests for 15 minutes (24 hours for `stake_required`) so the next refresh
+picks another route. Free allowances are shared
+by every account through one buyer, so each account may start
+`MYCELLIOS_MANAGED_FREE_DAILY_REQUESTS` free requests per UTC day (default 50);
+refused attempts do not count. Both limits answer 429 with a plain explanation,
+also inside a stream. A free request never falls back to a priced offer.
+
 Persist an AntSeed attribution tag, request ID and feed position before the one
 inference POST; persist the compatible response before waiting for billing.
 Only signed spend matching the buyer identity, request, tag and pinned seller
