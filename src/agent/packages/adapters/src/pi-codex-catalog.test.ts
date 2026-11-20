@@ -657,7 +657,8 @@ describe("CodexCatalogCache", () => {
 
     // A cold miss returns immediately instead of waiting on the network.
     expect(await cache.read("user-1", account(), { waitMs: 0 })).toBeUndefined();
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    // The revalidation resolves the client version before it fetches the catalog.
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
     // The kicked revalidation keeps running; a later zero-wait read sees it.
     resolveFetch?.(
