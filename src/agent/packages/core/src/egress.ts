@@ -29,6 +29,13 @@ function siteOf(hostname: string, allowPrivateDomains: boolean): string | undefi
   return parsed.domain ?? host;
 }
 
+/** Tools that send a whole http(s) URL to the site it names, gated per site like web_fetch. */
+export const SITE_FETCH_TOOL_NAMES: ReadonlySet<string> = new Set(["web_fetch", "read_video"]);
+
+export function isSiteFetchTool(toolName: string): boolean {
+  return SITE_FETCH_TOOL_NAMES.has(toolName);
+}
+
 /** The site an http(s) URL is sent to, or undefined for anything else. */
 export function urlSite(input: string): string | undefined {
   const url = httpUrl(input);

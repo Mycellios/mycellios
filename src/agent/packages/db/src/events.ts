@@ -26,7 +26,7 @@ import {
   STEERING_CONTINUATION_PROMPT,
   sanitizeJsonValue,
 } from "@rakazo/core";
-import { urlSite } from "@rakazo/core/egress";
+import { isSiteFetchTool, urlSite } from "@rakazo/core/egress";
 import { approvalEffectKey } from "@rakazo/core/node/approval-effect-key";
 import { getLogger } from "@rakazo/logging";
 import { saveApprovalRule } from "./approval-settings.js";
@@ -920,7 +920,7 @@ async function commitAnswerRunInput(
     const site = alwaysAllowedSite(approvalEffect!);
     const batch = composioBatchActions(approvalEffect!.kind, approvalEffect!.request);
     const tools = batch ? (batch.complete ? batch.slugs : []) : [approvalEffect!.kind];
-    if (input.answer === "always" && (site || approvalEffect!.kind !== "web_fetch")) {
+    if (input.answer === "always" && (site || !isSiteFetchTool(approvalEffect!.kind))) {
       // Saved where the member's confirmations apply in this Space: the account or its override.
       for (const tool of site ? [site] : tools) {
         await saveApprovalRule(
@@ -2140,7 +2140,7 @@ function alwaysAllowedSite(effect: {
   kind: string;
   request: Prisma.JsonValue;
 }): string | undefined {
-  if (effect.kind !== "web_fetch") return undefined;
+  if (!isSiteFetchTool(effect.kind)) return undefined;
   const request = effect.request as { url?: unknown } | null;
   return typeof request?.url === "string" ? urlSite(request.url) : undefined;
 }

@@ -739,6 +739,23 @@ export const builtinAgentTools: ConnectorTool[] = [
     readOnly: true,
   },
   {
+    name: "read_video",
+    description:
+      "Watch a public video link (YouTube, TikTok, Instagram, Facebook, Vimeo, X and similar sites). Returns the title, channel, duration, description, a timed transcript from captions or speech recognition, and still frames as images. Use it when the user shares a video or asks what one shows. Does not need a computer.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The video page link (http or https)." },
+        frames: {
+          type: "number",
+          description: "Still frames to look at, spread across the video; 0 for text only (default 6, max 12).",
+        },
+      },
+      required: ["url"],
+    },
+    readOnly: true,
+  },
+  {
     name: "cloud_agent_launch",
     description:
       "Launch a remote cloud coding agent on a connected repository. Returns immediately with a tracking id and status; the agent link appears when launched. Opens a PR when openPr is true. Not the bot computer.",

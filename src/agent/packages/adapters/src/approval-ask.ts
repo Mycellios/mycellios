@@ -9,7 +9,7 @@ import {
   sanitizeMessagingLabel,
   toolRequiresExplicitApproval,
 } from "@rakazo/core";
-import { urlSite } from "@rakazo/core/egress";
+import { isSiteFetchTool, urlSite } from "@rakazo/core/egress";
 
 export const MAX_APPROVAL_SUMMARY_LENGTH = 500;
 export const MAX_APPROVAL_DETAIL_LENGTH = 4_000;
@@ -141,7 +141,7 @@ export function buildApprovalAskBlock(
 }
 
 function webFetchSite(toolName: string, args: Record<string, unknown>): string | undefined {
-  return toolName === "web_fetch" && typeof args.url === "string" ? urlSite(args.url) : undefined;
+  return isSiteFetchTool(toolName) && typeof args.url === "string" ? urlSite(args.url) : undefined;
 }
 
 function describeApprovalAction(toolName: string, args: Record<string, unknown>): string {
@@ -176,7 +176,7 @@ function formatApprovalDetail(
   }
   // A fetch carries data in its path and query, so the card shows the whole URL.
   const keys =
-    toolName === "web_fetch"
+    isSiteFetchTool(toolName)
       ? ["url"]
       : ["collection", "title", "to", "recipient_email", "cc", "bcc", "subject", "amount", "body"];
   const pushArgs = (values: Record<string, unknown>) => {

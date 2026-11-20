@@ -2,6 +2,8 @@ FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d43
 # Agent lives in the Mycellios monorepo and imports root modules by relative path
 # (src/contracts, src/core, scripts/, and the web build hashes the native source tree).
 # Keep the monorepo layout so those paths resolve exactly as in CI.
+# ffmpeg lets read_video merge downloaded streams and sample frames and audio.
+RUN apt-get update \n    && apt-get install -y --no-install-recommends ffmpeg \n    && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo/src/agent
 COPY --chmod=755 . /repo/
 # Shared contracts consume the Agent workspace's own dependency graph. node_modules is a
