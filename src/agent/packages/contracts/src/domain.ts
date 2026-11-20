@@ -988,6 +988,15 @@ export const ArtifactVersionSchema = z.object({
 
 export type ArtifactVersion = z.infer<typeof ArtifactVersionSchema>;
 
+/** A live share link: the token is the whole capability, the version is the one it shows. */
+export const ArtifactShareSchema = z.object({
+  token: z.string(),
+  artifactId: Id,
+  version: z.number().int(),
+  updatedAt: z.string(),
+});
+export type ArtifactShare = z.infer<typeof ArtifactShareSchema>;
+
 export const ArtifactWithContentSchema = ArtifactSchema.extend({
   contentBase64: z.string(),
 });

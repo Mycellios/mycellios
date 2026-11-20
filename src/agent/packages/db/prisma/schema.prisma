@@ -1632,6 +1632,8 @@ model Artifact {
   rootArtifactId String?
   rootArtifact   Artifact?  @relation("ArtifactVersions", fields: [rootArtifactId], references: [id], onDelete: Cascade)
   versions       Artifact[] @relation("ArtifactVersions")
+  shareLinks     ArtifactShare[] @relation("ArtifactShareRoot")
+  sharedAs       ArtifactShare[] @relation("ArtifactSharePinned")
   version        Int        @default(1)
   // Client-chosen per upload so a retried upload that already landed returns this row.
   clientNonce    String?
@@ -1642,6 +1644,23 @@ model Artifact {
   @@index([rootArtifactId])
   // artifacts_family_version_key is raw SQL: Prisma cannot express COALESCE indexes.
   @@map("artifacts")
+}
+
+/// An owner-created share link for one artifact family, pinned to the version shared.
+model ArtifactShare {
+  id             String   @id
+  token          String   @unique
+  rootArtifactId String   @unique
+  artifactId     String
+  spaceId        String
+  userId         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  root           Artifact @relation("ArtifactShareRoot", fields: [rootArtifactId], references: [id], onDelete: Cascade)
+  artifact       Artifact @relation("ArtifactSharePinned", fields: [artifactId], references: [id], onDelete: Cascade)
+  @@index([spaceId, userId])
+  @@index([artifactId])
+  @@map("artifact_shares")
 }
 
 model UsageRecord {

@@ -20,6 +20,7 @@ import {
   listArtifactVersions,
   listSpaceArtifacts,
 } from "../artifacts.js";
+import { getArtifactShare, shareArtifact, unshareArtifact } from "../artifact-shares.js";
 import { listSpaceRuns } from "../runs.js";
 import { listRunLogs } from "../run-logs.js";
 import { querySpaceSearch } from "../search.js";
@@ -122,6 +123,13 @@ export function contentRoutes(ctx: RouterContext) {
       remove: authed.artifacts.remove.handler(async ({ context, input }) => {
         return deleteArtifactFamily(deps, context.actor, { familyId: input.artifactId });
       }),
+      getShare: authed.artifacts.getShare.handler(({ context, input }) =>
+        getArtifactShare(deps, context.actor, input.artifactId),
+      ),
+      share: authed.artifacts.share.handler(({ context, input }) => shareArtifact(deps, context.actor, input.artifactId)),
+      unshare: authed.artifacts.unshare.handler(({ context, input }) =>
+        unshareArtifact(deps, context.actor, input.artifactId),
+      ),
     },
     usage: {
       sporeRewards: authed.usage.sporeRewards.handler(({ context }) => sporeRewards(deps.prisma, context.actor)),

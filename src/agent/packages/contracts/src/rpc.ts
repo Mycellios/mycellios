@@ -72,6 +72,7 @@ import {
   AppBootstrapSchema,
   ApprovalModeSchema,
   ArtifactSchema,
+  ArtifactShareSchema,
   ArtifactVersionSchema,
   ArtifactWithContentSchema,
   AvatarStyleSchema,
@@ -1270,6 +1271,12 @@ export const appContract = {
     get: oc.input(threadTarget.and(z.object({ artifactId: Id }))).output(ArtifactWithContentSchema),
     getById: oc.input(z.object({ artifactId: Id })).output(ArtifactWithContentSchema),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** The family's share link, or null. Reading it never creates one. */
+    getShare: oc.input(z.object({ artifactId: Id })).output(ArtifactShareSchema.nullable()),
+    /** Share this exact version; an existing link keeps its address and moves to it. */
+    share: oc.input(z.object({ artifactId: Id })).output(ArtifactShareSchema),
+    /** Revoke the family's link: its address stops working for everyone. */
+    unshare: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   usage: {
     sporeRewards: oc.output(SporeRewardsSchema),

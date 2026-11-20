@@ -46,6 +46,7 @@ import { decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-ope
 import { takeInitialBootstrap } from "../lib/bootstrap";
 import { desktopBridge, desktopDragClass } from "../lib/desktop";
 import { useSpaceQueries, writeSaved } from "../lib/query";
+import { ArtifactShareButton } from "../components/ArtifactShareButton";
 import { formatRelativeTime } from "../lib/relative-time";
 import { useSpaceRpc } from "../lib/space-rpc";
 import { useObjectUrl } from "../lib/use-object-url";
@@ -1006,6 +1007,7 @@ function PreviewPane({
         ) : null}
         {state.status === "ready" ? (
           <>
+            <ArtifactShareButton familyId={artifactId} versionId={state.artifact.id} version={state.artifact.version} />
             <Button
               variant="outline"
               size="sm"
