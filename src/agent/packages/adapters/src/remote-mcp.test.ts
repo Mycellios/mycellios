@@ -3,6 +3,7 @@ import { fetch as undiciFetch } from "undici";
 import { describe, expect, it, vi } from "vitest";
 import {
   assertSafeRemoteUrl,
+  callRemoteMcpTool,
   createPrivateNetworkFetch,
   createSafeLookup,
   createSafeRemoteFetch,
@@ -658,5 +659,65 @@ describe("createPrivateNetworkFetch", () => {
     await expect(fetch("http://192.168.2.10:8080/v1/items", { method: "GET" })).rejects.toThrow(
       "redirects are not allowed",
     );
+  });
+});
+describe("remote MCP call budget", () => {
+  /** Answers the MCP handshake and delays `tools/call` by `callDelayMs`. */
+  function jsonRpcFetch(callDelayMs: number) {
+    return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const message = JSON.parse(await request.text()) as { id?: number; method?: string };
+      if (message.method === "initialize") {
+        return Response.json({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            protocolVersion: "2025-11-25",
+            capabilities: { tools: {} },
+            serverInfo: { name: "test", version: "1" },
+          },
+        });
+      }
+      if (message.method === "tools/list") {
+        return Response.json({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: { tools: [{ name: "slow.echo", inputSchema: { type: "object" } }] },
+        });
+      }
+      if (message.method === "tools/call") {
+        await new Promise((resolve) => setTimeout(resolve, callDelayMs));
+        return Response.json({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: { content: [{ type: "text", text: "slow ok" }] },
+        });
+      }
+      return new Response(null, { status: 202 });
+    });
+  }
+
+  const base = {
+    endpoint: "https://connectors.example.test/mcp",
+    resolveHostname: publicResolver,
+  };
+
+  it("lets a tool call outlive the connect and list budget", async () => {
+    const result = (await callRemoteMcpTool(
+      { ...base, fetch: jsonRpcFetch(120), timeoutMs: 40, callTimeoutMs: 2_000 },
+      "slow.echo",
+      {},
+    )) as { content: Array<{ text: string }> };
+    expect(result.content[0]?.text).toBe("slow ok");
+  });
+
+  it("still stops a tool call that passes its own budget", async () => {
+    await expect(
+      callRemoteMcpTool(
+        { ...base, fetch: jsonRpcFetch(200), timeoutMs: 5_000, callTimeoutMs: 40 },
+        "slow.echo",
+        {},
+      ),
+    ).rejects.toThrow();
   });
 });

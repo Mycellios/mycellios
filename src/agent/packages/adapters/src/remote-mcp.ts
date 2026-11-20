@@ -24,7 +24,11 @@ import { dispatcherFetch, fetchPairedWithDispatcher } from "./undici-fetch.js";
 
 const MAX_MCP_TOOLS = 250;
 const MAX_MCP_PAGES = 20;
+/** Budget for one connect or one `tools/list` page. */
 const MCP_TIMEOUT_MS = 30_000;
+/** A tool call gets its own budget: building an answer can outlive the
+ * handshake and the tool list, which stay bounded by `MCP_TIMEOUT_MS`. */
+const MCP_CALL_TIMEOUT_MS = 120_000;
 const MAX_RESULT_BYTES = 1_000_000;
 
 export type { ResolveHostname } from "./network-address.js";
@@ -45,6 +49,10 @@ export interface RemoteMcpOptions extends RemoteTransportDependencies, RemoteUrl
   endpoint: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** Budget for one connect or one `tools/list` request. Defaults to 30 s. */
+  timeoutMs?: number;
+  /** Budget for one tool call. Defaults to 120 s; the caller's `signal` still wins. */
+  callTimeoutMs?: number;
 }
 
 export interface SafeRemoteFetch {
@@ -56,8 +64,9 @@ const resolveHostname: ResolveHostname = (hostname) =>
   lookup(hostname, { all: true, verbatim: true });
 
 export async function listRemoteMcpTools(options: RemoteMcpOptions): Promise<ConnectorTool[]> {
-  return withRemoteMcpClient(options, async (client, signal) =>
-    (await listMcpTools(client, { signal, timeout: MCP_TIMEOUT_MS })).map((tool) => ({
+  const phaseTimeout = options.timeoutMs ?? MCP_TIMEOUT_MS;
+  return withRemoteMcpClient(options, phaseTimeout * 2, async (client, signal) =>
+    (await listMcpTools(client, { signal, timeout: phaseTimeout })).map((tool) => ({
       name: tool.name,
       description: tool.description ?? tool.title ?? tool.name,
       inputSchema: tool.inputSchema,
@@ -86,10 +95,12 @@ export async function callRemoteMcpTool(
   args: Record<string, unknown>,
   projectResult?: (result: unknown) => unknown,
 ): Promise<unknown> {
-  return withRemoteMcpClient(options, async (client, signal) => {
+  const phaseTimeout = options.timeoutMs ?? MCP_TIMEOUT_MS;
+  const callTimeout = options.callTimeoutMs ?? MCP_CALL_TIMEOUT_MS;
+  return withRemoteMcpClient(options, phaseTimeout + callTimeout, async (client, signal) => {
     const result = await client.callTool({ name: toolName, arguments: args }, undefined, {
       signal,
-      timeout: MCP_TIMEOUT_MS,
+      timeout: callTimeout,
     });
     const envelope = {
       content: result.content,
@@ -105,6 +116,8 @@ export async function callRemoteMcpTool(
 
 async function withRemoteMcpClient<T>(
   options: RemoteMcpOptions,
+  /** Whole-session budget: connecting plus the operation that follows it. */
+  sessionTimeoutMs: number,
   run: (client: Client, signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   const policy = { allowPrivateEndpoint: options.allowPrivateEndpoint };
@@ -113,7 +126,7 @@ async function withRemoteMcpClient<T>(
     options.resolveHostname ?? resolveHostname,
     policy,
   );
-  const signal = combineSignals(options.signal, AbortSignal.timeout(MCP_TIMEOUT_MS));
+  const signal = combineSignals(options.signal, AbortSignal.timeout(sessionTimeoutMs));
   const safeFetch = createSafeRemoteFetch(
     options.fetch,
     options.resolveHostname ?? resolveHostname,
@@ -129,7 +142,7 @@ async function withRemoteMcpClient<T>(
   });
   const client = new Client({ name: "rakazo", version: "0.1.0" }, { capabilities: {} });
   try {
-    await client.connect(transport, { signal, timeout: MCP_TIMEOUT_MS });
+    await client.connect(transport, { signal, timeout: options.timeoutMs ?? MCP_TIMEOUT_MS });
     return await run(client, signal);
   } finally {
     await client.close().catch(() => undefined);
