@@ -5,6 +5,9 @@ import { MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/
 import { managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest, type ManagedTextResult } from "./managed-openrouter.js";
 import { readManagedTextStream } from "./managed-text-stream.js";
+import { FREE_PROBE_REQUEST, FreeOfferCooldown, FreeOfferProbes, compareFreeRoutes, freeAllowanceRefusal, freeOfferLimits,
+  freeOfferSignals, freeOfferStakersOnly, freeProbePassed, freeRequestFits, freeTextLimits, freeRouteModel, freeRoutePool,
+  marketReferencePrices, pickFreeRoute, FREE_ROUTE_ID, type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
 
 const TTL = 60_000;
 const INPUT_CAP = "0.0000005", OUTPUT_CAP = "0.000001";
@@ -13,7 +16,9 @@ const object = (v: unknown): Record<string, any> => {
   return v as Record<string, any>;
 };
 interface Offer { public: ManagedModel; seller: string; provider: string; context: number; output: number;
-  service?: string; inputCap?: string; outputCap?: string; inputMillion?: string; outputMillion?: string }
+  service?: string; inputCap?: string; outputCap?: string; inputMillion?: string; outputMillion?: string;
+  /** Exact-zero generic offer, sized by its own window, with its published recommendation signals. */
+  free?: boolean; signals?: FreeOfferSignals | null }
 function priceBound(value: unknown) {
   if (typeof value !== "string") throw new Error("antseed_price_invalid");
   const micros = (usdAtoms(value) + 999_999_999_999n) / 1_000_000_000_000n;
@@ -42,6 +47,8 @@ export class ManagedAntseedGateway {
   private refreshing: Promise<void> | undefined;
   private offers = new Map<string, Offer>();
   private discovered: ManagedCatalogDiscovery[] = [];
+  private readonly cooldown = new FreeOfferCooldown();
+  private readonly probes = new FreeOfferProbes();
   constructor(private readonly key: string, base: string, private readonly allowed: readonly string[],
     private readonly funding: number | null = null, private readonly transport: typeof fetch = fetch,
     private readonly contract = "") {
@@ -57,7 +64,9 @@ export class ManagedAntseedGateway {
     const r = await this.transport(this.base + path, {...init, signal, redirect: "error"});
     if (!r.ok) {
       if (r.status === 401 || r.status === 403) this.session = undefined;
-      await r.body?.cancel(); throw new Error("managed_upstream_unavailable");
+      const refusal = await freeAllowanceRefusal(r);
+      if (refusal) throw Object.assign(new Error("managed_free_tier_exhausted"), {refusal});
+      await r.body?.cancel().catch(() => {}); throw new Error("managed_upstream_unavailable");
     }
     return r;
   }
@@ -105,6 +114,7 @@ export class ManagedAntseedGateway {
     const data = await this.json(response, signal);
     if (!Array.isArray(data.data) || data.data.length > 10000) throw new Error("antseed_catalog_invalid");
     const hasLiteralDeepseek = data.data.some(v => v?.id === "deepseek-v4-flash");
+    const market = marketReferencePrices(data.data);
     const offers = new Map<string, Offer>(), discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
     for (const raw of data.data) {
       try {
@@ -129,19 +139,33 @@ export class ManagedAntseedGateway {
         const generic = this.contract === "token-bounded-v2";
         if ((!generic && modelId !== "deepseek-v4-flash") || row.type !== "text" || !Array.isArray(row.peers) || row.peers.length > 1000) continue;
         if (this.funding === null) {entry.reason = "funding_cost_not_configured"; continue;}
-        const candidates: (Offer & {quality: number})[] = [];
+        const candidates: (Offer & {quality: number; free: boolean; signals: FreeOfferSignals | null})[] = [];
         for (const rawPeer of row.peers) {
           try {
-            const p = object(rawPeer), caps = object(p.capabilities);
+            const p = object(rawPeer);
             if (typeof p.peerId !== "string" || !/^[a-f0-9]{40}$/.test(p.peerId)
               || (generic ? typeof p.serviceId !== "string" || !/^[A-Za-z0-9._:/-]{1,180}$/.test(p.serviceId) : p.serviceId !== "deepseek-v4-flash")
               || (generic ? typeof p.provider !== "string" || !/^[A-Za-z0-9._-]{1,100}$/.test(p.provider) : p.provider !== "openai") || p.type !== "text" || p.unitBillingModels !== undefined
-              || (generic && (caps.toolUse !== true || p.allowed === false))
-              || !Array.isArray(p.protocols) || !p.protocols.includes("openai-chat-completions")
-              || !Array.isArray(caps.inputs) || (generic ? !caps.inputs.includes("text") : caps.inputs.length !== 1 || caps.inputs[0] !== "text")
-              || !Array.isArray(caps.outputs) || caps.outputs.length !== 1 || caps.outputs[0] !== "text"
-              || !Number.isSafeInteger(caps.contextWindow) || caps.contextWindow < 16384
-              || !Number.isSafeInteger(caps.maxOutputTokens) || caps.maxOutputTokens < 1) continue;
+              || (generic && p.allowed === false)
+              || !Array.isArray(p.protocols) || !p.protocols.includes("openai-chat-completions")) continue;
+            // Exact-zero generic offers cannot charge, so missing capabilities get conservative
+            // assumptions; staked-only pools and recently exhausted sellers would only refuse.
+            const free = generic && [p.inputUsdPerMillion, p.cachedInputUsdPerMillion ?? p.inputUsdPerMillion, p.outputUsdPerMillion]
+              .every(v => typeof v === "string" && /^[0-9.]+$/.test(v) && usdAtoms(v) === 0n);
+            let context: number, maxOutput: number, signals: FreeOfferSignals | null = null;
+            if (free) {
+              if (freeOfferStakersOnly(p) || this.cooldown.blocked(p.peerId, p.serviceId)) continue;
+              const limits = freeOfferLimits(p); if (!limits) continue;
+              ({context, maxOutput} = limits); signals = freeOfferSignals(p, row, context, market);
+            } else {
+              const caps = object(p.capabilities);
+              if ((generic && caps.toolUse !== true)
+                || !Array.isArray(caps.inputs) || (generic ? !caps.inputs.includes("text") : caps.inputs.length !== 1 || caps.inputs[0] !== "text")
+                || !Array.isArray(caps.outputs) || caps.outputs.length !== 1 || caps.outputs[0] !== "text"
+                || !Number.isSafeInteger(caps.contextWindow) || caps.contextWindow < 16384
+                || !Number.isSafeInteger(caps.maxOutputTokens) || caps.maxOutputTokens < 1) continue;
+              context = caps.contextWindow; maxOutput = Math.min(8192, caps.maxOutputTokens);
+            }
             let inputCap = INPUT_CAP, outputCap = OUTPUT_CAP;
             let inputMillion = "0.5", outputMillion = "1";
             if (generic) {
@@ -156,32 +180,70 @@ export class ManagedAntseedGateway {
             // about its ability to answer. Missing/invalid scores carry no trust.
             const score = p.effectiveReputationScore;
             const quality = typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= 100 ? score : 0;
-            candidates.push({quality, seller: p.peerId, provider: p.provider, context: caps.contextWindow, output: Math.min(8192, caps.maxOutputTokens),
+            candidates.push({quality, free, signals, seller: p.peerId, provider: p.provider, context, output: maxOutput,
               service: p.serviceId, inputCap, outputCap, inputMillion, outputMillion,
               public: {id: publicId, name: entry.name, owned_by: "mycellios", processing: "external", modality: "text",
                 pricing: {currency: "credits", unit: "token", serviceFeeBasisPoints: 400, fundingCostBasisPoints: this.funding,
                   input: markedUpUnitPrice(inputCap, this.funding), output: markedUpUnitPrice(outputCap, this.funding), estimate: "maximum"}}});
           } catch { /* Unpriced or unsupported offers cannot spend platform funds. */ }
         }
-        candidates.sort((a, b) => b.quality - a.quality || a.seller.localeCompare(b.seller));
+        // A free seller precedes paid ones for the same model (one that fails its probe rests);
+        // among free sellers the probed and eligible lead, otherwise reputation decides.
+        candidates.sort((a, b) => Number(b.free) - Number(a.free) || (a.free && b.free ? compareFreeRoutes(a, b, this.probes) : 0)
+          || b.quality - a.quality || a.seller.localeCompare(b.seller));
         if (candidates[0]) {
           const {quality: _quality, ...offer} = candidates[0];
           // Overhead covers the quote allowance with the 256-message maximum framing.
-          offer.public = {...offer.public, ...managedTextLimits(offer.context, offer.output, 8192 + 256 * 64)};
+          offer.public = {...offer.public, ...(offer.free ? freeTextLimits(offer.context, offer.output)
+            : managedTextLimits(offer.context, offer.output, 8192 + 256 * 64))};
           offers.set(publicId, offer); entry.available = true; entry.reason = "ready"; entry.pricing = offer.public.pricing;
         }
       } catch { /* Invalid discovery entries cannot authorize spend. */ }
     }
     this.offers = offers; this.discovered = discovered; this.refreshedAt = Date.now();
+    this.qualifyFreeRoutes();
+  }
+  /** Background tool-call probes of the strongest free routes; the catalog never waits for them. */
+  private qualifyFreeRoutes() {
+    void this.probes.run(this.probes.due(this.offers.values()), offer => this.probe(offer));
+  }
+  /** One zero-bounded tool call. A refusal rests the seller; a wrong answer is never recommended. */
+  private async probe(offer: Offer) {
+    if (!offer.free || !offer.signals) return;
+    const started = Date.now(), signal = AbortSignal.timeout(30_000);
+    try {
+      const r = await this.request("/v1/chat/completions", signal, {method: "POST",
+        headers: {authorization: "Bearer " + this.key, "content-type": "application/json",
+          "x-antseed-end-user": "mycellios-probe-" + randomUUID(), "x-antseed-provider": offer.provider},
+        body: JSON.stringify({...FREE_PROBE_REQUEST, model: offer.seller + "@" + offer.service,
+          mycellios_cost_bounds: {version: 2, input: "0", output: "0"}})});
+      const passed = freeProbePassed(await this.json(r, signal, 1_048_576));
+      this.probes.record(offer.signals.key, passed, Date.now() - started);
+      // A seller that cannot call tools rests, so the next refresh tries another seller of this model.
+      if (!passed) this.retire(offer, "exhausted");
+    } catch (error) {
+      this.probes.record(offer.signals.key, false, Date.now() - started);
+      const refusal = (error as {refusal?: FreeRefusal}).refusal;
+      this.retire(offer, refusal ?? "exhausted");
+    }
   }
   async ensureFresh() {
     if (Date.now() - this.refreshedAt < TTL) return;
     this.refreshing ??= this.refresh().finally(() => {this.refreshing = undefined;}); await this.refreshing;
   }
-  catalog(): ManagedModel[] {return Date.now() - this.refreshedAt < TTL ? [...this.offers.values()].map(o => o.public) : [];}
+  catalog(): ManagedModel[] {
+    if (Date.now() - this.refreshedAt >= TTL) return [];
+    const free = this.funding === null ? null : freeRouteModel(freeRoutePool(this.offers.values(), this.probes), this.funding);
+    return [...[...this.offers.values()].map(o => o.public), ...(free ? [free] : [])];
+  }
+  /** A concrete route, or for the stable free model the pool route this conversation maps to. */
+  private route(model: string, request: ManagedTextRequest) {
+    if (Date.now() - this.refreshedAt >= TTL) return undefined;
+    return model === FREE_ROUTE_ID ? pickFreeRoute(freeRoutePool(this.offers.values(), this.probes), request) : this.offers.get(model);
+  }
   inventory() {return this.discovered.map(row => ({...row, available: Date.now() - this.refreshedAt < TTL && row.available}));}
   quote(request: ManagedTextRequest): AntseedGatewayQuote {
-    const offer = Date.now() - this.refreshedAt < TTL ? this.offers.get(request.model) : undefined;
+    const offer = this.route(request.model, request);
     if (!offer || this.funding === null) throw new Error("managed_model_unavailable");
     const fields = new Set(["model", "messages", "max_tokens", "stream", "store", "temperature", "top_p", "stop", "tools", "tool_choice", "parallel_tool_calls", "response_format"]);
     if (Object.keys(request).some(k => !fields.has(k)) || (request.stream !== undefined && typeof request.stream !== "boolean")
@@ -201,7 +263,8 @@ export class ManagedAntseedGateway {
     const body = {...request, model: offer.seller + "@" + (offer.service ?? "deepseek-v4-flash"), store: false, max_tokens: output,
       ...(request.stream ? {stream_options: {include_usage: true}} : {})};
     const bytes = Buffer.byteLength(JSON.stringify(body)), inputBound = bytes + 8192 + request.messages.length * 64;
-    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || inputBound + output > offer.context) throw new Error("managed_request_too_large");
+    const fits = offer.free ? freeRequestFits(bytes, output, offer.context) : inputBound + output <= offer.context;
+    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || !fits) throw new Error("managed_request_too_large");
     // The gateway rounds its own upper bound to USDC micro-units. Cover that ceil as well.
     const rawUsd = tokenCost(offer.inputCap ?? INPUT_CAP, offer.outputCap ?? OUTPUT_CAP, inputBound, output);
     const micro = managedCharge(rawUsd, 0).upstreamMicrounits;
@@ -219,7 +282,11 @@ export class ManagedAntseedGateway {
     await submitted(job); // Durable intent before the single potentially billable POST.
     const r = await this.request("/v1/chat/completions", signal, {method: "POST",
       headers: {authorization: "Bearer " + this.key, "content-type": "application/json", "x-antseed-end-user": job.nonce,
-        "x-antseed-provider": q.offer.provider}, body: JSON.stringify(q.body)});
+        "x-antseed-provider": q.offer.provider}, body: JSON.stringify(q.body)}).catch((error: unknown) => {
+      const refusal = (error as {refusal?: FreeRefusal}).refusal;
+      if (q.offer.free && refusal) this.retire(q.offer, refusal);
+      throw error;
+    });
     const tag = r.headers.get("x-antseed-gateway-tag"), seller = r.headers.get("x-antseed-peer-id");
     if ((tag !== null && !/^gw_[a-f0-9-]{36}$/.test(tag)) || seller !== q.offer.seller) {await r.body?.cancel(); throw new Error("antseed_attribution_missing");}
     // Gateway 0.1.196 forwards the seller header but omits its own request tag.
@@ -242,6 +309,12 @@ export class ManagedAntseedGateway {
       const result = await this.recover(job, signal); if (result) return result;
     }
     throw new Error("antseed_receipt_pending");
+  }
+  /** The seller refused before any work: rest it so the next refresh picks another free route. */
+  private retire(offer: Offer, refusal: FreeRefusal) {
+    this.cooldown.block(offer.seller, offer.service ?? "", refusal);
+    const current = this.offers.get(offer.public.id);
+    if (current?.seller === offer.seller && current.service === offer.service) this.offers.delete(offer.public.id);
   }
   async recover(value: unknown, signal = AbortSignal.timeout(12_000)): Promise<ManagedTextResult | null> {
     const job = object(value) as Job;

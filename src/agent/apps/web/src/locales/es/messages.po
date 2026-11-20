@@ -13650,6 +13650,10 @@ msgid "On this computer"
 msgstr "En este ordenador"
 
 #: src/pages/Onboarding.tsx
+msgid "No free models are available right now. Try again in a few minutes or use your AI subscription."
+msgstr "Ahora mismo no hay modelos gratis disponibles. Inténtalo en unos minutos o usa tu suscripción de IA."
+
+#: src/pages/Onboarding.tsx
 msgid "Could not create your team. Try again."
 msgstr "No se ha podido crear tu equipo. Inténtalo de nuevo."
 

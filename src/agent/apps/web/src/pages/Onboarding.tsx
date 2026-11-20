@@ -77,7 +77,7 @@ import { OnboardingImport } from "./onboarding-import";
 import { createOnboardingTeam, draftOnboardingTeam, type OnboardingTeamMember } from "./onboarding/create-onboarding-team";
 import { useTeamCopy } from "./onboarding/team-copy";
 import { enableCompatibleModel } from "./model-settings/enable-compatible-model";
-import { isFreeMycelliosModel } from "../lib/free-models";
+import { pickFreeMycelliosModel } from "../lib/free-models";
 import { TeamBuilder } from "./onboarding/TeamBuilder";
 import { FirstRunChoice, PlanLogos } from "./onboarding/FirstRunChoice";
 import { BackLink, ChoiceList, ChoiceRow, OnboardingHeading } from "./onboarding/onboarding-ui";
@@ -318,10 +318,10 @@ export function OnboardingPage() {
   }
 
   /**
-   * "Use free models" must always get the user in. Mycellios with a zero-priced main model comes first.
-   * Without a Mycellios account (or during an outage) the installed OpenCode runs its anonymous free
-   * models, downloaded first when the operator allows it, as OpenBot does. Failing both, the team still
-   * opens and the chat offers the model connection. Only a failed team creation stops here.
+   * "Use free models" must never start on a paid model. Mycellios with the free model it recommends from
+   * live network signals comes first. Without a free Mycellios model (no account, an outage or no free
+   * route right now) the installed OpenCode runs its anonymous free models, downloaded first when the
+   * operator allows it, as OpenBot does. Failing both, say so and leave the subscription choice open.
    */
   async function startFree() {
     if (startingFree) return;
@@ -332,7 +332,14 @@ export function OnboardingPage() {
     setChoiceStatus("");
     const scoped = rpcForSpace(owner.spaceId);
     let engine: CreateBotInput["agentEngine"];
-    if (!(await startOnMycellios(scoped, owner))) engine = await freeOpenCode(scoped);
+    if (!(await startOnMycellios(scoped, owner))) {
+      engine = await freeOpenCode(scoped);
+      if (!engine) {
+        setChoiceError(t`No free models are available right now. Try again in a few minutes or use your AI subscription.`);
+        setStartingFree(false);
+        return;
+      }
+    }
     try {
       try {
         await finishTeam(defaultTeam(), engine);
@@ -355,21 +362,20 @@ export function OnboardingPage() {
     } catch {
       return false;
     }
-    // A missing free model or a refused role leaves Mycellios connected on its own default.
+    // Only a free main model counts: without one the start continues elsewhere, never on a paid default.
     try {
-      const free = (await scoped.models.mycelliosModels()).find(isFreeMycelliosModel);
-      if (free) {
-        connection = await enableCompatibleModel(scoped, owner.spaceId, connection, free.id, t`This connection has reached its enabled model limit.`);
-        await scoped.models.setRole({
-          role: "main",
-          expectedUserId: owner.userId,
-          primary: { provider: free.provider, modelId: free.id, credentialId: connection.id },
-        });
-      }
+      const free = pickFreeMycelliosModel(await scoped.models.mycelliosModels());
+      if (!free) return false;
+      connection = await enableCompatibleModel(scoped, owner.spaceId, connection, free.id, t`This connection has reached its enabled model limit.`);
+      await scoped.models.setRole({
+        role: "main",
+        expectedUserId: owner.userId,
+        primary: { provider: free.provider, modelId: free.id, credentialId: connection.id },
+      });
+      return true;
     } catch {
-      // Keep going: the connection itself works.
+      return false;
     }
-    return true;
   }
 
   async function freeOpenCode(scoped: ReturnType<typeof rpcForSpace>): Promise<CreateBotInput["agentEngine"]> {

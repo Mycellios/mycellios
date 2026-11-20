@@ -10,3 +10,12 @@ export function isFreeMycelliosModel(entry: ModelCatalogEntry): boolean {
   const price = entry.mycelliosPricing;
   return Boolean(price && zero(price.input) && zero(price.output) && zero(price.request));
 }
+
+/**
+ * The free model a new account starts on: the one Mycellios recommends from live network signals,
+ * otherwise the first free one in catalog order. Never a priced model.
+ */
+export function pickFreeMycelliosModel(entries: readonly ModelCatalogEntry[]): ModelCatalogEntry | undefined {
+  const free = entries.filter(isFreeMycelliosModel);
+  return free.find((entry) => entry.recommended) ?? free[0];
+}

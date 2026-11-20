@@ -682,4 +682,31 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
       expect(await wallet.reserved("alice")).toBe(0);
     } finally { await app.close(); }
   });
+  it("bounds free requests per account and UTC day and releases an exhausted seller allowance", async () => {
+    const limited = new ManagedPurchases(db, wallet, 10000000, undefined, undefined, 2); await limited.initialize();
+    let exhausted = true;
+    const provider = { provider: "free-fixture", ensureFresh: async () => {}, catalog: () => [],
+      quote: () => ({ maximumUsd: "0", maximumMicrounits: 0, expiresAt: Date.now() + 60000, body: { max_tokens: 10 } }),
+      execute: async () => {
+        if (exhausted) throw new Error("managed_free_tier_exhausted");
+        return { response: { id: "free-chat", model: input.model, choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } },
+          receiptId: "free-" + Math.random().toString(36).slice(2), usd: "0", inputTokens: 1, outputTokens: 1 };
+      } };
+    const service = new ManagedGateway(db, limited, api, provider as never, 1000000);
+    const refused = await service.quote("bob", input);
+    await expect(service.execute("bob", null, "free-exhausted", input, refused.token)).rejects.toThrow("managed_free_tier_exhausted");
+    // A refused seller allowance did no work: released, uncharged and not counted against the day.
+    expect((await limited.find("bob", "free-exhausted"))?.state).toBe("released");
+    exhausted = false;
+    for (const key of ["free-one", "free-two"]) {
+      const quote = await service.quote("bob", input);
+      expect(await service.execute("bob", null, key, input, quote.token)).toMatchObject({ status: "completed" });
+    }
+    await expect(service.quote("bob", input)).rejects.toThrow("managed_free_daily_limit_reached");
+    await expect(hold("free-direct", "0", "bob")).resolves.toBeTruthy(); // the shared instance keeps its own default
+    const usage = await api.beginUsage("bob", null, { model: input.model, messages: [] }, true);
+    await expect(limited.reserve({ usageId: usage.id, accountId: "bob", key: "free-over", digest: "free-over", provider: "free-fixture",
+      model: input.model, maximumUsd: "0" })).rejects.toThrow("managed_free_daily_limit_reached");
+    expect((await wallet.summary("account", "bob")).balanceMicrounits).toBe(0);
+  });
 });
