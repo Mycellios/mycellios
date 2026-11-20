@@ -689,7 +689,7 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
       quote: () => ({ maximumUsd: "0", maximumMicrounits: 0, expiresAt: Date.now() + 60000, body: { max_tokens: 10 } }),
       execute: async () => {
         if (exhausted) throw new Error("managed_free_tier_exhausted");
-        return { response: { id: "free-chat", choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } },
+        return { response: { id: "free-chat", model: input.model, choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } },
           receiptId: "free-" + Math.random().toString(36).slice(2), usd: "0", inputTokens: 1, outputTokens: 1 };
       } };
     const service = new ManagedGateway(db, limited, api, provider as never, 1000000);
