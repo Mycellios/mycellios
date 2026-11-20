@@ -64,15 +64,13 @@ describe("managed private upstream adapter", () => {
     expect(provider.inventory().filter(m=>!m.available)).toHaveLength(3);
     expect(transport.mock.calls.every(([,init])=>init?.method==="GET")).toBe(true);
   });
-  it("admits exact-zero chat for an unfunded account policy, enforces zero supplier prices and never chooses paid fallback",async()=>{
+  it("never offers an OpenRouter free tier: free models come only through AntSeed",async()=>{
     const transport=vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({data:[model,{...model,id:"vendor/free",pricing:{prompt:"0",completion:"0"}}]}));
-    const provider=new ManagedOpenRouter("fixture",["*"],transport);await provider.refresh();
-    expect(provider.catalog().map(m=>m.id)).toEqual(["mycellios/managed/vendor/free"]);
-    expect(provider.inventory().find(m=>m.id.endsWith("/text"))?.reason).toBe("funding_cost_not_configured");
-    const q=provider.quote({...request,model:"mycellios/managed/vendor/free"});expect(q.maximumMicrounits).toBe(0);
-    expect(q.body.provider).toMatchObject({allow_fallbacks:false,require_parameters:true,max_price:{prompt:0,completion:0,request:0,image:0}});
-    transport.mockResolvedValueOnce(new Response('{"id":"gen-free","choices":[{}],"usage":{"cost":0,"prompt_tokens":1,"completion_tokens":1}}'));
-    expect((await provider.execute(q)).usd).toBe("0");expect(transport.mock.calls.filter(([,i])=>i?.method==="POST")).toHaveLength(1);
+    const provider=new ManagedOpenRouter("fixture",["*"],transport,550);await provider.refresh();
+    expect(provider.catalog().map(m=>m.id)).toEqual(["mycellios/managed/vendor/text"]);
+    expect(provider.inventory().find(m=>m.id.endsWith("/free"))?.reason).toBe("free_requires_antseed");
+    expect(()=>provider.quote({...request,model:"mycellios/managed/vendor/free"})).toThrow();
+    expect(transport.mock.calls.filter(([,i])=>i?.method==="POST")).toHaveLength(0);
   });
   it("reserves fixed per-request charges and tiered token prices with supplier fees and upstream rate caps",async()=>{
     const transport=vi.fn<typeof fetch>().mockResolvedValue(Response.json({data:[{...model,pricing:{...model.pricing,request:"0.1",overrides:[{min_prompt_tokens:100,prompt:"0.000005",request:"0.2"}]}}]}));

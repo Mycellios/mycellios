@@ -469,8 +469,10 @@ These rules apply to the complete repository.
   `mycellios/managed/free` model that spreads conversations over routes passing the
   coordinator's own zero-priced tool-call probe, ranked by market signals (never a
   hardcoded model), rest exhausted or staked-only sellers, keep
-  the per-account free daily cap and never fall back to a priced offer. Check
-  tests/managed-free-offers.test.ts and the isolated managed-purchases suite.
+  the per-account free daily cap and never fall back to a priced offer. AntSeed is
+  the only free route: an OpenRouter upstream never offers its zero-priced models
+  (`free_requires_antseed`). Check tests/managed-free-offers.test.ts,
+  tests/managed-provider.test.ts and the isolated managed-purchases suite.
   `token-bounded-v2` expands only verified text/tool offers behind an advertised
   gateway reservation contract. Preserve `deepseek-bounded-v1` and recovery of
   its existing jobs. The protected operator key requires bounded paid admission;

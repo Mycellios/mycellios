@@ -1399,8 +1399,11 @@
   contribution credits; AntSeed remains an explicit alternative requiring the user's
   own key. Never fall back to another payer or provider when native credit access fails.
   Empty accounts see one OpenBot-style first-run choice (FirstRunChoice): free
-  models (recommended) connect Mycellios and make a zero-priced catalog model the
-  main role when one exists; a subscription goes to ChatGPT/Claude sign-in or an
+  models (recommended) connect Mycellios and make a zero-priced managed AntSeed
+  route (`mycellios/managed/*`, external processing; see lib/free-models.ts) the
+  main role when one exists. Free models come only through AntSeed: never offer a
+  zero-priced network model or fall back to OpenCode's anonymous free models;
+  without the AntSeed route, say none is available. A subscription goes to ChatGPT/Claude sign-in or an
   installed Codex/Claude Code/OpenCode. Both create the default team without model
   calls; analytics stays opt-in. The team builder remains at /onboarding/team.
   Explicit role/audience/start choices create bounded templates without model calls.

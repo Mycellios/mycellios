@@ -228,18 +228,15 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
       expect((await wallet.summary("account", "bob")).availableMicrounits).toBe(999989);
     } finally { await app.close(); }
   });
-  it("executes a verified zero-price model with no balance, no Credit hold and one persisted receipt",async()=>{
-    const transport=vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({data:[{id:"vendor/free",name:"Free",context_length:131072,
-      architecture:{output_modalities:["text"]},pricing:{prompt:"0",completion:"0"}}]}));
-    const provider=new ManagedOpenRouter("fixture",["*"],transport);await provider.refresh();
-    const service=new ManagedGateway(db,purchases,api,provider,1000000),request={...input,model:MANAGED_MODEL_PREFIX+"vendor/free"};
+  it("executes a verified zero-price AntSeed model with no balance, no Credit hold and one persisted receipt",async()=>{
+    const f=antseedFixture({free:true}),adapter=new ManagedAntseedText(operatorSecret,["*"],f.transport);
+    const service=new ManagedGateway(db,purchases,api,new ManagedTextRouter([managedTextBackend("antseed",adapter)]),1000000),request={...input,model:MANAGED_MODEL_PREFIX+"antseed/deepseek-test"};
     const quote=await service.quote("bob",request);expect(quote.maximumMicrounits).toBe(0);
-    transport.mockResolvedValueOnce(result("0","free-receipt"));
     expect(await service.execute("bob",null,"free-wallet-request",request,quote.token)).toMatchObject({status:"completed",response:{mycellios:{creditsMicrounits:0}}});
     await service.execute("bob",null,"free-wallet-request",request,quote.token);
     expect((await wallet.summary("account","bob")).availableMicrounits).toBe(0);
     expect(await db.raw.prepare("SELECT amount_microunits,status FROM economic_credit_holds WHERE account_id='bob'").get()).toMatchObject({amount_microunits:0,status:"settled"});
-    expect(transport.mock.calls.filter(([,i])=>i?.method==="POST")).toHaveLength(1);
+    expect(f.posts()).toHaveLength(1);
   });
   it("rejects a paid receipt for a zero-cost reservation instead of fabricating a free result",async()=>{
     const usage=await api.beginUsage("bob",null,{model:input.model,messages:[]},true);
