@@ -103,7 +103,8 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           if($status -eq '404'){
             $previous=Join-Path $runtime previous.exe
-            curl.exe --fail --location --retry 2 --output $previous https://www.mycellios.com/downloads/desktop/releases/0.3.15/Mycellios-Desktop-0.3.15-windows-x64-pilot.exe
+            # Hash-qualified URL: the plain URL's 404 from the Infomaniak migration is cached at the edge.
+            curl.exe --fail --location --retry 2 --output $previous 'https://www.mycellios.com/downloads/desktop/releases/0.3.15/Mycellios-Desktop-0.3.15-windows-x64-pilot.exe?sha256=a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'
             if($LASTEXITCODE){exit $LASTEXITCODE}
             if((Get-FileHash $previous).Hash.ToLowerInvariant() -ne 'a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'){throw 'Published runtime source installer changed'}
             & 'C:/Program Files/7-Zip/7z.exe' e $previous '$PLUGINSDIR\app-64.*' "-o$runtime" -y
