@@ -180,6 +180,8 @@ test('deployments are requested only from main pushes after the exact commit pas
   assert.ok(images.includes('runs-on: ubuntu-latest') && images.includes('packages: write'));
   assert.ok(images.includes(':sha-${{ github.sha }}'));
   assert.ok(images.includes('org.opencontainers.image.revision=${{ github.sha }}'));
+  for (const image of ['coordinator', 'agent', 'computer']) assert.ok(images.includes(`- image: ${image}\n`), image);
+  assert.ok(images.includes('context: src/agent/infra/sandboxes/computer'));
   const request = deploy.slice(deploy.indexOf('  request-deployment:'));
   assert.ok(request.includes('needs: publish-images') && request.includes('id-token: write'));
   assert.ok(request.indexOf('check_name=CI%20summary') < request.indexOf('/api/v1/deployments/github'));

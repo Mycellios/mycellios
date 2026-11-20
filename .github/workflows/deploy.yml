@@ -36,10 +36,18 @@ jobs:
       matrix:
         include:
           - image: coordinator
+            context: .
             dockerfile: Dockerfile.coordinator
             revision-arg: DEPLOY_REVISION
           - image: agent
+            context: .
             dockerfile: src/agent/infra/compose/Dockerfile
+            revision-arg: GIT_SHA
+          # The disposable desktop the sandbox supervisor starts for Agent tools. It is
+          # published with every commit so the supervisor is pinned to an image that exists.
+          - image: computer
+            context: src/agent/infra/sandboxes/computer
+            dockerfile: src/agent/infra/sandboxes/computer/Dockerfile
             revision-arg: GIT_SHA
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -56,7 +64,7 @@ jobs:
           password: ${{ github.token }}
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
