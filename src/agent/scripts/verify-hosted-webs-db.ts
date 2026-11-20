@@ -652,9 +652,9 @@ try {
     };
   };
   const styles = await delegated(["site:styles.css"]);
-  const page = await delegated(["site:index.html"]);
+  const pageWork = await delegated(["site:index.html"]);
   const leadContext = { ...owner, botId: botA.id, runId: leadRun.id };
-  const teamRead = await executeHostedAppTool(prisma, "app_read", { path: "index.html" }, page.context);
+  const teamRead = await executeHostedAppTool(prisma, "app_read", { path: "index.html" }, pageWork.context);
   const pageHash = "sha256" in teamRead ? teamRead.sha256 : undefined;
   assert.match(pageHash ?? "", /^[0-9a-f]{64}$/);
   assert.ok("files" in teamRead && teamRead.files.every((f) => /^[0-9a-f]{64}$/.test(f.sha256)));
@@ -665,7 +665,7 @@ try {
   }, styles.context);
   const pageWrite = await executeHostedAppTool(prisma, "app_write", {
     path: "index.html", content: "<h1>Team draft</h1>", expectedVersion: teamVersion, expectedFileSha256: pageHash,
-  }, page.context);
+  }, pageWork.context);
   assert.equal(pageWrite.version, teamVersion + 2);
   const teamDraft = await service.draft(owner, appDraft.id);
   const text = (path: string) => Buffer.from(teamDraft.bundle.files.find((f) => f.path === path)!.base64, "base64").toString("utf8");
@@ -674,7 +674,7 @@ try {
   // A stale file hash, a repeated "absent" or a stale version without a hash never overwrite.
   await assert.rejects(executeHostedAppTool(prisma, "app_write", {
     path: "index.html", content: "<h1>Lost</h1>", expectedVersion: pageWrite.version, expectedFileSha256: pageHash,
-  }, page.context), /version conflict/);
+  }, pageWork.context), /version conflict/);
   await assert.rejects(executeHostedAppTool(prisma, "app_write", {
     path: "styles.css", content: "h1{}", expectedVersion: pageWrite.version, expectedFileSha256: "absent",
   }, styles.context), /version conflict/);
@@ -684,10 +684,10 @@ try {
   assert.equal((await executeHostedAppTool(prisma, "app_read", {}, leadContext)).version, pageWrite.version);
   // A run that is not the started run of a live child of this request has no access.
   const strayTask = await system.task.create({
-    data: { ...owner, botId: botB.id, threadId: page.task.threadId, prompt: "Synthetic unrelated", status: "running" },
+    data: { ...owner, botId: botB.id, threadId: pageWork.task.threadId, prompt: "Synthetic unrelated", status: "running" },
   });
   const strayRun = await system.run.create({
-    data: { ...owner, botId: botB.id, threadId: page.task.threadId, taskId: strayTask.id, status: "running", trigger: "user" },
+    data: { ...owner, botId: botB.id, threadId: pageWork.task.threadId, taskId: strayTask.id, status: "running", trigger: "user" },
   });
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...owner, botId: botB.id, runId: strayRun.id }));
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...styles.context, ...foreign }));
@@ -697,15 +697,15 @@ try {
   await system.task.update({ where: { id: styles.task.id }, data: { paused: false, workStopPending: true } });
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, styles.context));
   await system.task.update({ where: { id: leadTask.id }, data: { delegationState: "cancelled" } });
-  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, page.context));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
   await system.task.update({ where: { id: leadTask.id }, data: { delegationState: "waiting" } });
-  await executeHostedAppTool(prisma, "app_read", {}, page.context);
+  await executeHostedAppTool(prisma, "app_read", {}, pageWork.context);
   await system.bot.update({ where: { id: botB.id }, data: { archivedAt: new Date() } });
-  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, page.context));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
   await system.bot.update({ where: { id: botB.id }, data: { archivedAt: null } });
   // Reassigning or removing the app's Mico revokes the whole delegated tree at once.
   await service.assignAgent(owner, appDraft.id, null);
-  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, page.context));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, leadContext));
   checks.push(
     "delegated Micos of the bound request share its draft; different files from one version are both kept, stale file hashes and versions are rejected; unrelated, foreign, cross-Space, paused, stopping, cancelled, archived and revoked access denied",
