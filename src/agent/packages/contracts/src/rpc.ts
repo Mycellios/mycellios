@@ -14,6 +14,8 @@ import {
   HostedWebFilesUsage,
   HostedWebSave,
   HostedWebSnapshot,
+  HostedWebPresence,
+  HostedWebTeam,
 } from "./hosted-webs.js";
 import { MicoSettingsState, MicoSettingsUpdate } from "./mico-settings.js";
 import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
@@ -240,6 +242,8 @@ export const appContract = {
     agent: oc.input(z.object({ id: z.string() })).output(HostedWebAgent.nullable()),
     assignAgent: oc.input(z.object({ id: z.string(), botId: z.string().nullable() })).output(HostedWebAgent.nullable()),
     revision: oc.input(z.object({ id: z.string() })).output(z.number().int().positive()),
+    team: oc.input(z.object({ id: z.string() })).output(HostedWebTeam),
+    presence: oc.input(z.object({ id: z.string() })).output(eventIterator(HostedWebPresence)),
     list: oc.input(z.object({ filter: z.enum(["discover", "trending", "pinned", "mine"]), query: z.string().max(100).default("") })).output(z.array(HostedWebCard)),
     draft: oc.input(z.object({ id: z.string() })).output(HostedWebDraft),
     save: oc.input(HostedWebSave).output(HostedWebDraft),

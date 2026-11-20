@@ -79,6 +79,7 @@ import {
 } from "@rakazo/core";
 import {
   createBoardEvents,
+  createWebPresence,
   createDb,
   createSecurityEventPruner,
   createThreadEvents,
@@ -142,6 +143,7 @@ async function main() {
   });
   const ticketBoardEnabled = process.env.TICKET_BOARD_ENABLED === "true";
   const boardEvents = createBoardEvents(realtime);
+  const webPresence = createWebPresence(realtime);
   const dataDir = process.env.DATA_DIR ?? "./data";
   const cloudRuntime =
     process.env.AGENT_RUNTIME === "scripted"
@@ -280,6 +282,7 @@ async function main() {
     // Live per-account Codex catalog; never refreshes or writes credentials.
     codexCatalog: new CodexCatalogCache(),
     sandbox,
+    webPresence,
     memory: localMemory,
     memoryProviders,
     home,

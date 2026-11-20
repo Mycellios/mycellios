@@ -4,7 +4,9 @@ import { createWebPreview } from "../hosted-webs/preview.js";
 import { hostedWebDataService } from "../hosted-webs/data.js";
 import { hostedWebFilesConfig, hostedWebFilesService } from "../hosted-webs/files.js";
 import { hostedWebService } from "../hosted-webs/service.js";
+import type { HostedWebPresence } from "@rakazo/contracts";
 import type { RouterContext } from "./context.js";
+import { HEARTBEAT_MS, SESSION_RECHECK_MS } from "./shared.js";
 
 export function hostedWebRoutes({ deps, authed }: RouterContext) {
   const filesConfig = hostedWebFilesConfig(
@@ -28,6 +30,51 @@ export function hostedWebRoutes({ deps, authed }: RouterContext) {
       revision: authed.webs.revision.handler(({ context, input }) =>
         service.revision(context.actor, input.id),
       ),
+      team: authed.webs.team.handler(({ context, input }) =>
+        service.team(context.actor, input.id),
+      ),
+      presence: authed.webs.presence.handler(async function* ({ context, input }) {
+        // Only the app's owner in its Space; the topic is per app and holds no content.
+        await service.assertOwner(context.actor, input.id);
+        const siteId = input.id;
+        if (!deps.webPresence) {
+          while (!context.signal?.aborted) {
+            await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_MS));
+            yield { siteId, at: new Date().toISOString() };
+          }
+          return;
+        }
+        const follow = deps.webPresence.follow(siteId, context.signal);
+        let pending: Promise<IteratorResult<HostedWebPresence>> | undefined;
+        let authorizedAt = Date.now();
+        try {
+          while (!context.signal?.aborted) {
+            pending ??= follow.next();
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const next = await Promise.race([
+              pending,
+              new Promise<"silent">((resolve) => {
+                timer = setTimeout(() => resolve("silent"), HEARTBEAT_MS);
+              }),
+            ]).finally(() => clearTimeout(timer));
+            if (Date.now() - authorizedAt >= SESSION_RECHECK_MS) {
+              if (context.stillAuthorized && !(await context.stillAuthorized()))
+                throw new ORPCError("UNAUTHORIZED");
+              await service.assertOwner(context.actor, siteId);
+              authorizedAt = Date.now();
+            }
+            if (next === "silent") {
+              yield { siteId, at: new Date().toISOString() };
+              continue;
+            }
+            pending = undefined;
+            if (next.done) return;
+            yield next.value;
+          }
+        } finally {
+          void follow.return(undefined).catch(() => {});
+        }
+      }),
       list: authed.webs.list.handler(({ context, input }) =>
         service.list(context.actor, input.filter, input.query),
       ),

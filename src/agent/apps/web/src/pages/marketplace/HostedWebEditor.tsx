@@ -29,6 +29,7 @@ import { TaskAgentSelect } from "../tasks/TaskComposer";
 import { HostedAppChat } from "./HostedAppChat";
 import { useAppStorageBridge } from "./app-storage-bridge";
 import { DraftHistory } from "./DraftHistory";
+import { PresenceOverlay, TeamIndicator, useTeamPresence } from "./TeamPresence";
 
 type EditorProps = {
   scope: string;
@@ -145,6 +146,8 @@ export function WebEditor({
       clearTimeout(timer);
     };
   }, [client, initial.id, saved]);
+  // Live team and cursors only while a Mico is assigned to a saved app.
+  const team = useTeamPresence(client.webs, initial.id, saved && Boolean(agent));
   const picker = useRef<HTMLInputElement>(null);
   const folder = useRef<HTMLInputElement>(null);
   const previewFrame = useRef<HTMLIFrameElement>(null);
@@ -477,6 +480,7 @@ export function WebEditor({
               blocked={dirty || busy}
               onWorking={setWorking}
               onOpenBot={onOpenBot}
+              teammates={bots.filter((bot) => bot.id !== agent.botId)}
             />
           ) : (
             <div className="hw-chat-intro">
@@ -657,6 +661,7 @@ export function WebEditor({
           <div className="hw-editor-preview" hidden={panel === "code"}>
             <div className="hw-preview-bar">
               <h2>Vista previa privada</h2>
+              <TeamIndicator members={team.members} />
               <Button
                 variant="secondary"
                 disabled={busy}
@@ -672,6 +677,13 @@ export function WebEditor({
                 src={preview}
                 {...hostedFrameAttributes(granted)}
                 referrerPolicy="no-referrer"
+              />
+            ) : null}
+            {preview ? (
+              <PresenceOverlay
+                frame={previewFrame}
+                cursors={team.cursors}
+                members={team.members}
               />
             ) : (
               <div className="hw-preview-empty">

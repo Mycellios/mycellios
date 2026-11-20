@@ -30,7 +30,7 @@ import type {
   verifyModelServesAgents,
 } from "@rakazo/adapters";
 import type { Auth } from "@rakazo/auth";
-import type { BoardEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
+import type { BoardEvents, PrismaClient, ThreadEvents, WebPresence } from "@rakazo/db";
 import type { BillingService } from "./billing.js";
 import { accountRoutes } from "./routes/account.js";
 import { referralRoutes } from "./routes/referrals.js";
@@ -76,6 +76,8 @@ export interface RouterDeps {
   prisma: PrismaClient;
   events: ThreadEvents;
   boardEvents: BoardEvents;
+  /** Optional so older test harnesses keep compiling; absent streams only heartbeats. */
+  webPresence?: WebPresence;
   ticketChanges: TicketChangeNotifier;
   auth: Auth;
   jobs: JobPublisher;

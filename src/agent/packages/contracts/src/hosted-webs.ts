@@ -74,6 +74,35 @@ export const HostedWebAgent = z.object({
   color: z.string().nullable(),
 });
 export type HostedWebAgent = z.infer<typeof HostedWebAgent>;
+
+/**
+ * A transient sign that a Mico is reading or writing an app draft, published by the
+ * server only while it runs app_read/app_write. Never stored; never carries content.
+ * A frame without botId is a liveness heartbeat.
+ */
+export const HostedWebPresence = z.object({
+  siteId: z.string(),
+  at: z.string(),
+  botId: z.string().optional(),
+  runId: z.string().optional(),
+  path: z.string().max(512).nullable().optional(),
+  phase: z.enum(["reading", "writing"]).optional(),
+  target: z
+    .object({ kind: z.enum(["selector", "file"]), value: z.string().max(512) })
+    .optional(),
+});
+export type HostedWebPresence = z.infer<typeof HostedWebPresence>;
+
+/** Micos with work on an app's delegation tree right now, from real run states. */
+export const HostedWebTeamMember = z.object({
+  botId: z.string(),
+  name: z.string(),
+  color: z.string().nullable(),
+  state: z.enum(["running", "queued"]),
+});
+export type HostedWebTeamMember = z.infer<typeof HostedWebTeamMember>;
+export const HostedWebTeam = z.object({ members: z.array(HostedWebTeamMember) });
+export type HostedWebTeam = z.infer<typeof HostedWebTeam>;
 export const HostedWebSave = z
   .object({
     id: z.string().uuid(),

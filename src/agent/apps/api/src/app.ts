@@ -97,6 +97,7 @@ import { signupPolicyFromEnv } from "@rakazo/core";
 import type { Pool, PrismaClient } from "@rakazo/db";
 import {
   createBoardEvents,
+  createWebPresence,
   createDb,
   createPool,
   createSecurityEventPruner,
@@ -298,6 +299,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   });
   const ticketBoardEnabled = env.ticketBoardEnabled;
   const boardEvents = createBoardEvents(realtime);
+  const webPresence = createWebPresence(realtime);
   const environmentSignupPolicy = signupPolicyFromEnv(env);
   // Mirror the env policy for the previous release during a rolling deploy.
   await prisma.deploymentSettings.upsert({
@@ -570,6 +572,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   // models.dev describes models newer than the bundled Pi list; warm it in the background.
   void modelsDevCatalog.read(0);
   const executor = createRunExecutor({
+    webPresence,
     billingEnabled: modelCreditsEnabled,
     maxUploadSizeBytes: env.maxUploadSizeBytes,
     contextStrategy,
@@ -680,6 +683,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     events,
     ticketChanges,
     boardEvents,
+    webPresence,
     auth,
     jobs,
     sandbox,

@@ -49,6 +49,17 @@
 
 # AGENTS.md
 
+- Team app builds follow OpenBot's bot-crew preview (behavior reference only, no
+  copied code) through specs/mico-team-build/spec.md. Presence is transient: the
+  worker publishes it on the realtime fanout only after an authorized app_read/
+  app_write commits, never content, never from clients or models; webs.presence
+  streams it to the app owner with session/ownership rechecks. webs.team counts
+  real running/queued runs, not presence. The locator script is preview-only and
+  answers only its parent; the host accepts replies only from its own iframe and
+  cursors never take pointer events. "Construir con equipo" only drafts an editable
+  request. Verify hosted-app-presence, web-presence, preview-locator, TeamPresence
+  tests and scripts/verify-hosted-webs-db.ts.
+
 - read_video follows OpenBot's video reading (behavior reference only; its code is
   PolyForm Noncommercial and not copied). `packages/adapters/src/video-reader.ts` runs
   in the worker: a pinned yt-dlp verified by SHA-256 before use, site extractors only
