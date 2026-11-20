@@ -1,3 +1,4 @@
+import { rateLimitKeyGenerator } from "./rate-limit-key.js";
 import { eventAgentAccess } from "./event-demo-agent-access.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
@@ -488,6 +489,7 @@ export async function createCoordinator(
     max: options.globalRateLimitMax ?? 600,
     timeWindow: "1 minute",
     hook: "onRequest",
+    keyGenerator: rateLimitKeyGenerator(config.rateLimitTrustedProxies),
   });
   const apiAccessEnabled = config.apiAccessEnabled ?? false;
   const isAccountNodeRoute = (path: string): boolean =>
@@ -502,6 +504,7 @@ export async function createCoordinator(
     reply.header("X-Frame-Options", "DENY");
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    reply.header("Strict-Transport-Security", "max-age=31536000"); // ignored on plain HTTP
     const path = request.url.split("?", 1)[0] ?? request.url;
     if (path.startsWith("/v1/") || path.startsWith("/public/v1/")) {
       reply.header("Access-Control-Allow-Origin", "*");

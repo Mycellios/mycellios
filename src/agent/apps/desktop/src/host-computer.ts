@@ -15,7 +15,11 @@ export function computerConsentScope(serverUrl: string, identity: { userId: stri
 }
 
 /** App-private credentials and consent, never sent to a renderer or a connected remote server. */
-export async function prepareHostComputer(userDataDir: string, agentRuntime?: AgentRuntime) {
+export async function prepareHostComputer(
+  userDataDir: string,
+  agentRuntime?: AgentRuntime,
+  listen: { hostname?: string } = {},
+) {
   const configFile = path.join(userDataDir, "host-computer.json");
   const consentFile = path.join(userDataDir, "host-computer-consent");
   const accountConsentFile = path.join(userDataDir, "host-computer-account-consent");
@@ -32,7 +36,7 @@ export async function prepareHostComputer(userDataDir: string, agentRuntime?: Ag
     /* Invalid local configuration is replaced. */
   }
   let server: Awaited<ReturnType<typeof startHostComputerServer>>;
-  const options = { root: path.join(userDataDir, "computers"), token, agentRuntime };
+  const options = { root: path.join(userDataDir, "computers"), token, agentRuntime, ...listen };
   try {
     server = await startHostComputerServer({ ...options, port });
   } catch (error) {

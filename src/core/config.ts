@@ -52,6 +52,11 @@ export interface CoordinatorConfig {
   referralEmailPepper?: string | undefined;
   apiStarterTokens?: number | undefined;
   apiRequestsPerMinute?: number | undefined;
+  /**
+   * Reverse-proxy peer addresses whose last X-Forwarded-For hop identifies the client
+   * for the global rate limit. Empty keeps limiting by the TCP peer address.
+   */
+  rateLimitTrustedProxies?: readonly string[] | undefined;
   apiMaxConcurrent?: number | undefined;
   apiMaxActiveKeys?: number | undefined;
   publicApiBaseUrl?: string | undefined;
@@ -342,6 +347,10 @@ export function loadCoordinatorConfig(
     apiStarterTokens: parseNonNegativeInteger(environment.MYCELLIOS_API_STARTER_TOKENS, 25_000),
     apiRequestsPerMinute: parseInteger(environment.MYCELLIOS_API_REQUESTS_PER_MINUTE, 30),
     apiMaxConcurrent: parseInteger(environment.MYCELLIOS_API_MAX_CONCURRENT, 2),
+    rateLimitTrustedProxies: (environment.MYCELLIOS_RATE_LIMIT_TRUSTED_PROXIES ?? "")
+      .split(",")
+      .map((address) => address.trim())
+      .filter(Boolean),
     apiMaxActiveKeys: parseInteger(environment.MYCELLIOS_API_MAX_ACTIVE_KEYS, 10),
     ...(networkToken ? { networkToken } : {}),
     ...(internalToken ? { internalToken } : {}),

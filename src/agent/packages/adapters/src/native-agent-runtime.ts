@@ -2,7 +2,7 @@ import { isPausingAskTool, pausingQuestionnaire } from "./ask-user-questionnaire
 import { nativeCodexQuota } from "./native-codex-quota.js";
 import { turnStyleReminder, withConversationStyle } from "./conversation-style.js";
 import { prepareOpenCodeProfile } from "./opencode-profile.js";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { platform } from "node:os";
@@ -201,7 +201,7 @@ async function toolBridge(
   const server = createServer((request, response) => {
     void (async () => {
       if (
-        request.headers.authorization !== `Bearer ${token}` ||
+        !bridgeAuthorized(request.headers.authorization, token) ||
         request.headers.origin ||
         request.url !== "/mcp"
       ) {
@@ -898,4 +898,11 @@ export class NativeAgentRuntime implements AgentRuntime {
       this.active.delete(request.runId);
     }
   }
+}
+
+/** Compares the bridge bearer in constant time; a mismatched length fails without comparing. */
+function bridgeAuthorized(header: string | undefined, token: string): boolean {
+  const expected = Buffer.from(`Bearer ${token}`);
+  const given = Buffer.from(header ?? "");
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }

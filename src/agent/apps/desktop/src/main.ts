@@ -1481,8 +1481,20 @@ app.whenReady().then(async () => {
     programData: process.env.ProgramData ?? "C:\\ProgramData",
   });
   const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope());
+  const nativeRoot = app.isPackaged
+    ? path.join(process.resourcesPath, "local-server")
+    : path.join(app.getAppPath(), "local-server");
+  const nativeResources = localResourcePaths(nativeRoot);
+  // Existing Compose installations retain their database, ports, and service lifecycle.
+  const nativeLocalStack =
+    !existsSync(path.join(stackDir(userDataDir), ".env")) &&
+    existsSync(nativeResources.entry);
+  // Compose containers reach the executor through Docker's host gateway, so only that
+  // legacy stack listens beyond loopback. The native stack and the account/cloud relays
+  // connect over 127.0.0.1; other machines on the network must not reach the executor.
+  const hostComputerListen = nativeLocalStack ? { hostname: "127.0.0.1" } : {};
   for (;;) {
-    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine), {
+    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine, hostComputerListen), {
       // A development launcher may have exited and closed stderr. Report through
       // the desktop reporter so a diagnostic cannot itself throw EPIPE.
       report: code => reportDesktopError(new Error(`Desktop executor startup failed (${code})`), "desktop.startup"),
@@ -1521,15 +1533,7 @@ app.whenReady().then(async () => {
       }
     },
   });
-  const nativeRoot = app.isPackaged
-    ? path.join(process.resourcesPath, "local-server")
-    : path.join(app.getAppPath(), "local-server");
-  const nativeResources = localResourcePaths(nativeRoot);
-  // Existing Compose installations retain their database, ports, and service lifecycle.
-  if (
-    !existsSync(path.join(stackDir(userDataDir), ".env")) &&
-    existsSync(nativeResources.entry)
-  ) {
+  if (nativeLocalStack) {
     localStack = new LocalNativeStackController({
       dataDir: path.join(userDataDir, "local-data"),
       stackDir: stackDir(userDataDir),

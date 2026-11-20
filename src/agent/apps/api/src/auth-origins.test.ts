@@ -1,6 +1,6 @@
 import { createAuth } from "@rakazo/auth";
 import { describe, expect, it } from "vitest";
-import { isTrustedOrigin, MOBILE_AUTH_ORIGINS } from "./app.js";
+import { isSameSiteRpcRequest, isTrustedOrigin, MOBILE_AUTH_ORIGINS } from "./app.js";
 
 // Better Auth skips its origin middleware under NODE_ENV=test, so check the
 // matcher that production uses for callback URLs and request origins.
@@ -80,5 +80,45 @@ describe("mobile auth origins", () => {
     ]) {
       expect(await trusted(url), url).toBe(true);
     }
+  });
+});
+
+describe("RPC cross-site request guard", () => {
+  const rpc = (method: string, headers: Record<string, string>) =>
+    new Request("http://127.0.0.1:3100/rpc/threads/send", {
+      method,
+      headers: { host: "127.0.0.1:3100", ...headers },
+    });
+
+  it("accepts same-origin, trusted and non-browser writes", () => {
+    for (const headers of [
+      { "sec-fetch-site": "same-origin", origin: "http://127.0.0.1:3100" },
+      { "sec-fetch-site": "none" },
+      { "sec-fetch-site": "cross-site", origin: "http://localhost:5173" },
+      { "sec-fetch-site": "same-site", origin: "http://127.0.0.1:5173" },
+      { origin: "rakazo://" },
+      {},
+      { origin: "http://127.0.0.1:3100" },
+    ]) {
+      expect(isSameSiteRpcRequest(rpc("POST", headers), env), JSON.stringify(headers)).toBe(true);
+    }
+  });
+
+  it("refuses writes the browser marks as coming from another site", () => {
+    for (const headers of [
+      { "sec-fetch-site": "cross-site", origin: "https://attacker.example" },
+      { "sec-fetch-site": "same-site", origin: "https://user-site.example.test" },
+      { "sec-fetch-site": "cross-site" },
+      { "sec-fetch-site": "cross-site", origin: "null" },
+      { origin: "https://attacker.example" },
+      { origin: "null" },
+    ]) {
+      expect(isSameSiteRpcRequest(rpc("POST", headers), env), JSON.stringify(headers)).toBe(false);
+    }
+  });
+
+  it("never blocks reads", () => {
+    const headers = { "sec-fetch-site": "cross-site", origin: "https://attacker.example" };
+    expect(isSameSiteRpcRequest(rpc("GET", headers), env)).toBe(true);
   });
 });
