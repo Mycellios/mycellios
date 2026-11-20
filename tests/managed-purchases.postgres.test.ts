@@ -229,7 +229,13 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
     } finally { await app.close(); }
   });
   it("executes a verified zero-price AntSeed model with no balance, no Credit hold and one persisted receipt",async()=>{
-    const f=antseedFixture({free:true}),adapter=new ManagedAntseedText(operatorSecret,["*"],f.transport);
+    // The adapter's background tool-call probe must pass, or the free seller rests before the quote.
+    const f=antseedFixture({free:true});
+    const transport=vi.fn<typeof fetch>(async(url,init)=>init?.method==="POST"&&String(init.body).includes("get_weather")
+      ?Response.json({id:"probe",choices:[{index:0,finish_reason:"tool_calls",message:{role:"assistant",content:null,
+        tool_calls:[{id:"c1",type:"function",function:{name:"get_weather",arguments:"{\"city\":\"Madrid\"}"}}]}}]})
+      :f.transport(url,init));
+    const adapter=new ManagedAntseedText(operatorSecret,["*"],transport);
     const service=new ManagedGateway(db,purchases,api,new ManagedTextRouter([managedTextBackend("antseed",adapter)]),1000000),request={...input,model:MANAGED_MODEL_PREFIX+"antseed/deepseek-test"};
     const quote=await service.quote("bob",request);expect(quote.maximumMicrounits).toBe(0);
     expect(await service.execute("bob",null,"free-wallet-request",request,quote.token)).toMatchObject({status:"completed",response:{mycellios:{creditsMicrounits:0}}});
