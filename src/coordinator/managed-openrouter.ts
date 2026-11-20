@@ -117,7 +117,9 @@ export class ManagedOpenRouter {
         if(Number(row.context_length)<4608){entry.reason="context_bound_not_qualified";continue;}
         const upper=upperTokenPrices(prices);
         const free=usdAtoms(upper.input)+usdAtoms(upper.output)+usdAtoms(upper.request)===0n;
-        if(!free&&this.fundingCostBasisPoints===null){entry.reason="funding_cost_not_configured";continue;}
+        // Free models are offered only through AntSeed's zero-priced route, never an OpenRouter free tier.
+        if(free){entry.reason="free_requires_antseed";continue;}
+        if(this.fundingCostBasisPoints===null){entry.reason="funding_cost_not_configured";continue;}
         const funding=this.fundingCostBasisPoints??0;
         entry.available=true;entry.reason="ready";
         offers.set(id, { upstreamId: row.id, inputUsd: upper.input, outputUsd: upper.output,requestUsd:upper.request,

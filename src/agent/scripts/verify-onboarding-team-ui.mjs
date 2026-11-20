@@ -79,13 +79,15 @@ try {
   }
   async function gallery() { await page.getByRole("button", { name: "Or start from a role", exact: true }).click(); }
   async function createSEO() { await gallery(); await page.getByRole("button", { name: "Create and open this team: SEO", exact: true }).click(); }
-  // First run asks one question. Free models connect Mycellios, select the free model the network
-  // recommends (never a recommended paid one) and open the team.
+  // First run asks one question. Free models connect Mycellios, select the managed AntSeed free route
+  // it recommends (never a recommended paid one, nor a zero-priced network model) and open the team.
   needsModel = true;
+  const zeroPrice = { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, input: "0", output: "0" };
   mycelliosModels = [
-    { provider: "openai-compatible", id: "fixture-paid", label: "Paid", billing: "Credits", recommended: true, mycelliosPricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, input: "1", output: "2" } },
-    { provider: "openai-compatible", id: "fixture-free-other", label: "Other free", billing: "0 Credits", mycelliosPricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 0, input: "0", output: "0" } },
-    { provider: "openai-compatible", id: "fixture-free", label: "Free", billing: "0 Credits", recommended: true, mycelliosPricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 0, input: "0", output: "0" } },
+    { provider: "openai-compatible", id: "mycellios/managed/fixture-paid", label: "Paid", billing: "Credits", recommended: true, mycelliosProcessing: "external", mycelliosPricing: { ...zeroPrice, input: "1", output: "2" } },
+    { provider: "openai-compatible", id: "fixture-network", label: "Network", billing: "0 Credits", recommended: true, mycelliosProcessing: "network", mycelliosPricing: { ...zeroPrice, serviceFeeBasisPoints: 0 } },
+    { provider: "openai-compatible", id: "mycellios/managed/fixture-free-other", label: "Other free", billing: "0 Credits", mycelliosProcessing: "external", mycelliosPricing: zeroPrice },
+    { provider: "openai-compatible", id: "mycellios/managed/free", label: "Free", billing: "0 Credits", recommended: true, mycelliosProcessing: "external", mycelliosPricing: zeroPrice },
   ];
   for (const lang of ["es", "en"]) {
     await page.goto(origin + "/__onboarding_team" + (lang === "es" ? "?lang=es" : ""));
@@ -99,32 +101,22 @@ try {
   await page.getByRole("button", { name: "Use free models", exact: true }).click();
   await expect(page.getByTestId("team-created")).toBeVisible();
   assert.equal(connects, 1);
-  assert.deepEqual(enables.map(input => input.enabledModelIds), [["fixture-paid", "fixture-free"]]);
+  assert.deepEqual(enables.map(input => input.enabledModelIds), [["fixture-paid", "mycellios/managed/free"]]);
   assert.equal(roles.length, 1);
-  assert.deepEqual(roles[0].primary, { provider: "openai-compatible", modelId: "fixture-free", credentialId: "fixture-mycellios" });
+  assert.deepEqual(roles[0].primary, { provider: "openai-compatible", modelId: "mycellios/managed/free", credentialId: "fixture-mycellios" });
   assert(bots.length >= 2 && creates.every(input => !input.agentEngine && input.expectedUserId === "fixture-owner"));
   proof.freeModelsStart = true;
-  // Without a Mycellios account the free start uses installed OpenCode or a managed download.
-  for (const [engines, expected, downloads] of [
-    [[...codexOnly, { id: "opencode", name: "OpenCode", available: true }], "opencode", 0],
-    [[...codexOnly, { id: "opencode", name: "OpenCode", available: false, canInstall: true }], "opencode", 1],
-  ]) {
-    bots = []; creates = []; installs = 0; unavailable = true; needsModel = true; engineList = engines;
-    await page.goto(origin + "/__onboarding_team");
-    await page.getByRole("button", { name: "Use free models", exact: true }).click();
-    await expect(page.getByTestId("team-created")).toBeVisible();
-    assert.equal(installs, downloads);
-    assert(bots.length >= 2 && creates.every(input => input.agentEngine === expected));
-  }
-  // With no free route at all the start says so instead of opening the team on a paid model:
-  // neither without an account nor with a Mycellios catalog that only has priced models.
-  for (const [accountUnavailable, models] of [[true, []], [false, [mycelliosModels[0]]]]) {
-    bots = []; creates = []; roles = []; unavailable = accountUnavailable; needsModel = true; engineList = codexOnly; mycelliosModels = models;
+  // Free models only come through AntSeed: without the managed free route the start says so instead
+  // of opening the team on a paid model, a zero-priced network model or OpenCode's anonymous models,
+  // whether or not OpenCode is installed or downloadable.
+  const withOpenCode = [...codexOnly, { id: "opencode", name: "OpenCode", available: false, canInstall: true }];
+  for (const [accountUnavailable, models] of [[true, []], [false, mycelliosModels.slice(0, 2)]]) {
+    bots = []; creates = []; roles = []; installs = 0; unavailable = accountUnavailable; needsModel = true; engineList = withOpenCode; mycelliosModels = models;
     await page.goto(origin + "/__onboarding_team");
     await page.getByRole("button", { name: "Use free models", exact: true }).click();
     await expect(page.getByRole("alert")).toHaveText("No free models are available right now. Try again in a few minutes or use your AI subscription.");
     await expect(page.getByTestId("team-created")).toHaveCount(0);
-    assert.equal(bots.length, 0); assert.equal(roles.length, 0);
+    assert.equal(bots.length, 0); assert.equal(roles.length, 0); assert.equal(installs, 0);
   }
   unavailable = false; engineList = codexOnly; needsModel = true;
   proof.freeStartNeverPaid = true;

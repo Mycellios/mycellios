@@ -318,10 +318,10 @@ export function OnboardingPage() {
   }
 
   /**
-   * "Use free models" must never start on a paid model. Mycellios with the free model it recommends from
-   * live network signals comes first. Without a free Mycellios model (no account, an outage or no free
-   * route right now) the installed OpenCode runs its anonymous free models, downloaded first when the
-   * operator allows it, as OpenBot does. Failing both, say so and leave the subscription choice open.
+   * "Use free models" must never start on a paid model, and every free model it offers runs through
+   * AntSeed: Mycellios's managed free route, chosen from live AntSeed signals. Without one (no
+   * account, an outage or no free route right now) say so and leave the subscription choice open;
+   * never fall back to another free provider such as OpenCode's anonymous models.
    */
   async function startFree() {
     if (startingFree) return;
@@ -331,23 +331,13 @@ export function OnboardingPage() {
     setChoiceError("");
     setChoiceStatus("");
     const scoped = rpcForSpace(owner.spaceId);
-    let engine: CreateBotInput["agentEngine"];
     if (!(await startOnMycellios(scoped, owner))) {
-      engine = await freeOpenCode(scoped);
-      if (!engine) {
-        setChoiceError(t`No free models are available right now. Try again in a few minutes or use your AI subscription.`);
-        setStartingFree(false);
-        return;
-      }
+      setChoiceError(t`No free models are available right now. Try again in a few minutes or use your AI subscription.`);
+      setStartingFree(false);
+      return;
     }
     try {
-      try {
-        await finishTeam(defaultTeam(), engine);
-      } catch (cause) {
-        // An engine this server refuses must not block the start: the same team runs without it.
-        if (!engine) throw cause;
-        await finishTeam(defaultTeam());
-      }
+      await finishTeam(defaultTeam());
     } catch {
       setChoiceStatus("");
       setChoiceError(t`Could not create your team. Try again.`);
@@ -375,21 +365,6 @@ export function OnboardingPage() {
       return true;
     } catch {
       return false;
-    }
-  }
-
-  async function freeOpenCode(scoped: ReturnType<typeof rpcForSpace>): Promise<CreateBotInput["agentEngine"]> {
-    try {
-      const openCode = (await scoped.engines.list()).find((engine) => engine.id === "opencode");
-      if (openCode?.available) return "opencode";
-      if (!openCode?.canInstall) return undefined;
-      setChoiceStatus(t`Downloading OpenCode…`);
-      await scoped.engines.installOpenCode();
-      return "opencode";
-    } catch {
-      return undefined;
-    } finally {
-      setChoiceStatus("");
     }
   }
 
