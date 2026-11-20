@@ -122,3 +122,29 @@ Small PRs, each independently safe:
   Fixture results do not qualify live models or paid inference.
 - A real run with at least three Micos on a test account is a separate,
   explicitly reported gate. No production deployment is part of this change.
+
+## Status
+
+- Shared draft access and `expectedFileSha256`: delivered (#365).
+- Presence: delivered. The worker publishes `HostedWebPresence` on the existing
+  realtime fanout (`web-presence:<siteId>`, `packages/db/src/web-presence.ts`) only
+  after an authorized `app_read`/`app_write` commits, at most one signal per run
+  every 250 ms. `webs.presence` streams it to the app's owner with heartbeats and
+  the usual session/ownership recheck. HTML targets use the innermost element at or
+  before the first changed character (`hosted-app-presence.ts`), anchored at the
+  nearest id; CSS targets use the first changed rule's selector.
+- Locator, overlay and indicator: delivered in `TeamPresence.tsx`. The locator is
+  injected only into preview HTML (`preview-locator.ts`); published revisions are
+  checked not to contain it. `webs.team` reads running/queued runs of the bound
+  thread and its delegated children. Cursors drop when their Mico stops running
+  (team refresh every 3 s) or 8 s after their last signal. There is no Storybook
+  in this workspace, so no stories were added.
+- Team flow: delivered in a reduced form. "Construir con equipo" lets the owner
+  pick teammates and writes an editable request into the app chat; nothing is sent
+  until Send. The app instructions tell the lead to delegate with `delegate_task`
+  and `site:<file>` resources and review the results. The agent thread is not
+  converted into a group thread; the existing delegation tree already shares the
+  draft.
+- Qualification: unit tests and `scripts/verify-hosted-webs-db.ts` on embedded
+  PostgreSQL pass. NOT RUN: the browser fixture with intercepted RPCs and the real
+  run with three Micos on a test account.

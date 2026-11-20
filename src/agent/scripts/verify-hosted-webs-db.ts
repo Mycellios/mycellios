@@ -335,7 +335,10 @@ try {
   });
   assert.equal(edited.version, 2);
   assert.equal((await listHostedWebs(prisma,null,"discover"))[0]!.coverPath,"mycellios-cover.png","unpublished cover removal must not alter the public card");
-  assert.match(await (await request(root)).text(), /public-v1/);
+  const publishedText = await (await request(root)).text();
+  assert.match(publishedText, /public-v1/);
+  // The cursor locator is preview-only: published documents never carry it.
+  assert.doesNotMatch(publishedText, /mycellios-preview-locator/);
   assert.equal(
     (await listHostedWebs(prisma, null, "discover"))[0]!.title,
     "Public utility",
@@ -346,7 +349,9 @@ try {
   const capability = createWebPreview(owner, id, edited.version, edited.bundle);
   const preview = await request(capability.path);
   assert.equal(preview.status, 200);
-  assert.match(await preview.text(), /private-v2/);
+  const previewText = await preview.text();
+  assert.match(previewText, /private-v2/);
+  assert.match(previewText, /mycellios-preview-locator/);
   assert.equal((await listHostedWebs(prisma, null, "discover"))[0]!.views, 1);
   const clone = await service.clone(foreign, id, randomUUID());
   assert.equal(clone.published, false);
@@ -654,7 +659,23 @@ try {
   const styles = await delegated(["site:styles.css"]);
   const pageWork = await delegated(["site:index.html"]);
   const leadContext = { ...owner, botId: botA.id, runId: leadRun.id };
-  const teamRead = await executeHostedAppTool(prisma, "app_read", { path: "index.html" }, pageWork.context);
+  // The team comes from real run states: the lead and both delegated teammates are running.
+  assert.deepEqual(
+    (await service.team(owner, appDraft.id)).members.map((m) => [m.botId, m.state]).sort(),
+    [[botA.id, "running"], [botB.id, "running"]].sort(),
+  );
+  await assert.rejects(service.team(foreign, appDraft.id));
+  const signals: unknown[] = [];
+  const record = (presence: unknown) => {
+    signals.push(presence);
+  };
+  const teamRead = await executeHostedAppTool(prisma, "app_read", { path: "index.html" }, pageWork.context, record);
+  assert.deepEqual(signals.at(-1), {
+    siteId: appDraft.id,
+    path: "index.html",
+    phase: "reading",
+    target: { kind: "file", value: "index.html" },
+  });
   const pageHash = "sha256" in teamRead ? teamRead.sha256 : undefined;
   assert.match(pageHash ?? "", /^[0-9a-f]{64}$/);
   assert.ok("files" in teamRead && teamRead.files.every((f) => /^[0-9a-f]{64}$/.test(f.sha256)));
@@ -662,10 +683,18 @@ try {
   // Two teammates write different files from the same version: both are kept.
   await executeHostedAppTool(prisma, "app_write", {
     path: "styles.css", content: "h1{color:teal}", expectedVersion: teamVersion, expectedFileSha256: "absent",
-  }, styles.context);
+  }, styles.context, record);
+  assert.deepEqual(signals.at(-1), {
+    siteId: appDraft.id,
+    path: "styles.css",
+    phase: "writing",
+    target: { kind: "selector", value: "h1" },
+  });
   const pageWrite = await executeHostedAppTool(prisma, "app_write", {
     path: "index.html", content: "<h1>Team draft</h1>", expectedVersion: teamVersion, expectedFileSha256: pageHash,
-  }, pageWork.context);
+  }, pageWork.context, record);
+  assert.equal((signals.at(-1) as { phase: string }).phase, "writing");
+  const signalCount = signals.length;
   assert.equal(pageWrite.version, teamVersion + 2);
   const teamDraft = await service.draft(owner, appDraft.id);
   const text = (path: string) => Buffer.from(teamDraft.bundle.files.find((f) => f.path === path)!.base64, "base64").toString("utf8");
@@ -690,7 +719,9 @@ try {
     data: { ...owner, botId: botB.id, threadId: pageWork.task.threadId, taskId: strayTask.id, status: "running", trigger: "user" },
   });
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...owner, botId: botB.id, runId: strayRun.id }));
-  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...styles.context, ...foreign }));
+  await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...styles.context, ...foreign }, record));
+  // Refused or conflicting calls publish no presence.
+  assert.equal(signals.length, signalCount);
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, { ...styles.context, ...crossSpace }));
   await system.task.update({ where: { id: styles.task.id }, data: { paused: true } });
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, styles.context));
@@ -708,6 +739,7 @@ try {
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, pageWork.context));
   await assert.rejects(executeHostedAppTool(prisma, "app_read", {}, leadContext));
   checks.push(
+    "team members come from real run states and only the owner reads them; presence is published only after authorized reads/writes, with the changed selector; the preview locator never reaches published documents",
     "delegated Micos of the bound request share its draft; different files from one version are both kept, stale file hashes and versions are rejected; unrelated, foreign, cross-Space, paused, stopping, cancelled, archived and revoked access denied",
   );
   await service.unpublish(owner, appDraft.id);

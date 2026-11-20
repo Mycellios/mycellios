@@ -3,6 +3,8 @@ import { HostedWebBundle } from "@rakazo/contracts";
 import { admitStaticBundle } from "@rakazo/core/node/hosted-web-bundle";
 import { recordHostedWebSnapshot, runAsTenant, type PrismaClient } from "@rakazo/db";
 import { createHash } from "node:crypto";
+import { presenceTarget } from "./hosted-app-presence.js";
+import type { PresenceTarget } from "./hosted-app-presence.js";
 import { z } from "zod";
 
 const readInput = z
@@ -48,15 +50,25 @@ type AppContext = {
   runId: string;
   signal?: AbortSignal;
 };
+/** Where a Mico is working, for the owner's live cursors; published after the call is authorized. */
+export type HostedAppPresence = {
+  siteId: string;
+  path: string | null;
+  phase: "reading" | "writing";
+  target: PresenceTarget;
+};
+
 export async function executeHostedAppTool(
   db: PrismaClient,
   name: string,
   args: unknown,
   context: AppContext,
+  onPresence?: (presence: HostedAppPresence) => Promise<void> | void,
 ) {
   const input =
     name === "app_read" ? readInput.parse(args) : writeInput.parse(args);
-  return runAsTenant(context, () =>
+  let presence: HostedAppPresence | undefined;
+  const result = await runAsTenant(context, () =>
     db.$transaction(async (tx) => {
       if (context.signal?.aborted) throw new Error("App edit cancelled.");
       // Resolve from the real run, never from an app ID supplied by the model.
@@ -119,6 +131,12 @@ export async function executeHostedAppTool(
           : undefined;
         const offset = read.offset ?? 0,
           limit = read.limit ?? 20000;
+        presence = {
+          siteId: row.id,
+          path: file?.path ?? null,
+          phase: "reading",
+          target: { kind: "file", value: file?.path ?? "" },
+        };
         return {
           version: row.version,
           title: row.title,
@@ -189,6 +207,16 @@ export async function executeHostedAppTool(
         throw new Error(
           "App version conflict: read the current draft before editing again.",
         );
+      presence = {
+        siteId: row.id,
+        path: file.path,
+        phase: "writing",
+        target: presenceTarget(
+          file.path,
+          current ? Buffer.from(current.base64, "base64").toString("utf8") : "",
+          write.content,
+        ),
+      };
       await recordHostedWebSnapshot(tx, {
         siteId: row.id,
         userId: context.userId,
@@ -211,6 +239,15 @@ export async function executeHostedAppTool(
       };
     }),
   );
+  // Only after the read or write committed; a failed signal never changes the result.
+  if (presence && onPresence) {
+    try {
+      await onPresence(presence);
+    } catch {
+      // Presence is best effort.
+    }
+  }
+  return result;
 }
 
 function fileSha256(base64: string) {

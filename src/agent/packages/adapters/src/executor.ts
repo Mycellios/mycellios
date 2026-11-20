@@ -148,7 +148,7 @@ import {
   stableJsonValue,
   toolEffectIdempotencyKey,
 } from "@rakazo/core/node/approval-effect-key";
-import type { McpServer, Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
+import type { McpServer, Prisma, PrismaClient, ThreadEvents, WebPresence } from "@rakazo/db";
 import {
   appendEventInTransaction,
   countUnreadInboxChats,
@@ -2903,6 +2903,8 @@ export interface ExecutorDeps {
   web?: WebProvider;
   /** Builtin read_video. Defaults to the pinned yt-dlp and the host's ffmpeg. */
   videoReader?: VideoReader;
+  /** Live cursors for app_read/app_write in the owner's editor; absent publishes nothing. */
+  webPresence?: WebPresence;
   mediaGeneration?: MediaGenerationProvider;
   /** Page browser (DOM refs) on the bot computer. Defaults to the sandbox live browser when supported. */
   browser?: BrowserProvider;
@@ -6471,7 +6473,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "app_read" || name === "app_write") {
             try {
-              return finish(await executeHostedAppTool(deps.prisma, name, args, { userId: run.userId, spaceId: run.spaceId, botId: bot.id, runId: run.id, signal: context.signal }));
+              return finish(
+                await executeHostedAppTool(
+                  deps.prisma,
+                  name,
+                  args,
+                  { userId: run.userId, spaceId: run.spaceId, botId: bot.id, runId: run.id, signal: context.signal },
+                  (presence) => deps.webPresence?.notify({ ...presence, botId: bot.id, runId: run.id }),
+                ),
+              );
             } catch (error) {
               return finish({ error: error instanceof Error ? error.message : "App edit failed." });
             }

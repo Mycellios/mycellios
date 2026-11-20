@@ -10,6 +10,7 @@ import {
   staticResponse,
 } from "./bundle.js";
 import { readWebPreview } from "./preview.js";
+import { withPreviewLocator } from "./preview-locator.js";
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -146,8 +147,13 @@ export function hostedWebHttp(
       ? preview.bundle.files.find((file) => file.path === path)
       : null;
     if (!file) return staticResponse("Not found", "text/plain", 404);
+    const bytes = new Uint8Array(Buffer.from(file.base64, "base64"));
     return staticResponse(
-      c.req.method === "HEAD" ? null : Buffer.from(file.base64, "base64"),
+      c.req.method === "HEAD"
+        ? null
+        : /\.html?$/i.test(file.path)
+          ? withPreviewLocator(bytes)
+          : bytes,
       staticFileType(file.path)!,
       200,
       bundleCapabilities(preview.bundle),

@@ -7,6 +7,7 @@ import {
   type HostedWebDraft,
   type HostedWebSave,
 } from "@rakazo/contracts";
+import type { HostedWebTeam } from "@rakazo/contracts";
 import {
   type HostedWebSnapshotSource,
   listHostedWebs,
@@ -20,6 +21,8 @@ import type * as z from "zod";
 import { admitStaticBundle } from "./bundle.js";
 
 type Save = z.infer<typeof HostedWebSave>;
+const TEAM_ROOT_LIMIT = 50;
+const TEAM_RUN_LIMIT = 100;
 export function hostedWebService(
   db: PrismaClient,
   options: { filesAvailable?: boolean } = {},
@@ -79,6 +82,67 @@ export function hostedWebService(
               color: binding.bot.color,
             }
           : null;
+      }),
+    /**
+     * Micos with running or queued work on this app: the assigned conversation and the
+     * work it delegated. Read from real run states, never from presence signals.
+     */
+    team: (actor: Actor, id: string): Promise<HostedWebTeam> =>
+      scoped(actor, async () => {
+        await draft(actor, id);
+        const binding = await db.hostedWebAgent.findFirst({
+          where: { siteId: id, ...where(actor) },
+          select: { threadId: true },
+        });
+        if (!binding) return { members: [] };
+        const roots = await db.task.findMany({
+          where: { ...where(actor), threadId: binding.threadId },
+          orderBy: { createdAt: "desc" },
+          take: TEAM_ROOT_LIMIT,
+          select: { id: true },
+        });
+        const children = roots.length
+          ? await db.task.findMany({
+              where: {
+                ...where(actor),
+                delegationRootId: { in: roots.map((root) => root.id) },
+                paused: false,
+              },
+              take: TEAM_RUN_LIMIT,
+              select: { id: true },
+            })
+          : [];
+        const runs = await db.run.findMany({
+          where: {
+            ...where(actor),
+            status: { in: ["running", "queued"] },
+            OR: [
+              { threadId: binding.threadId },
+              ...(children.length ? [{ taskId: { in: children.map((task) => task.id) } }] : []),
+            ],
+          },
+          take: TEAM_RUN_LIMIT,
+          select: { status: true, bot: { select: { id: true, name: true, color: true, archivedAt: true } } },
+        });
+        const members = new Map<string, HostedWebTeam["members"][number]>();
+        for (const run of runs) {
+          if (run.bot.archivedAt) continue;
+          const state = run.status === "running" ? "running" : "queued";
+          const known = members.get(run.bot.id);
+          if (known?.state === "running") continue;
+          members.set(run.bot.id, {
+            botId: run.bot.id,
+            name: run.bot.name,
+            color: run.bot.color,
+            state,
+          });
+        }
+        return { members: [...members.values()] };
+      }),
+    /** Confirms the actor owns the app before a presence stream opens. */
+    assertOwner: (actor: Actor, id: string) =>
+      scoped(actor, async () => {
+        await draft(actor, id);
       }),
     revision: (actor: Actor, id: string) =>
       scoped(actor, async () => {

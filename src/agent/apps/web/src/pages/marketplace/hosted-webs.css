@@ -591,3 +591,85 @@
     display: none;
   }
 }
+
+/* Live team presence over the private preview. Colors come from each Mico's identity. */
+.hw-editor-preview {
+  position: relative;
+}
+.hw-team-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: auto;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.hw-team-avatars {
+  display: inline-flex;
+}
+.hw-team-avatars > * + * {
+  margin-inline-start: -4px;
+}
+.hw-presence {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.hw-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 2px;
+  transition: transform 450ms ease;
+  will-change: transform;
+}
+.hw-cursor > svg {
+  fill: var(--hw-cursor, var(--primary));
+  stroke: var(--background);
+  stroke-width: 1;
+}
+.hw-cursor[data-phase="reading"] > svg {
+  opacity: 0.7;
+}
+.hw-cursor-label,
+.hw-cursor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 3px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--background);
+  background: var(--hw-cursor, var(--primary));
+  white-space: nowrap;
+}
+.hw-cursor-label {
+  margin-top: 12px;
+}
+.hw-presence-parked {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  transform: translateY(-100%);
+  max-width: calc(100% - 16px);
+}
+.hw-cursor-chip > .hw-cursor-label {
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+.hw-cursor-chip > code {
+  font-size: 10px;
+  opacity: 0.85;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hw-cursor {
+    transition: none;
+  }
+}
