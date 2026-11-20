@@ -525,6 +525,13 @@ interface PendingActivationCheckpointRestore {
 
 const MAX_PENDING_RUNTIME_LINK_PROBES = 64;
 const RUNTIME_RECONNECT_GRACE_MS = 45_000;
+/**
+ * Upper bound from opening a coordinator socket until `server.ready`.
+ * Without it, an upgrade that a proxy accepts but never answers (or a hello
+ * that is never acknowledged) leaves the worker waiting forever: no ping
+ * liveness runs before open and the reconnect loop never regains control.
+ */
+export const COORDINATOR_READY_TIMEOUT_MS = 60_000;
 
 export class WorkerAgent {
   private readonly adapter: InferenceAdapter;
@@ -565,6 +572,7 @@ export class WorkerAgent {
   private readonly logger: Pick<Console, "info" | "warn" | "error">;
   private runtimeCapacityGeneration = 0;
   private runtimeDisconnectTimer: NodeJS.Timeout | null = null;
+  private coordinatorReadyDeadline: NodeJS.Timeout | null = null;
   private contributionEnabled: boolean;
   private updateDraining = false;
   private coordinatorReady = false;
@@ -654,6 +662,7 @@ export class WorkerAgent {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = null;
     this.coordinatorReady = false;
+    this.clearCoordinatorReadyDeadline();
     this.clearRuntimeDisconnectTimer();
     this.clearRuntimeLinkProbes();
     await this.sendGoodbye("user_requested");
@@ -1232,11 +1241,13 @@ export class WorkerAgent {
       let opened = false;
       const socket = new WebSocket(url, {
         maxPayload: MAX_SERVER_MESSAGE_BYTES,
+        handshakeTimeout: COORDINATOR_READY_TIMEOUT_MS,
         ...(this.options.networkToken || this.workerSessionToken
           ? { headers: { authorization: `Bearer ${this.options.networkToken ?? this.workerSessionToken}` } }
           : {}),
       });
       this.socket = socket;
+      this.armCoordinatorReadyDeadline(socket);
       const abortStartup = () => {
         if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
       };
@@ -1277,6 +1288,7 @@ export class WorkerAgent {
         const closeReason = reason.toString("utf8").replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 123);
         if (!this.stopped) this.logger.warn(`Coordinator connection closed (code ${code}, ready ${this.coordinatorReady}): ${closeReason || "no reason received"}`);
         signal.removeEventListener("abort", abortStartup);
+        this.clearCoordinatorReadyDeadline(socket);
         this.coordinatorReady = false;
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = null;
@@ -1303,6 +1315,28 @@ export class WorkerAgent {
         }
       });
     });
+  }
+
+  private armCoordinatorReadyDeadline(socket: WebSocket): void {
+    this.clearCoordinatorReadyDeadline();
+    const timer = setTimeout(() => {
+      if (this.coordinatorReadyDeadline !== timer) return;
+      this.coordinatorReadyDeadline = null;
+      if (this.coordinatorReady || this.stopped || socket.readyState === WebSocket.CLOSED) return;
+      this.logger.warn(
+        `Coordinator did not acknowledge this worker within ${COORDINATOR_READY_TIMEOUT_MS}ms; reconnecting`,
+      );
+      socket.terminate();
+    }, COORDINATOR_READY_TIMEOUT_MS);
+    timer.unref?.();
+    this.coordinatorReadyDeadline = timer;
+  }
+
+  private clearCoordinatorReadyDeadline(socket?: WebSocket): void {
+    if (!this.coordinatorReadyDeadline) return;
+    if (socket && this.socket && this.socket !== socket) return;
+    clearTimeout(this.coordinatorReadyDeadline);
+    this.coordinatorReadyDeadline = null;
   }
 
   /**
@@ -1340,6 +1374,7 @@ export class WorkerAgent {
         if (message.payload.workerId !== this.registeredWorkerId) {
           throw new Error("Coordinator acknowledged a different worker id");
         }
+        this.clearCoordinatorReadyDeadline();
         this.logger.info(`Worker ${this.registeredWorkerId ?? "unknown"} connected`);
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.clearRuntimeDisconnectTimer();

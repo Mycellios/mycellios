@@ -314,14 +314,20 @@ export interface AutomaticActivationRetryState {
   launching: boolean;
 }
 
+/**
+ * Transient activation failures never give up permanently: after the initial
+ * progressive burst, retries continue at the last (largest) configured delay
+ * while the failure stays transient. Capacity, activation-slot and planner
+ * admission still gate every launch; only an empty schedule disables retries.
+ */
 export function nextAutomaticActivationRetry(
   retriesStarted: number,
   message: string,
   now = Date.now(),
   delays: readonly number[] = DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS,
 ): AutomaticActivationRetryState | null {
-  const delay = delays[retriesStarted];
-  if (delay === undefined) return null;
+  if (delays.length === 0) return null;
+  const delay = delays[Math.min(Math.max(0, retriesStarted), delays.length - 1)]!;
   return {
     retryCount: retriesStarted,
     nextAttemptAt: now + Math.max(0, delay),
@@ -1926,6 +1932,12 @@ export async function createCoordinator(
         },
       ]),
   );
+  const automaticRetryLabel = (retryNumber: number): string => {
+    const burst = automaticActivationRetryDelaysMs.length;
+    if (retryNumber <= burst) return `Automatic retry ${retryNumber} of ${burst}`;
+    const intervalSeconds = Math.round((automaticActivationRetryDelaysMs.at(-1) ?? 0) / 1_000);
+    return `Persistent automatic retry ${retryNumber} (every ${intervalSeconds}s while the failure stays transient)`;
+  };
   const automaticActivationRetryProgressForModel = (
     modelId: string,
   ): readonly ModelActivationProgressEvent[] => {
@@ -1941,12 +1953,12 @@ export async function createCoordinator(
     const retryNumber = retry.launching ? retry.retryCount : retry.retryCount + 1;
     const secondsRemaining = Math.max(0, Math.ceil((retry.nextAttemptAt - Date.now()) / 1_000));
     const waitMessage = secondsRemaining > 0
-      ? `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} starts in ${secondsRemaining}s.`
-      : `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is ready and waiting for healthy capacity and a free activation slot.`;
+      ? `${automaticRetryLabel(retryNumber)} starts in ${secondsRemaining}s.`
+      : `${automaticRetryLabel(retryNumber)} is ready and waiting for healthy capacity and a free activation slot.`;
     return [{
       phase: retry.launching ? "retrying" : "retry_wait",
       message: retry.launching
-        ? `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is starting.`
+        ? `${automaticRetryLabel(retryNumber)} is starting.`
         : `${incident.title}. ${waitMessage}`,
       at: new Date(retry.updatedAt).toISOString(),
       state: "running",
@@ -1980,12 +1992,12 @@ export async function createCoordinator(
     });
     const retryNumber = retry.launching ? retry.retryCount : retry.retryCount + 1;
     if (retry.launching) {
-      return `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is starting.`;
+      return `${automaticRetryLabel(retryNumber)} is starting.`;
     }
     const secondsRemaining = Math.max(0, Math.ceil((retry.nextAttemptAt - Date.now()) / 1_000));
     return secondsRemaining > 0
-      ? `${incident.title}. Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} starts in ${secondsRemaining}s.`
-      : `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is ready and waiting for healthy capacity and a free activation slot.`;
+      ? `${incident.title}. ${automaticRetryLabel(retryNumber)} starts in ${secondsRemaining}s.`
+      : `${automaticRetryLabel(retryNumber)} is ready and waiting for healthy capacity and a free activation slot.`;
   };
   const activationIncidentForModel = async (
     modelId: string,
