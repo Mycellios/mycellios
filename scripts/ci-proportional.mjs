@@ -18,8 +18,9 @@ const memoryEmbeddingPython = new Set(['python/distributed_runtime/qwen06_embedd
 // from the hash-locked cp312 wheel set; no model download or GPU.
 const speculationPython = new Set(['python/distributed_runtime/speculation.py',
   'python/distributed_runtime/server.py', 'python/distributed_runtime/draft_quality_runtime_benchmark.py',
-  'python/tests/test_speculation.py', 'python/tests/test_server.py', 'python/tests/test_draft_quality_runtime_benchmark.py']);
-const speculationTests = ['test_speculation.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py'];
+  'python/tests/test_speculation.py', 'python/tests/test_server.py', 'python/tests/test_draft_quality_runtime_benchmark.py',
+  'python/distributed_runtime/macro_wave_adapter.py', 'python/tests/test_macro_wave_adapter.py']);
+const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py'];
 export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
