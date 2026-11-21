@@ -14,6 +14,28 @@ export function desktopInstanceId(profileId: string, installation: string): stri
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+const deviceIds = new Map<string, Promise<string>>();
+
+/** This installation's stable Desktop device id (profile file + executable), shared by native connectors. */
+export function desktopDeviceId(profile: string): Promise<string> {
+  const known = deviceIds.get(profile);
+  if (known) return known;
+  const loading = (async () => {
+    const file = path.join(profile, "desktop-device-id");
+    const stored = await readPrivateFile(file, 128);
+    const profileId =
+      stored &&
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(stored)
+        ? stored
+        : randomUUID();
+    if (stored !== profileId) await writePrivateFile(file, profileId);
+    return desktopInstanceId(profileId, `${process.execPath}\0${path.resolve(profile)}`);
+  })();
+  deviceIds.set(profile, loading);
+  loading.catch(() => deviceIds.delete(profile));
+  return loading;
+}
+
 type Host = {
   hasRememberedAccess(scope: string): boolean;
   grant(scope: string): Promise<void>;
@@ -126,20 +148,7 @@ export class AccountComputerConnection {
         this.options.host.activate(false);
         return;
       }
-      if (!this.deviceId) {
-        const file = path.join(this.options.profile, "desktop-device-id");
-        const stored = await readPrivateFile(file, 128);
-        const profileId =
-          stored &&
-          /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(stored)
-            ? stored
-            : randomUUID();
-        if (stored !== profileId) await writePrivateFile(file, profileId);
-        this.deviceId = desktopInstanceId(
-          profileId,
-          `${process.execPath}\0${path.resolve(this.options.profile)}`,
-        );
-      }
+      this.deviceId ??= await desktopDeviceId(this.options.profile);
       const transport = (spaceId?: string) => async (url: string, init?: RequestInit) => {
         const headers = new Headers(init?.headers);
         if (spaceId) headers.set("x-rakazo-space-id", spaceId);

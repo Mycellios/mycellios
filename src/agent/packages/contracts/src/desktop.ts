@@ -84,6 +84,40 @@ export interface DesktopUpdatePreferences {
   installSupported?: boolean;
 }
 
+/** One WhatsApp number on this PC: a link in progress or an established linked device. */
+export interface RakazoDesktopWhatsAppStatus {
+  /** Local handle for this socket; stable while the link lives on this PC. */
+  sessionKey: string;
+  /** Server link id once the number is registered. */
+  linkId?: string;
+  state: "qr" | "pairing_code" | "connecting" | "connected" | "logged_out" | "error";
+  /** E.164 digits without "+". */
+  phone?: string;
+  /** Raw QR payload to render; it rotates while waiting. */
+  qr?: string;
+  pairingCode?: string;
+  error?: string;
+}
+
+export interface RakazoDesktopWhatsAppLinkInput {
+  botId: string;
+  mode: "personal" | "dedicated";
+  method: "qr" | "pairing_code";
+  /** Required for the pairing-code method. */
+  phone?: string;
+}
+
+/** WhatsApp linked device (specs/whatsapp-linked-device). Keys never leave native main. */
+export interface RakazoDesktopWhatsApp {
+  available: () => Promise<boolean>;
+  status: () => Promise<RakazoDesktopWhatsAppStatus[]>;
+  link: (input: RakazoDesktopWhatsAppLinkInput) => Promise<{ sessionKey: string }>;
+  cancel: (sessionKey: string) => Promise<void>;
+  disconnect: (linkId: string) => Promise<void>;
+  /** Receives the full status array on every change; returns an unsubscribe function. */
+  onStatus: (listener: (status: RakazoDesktopWhatsAppStatus[]) => void) => () => void;
+}
+
 export interface RakazoDesktopOAuthCallback {
   code: string;
   state?: string;
@@ -196,6 +230,8 @@ export interface RakazoDesktop {
     setAppControl?: (enabled: boolean) => Promise<{ available: boolean; enabled: boolean }>;
     onConfigure: (listener: () => void) => () => void;
   };
+  /** Absent in older desktop releases. */
+  whatsapp?: RakazoDesktopWhatsApp;
   /** Optional for compatibility with older desktop releases. */
   passkeys?: {
     /** Relying parties this build is associated with for system passkeys (macOS); others fail. */

@@ -498,6 +498,7 @@ model Space {
   modelOAuthSessions          ModelOAuthSession[]
   botMcpServers              BotMcpServer[]
   messagingIdentities         MessagingIdentity[]
+  whatsAppLinks               WhatsAppLink[]
   actionApprovalRules         ActionApprovalRule[]
   actionAutoReviewPreferences ActionAutoReviewPreference[]
   memoryConfig                SpaceMemoryConfig?
@@ -810,6 +811,7 @@ model Bot {
   ticketComments    TicketComment[]   @relation("TicketCommentAuthorBot")
 
   externalConversations ExternalConversation[]
+  whatsAppLinks         WhatsAppLink[]
 
   @@unique([spaceId, spawnKey])
   @@index([spaceId, userId, archivedAt, pinned, updatedAt])
@@ -2470,4 +2472,102 @@ model LocalMemoryReview {
   @@unique([threadId, generation, lastSeq])
   @@index([userId, spaceId, createdAt],map:"review_daily_budget")
   @@map("local_memory_reviews")
+}
+
+/// WhatsApp number linked as a device of the owner's Mycellios Desktop
+/// (specs/whatsapp-linked-device). The WhatsApp session stays on that PC; the
+/// server keeps which Mico answers, who may write and the outbox.
+model WhatsAppLink {
+  id              String             @id @default(cuid())
+  userId          String
+  spaceId         String
+  space           Space              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  botId           String
+  bot             Bot                @relation(fields: [botId], references: [id], onDelete: Cascade)
+  /// Stable id of the Desktop that holds the session; only it may act on the link.
+  desktopDeviceId String
+  mode            String
+  /// Bare `<digits>@s.whatsapp.net`: one row per number, so re-linking keeps history.
+  accountJid      String             @unique
+  accountLid      String?
+  phone           String
+  pushName        String?
+  status          String
+  /// Groups last reported by Desktop: [{ jid, name }].
+  groups          Json               @default("[]")
+  lastSeenAt      DateTime?
+  removedAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  senders         WhatsAppSender[]
+  outbound        WhatsAppOutbound[]
+  inbound         WhatsAppInbound[]
+
+  @@index([userId, spaceId])
+  @@map("whatsapp_links")
+}
+
+model WhatsAppSender {
+  id        String       @id @default(cuid())
+  linkId    String
+  link      WhatsAppLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  kind      String
+  jid       String
+  label     String
+  status    String
+  /// One-time approval code sent to a pending sender of a dedicated number.
+  code      String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([linkId, jid])
+  @@map("whatsapp_senders")
+}
+
+/// One send that Desktop performs once and reports; uncertain sends fail, never replay.
+model WhatsAppOutbound {
+  id                String       @id @default(cuid())
+  linkId            String
+  link              WhatsAppLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  idempotencyKey    String       @unique
+  chatJid           String
+  kind              String
+  text              String?
+  quotedId          String?
+  quotedParticipant String?
+  emoji             String?
+  targetId          String?
+  targetFromMe      Boolean      @default(false)
+  targetParticipant String?
+  sourceMessageId   String?
+  status            String       @default("pending")
+  claimedAt         DateTime?
+  attempts          Int          @default(0)
+  providerHandle    String?
+  error             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([linkId, status, createdAt])
+  @@map("whatsapp_outbound")
+}
+
+/// One uploaded WhatsApp message: idempotency, and where its reply and reactions go.
+model WhatsAppInbound {
+  id              String       @id @default(cuid())
+  linkId          String
+  link            WhatsAppLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  waMessageId     String
+  chatJid         String
+  senderJid       String
+  participant     String?
+  kind            String
+  threadMessageId String?
+  runId           String?
+  createdAt       DateTime     @default(now())
+
+  @@unique([linkId, waMessageId])
+  @@index([runId])
+  @@index([threadMessageId])
+  @@map("whatsapp_inbound")
 }

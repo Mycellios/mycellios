@@ -45,6 +45,7 @@ import { tailscaleRoutes } from "./routes/tailscale.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { messagingRoutes } from "./routes/messaging.js";
+import { whatsappRoutes } from "./routes/whatsapp.js";
 import { modelsRoutes } from "./routes/models.js";
 import { routinesRoutes } from "./routes/routines.js";
 import { workflowsRoutes } from "./routes/workflows.js";
@@ -186,6 +187,7 @@ export function createRouter(deps: RouterDeps) {
     ...tailscaleRoutes(ctx),
     ...connectionsRoutes(ctx),
     ...messagingRoutes(ctx),
+    ...whatsappRoutes(ctx),
     ...contentRoutes(ctx),
   });
 }

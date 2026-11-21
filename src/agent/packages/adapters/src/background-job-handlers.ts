@@ -28,6 +28,7 @@ import type { ExpoPushProvider } from "./expo-push.js";
 import { compactHistory } from "./history-compaction.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
+import { mirrorWhatsAppDeviceRun } from "./whatsapp-device-delivery.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
 
 type Tenant = { spaceId: string; userId: string };
@@ -131,6 +132,11 @@ export function createBackgroundJobHandlers(deps: {
           getLogger().error("messaging.deliver enqueue error", error);
           await drainMessaging();
         });
+      } else {
+        // The Desktop WhatsApp connector works without a server messaging surface.
+        await mirrorWhatsAppDeviceRun(deps.prisma, payload.runId).catch((error) =>
+          getLogger().error("whatsapp device mirror error", error),
+        );
       }
     }),
     "messaging.credential-cleanup": async ({ installationId, ref }) => {
@@ -149,6 +155,10 @@ export function createBackgroundJobHandlers(deps: {
     "messaging.deliver": async ({ runId }) => {
       if (runId && messagingDeps) {
         await asOwner(run, () => mirrorMessagingOutbound(messagingDeps, runId))({ runId });
+      } else if (runId) {
+        await asOwner(run, async () => {
+          await mirrorWhatsAppDeviceRun(deps.prisma, runId);
+        })({ runId });
       }
       await drainMessaging();
     },

@@ -13775,3 +13775,141 @@ msgstr "Cerrando…"
 
 msgid "Close sessions"
 msgstr "Cerrar sesiones"
+
+msgid "Couldn't update WhatsApp settings"
+msgstr "No se pudieron actualizar los ajustes de WhatsApp"
+
+msgid "Couldn't load linked WhatsApp numbers"
+msgstr "No se pudieron cargar los números de WhatsApp enlazados"
+
+msgid "WhatsApp (this PC)"
+msgstr "WhatsApp (este PC)"
+
+msgid "Linked. Open \"Message yourself\" in WhatsApp and send your first task."
+msgstr "Enlazado. Abre \"Mensaje para mí\" en WhatsApp y envía tu primera tarea."
+
+msgid "Link WhatsApp"
+msgstr "Enlazar WhatsApp"
+
+msgid "Linking WhatsApp needs Mycellios Desktop, because the WhatsApp session stays on your PC."
+msgstr "Para enlazar WhatsApp necesitas Mycellios Desktop, porque la sesión de WhatsApp se queda en tu PC."
+
+msgid "Personal number"
+msgstr "Número personal"
+
+msgid "Number only for Mycellios"
+msgstr "Número solo para Mycellios"
+
+msgid "Connecting"
+msgstr "Conectando"
+
+msgid "Mico for {0}"
+msgstr "Mico para {0}"
+
+msgid "Open Mycellios Desktop on the PC that linked it. WhatsApp removes a linked device after about 14 days offline."
+msgstr "Abre Mycellios Desktop en el PC que lo enlazó. WhatsApp elimina un dispositivo vinculado tras unos 14 días sin conexión."
+
+msgid "Disconnect this number?"
+msgstr "¿Desconectar este número?"
+
+msgid "This PC logs out of WhatsApp and the Mico stops answering this number."
+msgstr "Este PC cierra la sesión de WhatsApp y el Mico deja de responder en este número."
+
+msgid "The Mico stops answering this number. The PC that linked it logs out next time it connects. You can also remove it in WhatsApp → Linked devices."
+msgstr "El Mico deja de responder en este número. El PC que lo enlazó cerrará la sesión la próxima vez que se conecte. También puedes quitarlo en WhatsApp → Dispositivos vinculados."
+
+msgid "Who can write"
+msgstr "Quién puede escribir"
+
+msgid "Only your \"Message yourself\" chat."
+msgstr "Solo tu chat \"Mensaje para mí\"."
+
+msgid "No one yet."
+msgstr "Nadie todavía."
+
+msgid "Phone number with country code"
+msgstr "Número de teléfono con prefijo del país"
+
+msgid "Add contact"
+msgstr "Añadir contacto"
+
+msgid "Add group"
+msgstr "Añadir grupo"
+
+msgid "Denied ({0})"
+msgstr "Rechazados ({0})"
+
+msgid "Couldn't start linking. Try again."
+msgstr "No se pudo empezar a enlazar. Inténtalo de nuevo."
+
+msgid "Linking failed. Try again."
+msgstr "No se pudo enlazar. Inténtalo de nuevo."
+
+msgid "WhatsApp ended the link. Try again."
+msgstr "WhatsApp terminó el enlace. Inténtalo de nuevo."
+
+msgid "WhatsApp link code"
+msgstr "Código para enlazar WhatsApp"
+
+msgid "Could not show the code. Use a pairing code instead."
+msgstr "No se pudo mostrar el código. Usa un código de vinculación."
+
+msgid "On your phone open WhatsApp → Linked devices → Link a device and scan this code."
+msgstr "En tu teléfono, abre WhatsApp → Dispositivos vinculados → Vincular un dispositivo y escanea este código."
+
+msgid "WhatsApp → Linked devices → Link a device → Link with phone number instead, then type this code."
+msgstr "WhatsApp → Dispositivos vinculados → Vincular un dispositivo → Vincular con el número de teléfono, y escribe este código."
+
+msgid "1. Whose number?"
+msgstr "1. ¿De quién es el número?"
+
+msgid "Whose number?"
+msgstr "¿De quién es el número?"
+
+msgid "My personal number"
+msgstr "Mi número personal"
+
+msgid "Only your own \"Message yourself\" chat and the contacts and groups you allow reach your Mico. Mycellios never writes to anyone else first."
+msgstr "Solo tu chat \"Mensaje para mí\" y los contactos y grupos que permitas llegan a tu Mico. Mycellios nunca escribe primero a nadie más."
+
+msgid "A number only for Mycellios"
+msgstr "Un número solo para Mycellios"
+
+msgid "People you didn't allow get one message with a 6-character code. You approve them here."
+msgstr "Quien no esté permitido recibe un único mensaje con un código de 6 caracteres. Tú lo apruebas aquí."
+
+msgid "WhatsApp doesn't permit unofficial clients and can restrict or block a number it sees as automated. A number used only for Mycellios is safer than your personal one."
+msgstr "WhatsApp no permite clientes no oficiales y puede restringir o bloquear un número que considere automatizado. Un número usado solo para Mycellios es más seguro que el personal."
+
+msgid "2. Which Mico answers?"
+msgstr "2. ¿Qué Mico responde?"
+
+msgid "3. How to link"
+msgstr "3. Cómo enlazar"
+
+msgid "How to link"
+msgstr "Cómo enlazar"
+
+msgid "QR code"
+msgstr "Código QR"
+
+msgid "Scan a code with your phone."
+msgstr "Escanea un código con tu teléfono."
+
+msgid "Pairing code"
+msgstr "Código de vinculación"
+
+msgid "Type a code on your phone instead."
+msgstr "Escribe un código en tu teléfono."
+
+msgid "WhatsApp phone number with country code"
+msgstr "Número de WhatsApp con prefijo del país"
+
+msgid "Show QR code"
+msgstr "Mostrar código QR"
+
+msgid "Get pairing code"
+msgstr "Obtener código de vinculación"
+
+msgid "Talk to a Mico from your own WhatsApp number through Mycellios Desktop."
+msgstr "Habla con un Mico desde tu propio número de WhatsApp a través de Mycellios Desktop."

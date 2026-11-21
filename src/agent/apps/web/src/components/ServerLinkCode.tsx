@@ -1,8 +1,11 @@
 import { useLingui } from "@lingui/react/macro";
 import { useEffect, useRef, useState } from "react";
 
-/** A server address only. Signing in on the phone still owns authentication. */
-export function ServerLinkCode({ url }: { url: string }) {
+/**
+ * Flat dark modules on a white quiet zone, in every theme, so phone cameras
+ * can read it in dark mode too.
+ */
+export function QrCode({ value, label, failedText }: { value: string; label: string; failedText: string }) {
   const { t } = useLingui();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
@@ -10,11 +13,10 @@ export function ServerLinkCode({ url }: { url: string }) {
   useEffect(() => {
     let live = true;
     setFailed(false);
-    setReady(false);
     void import("qrcode-generator").then(({ default: qrcode }) => {
       if (!live || !canvas.current) return;
       const code = qrcode(0, "M");
-      code.addData(url);
+      code.addData(value);
       code.make();
       const count = code.getModuleCount();
       const scale = Math.max(2, Math.floor(256 / (count + 8)));
@@ -33,14 +35,22 @@ export function ServerLinkCode({ url }: { url: string }) {
         }
       }
       setReady(true);
-    }).catch(() => { if (live) setFailed(true); });
+    }).catch(() => { if (live) { setReady(false); setFailed(true); } });
     return () => { live = false; };
-  }, [url]);
-  return <div className="flex flex-col items-center gap-3">
-    <canvas ref={canvas} role="img" aria-label={t`Scan to open Mycellios on your phone`}
-      hidden={!ready} className="size-60 max-w-full rounded-lg" />
+  }, [value]);
+  return <>
+    <canvas ref={canvas} role="img" aria-label={label} hidden={!ready} className="size-60 max-w-full rounded-lg" />
     {!ready && !failed && <p role="status" className="text-sm text-muted-foreground">{t`Preparing code…`}</p>}
-    {failed && <p role="alert" className="text-sm text-destructive">{t`Could not show the code. Use the link below.`}</p>}
+    {failed && <p role="alert" className="text-sm text-destructive">{failedText}</p>}
+  </>;
+}
+
+/** A server address only. Signing in on the phone still owns authentication. */
+export function ServerLinkCode({ url }: { url: string }) {
+  const { t } = useLingui();
+  return <div className="flex flex-col items-center gap-3">
+    <QrCode value={url} label={t`Scan to open Mycellios on your phone`}
+      failedText={t`Could not show the code. Use the link below.`} />
     <a href={url} target="_blank" rel="noopener noreferrer" className="break-all text-sm underline underline-offset-4">{url}</a>
   </div>;
 }

@@ -4503,7 +4503,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? [messagingDmSurfaceNote(), messagingChannelRun ? messagingChannelPrivacyBlock() : null]
               .filter(Boolean)
               .join("\n\n")
-          : undefined;
+          : // Desktop-linked WhatsApp chats carry a channel block without a messaging identity.
+            messagingChannelRun
+            ? messagingChannelPrivacyBlock()
+            : undefined;
         if (heldForTakeover) {
           const held = await deps.prisma.run.findUnique({
             where: { id: runId },

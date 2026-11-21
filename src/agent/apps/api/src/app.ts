@@ -145,6 +145,7 @@ import {
 } from "./client-ip.js";
 import { cspReportRoutes } from "./csp-report.js";
 import { mountDesktopRelay } from "./desktop-relay.js";
+import { mountDesktopWhatsApp } from "./desktop-whatsapp.js";
 import { mountDiagramScript } from "./diagram-script.js";
 import { configuredEmailProvider } from "./email.js";
 import type { AppEnv } from "./env.js";
@@ -862,6 +863,15 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     return actor && { actor, sessionId: session.session.id };
   };
   const sessionActor = async (request: Request) => (await requestSession(request))?.actor ?? null;
+  const ownsActiveBot = (actor: { userId: string; spaceId: string }, botId: string) =>
+    runAsTenant(actor, async () =>
+      Boolean(
+        await prisma.bot.findFirst({
+          where: { id: botId, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+          select: { id: true },
+        }),
+      ),
+    );
   const stopDesktopRelay = mountDesktopRelay(app, {    desktopExecution: (actor, enabled) => runAsTenant(actor, async () => {
       const where = { spaceId_userId: { spaceId: actor.spaceId, userId: actor.userId } };
       if (enabled !== undefined) {
@@ -874,17 +884,23 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",
     secret: env.screenProxySecret,
     authenticate: requestSession,
-    ownsBot: (actor, botId) =>
-      runAsTenant(actor, async () =>
-        Boolean(
-          await prisma.bot.findFirst({
-            where: { id: botId, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
-            select: { id: true },
-          }),
-        ),
-      ),
+    ownsBot: ownsActiveBot,
   });
   desktopHostProbe = stopDesktopRelay.hasAgentDevice;
+  mountDesktopWhatsApp(app, {
+    enabled: env.whatsappDeviceEnabled === true,
+    prisma,
+    events,
+    jobs,
+    authenticate: requestSession,
+    ownsBot: ownsActiveBot,
+    storeAttachment: (owner, input) =>
+      storeInboundAttachment(
+        { prisma, artifacts, maxUploadSizeBytes: env.maxUploadSizeBytes },
+        owner,
+        input,
+      ),
+  });
   if (messagingInstallations) {
     app.get("/api/v1/messaging/install/slack/callback", async (c) => {
       try {

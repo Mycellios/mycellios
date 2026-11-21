@@ -102,6 +102,16 @@ Apache-2.0), used unmodified for opt-in accessibility control of the owner's own
 applications. Its SHA-256 is pinned and verified when packaging and before every
 use.
 
+## WhatsApp linked device
+
+Desktop bundles Baileys 7.0.0-rc14 (WhiskeySockets, MIT) in
+`dist/whatsapp-runtime.js` for the optional WhatsApp linked-device connector,
+together with its Signal dependencies `libsignal` 6.0.0 (GPL-3.0) and
+`whatsapp-rust-bridge` 0.5.4 (WebAssembly that contains AGPL-3.0 code). These
+builds are distributed under GPL-3.0-compatible terms; the bundle is loaded only
+when the owner links a number and is not part of the hosted API or worker. See
+`specs/whatsapp-linked-device/spec.md`.
+
 ## Integrated development tooling
 
 Desktop development resources may bundle npm and its bundled dependencies from

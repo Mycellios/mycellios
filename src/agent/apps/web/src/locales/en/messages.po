@@ -13397,3 +13397,141 @@ msgstr "Closing…"
 
 msgid "Close sessions"
 msgstr "Close sessions"
+
+msgid "Couldn't update WhatsApp settings"
+msgstr "Couldn't update WhatsApp settings"
+
+msgid "Couldn't load linked WhatsApp numbers"
+msgstr "Couldn't load linked WhatsApp numbers"
+
+msgid "WhatsApp (this PC)"
+msgstr "WhatsApp (this PC)"
+
+msgid "Linked. Open \"Message yourself\" in WhatsApp and send your first task."
+msgstr "Linked. Open \"Message yourself\" in WhatsApp and send your first task."
+
+msgid "Link WhatsApp"
+msgstr "Link WhatsApp"
+
+msgid "Linking WhatsApp needs Mycellios Desktop, because the WhatsApp session stays on your PC."
+msgstr "Linking WhatsApp needs Mycellios Desktop, because the WhatsApp session stays on your PC."
+
+msgid "Personal number"
+msgstr "Personal number"
+
+msgid "Number only for Mycellios"
+msgstr "Number only for Mycellios"
+
+msgid "Connecting"
+msgstr "Connecting"
+
+msgid "Mico for {0}"
+msgstr "Mico for {0}"
+
+msgid "Open Mycellios Desktop on the PC that linked it. WhatsApp removes a linked device after about 14 days offline."
+msgstr "Open Mycellios Desktop on the PC that linked it. WhatsApp removes a linked device after about 14 days offline."
+
+msgid "Disconnect this number?"
+msgstr "Disconnect this number?"
+
+msgid "This PC logs out of WhatsApp and the Mico stops answering this number."
+msgstr "This PC logs out of WhatsApp and the Mico stops answering this number."
+
+msgid "The Mico stops answering this number. The PC that linked it logs out next time it connects. You can also remove it in WhatsApp → Linked devices."
+msgstr "The Mico stops answering this number. The PC that linked it logs out next time it connects. You can also remove it in WhatsApp → Linked devices."
+
+msgid "Who can write"
+msgstr "Who can write"
+
+msgid "Only your \"Message yourself\" chat."
+msgstr "Only your \"Message yourself\" chat."
+
+msgid "No one yet."
+msgstr "No one yet."
+
+msgid "Phone number with country code"
+msgstr "Phone number with country code"
+
+msgid "Add contact"
+msgstr "Add contact"
+
+msgid "Add group"
+msgstr "Add group"
+
+msgid "Denied ({0})"
+msgstr "Denied ({0})"
+
+msgid "Couldn't start linking. Try again."
+msgstr "Couldn't start linking. Try again."
+
+msgid "Linking failed. Try again."
+msgstr "Linking failed. Try again."
+
+msgid "WhatsApp ended the link. Try again."
+msgstr "WhatsApp ended the link. Try again."
+
+msgid "WhatsApp link code"
+msgstr "WhatsApp link code"
+
+msgid "Could not show the code. Use a pairing code instead."
+msgstr "Could not show the code. Use a pairing code instead."
+
+msgid "On your phone open WhatsApp → Linked devices → Link a device and scan this code."
+msgstr "On your phone open WhatsApp → Linked devices → Link a device and scan this code."
+
+msgid "WhatsApp → Linked devices → Link a device → Link with phone number instead, then type this code."
+msgstr "WhatsApp → Linked devices → Link a device → Link with phone number instead, then type this code."
+
+msgid "1. Whose number?"
+msgstr "1. Whose number?"
+
+msgid "Whose number?"
+msgstr "Whose number?"
+
+msgid "My personal number"
+msgstr "My personal number"
+
+msgid "Only your own \"Message yourself\" chat and the contacts and groups you allow reach your Mico. Mycellios never writes to anyone else first."
+msgstr "Only your own \"Message yourself\" chat and the contacts and groups you allow reach your Mico. Mycellios never writes to anyone else first."
+
+msgid "A number only for Mycellios"
+msgstr "A number only for Mycellios"
+
+msgid "People you didn't allow get one message with a 6-character code. You approve them here."
+msgstr "People you didn't allow get one message with a 6-character code. You approve them here."
+
+msgid "WhatsApp doesn't permit unofficial clients and can restrict or block a number it sees as automated. A number used only for Mycellios is safer than your personal one."
+msgstr "WhatsApp doesn't permit unofficial clients and can restrict or block a number it sees as automated. A number used only for Mycellios is safer than your personal one."
+
+msgid "2. Which Mico answers?"
+msgstr "2. Which Mico answers?"
+
+msgid "3. How to link"
+msgstr "3. How to link"
+
+msgid "How to link"
+msgstr "How to link"
+
+msgid "QR code"
+msgstr "QR code"
+
+msgid "Scan a code with your phone."
+msgstr "Scan a code with your phone."
+
+msgid "Pairing code"
+msgstr "Pairing code"
+
+msgid "Type a code on your phone instead."
+msgstr "Type a code on your phone instead."
+
+msgid "WhatsApp phone number with country code"
+msgstr "WhatsApp phone number with country code"
+
+msgid "Show QR code"
+msgstr "Show QR code"
+
+msgid "Get pairing code"
+msgstr "Get pairing code"
+
+msgid "Talk to a Mico from your own WhatsApp number through Mycellios Desktop."
+msgstr "Talk to a Mico from your own WhatsApp number through Mycellios Desktop."
