@@ -227,8 +227,14 @@ class MacroWavePreparation:
                 raise ValueError("the legacy controller may only prepare a linear wave")
             if self.proposal.linear_tokens != self.selected_draft_tokens:
                 raise ValueError("proposal tokens must match the selected draft")
-        if self.is_probe and self.decision.enabled:
-            raise ValueError("an enabled controller decision is not a probe")
+        if (
+            self.is_probe
+            and self.decision.enabled
+            and len(self.selected_draft_tokens) <= self.decision.candidate_size
+        ):
+            raise ValueError(
+                "a probe may only replace an enabled decision with a larger size"
+            )
 
     @property
     def enabled(self) -> bool:
@@ -388,8 +394,11 @@ def prepare_linear_macro_wave(
 ) -> MacroWavePreparation:
     """Run the current provider/controller gate and adapt its selected draft.
 
-    ``allow_probe`` mirrors the engine's explicit warm-up probe path.  It never
-    changes the controller's decision; ``is_probe`` identifies that override.
+    ``allow_probe`` mirrors the engine's explicit probe path.  It never changes
+    the controller's decision; ``is_probe`` identifies that override.  A probe
+    runs while speculation is disabled, and also when a larger candidate size
+    than the enabled one has not been measured yet, so a small first winner is
+    not a permanent local optimum.  Every probed token is still verified.
     """
 
     if not isinstance(provider, DraftProvider):
@@ -415,12 +424,17 @@ def prepare_linear_macro_wave(
         )
         selected_size = decision.candidate_size if decision.enabled else 0
         is_probe = False
-        if selected_size == 0 and allow_probe:
-            selected_size = controller.next_probe_size(
+        if allow_probe:
+            # Keep exploring larger unmeasured sizes after a smaller one is
+            # enabled; otherwise the first beneficial size (usually 1) is a
+            # permanent local optimum even on a high-RTT route.
+            probe = controller.next_probe_size(
                 history_tokens=len(history),
                 available_draft_tokens=assumed_available,
             ) or 0
-            is_probe = selected_size > 0
+            if probe > selected_size:
+                selected_size = probe
+                is_probe = True
         available = (
             _tokens(
                 _draft_tokens_for_request(
@@ -446,12 +460,17 @@ def prepare_linear_macro_wave(
         )
         selected_size = decision.candidate_size if decision.enabled else 0
         is_probe = False
-        if selected_size == 0 and allow_probe:
-            selected_size = controller.next_probe_size(
+        if allow_probe:
+            # Keep exploring larger unmeasured sizes after a smaller one is
+            # enabled; otherwise the first beneficial size (usually 1) is a
+            # permanent local optimum even on a high-RTT route.
+            probe = controller.next_probe_size(
                 history_tokens=len(history),
                 available_draft_tokens=len(available),
             ) or 0
-            is_probe = selected_size > 0
+            if probe > selected_size:
+                selected_size = probe
+                is_probe = True
     draft_latency_seconds = perf_counter() - draft_started
 
     if limit is not None and len(available) > limit:

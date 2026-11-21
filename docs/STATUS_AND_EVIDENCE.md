@@ -1,5 +1,37 @@
 # Status and evidence
 
+## Speculative drafting over a two-machine relay route — exploratory, 2026-11-21
+
+Not a physical claim under the evidence policy below. TTFT, peak memory,
+machine identity receipts and native transport were not recorded.
+
+| Setting | Value |
+| --- | --- |
+| Model | SmolLM2-360M-Instruct |
+| Root, layers 0–16 | Windows desktop CPU |
+| Tail, layers 16–32 | Separate Linux server on another network, CPU |
+| Transport | SSH stdio relays over the private overlay VPN, measured route RTT 57–73 ms |
+| Requests | 16 greedy requests per arm |
+
+Every arm returned text byte-identical to non-speculative decoding.
+
+| Arm, k=16 | Copy-heavy | Mixed chat |
+| --- | ---: | ---: |
+| No speculation | 4.09 tok/s | 4.39 tok/s |
+| n-gram | ×2.79 | ×1.05 |
+| fused lookup | **×3.97** | ×1.06 |
+| 135M draft model | ×0.77 | ×1.07 |
+| fused lookup + draft model | ×1.64 | ×0.48 |
+
+The first run exposed a controller defect. Once a one-token draft was judged
+beneficial, larger sizes were never probed, so a 55 ms route stayed at one
+draft token per round trip. Probes now explore larger unmeasured sizes while a
+smaller size is enabled.
+
+A local draft model sharing the root CPU lost throughput. Fused drafting with a
+model also enabled four-token waves that were slower on mixed chat. Draft
+models therefore remain an operator choice, not a default.
+
 ## Windows companion dock local repair, 2026-11-16
 
 Companion windows wait for their populated renderer and native ready-to-show
