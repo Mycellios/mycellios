@@ -339,6 +339,13 @@ These rules apply to the complete repository.
 
 ## Execution route admission
 
+- Contributor PCs are untrusted readers (`specs/node-owner-privacy/spec.md`).
+  `lease.offer` carries only `WorkerRequestView`: a per-worker session
+  pseudonym, no privacy policy, region or participant names. Worker logs and
+  `task.fail` use `contentFreeFailure`; never write request or output content
+  to a contributor's disk, logs or telemetry. One identity id never spans two
+  kinds, and pins fail closed when it does. Check tests/node-owner-privacy.test.ts.
+
 - Native RTT probes keep one outstanding ping and terminate silent sockets after
   the bounded pong grace period. Reuse the existing reconnect and offset-ACK
   recovery path; never replay a whole request to recover a transport. Check

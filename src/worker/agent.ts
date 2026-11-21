@@ -26,6 +26,7 @@ import type {
 import type { AdapterChunk, AdapterMetrics, InferenceAdapter } from "../adapters/base.js";
 import { HeartbeatObservation } from "./heartbeat-observation.js";
 import { createAdapter } from "../adapters/factory.js";
+import { contentFreeFailure } from "./content-free-failure.js";
 import { sha256Text } from "../core/json.js";
 import { estimateInputTokens } from "../core/request.js";
 import { observeHostMemory, withoutHostMemory } from "./host-memory.js";
@@ -2408,7 +2409,8 @@ export class WorkerAgent {
       };
       this.sendMessage("task.complete", result);
     } catch (error) {
-      const failureMessage = errorText(error).slice(0, 300);
+      // Logs on the PC and task.fail never carry request or output content.
+      const failureMessage = error instanceof WorkerOutputLimitError ? errorText(error).slice(0, 300) : contentFreeFailure(error);
       this.logger.error(`Inference job ${payload.jobId} failed: ${failureMessage}`);
       this.sendMessage("task.fail", {
         jobId: payload.jobId,
