@@ -142,9 +142,52 @@ class TorchEmbedder:
             self.torch.cuda.empty_cache()
 
 
+class ThermalGuard:
+    """Hysteresis gate below the owner's node temperature limit.
+
+    Sustained backfill can heat a laptop GPU past the node's limit, which
+    pauses the whole node and every replica on it. Work waits while the GPU
+    is at or above `pause_c` and resumes below `resume_c`; a request that
+    cannot start within `max_wait_s` gets 503 so the caller backs off.
+    """
+
+    def __init__(self, read_temperature, pause_c=78, resume_c=72, max_wait_s=60, sleep=time.sleep):
+        self.read = read_temperature
+        self.pause_c, self.resume_c, self.max_wait_s, self.sleep = pause_c, resume_c, max_wait_s, sleep
+        self.paused = False
+
+    def wait(self):
+        waited = 0.0
+        while True:
+            try:
+                temperature = self.read()
+            except Exception:
+                temperature = None
+            if temperature is None:
+                return
+            if self.paused and temperature < self.resume_c:
+                self.paused = False
+            elif not self.paused and temperature >= self.pause_c:
+                self.paused = True
+            if not self.paused:
+                return
+            if waited >= self.max_wait_s:
+                raise ServiceError(503, "replica_cooling_down")
+            self.sleep(2.0)
+            waited += 2.0
+
+
+def nvidia_temperature():
+    import subprocess
+    out = subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"],
+                         capture_output=True, text=True, timeout=5, check=True).stdout
+    return max(int(line) for line in out.split() if line.strip().isdigit())
+
+
 class Replica:
-    def __init__(self, config, load=None, gate=None):
+    def __init__(self, config, load=None, gate=None, thermal=None):
         self.config = config
+        self.thermal = thermal
         self.load = load or (lambda: TorchEmbedder(config["modelPath"], config["device"], config["dtype"], config["revision"]))
         self.gate = gate
         self.embedder = None
@@ -168,6 +211,8 @@ class Replica:
             self.state = "ready" if self.embedder is not None else "waiting_reservation"
 
     def embed(self, texts):
+        if self.thermal is not None:
+            self.thermal.wait()
         with self.lock:
             if self.embedder is None:
                 raise ServiceError(503, "no_replica_available")
@@ -233,7 +278,11 @@ def main():
     if len(token) < 32:
         raise ValueError("token_too_short")
     gate = ReservationGate(config["reservation"]) if config.get("reservation") else None
-    replica = Replica(config, gate=gate)
+    thermal = None
+    if config["device"] == "cuda":
+        limits = config.get("thermal", {})
+        thermal = ThermalGuard(nvidia_temperature, limits.get("pauseC", 78), limits.get("resumeC", 72))
+    replica = Replica(config, gate=gate, thermal=thermal)
 
     def loop():
         while True:

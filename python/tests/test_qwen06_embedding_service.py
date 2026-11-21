@@ -88,6 +88,27 @@ class MicroBatchTests(unittest.TestCase):
         self.assertEqual(service.plan_micro_batches([20_000, 10], 16_384), [[1], [0]])
 
 
+class ThermalGuardTests(unittest.TestCase):
+    def test_pauses_above_limit_and_resumes_with_hysteresis(self):
+        readings = iter([80, 79, 74, 71])
+        sleeps = []
+        guard = service.ThermalGuard(lambda: next(readings), pause_c=78, resume_c=72, sleep=sleeps.append)
+        guard.wait()
+        self.assertEqual(len(sleeps), 3)
+        self.assertFalse(guard.paused)
+
+    def test_gives_up_with_503_while_still_hot(self):
+        guard = service.ThermalGuard(lambda: 90, max_wait_s=4, sleep=lambda s: None)
+        with self.assertRaises(service.ServiceError) as raised:
+            guard.wait()
+        self.assertEqual((raised.exception.status, raised.exception.code), (503, "replica_cooling_down"))
+
+    def test_unreadable_temperature_does_not_block(self):
+        def broken():
+            raise OSError("no nvidia-smi")
+        service.ThermalGuard(broken).wait()
+
+
 class ReservationGateTests(unittest.TestCase):
     cfg = {"timelineUrl": "https://www.mycellios.com/public/v1/requested-models/m-q06/timeline", "modelId": "m-q06",
            "consumerId": "c1", "nodeId": "n1", "memoryMiB": 1024}

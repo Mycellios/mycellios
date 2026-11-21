@@ -12,7 +12,8 @@ const installerPython = new Set(['deploy/installers/publisher.py', 'deploy/insta
 // The private memory-embedding replica and forwarder tests use only the standard library.
 const memoryEmbeddingPython = new Set(['python/distributed_runtime/qwen06_embedding_service.py',
   'python/distributed_runtime/qwen06_embedding_forwarder.py', 'python/tests/test_qwen06_embedding_service.py',
-  'python/tests/test_qwen06_embedding_forwarder.py']);
+  'python/tests/test_qwen06_embedding_forwarder.py', 'deploy/transcription-openai-bridge/bridge.py',
+  'deploy/transcription-openai-bridge/test_bridge.py']);
 export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
@@ -52,6 +53,7 @@ export function planChecks(files, availableAgentTests) {
   }
   if (files.some(f => memoryEmbeddingPython.has(f))) {
     add('python', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_qwen06_*.py'], 'memory-embedding replica and forwarder boundaries (no model or GPU)');
+    add('.', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'deploy/transcription-openai-bridge', '-p', 'test_*.py'], 'OpenAI transcription bridge boundaries (no ffmpeg or network)');
   }
   if (files.some(f => transcriptionPython.has(f) || f === 'python/transcription-artifacts.json')) {
     add('.', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_transcription_*.py'], 'native transcription Python boundaries (no model or GPU)');
