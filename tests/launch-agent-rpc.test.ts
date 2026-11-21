@@ -595,6 +595,29 @@ describe("HTTP LaunchAgent RPC", () => {
     );
   });
 
+  it("accepts a root engine launched with a sealed fused lookup", () => {
+    const description = fixtureDescription(
+      "sha256:rpc-r1",
+      { waves: 3, bytes: 64 * 1024 * 1024 },
+      "fused",
+    );
+    const root = description.launchOrder.find(
+      (process) => process.kind === "root-engine",
+    )!;
+    const lookupIndex = root.command.args.indexOf("--speculation-lookup");
+
+    expect(root.command.args[lookupIndex + 1]).toBe("fused");
+    expect(() =>
+      validateLaunchAgentRpcStartRequest({
+        launchId: description.launchId,
+        pipelineId: description.pipelineId,
+        deploymentGeneration: description.deploymentGeneration,
+        nodeId: root.anchor.memberId,
+        process: structuredClone(root),
+      }),
+    ).not.toThrow();
+  });
+
   it("preserves an exact resident MacroWave stage contract and rejects extensions", async () => {
     const request = fixtureRequest();
     request.process.macroWave = residentMacroWaveStage();
@@ -1335,6 +1358,7 @@ function residentMacroWaveStage(): MacroWaveStageExecutionContractV1 {
 function fixtureDescription(
   modelRevision = "sha256:rpc-r1",
   conveyor: { waves: number; bytes: number } | null = null,
+  lookup?: "fused",
 ): PythonPipelineLaunchDescription {
   const model: DistributedModelProfile = {
     id: "rpc-model",
@@ -1428,6 +1452,7 @@ function fixtureDescription(
                 minAcceptanceRate: 0.5,
                 maxWasteRatio: 0.4,
                 priority: 10,
+                ...(lookup === undefined ? {} : { lookup }),
               },
               {
                 id: "autoregressive",

@@ -2185,13 +2185,7 @@ function validateSpeculation(value: unknown): void {
     assertExactKeys(
       strategy,
       ["id", "kind", "maxDraftTokens", "minAcceptanceRate", "maxWasteRatio", "priority"],
-      [
-        "artifactId",
-        "maxBranches",
-        "maxBranchTokens",
-        "maxKvBytes",
-        "maxWaveTokens",
-      ],
+      ["artifactId", "maxBranches", "maxBranchTokens", "maxKvBytes", "maxWaveTokens", "lookup"],
       "speculation.strategy",
     );
     assertIdentifier(strategy.id, "speculation.strategy.id");
@@ -2201,6 +2195,12 @@ function validateSpeculation(value: unknown): void {
     assertFiniteRange(strategy.maxWasteRatio, 0, 1, "speculation.strategy.maxWasteRatio");
     assertInteger(strategy.priority, 0, 1_000_000, "speculation.strategy.priority");
     if (strategy.artifactId !== undefined) assertIdentifier(strategy.artifactId, "speculation.strategy.artifactId");
+    if (
+      strategy.lookup !== undefined
+      && (strategy.lookup !== "fused" || (strategy.kind !== "ngram" && strategy.kind !== "draft-model"))
+    ) {
+      throw new Error("speculation_strategy_lookup_is_invalid");
+    }
     for (const [name, maximum] of [
       ["maxBranches", 64],
       ["maxBranchTokens", 1_048_576],

@@ -618,6 +618,7 @@ interface PythonSpeculationArguments {
   artifactId: string | null;
   parameterBytes: number;
   memoryReservationBytes: number;
+  lookup: "plain" | "fused";
 }
 
 /**
@@ -1439,6 +1440,7 @@ function renderRootEngineArguments(
     speculation.provider,
     "--speculative-max-draft-tokens",
     String(speculation.maxDraftTokens),
+    ...(speculation.lookup === "fused" ? ["--speculation-lookup", "fused"] : []),
     "--speculation-minimum-speedup",
     finiteNumber(configuration.speculationMinimumSpeedup),
     "--max-output-tokens",
@@ -1520,9 +1522,7 @@ function appendPagedKvArguments(
 }
 
 function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationArguments {
-  const selected = policy.strategies.find(
-    (strategy) => strategy.id === policy.defaultStrategyId,
-  );
+  const selected = policy.strategies.find((strategy) => strategy.id === policy.defaultStrategyId);
   if (!selected) throw new Error("python_speculation_default_is_missing");
   if (policy.mode === "disabled" || selected.kind === "autoregressive") {
     return {
@@ -1536,13 +1536,10 @@ function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationA
       artifactId: null,
       parameterBytes: 0,
       memoryReservationBytes: 0,
+      lookup: "plain",
     };
   }
-  if (
-    selected.kind !== "ngram"
-    && selected.kind !== "draft-tree"
-    && selected.kind !== "draft-model"
-  ) {
+  if (selected.kind !== "ngram" && selected.kind !== "draft-tree" && selected.kind !== "draft-model") {
     throw new Error(`python_speculation_strategy_not_supported:${selected.kind}`);
   }
   if (selected.maxDraftTokens > 16) {
@@ -1560,6 +1557,7 @@ function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationA
       artifactId: null,
       parameterBytes: 0,
       memoryReservationBytes: 0,
+      lookup: selected.lookup ?? "plain",
     };
   }
   if (selected.kind === "draft-model") {
@@ -1587,6 +1585,7 @@ function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationA
         Number.MAX_SAFE_INTEGER,
         "python_draft_model_memory_reservation_is_invalid",
       ),
+      lookup: selected.lookup ?? "plain",
     };
   }
   if (
@@ -1611,6 +1610,7 @@ function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationA
     artifactId: null,
     parameterBytes: 0,
     memoryReservationBytes: 0,
+    lookup: "plain",
   };
 }
 
