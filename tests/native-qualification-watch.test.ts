@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nativeTargetsNeedingRefresh, reserveNativeQualificationAttempt } from "../src/coordinator/native-qualification-watch.js";
+import { nativeTargetsNeedingRefresh, reserveNativeQualificationAttempt, settleNativeQualificationAttempt } from "../src/coordinator/native-qualification-watch.js";
 const digest = `sha256:${"a".repeat(64)}`;
 function fixture() {
   const t = { workerId: "w", deploymentId: "d", activationId: "a", modelDigest: digest, buildSourceId: digest, physicalNodeId: "n" };
@@ -17,6 +17,16 @@ describe("native qualification refresh approval", () => {
     const reloaded = JSON.parse(JSON.stringify(state));
     expect(reserveNativeQualificationAttempt(reloaded, 2_701_000)).toBeNull();
     expect(reserveNativeQualificationAttempt(reloaded, 86_402_000)?.count).toBe(1);
+  });
+  it("clears the cap after a confirmed qualification but keeps it for failed and uncertain attempts", () => {
+    let state = reserveNativeQualificationAttempt(undefined, 1_000)!;
+    for (const now of [901_000, 1_801_000]) state = reserveNativeQualificationAttempt(state, now)!;
+    expect(state.count).toBe(3);
+    for (const status of [422, 502, null]) expect(settleNativeQualificationAttempt(state, status)).toEqual(state);
+    // Every coordinator restart drops the proof; a confirmed refresh leaves the next one available.
+    const cleared = settleNativeQualificationAttempt(state, 200);
+    expect(cleared).toBeUndefined();
+    expect(reserveNativeQualificationAttempt(cleared, 2_701_000)?.count).toBe(1);
   });
   it("refreshes an approved idle physical replica after its session lost evidence", () => {
     const f = fixture(); expect(nativeTargetsNeedingRefresh(f.allowlist, f.workers, 1000)).toEqual([f.t]);
