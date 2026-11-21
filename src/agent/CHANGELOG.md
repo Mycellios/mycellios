@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-21
+
+### Fixed
+
+- When the server cancels a step running on your PC, Mycellios Desktop now stops that step
+  instead of finishing it unobserved and resending results the server no longer accepts.
+- A chat now says "Working in another conversation…" when its Mico is busy in another of its
+  conversations, instead of showing nothing while the sidebar says it is working.
+- Desktop updates download much faster: Mycellios now fetches the installer from the release's
+  download network, falling back to the website copy of the same verified file.
+- Updates on slow connections no longer fail after 15 minutes; a download is only abandoned when
+  it stops receiving data.
+
 ## [0.8.0] - 2026-11-21
 
 ### Added
