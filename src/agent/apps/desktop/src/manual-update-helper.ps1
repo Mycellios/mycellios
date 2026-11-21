@@ -84,17 +84,65 @@ function Write-Result($receipt){
  $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8
  [IO.File]::Move($temporary,$result)
 }
+function Pump-Window {if($window){[Windows.Forms.Application]::DoEvents()}}
+# The app has quit by now. Show progress at once instead of leaving the owner
+# with nothing on screen while the backup and installation run.
+function Show-Status([string]$text){
+ if(!$script:window){
+  Add-Type -AssemblyName System.Windows.Forms
+  $window=New-Object Windows.Forms.Form
+  $window.Text='Actualizando Mycellios'
+  $window.Width=440;$window.Height=140
+  $window.StartPosition=[Windows.Forms.FormStartPosition]::CenterScreen
+  $window.ControlBox=$false
+  $label=New-Object Windows.Forms.Label
+  $label.Dock=[Windows.Forms.DockStyle]::Fill
+  $label.Padding=New-Object Windows.Forms.Padding(20)
+  $window.Controls.Add($label)
+  $script:window=$window;$script:label=$label
+  $label.Text=$text
+  $window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()
+  # The hidden worker's STARTUPINFO can suppress the first ShowWindow call.
+  [MycelliosUpdatePath]::ShowWindow($window.Handle,5)|Out-Null
+ }
+ $script:label.Text=$text
+ [Windows.Forms.Application]::DoEvents()
+}
 function Copy-Safe([string]$source,[string]$destination,[string[]]$exclude=@(),[string[]]$excludeFiles=@()){
- $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:10','/W:2','/NFL','/NDL','/NP','/NJH','/NJS')
+ $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:10','/W:2','/NFL','/NDL','/NP','/NJH','/NJS',('/LOG+:'+(Join-Path $job 'copy.log')))
  if($exclude.Count){$arguments+=@('/XD');$arguments+=$exclude}
  if($excludeFiles.Count){$arguments+=@('/XF');$arguments+=$excludeFiles}
- & robocopy @arguments >> (Join-Path $job 'copy.log')
- if($LASTEXITCODE -ge 8){throw 'Could not make a recoverable backup'}
+ # Run robocopy as a child so the progress window keeps answering while it copies.
+ $start=New-Object Diagnostics.ProcessStartInfo
+ $start.FileName=Join-Path $env:SystemRoot 'System32\robocopy.exe'
+ $start.Arguments=($arguments|ForEach-Object {'"'+$_+'"'}) -join ' '
+ $start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.WorkingDirectory=$env:TEMP
+ $copy=[Diagnostics.Process]::Start($start)
+ $null=$copy.Handle
+ while(!$copy.WaitForExit(250)){Pump-Window}
+ $copy.Refresh()
+ if($copy.ExitCode -ge 8){throw 'Could not make a recoverable backup'}
 }
 function Get-Sha256([IO.Stream]$stream) {
  $algorithm=[Security.Cryptography.SHA256]::Create()
  try {return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}
  finally {$algorithm.Dispose()}
+}
+# Windows can keep a just-closed app's storage file open for a moment (for
+# example while an antivirus scan finishes). Wait briefly instead of failing
+# the update; a file that stays busy still stops it before installation.
+function Get-FileSha256([string]$file){
+ $deadline=(Get-Date).AddSeconds(30)
+ while($true){
+  try {$stream=[IO.File]::OpenRead($file)}
+  catch {
+   $cause=if($_.Exception.InnerException){$_.Exception.InnerException}else{$_.Exception}
+   if($cause -isnot [IO.IOException] -or $cause -is [IO.FileNotFoundException] -or $cause -is [IO.DirectoryNotFoundException] -or (Get-Date) -gt $deadline){throw}
+   Pump-Window;Start-Sleep -Milliseconds 500;continue
+  }
+  try {return Get-Sha256 $stream}
+  finally {$stream.Dispose()}
+ }
 }
 function Installer-Valid {
  $file=Get-Item -LiteralPath $installer
@@ -111,9 +159,7 @@ function Draft-Stores {
  foreach($folder in $folders){
   if(!(Test-Path -LiteralPath $folder)){continue}
   foreach($file in Get-ChildItem -LiteralPath $folder -File -Recurse){
-   $stream=[IO.File]::OpenRead($file.FullName)
-   try {$entries[$file.FullName.Substring($profile.Length+1)]=Get-Sha256 $stream}
-   finally {$stream.Dispose()}
+   $entries[$file.FullName.Substring($profile.Length+1)]=Get-FileSha256 $file.FullName
   }
  }
  return $entries
@@ -193,6 +239,7 @@ try {
  if($commit.approved -ne $true){throw 'The native install request was not committed'}
  $canReopen=$true
  Progress 'backing-up'
+ Show-Status ('Preparando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
  foreach($location in @($installation,$profile)){
   if((Get-PSDrive -Name ([IO.Path]::GetPathRoot($location).Substring(0,1))).Free -lt 6GB){throw 'Not enough free space for a recoverable update'}
  }
@@ -203,7 +250,9 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Could not protect the private backup'}
  Copy-Safe $installation (Join-Path $backup 'installation')
  $excluded=@('Cache','Code Cache','GPUCache','DawnGraphiteCache','DawnWebGPUCache','GPUPersistentCache','GrShaderCache','ShaderCache')
- $excluded+=@('updates','computers','local-data','local-web','apps-local-backups','upgrade-backups')|ForEach-Object {Join-Path $profile $_}
+ # Workspaces and development source copies are never touched by the installer
+ # and can be gigabytes; copying them only delays the update.
+ $excluded+=@('updates','computers','development','local-data','local-web','apps-local-backups','upgrade-backups')|ForEach-Object {Join-Path $profile $_}
  Copy-Safe $profile (Join-Path $backup 'profile') $excluded @('Cookies','Cookies-journal')
  $drafts=Draft-Stores
  $drafts|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $backup 'draft-stores.json') -Encoding UTF8
@@ -215,21 +264,7 @@ try {
  # File checks were approved before shutdown. Keep a responsive progress window
  # while the already-verified per-user installer runs and the app reopens.
  Progress 'preparing-installer-ui'
- Add-Type -AssemblyName System.Windows.Forms
- $window=New-Object Windows.Forms.Form
- $window.Text='Actualizando Mycellios'
- $window.Width=440;$window.Height=140
- $window.StartPosition=[Windows.Forms.FormStartPosition]::CenterScreen
- $window.ControlBox=$false
- $label=New-Object Windows.Forms.Label
- $label.Text=('Instalando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
- $label.Dock=[Windows.Forms.DockStyle]::Fill
- $label.Padding=New-Object Windows.Forms.Padding(20)
- $window.Controls.Add($label)
- $window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()
-  # The hidden worker's STARTUPINFO can suppress the first ShowWindow call.
-  [MycelliosUpdatePath]::ShowWindow($window.Handle,5)|Out-Null
-  [Windows.Forms.Application]::DoEvents()
+ Show-Status ('Instalando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
   $start=New-Object Diagnostics.ProcessStartInfo
   $start.FileName=$installer;$start.Arguments='/S';$start.WorkingDirectory=$env:TEMP
   # Attachment Services already enforced policy, scanning and any owner prompt;

@@ -275,15 +275,19 @@ function QuotaContent({
 const RAIL_RING_LIMIT = 4;
 
 /**
- * The rail shows one ring per account that reports a fresh allowance. When they do not fit, the
- * accounts with the least left stay, in their order, and a "+N" mark counts the rest.
+ * The rail shows one ring per account that can report quota. An account without a fresh
+ * measurement keeps an empty ring, so it never vanishes and reappears between readings. When
+ * they do not fit, the accounts with the least left stay, in their order, and a "+N" mark counts
+ * the rest.
  */
 export function railRings(accounts: AccountPlanLimit[], now: number) {
-  const measured = accounts.filter((row) => ringWindows(row, now).length > 0);
-  if (measured.length <= RAIL_RING_LIMIT) return { shown: measured, more: 0 };
-  const left = (row: AccountPlanLimit) => Math.min(...ringWindows(row, now).map(remainingQuota));
-  const kept = new Set([...measured].sort((a, b) => left(a) - left(b)).slice(0, RAIL_RING_LIMIT - 1));
-  return { shown: measured.filter((row) => kept.has(row)), more: measured.length - kept.size };
+  if (accounts.length <= RAIL_RING_LIMIT) return { shown: accounts, more: 0 };
+  const left = (row: AccountPlanLimit) => {
+    const windows = ringWindows(row, now);
+    return windows.length ? Math.min(...windows.map(remainingQuota)) : Number.POSITIVE_INFINITY;
+  };
+  const kept = new Set([...accounts].sort((a, b) => left(a) - left(b)).slice(0, RAIL_RING_LIMIT - 1));
+  return { shown: accounts.filter((row) => kept.has(row)), more: accounts.length - kept.size };
 }
 
 function QuotaRing({ account, windows }: { account: AccountPlanLimit | undefined; windows: PlanLimitWindow[] }) {
