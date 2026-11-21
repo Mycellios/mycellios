@@ -22,6 +22,7 @@ import { sha256CanonicalEvidence } from "../core/json.js";
 import { Scheduler } from "../scheduler/scheduler.js";
 import type { MeshStore, StoredJob } from "../storage/store.js";
 import type { WorkerHub } from "./worker-hub.js";
+import { DispersionGroups, workerDispersionKeys } from "./dispersion-groups.js";
 import type { RuntimeTransportSnapshot } from "./worker-hub.js";
 import {
   buildNetworkExecutionTrace,
@@ -128,6 +129,8 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
 
   private readonly runtimes = new Map<string, RuntimeJob>();
   private readonly activeSessions = new Map<string, string>();
+  // Pieces of one recording never reach the same node, owner or network.
+  private readonly dispersion = new DispersionGroups();
   private readonly recentTransportUsage: TransportUsageInterval[] = [];
 
   static async create(store: MeshStore, scheduler: Scheduler, hub: WorkerHub, requestTimeoutMs: number, options: MeshServiceOptions = {}): Promise<MeshService> {
@@ -214,12 +217,33 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       }
     }));
 
-    const routeOptions = routeOptionsForRequest(stableRequest, this.hub.connectedWorkerIds());
-    const routePlan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
-      ...routeOptions,
-      allowPipeline: false,
-      maxStandbyRoutes: stableRequest.model === TRANSCRIPTION_MODEL ? 0 : 2,
-    }));
+    const connected = this.hub.connectedWorkerIds();
+    const planRoute = async (allowed: ReadonlySet<string>) => {
+      const options = routeOptionsForRequest(stableRequest, allowed);
+      const plan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
+        ...options,
+        allowPipeline: false,
+        maxStandbyRoutes: stableRequest.model === TRANSCRIPTION_MODEL ? 0 : 2,
+      }));
+      return { options, plan };
+    };
+    const group = stableRequest.dispersion?.group;
+    const { options: routeOptions, plan: routePlan } = group
+      ? await this.dispersion.exclusive(group, async () => {
+        const allowed = await this.dispersionAllowedWorkers(group, jobId, connected);
+        const planned = await planRoute(allowed);
+        if (planned.plan) {
+          for (const stage of planned.plan.primary.stages) {
+            this.dispersion.reserve(group, jobId, await this.dispersionKeys(stage.workerId));
+          }
+        } else if (allowed.size < connected.size && (await planRoute(connected)).plan) {
+          (await this.store.setJobStatus(jobId, "failed", "dispersion_exhausted"));
+          throw new MeshServiceError("dispersion_exhausted",
+            "Every node able to serve this piece already received another piece of the same recording", 503);
+        }
+        return planned;
+      })
+      : await planRoute(connected);
     this.emit("demand", { model: stableRequest.model, served: routePlan !== null });
     if (!routePlan) {
       (await this.store.setJobStatus(jobId, "failed", "no_capacity"));
@@ -326,6 +350,27 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     return true;
   }
 
+  private async dispersionKeys(workerId: string): Promise<string[]> {
+    const worker = await this.store.getWorker(workerId);
+    if (!worker) return [`worker:${workerId}`];
+    const ownership = worker.identityKind === "device" && worker.identityId
+      ? await this.store.database.getNodeOwnership("device", worker.identityId)
+      : null;
+    return workerDispersionKeys(worker, {
+      ownerAccountId: ownership?.status === "active" ? ownership.accountId : null,
+      networkAddress: this.hub.workerNetworkAddress?.(workerId) ?? null,
+    });
+  }
+
+  /** Connected workers that share nothing with the pieces already placed. */
+  private async dispersionAllowedWorkers(group: string, jobId: string, connected: ReadonlySet<string>): Promise<ReadonlySet<string>> {
+    const allowed = new Set<string>();
+    for (const workerId of connected) {
+      if (!this.dispersion.conflicts(group, jobId, await this.dispersionKeys(workerId))) allowed.add(workerId);
+    }
+    return allowed;
+  }
+
   private async dispatch(jobId: string, runtime: RuntimeJob, promote = false): Promise<void> {
     if (
       inputHashForRequest(runtime.promptCheckpoint.request) !==
@@ -368,6 +413,16 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       deadlineAt: job.deadlineAt,
       request: cloneRequest(runtime.promptCheckpoint.request),
     };
+    const group = runtime.request.dispersion?.group;
+    if (group) {
+      // A standby may have received another piece since it was planned.
+      const keys = await this.dispersionKeys(stage.workerId);
+      if (this.dispersion.conflicts(group, jobId, keys)) {
+        await this.retryOrFail(jobId, "dispersion_conflict", "The planned node already received another piece of this recording");
+        return;
+      }
+      this.dispersion.reserve(group, jobId, keys);
+    }
     if (!this.hub.send(stage.workerId, "lease.offer", payload)) {
       (await this.retryOrFail(jobId, "worker_unreachable"));
       return;

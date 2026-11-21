@@ -358,6 +358,11 @@ These rules apply to the complete repository.
   all planner constraints; the error alone does not identify memory or link
   failure and must not authorize looser admission.
 
+- A request's `dispersion.group` is coordinator-only and scoped to the caller.
+  Pieces of one group never reach the same worker, identity, owner account or
+  public network prefix (private and overlay addresses are ignored); exhaustion
+  fails before dispatch with `dispersion_exhausted`, and dispatch rechecks
+  standbys. Check tests/chunk-dispersion.test.ts and the bridge unit tests.
 - Session affinity must be revalidated and rescored from current worker capacity,
   exact deployments and measured forward/return links. Cached scores are not
   current capacity evidence. Respect disabled pipeline dispatch on cached routes.
