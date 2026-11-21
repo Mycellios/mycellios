@@ -105,3 +105,21 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   (adapter, deployments, receipts) instead of a direct private service.
 - Add more CPU backups once nodes have spare RAM (the MSI GE60 has about
   3 GB free while it runs its 4B stage).
+
+## Operating limits measured on 2026-11-21
+
+- MRPUCCHI's cooling is the throughput limit. After hours of load the RTX
+  2060 idles near 78-80 °C. Unbounded work peaked at 87 °C and repeatedly
+  paused the node (limit 85 °C). The replica pauses at 82 °C and resumes at
+  79 °C. The GPU clock is locked with `nvidia-smi -lgc 300,900` (reset with
+  `-rgc`; a reboot clears it). At that clock it stays at 79-81 °C, about 70 %
+  busy, and the node stays ready. Jarvis receives about 150 chunks per minute.
+- The MSI GE60 (i5-4210H) measured 7 tokens/s in bfloat16, which is too slow
+  to help, so its replica is installed but disabled. The HP ProBook replica is
+  added once its model download finishes, and only if it beats 100 tokens/s.
+- The retired 4B CUDA runner (`MycelliosEmbeddingGPU`) was restarting every
+  few seconds without a reservation, which added load and heat. It is
+  disabled.
+- Abandoned requests are cancelled. The entry closes the replica connection
+  when the client goes away, and the replica stops between micro-batches. A
+  started request waits through a thermal pause instead of failing.
