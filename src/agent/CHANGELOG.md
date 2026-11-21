@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-21
+
+### Fixed
+
+- Long Mico tasks on your computer with many screenshots or images no longer stop with
+  "Desktop execution interrupted". The oldest images are left out of the request when the
+  conversation gets too large for the connection; the latest ones are kept.
+- On a Mac, a Mico task on your computer no longer stops with "Desktop execution interrupted"
+  while you use another app. Mycellios now keeps macOS from pausing it until the task ends.
+- A Mico working on your computer no longer stops with "Desktop execution interrupted" when
+  several of its steps, or a routine of the same Mico, run at once. It now waits for the
+  computer to have room instead of giving up.
+- Desktop no longer refuses to send messages to a Mico that has its own server computer
+  ("The workspace response did not match this Mico"). Those messages now run on the server,
+  as they do on the web, without connecting your PC.
+
 ## [0.9.0] - 2026-11-21
 
 ### Changed
