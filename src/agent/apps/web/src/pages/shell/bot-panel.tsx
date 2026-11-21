@@ -111,7 +111,7 @@ export function ComputerModeDescription({ mode }: { mode: ComputerMode }) {
         : <Trans>Uses your connected PC and its permissions. It is not an isolated server computer.</Trans>}
     </p>
     {mode === "dedicated" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-      <Trans>If this PC is offline, the turn stops. It never moves to the cloud without your permission.</Trans>
+      <Trans>If this PC is offline, a new message runs on the server instead, without this PC's files. Work already running on this PC stops.</Trans>
     </p> : null}
   </>;
 }

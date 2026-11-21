@@ -13113,6 +13113,9 @@ msgstr "Tus Micos comparten un ordenador en este espacio."
 msgid "Uses your connected PC and its permissions. It is not an isolated server computer."
 msgstr "Usa tu PC conectado y sus permisos. No es un ordenador aislado del servidor."
 
+msgid "If this PC is offline, a new message runs on the server instead, without this PC's files. Work already running on this PC stops."
+msgstr "Si este PC está desconectado, un mensaje nuevo se ejecuta en el servidor, sin los archivos de este PC. El trabajo que ya estaba en marcha en este PC se detiene."
+
 #: src/pages/onboarding/team-copy.ts
 msgid "Sales"
 msgstr "Ventas"

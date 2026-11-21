@@ -9,7 +9,8 @@ export async function* desktopAgentFrames(response: Response, signal: AbortSigna
   const started = Date.now();
   const failure = (code: DesktopFailureCode, stage: DesktopDiagnosticStage, frameId?: unknown) => {
     const diagnostic = { code, phase, stage, operationId: operationId ?? desktopOperationId(frameId) };
-    getLogger().warn("desktop.relay.stream_interrupted", { "desktop.phase": phase, "desktop.reason": code,
+    // A full queue before dispatch is an expected wait; sendWhenPcHasRoom logs it once.
+    if (!(code === "desktop_busy" && stage === "dispatch")) getLogger().warn("desktop.relay.stream_interrupted", { "desktop.phase": phase, "desktop.reason": code,
       "desktop.stage": stage, "desktop.operation.id": diagnostic.operationId, "desktop.elapsed_ms": Date.now() - started });
     return Error(desktopDiagnosticMessage(diagnostic));
   };
