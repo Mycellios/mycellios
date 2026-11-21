@@ -5688,6 +5688,10 @@ msgstr "Working instructions"
 msgid "Working…"
 msgstr "Working…"
 
+#: src/pages/shell/transcript.tsx
+msgid "Working in another conversation…"
+msgstr "Working in another conversation…"
+
 #: src/components/RunActivityStatus.tsx
 msgid "Live updates stopped. The task was not cancelled."
 msgstr "Live updates stopped. The task was not cancelled."
