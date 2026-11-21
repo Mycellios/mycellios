@@ -18,7 +18,6 @@ async def request(port, payload=b"ping"):
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write(payload)
     await writer.drain()
-    writer.write_eof()
     try:
         data = await reader.read()
     except ConnectionResetError:

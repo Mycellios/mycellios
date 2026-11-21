@@ -227,7 +227,7 @@ class Replica:
                 self.embedder = None
             self.state = "ready" if self.embedder is not None else "waiting_reservation"
 
-    def embed(self, texts):
+    def embed(self, texts, cancelled=None):
         before = self.thermal.wait if self.thermal is not None else None
         if before is not None:
             before()
@@ -238,12 +238,28 @@ class Replica:
             # run the GPU past the owner's node temperature limit.
             # Once a request has started, pause between micro-batches instead of
             # failing it: a mid-request 503 would discard work already done.
-            between = (lambda: self.thermal.wait(MID_REQUEST_COOLING_S)) if before is not None else None
-            vectors, tokens = (self.embedder.embed(texts, between) if between is not None
-                               else self.embedder.embed(texts))
+            def between():
+                # Stop work nobody waits for: a client that gave up (and will
+                # retry) must not keep the GPU busy with its abandoned request.
+                if cancelled is not None and cancelled():
+                    raise ServiceError(499, "client_closed")
+                if before is not None:
+                    self.thermal.wait(MID_REQUEST_COOLING_S)
+            vectors, tokens = self.embedder.embed(texts, between)
         if len(vectors) != len(texts) or any(len(vector) != DIMENSIONS for vector in vectors):
             raise ServiceError(500, "invalid_model_output")
         return vectors, tokens
+
+
+def connection_closed(sock):
+    """True when the peer has closed its side (readable with no data)."""
+    import select
+    import socket as socket_module
+    try:
+        readable, _, _ = select.select([sock], [], [], 0)
+        return bool(readable) and sock.recv(1, socket_module.MSG_PEEK) == b""
+    except (OSError, ValueError):
+        return True
 
 
 def make_handler(replica, token):
@@ -285,7 +301,7 @@ def make_handler(replica, token):
                 if not hmac.compare_digest(supplied.encode(), ("Bearer " + token).encode()):
                     raise ServiceError(401, "unauthorized")
                 texts = validate_request(json.loads(raw))
-                vectors, tokens = replica.embed(texts)
+                vectors, tokens = replica.embed(texts, lambda: connection_closed(self.connection))
                 self.reply(200, {"object": "list", "model": MODEL_ID, "revision": replica.config["revision"],
                                  "data": [{"object": "embedding", "index": i, "embedding": v} for i, v in enumerate(vectors)],
                                  "usage": {"prompt_tokens": tokens, "total_tokens": tokens}})

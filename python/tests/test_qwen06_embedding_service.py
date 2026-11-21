@@ -63,6 +63,24 @@ class ReplicaTests(unittest.TestCase):
         self.assertEqual(replica.state, "ready")
 
 
+class CancellationTests(unittest.TestCase):
+    def test_abandoned_request_stops_between_micro_batches(self):
+        replica = service.Replica({**CONFIG, "device": "cpu"}, load=FakeEmbedder)
+        replica.reconcile()
+        with self.assertRaises(service.ServiceError) as raised:
+            replica.embed(["a"], cancelled=lambda: True)
+        self.assertEqual(raised.exception.code, "client_closed")
+        self.assertEqual(len(replica.embed(["a"], cancelled=lambda: False)[0]), 1)
+
+    def test_detects_a_closed_peer(self):
+        import socket
+        left, right = socket.socketpair()
+        self.assertFalse(service.connection_closed(left))
+        right.close()
+        self.assertTrue(service.connection_closed(left))
+        left.close()
+
+
 class RequestTests(unittest.TestCase):
     def test_query_instruction_is_applied_server_side_only_for_queries(self):
         self.assertEqual(service.validate_request({"input": ["hola"]}), ["hola"])
