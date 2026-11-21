@@ -22,6 +22,7 @@ import { sha256CanonicalEvidence } from "../core/json.js";
 import { Scheduler } from "../scheduler/scheduler.js";
 import type { MeshStore, StoredJob } from "../storage/store.js";
 import type { WorkerHub } from "./worker-hub.js";
+import { WorkerRequestView } from "./worker-request-view.js";
 import type { RuntimeTransportSnapshot } from "./worker-hub.js";
 import {
   buildNetworkExecutionTrace,
@@ -128,6 +129,8 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
 
   private readonly runtimes = new Map<string, RuntimeJob>();
   private readonly activeSessions = new Map<string, string>();
+  // Nodes see a per-worker session pseudonym, never the client's session id.
+  private readonly workerRequestView = new WorkerRequestView();
   private readonly recentTransportUsage: TransportUsageInterval[] = [];
 
   static async create(store: MeshStore, scheduler: Scheduler, hub: WorkerHub, requestTimeoutMs: number, options: MeshServiceOptions = {}): Promise<MeshService> {
@@ -366,7 +369,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       leaseId,
       modelDigest: stage.modelDigest,
       deadlineAt: job.deadlineAt,
-      request: cloneRequest(runtime.promptCheckpoint.request),
+      request: this.workerRequestView.build(runtime.promptCheckpoint.request, stage.workerId),
     };
     if (!this.hub.send(stage.workerId, "lease.offer", payload)) {
       (await this.retryOrFail(jobId, "worker_unreachable"));
