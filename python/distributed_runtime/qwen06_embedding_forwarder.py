@@ -38,9 +38,18 @@ async def probe(host, port, timeout=3.0):
 class Forwarder:
     def __init__(self, backends, allowed, probe_fn=probe):
         self.backends = [(item["host"], int(item["port"])) for item in backends]
+        # Relative speed of each replica: work is spread by active connections
+        # per unit of weight, so a GPU takes most requests and CPUs share the rest.
+        self.weights = {(item["host"], int(item["port"])): max(1, int(item.get("weight", 1))) for item in backends}
+        self.active = {backend: 0 for backend in self.backends}
         self.allowed = set(allowed)
         self.probe = probe_fn
         self.ready = []
+
+    def ordered_ready(self):
+        """Ready replicas, least loaded relative to their weight first; config order breaks ties."""
+        rank = {backend: index for index, backend in enumerate(self.backends)}
+        return sorted(self.ready, key=lambda b: ((self.active[b] + 1) / self.weights[b], rank[b]))
 
     async def refresh(self):
         results = await asyncio.gather(*(self.probe(host, port) for host, port in self.backends))
@@ -54,9 +63,11 @@ class Forwarder:
             if not self.ready:
                 return await self.reject(reader, writer)
             upstream = None
-            for host, port in list(self.ready):
+            chosen = None
+            for host, port in self.ordered_ready():
                 try:
                     upstream = await asyncio.wait_for(asyncio.open_connection(host, port), 5)
+                    chosen = (host, port)
                     break
                 except (OSError, asyncio.TimeoutError):
                     continue
@@ -74,9 +85,11 @@ class Forwarder:
                 except OSError:
                     pass
 
+            self.active[chosen] += 1
             try:
                 await asyncio.gather(pump(reader, up_writer), pump(up_reader, writer))
             finally:
+                self.active[chosen] -= 1
                 up_writer.close()
         finally:
             writer.close()

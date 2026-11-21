@@ -113,6 +113,16 @@ class ThermalGuardTests(unittest.TestCase):
         service.ThermalGuard(lambda: 60, pause_c=78, sleep=sleeps.append).wait()
         self.assertEqual(sleeps, [])
 
+    def test_observe_tracks_hysteresis_without_sleeping(self):
+        readings = iter([80, 77, 71])
+        guard = service.ThermalGuard(lambda: next(readings), pause_c=78, resume_c=72)
+        guard.observe()
+        self.assertTrue(guard.paused)
+        guard.observe()
+        self.assertTrue(guard.paused)
+        guard.observe()
+        self.assertFalse(guard.paused)
+
     def test_unreadable_temperature_does_not_block(self):
         def broken():
             raise OSError("no nvidia-smi")
