@@ -41,9 +41,14 @@ describe("window chrome", () => {
   it("does not paint fake traffic lights in the browser", () => {
     expect(windowChromeKind(undefined)).toBe("spacer");
   });
-  it("defaults ordinary new Micos to isolation on web and Desktop", () => {
+  it("defaults new Micos to this PC in Desktop and to isolation elsewhere", () => {
     expect(defaultComputerMode(undefined)).toBe("isolated");
-    for (const platform of ["linux", "win32", "darwin"]) expect(defaultComputerMode(desktop(platform))).toBe("isolated");
+    const host = { connect: async () => undefined } as unknown as NonNullable<RakazoDesktop["computer"]>;
+    for (const platform of ["linux", "win32", "darwin"]) {
+      expect(defaultComputerMode({ ...desktop(platform), computer: host })).toBe("dedicated");
+      // A Desktop build without local computer access cannot host the Mico.
+      expect(defaultComputerMode(desktop(platform))).toBe("isolated");
+    }
   });
   it("preserves the computer route when the user explicitly selects an installed account", () => {
     expect(defaultComputerMode(undefined, true)).toBe("team");
