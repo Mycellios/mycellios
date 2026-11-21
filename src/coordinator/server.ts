@@ -5382,9 +5382,6 @@ const requestedModelCreateSchema = z.object({
   source: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
   revision: z.string().min(1).max(512).nullable().default(null),
   contextTokens: z.number().int().min(128).max(1_048_576).default(4_096),
-  // One node is allowed: a model that fits a single node runs faster unsplit,
-  // and the planner still splits it when no node can hold it. The default
-  // stays at two so existing requests keep their distributed route.
   minimumNodes: z.number().int().min(1).max(8).default(2),
   autoActivate: z.boolean().default(true),
 }).strict();
