@@ -97,4 +97,3 @@ function abortReason(signal: AbortSignal): Error {
     ? signal.reason
     : new Error(String(signal.reason ?? "worker_start_cancelled"));
 }
-
