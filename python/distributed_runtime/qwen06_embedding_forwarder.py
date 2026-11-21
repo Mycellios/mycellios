@@ -37,7 +37,7 @@ async def probe(host, port, timeout=3.0):
 
 
 class Forwarder:
-    def __init__(self, backends, allowed, probe_fn=probe):
+    def __init__(self, backends, allowed, probe_fn=probe, hold_seconds=0.0, poll_seconds=1.0):
         self.backends = [(item["host"], int(item["port"])) for item in backends]
         # Relative speed of each replica: work is spread by active connections
         # per unit of weight, so a GPU takes most requests and CPUs share the rest.
@@ -45,6 +45,9 @@ class Forwarder:
         self.active = {backend: 0 for backend in self.backends}
         self.allowed = set(allowed)
         self.probe = probe_fn
+        # While every replica is briefly unavailable (a GPU cooling down),
+        # hold the connection instead of answering 503 at once.
+        self.hold_seconds, self.poll_seconds = hold_seconds, poll_seconds
         self.ready = []
 
     def ordered_ready(self):
@@ -61,6 +64,10 @@ class Forwarder:
         try:
             if not peer or peer[0] not in self.allowed:
                 return
+            waited = 0.0
+            while not self.ready and waited < self.hold_seconds:
+                await asyncio.sleep(self.poll_seconds)
+                waited += self.poll_seconds
             if not self.ready:
                 return await self.reject(reader, writer)
             upstream = None
@@ -108,7 +115,7 @@ class Forwarder:
 
 
 async def serve(config):
-    forwarder = Forwarder(config["backends"], config["allowedClients"])
+    forwarder = Forwarder(config["backends"], config["allowedClients"], hold_seconds=float(config.get("holdSeconds", 0)))
 
     async def health_loop():
         while True:

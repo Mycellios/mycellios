@@ -63,6 +63,18 @@ class ForwarderTests(unittest.IsolatedAsyncioTestCase):
         self.forwarder.active[cpu] = 1
         self.assertEqual(self.forwarder.ordered_ready()[0], gpu)
 
+    async def test_holds_a_request_until_a_replica_becomes_ready(self):
+        self.health = {port: False for port in self.ports}
+        await self.forwarder.refresh()
+        self.forwarder.hold_seconds, self.forwarder.poll_seconds = 2.0, 0.05
+
+        async def recover():
+            await asyncio.sleep(0.2)
+            self.health[self.ports[1]] = True
+            await self.forwarder.refresh()
+        asyncio.create_task(recover())
+        self.assertEqual(await request(self.port), b"cpu:ping")
+
     async def test_answers_503_when_no_replica_is_ready(self):
         self.health = {port: False for port in self.ports}
         await self.forwarder.refresh()
