@@ -84,6 +84,25 @@ it("sends the original draft after native admission without switching an introdu
   expect(computer.connect).toHaveBeenCalledWith("bot");
 });
 
+it("sends an isolated Mico's turn to its own server computer without binding this PC", async () => {
+  const draft = JSON.stringify({ json: { botId: "bot", text: "hello", taskThreadId: "task" } });
+  const send = vi.fn<typeof fetch>(async (input) => {
+    if (String(input).endsWith("/bots/get")) return Response.json({json:{id:"bot",computerMode:"isolated",instructions:"Owner rules"}});
+    return Response.json({json:{ok:true}});
+  });
+  const computer = {
+    requestAccess: vi.fn(async () => true), revokeAccess: vi.fn(async () => undefined),
+    connect: vi.fn(async (_id:string) => undefined), connected: vi.fn(async (_id:string) => true),
+    projectAvailable: vi.fn(async () => true), onConfigure: vi.fn(() => () => undefined),
+    prepareTask: vi.fn(async () => undefined),
+  };
+  const admit = nativeComputerAdmission(computer, id => prepareNativeWorkspace(send,"https://example.test","/agent","space",id));
+  await nativeComputerFetch(send,computer,"https://example.test","/agent",admit)("https://example.test/agent/rpc/threads/send",{method:"POST",body:draft});
+  expect(send.mock.calls.map(call => String(call[0]))).toEqual(["https://example.test/agent/rpc/bots/get","https://example.test/agent/rpc/threads/send"]);
+  expect(computer.connect).not.toHaveBeenCalled();
+  expect(computer.prepareTask).not.toHaveBeenCalled();
+});
+
 
 it.each([
   [401,"Sign in again"], [403,"This account cannot"], [409,"This agent changed"], [500,"Could not prepare this agent"],

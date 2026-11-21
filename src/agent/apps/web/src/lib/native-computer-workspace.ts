@@ -1,14 +1,18 @@
 import { withNativeProjectInstructions } from "./native-project-instructions";
 import { t } from "@lingui/core/macro";
 
-/** Native main owns per-agent folders. Sending a message must preserve server assignments. */
+/**
+ * Native main owns per-agent folders. Sending a message must preserve server assignments.
+ * Resolves false for a Mico on its own isolated server computer: that turn runs on the server,
+ * so the PC is neither bound nor allowed to redirect its workspace.
+ */
 export async function prepareNativeWorkspace(
   send: typeof fetch,
   origin: string,
   base: string,
   spaceId: string | null,
   botId: string,
-) {
+): Promise<boolean> {
   const headers = new Headers({ "content-type": "application/json" });
   if (spaceId) headers.set("x-rakazo-space-id", spaceId);
   async function call(method: string, input: Record<string, string>) {
@@ -23,11 +27,12 @@ export async function prepareNativeWorkspace(
       throw new Error(t`Could not prepare this agent. Your message has been kept.`);
     }
     const value = (await response.json()).json as { id?: unknown; computerMode?: unknown; instructions?: unknown } | undefined;
-    if (value?.id !== botId || !["team", "dedicated"].includes(String(value?.computerMode)))
+    if (value?.id !== botId || !["isolated", "team", "dedicated"].includes(String(value?.computerMode)))
       throw new Error("The workspace response did not match this Mico.");
     return value;
   }
   const bot = await call("get", { botId });
+  if (bot.computerMode === "isolated") return false;
   if (typeof bot?.instructions !== "string") throw new Error("Could not read this Mico's instructions. The message was not sent.");
   const instructions = withNativeProjectInstructions(bot.instructions);
   if (instructions.length > 20_000) throw new Error("This Mico's instructions are too long to add the project workflow without losing content. The message was not sent.");
@@ -38,4 +43,5 @@ export async function prepareNativeWorkspace(
   // connect(botId) already verifies the native owner and creates that bot's private
   // folder. Changing team/dedicated here can reject a waiting introduction or
   // disrupt existing computer work; the explicit computer settings own that choice.
+  return true;
 }
