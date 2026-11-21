@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { DESKTOP_RUN_INTERRUPTED_ERROR, isUncertainDesktopRun } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
+import { sendWhenPcHasRoom } from "./desktop-callback-wait.js";
 import { DesktopAgentRpc, type AgentRpcMessage } from "./desktop-agent-rpc.js";
 import { desktopAgentFrames } from "./desktop-agent-stream.js";
 import type { DesktopAgentFrame } from "./desktop-agent-host.js";
@@ -166,10 +167,10 @@ export class DesktopAgentRuntime implements AgentRuntime {
     const owned = { ...context, signal };
     let callbackError: unknown;
     const rpc = new DesktopAgentRpc(async (message: AgentRpcMessage) => {
-      const post = async () => {
+      const post = () => sendWhenPcHasRoom(async () => {
         const response = await this.options.transport({ method: "agentMessage", botId: request.botId, runId: request.runId, sessionId, message, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
         for await (const _ of desktopAgentFrames(response, signal, "callback")) { /* consume the complete acknowledgement */ }
-      };
+      }, request.runId, signal);
       if (message.kind !== "result") { await post(); return; }
       await deliverAgentResult(post, request.runId, signal);
     });
