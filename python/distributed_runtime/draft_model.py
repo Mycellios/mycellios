@@ -28,6 +28,27 @@ from .model import model_artifact_reference
 from .speculation import MAX_DRAFT_TOKENS
 
 
+_DIRECTML_DEVICE = re.compile(r"directml(?::(?:0|[1-9][0-9]*))?")
+
+
+def _is_directml(device: torch.device) -> bool:
+    # torch-directml exposes its adapters through PyTorch's PrivateUse1 key.
+    return device.type == "privateuseone"
+
+
+def _draft_inference_mode(function):
+    """Use inference mode except on DirectML, whose tensors need versions."""
+
+    from functools import wraps
+
+    @wraps(function)
+    def call(self, *args, **kwargs):
+        with torch.inference_mode(not _is_directml(self.device)), torch.no_grad():
+            return function(self, *args, **kwargs)
+
+    return call
+
+
 LOCAL_DRAFT_MODEL_SCHEMA = "mycellios-local-draft-model/1"
 SUPPORTED_DRAFT_DTYPES = frozenset(("auto", "float32", "float16", "bfloat16"))
 _SHA256_IDENTITY = re.compile(r"sha256:[0-9a-f]{64}")
@@ -385,7 +406,7 @@ class LocalDraftModelProvider:
             finally:
                 self._draft_time_ns += perf_counter_ns() - started_ns
 
-    @torch.inference_mode()
+    @_draft_inference_mode
     def _greedy_draft(
         self,
         context: tuple[int, ...],
@@ -687,17 +708,40 @@ def load_local_draft_model_provider(
     )
 
 
+def _directml_device(requested: str) -> torch.device | None:
+    """Resolve DirectML through the stage resolver; None when unavailable."""
+
+    from .device import resolve_torch_execution_device
+
+    if requested == "auto":
+        try:
+            import torch_directml
+        except ImportError:
+            return None
+        if torch_directml.device_count() < 1:
+            return None
+        from .directml import selected_device_index
+
+        requested = f"directml:{selected_device_index(torch_directml.device_count())}"
+    return resolve_torch_execution_device(requested).device
+
+
 def _canonical_device(value: object, *, allow_auto: bool) -> str:
     if not isinstance(value, str) or not value.strip() or value != value.strip():
         raise ValueError("local draft device must be normalized")
     if allow_auto and value == "auto":
+        return value
+    if _DIRECTML_DEVICE.fullmatch(value):
+        # The launcher contract already admits DirectML draft devices.
         return value
     try:
         device = torch.device(value)
     except (TypeError, RuntimeError) as error:
         raise ValueError("local draft device is invalid") from error
     if device.type not in ("cpu", "cuda", "mps", "xpu"):
-        raise ValueError("local draft device must be auto, cpu, cuda, mps or xpu")
+        raise ValueError(
+            "local draft device must be auto, cpu, cuda, mps, xpu or directml"
+        )
     if value != str(device):
         raise ValueError("local draft device must use canonical torch spelling")
     return value
@@ -712,8 +756,15 @@ def _resolve_device(value: str) -> torch.device:
         xpu = getattr(torch, "xpu", None)
         if xpu is not None and xpu.is_available():
             return torch.device("xpu")
-        return torch.device("cpu")
-    device = torch.device(_canonical_device(value, allow_auto=False))
+        # Windows AMD/Intel GPUs: prefer the accelerator, as the stages do.
+        return _directml_device("auto") or torch.device("cpu")
+    canonical = _canonical_device(value, allow_auto=False)
+    if _DIRECTML_DEVICE.fullmatch(canonical):
+        device = _directml_device(canonical)
+        if device is None:
+            raise RuntimeError("local draft DirectML device is unavailable")
+        return device
+    device = torch.device(canonical)
     if device.type == "cuda":
         if not torch.cuda.is_available():
             raise RuntimeError("local draft CUDA device is unavailable")
@@ -738,7 +789,9 @@ def _resolve_device(value: str) -> torch.device:
 
 def _resolve_dtype(value: str, device: torch.device) -> torch.dtype | str:
     if value == "auto":
-        return "auto"
+        # DirectML falls back to CPU for bfloat16 kernels; keep the draft on
+        # the GPU with float16 instead of the checkpoint's stored dtype.
+        return torch.float16 if _is_directml(device) else "auto"
     dtype = {
         "float32": torch.float32,
         "float16": torch.float16,
@@ -927,6 +980,14 @@ def _ensure_memory_reservation(
 
 
 def _available_memory_bytes(device: torch.device) -> int | None:
+    if _is_directml(device):
+        import torch_directml
+        from .directml import video_memory_budget
+
+        budget, usage = video_memory_budget(
+            torch_directml.device_name(device.index or 0).strip("\x00")
+        )
+        return max(0, int(budget) - int(usage))
     if device.type == "cuda":
         free, _total = torch.cuda.mem_get_info(device)
         return int(free)
