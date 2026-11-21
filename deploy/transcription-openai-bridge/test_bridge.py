@@ -95,7 +95,7 @@ class MultipartAndFlowTests(unittest.TestCase):
                 f"Content-Type: audio/mpeg\r\n\r\n").encode() + b"AUDIO\x00\x01" + f"\r\n--{boundary}--\r\n".encode()
         upload, fields = bridge.parse_multipart(f"multipart/form-data; boundary={boundary}", body)
         self.assertEqual(upload, b"AUDIO\x00\x01")
-        self.assertEqual((fields["model"], fields["language"]), ("whisper-1", "es"))
+        self.assertEqual((fields["model"], fields["language"], fields["_filename"]), ("whisper-1", "es", "a.mp3"))
 
         class FakeUpstream:
             def __init__(self):
@@ -107,6 +107,22 @@ class MultipartAndFlowTests(unittest.TestCase):
         text, language, seconds = bridge.transcribe_upload(upload, "es", "Bearer k", FakeUpstream(),
                                                            decode=lambda raw: b"\x00\x00" * (16_000 * 40))
         self.assertEqual((text, language, round(seconds)), ("parte 1 parte 2", "es", 40))
+
+
+class FallbackTests(unittest.TestCase):
+    def test_fallback_posts_openai_multipart_with_its_own_key(self):
+        seen = []
+
+        def opener(request, timeout):
+            seen.append(request)
+            return FakeResponse(json.dumps({"text": " hola "}).encode())
+        text = bridge.Fallback("https://omni/api/v1/", "groq/whisper-large-v3", "fk", opener=opener).transcribe(b"AUDIO", "a", "es")
+        self.assertEqual(text, "hola")
+        self.assertEqual(seen[0].full_url, "https://omni/api/v1/audio/transcriptions")
+        self.assertEqual(seen[0].get_header("Authorization"), "Bearer fk")
+        self.assertIn(b'name="model"\r\n\r\ngroq/whisper-large-v3', seen[0].data)
+        self.assertIn(b'name="language"\r\n\r\nes', seen[0].data)
+        self.assertIn(b"AUDIO", seen[0].data)
 
 
 if __name__ == "__main__":

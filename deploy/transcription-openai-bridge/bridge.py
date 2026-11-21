@@ -83,6 +83,8 @@ def parse_multipart(content_type, body):
         name = part.get_param("name", header="content-disposition")
         if name == "file":
             upload = part.get_payload(decode=True)
+            # Keep the client's name: format detection in fallback providers needs its extension.
+            fields["_filename"] = os.path.basename(part.get_filename() or "audio.webm")
         elif name:
             fields[name] = part.get_content().strip() if part.get_content_maintype() == "text" else ""
     if not upload:
@@ -137,17 +139,52 @@ def transcribe_upload(raw, language, authorization, upstream, decode=decode_audi
     return " ".join(texts), detected, len(pcm) / (SAMPLE_RATE * 2)
 
 
-def make_handler(upstream):
+class Fallback:
+    """Optional OpenAI-compatible provider used only when the network cannot transcribe."""
+
+    def __init__(self, base_url, model, key, opener=urllib.request.urlopen):
+        self.base_url, self.model, self.key, self.opener = base_url.rstrip("/"), model, key, opener
+
+    def transcribe(self, upload, filename, language):
+        boundary = hashlib.sha256(upload[:4096] + str(time.time()).encode()).hexdigest()[:32]
+        fields = {"model": self.model, "response_format": "json"}
+        if language != "auto":
+            fields["language"] = language
+        crlf = "\r\n"
+        body = b"".join(f'--{boundary}{crlf}Content-Disposition: form-data; name="{k}"{crlf}{crlf}{v}{crlf}'.encode()
+                        for k, v in fields.items())
+        body += (f'--{boundary}{crlf}Content-Disposition: form-data; name="file"; filename="{filename}"{crlf}'
+                 f"Content-Type: application/octet-stream{crlf}{crlf}").encode()
+        body += upload + f"{crlf}--{boundary}--{crlf}".encode()
+        request = urllib.request.Request(self.base_url + "/audio/transcriptions", data=body, method="POST", headers={
+            "Authorization": "Bearer " + self.key, "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "User-Agent": "mycellios-openai-transcription-bridge/1"})
+        try:
+            with self.opener(request, timeout=600) as response:
+                return json.loads(response.read())["text"].strip()
+        except (urllib.error.URLError, KeyError, ValueError) as error:
+            raise BridgeError(502, "fallback_failed") from error
+
+
+def log_event(**fields):
+    print(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **fields}), flush=True)
+
+
+def make_handler(upstream, fallback=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "MycelliosTranscriptionBridge/1"
 
         def log_message(self, *args):
             return
 
+        provider = None
+
         def reply(self, status, payload, content_type="application/json"):
             raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
             self.send_response(status)
             self.send_header("Content-Type", content_type)
+            if self.provider:
+                self.send_header("x-transcription-provider", self.provider)
             self.send_header("Content-Length", str(len(raw)))
             self.end_headers()
             self.wfile.write(raw)
@@ -169,8 +206,21 @@ def make_handler(upstream):
                     raise BridgeError(413, "invalid_upload_size")
                 body = self.rfile.read(length)
                 upload, fields = parse_multipart(self.headers.get("Content-Type", ""), body)
-                text, detected, seconds = transcribe_upload(upload, normalize_language(fields.get("language")),
-                                                            authorization, upstream)
+                language = normalize_language(fields.get("language"))
+                provider = "mycellios"
+                try:
+                    text, detected, seconds = transcribe_upload(upload, language, authorization, upstream)
+                except BridgeError as error:
+                    # Bad audio or a bad key is the caller's problem; anything
+                    # else is a network outage the fallback may cover.
+                    if fallback is None or error.status in (400, 401, 413):
+                        log_event(event="transcription_failed", code=error.code)
+                        raise
+                    log_event(event="transcription_fallback", code=error.code)
+                    text, detected, seconds = fallback.transcribe(upload, fields.get("_filename", "audio.webm"), language), None, None
+                    provider = "fallback"
+                log_event(event="transcription_served", provider=provider, seconds=seconds)
+                self.provider = provider
                 if fields.get("response_format") == "text":
                     return self.reply(200, text.encode(), "text/plain; charset=utf-8")
                 payload = {"text": text}
@@ -190,7 +240,12 @@ def main():
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--upstream", default=os.environ.get("MYCELLIOS_API_URL", "https://www.mycellios.com"))
     args = parser.parse_args()
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(Upstream(args.upstream)))
+    fallback = None
+    if os.environ.get("FALLBACK_BASE_URL") and os.environ.get("FALLBACK_KEY_FILE"):
+        with open(os.environ["FALLBACK_KEY_FILE"], encoding="utf-8") as handle:
+            key = handle.read().strip()
+        fallback = Fallback(os.environ["FALLBACK_BASE_URL"], os.environ.get("FALLBACK_MODEL", "groq/whisper-large-v3"), key)
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(Upstream(args.upstream), fallback))
     server.daemon_threads = True
     server.serve_forever()
 
