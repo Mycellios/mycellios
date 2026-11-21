@@ -274,6 +274,31 @@ class EngineConfigurationTests(unittest.TestCase):
             tree_draft_provider_from_args(parse_server_args(["--speculation", "ngram"]))
         )
 
+    def test_fused_lookup_is_opt_in_and_requires_linear_speculation(self) -> None:
+        self.assertEqual(parse_server_args([]).speculation_lookup, "plain")
+        self.assertEqual(
+            parse_server_args(
+                ["--speculation", "ngram", "--speculation-lookup", "fused"]
+            ).speculation_lookup,
+            "fused",
+        )
+        for speculation in ("off", "draft-tree"):
+            with patch("distributed_runtime.server.resolve_model_snapshot") as resolve:
+                with self.assertRaisesRegex(
+                    ValueError, "fused speculation lookup requires linear"
+                ):
+                    build_server(
+                        parse_server_args(
+                            [
+                                "--speculation",
+                                speculation,
+                                "--speculation-lookup",
+                                "fused",
+                            ]
+                        )
+                    )
+            resolve.assert_not_called()
+
     def test_native_draft_tree_cli_fails_closed_before_model_loading(self) -> None:
         with self.assertRaisesRegex(ValueError, "requires sealed positive"):
             build_server(

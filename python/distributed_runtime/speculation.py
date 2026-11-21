@@ -8,12 +8,15 @@ MTP/EAGLE heads, or an external draft model.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Sequence
+import copy
 from dataclasses import dataclass
 import math
 from numbers import Integral
 from statistics import NormalDist
-from typing import Protocol, runtime_checkable
+import threading
+from typing import Any, Protocol, runtime_checkable
 
 
 MAX_DRAFT_TOKENS = 16
@@ -118,6 +121,19 @@ class NgramDraftProvider:
         token_history: Sequence[int],
         max_tokens: int | None = None,
     ) -> tuple[int, ...]:
+        return self.draft_with_match(token_history, max_tokens)[0]
+
+    def draft_with_match(
+        self,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+    ) -> tuple[tuple[int, ...], int]:
+        """Return the draft and the width of the suffix match that produced it.
+
+        The width is ``0`` when no draft is returned.  It is the confidence
+        signal used by :class:`FusedLookupDraftProvider`.
+        """
+
         if isinstance(token_history, (str, bytes, bytearray)):
             raise ValueError("token_history must be a sequence of integer token ids")
         observed: list[int] = []
@@ -132,7 +148,7 @@ class NgramDraftProvider:
             limit = _validate_count("max_tokens", max_tokens)
             limit = min(limit, int(self.max_draft_tokens))
         if limit == 0 or len(observed) <= int(self.min_match_tokens):
-            return ()
+            return (), 0
 
         largest_width = len(observed) - 1
         if self.max_match_tokens is not None:
@@ -151,8 +167,272 @@ class NgramDraftProvider:
                 continuation_end = min(history_size, continuation_start + limit)
                 continuation = observed[continuation_start:continuation_end]
                 if continuation:
-                    return tuple(continuation)
-        return ()
+                    return tuple(continuation), width
+        return (), 0
+
+
+@dataclass
+class _FusedRequestState:
+    history_tokens: int
+    proposal: tuple[int, ...]
+    full_block_streak: int
+
+
+class FusedLookupDraftProvider:
+    """Combine prompt lookup with an optional model drafter.
+
+    The rules follow the context-drafting policy measured by HyperQwen
+    (``docs/optimizations.md``), adapted to a networked pipeline where every
+    verification wave costs one sequential round trip through all stages:
+
+    * A lookup match of at least ``strong_match_tokens`` is copied alone and
+      the model drafter is not run.
+    * A shorter lookup match is used only when the model drafter's first
+      ``agree_tokens`` tokens agree with it; otherwise the model draft is used.
+      Without a model drafter a short match is used as plain n-gram lookup.
+    * Drafts are capped at ``short_block_tokens`` unless the request is
+      copying: a strong lookup match after ``long_block_streak`` consecutive
+      calls whose proposal was carried forward in full.  Only then may a draft
+      use ``max_draft_tokens``.  The default streak is ``0``: over a network
+      every extra verified token is nearly free next to the round trip, and a
+      measured single-host run lost 17% of tokens per traversal while waiting
+      for the streak.  HyperQwen's streak exists because extra verify width
+      costs real compute on one GPU.
+
+    The provider is only a candidate source.  The target model still verifies
+    every token, so a wrong guess costs efficiency and never output.  The
+    streak is inferred from the history passed on the next call.  With a
+    VERIFY conveyor that history already contains the previous, still pending,
+    proposal without a bonus token, so a carried-forward proposal counts as a
+    full block whether or not its bonus is present yet.
+    """
+
+    strategy = "fused-lookup"
+    defer_until_selected = False
+
+    def __init__(
+        self,
+        *,
+        max_draft_tokens: int = MAX_DRAFT_TOKENS,
+        short_block_tokens: int = 7,
+        strong_match_tokens: int = 8,
+        agree_tokens: int = 2,
+        long_block_streak: int = 0,
+        min_match_tokens: int = 2,
+        draft_model: DraftProvider | None = None,
+        max_tracked_requests: int = 256,
+    ) -> None:
+        if (
+            not _is_int(max_draft_tokens)
+            or not 1 <= int(max_draft_tokens) <= MAX_DRAFT_TOKENS
+        ):
+            raise ValueError(
+                f"max_draft_tokens must be an integer between 1 and {MAX_DRAFT_TOKENS}"
+            )
+        if (
+            not _is_int(short_block_tokens)
+            or not 1 <= int(short_block_tokens) <= int(max_draft_tokens)
+        ):
+            raise ValueError(
+                "short_block_tokens must be an integer between 1 and max_draft_tokens"
+            )
+        if not _is_int(min_match_tokens) or int(min_match_tokens) < 1:
+            raise ValueError("min_match_tokens must be a positive integer")
+        if not _is_int(strong_match_tokens) or int(strong_match_tokens) < int(
+            min_match_tokens
+        ):
+            raise ValueError("strong_match_tokens must be an integer >= min_match_tokens")
+        if not _is_int(agree_tokens) or int(agree_tokens) < 1:
+            raise ValueError("agree_tokens must be a positive integer")
+        if not _is_int(long_block_streak) or int(long_block_streak) < 0:
+            raise ValueError("long_block_streak must be a non-negative integer")
+        if not _is_int(max_tracked_requests) or int(max_tracked_requests) < 1:
+            raise ValueError("max_tracked_requests must be a positive integer")
+        if draft_model is not None and not isinstance(draft_model, DraftProvider):
+            raise ValueError("draft_model must implement DraftProvider")
+        self.max_draft_tokens = int(max_draft_tokens)
+        self.short_block_tokens = int(short_block_tokens)
+        self.strong_match_tokens = int(strong_match_tokens)
+        self.agree_tokens = int(agree_tokens)
+        self.long_block_streak = int(long_block_streak)
+        self.max_tracked_requests = int(max_tracked_requests)
+        self.draft_model = draft_model
+        # The match width must be able to reach the strong threshold.
+        self._lookup = NgramDraftProvider(
+            max_draft_tokens=self.max_draft_tokens,
+            min_match_tokens=int(min_match_tokens),
+            max_match_tokens=max(int(strong_match_tokens), 8),
+        )
+        self._lock = threading.Lock()
+        self._requests: OrderedDict[str | int, _FusedRequestState] = OrderedDict()
+        self._counters = {
+            "draftCalls": 0,
+            "strongLookupDrafts": 0,
+            "agreedLookupDrafts": 0,
+            "modelDrafts": 0,
+            "weakLookupDrafts": 0,
+            "emptyDrafts": 0,
+            "longBlocks": 0,
+            "modelCalls": 0,
+        }
+
+    def draft(
+        self,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+    ) -> tuple[int, ...]:
+        return self._draft(None, token_history, max_tokens)
+
+    def draft_for_request(
+        self,
+        request_id: str | int,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+    ) -> tuple[int, ...]:
+        if isinstance(request_id, bool) or not isinstance(request_id, (str, Integral)):
+            raise ValueError("request id must be a string or integer")
+        key: str | int = int(request_id) if isinstance(request_id, Integral) else request_id
+        return self._draft(key, token_history, max_tokens)
+
+    def release_request(self, request_id: str | int) -> None:
+        key = int(request_id) if isinstance(request_id, Integral) else request_id
+        with self._lock:
+            self._requests.pop(key, None)
+        release = getattr(self.draft_model, "release_request", None)
+        if callable(release):
+            release(request_id)
+
+    def _streak(self, key: str | int | None, history: Sequence[int]) -> int:
+        if key is None:
+            return 0
+        with self._lock:
+            state = self._requests.get(key)
+        if state is None or not state.proposal:
+            return 0
+        emitted = len(history) - state.history_tokens
+        block = min(self.short_block_tokens, len(state.proposal))
+        # ``block`` rather than ``block + 1``: a conveyor passes the pending
+        # proposal back before its bonus token exists.
+        if emitted < block:
+            return 0
+        start = state.history_tokens
+        if tuple(int(t) for t in history[start : start + block]) != state.proposal[:block]:
+            return 0
+        return state.full_block_streak + 1
+
+    def _remember(
+        self,
+        key: str | int | None,
+        history_tokens: int,
+        proposal: tuple[int, ...],
+        streak: int,
+    ) -> None:
+        if key is None:
+            return
+        with self._lock:
+            self._requests[key] = _FusedRequestState(history_tokens, proposal, streak)
+            self._requests.move_to_end(key)
+            while len(self._requests) > self.max_tracked_requests:
+                self._requests.popitem(last=False)
+
+    def _model_draft(
+        self,
+        key: str | int | None,
+        history: Sequence[int],
+        limit: int,
+    ) -> tuple[int, ...]:
+        model = self.draft_model
+        if model is None or limit < 1:
+            return ()
+        limit = min(limit, int(model.max_draft_tokens))
+        if limit < 1:
+            return ()
+        draft_for_request = getattr(model, "draft_for_request", None)
+        with self._lock:
+            self._counters["modelCalls"] += 1
+        if key is not None and callable(draft_for_request):
+            tokens = draft_for_request(key, history, max_tokens=limit)
+        else:
+            tokens = model.draft(history, max_tokens=limit)
+        return tuple(int(token) for token in tokens)[:limit]
+
+    def _count(self, name: str) -> None:
+        with self._lock:
+            self._counters[name] += 1
+
+    def _draft(
+        self,
+        key: str | int | None,
+        token_history: Sequence[int],
+        max_tokens: int | None,
+    ) -> tuple[int, ...]:
+        if isinstance(token_history, (str, bytes, bytearray)):
+            raise ValueError("token_history must be a sequence of integer token ids")
+        history = tuple(token_history)
+        if max_tokens is None:
+            limit = self.max_draft_tokens
+        else:
+            limit = min(_validate_count("max_tokens", max_tokens), self.max_draft_tokens)
+        self._count("draftCalls")
+        if limit == 0:
+            return ()
+        lookup, width = self._lookup.draft_with_match(history, limit)
+        streak = self._streak(key, history)
+        copying = width >= self.strong_match_tokens
+        if copying and streak >= self.long_block_streak:
+            cap = limit
+        else:
+            cap = min(limit, self.short_block_tokens)
+
+        if copying:
+            result = lookup[:cap]
+            self._count("strongLookupDrafts")
+        else:
+            model = self._model_draft(key, history, cap)
+            agree = self.agree_tokens
+            if (
+                lookup
+                and len(lookup) >= agree
+                and len(model) >= agree
+                and model[:agree] == lookup[:agree]
+            ):
+                result = lookup[:cap]
+                self._count("agreedLookupDrafts")
+            elif model:
+                result = model[:cap]
+                self._count("modelDrafts")
+            elif lookup:
+                result = lookup[:cap]
+                self._count("weakLookupDrafts")
+            else:
+                result = ()
+                self._count("emptyDrafts")
+        if len(result) > self.short_block_tokens:
+            self._count("longBlocks")
+        self._remember(key, len(history), result, streak)
+        return result
+
+    def execution_snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            counters = dict(self._counters)
+            tracked = len(self._requests)
+        model_snapshot = getattr(self.draft_model, "execution_snapshot", None)
+        return {
+            "strategy": self.strategy,
+            "maxDraftTokens": self.max_draft_tokens,
+            "shortBlockTokens": self.short_block_tokens,
+            "strongMatchTokens": self.strong_match_tokens,
+            "agreeTokens": self.agree_tokens,
+            "longBlockStreak": self.long_block_streak,
+            "deferredUntilSelected": False,
+            "trackedRequests": tracked,
+            **counters,
+            "draftModel": (
+                copy.deepcopy(model_snapshot())
+                if callable(model_snapshot)
+                else None
+            ),
+        }
 
 
 @dataclass(frozen=True)

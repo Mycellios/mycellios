@@ -10,6 +10,7 @@ from distributed_runtime.speculation import (
     AdaptiveSpeculationController,
     CandidateEstimate,
     DraftProvider,
+    FusedLookupDraftProvider,
     NgramDraftProvider,
     NgramTreeDraftProvider,
     TreeDraftProvider,
@@ -879,6 +880,151 @@ class DelayAdaptiveSpeculationTests(unittest.TestCase):
                     controller.record_rtt(invalid_rtt)
         with self.assertRaises(ValueError):
             controller.delay_draft_cap(-1.0)
+
+
+
+class _FixedModelDrafter:
+    strategy = "draft-model"
+
+    def __init__(self, tokens: tuple[int, ...], max_draft_tokens: int = 7) -> None:
+        self.tokens = tokens
+        self.max_draft_tokens = max_draft_tokens
+        self.calls: list[tuple[object, int | None]] = []
+        self.released: list[object] = []
+
+    def draft(self, token_history, max_tokens=None):
+        self.calls.append((None, max_tokens))
+        return self.tokens[: max_tokens or self.max_draft_tokens]
+
+    def draft_for_request(self, request_id, token_history, max_tokens=None):
+        self.calls.append((request_id, max_tokens))
+        return self.tokens[: max_tokens or self.max_draft_tokens]
+
+    def release_request(self, request_id) -> None:
+        self.released.append(request_id)
+
+
+class FusedLookupDraftProviderTests(unittest.TestCase):
+    # A 10-token phrase repeated, so the history ends inside a strong match.
+    PHRASE = list(range(100, 120))
+
+    def test_satisfies_runtime_protocol(self) -> None:
+        self.assertIsInstance(FusedLookupDraftProvider(), DraftProvider)
+
+    def test_ngram_reports_match_width(self) -> None:
+        provider = NgramDraftProvider(max_draft_tokens=2, min_match_tokens=2)
+        self.assertEqual(
+            provider.draft_with_match([1, 2, 3, 8, 2, 3, 9, 1, 2, 3]), ((8, 2), 3)
+        )
+        self.assertEqual(provider.draft_with_match([1, 2, 3]), ((), 0))
+
+    def test_strong_lookup_is_used_alone_without_running_the_model(self) -> None:
+        model = _FixedModelDrafter((7, 7, 7))
+        provider = FusedLookupDraftProvider(draft_model=model)
+        history = self.PHRASE + self.PHRASE[:10]
+        self.assertEqual(
+            provider.draft_for_request("r", history),
+            tuple(self.PHRASE[10:] + self.PHRASE[:6]),
+        )
+        self.assertEqual(model.calls, [])
+
+    def test_weak_lookup_needs_model_agreement(self) -> None:
+        history = [5, 1, 2, 30, 31, 32, 9, 1, 2]
+        agreeing = FusedLookupDraftProvider(
+            draft_model=_FixedModelDrafter((30, 31, 77))
+        )
+        self.assertEqual(agreeing.draft(history), (30, 31, 32, 9, 1, 2))
+        disagreeing = FusedLookupDraftProvider(
+            draft_model=_FixedModelDrafter((30, 40, 41))
+        )
+        self.assertEqual(disagreeing.draft(history), (30, 40, 41))
+
+    def test_without_model_weak_lookup_behaves_as_ngram(self) -> None:
+        history = [5, 1, 2, 30, 31, 32, 9, 1, 2]
+        provider = FusedLookupDraftProvider(short_block_tokens=3)
+        self.assertEqual(provider.draft(history), (30, 31, 32))
+
+    def test_strong_match_uses_long_block_immediately_by_default(self) -> None:
+        provider = FusedLookupDraftProvider(max_draft_tokens=16, short_block_tokens=7)
+        text = list(range(200, 260))
+        self.assertEqual(
+            provider.draft_for_request(1, text + text[:10]), tuple(text[10:26])
+        )
+
+    def test_weak_match_stays_within_short_block(self) -> None:
+        provider = FusedLookupDraftProvider(max_draft_tokens=16, short_block_tokens=3)
+        history = [5, 1, 2, 30, 31, 32, 9, 1, 2]
+        self.assertEqual(provider.draft_for_request(1, history), (30, 31, 32))
+
+    def test_conveyor_history_without_bonus_counts_as_full_block(self) -> None:
+        provider = FusedLookupDraftProvider(
+            max_draft_tokens=16, short_block_tokens=7, long_block_streak=1
+        )
+        text = list(range(200, 260))
+        history = text + text[:10]
+        first = provider.draft_for_request(1, history)
+        self.assertEqual(len(first), 7)
+        # Pending proposal passed back provisionally, no bonus yet.
+        self.assertEqual(len(provider.draft_for_request(1, history + list(first))), 16)
+
+    def test_long_block_needs_strong_match_and_two_full_blocks(self) -> None:
+        provider = FusedLookupDraftProvider(
+            max_draft_tokens=16, short_block_tokens=7, long_block_streak=2
+        )
+        text = list(range(200, 260))
+        history = text + text[:10]
+        first = provider.draft_for_request(1, history)
+        self.assertEqual(len(first), 7)
+        # Whole block accepted plus the bonus token.
+        history = history + list(first) + [text[17]]
+        second = provider.draft_for_request(1, history)
+        self.assertEqual(len(second), 7)
+        history = history + list(second) + [text[25]]
+        third = provider.draft_for_request(1, history)
+        self.assertEqual(third, tuple(text[26:42]))
+        self.assertEqual(provider.execution_snapshot()["longBlocks"], 1)
+
+    def test_rejection_resets_the_long_block_streak(self) -> None:
+        provider = FusedLookupDraftProvider(
+            max_draft_tokens=16, short_block_tokens=7, long_block_streak=2
+        )
+        text = list(range(200, 260))
+        history = text + text[:10]
+        first = provider.draft_for_request(1, history)
+        history = history + list(first) + [text[17]]
+        provider.draft_for_request(1, history)
+        # Only two tokens accepted, then a divergent target token.
+        history = history + [text[18], text[19], 999]
+        self.assertLessEqual(len(provider.draft_for_request(1, history)), 7)
+
+    def test_stateless_draft_never_uses_a_long_block_when_streak_required(self) -> None:
+        provider = FusedLookupDraftProvider(
+            max_draft_tokens=16, short_block_tokens=4, long_block_streak=1
+        )
+        text = list(range(200, 260))
+        self.assertEqual(len(provider.draft(text + text[:20])), 4)
+
+    def test_release_forwards_and_tracking_is_bounded(self) -> None:
+        model = _FixedModelDrafter((1, 2))
+        provider = FusedLookupDraftProvider(draft_model=model, max_tracked_requests=2)
+        for request in range(4):
+            provider.draft_for_request(request, [9, 8, 7, 6])
+        self.assertEqual(provider.execution_snapshot()["trackedRequests"], 2)
+        provider.release_request(3)
+        self.assertEqual(model.released, [3])
+        self.assertEqual(provider.execution_snapshot()["trackedRequests"], 1)
+
+    def test_respects_max_tokens_and_validates_configuration(self) -> None:
+        provider = FusedLookupDraftProvider()
+        text = list(range(200, 260))
+        self.assertEqual(provider.draft(text + text[:10], max_tokens=3), tuple(text[10:13]))
+        with self.assertRaises(ValueError):
+            FusedLookupDraftProvider(long_block_streak=-1)
+        self.assertEqual(provider.draft(text, max_tokens=0), ())
+        with self.assertRaises(ValueError):
+            FusedLookupDraftProvider(short_block_tokens=17)
+        with self.assertRaises(ValueError):
+            FusedLookupDraftProvider(strong_match_tokens=1, min_match_tokens=2)
 
 
 if __name__ == "__main__":

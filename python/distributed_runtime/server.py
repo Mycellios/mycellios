@@ -69,7 +69,7 @@ from .stage import (
     MAX_SPECULATIVE_BRANCH_TOKENS,
     MAX_SPECULATIVE_KV_BYTES,
 )
-from .speculation import NgramTreeDraftProvider
+from .speculation import FusedLookupDraftProvider, NgramTreeDraftProvider
 from .tokenizer_coordinates import stage_tokenizer_coordinates
 
 
@@ -1168,6 +1168,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--speculative-max-draft-tokens", type=int, default=4)
     parser.add_argument(
+        "--speculation-lookup",
+        choices=("plain", "fused"),
+        default="plain",
+        help=(
+            "Draft source policy for linear ngram/draft-model speculation. "
+            "'fused' copies strong prompt-lookup matches without running the "
+            "draft model and uses short matches only when the draft model "
+            "agrees. Every token is still verified by the target."
+        ),
+    )
+    parser.add_argument(
         "--speculative-inflight-waves",
         type=int,
         default=1,
@@ -1351,6 +1362,13 @@ def build_server(args: argparse.Namespace) -> DistributedMycelliosServer:
         raise ValueError(
             "speculative branch count, tokens and KV bytes must all be zero "
             "or all be positive"
+        )
+    if args.speculation_lookup == "fused" and args.speculation not in (
+        "ngram",
+        "draft-model",
+    ):
+        raise ValueError(
+            "fused speculation lookup requires linear ngram or draft-model speculation"
         )
     if args.speculation == "draft-tree" and not all(
         speculative_tree_limits_enabled
@@ -1677,12 +1695,22 @@ def build_server(args: argparse.Namespace) -> DistributedMycelliosServer:
             max_cached_requests=args.max_active_sequences,
         )
     )
+    if args.speculation_lookup == "fused":
+        draft_provider = FusedLookupDraftProvider(
+            max_draft_tokens=args.speculative_max_draft_tokens,
+            short_block_tokens=min(7, args.speculative_max_draft_tokens),
+            draft_model=draft_provider,
+            max_tracked_requests=max(1, args.max_active_sequences),
+        )
 
     def make_engine(
         config: PipelineEngineConfig = engine_config,
     ) -> DistributedPipelineEngine | LocalPipelineEngine:
         if len(config.boundaries) == 2:
-            if draft_provider is not None or tree_draft_provider_from_args(args) is not None:
+            if (
+                local_draft_model is not None
+                or tree_draft_provider_from_args(args) is not None
+            ):
                 raise ValueError("single-stage routes do not accept a draft provider")
             return LocalPipelineEngine(config)
         tree_provider = tree_draft_provider_from_args(args)

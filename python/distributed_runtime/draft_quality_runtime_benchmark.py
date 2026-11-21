@@ -611,6 +611,9 @@ def _provider_snapshot_clean(
             and provider.get("circuitOpen") is False
             and provider.get("cachedKvBytes") == 0
         )
+    if provider.get("strategy") == "fused-lookup":
+        inner = provider.get("draftModel")
+        return inner is None or _provider_snapshot_clean(inner, arm_name=arm_name)
     return provider.get("strategy") == "ngram"
 
 
@@ -973,6 +976,29 @@ def _build_draft_provider(
             max_match_tokens=args.ngram_max_match_tokens,
         )
 
+    if args.provider == "fused":
+        from .speculation import FusedLookupDraftProvider
+
+        return FusedLookupDraftProvider(
+            max_draft_tokens=k,
+            short_block_tokens=min(args.fused_short_block_tokens, k),
+            strong_match_tokens=args.fused_strong_match_tokens,
+            min_match_tokens=args.ngram_min_match_tokens,
+            draft_model=(
+                _load_draft_model(args, k=k, target_tokenizer=target_tokenizer)
+                if args.draft_model_source is not None
+                else None
+            ),
+        )
+    return _load_draft_model(args, k=k, target_tokenizer=target_tokenizer)
+
+
+def _load_draft_model(
+    args: argparse.Namespace,
+    *,
+    k: int,
+    target_tokenizer: Any,
+) -> Any:
     from .draft_model import (
         LocalDraftModelRuntimeConfig,
         load_local_draft_model_provider,
@@ -1374,7 +1400,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--revision")
-    parser.add_argument("--provider", choices=("ngram", "draft-model"), default="ngram")
+    parser.add_argument("--provider", choices=("ngram", "draft-model", "fused"), default="ngram")
     parser.add_argument(
         "--k-sweep",
         type=parse_k_sweep,
@@ -1417,6 +1443,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=29)
     parser.add_argument("--ngram-min-match-tokens", type=_positive_int, default=2)
     parser.add_argument("--ngram-max-match-tokens", type=_positive_int, default=8)
+    parser.add_argument("--fused-short-block-tokens", type=_positive_int, default=7)
+    parser.add_argument("--fused-strong-match-tokens", type=_positive_int, default=8)
     parser.add_argument("--draft-model-source")
     parser.add_argument("--draft-model-revision")
     parser.add_argument("--draft-model-artifact-identity")
@@ -1463,7 +1491,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         args.draft_model_canonical_source,
         args.draft_model_canonical_revision,
     )
-    if args.provider == "draft-model" and any(
+    if (
+        args.provider == "draft-model"
+        or (args.provider == "fused" and any(v is not None for v in supplied_draft_fields))
+    ) and any(
         value is None for value in required_draft_fields
     ):
         parser.error(
