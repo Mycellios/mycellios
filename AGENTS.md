@@ -399,6 +399,11 @@ These rules apply to the complete repository.
   activation/node tuples. Keep the three-attempt daily cap and uncertain-request
   backoff; source drift requires operator approval, not a widened allowlist.
 
+- Shared-GPU native replicas follow `specs/on-demand-replica-placement/spec.md`:
+  with `MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG` the coordinator owns their
+  reservations, granting by demand and releasing only idle, unpinned, unbusy
+  replicas after minimum residency. Never exceed the safe budget or bypass the
+  runner's committed-reservation guard. Check `tests/native-replica-placement.test.ts`.
 - Kokoro uses an explicit native replica adapter, not the Transformers layer planner.
 - Its loopback runtime owns model loading; the existing worker owns admission and leases.
 - Speech bytes are bounded independently from max_tokens and never counted as output text tokens.
