@@ -435,22 +435,40 @@ Mico names and instructions stay: they are the content the user chose.
 
 ### D8. Deterrence (principle 7)
 
-**Bait traffic.**
+**Bait traffic and tripwires (implemented, off until configured).**
 
-- A coordinator component submits synthetic jobs through the normal path,
-  funded by an operator account, with realistic content drawn from a curated
-  corpus. Each dispatch embeds unique markers: a phrase, plus tripwires (a
-  URL on a Mycellios domain and a fake API key in the `myc_` format, both
-  registered and answering normally).
-- The coordinator records `(marker, workerId, identity, owner, time)`. A hit
-  on a tripwire URL or an attempt to use a fake key identifies the node that
-  received it. Markers found in public sources point to the same record.
-- Rate: about 1-2 % of jobs per model, with Poisson timing and parameters
-  drawn from real traffic. After D1 removes `privacy` and session prefixes, a
-  node cannot tell bait from user jobs. New nodes receive a higher share of
-  bait during their first jobs (a ramp, not a trust tier).
-- Audio bait is prerecorded speech containing tripwire phone numbers or
-  emails.
+- `scripts/node-privacy-bait.mjs send` submits ordinary requests through the
+  public API with an operator key and contribution-credit funding, in the same
+  shape real clients use: speech (`mycellios-kokoro-es`, `es`/`en` voices)
+  and memory embeddings (the `mycellios-embeddings/1` envelope, optional
+  dimensions). Each carries a unique marker phrase, a link and an API key.
+- Tripwires are stateless: a link is `/go/<id><tag>` and a key has the real
+  `myc_live_<10>_<43>` format, both derived with HMAC from
+  `MYCELLIOS_TRIPWIRE_SECRET` (`src/coordinator/tripwires.ts`). Only the
+  operator can produce them, so no table or migration is needed. When the
+  secret is set, the coordinator logs `tripwire_hit` (kind, tripwire id, IP,
+  forwarded-for, user agent) when a link is followed or a key is tried; both
+  answer exactly like an unknown page or an invalid key.
+- The bait client appends each bait (time, model, job id, link id, key id,
+  phrase) to a private JSONL file on the operator's machine. `lookup --id`
+  maps a tripwire id or phrase back to the job, and the coordinator's `jobs`
+  table maps the job to the worker and its identity:
+  `SELECT j.worker_id, w.identity_kind, w.identity_id FROM jobs j JOIN workers w ON w.id = j.worker_id WHERE j.id = ?`.
+  A node that read the offer and rejected it is not in `jobs`; the rejection
+  monitor (D2) covers that case.
+- Rate: about 1-2 % of each model's traffic, with exponential gaps
+  (`--mean-gap-seconds`). After D1 removes `privacy` and session prefixes,
+  the request carries nothing that marks it as bait.
+- To activate: set `MYCELLIOS_TRIPWIRE_SECRET` (32+ characters) on the
+  coordinator, keep the same secret and a dedicated operator key on the
+  machine that runs the bait client, and schedule it. Then expel confirmed
+  leakers as below.
+- Limits: the templates are few and fixed, so an owner who studies many
+  requests could learn to spot them; widen the corpus before relying on it.
+  Speech is read aloud and embedded text is not shown, so a hit needs an owner
+  who inspects content. Audio bait for transcription (prerecorded speech with
+  tripwire phone numbers or emails) is not built yet. Silent retention stays
+  undetectable.
 
 **Expulsion (implemented, `src/coordinator/node-owner-policy.ts`).**
 
