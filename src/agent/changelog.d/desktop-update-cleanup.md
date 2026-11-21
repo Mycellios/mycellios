@@ -9,3 +9,5 @@
   installer it has downloaded.
 - The usage indicator keeps a ring for each connected subscription while its quota is being
   checked, so accounts no longer disappear and reappear in the sidebar.
+- Right-clicking in the desktop app now opens a menu to copy an image, a link or selected text,
+  and to cut, copy and paste in text fields.

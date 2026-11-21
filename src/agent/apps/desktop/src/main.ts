@@ -13,6 +13,7 @@ import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpa
 import { publishedDesktopRelease } from "./published-desktop-release.js";
 import { acknowledgeManualUpdate, launchManualUpdate } from "./manual-update-handoff.js";
 import { pruneManualUpdates } from "./manual-update-retention.js";
+import { attachContextMenu } from "./context-menu.js";
 import { linuxPackageKind } from "./linux-package.js";
 import { macosPackageKind } from "./macos-package.js";
 import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
@@ -236,6 +237,7 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
     },
   }) : null;
 const desktopUpdater = manualDesktopUpdater ?? automaticDesktopUpdater;
+app.on("web-contents-created", (_event, contents) => attachContextMenu(contents, () => app.getLocale()));
 let manualUpdatePruneScheduled = false;
 /** After the helper of a just-finished update has released its lock, drop older jobs and installers. */
 function scheduleManualUpdatePrune() {
