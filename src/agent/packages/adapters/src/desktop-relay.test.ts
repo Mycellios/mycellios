@@ -40,6 +40,16 @@ describe("outbound Desktop relay", () => {
     broker.result(owner, "device", id, 0, Buffer.from('{"done":true}\n').toString("base64"), true);
     expect(await response.text()).toContain("done");
   });
+  it("keeps a streaming operation alive while its results arrive between polls", async () => {
+    let now = 0; broker = new DesktopRelayBroker(() => now); broker.bind(owner, binding);
+    const response = broker.dispatch({ method: "environment", botId: "bot" }, context());
+    const id = broker.poll(owner, "device").operations[0]!.id;
+    const chunk = Buffer.from('{"progress":1}\n').toString("base64");
+    for (let seq = 0; seq < 3; seq++) { now += 30_000; broker.result(owner, "device", id, seq, chunk, false); }
+    expect(broker.available(owner, "bot")).toBe(true);
+    broker.result(owner, "device", id, 3, Buffer.from('{"done":true}\n').toString("base64"), true);
+    expect(await response.text()).toContain("done");
+  });
   it("expires disconnected work and never moves an active agent to a different PC", async () => {
     let now = 0; broker = new DesktopRelayBroker(() => now); broker.bind(owner, binding);
     const response = broker.dispatch({ method: "environment", botId: "bot" }, context());

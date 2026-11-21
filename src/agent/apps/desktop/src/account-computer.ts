@@ -60,6 +60,7 @@ export class AccountComputerConnection {
       profile: string;
       nativeVersion?: string;
       agentExecution?: 1;
+      awake?: () => () => void;
       host: Host;
       localUrl: string;
       localToken: string;
@@ -208,6 +209,7 @@ export class AccountComputerConnection {
             localToken: this.options.localToken,
             deviceId: this.deviceId,
             agentExecution: this.options.agentExecution,
+            awake: this.options.awake,
             restoreUpdate: this.options.nativeVersion ? identity => restoreUpdateBinding(this.options.profile, this.options.nativeVersion!, context.base, identity) : undefined,
             revoked: () => {
               this.clients.get(spaceId)?.stop();

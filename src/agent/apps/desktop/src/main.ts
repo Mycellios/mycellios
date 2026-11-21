@@ -289,6 +289,19 @@ async function loadBackgroundPreference(profile: string) {
   powerMonitor.on("on-battery", () => appBehavior?.syncPower());
 }
 
+// macOS App Nap throttles a hidden app's timers and network; a Mico run on this
+// computer would then miss relay polls and the server would end it as disconnected.
+let awakeHolds = 0, awakeBlocker: number | undefined;
+function holdAwakeWhileWorking() {
+  if (awakeHolds++ === 0) awakeBlocker = powerSaveBlocker.start("prevent-app-suspension");
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--awakeHolds === 0 && awakeBlocker !== undefined) { powerSaveBlocker.stop(awakeBlocker); awakeBlocker = undefined; }
+  };
+}
+
 function setKeepRunningInBackground(checked: boolean) {
   void appBehavior?.update({ keepRunningInBackground: checked }).catch(error => reportDesktopError(error, "desktop.settings"));
 }
@@ -1814,6 +1827,7 @@ app.whenReady().then(async () => {
     const owningWindow = mainWindow;
     cloudComputerBase = base;
     cloudComputer ??= new DesktopRelayClient({ base,
+        awake: holdAwakeWhileWorking,
         restoreUpdate: (identity, botId) => restoreUpdateBinding(userDataDir, app.getVersion(), base, identity, botId),
       fetch: async (url, init) => {
         const spaceId = await nativeProjectSpace(owningWindow);
@@ -1839,6 +1853,7 @@ app.whenReady().then(async () => {
   };
   if(hostComputer) accountComputer = installAccountComputerBackground({
     agentExecution: 1,
+    awake: holdAwakeWhileWorking,
     profile:userDataDir,host:hostComputer,nativeVersion:app.getVersion(),
     localUrl:hostComputer.connection.url.replace("host.docker.internal","127.0.0.1"),localToken:hostComputer.connection.token,
     consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,
