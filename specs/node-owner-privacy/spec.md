@@ -1,6 +1,7 @@
 # Privacy from node owners
 
-Status: phase 0 (this spec) opened 2026-11-21. No phase is in production yet.
+Status: phases 1-5 and the first parts of phase 7 are in `main` (2026-11-21);
+see docs/STATUS_AND_EVIDENCE.md for what is established. Opened 2026-11-21.
 
 ## Goal
 
@@ -427,11 +428,30 @@ Mico names and instructions stay: they are the content the user chose.
 
 ### D7. Replacing the trust policy
 
-- Fix F0 first: pin matching uses the same identity key as admission.
-- Then, once D1-D4 are in production, the public API stops accepting
-  `privacy.trust`/`boundary`. Pins remain only as an operator-only placement
-  tool for native qualification, never as a privacy tier. Agent speech and
-  dictation stop pinning and use the global pool with the protections above.
+- Fix F0 first (done in #412): pin matching uses the same identity key as
+  admission.
+- The Agent's speech and dictation pins do a second job today: they keep a
+  contribution-funded request on a replica whose native qualification can
+  settle it. Settlement (`verifiedContributionCanary`) requires a verified
+  deployment with `nativeReplicaEvidence` bound to the worker's current
+  session, deployment, activation, build and physical node, not older than
+  the canary maximum age. Without it the job runs, settlement rejects it and
+  the client gets 502. Removing the pins first would send paid requests to
+  unqualified replicas.
+- So, once D1-D4 are in production:
+  1. The scheduler gains a settlement-eligibility rule for requests that need
+     settlement: a native replica deployment (kokoro, transcription,
+     embedding) is eligible only with that evidence present and fresh
+     (`candidate_evidence_missing` otherwise). The admission route passes the
+     need from `beginContributionUsage`; operator and unfunded traffic, such as
+     Jarvis memory backfill, keeps today's behavior so a lapsed qualification
+     cannot stop it. `src/coordinator/server.ts` is at its size ceiling, so
+     move code out of it first.
+  2. The Agent stops sending `privacy` for speech and dictation (with a
+     `src/agent/changelog.d` note), relying on rule 1 and on D1-D4.
+  3. The coordinator then drops `privacy` from public requests at admission,
+     keeping it only for its internal native qualification, which pins the
+     worker under test.
 
 ### D8. Deterrence (principle 7)
 

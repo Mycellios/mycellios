@@ -1,5 +1,34 @@
 # Status and evidence
 
+## Privacy from node owners — merged, not yet in production, 2026-11-21
+
+`specs/node-owner-privacy/spec.md` phases 1-5 and the first parts of phase 7
+are in `main` (#412, #413, #416, #417, #419, #420, #422, #424). At the time of
+writing the production coordinator still ran 0337e753; none of this has served
+a real request yet, and worker changes reach PCs with the next Desktop release.
+
+What the code does, verified by focused unit and integration tests only:
+
+- A node receives a per-worker session pseudonym and no privacy policy, region
+  or participant names. Its failure logs and `task.fail` carry no content.
+- Assignment is uniform among routes within 10 % of the best score and
+  estimated service time, ranked with coordinator-measured speed rather than
+  the node's claims.
+- Pieces of one recording sharing a dispersion group never reach the same
+  worker, identity, owner or public network; the Speakr bridge keeps it off.
+- Workers that announce an in-memory X25519 key receive sealed offers
+  (per-lease ephemeral key, AES-256-GCM bound to the lease). A local end-to-end
+  test ran a real coordinator and worker over the sealed path.
+- Operator revocations with a `node_privacy_violation` reason expel the owner
+  account; bait tripwires are logged when `MYCELLIOS_TRIPWIRE_SECRET` is set.
+  The per-owner node limit, closed cell admission and the rejection hold are
+  off until configured.
+
+Not established: any behavior on physical contributor PCs or across two
+physical computers, bait detection in practice, and protection against an
+owner who reads process memory or runs a modified worker, which the design
+explicitly does not claim.
+
 ## Speculative drafting over a two-machine relay route — exploratory, 2026-11-21
 
 Not a physical claim under the evidence policy below. TTFT, peak memory,
