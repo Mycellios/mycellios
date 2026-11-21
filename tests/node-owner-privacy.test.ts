@@ -45,12 +45,14 @@ describe("worker view of a request", () => {
     seed: 42,
     temperature: 0.2,
     privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: ["node-a"] },
+    dispersion: { group: "recording-0123456789abcdef" },
   };
 
   it("drops routing policy, region and participant names but keeps content and sampling", () => {
     const view = new WorkerRequestView(KEY).build(request, "wrk_a");
     expect(view).not.toHaveProperty("privacy");
     expect(view).not.toHaveProperty("preferred_region");
+    expect(view).not.toHaveProperty("dispersion");
     expect(view.messages).toEqual([
       { role: "system", content: "Be brief." },
       { role: "user", content: "hello" },

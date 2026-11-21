@@ -34,6 +34,7 @@ export class WorkerRequestView {
       session_id: sessionId,
       privacy: _privacy,
       preferred_region: _region,
+      dispersion: _dispersion,
       ...rest
     } = request;
     return {
