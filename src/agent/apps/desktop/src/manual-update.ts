@@ -8,6 +8,13 @@ import type { ReadableStream } from "node:stream/web";
 import { pipeline } from "node:stream/promises";
 import { fetchDesktopArtifact } from "./published-desktop-release.js";
 import { ManualUpdateInProgressError } from "./manual-update-lock.js";
+import { downloadDifferential } from "./manual-update-differential.js";
+
+const GITHUB_RELEASES = "https://github.com/Mycellios/mycellios/releases/download/";
+/** A real local file (never a link) that a differential download may read blocks from. */
+async function verifyManualInstallerExists(file: string): Promise<boolean> {
+  return lstat(file).then(info => info.isFile(), () => false);
+}
 
 const ORIGIN = "https://www.mycellios.com";
 /** Fedora RPMs are published as the optional `fedora` entry of the extended catalog. */
@@ -201,7 +208,20 @@ export class ManualUpdateController {
     catch {
       const temporary = destination + ".part";
       let source: string | null = null;
-      for (const url of [release.url, ...(this.mirror ? [this.mirror] : [])]) {
+      // Reuse the installer of the running version when both have published block maps.
+      const previous = path.join(directory, `Mycellios-Desktop-${this.options.version}-windows-x64-pilot.exe`);
+      if ((this.options.packageKind ?? "windows-x64") === "windows-x64" && release.url.startsWith(GITHUB_RELEASES) &&
+          await verifyManualInstallerExists(previous)) {
+        this.current = { ...this.current, phase: "downloading", percent: 0 };
+        try {
+          await this.withStall(signal => downloadDifferential({ fetch: this.options.fetch ?? fetch, release, previousFile: previous,
+            previousBlockmapUrl: `${GITHUB_RELEASES}desktop-v${this.options.version}-windows-preview/Mycellios-Desktop-${this.options.version}-windows-x64-pilot.exe.blockmap`,
+            temporary, signal, progress: written => this.progress(written, release.bytes) }));
+          await rename(temporary, destination);
+          source = release.url;
+        } catch { await rm(temporary, { force: true }); }
+      }
+      for (const url of source ? [] : [release.url, ...(this.mirror ? [this.mirror] : [])]) {
         this.current = { ...this.current, phase: "downloading", percent: 0 };
         try {
           await this.transfer(url, release, temporary);
@@ -225,28 +245,38 @@ export class ManualUpdateController {
    * Stream one source into `temporary`, verifying size and SHA-256. A large installer on a slow
    * link may take longer than any fixed total deadline, so only a stalled transfer is abandoned.
    */
-  private async transfer(url: string, release: ManualRelease, temporary: string) {
+  private stallTimer: (() => void) | null = null;
+  private progress(bytes: number, total: number) {
+    this.stallTimer?.();
+    this.current = { ...this.current, percent: Math.floor(bytes / total * 100) };
+  }
+  /** Run a transfer that is abandoned only after DOWNLOAD_STALL_MS without progress. */
+  private async withStall<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const controller = new AbortController();
     let stall: NodeJS.Timeout | undefined;
     const arm = () => { clearTimeout(stall); stall = setTimeout(() => controller.abort(), DOWNLOAD_STALL_MS); stall.unref?.(); };
     arm();
-    try {
-      const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, url, controller.signal, release.sha256);
+    this.stallTimer = arm;
+    try { return await work(controller.signal); }
+    finally { clearTimeout(stall); this.stallTimer = null; }
+  }
+  private async transfer(url: string, release: ManualRelease, temporary: string) {
+    await this.withStall(async signal => {
+      const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, url, signal, release.sha256);
       if (!response.ok || !response.body) throw Error("Installer unavailable");
       let bytes = 0;
       const hash = createHash("sha256");
       const check = new Transform({ transform: (chunk: Buffer, _encoding, done) => {
-        arm();
         bytes += chunk.length;
         if (bytes > release.bytes) return done(Error("Installer exceeds catalog size"));
         hash.update(chunk);
-        this.current = { ...this.current, percent: Math.floor(bytes / release.bytes * 100) };
+        this.progress(bytes, release.bytes);
         done(null, chunk);
       } });
       await pipeline(Readable.fromWeb(response.body as ReadableStream), check,
-        createWriteStream(temporary, { flags: "wx", mode: 0o600 }), { signal: controller.signal });
+        createWriteStream(temporary, { flags: "wx", mode: 0o600 }), { signal });
       if (bytes !== release.bytes || hash.digest("hex") !== release.sha256) throw Error("Installer differs from catalog");
-    } finally { clearTimeout(stall); }
+    });
   }
   install(force = false): Promise<DesktopUpdateState> {
     if (force && this.current.phase === "ready" && this.current.installPending && !this.committed) {
