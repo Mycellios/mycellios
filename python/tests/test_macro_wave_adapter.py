@@ -354,6 +354,39 @@ class LinearMacroWaveAdapterTests(unittest.TestCase):
         self.assertFalse(short.is_probe)
         self.assertEqual(short.selected_draft_tokens, (10,))
 
+    def test_deferred_probe_truncated_by_the_drafter_is_not_a_probe(self) -> None:
+        controller = AdaptiveSpeculationController(
+            AdaptiveSpeculationConfig(
+                max_draft_tokens=4,
+                candidate_sizes=(1, 2, 4),
+                min_token_history=0,
+                min_classic_observations=2,
+                min_verify_observations=2,
+                minimum_speedup=1.0,
+            )
+        )
+        for _ in range(2):
+            controller.record_classic(latency_seconds=1.0, transferred_bytes=100)
+            controller.record_verification(
+                proposed_tokens=1,
+                accepted_tokens=1,
+                latency_seconds=0.5,
+                transferred_bytes=100,
+            )
+        provider = _FixedDraftProvider((10,))
+        provider.defer_until_selected = True
+        preparation = prepare_linear_macro_wave(
+            provider,
+            controller,
+            (1, 2, 3),
+            request_id="shrunk",
+            ordinal=0,
+            allow_probe=True,
+        )
+        self.assertTrue(preparation.decision.enabled)
+        self.assertFalse(preparation.is_probe)
+        self.assertEqual(preparation.selected_draft_tokens, (10,))
+
     def test_deferred_model_runs_only_for_an_enabled_decision_or_probe(self) -> None:
         provider = _DeferredDraftProvider((10, 11, 12, 13))
         disabled = prepare_linear_macro_wave(
