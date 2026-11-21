@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { MeasuredServiceRates } from "./measured-service-rates.js";
 import { flatMapAsync, mapAsync, filterAsync, everyAsync, someAsync } from "../core/async-collections.js";
 import type {
   ChatCompletionRequest,
@@ -56,6 +57,7 @@ export interface SchedulerEvidenceOptions {
   /** Near-best band for uniform selection; tests may pass 0 for a fixed choice. */
   serviceBand?: number | undefined;
   randomIndex?: ((exclusiveMax: number) => number) | undefined;
+  serviceRates?: MeasuredServiceRates | undefined;
 }
 
 /**
@@ -87,10 +89,21 @@ export interface AvailableModel {
 }
 
 export class Scheduler {
+  /** Corrects each node's claimed speed with the speed the coordinator measured. */
+  readonly serviceRates: MeasuredServiceRates;
+
   constructor(
     private readonly store: MeshStore,
     private readonly evidence: SchedulerEvidenceOptions = {},
-  ) {}
+  ) {
+    this.serviceRates = evidence.serviceRates ?? new MeasuredServiceRates();
+  }
+
+  /** A deployment's claims, slowed down by how much slower it has measured. */
+  measuredClaims(workerId: string, deployment: ModelDeployment): { ttftMs: number; tokensPerSecond: number } {
+    const factor = this.serviceRates.factor(workerId, deployment.deploymentId);
+    return { ttftMs: deployment.ttftMs * factor, tokensPerSecond: deployment.tokensPerSecond / factor };
+  }
 
   async selectRoute(
     request: ChatCompletionRequest,
@@ -167,7 +180,10 @@ export class Scheduler {
           ...(eligibilityRejections.get(routeCandidateId(route)) ?? []),
           ...routePolicyRejections(route, workerById, options),
         ];
-        const serviceMs = estimatedRouteServiceMs(route, workerById, request);
+        // Measured speed only ranks candidates. Eligibility keeps the claims, so a
+        // node whose work the claim model fits poorly is never shut out by it.
+        const serviceMs = estimatedRouteServiceMs(route, workerById, request, (workerId, deployment) => this.measuredClaims(workerId, deployment));
+        const claimedServiceMs = estimatedRouteServiceMs(route, workerById, request, (_workerId, deployment) => deployment);
         return {
           id: routeCandidateId(route),
           kind: executionRouteKind(route, workerById, options.originWorkerId),
@@ -175,7 +191,7 @@ export class Scheduler {
           score: route.score,
           serviceMs,
           nodeCount: new Set(route.stages.map((stage) => stage.workerId)).size,
-          meetsSlo: serviceMs <= (request.deadline_ms ?? 120_000),
+          meetsSlo: claimedServiceMs <= (request.deadline_ms ?? 120_000),
           eligible: rejectionReasons.length === 0,
           rejectionReasons,
         };
@@ -287,13 +303,14 @@ export class Scheduler {
       Math.min(worker.capabilities.limits.maxConcurrency, deployment.maxConcurrency),
     );
     const queueRatio = Math.min(1, active / capacity);
-    const generationMs = isDecisionDeployment(deployment) ? 0 : ((request.max_tokens ?? 256) / deployment.tokensPerSecond) * 1_000;
-    const estimatedMs = deployment.ttftMs + generationMs;
+    const claims = this.measuredClaims(worker.id, deployment);
+    const generationMs = isDecisionDeployment(deployment) ? 0 : ((request.max_tokens ?? 256) / claims.tokensPerSecond) * 1_000;
+    const estimatedMs = claims.ttftMs + generationMs;
     const deadline = request.deadline_ms ?? 120_000;
     const slaRisk = Math.min(1, estimatedMs / deadline);
     const workloadClass = request.workload_class ?? "interactive";
     const interactive = workloadClass === "interactive";
-    const firstTokenRisk = Math.min(1, deployment.ttftMs / Math.max(250, deadline * 0.2));
+    const firstTokenRisk = Math.min(1, claims.ttftMs / Math.max(250, deadline * 0.2));
     const throughputServiceTime = Math.min(1, generationMs / 120_000);
     const interactiveServiceTime = Math.min(1, estimatedMs / 120_000);
     const failure = 1 - Math.max(0, Math.min(1, worker.reliability));
@@ -795,19 +812,20 @@ function estimatedRouteServiceMs(
   route: ScheduledRoute,
   workerById: ReadonlyMap<string, StoredWorker>,
   request: ChatCompletionRequest,
+  claimsFor: (workerId: string, deployment: ModelDeployment) => { ttftMs: number; tokensPerSecond: number },
 ): number {
   const deployments = route.stages.flatMap((stage) => {
     const worker = workerById.get(stage.workerId);
     const deployment = worker?.capabilities.deployments.find(
       (candidate) => candidate.deploymentId === stage.deploymentId,
     );
-    return deployment ? [deployment] : [];
+    return deployment ? [{ deployment, claims: claimsFor(stage.workerId, deployment) }] : [];
   });
   if (deployments.length !== route.stages.length) return Number.POSITIVE_INFINITY;
   const outputTokens = request.max_tokens ?? 256;
-  const ttftMs = deployments.reduce((total, deployment) => total + deployment.ttftMs, 0);
+  const ttftMs = deployments.reduce((total, { claims }) => total + claims.ttftMs, 0);
   const generationMs = Math.max(
-    ...deployments.map((deployment) => isDecisionDeployment(deployment) ? 0 : outputTokens / deployment.tokensPerSecond * 1_000),
+    ...deployments.map(({ deployment, claims }) => isDecisionDeployment(deployment) ? 0 : outputTokens / claims.tokensPerSecond * 1_000),
   );
   return ttftMs + generationMs;
 }

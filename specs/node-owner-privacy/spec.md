@@ -297,11 +297,15 @@ used, since that would reward inflated claims again.
 - Identical or near-identical nodes share offers instead of the lowest id
   always winning. With one eligible node (Whisper and Kokoro today) nothing
   changes.
-- **Still open (phase 2b): measured rates.** Scores use the throughput a node
-  reports for itself (every adapter except `mycellios-pipeline`), so a node
-  that overstates it still wins. The coordinator should score from rates it
-  measures itself (lease accept to completion, first token) and never let a
-  claim look better than the measurement.
+- **Measured rates (phase 2b).** Nodes report their own throughput and
+  first-token time (every adapter except `mycellios-pipeline`). After each
+  completed job the coordinator compares the attempt's real duration with what
+  those claims predicted, sizing the output as the smaller of the node's token
+  count and half the bytes it actually delivered. Once three recent jobs (six
+  hours) exist, the median slowdown, between 1 and 20, scales the claims down
+  for ranking. Claiming less than delivered gains nothing. The factor only
+  ranks candidates: SLO eligibility keeps the claims, so a node whose work the
+  claim model fits poorly is never shut out.
 
 **Rejections after content.** A `lease.reject` arrives after the node has read
 the request. The coordinator counts these per worker in a rolling hour, except
@@ -479,7 +483,7 @@ that changes behavior for users is merged without Daniel's explicit OK.
 1. **Worker view, F0 and content-free failures** (D1, D7 F0 fix, first part
    of D6). Coordinator and worker. Highest protection for the lowest risk.
 2. **Random band and rejection accounting** (D2), then **2b, measured rates**
-   so self-reported throughput cannot win the band.
+   so self-reported throughput cannot win the band. Both are in `main`.
 3. **Dispersion groups** (D3). Coordinator first, then the bridge. The bridge
    and parallel chunks are owned operationally by the session "Mycellios:
    huellas Qwen sin redistribución"; coordinate with it before deploying.

@@ -384,7 +384,9 @@ These rules apply to the complete repository.
   offering a lease; use only compatible preplanned standbys if eligibility changed.
 - Routes within `SCHEDULER_SERVICE_BAND` of both the best score and the best
   estimated service time are chosen uniformly; a healthy affinity still wins.
-  Tests of recovery rather than selection pass `serviceBand: 0`. Rejections
+  Tests of recovery rather than selection pass `serviceBand: 0`. Ranking scales
+  claimed speed by `MeasuredServiceRates` (coordinator-measured, never below
+  claims); SLO eligibility keeps raw claims. Rejections
   after an offer is delivered feed `LeaseRejectionMonitor`; holding a worker
   stays opt-in (`MYCELLIOS_LEASE_REJECTION_HOLD=1`).
 - Verify with `npx vitest run tests/capacity-dispatch-hardening.test.ts
