@@ -1,7 +1,8 @@
 import { QualifiedWarmRouteAuthority } from "./qualified-warm-route.js";
 import { readFile, writeFile, rename } from "node:fs/promises";
 import { activationCanaryRecord } from "./activation-canary-record.js";
-import { isAbsolute, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { loadCoordinatorConfig } from "../core/config.js";
 import { parseAutoDistributionConfig } from "../distribution/auto-distribute.js";
 import {
@@ -217,7 +218,14 @@ if (baseActivationConfig) {
   );
 }
 
-const replicaPlacementPath = process.env.MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG?.trim();
+// Explicit variable, or a file next to the coordinator state. Release
+// promotion copies the running container's environment, so the state-file
+// convention lets operators enable placement without recreating it by hand.
+const defaultReplicaPlacementPath = config.databasePath === ":memory:"
+  ? undefined
+  : join(dirname(config.databasePath), "native-replica-placement.json");
+const replicaPlacementPath = process.env.MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG?.trim()
+  || (defaultReplicaPlacementPath && existsSync(defaultReplicaPlacementPath) ? defaultReplicaPlacementPath : undefined);
 const replicaPlacement = replicaPlacementPath
   ? new NativeReplicaPlacementBroker(
       runtime.store,
