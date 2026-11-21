@@ -39,12 +39,29 @@ it("never presents an expired measurement as fresh remaining quota", async () =>
 });
 it("shows one rail ring for every account that reports quota, like Codex and Claude together", async () => {
   const claude = { ...account(), credentialId: "claude-oauth", provider: "anthropic", label: "Claude" };
-  const unmeasured = { ...account(), credentialId: "stale", measuredAt: new Date(Date.now() - 121000).toISOString() };
-  mocks.native.mockResolvedValue(account()); mocks.planLimits.mockResolvedValue({ accounts: [claude, unmeasured] }); await render();
+  mocks.native.mockResolvedValue(account()); mocks.planLimits.mockResolvedValue({ accounts: [claude] }); await render();
   const trigger = container.querySelector('[data-testid="provider-quota-trigger"]')!;
   expect(trigger.querySelectorAll('[data-testid="provider-quota-ring"]').length).toBe(2);
   expect(trigger.querySelector('img[src$="openai-black.svg"]')).not.toBeNull();
   expect(trigger.querySelector('[data-testid="provider-quota-more"]')).toBeNull();
+});
+it("keeps an empty ring for a connected account until its quota is measured", async () => {
+  const claude = { ...account(), credentialId: "claude-oauth", provider: "anthropic", label: "Claude",
+    status: "rate_limited" as const, measuredAt: null, windows: [] };
+  const stale = { ...account(), credentialId: "stale", measuredAt: new Date(Date.now() - 121000).toISOString() };
+  mocks.native.mockResolvedValue(account()); mocks.planLimits.mockResolvedValue({ accounts: [claude, stale] }); await render();
+  const trigger = container.querySelector('[data-testid="provider-quota-trigger"]')!;
+  const rings = trigger.querySelectorAll('[data-testid="provider-quota-ring"]');
+  expect(rings.length).toBe(3);
+  // Only the fresh native reading draws a remaining-quota arc; the other two are empty tracks.
+  expect([...rings].map(ring => ring.querySelectorAll("circle").length)).toEqual([1, 1, 2]);
+});
+it("drops unmeasured accounts first when the rail is full", () => {
+  const rows = [90, 10, 50].map((used, i) => ({ ...account(), credentialId: `a${i}`, windows: [{ ...account().windows[0]!, usedPercent: used }] }));
+  const waiting = [3, 4].map(i => ({ ...account(), credentialId: `a${i}`, measuredAt: null }));
+  const { shown, more } = railRings([...rows, ...waiting], Date.now());
+  expect(shown.map((row) => row.credentialId)).toEqual(["a0", "a1", "a2"]);
+  expect(more).toBe(2);
 });
 it("keeps the accounts with the least left and counts the rest when the rail is full", () => {
   const rows = [90, 10, 50, 70, 30].map((used, i) => ({ ...account(), credentialId: `a${i}`, windows: [{ ...account().windows[0]!, usedPercent: used }] }));

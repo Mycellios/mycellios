@@ -12,6 +12,7 @@ import { installAppsStudio } from "./apps-studio-ipc.js";
 import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpace, type ManualPackageKind } from "./manual-update.js";
 import { publishedDesktopRelease } from "./published-desktop-release.js";
 import { acknowledgeManualUpdate, launchManualUpdate } from "./manual-update-handoff.js";
+import { pruneManualUpdates } from "./manual-update-retention.js";
 import { linuxPackageKind } from "./linux-package.js";
 import { macosPackageKind } from "./macos-package.js";
 import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
@@ -235,6 +236,16 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
     },
   }) : null;
 const desktopUpdater = manualDesktopUpdater ?? automaticDesktopUpdater;
+let manualUpdatePruneScheduled = false;
+/** After the helper of a just-finished update has released its lock, drop older jobs and installers. */
+function scheduleManualUpdatePrune() {
+  if (manualUpdatePruneScheduled || catalogPackage !== "windows-x64") return;
+  manualUpdatePruneScheduled = true;
+  setTimeout(() => {
+    void pruneManualUpdates(app.getPath("userData"), app.getVersion())
+      .catch(() => console.warn("Could not remove older Desktop update files"));
+  }, 2 * 60_000).unref();
+}
 let updatePreferences: UpdatePreferences | undefined;
 let serverDirectory: ServerDirectory;
 let preferredServer: string | null = null;
@@ -1200,6 +1211,7 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
     if (loaded !== "failed" && manualDesktopUpdater) {
       void acknowledgeManualUpdate(app.getPath("userData"), process.execPath, app.getVersion(), process.pid, process.argv)
         .catch(() => console.warn("Could not record Desktop update startup"));
+      scheduleManualUpdatePrune();
     }
     currentTargetUrl = targetUrl;
     activateDesktopMonitoring(targetUrl, target.value);

@@ -47,6 +47,11 @@ it.runIf(process.platform === "win32")("parses the real helper and requires the 
   expect(text).toContain("$window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()");
   expect(text).toContain("$installDeadline=(Get-Date).AddMinutes(10)");
   expect(text).toContain("while(!$setup.WaitForExit(250))");
+  // The window appears before the backup, which stays responsive and skips regenerable trees.
+  expect(text.indexOf("Show-Status ('Preparando")).toBeLessThan(text.indexOf("Copy-Safe $installation"));
+  expect(text).toContain("while(!$copy.WaitForExit(250)){Pump-Window}");
+  expect(text).toMatch(/\$excluded\+=@\([^)]*'development'/);
+  expect(text).toContain("$entries[$file.FullName.Substring($profile.Length+1)]=Get-FileSha256 $file.FullName");
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-helper-"));
   try {
     const file = path.join(directory, "parse.ps1");
@@ -277,6 +282,11 @@ function Get-PSDrive { [pscustomobject]@{Free=20GB} }
 & $Helper -ConfigFile $Request
 exit $LASTEXITCODE`);
     const resultFile = path.join(job, "result.json");
+    // A process that has just quit may still hold a storage file. The helper must wait, not fail.
+    const holder = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+      `$f=[IO.File]::Open('${draft.replaceAll("'", "''")}','Open','ReadWrite','None');Write-Output held;Start-Sleep -Seconds 4;$f.Dispose()`],
+    { windowsHide: true });
+    await new Promise<void>((resolve, reject) => { holder.stdout!.once("data", () => resolve()); holder.once("error", reject); });
     await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", runner, helper, request], {
       env: { ...process.env, UPDATE_FIXTURE_EXE: executable, UPDATE_FIXTURE_JOB: job },
       windowsHide: true, timeout: 60_000,
