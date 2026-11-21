@@ -75,6 +75,19 @@ class RequestTests(unittest.TestCase):
             self.assertEqual(raised.exception.status, status)
 
 
+class MicroBatchTests(unittest.TestCase):
+    def test_long_texts_do_not_inflate_the_whole_batch(self):
+        lengths = [150] * 63 + [8192]
+        groups = service.plan_micro_batches(lengths, 16_384)
+        self.assertEqual(sorted(i for group in groups for i in group), list(range(64)))
+        for group in groups:
+            self.assertLessEqual(max(lengths[i] for i in group) * len(group), 16_384)
+        self.assertIn([63], groups)
+
+    def test_single_text_over_budget_still_runs_alone(self):
+        self.assertEqual(service.plan_micro_batches([20_000, 10], 16_384), [[1], [0]])
+
+
 class ReservationGateTests(unittest.TestCase):
     cfg = {"timelineUrl": "https://www.mycellios.com/public/v1/requested-models/m-q06/timeline", "modelId": "m-q06",
            "consumerId": "c1", "nodeId": "n1", "memoryMiB": 1024}

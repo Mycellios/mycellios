@@ -26,6 +26,24 @@ MAX_BODY_BYTES = 4 * 1024 * 1024
 QUERY_INSTRUCTION = "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: "
 
 
+MICRO_BATCH_TOKENS = 16_384
+
+
+def plan_micro_batches(lengths, budget):
+    """Group indices, shortest first, so each padded group stays within budget."""
+    groups, current, longest = [], [], 0
+    for index in sorted(range(len(lengths)), key=lambda i: lengths[i]):
+        size = max(1, lengths[index])
+        if current and max(longest, size) * (len(current) + 1) > budget:
+            groups.append(current)
+            current, longest = [], 0
+        current.append(index)
+        longest = max(longest, size)
+    if current:
+        groups.append(current)
+    return groups
+
+
 class ServiceError(Exception):
     def __init__(self, status, code, message=""):
         super().__init__(code)
@@ -102,11 +120,21 @@ class TorchEmbedder:
 
     def embed(self, texts):
         torch = self.torch
-        encoded = self.tokenizer(texts, padding=True, truncation=True, max_length=MAX_TOKENS, return_tensors="pt").to(self.device)
-        with torch.inference_mode():
-            hidden = self.model(**encoded).last_hidden_state[:, -1]
-            vectors = torch.nn.functional.normalize(hidden.float(), dim=-1)
-        return vectors.cpu().tolist(), int(encoded["attention_mask"].sum())
+        lengths = [len(ids) for ids in self.tokenizer(texts, truncation=True, max_length=MAX_TOKENS)["input_ids"]]
+        vectors = [None] * len(texts)
+        tokens = 0
+        # Padding to the longest text makes one long chunk inflate a whole
+        # batch; bounded length-sorted micro-batches keep memory and time flat.
+        for group in plan_micro_batches(lengths, MICRO_BATCH_TOKENS):
+            encoded = self.tokenizer([texts[i] for i in group], padding=True, truncation=True,
+                                     max_length=MAX_TOKENS, return_tensors="pt").to(self.device)
+            with torch.inference_mode():
+                hidden = self.model(**encoded).last_hidden_state[:, -1]
+                rows = torch.nn.functional.normalize(hidden.float(), dim=-1).cpu().tolist()
+            for index, row in zip(group, rows):
+                vectors[index] = row
+            tokens += int(encoded["attention_mask"].sum())
+        return vectors, tokens
 
     def close(self):
         del self.model
