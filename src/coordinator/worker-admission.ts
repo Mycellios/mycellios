@@ -1,3 +1,4 @@
+import { isPrivacyViolationRevocation } from "./node-owner-policy.js";
 import {
   createHash,
   createPublicKey,
@@ -228,6 +229,7 @@ export class WorkerAdmissionAuthority {
     }
     const ownership = (await this.database.getNodeOwnership("device", input.identity.id));
     if (!ownership) throw new WorkerAdmissionError("worker_ownership_unknown", "This node identity has not been enrolled.", 404);
+    await this.assertNotExpelled(input.identity.id);
     if (ownership.accountId !== accountId) throw new WorkerAdmissionError("worker_recovery_owner_mismatch", "Only the current node owner can recover its credential.", 403);
     const next = normalizePublicKey(input.nextPublicKey);
     if (next.fingerprint === ownership.credentialFingerprint) throw new WorkerAdmissionError("worker_recovery_key_unchanged", "Recovery requires a new device key.", 409);
@@ -256,6 +258,7 @@ export class WorkerAdmissionAuthority {
     if (!verifyAdmissionSignature(challenge.nextKey, challenge.nextPublicKey.algorithm, challenge.signingPayload, parsedProof.nextSignature)) {
       throw new WorkerAdmissionError("worker_recovery_signature_invalid", "Recovery requires proof of possession of the replacement key.", 401);
     }
+    await this.assertNotExpelled(identity.id);
     const result = (await this.database.recoverWorkerAdmissionCredential({ identityKind: "device", identityId: identity.id, accountId,
       algorithm: challenge.nextPublicKey.algorithm, publicKey: challenge.nextPublicKey.spki,
       fingerprint: challenge.nextFingerprint, protocolVersion: challenge.protocolVersion }));
@@ -504,6 +507,14 @@ export class WorkerAdmissionAuthority {
       credentialFingerprint: admission.credential.fingerprint,
       enrollment: admission.state,
     };
+  }
+
+  /** A node expelled for a privacy violation cannot get its credential back. */
+  private async assertNotExpelled(identityId: string): Promise<void> {
+    const credential = await this.database.getWorkerAdmissionCredential("device", identityId);
+    if (isPrivacyViolationRevocation(credential?.revocationReason)) {
+      throw new WorkerAdmissionError("worker_ownership_expelled", "This node was expelled for a privacy violation.", 403);
+    }
   }
 
   private pruneExpired(): void {

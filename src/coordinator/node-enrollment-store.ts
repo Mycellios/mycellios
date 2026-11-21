@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { MeshDatabase } from "../storage/database.js";
 import { NODE_ENROLLMENT_MAX_TTL_SECONDS, nodeControlActorSchema } from "../contracts/node-control.js";
+import type { NodeOwnerPolicy } from "./node-owner-policy.js";
 
 const sha256 = (value: string) =>
   `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}` as const;
@@ -25,12 +26,13 @@ export interface IssuedNodeEnrollment {
 
 export type NodeEnrollmentConsumeResult =
   | { state: "consumed"; enrollmentId: string; accountId: string }
-  | { state: "unknown" | "expired" | "unconfirmed" | "already-consumed" | "nonce-mismatch" | "ownership-conflict" | "credential-conflict" | "recovery-required" | "revoked" };
+  | { state: "unknown" | "expired" | "unconfirmed" | "already-consumed" | "nonce-mismatch" | "ownership-conflict" | "credential-conflict" | "recovery-required" | "revoked" | "owner-expelled" | "owner-limit" };
 
 export class NodeEnrollmentStore {
   constructor(
     private readonly database: MeshDatabase,
     private readonly now: () => number = Date.now,
+    private readonly ownerPolicy?: NodeOwnerPolicy,
   ) {}
 
   async issue(input: {
@@ -44,6 +46,7 @@ export class NodeEnrollmentStore {
     if (!Number.isInteger(input.expiresInSeconds) || input.expiresInSeconds < 60 || input.expiresInSeconds > NODE_ENROLLMENT_MAX_TTL_SECONDS) {
       throw new Error("node_enrollment_ttl_invalid");
     }
+    await this.ownerPolicy?.assertCanAddNode(input.accountId);
     const id = randomUUID();
     const token = randomBytes(32).toString("base64url");
     const nonce = randomBytes(24).toString("base64url");
@@ -107,6 +110,11 @@ export class NodeEnrollmentStore {
       if (ownership?.status === "revoked") return { state: "revoked" };
       if (ownership && ownership.credentialFingerprint !== input.publicKeyFingerprint) {
         return { state: "recovery-required" };
+      }
+      if (!ownership && this.ownerPolicy) {
+        try { await this.ownerPolicy.assertCanAddNode(row.account_id); } catch (error) {
+          return { state: error instanceof Error && error.message === "node_owner_expelled_denied" ? "owner-expelled" : "owner-limit" };
+        }
       }
       const credentialOwner = (await this.database.getNodeOwnershipByCredentialFingerprint(input.publicKeyFingerprint));
       if (

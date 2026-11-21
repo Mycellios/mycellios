@@ -1,8 +1,10 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { MeshDatabase } from "../storage/database.js";
+import type { NodeOwnerPolicy } from "./node-owner-policy.js";
 
 export class NodeOwnershipTransferStore {
-  constructor(private readonly database: MeshDatabase, private readonly now: () => number = Date.now) {}
+  constructor(private readonly database: MeshDatabase, private readonly now: () => number = Date.now,
+    private readonly ownerPolicy?: NodeOwnerPolicy) {}
 
   async create(input: { nodeId: string; sourceAccountId: string; targetAccountId: string; expectedGeneration: number; expiresInSeconds: number }) {
     if (input.sourceAccountId === input.targetAccountId) throw new Error("node_transfer_target_is_current_owner");
@@ -37,6 +39,7 @@ export class NodeOwnershipTransferStore {
       if (row.expires_at < this.now()) throw new Error("node_transfer_expired");
       if (row.identity_id !== input.nodeId || row.target_account_id !== input.targetAccountId) throw new Error("node_transfer_target_mismatch");
       if (!equalHash(row.token_hash, hash(input.transferToken))) throw new Error("node_transfer_token_mismatch");
+      await this.ownerPolicy?.assertCanAddNode(input.targetAccountId);
       const ownership = (await this.database.getNodeOwnership("device", input.nodeId));
       if (!ownership || ownership.status !== "active" || ownership.accountId !== row.source_account_id
         || ownership.generation !== row.expected_generation) throw new Error("node_transfer_generation_conflict");
