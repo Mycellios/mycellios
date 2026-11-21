@@ -456,7 +456,7 @@ Mico names and instructions stay: they are the content the user chose.
 
 - A node must hold a bond before receiving work. To avoid an upfront payment,
   the bond fills from the node's own earnings, which are held until it is
-  complete. Amount to be set by Daniel (proposal: 10 Credits per node).
+  complete. Decided by Daniel on 2026-11-21: 10 Credits per node.
 - A confirmed tripwire hit slashes the bond, revokes the credential and
   ownership, bans the owner account from enrolling nodes and records the
   physical identity hashes and network prefixes for review.
@@ -467,7 +467,8 @@ Mico names and instructions stay: they are the content the user chose.
 
 - Each node needs its own bond, so N nodes cost N bonds.
 - Dispersion excludes by owner and network prefix, not only by worker.
-- A cap of nodes per owner account (proposal: 5) unless raised by an operator.
+- At most 5 nodes per owner account unless an operator raises it (decided by
+  Daniel on 2026-11-21).
 
 Node operators' terms must forbid keeping or using content and disclose that
 bait traffic exists.
