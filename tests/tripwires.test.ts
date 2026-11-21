@@ -103,6 +103,24 @@ describe("bait client", () => {
     }
   });
 
+  it("varies its wording so no fixed text marks bait", () => {
+    for (const language of ["es", "en"] as const) {
+      const markers = { link: "https://x.test/go/L", key: "myc_live_K", phrase: "maple cedar 4242" };
+      const texts = Array.from({ length: 300 }, () => bait.baitText(language, markers) as string);
+      for (const text of texts) {
+        expect(text).toContain(markers.link);
+        expect(text).toContain(markers.key);
+        expect(text).toContain(markers.phrase);
+      }
+      expect(new Set(texts).size).toBeGreaterThan(250);
+      const firstWords = new Set(texts.map((text) => text.split(" ").slice(0, 2).join(" ")));
+      expect(firstWords.size).toBeGreaterThanOrEqual(6);
+      const sentences = texts.map((text) => new Set(text.split(/(?<=[.:])\s+/)));
+      const shared = [...sentences[0]!].filter((sentence) => sentences.every((set) => set.has(sentence)));
+      expect(shared).toEqual([]);
+    }
+  });
+
   it("builds embedding bait as the same envelope memory clients send", () => {
     const built = bait.buildBait({ ...options, model: bait.EMBEDDING_MODEL, language: "en", dimensions: 1024 });
     const request = chatCompletionRequestSchema.parse(built.request) as ChatCompletionRequest;

@@ -485,8 +485,10 @@ Mico names and instructions stay: they are the content the user chose.
   coordinator, keep the same secret and a dedicated operator key on the
   machine that runs the bait client, and schedule it. Then expel confirmed
   leakers as below.
-- Limits: the templates are few and fixed, so an owner who studies many
-  requests could learn to spot them; widen the corpus before relying on it.
+- Limits: the text combines an opener, the three markers in random order and
+  up to two context lines from small per-language sets, so no sentence is
+  common to all bait; still, an owner who studies many requests could learn
+  the vocabulary, so keep widening it.
   Speech is read aloud and embedded text is not shown, so a hit needs an owner
   who inspects content. Audio bait for transcription (prerecorded speech with
   tripwire phone numbers or emails) is not built yet. Silent retention stays
