@@ -56,11 +56,14 @@ replica. Phase 1 needs no new node command and no change on the PCs.
   identity check, claim operation, prepare, commit with the qualified canary.
   The canary receipt is hash-checked when the configuration loads.
 - **Configuration.** `MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG` points to a
-  `mycellios-native-replica-placement/1` JSON file. Each replica declares its
+  `mycellios-native-replica-placement/1` JSON file; without it, the coordinator
+  uses `native-replica-placement.json` next to its state database when that
+  file exists. Release promotion copies the running container's environment,
+  so the file convention enables placement without recreating the container. Each replica declares its
   consumer, reservation model, the public models whose requests count as its
   demand, node, GPU identity, memory, priority, `pinned`, the operation
   metadata and the canary that its runner's guard requires. Without the
-  variable nothing changes.
+  variable or the file nothing changes.
 
 ### Rollout
 
@@ -68,14 +71,15 @@ replica. Phase 1 needs no new node command and no change on the PCs.
    Whisper) plus the embedding replica (`gpu.private.json` fields: consumer
    `embedding-cuda-76166167-20261020`, `coreSha256`, `runtimeSourceId`,
    `modelDigest`).
-2. Deploy the coordinator through Nucleus with the variable set.
+2. Place the file at `/var/lib/mycellios/native-replica-placement.json` (or
+   set the variable) and restart the coordinator through Nucleus.
 3. Stop the two keeper containers. The broker adopts their live reservations,
    because ownership is by `consumerId`, and from then on is the only writer.
 4. Verify on `/timeline`: grants and releases follow Jarvis embedding and
    speech traffic; no reservation exceeds 5221 MiB per node.
 
-Rollback: unset the variable, restart the coordinator and start the keepers
-again.
+Rollback: remove the file (or unset the variable), restart the coordinator
+and start the keepers again.
 
 ### Limits
 

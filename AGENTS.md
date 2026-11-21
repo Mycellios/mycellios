@@ -400,7 +400,8 @@ These rules apply to the complete repository.
   backoff; source drift requires operator approval, not a widened allowlist.
 
 - Shared-GPU native replicas follow `specs/on-demand-replica-placement/spec.md`:
-  with `MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG` the coordinator owns their
+  with `MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG` (or `native-replica-placement.json`
+  beside the state database) the coordinator owns their
   reservations, granting by demand and releasing only idle, unpinned, unbusy
   replicas after minimum residency. Never exceed the safe budget or bypass the
   runner's committed-reservation guard. Check `tests/native-replica-placement.test.ts`.
