@@ -27,6 +27,7 @@ QUERY_INSTRUCTION = "Instruct: Given a web search query, retrieve relevant passa
 
 
 MICRO_BATCH_TOKENS = 16_384
+MID_REQUEST_COOLING_S = 120
 
 
 def plan_micro_batches(lengths, budget):
@@ -176,7 +177,8 @@ class ThermalGuard:
             self.paused = True
         return temperature
 
-    def wait(self):
+    def wait(self, max_wait_s=None):
+        limit = self.max_wait_s if max_wait_s is None else max_wait_s
         waited = 0.0
         while True:
             temperature = self.observe()
@@ -186,7 +188,7 @@ class ThermalGuard:
                 if temperature >= self.soft_c:
                     self.sleep(self.soft_pause_s)
                 return
-            if waited >= self.max_wait_s:
+            if waited >= limit:
                 raise ServiceError(503, "replica_cooling_down")
             self.sleep(2.0)
             waited += 2.0
@@ -234,7 +236,10 @@ class Replica:
                 raise ServiceError(503, "no_replica_available")
             # Check between micro-batches too: one long request can otherwise
             # run the GPU past the owner's node temperature limit.
-            vectors, tokens = (self.embedder.embed(texts, before) if before is not None
+            # Once a request has started, pause between micro-batches instead of
+            # failing it: a mid-request 503 would discard work already done.
+            between = (lambda: self.thermal.wait(MID_REQUEST_COOLING_S)) if before is not None else None
+            vectors, tokens = (self.embedder.embed(texts, between) if between is not None
                                else self.embedder.embed(texts))
         if len(vectors) != len(texts) or any(len(vector) != DIMENSIONS for vector in vectors):
             raise ServiceError(500, "invalid_model_output")
