@@ -3354,7 +3354,7 @@ export function Models({ snapshot, onSearch, onRequest, onRemove, adminToken: in
           <UiFieldLabel>NETWORK NAME <small>automatic</small><UiInput value={modelId} onChange={(event) => setModelId(event.target.value)} placeholder="qwen3-0.6b" required pattern="[A-Za-z0-9][A-Za-z0-9._-]*" /></UiFieldLabel>
           <UiFieldLabel>REVISION <small>optional</small><UiInput value={revision} onChange={(event) => setRevision(event.target.value)} placeholder="main or commit" /></UiFieldLabel>
           <UiFieldLabel>CONTEXT TOKENS<UiInput type="number" min={128} max={1048576} value={contextTokens} onChange={(event) => setContextTokens(Number(event.target.value))} /></UiFieldLabel>
-          <UiFieldLabel>MINIMUM NODES<AppSelect ariaLabel="Minimum nodes" value={String(minimumNodes)} onChange={(value) => setMinimumNodes(Number(value))} options={[2, 3, 4, 5, 6, 7, 8].map((count) => ({ value: String(count), label: String(count) }))} /></UiFieldLabel>
+          <UiFieldLabel>MINIMUM NODES<AppSelect ariaLabel="Minimum nodes" value={String(minimumNodes)} onChange={(value) => setMinimumNodes(Number(value))} options={[1, 2, 3, 4, 5, 6, 7, 8].map((count) => ({ value: String(count), label: String(count) }))} /></UiFieldLabel>
         </div>
       </UiDisclosure>
 

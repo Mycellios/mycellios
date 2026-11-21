@@ -88,6 +88,40 @@ describe("requested model API activation flow", () => {
     });
   });
 
+  it("accepts a one-node request so a model that fits one node stays unsplit", async () => {
+    const manager = new FakeActivationManager();
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 404 }));
+    runtime = await createCoordinator({
+      host: "127.0.0.1",
+      port: 8_787,
+      databasePath: ":memory:",
+      requestTimeoutMs: 30_000,
+    }, { activationManager: manager });
+    const payload = {
+      id: "qwen-one-node",
+      source: "Qwen/Qwen3-0.6B",
+      revision: null,
+      contextTokens: 4_096,
+      autoActivate: false,
+    };
+
+    const accepted = await runtime.app.inject({
+      method: "POST",
+      url: "/public/v1/requested-models",
+      payload: { ...payload, minimumNodes: 1 },
+    });
+    const rejected = await runtime.app.inject({
+      method: "POST",
+      url: "/public/v1/requested-models",
+      payload: { ...payload, id: "qwen-zero-nodes", minimumNodes: 0 },
+    });
+
+    expect(accepted.statusCode).toBe(201);
+    expect((await runtime.store.getRequestedModel("qwen-one-node"))!.minimumNodes).toBe(1);
+    expect(rejected.statusCode).toBe(400);
+    expect(await runtime.store.getRequestedModel("qwen-zero-nodes")).toBeNull();
+  });
+
   it("returns an actionable authorization error for protected model changes", async () => {
     runtime = await createCoordinator({
       host: "127.0.0.1",
