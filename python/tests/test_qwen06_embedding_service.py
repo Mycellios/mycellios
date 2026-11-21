@@ -123,6 +123,13 @@ class ThermalGuardTests(unittest.TestCase):
         guard.observe()
         self.assertFalse(guard.paused)
 
+    def test_wait_accepts_a_longer_limit_for_started_requests(self):
+        readings = iter([90, 90, 90, 70])
+        sleeps = []
+        guard = service.ThermalGuard(lambda: next(readings), pause_c=78, resume_c=72, max_wait_s=2, sleep=sleeps.append)
+        guard.wait(max_wait_s=120)
+        self.assertEqual(len(sleeps), 3)
+
     def test_unreadable_temperature_does_not_block(self):
         def broken():
             raise OSError("no nvidia-smi")
