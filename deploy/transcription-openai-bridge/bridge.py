@@ -8,17 +8,28 @@ segment with `mycellios-whisper-small` through the public coordinator API
 funded by contribution credits. The caller's bearer key is forwarded and never
 stored. Only explicit pre-dispatch refusals (429 concurrency, 503 no capacity)
 are retried; any other failure is returned without replaying paid work.
+
+Chunk dispersion (specs/node-owner-privacy, D3) is opt-in with
+`DISPERSION_POLICY`. When it is `fallback` or `fail`, every upload gets a
+random group sent with each segment, so the coordinator never gives two
+segments of one recording to the same node, owner or network. A segment no
+node can take any more (`dispersion_exhausted`) goes to the fallback provider
+(`fallback`) or fails the upload (`fail`). `TRANSCRIPTION_PARALLEL` sends
+that many segments at once. The defaults (`off`, 1) keep the serial,
+ungrouped behavior.
 """
 import argparse
 import base64
 import hashlib
 import json
 import os
+import secrets
 import struct
 import subprocess
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from email.parser import BytesParser
 from email.policy import HTTP
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -30,6 +41,7 @@ SAMPLE_RATE = 16_000
 SEGMENT_SECONDS = 24.0
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 RETRYABLE = {429, 503}
+DISPERSION_POLICIES = ("off", "fallback", "fail")
 
 
 def wav_bytes(pcm):
@@ -99,12 +111,15 @@ class Upstream:
         self.sleep = sleep
         self.opener = opener
 
-    def transcribe(self, wav, language, authorization):
+    def transcribe(self, wav, language, authorization, group=None):
         # Transcription bills recognized text, never generated tokens. Without a
         # tiny max_tokens the scheduler's SLO estimate (configured 1 token/s)
         # rejects every replica with candidate_slo_exceeded.
-        body = json.dumps({"model": MODEL, "max_tokens": 1, "deadline_ms": 60_000, "stream": False,
-                           "messages": [{"role": "user", "content": envelope(wav, language)}]}).encode()
+        request = {"model": MODEL, "max_tokens": 1, "deadline_ms": 60_000, "stream": False,
+                   "messages": [{"role": "user", "content": envelope(wav, language)}]}
+        if group:
+            request["dispersion"] = {"group": group}
+        body = json.dumps(request).encode()
         deadline = time.monotonic() + self.deadline_seconds
         delay = 2.0
         while True:
@@ -119,6 +134,9 @@ class Upstream:
                     raise BridgeError(502, "invalid_upstream_result")
                 return content["text"].strip(), content.get("language")
             except urllib.error.HTTPError as error:
+                if error.code == 503 and error_code(error) == "dispersion_exhausted":
+                    # No node is left that has not seen this recording; waiting will not help.
+                    raise BridgeError(503, "dispersion_exhausted") from error
                 if error.code not in RETRYABLE or time.monotonic() + delay > deadline:
                     raise BridgeError(error.code if error.code in (401, 402, 403, 429, 503) else 502,
                                       f"upstream_http_{error.code}") from error
@@ -128,14 +146,46 @@ class Upstream:
                 raise BridgeError(502, "invalid_upstream_result") from error
 
 
-def transcribe_upload(raw, language, authorization, upstream, decode=decode_audio):
+def error_code(error):
+    try:
+        return json.loads(error.read() or b"{}").get("error", {}).get("code")
+    except (ValueError, AttributeError, OSError):
+        return None
+
+
+def transcribe_upload(raw, language, authorization, upstream, decode=decode_audio,
+                      policy="off", parallel=1, fallback=None):
+    """Transcribes every segment and joins them in order.
+
+    With a dispersion policy the segments share a fresh random group. A
+    segment refused with dispersion_exhausted goes to the fallback provider
+    under the `fallback` policy; any other failure fails the upload.
+    """
+    if policy not in DISPERSION_POLICIES:
+        raise ValueError("unknown dispersion policy")
     pcm = decode(raw)
-    texts, detected = [], None
-    for piece in split_pcm(pcm):
-        text, piece_language = upstream.transcribe(wav_bytes(piece), language, authorization)
-        detected = detected or piece_language
-        if text:
-            texts.append(text)
+    group = secrets.token_urlsafe(24) if policy != "off" else None
+
+    def one(indexed):
+        index, piece = indexed
+        wav = wav_bytes(piece)
+        try:
+            return upstream.transcribe(wav, language, authorization, group) if group else                 upstream.transcribe(wav, language, authorization)
+        except BridgeError as error:
+            if error.code != "dispersion_exhausted" or policy != "fallback" or fallback is None:
+                raise
+            log_event(event="transcription_segment_fallback", code=error.code)
+            return fallback.transcribe(wav, f"segment-{index}.wav", language), None
+
+    pieces = list(enumerate(split_pcm(pcm)))
+    workers = max(1, min(int(parallel), len(pieces) or 1))
+    if workers == 1:
+        results = [one(item) for item in pieces]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(one, pieces))
+    texts = [text for text, _ in results if text]
+    detected = next((piece_language for _, piece_language in results if piece_language), None)
     return " ".join(texts), detected, len(pcm) / (SAMPLE_RATE * 2)
 
 
@@ -170,7 +220,7 @@ def log_event(**fields):
     print(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **fields}), flush=True)
 
 
-def make_handler(upstream, fallback=None):
+def make_handler(upstream, fallback=None, policy="off", parallel=1):
     class Handler(BaseHTTPRequestHandler):
         server_version = "MycelliosTranscriptionBridge/1"
 
@@ -209,7 +259,8 @@ def make_handler(upstream, fallback=None):
                 language = normalize_language(fields.get("language"))
                 provider = "mycellios"
                 try:
-                    text, detected, seconds = transcribe_upload(upload, language, authorization, upstream)
+                    text, detected, seconds = transcribe_upload(upload, language, authorization, upstream,
+                                                                policy=policy, parallel=parallel, fallback=fallback)
                 except BridgeError as error:
                     # Bad audio or a bad key is the caller's problem; anything
                     # else is a network outage the fallback may cover.
@@ -245,7 +296,12 @@ def main():
         with open(os.environ["FALLBACK_KEY_FILE"], encoding="utf-8") as handle:
             key = handle.read().strip()
         fallback = Fallback(os.environ["FALLBACK_BASE_URL"], os.environ.get("FALLBACK_MODEL", "groq/whisper-large-v3"), key)
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(Upstream(args.upstream), fallback))
+    policy = os.environ.get("DISPERSION_POLICY", "off").strip().lower() or "off"
+    if policy not in DISPERSION_POLICIES:
+        raise SystemExit(f"DISPERSION_POLICY must be one of {', '.join(DISPERSION_POLICIES)}")
+    parallel = max(1, min(8, int(os.environ.get("TRANSCRIPTION_PARALLEL", "1"))))
+    server = ThreadingHTTPServer((args.host, args.port),
+                                 make_handler(Upstream(args.upstream), fallback, policy, parallel))
     server.daemon_threads = True
     server.serve_forever()
 

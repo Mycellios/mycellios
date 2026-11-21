@@ -1,4 +1,4 @@
-import { rateLimitKeyGenerator } from "./rate-limit-key.js";
+import { rateLimitClientKey, rateLimitKeyGenerator } from "./rate-limit-key.js";
 import {
   automaticRetryLabel,
   DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS,
@@ -1542,7 +1542,9 @@ export async function createCoordinator(
     ),
   }));
   const fleetContribution = new FleetContributionController(store, hub);
+  const trustedProxies = new Set(config.rateLimitTrustedProxies ?? []);
   hub.attach(app, {
+    clientAddress: (request) => rateLimitClientKey(request.ip, request.headers["x-forwarded-for"], trustedProxies),
     authorizedWorkerId: (request) => workerSessionPrincipals.get(request) ?? null,
     authorizedSession: (request) => workerSessionContexts.get(request) ?? null,
     sessionIsCurrent: async (session) => {
@@ -4693,6 +4695,9 @@ export async function createCoordinator(
       ? principalFor(request)
       : { kind: "system" };
     if (principal.kind !== "system") (await apiAccess.assertSessionAccess(principal.userId, parsed.session_id));
+    // A dispersion group belongs to its caller: another account cannot exhaust it.
+    const caller = principal.kind === "system" ? "system" : principal.userId;
+    if (parsed.dispersion) parsed.dispersion = { group: createHash("sha256").update(`${caller}:${parsed.dispersion.group}`).digest("hex") };
     const idempotencyKey = (await resolveChatIdempotencyKey(service, parsed, request.headers["idempotency-key"], principal));
     const supersededJobId = idempotencyKey ? null : (await service.cancelMatchingActiveSession(parsed, parsed.session_id));
     if (supersededJobId) {
