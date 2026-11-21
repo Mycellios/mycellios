@@ -56,6 +56,8 @@ export interface JobHandle {
 
 interface RuntimeJob {
   request: ChatCompletionRequest;
+  /** Contribution-funded: only routes whose execution settlement can verify. */
+  requireSettlementEvidence: boolean;
   route: ScheduledRoute;
   routePlan: ScheduledRoute[];
   routeDecision: ExecutionRouteDecisionRecord;
@@ -176,6 +178,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     requestedSessionId?: string,
     idempotencyKey?: string,
     operatorReleaseRevision?: string,
+    submitOptions: { requireSettlementEvidence?: boolean } = {},
   ): Promise<JobHandle> {
     if (operatorReleaseRevision && !/^[a-f0-9]{40}$/.test(operatorReleaseRevision)) throw new Error("Invalid operator release revision");
     const sessionId = requestedSessionId ?? request.session_id ?? newId("ses");
@@ -230,8 +233,9 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     }));
 
     const connected = this.offerableWorkerIds();
-    const planRoute = async (allowed: ReadonlySet<string>) => {
-      const options = routeOptionsForRequest(stableRequest, allowed);
+    const requireSettlementEvidence = submitOptions.requireSettlementEvidence === true;
+    const planRoute = async (allowed: ReadonlySet<string>, settle = requireSettlementEvidence) => {
+      const options = routeOptionsForRequest(stableRequest, allowed, settle);
       const plan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
         ...options,
         allowPipeline: false,
@@ -256,6 +260,14 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
         return planned;
       })
       : await planRoute(connected);
+    if (!routePlan && requireSettlementEvidence && (await planRoute(connected, false)).plan) {
+      // A replica exists but none can settle a paid request (its native
+      // qualification lapsed). Refuse before running it: running would only
+      // end in the same 502 after spending the node's time.
+      (await this.store.setJobStatus(jobId, "failed", "settlement_evidence_unavailable"));
+      throw new MeshServiceError("settlement_evidence_unavailable",
+        "No replica that can settle contribution-funded work is available right now", 502);
+    }
     this.emit("demand", { model: stableRequest.model, served: routePlan !== null });
     if (!routePlan) {
       (await this.store.setJobStatus(jobId, "failed", "no_capacity"));
@@ -283,6 +295,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const attemptStartedAt = Date.now();
     const runtime: RuntimeJob = {
       request: stableRequest,
+      requireSettlementEvidence,
       route,
       routePlan: [routePlan.primary, ...routePlan.standbys],
       routeDecision: structuredClone(routePlan.decision),
@@ -413,7 +426,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return;
     }
     if (!(await this.scheduler.isRouteCurrentlyEligible(runtime.request, queued.sessionId, runtime.route, {
-      ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds()), allowPipeline: false,
+      ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds(), runtime.requireSettlementEvidence), allowPipeline: false,
     }))) {
       await this.retryOrFail(jobId, "route_no_longer_eligible", "The planned route is no longer eligible");
       return;
@@ -721,7 +734,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
         runtime.request,
         job.sessionId,
         route,
-        { ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds()), allowPipeline: false },
+        { ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds(), runtime.requireSettlementEvidence), allowPipeline: false },
       ))) continue;
       runtime.route = route;
       runtime.replayPrefix = replayingCommittedPrefix
@@ -1028,7 +1041,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
   }
 }
 
-function routeOptionsForRequest(request: ChatCompletionRequest, connectedWorkerIds: ReadonlySet<string>) {
+function routeOptionsForRequest(request: ChatCompletionRequest, connectedWorkerIds: ReadonlySet<string>, requireSettlementEvidence = false) {
   const pinned = request.privacy?.boundary === "pinned-edges"
     ? new Set(request.privacy.pinned_identity_ids ?? [])
     : undefined;
@@ -1038,6 +1051,7 @@ function routeOptionsForRequest(request: ChatCompletionRequest, connectedWorkerI
       requireTrustedBoundaryIdentity: true,
       requireTrustedIdentity: request.privacy?.trust === "trusted-only",
       ...(pinned ? { pinnedBoundaryIdentityIds: pinned } : {}),
+      ...(requireSettlementEvidence ? { requireSettlementEvidence } : {}),
     },
   };
 }

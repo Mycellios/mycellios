@@ -385,6 +385,10 @@ These rules apply to the complete repository.
   shared format with `scripts/node-privacy-bait.mjs`); a followed link or tried
   key must answer exactly like an unknown page or invalid key and only log
   `tripwire_hit`. Off without `MYCELLIOS_TRIPWIRE_SECRET`. Check tests/tripwires.test.ts.
+- Contribution-funded requests only run on native replicas whose fresh,
+  worker- and build-bound qualification lets settlement verify them; otherwise
+  they fail before dispatch with 502 `settlement_evidence_unavailable`.
+  Unfunded traffic is unaffected. Check tests/settlement-eligibility.test.ts.
 - Session affinity must be revalidated and rescored from current worker capacity,
   exact deployments and measured forward/return links. Cached scores are not
   current capacity evidence. Respect disabled pipeline dispatch on cached routes.
