@@ -26,6 +26,10 @@ export const nativeReplicaPlacementConfigSchema = z.object({
   releaseGapMs: z.number().int().min(5_000).max(300_000).default(30_000),
   reservationTtlMs: z.number().int().min(60_000).max(180_000).default(180_000),
   tickMs: z.number().int().min(5_000).max(60_000).default(15_000),
+  /** A worker heartbeat older than this does not verify its GPU. */
+  workerFreshnessMs: z.number().int().min(15_000).max(600_000).default(90_000),
+  /** A node that stops verifying keeps its replicas this long before release. */
+  nodeGraceMs: z.number().int().min(30_000).max(3_600_000).default(300_000),
   replicas: z.array(z.object({
     consumerId: z.string().min(1).max(200),
     /** Requested-model id that owns the reservation (timeline id). */
@@ -238,6 +242,7 @@ export class NativeReplicaPlacementBroker {
   readonly demand: ReplicaDemandLedger;
   private readonly heldSince = new Map<string, number>();
   private readonly draining = new Map<string, { nodeId: string; memoryMiB: number; until: number }>();
+  private readonly lastVerified = new Map<string, { capacityMiB: number; at: number }>();
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<void> | null = null;
 
@@ -272,7 +277,16 @@ export class NativeReplicaPlacementBroker {
   async tick(now = Date.now()): Promise<PlacementDecision> {
     for (const [consumerId, entry] of this.draining) if (entry.until <= now) this.draining.delete(consumerId);
     const workers = await this.store.listWorkers();
-    const capacityByNode = gpuCapacityByNode(this.config.replicas, workers, now);
+    // Heartbeats reach storage with some delay; a briefly unverified node keeps
+    // its last capacity for nodeGraceMs instead of releasing running replicas.
+    for (const [nodeId, capacityMiB] of gpuCapacityByNode(this.config.replicas, workers, now, this.config.workerFreshnessMs)) {
+      this.lastVerified.set(nodeId, { capacityMiB, at: now });
+    }
+    const capacityByNode = new Map<string, number>();
+    for (const [nodeId, entry] of this.lastVerified) {
+      if (now - entry.at <= this.config.nodeGraceMs) capacityByNode.set(nodeId, entry.capacityMiB);
+      else this.lastVerified.delete(nodeId);
+    }
     const held = new Map<string, RouteReservation>();
     for (const replica of this.config.replicas) {
       const own = await ownedReservations(this.store, replica, now);
@@ -348,11 +362,12 @@ export function gpuCapacityByNode(
   replicas: readonly Pick<NativeReplicaConfig, "nodeId" | "deviceName" | "gpuFingerprint">[],
   workers: readonly StoredWorker[],
   now: number,
+  freshnessMs = 15_000,
 ): Map<string, number> {
   const capacity = new Map<string, number>();
   for (const replica of replicas) {
     if (capacity.has(replica.nodeId)) continue;
-    const executors = workers.filter(worker => worker.status === "online" && now - worker.lastSeenAt < 15_000
+    const executors = workers.filter(worker => worker.status === "online" && now - worker.lastSeenAt < freshnessMs
       && worker.capabilities.distributedExecutor?.nodeId === replica.nodeId);
     if (executors.length !== 1) continue;
     const worker = executors[0]!;

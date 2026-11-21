@@ -226,6 +226,27 @@ describe("NativeReplicaPlacementBroker", () => {
     expect(logger.warn).not.toHaveBeenCalled();
     await database.close();
   });
+
+  it("keeps replicas through a brief heartbeat gap and releases them only after the node grace", async () => {
+    const database = await MeshDatabase.open(":memory:");
+    const store = new MeshStore(database);
+    let now = NOW;
+    let seenAt = NOW;
+    vi.spyOn(store, "listWorkers").mockImplementation(async () => [gpuWorker(seenAt)]);
+    const placement = nativeReplicaPlacementConfigSchema.parse({ ...config([{ id: "kokoro", priority: 10 }]), workerFreshnessMs: 60_000, nodeGraceMs: 300_000 });
+    const broker = new NativeReplicaPlacementBroker(store, placement, { info: vi.fn(), warn: vi.fn() });
+    expect((await broker.tick(now)).grant).toEqual(["kokoro-consumer"]);
+    for (let step = 0; step < 4; step += 1) {
+      now += 60_000;
+      expect((await broker.tick(now))).toMatchObject({ keep: ["kokoro-consumer"], release: [] });
+    }
+    now += 120_000;
+    expect((await broker.tick(now)).release).toEqual(["kokoro-consumer"]);
+    now += 60_000;
+    seenAt = now;
+    expect((await broker.tick(now)).grant).toEqual(["kokoro-consumer"]);
+    await database.close();
+  });
 });
 
 describe("recordJobDemand", () => {

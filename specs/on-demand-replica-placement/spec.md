@@ -49,7 +49,10 @@ replica. Phase 1 needs no new node command and no change on the PCs.
      slots than its concurrency), pinned, used within `idleMs` (10 min), or
      loaded less than `minResidencyMs` ago (3 min). This prevents thrashing.
   5. Reservations on a node that is no longer a fresh, verified CUDA executor
-     are released.
+     are released only after `nodeGraceMs` (5 min). Heartbeats reach storage
+     with delay, so a worker counts as fresh for `workerFreshnessMs` (90 s);
+     a brief gap must not unload running replicas (seen in production on
+     2026-11-21, when a 15 s window released Kokoro repeatedly).
 - **Broker.** Every `tickMs` (15 s) it reads fresh workers and owned
   reservations, applies the plan, and renews kept reservations
   (`reservationTtlMs`, 180 s). Granting reuses the former keeper's sequence:
