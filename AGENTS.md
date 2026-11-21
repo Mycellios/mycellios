@@ -381,6 +381,10 @@ These rules apply to the complete repository.
   account; `MYCELLIOS_NODE_OWNER_LIMIT` (+ overrides) caps active nodes per
   account; `MYCELLIOS_CELL_ADMISSION=enrolled` refuses new unowned cells. The
   limit and the cell rule are off unless configured. Check tests/node-owner-policy.test.ts.
+- Bait tripwires are stateless HMAC tokens (`src/coordinator/tripwires.ts`,
+  shared format with `scripts/node-privacy-bait.mjs`); a followed link or tried
+  key must answer exactly like an unknown page or invalid key and only log
+  `tripwire_hit`. Off without `MYCELLIOS_TRIPWIRE_SECRET`. Check tests/tripwires.test.ts.
 - Session affinity must be revalidated and rescored from current worker capacity,
   exact deployments and measured forward/return links. Cached scores are not
   current capacity evidence. Respect disabled pipeline dispatch on cached routes.

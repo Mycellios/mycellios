@@ -1,3 +1,4 @@
+import { Tripwires } from "./tripwires.js";
 import { NodeOwnerPolicy } from "./node-owner-policy.js";
 import { SEALED_LEASES_HEADER } from "../contracts/sealed-lease.js";
 import { rateLimitClientKey, rateLimitKeyGenerator } from "./rate-limit-key.js";
@@ -683,6 +684,7 @@ export async function createCoordinator(
   (await economicLedger.registerDefaultInternalPricing());
   const workerAdmission = new WorkerAdmissionAuthority(database);
   const nodeOwnerPolicy = NodeOwnerPolicy.fromEnvironment(database);
+  const tripwires = Tripwires.fromEnvironment(process.env, app.log); tripwires?.register(app);
   const nodeEnrollments = new NodeEnrollmentStore(database, undefined, nodeOwnerPolicy);
   const nodeCommands = new NodeCommandStore(database);
   const nodeReconciliation = new NodeReconciliationStore(database, nodeCommands);
@@ -908,6 +910,7 @@ export async function createCoordinator(
     if (token.startsWith(API_KEY_PREFIX)) {
       const principal = (await apiAccess.authenticateKey(token));
       if (!principal) {
+        tripwires?.observeKey(token, request);
         return reply.code(401).send({
           error: { code: "invalid_api_key", message: "The Mycellios API key is invalid or revoked." },
         });
