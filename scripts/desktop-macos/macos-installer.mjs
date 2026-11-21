@@ -33,7 +33,7 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
       {from:path.join(agent,'infra/compose/docker-compose.images.yml'),to:'stack/docker-compose.images.yml'},
       {from:path.join(agent,'infra/compose/stack-env.example'),to:'stack/stack-env.example'},
       {from:path.join(agent,'LICENSE'),to:'licenses/Agent-Apache-2.0.txt'},
-      {from:path.join(repository,'LICENSE'),to:'licenses/Mycellios-GPL-3.0.txt'},
+      {from:path.join(repository,'LICENSE'),to:'licenses/Mycellios-PolyForm-Shield-1.0.0.txt'},
       {from:path.join(repository,'THIRD_PARTY.md'),to:'licenses/THIRD_PARTY.md'},
     ],
     // Ad-hoc seals the final bundle without a paid certificate. It does not

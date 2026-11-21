@@ -82,5 +82,6 @@ depend on equipment that GitHub-hosted runners cannot reproduce.
   physical-validation claims.
 - Use conventional, imperative commit messages where practical.
 
-By contributing, you agree that your contribution is licensed under the
-repository's `GPL-3.0-only` license.
+By contributing, you license your contribution to Mycellios under the Apache
+License 2.0, so Mycellios may distribute it under the repository license
+(PolyForm Shield 1.0.0) or any later license it chooses. You keep your copyright.

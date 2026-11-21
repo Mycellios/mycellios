@@ -17,7 +17,7 @@
 <p align="center">
   <a href="https://github.com/Mycellios/mycellios/actions/workflows/public-quality.yml"><img src="https://github.com/Mycellios/mycellios/actions/workflows/public-quality.yml/badge.svg?branch=main" alt="Public quality gates" /></a>
   <a href="docs/DEVELOPMENT.md"><img src="https://img.shields.io/badge/Node.js-24%2B-3b4d35?style=flat" alt="Node.js 24 or newer" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--only-ad7a48?style=flat" alt="GPL-3.0-only license" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-ad7a48?style=flat" alt="PolyForm Shield 1.0.0 license" /></a>
 </p>
 
 ## One model. Shared compute.
@@ -130,5 +130,9 @@ Contributions to the runtime, documentation and reproducible experiments are
 welcome. Read [Contributing](CONTRIBUTING.md) before starting, or
 [open an issue](https://github.com/Mycellios/mycellios/issues) to discuss a bug or idea.
 
-Mycellios is licensed under [GPL-3.0-only](LICENSE).
+Mycellios is source-available under the [PolyForm Shield License 1.0.0](LICENSE):
+you may use, modify and share it, but not to build a product that competes with
+Mycellios. Versions published before this change remain under their original
+licenses. Code that came from other projects keeps its own license; see
+[third-party notices](THIRD_PARTY.md).
 See [third-party notices](THIRD_PARTY.md) for source attribution.

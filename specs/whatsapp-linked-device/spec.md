@@ -1,6 +1,7 @@
 # WhatsApp linked device (Desktop connector)
 
-Status: in progress (branch `feat/whatsapp-linked-device`).
+Status: server, web and Desktop connector merged (#391); not shipped. Desktop release
+builds omit the WhatsApp runtime since the move to PolyForm Shield (see below).
 
 ## Goal
 
@@ -29,11 +30,15 @@ written independently.
 
 - WhatsApp does not permit unofficial clients and may restrict or block a number
   it sees as automated. The link UI says so and recommends a dedicated number.
-- The client is upstream **Baileys** (MIT) with its upstream Signal dependencies:
+- The client is upstream **Baileys** (MIT), whose Signal dependencies are
   `libsignal` (GPL-3.0) and `whatsapp-rust-bridge` (contains AGPL-3.0 code).
-  The owner accepted this route (2026-11-21). Desktop builds that bundle the
-  connector are distributed under GPL-3.0-compatible terms; the repository root
-  is GPL-3.0. They are not linked into the hosted API or worker.
+- On 2026-11-21 Mycellios moved to the PolyForm Shield License 1.0.0, which is
+  incompatible with distributing those dependencies. Release builds therefore do
+  not bundle `dist/whatsapp-runtime.js`; Desktop reports WhatsApp as unavailable,
+  and `scripts/verify-release.cjs` refuses to package the runtime. Only a local,
+  non-distributed build may include it (`MYCELLIOS_DESKTOP_WHATSAPP_RUNTIME=local-gpl`).
+- Shipping requires a Signal implementation under a compatible license (for
+  example an independent clean-room implementation with legal review).
 - The WhatsApp Business Cloud API provider (`provider: "whatsapp"`) is unchanged
   and remains the official server-side route.
 

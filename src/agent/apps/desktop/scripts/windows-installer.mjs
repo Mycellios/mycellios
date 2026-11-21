@@ -58,7 +58,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
         { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
         ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),
       ]),
-      { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-GPL-3.0.txt' },
+      { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-PolyForm-Shield-1.0.0.txt' },
       { from: path.join(agentRoot, 'LICENSE'), to: 'licenses/Agent-upstream-Apache-2.0.txt' },
       { from: path.join(repository, 'THIRD_PARTY.md'), to: 'licenses/THIRD_PARTY.md' },
       ...(appControl ? [appControl] : []),

@@ -1014,7 +1014,7 @@ export function NetworkPage({
           <div><span className="net-kicker">MEASUREMENT CONTRACT</span><UiHeading as="h2" id="net-method-title">What these numbers mean.</UiHeading></div>
           <div className="net-method-copy">
             <UiText><ShieldCheck /> <span><strong>Observed</strong>Workers, models, memory and jobs come from the coordinator’s live public snapshot.</span></UiText>
-            <UiText><Database /> <span><strong>Derived</strong>Regions and totals are calculated only from that snapshot; the formula stays visible in the open source client.</span></UiText>
+            <UiText><Database /> <span><strong>Derived</strong>Regions and totals are calculated only from that snapshot; the formula stays visible in the published client source.</span></UiText>
             <UiText><CheckCircle2 /> <span><strong>Deliberately absent</strong>Revenue, rewards and throughput stay unpublished until they have an auditable public source.</span></UiText>
           </div>
           <div className="net-method-links"><UiLink href="/docs/protocol">Read the architecture <ExternalLink /></UiLink><UiLink href="https://github.com/tych0s/mycellios" target="_blank" rel="noreferrer">Inspect the source <ExternalLink /></UiLink></div>

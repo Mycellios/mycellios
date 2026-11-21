@@ -73,8 +73,8 @@ export const TERMS: LegalDocument = {
     { id: "third-parties", heading: "Third-party providers and integrations", paragraphs: [
       "Models, connected apps and other integrations are provided by third parties under their own terms and policies. We are not responsible for their services, and their availability can change.",
     ] },
-    { id: "software", heading: "Software and open source", paragraphs: [
-      "The Mycellios source code is published under open-source licenses, which govern your use of that code. These terms govern the services we run. The Mycellios name and logo are ours and are not licensed for other products.",
+    { id: "software", heading: "Software and source code", paragraphs: [
+      "The Mycellios source code is published under the PolyForm Shield License 1.0.0, which lets you use and modify it but not to build a competing product; code from other projects keeps its own license. That license governs your use of the code. These terms govern the services we run. The Mycellios name and logo are ours and are not licensed for other products.",
     ] },
     { id: "termination", heading: "Suspension and termination", paragraphs: [
       "You can stop using Mycellios and delete your account at any time. We can suspend or close an account that breaks these terms, puts others at risk or where the law requires it. Where possible we will tell you why and give you a chance to export your data.",

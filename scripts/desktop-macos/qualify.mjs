@@ -13,7 +13,7 @@ const binary=path.join(app,'Contents/MacOS/Mycellios Desktop');
 const arch=execFileSync('/usr/bin/lipo',['-archs',binary],{encoding:'utf8'}).trim();
 if(arch!==(process.arch==='arm64'?'arm64':'x86_64'))throw Error('Unexpected application architecture');
 const resources=path.join(app,'Contents/Resources');
-for(const f of ['app.asar','licenses/Agent-Apache-2.0.txt','licenses/Mycellios-GPL-3.0.txt'])await fs.access(path.join(resources,f));
+for(const f of ['app.asar','licenses/Agent-Apache-2.0.txt','licenses/Mycellios-PolyForm-Shield-1.0.0.txt'])await fs.access(path.join(resources,f));
 if(process.arch==='arm64'){
 for(const f of ['contribution/mycellios-runtime.pkg','contribution/runtime.json','contribution/install-runtime-macos.sh','contribution/describe-runtime-macos.sh'])await fs.access(path.join(resources,f));
 execFileSync('/bin/sh',['-n',path.join(resources,'contribution/install-runtime-macos.sh')]);
