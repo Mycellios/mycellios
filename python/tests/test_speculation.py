@@ -883,6 +883,81 @@ class DelayAdaptiveSpeculationTests(unittest.TestCase):
 
 
 
+class SpeculationExplorationTests(unittest.TestCase):
+    @staticmethod
+    def _controller(**overrides) -> AdaptiveSpeculationController:
+        controller = AdaptiveSpeculationController(
+            AdaptiveSpeculationConfig(
+                max_draft_tokens=4,
+                candidate_sizes=(2, 4),
+                min_token_history=0,
+                min_classic_observations=2,
+                min_verify_observations=2,
+                **overrides,
+            )
+        )
+        for _ in range(4):
+            controller.record_classic(latency_seconds=1.0, transferred_bytes=10)
+            controller.record_verification(
+                proposed_tokens=2,
+                accepted_tokens=2,
+                latency_seconds=1.0,
+                transferred_bytes=10,
+            )
+        return controller
+
+    @staticmethod
+    def _probe(controller: AdaptiveSpeculationController) -> list[int | None]:
+        sizes = []
+        for _ in range(4):
+            controller.decide(history_tokens=32, available_draft_tokens=4)
+            sizes.append(
+                controller.next_probe_size(
+                    history_tokens=32, available_draft_tokens=4
+                )
+            )
+        return sizes
+
+    def test_noisy_size_that_may_win_is_reprobed_at_the_interval(self) -> None:
+        controller = self._controller()
+        for accepted in (4, 0):
+            controller.record_verification(
+                proposed_tokens=4,
+                accepted_tokens=accepted,
+                latency_seconds=1.0,
+                transferred_bytes=10,
+            )
+        self.assertEqual(self._probe(controller), [None, None, None, 4])
+
+    def test_clear_loser_is_never_reprobed(self) -> None:
+        controller = self._controller()
+        for _ in range(2):
+            controller.record_verification(
+                proposed_tokens=4,
+                accepted_tokens=0,
+                latency_seconds=9.0,
+                transferred_bytes=10,
+            )
+        self.assertEqual(self._probe(controller), [None] * 4)
+
+    def test_exploration_stops_at_its_cap_and_can_be_disabled(self) -> None:
+        for overrides in (
+            {"max_exploration_observations": 2},
+            {"exploration_interval": 0},
+        ):
+            controller = self._controller(**overrides)
+            for accepted in (4, 0):
+                controller.record_verification(
+                    proposed_tokens=4,
+                    accepted_tokens=accepted,
+                    latency_seconds=1.0,
+                    transferred_bytes=10,
+                )
+            self.assertEqual(self._probe(controller), [None] * 4)
+        with self.assertRaises(ValueError):
+            AdaptiveSpeculationConfig(exploration_interval=-1)
+
+
 class _FixedModelDrafter:
     strategy = "draft-model"
 
@@ -1016,6 +1091,86 @@ class FusedLookupDraftProviderTests(unittest.TestCase):
         provider = FusedLookupDraftProvider(draft_model=deferred_model)
         self.assertTrue(provider.defer_until_selected)
         self.assertTrue(provider.execution_snapshot()["deferredUntilSelected"])
+
+    def test_draft_sources_order_free_copies_and_paid_model_drafts(self) -> None:
+        text = list(range(200, 260))
+        self.assertEqual(FusedLookupDraftProvider().draft_sources(text + text[:10]), ())
+        model = _FixedModelDrafter((7, 7, 7))
+        provider = FusedLookupDraftProvider(draft_model=model)
+        self.assertEqual(provider.draft_sources(text + text[:10]), ("lookup",))
+        self.assertEqual(
+            provider.draft_sources([5, 1, 2, 30, 31, 1, 2]), ("weak", "model")
+        )
+        self.assertEqual(provider.draft_sources([1, 2, 3]), ("model",))
+        # Naming the sources never runs the model or changes request state.
+        self.assertEqual(model.calls, [])
+        self.assertEqual(provider.execution_snapshot()["draftCalls"], 0)
+
+    def test_source_views_draft_only_from_their_source(self) -> None:
+        text = list(range(200, 260))
+        copying = text + text[:10]
+        weak = [5, 1, 2, 30, 31, 32, 9, 1, 2]
+        model = _FixedModelDrafter((30, 40, 41))
+        provider = FusedLookupDraftProvider(draft_model=model)
+        lookup_view = provider.for_source("lookup")
+        self.assertIsInstance(lookup_view, DraftProvider)
+        self.assertEqual(lookup_view.draft(copying), tuple(text[10:26]))
+        self.assertEqual(lookup_view.draft(weak), ())
+        self.assertEqual(lookup_view.available_draft_tokens(weak), 0)
+        self.assertEqual(model.calls, [])
+        # The free short match never runs the model.
+        weak_view = provider.for_source("weak")
+        self.assertEqual(weak_view.draft_for_request(1, weak), (30, 31, 32, 9, 1, 2))
+        self.assertEqual(weak_view.available_draft_tokens(weak), 6)
+        self.assertEqual(model.calls, [])
+        # The paid source drafts with the model and has no free fallback.
+        model_view = provider.for_source("model")
+        self.assertEqual(model_view.draft_for_request(1, weak), (30, 40, 41))
+        self.assertEqual(model_view.available_draft_tokens(weak), 7)
+        silent = FusedLookupDraftProvider(draft_model=_FixedModelDrafter(()))
+        self.assertEqual(silent.for_source("model").draft(weak), ())
+        with self.assertRaises(ValueError):
+            provider.for_source("other")
+
+    def test_only_the_paid_source_view_defers(self) -> None:
+        deferred_model = _FixedModelDrafter((1,))
+        deferred_model.defer_until_selected = True
+        provider = FusedLookupDraftProvider(draft_model=deferred_model)
+        self.assertTrue(provider.for_source("model").defer_until_selected)
+        self.assertFalse(provider.for_source("lookup").defer_until_selected)
+        self.assertFalse(provider.for_source("weak").defer_until_selected)
+
+    def test_source_scan_is_reused_without_changing_the_draft(self) -> None:
+        text = list(range(200, 260))
+        history = text + text[:10]
+        provider = FusedLookupDraftProvider(draft_model=_FixedModelDrafter((7,)))
+        self.assertEqual(provider.draft_sources(history), ("lookup",))
+        self.assertEqual(
+            provider.draft_for_request(1, history, max_tokens=5), tuple(text[10:15])
+        )
+        other = [9, 8, 9, 8, 9, 8, 9, 8, 9, 8, 9, 8]
+        self.assertEqual(
+            provider.draft_for_request(2, other, max_tokens=3),
+            FusedLookupDraftProvider().draft(other, max_tokens=3),
+        )
+
+    def test_available_draft_tokens_bounds_each_source(self) -> None:
+        text = list(range(200, 260))
+        copying = text + text[:10]
+        chat = [5, 1, 2, 30, 31, 1, 2]
+        model = _FixedModelDrafter((7,) * 16, max_draft_tokens=16)
+        provider = FusedLookupDraftProvider(draft_model=model)
+        self.assertEqual(provider.available_draft_tokens(copying), 16)
+        self.assertEqual(provider.available_draft_tokens(copying, 4), 4)
+        # A model draft never exceeds the short block.
+        self.assertEqual(provider.available_draft_tokens(chat), 8)
+        self.assertEqual(provider.available_draft_tokens(chat, 0), 0)
+        self.assertEqual(model.calls, [])
+        # The bound matches what the provider then drafts.
+        self.assertEqual(len(provider.draft(copying)), 16)
+        self.assertEqual(len(provider.draft(chat)), 8)
+        plain = FusedLookupDraftProvider()
+        self.assertEqual(plain.available_draft_tokens([1, 2, 3]), 0)
 
     def test_release_forwards_and_tracking_is_bounded(self) -> None:
         model = _FixedModelDrafter((1, 2))

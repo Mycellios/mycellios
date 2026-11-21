@@ -1443,7 +1443,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=29)
     parser.add_argument("--ngram-min-match-tokens", type=_positive_int, default=2)
     parser.add_argument("--ngram-max-match-tokens", type=_positive_int, default=8)
-    parser.add_argument("--fused-short-block-tokens", type=_positive_int, default=7)
+    parser.add_argument("--fused-short-block-tokens", type=_positive_int, default=8)
     parser.add_argument("--fused-strong-match-tokens", type=_positive_int, default=8)
     parser.add_argument("--draft-model-source")
     parser.add_argument("--draft-model-revision")

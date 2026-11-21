@@ -30,7 +30,9 @@ test('speculation changes run locked CPU engine and server tests without admitti
   assert.ok(plan.some(c => c.args.includes('--require-hashes') && c.args.includes('scripts/wheel-locks/linux-x64-cp312.txt')));
   for (const test of ['test_speculation.py', 'test_engine.py', 'test_server.py']) assert.ok(plan.some(c => c.cwd === 'python' && c.args.includes(test)));
   assert.deepEqual(uncoveredNativeFiles(files), []);
-  assert.deepEqual(uncoveredNativeFiles([...files, 'python/distributed_runtime/engine.py']), ['python/distributed_runtime/engine.py']);
+  assert.deepEqual(uncoveredNativeFiles([...files, 'python/distributed_runtime/engine.py']), []);
+  assert.deepEqual(uncoveredNativeFiles([...files, 'python/distributed_runtime/stage.py']), ['python/distributed_runtime/stage.py']);
+  for (const test of ['test_session_reuse.py', 'test_recovery.py']) assert.ok(planChecks(['python/distributed_runtime/engine.py']).some(c => c.args.includes(test)));
   assert.ok(readFileSync('.github/workflows/ci.yml', 'utf8').includes('python-version: "3.12"'));
 });
 

@@ -30,7 +30,7 @@ from .failure_evidence import StageFailureEvidence, unattributed_failure_message
 from .macro_wave import KVVersion, MacroWaveState
 from .macro_wave_adapter import (
     MacroWaveProposal,
-    prepare_linear_macro_wave,
+    prepare_linear_source_wave,
     prepare_tree_macro_wave,
     record_linear_resolution,
     resolve_linear_macro_wave,
@@ -954,6 +954,7 @@ class _InflightWave:
     verify_seed_tokens: int = 0
     verify_input_tokens: tuple[int, ...] = ()
     verify_generation: int = 0
+    speculation_profiles: tuple[str, ...] = ()  # controllers measured by this wave
 
     @property
     def is_prefill(self) -> bool:
@@ -1082,6 +1083,7 @@ class _PreparedRootWave:
     verify_seed_tokens: int = 0
     verify_input_tokens: tuple[int, ...] = ()
     verify_generation: int = 0
+    speculation_profiles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -3679,7 +3681,7 @@ class DistributedPipelineEngine:
                 raise RuntimeError("verification returned while speculation is disabled")
             with self._speculation_lock:
                 controller = self._speculation_controller_for_profile_locked(
-                    job.speculation_profile
+                    (flight.speculation_profiles or (job.speculation_profile,))[0]
                 )
                 record_linear_resolution(
                     controller,
@@ -3842,7 +3844,7 @@ class DistributedPipelineEngine:
                 resolution = outcome.resolution
                 with self._speculation_lock:
                     controller = self._speculation_controller_for_profile_locked(
-                        job.speculation_profile
+                        (flight.speculation_profiles or (job.speculation_profile,))[0]
                     )
                     if resolution is None:
                         controller.record_verification(
@@ -3962,15 +3964,16 @@ class DistributedPipelineEngine:
                 pass
         if self.speculation_controller is not None and prior_output_tokens > 0:
             with self._speculation_lock:
-                controller = self._speculation_controller_for_profile_locked(
-                    job.speculation_profile
-                )
-                controller.record_classic(
-                    latency_seconds=max(1e-9, arrived - flight.started_at),
-                    transferred_bytes=(
-                        flight.outbound_bytes + HEADER_BYTES + len(frame.payload)
-                    ),
-                )
+                # A classic step teaches the baseline to every source it tried.
+                for profile in flight.speculation_profiles or (job.speculation_profile,):
+                    self._speculation_controller_for_profile_locked(
+                        profile
+                    ).record_classic(
+                        latency_seconds=max(1e-9, arrived - flight.started_at),
+                        transferred_bytes=(
+                            flight.outbound_bytes + HEADER_BYTES + len(frame.payload)
+                        ),
+                    )
 
         reached_eos = token in job.request.eos_token_ids
         reached_limit = len(job.token_ids) >= job.request.max_new_tokens
@@ -4764,6 +4767,7 @@ class DistributedPipelineEngine:
         provider = self.draft_provider
         controller = self.speculation_controller
         proposal: MacroWaveProposal | None = None
+        wave_profiles: tuple[str, ...] = ()
         verify_base_tokens = 0
         draft_latency_seconds = 0.0
         measurement_started_at = (
@@ -4778,13 +4782,11 @@ class DistributedPipelineEngine:
             ]
             history = (*prompt_history, *job.token_ids)
             verify_base_tokens = runner.sequence_length(job.wire_id)
-            profile = _speculation_load_profile(active_sequences)
-            job.speculation_profile = profile
             with self._speculation_lock:
-                controller = self._speculation_controller_for_profile_locked(profile)
-                preparation = prepare_linear_macro_wave(
+                preparation, wave_profiles = prepare_linear_source_wave(
                     provider,
-                    controller,
+                    _speculation_load_profile(active_sequences),
+                    self._speculation_controller_for_profile_locked,
                     history,
                     request_id=job.wire_id,
                     ordinal=job.step,
@@ -4863,6 +4865,7 @@ class DistributedPipelineEngine:
         if job.inflight_waves:
             raise RuntimeError("decode cannot prepare while another wave is in flight")
         return _PreparedRootWave(
+            speculation_profiles=wave_profiles,
             job=job,
             input_ids=next_ids,
             frame_type=frame_type,
@@ -4966,14 +4969,12 @@ class DistributedPipelineEngine:
         if maximum < 1:
             return None
 
-        profile = _speculation_load_profile(active_sequences)
-        job.speculation_profile = profile
         measurement_started_at = time.perf_counter()
         with self._speculation_lock:
-            controller = self._speculation_controller_for_profile_locked(profile)
-            preparation = prepare_linear_macro_wave(
+            preparation, wave_profiles = prepare_linear_source_wave(
                 self.draft_provider,
-                controller,
+                _speculation_load_profile(active_sequences),
+                self._speculation_controller_for_profile_locked,
                 provisional,
                 request_id=job.wire_id,
                 ordinal=(job.next_step if job.next_step is not None else job.step),
@@ -5028,6 +5029,7 @@ class DistributedPipelineEngine:
             reserved_bytes=reserved_bytes,
             draft_latency_seconds=preparation.draft_latency_seconds,
             measurement_started_at=measurement_started_at,
+            speculation_profiles=wave_profiles,
             verify_proposal=proposal,
             verify_base_tokens=verify_base_tokens,
             verify_seed_tokens=0,
@@ -5816,6 +5818,7 @@ class DistributedPipelineEngine:
                 f"but expects return step {job.step}"
             )
         flight = _InflightWave(
+            speculation_profiles=wave.speculation_profiles,
             step=wave.step,
             frame_type=wave.frame_type,
             prefill_end=wave.prefill_end,

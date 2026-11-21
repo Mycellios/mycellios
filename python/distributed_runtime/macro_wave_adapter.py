@@ -19,10 +19,11 @@ paged KV backend can materialize multiple branches in every stage.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 import math
+from typing import Any
 from numbers import Integral
 from time import perf_counter
 
@@ -230,10 +231,10 @@ class MacroWavePreparation:
         if (
             self.is_probe
             and self.decision.enabled
-            and len(self.selected_draft_tokens) <= self.decision.candidate_size
+            and len(self.selected_draft_tokens) == self.decision.candidate_size
         ):
             raise ValueError(
-                "a probe may only replace an enabled decision with a larger size"
+                "a probe must use a different size than the enabled decision"
             )
 
     @property
@@ -396,9 +397,10 @@ def prepare_linear_macro_wave(
 
     ``allow_probe`` mirrors the engine's explicit probe path.  It never changes
     the controller's decision; ``is_probe`` identifies that override.  A probe
-    runs while speculation is disabled, and also when a larger candidate size
-    than the enabled one has not been measured yet, so a small first winner is
-    not a permanent local optimum.  Every probed token is still verified.
+    runs while speculation is disabled, and also when another candidate size is
+    unmeasured or may still beat the enabled one, so a first winner judged on a
+    few samples is not a permanent local optimum.  Every probed token is still
+    verified.
     """
 
     if not isinstance(provider, DraftProvider):
@@ -418,6 +420,14 @@ def prepare_linear_macro_wave(
             int(provider.max_draft_tokens),
             int(provider.max_draft_tokens) if limit is None else limit,
         )
+        capacity = getattr(provider, "available_draft_tokens", None)
+        if callable(capacity):
+            # A provider that can bound its next draft cheaply keeps the
+            # controller from selecting or probing sizes it cannot supply.
+            assumed_available = min(
+                assumed_available,
+                _count("available draft tokens", capacity(history, limit)),
+            )
         decision = controller.decide(
             history_tokens=len(history),
             available_draft_tokens=assumed_available,
@@ -432,7 +442,7 @@ def prepare_linear_macro_wave(
                 history_tokens=len(history),
                 available_draft_tokens=assumed_available,
             ) or 0
-            if probe > selected_size:
+            if probe and probe != selected_size:
                 selected_size = probe
                 is_probe = True
         available = (
@@ -452,11 +462,11 @@ def prepare_linear_macro_wave(
         if (
             is_probe
             and decision.enabled
-            and selected_size <= decision.candidate_size
+            and selected_size == decision.candidate_size
         ):
             # A deferred drafter may return fewer tokens than the probe asked
-            # for (EOS, context limit, short lookup). The truncated wave is
-            # then no larger than the enabled decision, so it is not a probe.
+            # for (EOS, context limit, short lookup). A truncated wave of the
+            # enabled size is the enabled decision, not a probe.
             is_probe = False
     else:
         available = _tokens(
@@ -477,7 +487,7 @@ def prepare_linear_macro_wave(
                 history_tokens=len(history),
                 available_draft_tokens=len(available),
             ) or 0
-            if probe > selected_size:
+            if probe and probe != selected_size:
                 selected_size = probe
                 is_probe = True
     draft_latency_seconds = perf_counter() - draft_started
@@ -508,6 +518,61 @@ def prepare_linear_macro_wave(
         is_probe=is_probe,
         draft_latency_seconds=draft_latency_seconds,
     )
+
+
+def draft_source_attempts(
+    load_profile: str,
+    provider: Any,
+    history: Sequence[int],
+) -> tuple[tuple[str, Any], ...]:
+    """Controller profile and provider view for each draft source to try.
+
+    Each profile owns independent measurements. A provider with several
+    sources (free copies of earlier text, a paid draft model) names them in
+    order; every source is then enabled only where it actually wins. A
+    single-source provider keeps the plain load profile.
+    """
+
+    draft_sources = getattr(provider, "draft_sources", None)
+    for_source = getattr(provider, "for_source", None)
+    if not callable(draft_sources) or not callable(for_source):
+        return ((load_profile, provider),)
+    sources = tuple(draft_sources(history))
+    if not sources:
+        return ((load_profile, provider),)
+    attempts = []
+    for source in sources:
+        if not isinstance(source, str) or not source.isidentifier():
+            raise ValueError("draft source must be a short identifier")
+        attempts.append((f"{load_profile}/{source}", for_source(source)))
+    return tuple(attempts)
+
+
+def prepare_linear_source_wave(
+    provider: Any,
+    load_profile: str,
+    controller_for_profile: Callable[[str], AdaptiveSpeculationController],
+    token_history: Sequence[int],
+    **wave: Any,
+) -> tuple[MacroWavePreparation, tuple[str, ...]]:
+    """Try each draft source with its own controller; the first wave wins.
+
+    Returns the preparation and the profiles its measurement belongs to: the
+    selected source for a VERIFY wave, or every source tried when the step
+    falls back to classic decode, so each of them learns the baseline.
+    """
+
+    tried: list[str] = []
+    for profile, candidate in draft_source_attempts(
+        load_profile, provider, token_history
+    ):
+        preparation = prepare_linear_macro_wave(
+            candidate, controller_for_profile(profile), token_history, **wave
+        )
+        if preparation.proposal is not None:
+            return preparation, (profile,)
+        tried.append(profile)
+    return preparation, tuple(tried)
 
 
 def _draft_tokens_for_request(

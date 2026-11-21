@@ -85,6 +85,24 @@ On DirectML, 1–2 of 16 speculative answers differed from non-speculative GPU
 decoding. Multi-token verification rounds differently from one-token decode,
 so near-tied greedy tokens can change. On the CPU every answer was identical.
 
+The controller was then reworked on the same single-machine GPU setup. Each
+draft source now has its own measurements, free sources are tried before the
+paid model, a deferred provider reports how many tokens it can supply, and
+measured sizes are re-probed while their optimistic bound can still win.
+
+| Arm, GPU root, steady state | Copy-heavy | Mixed chat |
+| --- | ---: | ---: |
+| No speculation | 6.5 tok/s | 6.8 tok/s |
+| Fused lookup | 21–22 tok/s | 8.3–8.5 tok/s |
+| Fused lookup + draft model, before | 16 tok/s | ×0.45 of no speculation |
+| Fused lookup + draft model, after | 21–22 tok/s | 8.7–8.9 tok/s |
+
+Before the rework a size-8 probe returned seven tokens, was never recorded as
+measured and ran the model on every step. Afterwards the model ran 13–14
+times per session and then stopped. Enabling a draft model no longer costs
+throughput on hardware where it loses. Whether it wins on a discrete GPU is
+not measured.
+
 ## Windows companion dock local repair, 2026-11-16
 
 Companion windows wait for their populated renderer and native ready-to-show

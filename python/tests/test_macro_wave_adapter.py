@@ -387,6 +387,90 @@ class LinearMacroWaveAdapterTests(unittest.TestCase):
         self.assertFalse(preparation.is_probe)
         self.assertEqual(preparation.selected_draft_tokens, (10,))
 
+    def test_exploration_probe_may_be_smaller_than_the_enabled_size(self) -> None:
+        controller = AdaptiveSpeculationController(
+            AdaptiveSpeculationConfig(
+                max_draft_tokens=4,
+                candidate_sizes=(2, 4),
+                min_token_history=0,
+                min_classic_observations=2,
+                min_verify_observations=2,
+                exploration_interval=1,
+            )
+        )
+        for _ in range(4):
+            controller.record_classic(latency_seconds=1.0, transferred_bytes=10)
+            controller.record_verification(
+                proposed_tokens=4,
+                accepted_tokens=4,
+                latency_seconds=1.0,
+                transferred_bytes=10,
+            )
+        for accepted in (2, 0):
+            controller.record_verification(
+                proposed_tokens=2,
+                accepted_tokens=accepted,
+                latency_seconds=0.2,
+                transferred_bytes=10,
+            )
+        preparation = prepare_linear_macro_wave(
+            _FixedDraftProvider((10, 11, 12, 13)),
+            controller,
+            (1, 2, 3),
+            request_id="down",
+            ordinal=0,
+            allow_probe=True,
+        )
+        self.assertTrue(preparation.decision.enabled)
+        self.assertEqual(preparation.decision.candidate_size, 4)
+        self.assertTrue(preparation.is_probe)
+        self.assertEqual(preparation.selected_draft_tokens, (10, 11))
+
+    def test_deferred_capacity_stops_probes_the_provider_cannot_supply(self) -> None:
+        controller = AdaptiveSpeculationController(
+            AdaptiveSpeculationConfig(
+                max_draft_tokens=4,
+                candidate_sizes=(1, 2, 4),
+                min_token_history=0,
+                min_classic_observations=2,
+                min_verify_observations=2,
+                minimum_speedup=1.0,
+            )
+        )
+        for _ in range(2):
+            controller.record_classic(latency_seconds=1.0, transferred_bytes=100)
+            for size in (1, 2):
+                controller.record_verification(
+                    proposed_tokens=size,
+                    accepted_tokens=0,
+                    latency_seconds=5.0,
+                    transferred_bytes=100,
+                )
+
+        class _Capped(_FixedDraftProvider):
+            defer_until_selected = True
+            calls = 0
+
+            def available_draft_tokens(self, history, max_tokens=None):
+                return 2
+
+            def draft(self, token_history, max_tokens=None):
+                type(self).calls += 1
+                return super().draft(token_history, max_tokens)
+
+        preparation = prepare_linear_macro_wave(
+            _Capped((10, 11)),
+            controller,
+            (1, 2, 3),
+            request_id="capped",
+            ordinal=0,
+            allow_probe=True,
+        )
+        # Sizes 1 and 2 are measured and lose; size 4 is out of reach, so the
+        # paid drafter is not run at all.
+        self.assertFalse(preparation.enabled)
+        self.assertEqual(_Capped.calls, 0)
+
     def test_deferred_model_runs_only_for_an_enabled_decision_or_probe(self) -> None:
         provider = _DeferredDraftProvider((10, 11, 12, 13))
         disabled = prepare_linear_macro_wave(
@@ -598,6 +682,111 @@ class BranchedMacroWaveAdapterTests(unittest.TestCase):
             resolve_macro_wave(proposal, {(): 1})
         for branch in proposal.tree.branches()[1:]:
             self.assertEqual(branch.state, MacroBranchState.SPECULATIVE)
+
+
+class DraftSourceWaveTests(unittest.TestCase):
+    def test_attempts_follow_the_provider_source_order(self) -> None:
+        from distributed_runtime.macro_wave_adapter import draft_source_attempts
+
+        class _Sources:
+            def __init__(self, sources):
+                self.sources = sources
+
+            def draft_sources(self, history):
+                return self.sources
+
+            def for_source(self, source):
+                return ("view", source)
+
+        plain = object()
+        self.assertEqual(
+            draft_source_attempts("load-1", plain, (1, 2)), (("load-1", plain),)
+        )
+        single = _Sources(())
+        self.assertEqual(
+            draft_source_attempts("load-3-4", single, (1,)), (("load-3-4", single),)
+        )
+        self.assertEqual(
+            draft_source_attempts("load-1", _Sources(("weak", "model")), (1,)),
+            (("load-1/weak", ("view", "weak")), ("load-1/model", ("view", "model"))),
+        )
+        with self.assertRaises(ValueError):
+            draft_source_attempts("load-1", _Sources(("bad source",)), (1,))
+
+    def test_free_source_goes_first_and_classic_teaches_all(self) -> None:
+        from distributed_runtime.macro_wave_adapter import prepare_linear_source_wave
+        from distributed_runtime.speculation import FusedLookupDraftProvider
+
+        class _Model:
+            strategy = "draft-model"
+            max_draft_tokens = 8
+            defer_until_selected = True
+            calls = 0
+
+            def draft(self, token_history, max_tokens=None):
+                type(self).calls += 1
+                return (7, 7, 7, 7)[: max_tokens or 4]
+
+        controllers: dict[str, AdaptiveSpeculationController] = {}
+
+        def controller_for(profile: str) -> AdaptiveSpeculationController:
+            return controllers.setdefault(
+                profile,
+                AdaptiveSpeculationController(
+                    AdaptiveSpeculationConfig(
+                        max_draft_tokens=8,
+                        min_token_history=0,
+                        min_classic_observations=1,
+                        min_verify_observations=1,
+                    )
+                ),
+            )
+
+        provider = FusedLookupDraftProvider(max_draft_tokens=8, draft_model=_Model())
+        wave = dict(
+            request_id=1,
+            ordinal=0,
+            parent_kv_version=KVVersion(9),
+            max_tokens=8,
+            allow_probe=True,
+        )
+        weak_history = (5, 1, 2, 30, 31, 32, 9, 1, 2)
+
+        # No classic baseline yet: nothing may speculate, both sources learn it.
+        preparation, profiles = prepare_linear_source_wave(
+            provider, "load-1", controller_for, weak_history, **wave
+        )
+        self.assertIsNone(preparation.proposal)
+        self.assertEqual(profiles, ("load-1/weak", "load-1/model"))
+        self.assertEqual(_Model.calls, 0)
+        for profile in profiles:
+            controllers[profile].record_classic(
+                latency_seconds=1.0, transferred_bytes=10
+            )
+
+        # The free short match goes first and owns the wave it produced.
+        preparation, profiles = prepare_linear_source_wave(
+            provider, "load-1", controller_for, weak_history, **wave
+        )
+        self.assertEqual(profiles, ("load-1/weak",))
+        self.assertEqual(preparation.selected_draft_tokens[:1], (30,))
+        self.assertEqual(_Model.calls, 0)
+
+        # Only once every free size is measured as a loss is the paid model
+        # tried, with its own measurements.
+        for size in (1, 2, 4, 8):
+            controllers["load-1/weak"].record_verification(
+                proposed_tokens=size,
+                accepted_tokens=0,
+                latency_seconds=9.0,
+                transferred_bytes=10,
+            )
+        preparation, profiles = prepare_linear_source_wave(
+            provider, "load-1", controller_for, weak_history, **wave
+        )
+        self.assertEqual(profiles, ("load-1/model",))
+        self.assertTrue(preparation.is_probe)
+        self.assertEqual(_Model.calls, 1)
 
 
 if __name__ == "__main__":
