@@ -462,3 +462,42 @@ class LocalDraftModelProviderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DraftModelDirectmlDeviceTests(unittest.TestCase):
+    def test_directml_spellings_match_the_launcher_contract(self) -> None:
+        from distributed_runtime.draft_model import _canonical_device
+
+        for value in ("directml", "directml:0", "directml:12"):
+            self.assertEqual(_canonical_device(value, allow_auto=False), value)
+        for value in ("directml:", "directml:01", "DirectML", "dml"):
+            with self.assertRaises(ValueError):
+                _canonical_device(value, allow_auto=False)
+
+    def test_auto_prefers_directml_over_cpu_when_present(self) -> None:
+        from distributed_runtime import draft_model
+
+        sentinel = torch.device("meta")
+        with patch.object(torch.cuda, "is_available", return_value=False), patch.object(
+            draft_model, "_directml_device", return_value=sentinel
+        ) as directml:
+            self.assertEqual(draft_model._resolve_device("auto"), sentinel)
+        directml.assert_called_once_with("auto")
+        with patch.object(torch.cuda, "is_available", return_value=False), patch.object(
+            draft_model, "_directml_device", return_value=None
+        ):
+            self.assertEqual(draft_model._resolve_device("auto"), torch.device("cpu"))
+
+    def test_explicit_directml_fails_closed_when_unavailable(self) -> None:
+        from distributed_runtime import draft_model
+
+        with patch.object(draft_model, "_directml_device", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "DirectML device is unavailable"):
+                draft_model._resolve_device("directml")
+
+    def test_directml_auto_dtype_avoids_bfloat16_fallback(self) -> None:
+        from distributed_runtime.draft_model import _resolve_dtype
+
+        directml = torch.device("privateuseone", 0)
+        self.assertEqual(_resolve_dtype("auto", directml), torch.float16)
+        self.assertEqual(_resolve_dtype("auto", torch.device("cpu")), "auto")

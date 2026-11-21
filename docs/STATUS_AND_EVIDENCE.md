@@ -72,6 +72,19 @@ stayed identical. It remains slower because the controller still measures
 free lookup drafts and paid model drafts together; separating their costs is
 open work.
 
+The same follow-up ran the root stage on an AMD Radeon 890M through DirectML.
+The root ran ×1.29 faster than on the CPU. Fused lookup reached ×2.94 on
+copy-heavy prompts and ×1.02 on mixed chat, compared with the same GPU without
+speculation.
+
+A 135M draft model now resolves to DirectML. It produced the same tokens as on
+the CPU but was not faster at one token per step, so fused drafting with it
+stayed slower: ×0.40 on mixed chat and ×1.76 on copy-heavy prompts.
+
+On DirectML, 1–2 of 16 speculative answers differed from non-speculative GPU
+decoding. Multi-token verification rounds differently from one-token decode,
+so near-tied greedy tokens can change. On the CPU every answer was identical.
+
 ## Windows companion dock local repair, 2026-11-16
 
 Companion windows wait for their populated renderer and native ready-to-show
