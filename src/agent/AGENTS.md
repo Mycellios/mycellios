@@ -5,7 +5,9 @@
   of connected providers that bundled Pi lacks, on that provider's own protocol and
   host. ChatGPT sign-in keeps its account catalog, whose Codex client_version comes
   from npm with a pinned floor; the managed provider and compatible endpoints are
-  unchanged. `model-listing.ts` sets New/Older from release dates; saved choices stay
+  unchanged. Claude sign-in (OAuth) requests likewise send the Claude Code version
+  from npm with a pinned floor (`pi-claude-code-version.ts`) instead of Pi's bundled
+  one, which Anthropic rejects for newer models; verify its test with pi-runtime. `model-listing.ts` sets New/Older from release dates; saved choices stay
   in the main list and search shows everything. Verify models-dev, model-listing,
   models-dev-runtime, pi-codex-catalog and chat-model-picker tests.
 

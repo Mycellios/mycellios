@@ -180,13 +180,17 @@ function compareReleaseVersions(a: string, b: string): number {
   return 0;
 }
 
-/** Read `version` from npm's `@openai/codex@latest` manifest; undefined on any failure. */
+/**
+ * Read `version` from an npm `latest` manifest (`@openai/codex` by default);
+ * undefined on any failure.
+ */
 export async function fetchLatestCodexClientVersion(
   fetchImpl: typeof fetch = fetch,
+  endpoint: string = CODEX_NPM_LATEST_ENDPOINT,
 ): Promise<string | undefined> {
   let response: Response;
   try {
-    response = await fetchImpl(CODEX_NPM_LATEST_ENDPOINT, {
+    response = await fetchImpl(endpoint, {
       headers: { accept: "application/json" },
       redirect: "error",
       signal: AbortSignal.timeout(CODEX_VERSION_TIMEOUT_MS),
@@ -219,6 +223,7 @@ export class CodexClientVersionResolver {
   private readonly ttlMs: number;
   private readonly failureTtlMs: number;
   private readonly floor: string;
+  private readonly endpoint: string;
   private cached: { version: string; expiresAt: number } | undefined;
   private inflight: Promise<string> | undefined;
 
@@ -229,8 +234,11 @@ export class CodexClientVersionResolver {
       ttlMs?: number;
       failureTtlMs?: number;
       floor?: string;
+      /** npm `latest` manifest to read; the same policy serves other CLIs' versions. */
+      endpoint?: string;
     } = {},
   ) {
+    this.endpoint = opts.endpoint ?? CODEX_NPM_LATEST_ENDPOINT;
     this.fetchImpl = opts.fetch ?? fetch;
     this.now = opts.now ?? Date.now;
     this.ttlMs = opts.ttlMs ?? CODEX_VERSION_TTL_MS;
@@ -248,7 +256,7 @@ export class CodexClientVersionResolver {
   }
 
   private async refresh(previous: string | undefined): Promise<string> {
-    const latest = await fetchLatestCodexClientVersion(this.fetchImpl).catch(() => undefined);
+    const latest = await fetchLatestCodexClientVersion(this.fetchImpl, this.endpoint).catch(() => undefined);
     const known = previous ?? this.floor;
     const version = latest && compareReleaseVersions(latest, known) > 0 ? latest : known;
     this.cached = {

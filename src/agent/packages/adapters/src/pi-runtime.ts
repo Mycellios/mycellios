@@ -93,6 +93,7 @@ import { liveModelSibling } from "./pi-live-model.js";
 import { registerLocalProvider } from "./pi-local-provider.js";
 import { applyPiModelCompatibility } from "./pi-model-compat.js";
 import { codexComputeResidency } from "./pi-oauth.js";
+import { withClaudeCodeIdentity } from "./pi-claude-code-version.js";
 import {
   registerOpenAiCompatibleCatalog,
   registerOpenAiCompatibleRuntime,
@@ -4307,6 +4308,10 @@ export function reliableStreamOptions(
       },
     };
   }
+
+  // Pi's bundled Claude Code version lags releases; Anthropic rejects new models for
+  // old CLI versions on subscription (OAuth) requests.
+  if (model.provider === "anthropic") next = withClaudeCodeIdentity(next, accessToken);
 
   // OpenCode Go/Zen require a sticky x-opencode-session header (affinity + some
   // models 400 without it). Pi 0.85.1 does not attach that header on its own.
