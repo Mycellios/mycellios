@@ -45,10 +45,10 @@ export async function renderNetworkSpeech(
         model: KOKORO_MODEL,
         messages: [{ role: "user", content: text }],
         stream: false,
-        // Keep the existing authenticated scheduler/dispatch privacy checks. A
-        // failed or unavailable pinned replica must never fall back to a legacy
-        // CPU worker whose execution cannot settle contribution-funded usage.
-        privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: identities },
+        // No placement pin: the coordinator keeps contribution-funded speech on
+        // replicas whose qualification lets settlement verify it, and never on a
+        // legacy CPU worker (specs/node-owner-privacy, D7). The configured
+        // identities only switch network voice on.
         ...options,
       }),
       signal,
