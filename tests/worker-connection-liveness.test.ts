@@ -39,7 +39,7 @@ describe("worker connection liveness", () => {
   it("terminates a coordinator socket that never becomes ready so reconnect regains control", async () => {
     const { harness, socket, advance, logger } = setup();
     socket.readyState = WebSocket.CONNECTING;
-    harness.armCoordinatorReadyDeadline(socket as unknown as WebSocket);
+    harness.readyDeadline.arm(socket as unknown as WebSocket);
     await advance(COORDINATOR_READY_TIMEOUT_MS - 1);
     expect(socket.terminate).not.toHaveBeenCalled();
     await advance(1);
@@ -49,9 +49,9 @@ describe("worker connection liveness", () => {
 
   it("keeps a socket that the coordinator acknowledged in time", async () => {
     const { harness, socket, advance } = setup();
-    harness.armCoordinatorReadyDeadline(socket as unknown as WebSocket);
+    harness.readyDeadline.arm(socket as unknown as WebSocket);
     await advance(10_000);
-    harness.clearCoordinatorReadyDeadline();
+    harness.readyDeadline.clear();
     await advance(COORDINATOR_READY_TIMEOUT_MS * 2);
     expect(socket.terminate).not.toHaveBeenCalled();
   });
@@ -82,8 +82,7 @@ function setup() {
     startRttProbe(socket: WebSocket): void;
     stopRttProbe(): void;
     recordRttSample(payload: Buffer): void;
-    armCoordinatorReadyDeadline(socket: WebSocket): void;
-    clearCoordinatorReadyDeadline(socket?: WebSocket): void;
+    readyDeadline: { arm(socket: WebSocket): void; clear(socket?: WebSocket): void };
   };
   const socket: { readyState: number; ping: ReturnType<typeof vi.fn<(payload: Buffer) => void>>; terminate: ReturnType<typeof vi.fn> } = { readyState: WebSocket.OPEN, ping: vi.fn<(payload: Buffer) => void>(), terminate: vi.fn() };
   return {
