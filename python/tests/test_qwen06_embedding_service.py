@@ -15,7 +15,9 @@ class FakeEmbedder:
         self.closed = False
         self.seen = []
 
-    def embed(self, texts):
+    def embed(self, texts, before_batch=None):
+        if before_batch is not None:
+            before_batch()
         self.seen.append(texts)
         return [[1.0] + [0.0] * (service.DIMENSIONS - 1) for _ in texts], 7 * len(texts)
 
@@ -102,6 +104,14 @@ class ThermalGuardTests(unittest.TestCase):
         with self.assertRaises(service.ServiceError) as raised:
             guard.wait()
         self.assertEqual((raised.exception.status, raised.exception.code), (503, "replica_cooling_down"))
+
+    def test_rests_briefly_in_the_soft_band(self):
+        sleeps = []
+        service.ThermalGuard(lambda: 75, pause_c=78, sleep=sleeps.append).wait()
+        self.assertEqual(sleeps, [0.5])
+        sleeps.clear()
+        service.ThermalGuard(lambda: 60, pause_c=78, sleep=sleeps.append).wait()
+        self.assertEqual(sleeps, [])
 
     def test_unreadable_temperature_does_not_block(self):
         def broken():

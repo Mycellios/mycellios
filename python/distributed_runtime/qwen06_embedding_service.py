@@ -118,7 +118,7 @@ class TorchEmbedder:
         torch_dtype = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}[dtype]
         self.model = AutoModel.from_pretrained(path, torch_dtype=torch_dtype).to(device).eval()
 
-    def embed(self, texts):
+    def embed(self, texts, before_batch=None):
         torch = self.torch
         lengths = [len(ids) for ids in self.tokenizer(texts, truncation=True, max_length=MAX_TOKENS)["input_ids"]]
         vectors = [None] * len(texts)
@@ -126,6 +126,8 @@ class TorchEmbedder:
         # Padding to the longest text makes one long chunk inflate a whole
         # batch; bounded length-sorted micro-batches keep memory and time flat.
         for group in plan_micro_batches(lengths, MICRO_BATCH_TOKENS):
+            if before_batch is not None:
+                before_batch()
             encoded = self.tokenizer([texts[i] for i in group], padding=True, truncation=True,
                                      max_length=MAX_TOKENS, return_tensors="pt").to(self.device)
             with torch.inference_mode():
@@ -151,9 +153,13 @@ class ThermalGuard:
     cannot start within `max_wait_s` gets 503 so the caller backs off.
     """
 
-    def __init__(self, read_temperature, pause_c=78, resume_c=72, max_wait_s=60, sleep=time.sleep):
+    def __init__(self, read_temperature, pause_c=78, resume_c=72, max_wait_s=60, sleep=time.sleep, soft_c=None,
+                 soft_pause_s=0.5):
         self.read = read_temperature
         self.pause_c, self.resume_c, self.max_wait_s, self.sleep = pause_c, resume_c, max_wait_s, sleep
+        # Between soft_c and pause_c, short rests let the laptop cooler keep up.
+        self.soft_c = pause_c - 4 if soft_c is None else soft_c
+        self.soft_pause_s = soft_pause_s
         self.paused = False
 
     def wait(self):
@@ -170,6 +176,8 @@ class ThermalGuard:
             elif not self.paused and temperature >= self.pause_c:
                 self.paused = True
             if not self.paused:
+                if temperature >= self.soft_c:
+                    self.sleep(self.soft_pause_s)
                 return
             if waited >= self.max_wait_s:
                 raise ServiceError(503, "replica_cooling_down")
@@ -211,12 +219,16 @@ class Replica:
             self.state = "ready" if self.embedder is not None else "waiting_reservation"
 
     def embed(self, texts):
-        if self.thermal is not None:
-            self.thermal.wait()
+        before = self.thermal.wait if self.thermal is not None else None
+        if before is not None:
+            before()
         with self.lock:
             if self.embedder is None:
                 raise ServiceError(503, "no_replica_available")
-            vectors, tokens = self.embedder.embed(texts)
+            # Check between micro-batches too: one long request can otherwise
+            # run the GPU past the owner's node temperature limit.
+            vectors, tokens = (self.embedder.embed(texts, before) if before is not None
+                               else self.embedder.embed(texts))
         if len(vectors) != len(texts) or any(len(vector) != DIMENSIONS for vector in vectors):
             raise ServiceError(500, "invalid_model_output")
         return vectors, tokens
