@@ -1565,7 +1565,10 @@ export async function createCoordinator(
   if (persistence && config.mobileExpertArtifactsPath) {
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }
-  const service = (await MeshService.create(store, scheduler, hub, config.requestTimeoutMs, { modelRequestTimeoutsMs: config.modelRequestTimeoutsMs }));
+  const service = (await MeshService.create(store, scheduler, hub, config.requestTimeoutMs, { modelRequestTimeoutsMs: config.modelRequestTimeoutsMs,
+    leaseRejectionHold: process.env.MYCELLIOS_LEASE_REJECTION_HOLD === "1" }));
+  service.on("lease_rejection_anomaly", (anomaly) => app.log.warn({ event: "lease_rejection_anomaly", ...anomaly },
+    "A worker rejected an anomalous share of offers after receiving their content"));
   await apiAccess.reconcileRestartedZeroTokenUsage();
   const attachExecutionReceipt = async (
     event: Extract<JobStreamEvent, { type: "completed" }>,

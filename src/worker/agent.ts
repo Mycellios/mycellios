@@ -2486,6 +2486,7 @@ export class WorkerAgent {
         }),
       };
     }
+    const advertised = this.policyAdvertisedCapabilities(this.capabilities);
     const heartbeat: WorkerHeartbeat = {
       draining: !this.acceptsNewWork() || (this.capabilities.deployments.length > 0 && !metrics.ready),
       pausedReason: !this.contributionEnabled
@@ -2501,7 +2502,7 @@ export class WorkerAgent {
         ...(gpu.temperatureC === undefined ? {} : { temperatureC: gpu.temperatureC }),
         ...(gpu.powerW === undefined ? {} : { powerW: gpu.powerW }),
       })),
-      deployments: this.capabilities.deployments.map((deployment) => ({
+      deployments: advertised.deployments.map((deployment) => ({
         deploymentId: deployment.deploymentId,
         freeSlots: metrics.ready ? deployment.freeSlots : 0,
       })),
@@ -2512,7 +2513,7 @@ export class WorkerAgent {
     };
     this.sendMessage("worker.heartbeat", {
       heartbeat,
-      capabilities: this.capabilities,
+      capabilities: advertised,
       metrics: {
         ...metrics,
         ready: this.acceptsNewWork() && metrics.ready,
@@ -2530,6 +2531,21 @@ export class WorkerAgent {
         ...deployment,
         freeSlots,
       })),
+    };
+  }
+
+  /**
+   * Deployments whose model the owner's policy excludes right now advertise no
+   * free slot, so the coordinator never sends their content only to have it
+   * rejected (specs/node-owner-privacy, D2).
+   */
+  private policyAdvertisedCapabilities(capabilities: WorkerCapabilities): WorkerCapabilities {
+    if (!this.options.workAdmissionPolicy) return capabilities;
+    return {
+      ...capabilities,
+      deployments: capabilities.deployments.map((deployment) => (
+        this.workPolicyRejection(deployment.model) === null ? deployment : { ...deployment, freeSlots: 0 }
+      )),
     };
   }
 

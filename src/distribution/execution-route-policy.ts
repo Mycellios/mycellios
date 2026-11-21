@@ -27,6 +27,8 @@ export interface ExecutionRouteCandidate<T> {
   route: T;
   /** Lower is better; callers normalize compute, queue, network, cost and SLO. */
   score: number;
+  /** Estimated time to serve the request; bounds the band by actual latency. */
+  serviceMs?: number | undefined;
   nodeCount: number;
   meetsSlo: boolean;
   eligible: boolean;
@@ -65,6 +67,17 @@ export interface ExecutionRoutePolicyInput<T> {
   affinityCandidateId?: string | undefined;
   /** Maximum additive normalized score tolerated to keep an eligible KV route. */
   maxAffinityScorePenalty?: number | undefined;
+  /**
+   * Relative width of the near-best band. Candidates scoring at most
+   * best * (1 + serviceBand) + SERVICE_BAND_FLOOR, and whose serviceMs is at
+   * most the best's * (1 + serviceBand), are equally likely. Equivalent nodes
+   * then share offers instead of the lowest id always winning, while a
+   * clearly faster node keeps winning (specs/node-owner-privacy, D2).
+   * 0 keeps the single best.
+   */
+  serviceBand?: number | undefined;
+  /** Uniform integer in [0, exclusiveMax). Required when serviceBand > 0. */
+  randomIndex?: ((exclusiveMax: number) => number) | undefined;
 }
 
 const KIND_ORDER: Record<Exclude<ExecutionRouteKind, "unavailable">, number> = {
@@ -74,8 +87,10 @@ const KIND_ORDER: Record<Exclude<ExecutionRouteKind, "unavailable">, number> = {
 };
 
 /**
- * Pure, deterministic execution-route policy. It does not read clocks, stores,
- * probes or queues: callers must snapshot and normalize that evidence first.
+ * Pure execution-route policy. It does not read clocks, stores, probes or
+ * queues: callers must snapshot and normalize that evidence first. It is
+ * deterministic unless the caller asks for a service band and supplies the
+ * randomness.
  */
 export function decideExecutionRoute<T>(
   input: ExecutionRoutePolicyInput<T>,
@@ -83,6 +98,13 @@ export function decideExecutionRoute<T>(
   const affinityPenalty = input.maxAffinityScorePenalty ?? 0.1;
   if (!Number.isFinite(affinityPenalty) || affinityPenalty < 0) {
     throw new RangeError("maxAffinityScorePenalty must be a finite non-negative number");
+  }
+  const serviceBand = input.serviceBand ?? 0;
+  if (!Number.isFinite(serviceBand) || serviceBand < 0) {
+    throw new RangeError("serviceBand must be a finite non-negative number");
+  }
+  if (serviceBand > 0 && !input.randomIndex) {
+    throw new RangeError("serviceBand requires randomIndex");
   }
   const ids = new Set<string>();
   const evaluations: ExecutionRouteEvaluation[] = input.candidates.map((candidate) => {
@@ -126,7 +148,7 @@ export function decideExecutionRoute<T>(
     : undefined;
   const chosen = affinity && affinity.score <= recommended.score + affinityPenalty
     ? affinity
-    : recommended;
+    : pickWithinBand(eligible, serviceBand, input.randomIndex);
   const recommendation = selection(recommended, "selected_best_service");
   const selectedReason = chosen === affinity && chosen !== recommended
     ? "selected_kv_affinity"
@@ -141,6 +163,28 @@ export function decideExecutionRoute<T>(
     reasons: [selectedReason],
     evaluations,
   };
+}
+
+/** Absolute slack so equal near-zero scores still form a band. */
+export const SERVICE_BAND_FLOOR = 0.002;
+
+function pickWithinBand<T>(
+  sorted: readonly ExecutionRouteCandidate<T>[],
+  serviceBand: number,
+  randomIndex: ((exclusiveMax: number) => number) | undefined,
+): ExecutionRouteCandidate<T> {
+  const best = sorted[0]!;
+  if (serviceBand === 0 || !randomIndex) return best;
+  const scoreLimit = best.score * (1 + serviceBand) + SERVICE_BAND_FLOOR;
+  const serviceLimit = best.serviceMs === undefined ? undefined : best.serviceMs * (1 + serviceBand);
+  const band = sorted.filter((candidate) => candidate.score <= scoreLimit
+    && (serviceLimit === undefined || candidate.serviceMs === undefined || candidate.serviceMs <= serviceLimit));
+  if (band.length === 1) return best;
+  const index = randomIndex(band.length);
+  if (!Number.isInteger(index) || index < 0 || index >= band.length) {
+    throw new RangeError("randomIndex returned an index outside the band");
+  }
+  return band[index]!;
 }
 
 function validateCandidate<T>(candidate: ExecutionRouteCandidate<T>, ids: Set<string>): void {

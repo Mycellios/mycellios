@@ -364,8 +364,14 @@ These rules apply to the complete repository.
 - Evaluate bounded complete pipeline alternatives including the return path before
   applying route policy. Recheck the exact immutable request immediately before
   offering a lease; use only compatible preplanned standbys if eligibility changed.
+- Routes within `SCHEDULER_SERVICE_BAND` of both the best score and the best
+  estimated service time are chosen uniformly; a healthy affinity still wins.
+  Tests of recovery rather than selection pass `serviceBand: 0`. Rejections
+  after an offer is delivered feed `LeaseRejectionMonitor`; holding a worker
+  stays opt-in (`MYCELLIOS_LEASE_REJECTION_HOLD=1`).
 - Verify with `npx vitest run tests/capacity-dispatch-hardening.test.ts
-  tests/scheduler.test.ts tests/mesh-failover.test.ts tests/kokoro-network.test.ts`.
+  tests/scheduler.test.ts tests/mesh-failover.test.ts tests/kokoro-network.test.ts
+  tests/random-assignment.test.ts`.
 
 ## Optional speech replicas
 

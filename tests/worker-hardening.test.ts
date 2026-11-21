@@ -51,6 +51,25 @@ describe("worker boundary hardening", () => {
     } });
   });
 
+  it("advertises no free slot for a model the owner's policy excludes, before any content is offered", async () => {
+    const agent = new WorkerAgent(baseConfig(), {
+      coordinatorUrl: "http://127.0.0.1:8080",
+      workAdmissionPolicy: (model) => (model === "test-model" ? "model_not_allowed" : null),
+    });
+    const harness = agent as unknown as AgentHarness;
+    const sent: Array<{ type: string; payload: { heartbeat: { deployments: Array<{ freeSlots: number }> };
+      capabilities: WorkerCapabilities } }> = [];
+    harness.registeredWorkerId = "worker-policy";
+    harness.capabilities = capabilities();
+    harness.adapter = { ...harness.adapter, metrics: async () => ({ ready: true, activeJobs: 0, loadedModels: ["test-model"] }) };
+    harness.socket = { readyState: 1, send: (value) => sent.push(JSON.parse(value)) };
+    await harness.sendHeartbeat();
+    const heartbeat = sent.at(-1)!.payload;
+    expect(heartbeat.heartbeat.deployments).toEqual([{ deploymentId: "deployment-test", freeSlots: 0 }]);
+    expect(heartbeat.capabilities.deployments[0]!.freeSlots).toBe(0);
+    expect(harness.capabilities.deployments[0]!.freeSlots).toBe(1);
+  });
+
   it("keeps heartbeats alive while probes hang, closes admission and recovers with fresh metrics", async () => {
     vi.useFakeTimers();
     try {
