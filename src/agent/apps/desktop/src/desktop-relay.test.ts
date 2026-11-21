@@ -73,8 +73,8 @@ it("stops local work and stops posting when the API no longer holds the operatio
       if (action === "identity") return Response.json(identity);
       if (action === "bind") { binding = payload; return Response.json({ ok: true }); }
       if (action === "poll") {
-        const operations = delivered ? [] : [{ id: "cancelled", binding, request: { method: "execute", botId: "bot" } }];
-        delivered = true;
+        const operations = delivered || !binding ? [] : [{ id: "cancelled", binding, request: { method: "environment", botId: "bot" } }];
+        if (operations.length) delivered = true;
         return Response.json({ identity, active: [], operations });
       }
       reports.push({ id: payload.id, seq: payload.seq, done: payload.done });
