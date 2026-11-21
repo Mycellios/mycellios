@@ -25,6 +25,8 @@ export interface ConnectionState {
   sessionId: string;
   /** Client address of the socket, for chunk dispersion by network. */
   networkAddress?: string | null;
+  /** X25519 key this connection announced for sealed lease offers. */
+  sealingPublicKey?: string | null;
 }
 
 
