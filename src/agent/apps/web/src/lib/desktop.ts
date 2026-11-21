@@ -19,12 +19,15 @@ export function desktopBridge(): RakazoDesktop | undefined {
 }
 
 /**
- * Ordinary new Micos use their own isolated server workspace. An explicitly
- * chosen installed account keeps the existing native first-run computer route;
- * isolation must never silently authorize or redirect a local project.
+ * A Mico created in Desktop works on this PC, in its own folder, as OpenBot's
+ * agents do (behavior reference only). Binding still waits for the owner's
+ * local-access consent on the first send. Without a Desktop host, new Micos use
+ * their own isolated server workspace; an explicitly chosen installed account
+ * keeps the shared computer route.
  */
 export function defaultComputerMode(desktop?: RakazoDesktop, installedAccountSelected = false): ComputerMode {
-  return installedAccountSelected ? (desktop ? "dedicated" : "team") : DEFAULT_COMPUTER_MODE;
+  if (desktop?.computer?.connect || (desktop && installedAccountSelected)) return "dedicated";
+  return installedAccountSelected ? "team" : DEFAULT_COMPUTER_MODE;
 }
 
 /**

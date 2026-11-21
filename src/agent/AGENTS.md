@@ -1330,7 +1330,10 @@
   transport sends, preserving current instructions and correlated results.
   Keep authorized memory and user-clarification schemas in the initial catalog;
   basic interactions should not require discovering their own core tools.
-- New ordinary Micos use `isolated` server computers with distinct account/Space/
+- Micos created in Desktop default to This PC (`dedicated`), each in its own
+  native folder, as OpenBot's agents work on the owner's computer (behavior
+  reference only); local-access consent is still requested before binding.
+  Elsewhere, new ordinary Micos use `isolated` server computers with distinct account/Space/
   Mico home keys. Keep Team sharing and explicit This PC (`dedicated`) unchanged,
   including the installed-account first-run route. Creation allocates stopped
   metadata only, under existing quotas. Never move existing assignments by default.
