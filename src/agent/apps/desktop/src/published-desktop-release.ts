@@ -8,7 +8,8 @@ const VERSION = "(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})";
 const TAG = new RegExp(`^desktop-v${VERSION}-windows-preview$`);
 
 /** Only the owned release URL may redirect, and only to GitHub's release-asset CDN. */
-export async function fetchDesktopArtifact(fetcher: typeof fetch, url: string, signal: AbortSignal, expectedSha256?: string): Promise<Response> {
+export async function fetchDesktopArtifact(fetcher: typeof fetch, url: string, signal: AbortSignal, expectedSha256?: string, range?: string): Promise<Response> {
+  if (range !== undefined && !/^bytes=\d+-\d+$/.test(range)) throw Error("Invalid Desktop artifact range");
   if (url.includes("..") || url.includes("%")) throw Error("Invalid Desktop artifact path");
   const initial = new URL(url);
   const runtimePath = typeof expectedSha256 === "string" && /^[a-f0-9]{64}$/.test(expectedSha256) &&
@@ -24,7 +25,7 @@ export async function fetchDesktopArtifact(fetcher: typeof fetch, url: string, s
   let target = initial;
   for (let attempt = 0; attempt < 4; attempt++) {
     const response = await fetcher(target.href, {redirect: "manual", credentials: "omit", signal,
-      headers: {"Accept-Encoding": "identity"}});
+      headers: {"Accept-Encoding": "identity", ...(range ? {Range: range} : {})}});
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
     await response.body?.cancel();
