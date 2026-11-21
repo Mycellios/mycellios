@@ -70,7 +70,7 @@ export class DesktopRelayClient {
       this.options.revoked();
     }
     if (!response.ok)
-      throw new Error("Desktop connection is unavailable. Sign in again or reconnect the project.");
+      throw Object.assign(new Error("Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
     return response;
   }
   async identity() {
@@ -286,7 +286,7 @@ export class DesktopRelayClient {
     }
   }
   private async execute(operation: DesktopExecutorOperation, controller: AbortController) {
-    let seq = 0, closed = false;
+    let seq = 0, closed = false, discarded = false;
     const started = (this.options.now ?? Date.now)();
     let stage: "native_request" | "native_stream" | "result_ack" = "native_request";
     let failureCode: DesktopFailureCode = "native_transport_interrupted";
@@ -304,6 +304,10 @@ export class DesktopRelayClient {
           try { await this.post("result", body, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])); break; }
           catch (error) {
             if (done) this.settled.delete(operation.id);
+            // 409: the server no longer holds this operation (cancelled, timed out or
+            // already closed). Retrying cannot deliver it, and nobody reads the output:
+            // stop the local work instead of finishing it unobserved.
+            if (relayStatus(error) === 409) { discarded = true; stage = "result_ack"; controller.abort(); throw error; }
             if (attempt >= attempts || controller.signal.aborted || this.stopped) {stage="result_ack";throw error;}
           }
         }
@@ -374,7 +378,7 @@ export class DesktopRelayClient {
     } catch (error) {
       recordDesktopDiagnostic("operation_failed", {...correlation,stage,code:failureCode,httpStatus,lastSequence:seq-1,elapsedMs:(this.options.now ?? Date.now)()-started,...desktopExceptionFields(error)});
       controller.abort();
-      if (!this.stopped && !closed) {
+      if (!this.stopped && !closed && !discarded) {
         try {
           await this.post("result", {
             deviceId: this.deviceId,
@@ -396,4 +400,9 @@ export class DesktopRelayClient {
       }
     } finally { this.updateNotices.delete(operation.id); }
   }
+}
+
+function relayStatus(error: unknown): number | undefined {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === "number" ? status : undefined;
 }

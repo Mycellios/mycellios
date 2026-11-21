@@ -78,6 +78,7 @@ export const Transcript = memo(function Transcript({
   answerableAskIds,
   dismissableAskIds,
   running,
+  workingElsewhere = false,
   workingBots,
   activeRun,
   lastRun,
@@ -122,6 +123,8 @@ export const Transcript = memo(function Transcript({
   answerableAskIds: Set<string>;
   dismissableAskIds: Set<string>;
   running: boolean;
+  /** The Mico is busy in another of its conversations while this one is idle. */
+  workingElsewhere?: boolean;
   workingBots: GroupAvatarMember[];
   activeRun?: Run;
   lastRun?: Run | null;
@@ -767,6 +770,10 @@ export const Transcript = memo(function Transcript({
           ) : (
             <PendingRunActivity bots={workingBots} messages={messages} onRefresh={onRefresh} />
           )
+        ) : workingElsewhere ? (
+          <p role="status" data-testid="working-elsewhere" className="px-1 py-2 text-xs text-muted-foreground">
+            {t`Working in another conversation…`}
+          </p>
         ) : null}
         </div>
       </div>
