@@ -24,6 +24,16 @@ test('transcription has real Python checks without admitting unrelated native ch
     ['python/distributed_runtime/decision_actor.py', 'native/unknown.cpp']);
 });
 
+test('speculation changes run locked CPU engine and server tests without admitting other runtime files', () => {
+  const files = ['python/distributed_runtime/speculation.py', 'python/distributed_runtime/server.py', 'python/tests/test_speculation.py'];
+  const plan = planChecks(files);
+  assert.ok(plan.some(c => c.args.includes('--require-hashes') && c.args.includes('scripts/wheel-locks/linux-x64-cp312.txt')));
+  for (const test of ['test_speculation.py', 'test_engine.py', 'test_server.py']) assert.ok(plan.some(c => c.cwd === 'python' && c.args.includes(test)));
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  assert.deepEqual(uncoveredNativeFiles([...files, 'python/distributed_runtime/engine.py']), ['python/distributed_runtime/engine.py']);
+  assert.ok(readFileSync('.github/workflows/ci.yml', 'utf8').includes('python-version: "3.12"'));
+});
+
 test('installer publishing changes execute real signing, catalog and recovery boundaries', () => {
  const files=['deploy/installers/publisher.py','deploy/installers/test_publisher.py'];
  const plan=planChecks(files);
