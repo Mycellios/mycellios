@@ -229,9 +229,11 @@ Missing:
 - **The decision gateway writes one file per job** (`{jobId}.json`, with an
   unsalted SHA-256 of the input and the output logits)
   (`python/distributed_runtime/decision_gateway.py:136-203`).
-- **Kokoro's library logs to stderr**, which the launcher writes to
-  `Logs\engine.stderr.log` (`deploy/kokoro-start.ps1:22`). Whether its own
-  warnings include phonemes of long inputs is unverified.
+- **Kokoro's phonemizer prints input words to stdout**, which the launcher
+  wrote to `Logs\engine.stdout.log`. Checked against the published wheels:
+  kokoro 0.9.4 disables its own loguru logs on import (`logger.disable("kokoro")`,
+  which covers its phoneme warnings), but misaki 0.9.4, the minimum it
+  requires, prints `TODO:NUM` words with their currency (`misaki/en.py:440`).
 - No process hardening: crash dumps and debugger attach follow OS defaults.
 - The CUDA embedding runtime on the operator's PC is not in this repository
   and has not been audited.
@@ -389,8 +391,10 @@ millisecond per lease.
 
 ### D5. Prompt identifier minimization (principle 5)
 
-When the selected model runs on the Mycellios network (not BYOK or managed
-providers), the Agent:
+Deferred: today the Agent sends text only to managed models
+(`mycellios/managed/...`), which external providers serve, never to
+contributor nodes; dictation and speech carry no prompt context. When Agent
+text starts running on contributor nodes, the Agent:
 
 - sends the local date and time with its UTC offset, not the IANA zone name;
 - labels attachments as `attachment 1 (application/pdf, 120 KB)` instead of
@@ -403,11 +407,17 @@ Mico names and instructions stay: they are the content the user chose.
 
 - The worker maps failures to fixed codes before logging or sending
   `task.fail`. Messages never include parser excerpts or runtime bodies.
-- The decision gateway keeps receipts in memory for idempotent redelivery
-  (bounded, with the same retention it needs today) instead of per-job files,
-  and salts its request digest. Its existing redelivery semantics stay.
-- Kokoro's library loggers are set to errors only, verified against the
-  pinned package.
+- The Kokoro launcher discards the engine's stdout (readiness is checked over
+  HTTP), so misaki's prints never reach disk. Checked on Windows PowerShell 5.1
+  and 7 that `-RedirectStandardOutput 'NUL'` discards output and creates no
+  file. Takes effect when the operator updates the launcher on the replica PC.
+- Deferred, because the code is source-bound: the decision gateway writes a
+  per-job receipt (unsalted input digest and output logits) in serving mode,
+  but `decision_gateway.py` is part of the `sourceId` its physical activation
+  receipt is bound to, and the transcription launcher pins its engine's
+  SHA256. Changing either needs an operator-approved requalification on the
+  physical PCs; do it with the next such requalification (serving receipts in
+  memory only, digest salted).
 - Best effort, documented as such: Python engines disable core dumps and
   same-user debugger attach where the OS allows it without privileges
   (`prctl(PR_SET_DUMPABLE, 0)` on Linux), buffers holding audio are zeroed
@@ -446,7 +456,7 @@ Mico names and instructions stay: they are the content the user chose.
 
 - A node must hold a bond before receiving work. To avoid an upfront payment,
   the bond fills from the node's own earnings, which are held until it is
-  complete. Amount to be set by Daniel (proposal: 10 Credits per node).
+  complete. Decided by Daniel on 2026-11-21: 10 Credits per node.
 - A confirmed tripwire hit slashes the bond, revokes the credential and
   ownership, bans the owner account from enrolling nodes and records the
   physical identity hashes and network prefixes for review.
@@ -457,7 +467,8 @@ Mico names and instructions stay: they are the content the user chose.
 
 - Each node needs its own bond, so N nodes cost N bonds.
 - Dispersion excludes by owner and network prefix, not only by worker.
-- A cap of nodes per owner account (proposal: 5) unless raised by an operator.
+- At most 5 nodes per owner account unless an operator raises it (decided by
+  Daniel on 2026-11-21).
 
 Node operators' terms must forbid keeping or using content and disclose that
 bait traffic exists.
@@ -489,7 +500,9 @@ that changes behavior for users is merged without Daniel's explicit OK.
    huellas Qwen sin redistribución"; coordinate with it before deploying.
    Speakr must keep working: deploy only with Daniel's chosen policy.
 4. **Sealed leases** (D4), negotiated per connection.
-5. **Remaining hardening and Agent identifiers** (D5, D6).
+5. **Remaining hardening** (D6): content-free worker failures shipped in phase
+   1, Kokoro stdout in phase 5; source-bound engines wait for their next
+   requalification, and Agent identifiers (D5) for Agent text on nodes.
 6. **Trust-policy removal** (D7), after 1-4 are in production.
 7. **Deterrence** (D8): bait and tripwires first (no ledger change), then
    bond, expulsion and Sybil limits with isolated PostgreSQL tests.

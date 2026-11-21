@@ -19,7 +19,11 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $root 'Logs'),(Join-Path $root 'State'),(Join-Path $root 'Cache\tiktoken') | Out-Null
     $occupied=Get-NetTCPConnection -LocalPort 8890 -State Listen -ErrorAction SilentlyContinue
     if($occupied){throw 'Kokoro loopback port is already owned by another process'}
-    $engine=Start-Process -FilePath $python -ArgumentList @('-u',(Join-Path $root 'kokoro_engine.py')) -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $root 'Logs\engine.stdout.log') -RedirectStandardError (Join-Path $root 'Logs\engine.stderr.log')
+    # The engine reports readiness over HTTP. Its stdout is discarded because the
+    # English phonemizer (misaki) prints words of the text it cannot handle, and
+    # request content must never reach this PC's disk (specs/node-owner-privacy,
+    # D6). Its own errors stay in engine.stderr.log.
+    $engine=Start-Process -FilePath $python -ArgumentList @('-u',(Join-Path $root 'kokoro_engine.py')) -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput 'NUL' -RedirectStandardError (Join-Path $root 'Logs\engine.stderr.log')
     $engine.PriorityClass='BelowNormal'
     $ready=$false
     $deadline=[DateTime]::UtcNow.AddMinutes(15)
