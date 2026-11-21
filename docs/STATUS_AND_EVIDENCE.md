@@ -64,6 +64,14 @@ A local draft model sharing the root CPU lost throughput. Fused drafting with a
 model also enabled four-token waves that were slower on mixed chat. Draft
 models therefore remain an operator choice, not a default.
 
+A follow-up on one machine used the real adaptive controller: two processes,
+an emulated 28 ms one-way delay and mixed chat. Fused lookup with a draft model
+improved from ×0.40 to ×0.52 of non-speculative decoding once the model ran
+only for enabled or probing waves, with 522 model calls reduced to 344. Output
+stayed identical. It remains slower because the controller still measures
+free lookup drafts and paid model drafts together; separating their costs is
+open work.
+
 ## Windows companion dock local repair, 2026-11-16
 
 Companion windows wait for their populated renderer and native ready-to-show

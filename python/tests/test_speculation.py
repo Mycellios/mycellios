@@ -1004,6 +1004,19 @@ class FusedLookupDraftProviderTests(unittest.TestCase):
         text = list(range(200, 260))
         self.assertEqual(len(provider.draft(text + text[:20])), 4)
 
+    def test_defers_only_when_its_model_drafter_defers(self) -> None:
+        self.assertFalse(FusedLookupDraftProvider().defer_until_selected)
+        self.assertFalse(
+            FusedLookupDraftProvider(
+                draft_model=_FixedModelDrafter((1,))
+            ).defer_until_selected
+        )
+        deferred_model = _FixedModelDrafter((1,))
+        deferred_model.defer_until_selected = True
+        provider = FusedLookupDraftProvider(draft_model=deferred_model)
+        self.assertTrue(provider.defer_until_selected)
+        self.assertTrue(provider.execution_snapshot()["deferredUntilSelected"])
+
     def test_release_forwards_and_tracking_is_bounded(self) -> None:
         model = _FixedModelDrafter((1, 2))
         provider = FusedLookupDraftProvider(draft_model=model, max_tracked_requests=2)
