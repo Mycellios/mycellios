@@ -20,6 +20,7 @@ import { modelRequestTimeout } from "../core/model-request-deadline.js";
 import { estimateInputTokens, inputHashForRequest } from "../core/request.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { Scheduler } from "../scheduler/scheduler.js";
+import { predictedServiceMs } from "../scheduler/measured-service-rates.js";
 import type { MeshStore, StoredJob } from "../storage/store.js";
 import type { WorkerHub } from "./worker-hub.js";
 import { WorkerRequestView } from "./worker-request-view.js";
@@ -588,6 +589,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return;
     }
     const observedUntil = Date.now();
+    await this.recordServiceObservation(runtime, result.metrics.outputTokens, observedUntil);
     const endTransports = this.captureRuntimeTransportSnapshot();
     const contendedBoundaryKeys = this.contendedBoundaryKeys(
       job.id,
@@ -620,6 +622,28 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       workerId: job.workerId,
     });
     (await this.finishRuntime(job.id));
+  }
+
+  /**
+   * Compares the attempt's real duration with what the node's own claims
+   * predicted, so overstated claims stop winning offers. The node's output
+   * token count is capped by the bytes the coordinator actually received, so
+   * claiming more output cannot make it look faster.
+   */
+  private async recordServiceObservation(runtime: RuntimeJob, reportedOutputTokens: number, observedUntil: number): Promise<void> {
+    const stage = runtime.route.stages.length === 1 ? runtime.route.stages[0] : undefined;
+    if (!stage) return;
+    const deployment = (await this.store.getWorker(stage.workerId))?.capabilities.deployments
+      .find((candidate) => candidate.deploymentId === stage.deploymentId);
+    if (!deployment) return;
+    const receivedBytes = Buffer.byteLength(runtime.output, "utf8");
+    const outputTokens = Math.max(1, Math.min(reportedOutputTokens, Math.ceil(receivedBytes / 2), runtime.request.max_tokens ?? 256));
+    this.scheduler.serviceRates.record({
+      workerId: stage.workerId,
+      deploymentId: stage.deploymentId,
+      observedMs: observedUntil - runtime.attemptStartedAt,
+      predictedMs: predictedServiceMs(deployment, outputTokens, !isDecisionDeployment(deployment)),
+    });
   }
 
   private async onFailure(envelope: WorkerEnvelope): Promise<void> {
