@@ -284,6 +284,8 @@ export class DesktopRelayBroker {
     if ((op.controller.desiredSize ?? 0) < bytes.length) { this.fail(op, "Desktop result exceeded its buffer"); throw new Error("Slow consumer"); }
     op.controller.enqueue(bytes);
     op.seq = seq; op.digest = digest;
+    // An accepted, owner-checked result proves the PC is alive as much as a poll does.
+    op.binding.seen = this.now();
     if (done) {
       op.closed = true; op.dispose(); op.controller.close();
       this.wake(op.binding, op.binding.deviceId);

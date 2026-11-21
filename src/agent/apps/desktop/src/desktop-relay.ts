@@ -51,6 +51,8 @@ export class DesktopRelayClient {
       now?: () => number;
       deviceId?:string;
       agentExecution?: 1;
+      /** Keeps the OS from suspending the app while an operation runs; returns its release. */
+      awake?: () => () => void;
       restoreUpdate?: (identity: {userId:string;spaceId:string;connectionId:string}, botId?: string) => Promise<UpdateResumeBinding | undefined>;
     },
   ) { if(options.deviceId)this.deviceId=options.deviceId; }
@@ -267,7 +269,8 @@ export class DesktopRelayClient {
         const controller = new AbortController();
         recordDesktopDiagnostic("operation_received", {operationId:operation.id,runId:"runId" in input.data ? input.data.runId : undefined,method:input.data.method});
         this.active.set(operation.id, controller);
-        void this.execute(operation, controller).finally(() => { this.active.delete(operation.id); this.settled.delete(operation.id); });
+        const release = this.options.awake?.();
+        void this.execute(operation, controller).finally(() => { release?.(); this.active.delete(operation.id); this.settled.delete(operation.id); });
       }
     } catch (error) {
       if (!this.stopped && !pollController.signal.aborted) recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
