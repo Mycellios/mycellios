@@ -103,6 +103,43 @@ times per session and then stopped. Enabling a draft model no longer costs
 throughput on hardware where it loses. Whether it wins on a discrete GPU is
 not measured.
 
+A further follow-up on 2026-11-22, same single machine and emulated delay,
+looked at the answers that differed on DirectML. The cause is float16
+arithmetic. In the Torch stage runner every decode batch size gives different
+bits; the logits move by about 0.1 in float16 on DirectML and by about 0.00006
+in float32 on DirectML or on the CPU. With the existing
+`--dense-compute-precision float32` on the DirectML root:
+
+| SmolLM2-360M, GPU root | Speculative answers equal to non-speculative | No speculation | Fused lookup |
+| --- | ---: | ---: | ---: |
+| float32, mixed chat | 16 of 16 | 6.9–7.0 tok/s | 8.4–8.9 tok/s |
+| float16, mixed chat | 15 of 16 | 6.6 tok/s | 8.1–8.3 tok/s |
+| float32, copy-heavy | 16 of 16 | 5.9–6.8 tok/s | 18.1–21.8 tok/s |
+| float16, copy-heavy | 14 of 16 | 5.4–5.8 tok/s | 14.4–17.7 tok/s |
+
+Float32 is not a general default: one decode step of the complete
+SmolLM2-1.7B took 597 ms in float32 against 157 ms in float16 on the same GPU.
+
+SmolLM2-1.7B with both stages on that GPU in float16, 8 requests per arm, one
+round:
+
+| Arm, k=16 | Copy-heavy | Mixed chat |
+| --- | ---: | ---: |
+| No speculation | 4.72 tok/s | 3.68 tok/s |
+| Fused lookup | ×3.29 | ×1.12 |
+| Fused lookup + 135M draft model | ×2.74 | ×1.42 |
+
+One of the 8 mixed-chat answers with fused lookup differed from non-speculative
+decoding, as expected in float16.
+
+Stage compute dominates this route: about 157 ms per step against a 56 ms
+emulated round trip. `specs/native-quantized-stages/spec.md` records a
+prototype that runs layer ranges on quantized weights through an unpatched
+llama.cpp build. On the same PC it decoded the complete 1.7B model in 28–34 ms
+per step, and a two-stage split gave tokens and cut-point hidden states
+identical to the unsplit model. It is a prototype outside the runtime, on one
+host.
+
 ## Windows companion dock local repair, 2026-11-16
 
 Companion windows wait for their populated renderer and native ready-to-show
