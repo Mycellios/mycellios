@@ -17,7 +17,7 @@ import {
   selectPreferredRuntimeLinkObservation,
   type RuntimeLinkObservation,
 } from "../contracts/runtime-link-observations.js";
-import { deploymentMetricsFromCanaryEvidence } from "../contracts/deployment-canary.js";
+import { DEPLOYMENT_CANARY_MAXIMUM_AGE_MS, deploymentMetricsFromCanaryEvidence } from "../contracts/deployment-canary.js";
 import {
   decideExecutionRoute,
   type ExecutionRouteCandidate,
@@ -39,6 +39,12 @@ export interface SchedulerOptions {
     residencyRegion?: string;
     excludedFailureDomainIds?: ReadonlySet<string>;
     maxNormalizedCost?: number;
+    /**
+     * The request is paid with contribution credits, so it must run where
+     * settlement can verify it: native replicas need fresh, session-bound
+     * qualification evidence (the same binding verifiedContributionCanary checks).
+     */
+    requireSettlementEvidence?: boolean;
   };
 }
 
@@ -786,6 +792,13 @@ function routePolicyRejections(
   ) {
     reasons.push("candidate_cost_exceeded");
   }
+  if (policy.requireSettlementEvidence && route.stages.some((stage) => {
+    const worker = workerById.get(stage.workerId);
+    const deployment = worker?.capabilities.deployments.find((candidate) => candidate.deploymentId === stage.deploymentId);
+    return !worker || !deployment || !nativeReplicaCanSettle(worker, deployment, options.now ?? Date.now());
+  })) {
+    reasons.push("candidate_evidence_missing");
+  }
   return reasons;
 }
 
@@ -802,6 +815,20 @@ function identityIdIsAmbiguous(
     if (other.identityId === worker.identityId && other.identityKind !== worker.identityKind) return true;
   }
   return false;
+}
+
+const NATIVE_REPLICA_ADAPTERS = new Set(["kokoro", "transcription", "embedding"]);
+
+/** Native replicas settle only with fresh qualification bound to this worker and build. */
+function nativeReplicaCanSettle(worker: StoredWorker, deployment: ModelDeployment, now: number): boolean {
+  if (!NATIVE_REPLICA_ADAPTERS.has(deployment.adapter)) return true;
+  const evidence = deployment.nativeReplicaEvidence;
+  return deployment.verificationState === "verified" && evidence !== undefined
+    && evidence.workerId === worker.id && evidence.deploymentId === deployment.deploymentId
+    && evidence.model === deployment.model && evidence.modelDigest === deployment.modelDigest
+    && evidence.activationId === deployment.activationId
+    && evidence.buildSourceId === worker.capabilities.buildIdentity?.sourceId
+    && evidence.observedAt <= now && now - evidence.observedAt <= DEPLOYMENT_CANARY_MAXIMUM_AGE_MS;
 }
 
 function workerHasTrustedIdentity(worker: StoredWorker): boolean {

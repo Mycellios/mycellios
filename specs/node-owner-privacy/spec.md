@@ -439,14 +439,16 @@ Mico names and instructions stay: they are the content the user chose.
   the client gets 502. Removing the pins first would send paid requests to
   unqualified replicas.
 - So, once D1-D4 are in production:
-  1. The scheduler gains a settlement-eligibility rule for requests that need
-     settlement: a native replica deployment (kokoro, transcription,
-     embedding) is eligible only with that evidence present and fresh
-     (`candidate_evidence_missing` otherwise). The admission route passes the
-     need from `beginContributionUsage`; operator and unfunded traffic, such as
-     Jarvis memory backfill, keeps today's behavior so a lapsed qualification
-     cannot stop it. `src/coordinator/server.ts` is at its size ceiling, so
-     move code out of it first.
+  1. Done: contribution-funded requests carry `requireSettlementEvidence`,
+     and a native replica deployment (kokoro, transcription, embedding) is
+     eligible for them only with verified `nativeReplicaEvidence` for this
+     worker, deployment, model, activation and build, observed within the
+     canary maximum age (`candidate_evidence_missing` otherwise). If a replica
+     exists but none can settle, the request fails before dispatch with
+     `502 settlement_evidence_unavailable`, the status clients already got
+     after the wasted run, so the Speakr bridge still falls back at once.
+     Unfunded and operator traffic, such as Jarvis memory backfill, is
+     unchanged.
   2. The Agent stops sending `privacy` for speech and dictation (with a
      `src/agent/changelog.d` note), relying on rule 1 and on D1-D4.
   3. The coordinator then drops `privacy` from public requests at admission,

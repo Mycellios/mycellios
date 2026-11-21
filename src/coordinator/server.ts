@@ -4757,7 +4757,7 @@ export async function createCoordinator(
     }
     let handle: Awaited<ReturnType<MeshService["submit"]>>;
     try {
-      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey));
+      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey, undefined, { requireSettlementEvidence: funded }));
     } catch (error) {
       if (usage) (await apiAccess.failUsage(usage.id, "submission_failed"));
       throw error;
