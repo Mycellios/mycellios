@@ -23,6 +23,8 @@ export interface ConnectionState {
   messageWindowStartedAt: number;
   messagesInWindow: number;
   sessionId: string;
+  /** Client address of the socket, for chunk dispersion by network. */
+  networkAddress?: string | null;
 }
 
 

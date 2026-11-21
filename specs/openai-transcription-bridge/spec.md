@@ -29,6 +29,17 @@ coordinator release.
 - **Retries.** Only explicit pre-dispatch refusals (429 account concurrency,
   503 no capacity) are retried with backoff, within a 15-minute deadline. Any
   other failure is returned, and paid work is never replayed.
+- **Dispersion (opt-in).** With `DISPERSION_POLICY=fallback` or `fail`, each
+  upload gets a random group sent with every segment, and the coordinator never
+  gives two segments of one recording to the same node, owner or network
+  (`specs/node-owner-privacy/spec.md`, D3). `503 dispersion_exhausted` is not
+  retried: under `fallback` that segment goes to the fallback provider, under
+  `fail` the upload fails (and, like any network failure, goes whole to the
+  fallback provider when one is configured). `TRANSCRIPTION_PARALLEL` (1-8)
+  sends that many segments at once; keep it within the account's concurrency.
+  The defaults (`off`, 1) keep the serial, ungrouped behavior. With a single
+  Whisper replica, `fallback` sends every segment after the first to the
+  provider, so enable it only with Daniel's chosen policy.
 
 ## Deployment
 

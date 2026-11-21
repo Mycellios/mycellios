@@ -80,6 +80,8 @@ export interface ChatCompletionRequest {
     workload_class?: WorkloadClass;
     preferred_region?: string;
     deadline_ms?: number;
+    /** Coordinator-only grouping of one recording's pieces; never sent to a node. */
+    dispersion?: { group: string };
     privacy?: {
         trust: "default" | "trusted-only";
         boundary: "trusted-edges" | "pinned-edges";

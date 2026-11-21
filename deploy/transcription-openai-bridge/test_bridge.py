@@ -109,6 +109,101 @@ class MultipartAndFlowTests(unittest.TestCase):
         self.assertEqual((text, language, round(seconds)), ("parte 1 parte 2", "es", 40))
 
 
+class DispersionTests(unittest.TestCase):
+    """specs/node-owner-privacy D3: one recording's segments never share a node."""
+
+    def test_sends_the_group_only_when_given(self):
+        sent = []
+
+        def opener(request, timeout):
+            sent.append(json.loads(request.data))
+            return result("hola")
+        upstream = bridge.Upstream("https://x", sleep=lambda s: None, opener=opener)
+        upstream.transcribe(b"w", "es", "Bearer k")
+        upstream.transcribe(b"w", "es", "Bearer k", "group-0123456789abcdef")
+        self.assertNotIn("dispersion", sent[0])
+        self.assertEqual(sent[1]["dispersion"], {"group": "group-0123456789abcdef"})
+
+    def test_does_not_wait_when_no_node_is_left(self):
+        calls = []
+
+        def opener(request, timeout):
+            calls.append(request)
+            raise urllib.error.HTTPError("https://x", 503, "err", {},
+                                         io.BytesIO(b'{"error":{"code":"dispersion_exhausted"}}'))
+        with self.assertRaises(bridge.BridgeError) as raised:
+            bridge.Upstream("https://x", sleep=lambda s: None, opener=opener).transcribe(b"w", "es", "Bearer k", "g" * 32)
+        self.assertEqual((len(calls), raised.exception.status, raised.exception.code), (1, 503, "dispersion_exhausted"))
+
+    def upstream(self, exhausted_from=None, delays=None):
+        import threading
+        import time as clock
+
+        class Recording:
+            def __init__(self):
+                self.groups, self.lock = [], threading.Lock()
+
+            def transcribe(self, wav, language, authorization, group=None):
+                with self.lock:
+                    self.groups.append(group)
+                    index = len(self.groups)
+                if delays:
+                    clock.sleep(delays.get(wav[44:46], 0))
+                if exhausted_from is not None and index >= exhausted_from:
+                    raise bridge.BridgeError(503, "dispersion_exhausted")
+                return f"part-{wav[44]}", "es"
+        return Recording()
+
+    @staticmethod
+    def pcm(segments):
+        step = int(bridge.SEGMENT_SECONDS * bridge.SAMPLE_RATE) * 2
+        return b"".join(bytes([index, 0]) * (step // 2) for index in range(segments))
+
+    def test_fallback_policy_sends_only_exhausted_segments_to_the_provider(self):
+        upstream = self.upstream(exhausted_from=2)
+        provider = []
+
+        class Provider:
+            def transcribe(self, upload, filename, language):
+                provider.append((upload[44], filename))
+                return f"provider-{upload[44]}"
+        text, language, _ = bridge.transcribe_upload(b"raw", "es", "Bearer k", upstream, decode=lambda raw: self.pcm(3),
+                                                     policy="fallback", fallback=Provider())
+        self.assertEqual(text, "part-0 provider-1 provider-2")
+        self.assertEqual(language, "es")
+        self.assertEqual(provider, [(1, "segment-1.wav"), (2, "segment-2.wav")])
+        self.assertEqual(len(set(upstream.groups)), 1)
+        self.assertRegex(upstream.groups[0], r"^[A-Za-z0-9_-]{32}$")
+
+    def test_fail_policy_and_missing_provider_fail_the_upload(self):
+        for policy, provider in (("fail", object()), ("fallback", None)):
+            with self.assertRaises(bridge.BridgeError) as raised:
+                bridge.transcribe_upload(b"raw", "es", "Bearer k", self.upstream(exhausted_from=2),
+                                         decode=lambda raw: self.pcm(2), policy=policy, fallback=provider)
+            self.assertEqual(raised.exception.code, "dispersion_exhausted")
+
+    def test_each_upload_gets_a_new_group(self):
+        upstream = self.upstream()
+        for _ in range(2):
+            bridge.transcribe_upload(b"raw", "es", "Bearer k", upstream, decode=lambda raw: self.pcm(1), policy="fail")
+        self.assertEqual(len(set(upstream.groups)), 2)
+
+    def test_parallel_segments_keep_their_order(self):
+        upstream = self.upstream(delays={bytes([0, 0]): 0.2, bytes([1, 0]): 0.1})
+        text, _, _ = bridge.transcribe_upload(b"raw", "es", "Bearer k", upstream, decode=lambda raw: self.pcm(3),
+                                              policy="fail", parallel=3)
+        self.assertEqual(text, "part-0 part-1 part-2")
+
+    def test_off_keeps_the_ungrouped_serial_call(self):
+        class ThreeArguments:
+            def transcribe(self, wav, language, authorization):
+                return "solo", "es"
+        text, _, _ = bridge.transcribe_upload(b"raw", "es", "Bearer k", ThreeArguments(), decode=lambda raw: self.pcm(1))
+        self.assertEqual(text, "solo")
+        with self.assertRaises(ValueError):
+            bridge.transcribe_upload(b"raw", "es", "Bearer k", ThreeArguments(), decode=lambda raw: self.pcm(1), policy="x")
+
+
 class FallbackTests(unittest.TestCase):
     def test_fallback_posts_openai_multipart_with_its_own_key(self):
         seen = []
