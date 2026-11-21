@@ -40,6 +40,10 @@ export async function runNativeQualificationWatch(path: string): Promise<never> 
   const network = process.env.MYCELLIOS_NETWORK_TOKEN, admin = process.env.MYCELLIOS_MODEL_ADMIN_TOKEN;
   if (!network || !admin) throw new Error("native_qualification_watch_credentials_missing");
   const headers = { authorization: `Bearer ${network}`, "x-mycellios-admin-token": admin, "content-type": "application/json" };
+  // Loopback by default; a sidecar on the coordinator's network sets its service URL
+  // so it does not have to share (and lose) the coordinator container's namespace.
+  const base = (process.env.MYCELLIOS_COORDINATOR_INTERNAL_URL ?? "http://127.0.0.1:4174").replace(/\/+$/, "");
+  if (!/^http:\/\/[a-z0-9.-]+:\d+$/i.test(base)) throw new Error("native_qualification_watch_coordinator_url_invalid");
   const journalPath = path + ".attempts.json";
   const saved: unknown = await readFile(journalPath, "utf8").then(value => JSON.parse(value)).catch(error => {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { schema: "mycellios-native-qualification-attempts/1", attempts: [] };
@@ -49,7 +53,7 @@ export async function runNativeQualificationWatch(path: string): Promise<never> 
   for (;;) {
     try {
       const allowlist: unknown = JSON.parse(await readFile(path, "utf8"));
-      const snapshot = await fetch("http://127.0.0.1:4174/internal/v1/workers", { headers, signal: AbortSignal.timeout(10_000) });
+      const snapshot = await fetch(`${base}/internal/v1/workers`, { headers, signal: AbortSignal.timeout(10_000) });
       if (!snapshot.ok) throw new Error("native_qualification_watch_snapshot_failed");
       const workers = (await snapshot.json() as { data: WorkerObservation[] }).data;
       for (const t of nativeTargetsNeedingRefresh(allowlist, workers, Date.now())) {
@@ -64,7 +68,7 @@ export async function runNativeQualificationWatch(path: string): Promise<never> 
         await writeFile(temporary, JSON.stringify(journalSchema.parse(journal)), { mode: 0o600 });
         await rename(temporary, journalPath);
         try {
-          const response = await fetch("http://127.0.0.1:4174/internal/v1/native-replica-qualifications", {
+          const response = await fetch(`${base}/internal/v1/native-replica-qualifications`, {
             method: "POST", headers, body: JSON.stringify({ workerId: t.workerId, deploymentId: t.deploymentId }),
             signal: AbortSignal.timeout(480_000),
           });
