@@ -1,6 +1,35 @@
 import type { AgentRunModel } from "@rakazo/adapter-kit";
 import type { Api, AssistantMessage, Context, Model, Models, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
+import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
+
+/** Room left for the call envelope under the bridge's one-frame limit. */
+const CONTEXT_FRAME_BUDGET = HOST_COMPUTER_MAX_BYTES - 512 * 1024;
+export const OMITTED_IMAGE_TEXT = "[An earlier image was left out to fit the connection to this computer.]";
+
+/**
+ * Each model call from a Desktop-run Mico carries its whole conversation in one bridge frame,
+ * and the bridge rejects frames over HOST_COMPUTER_MAX_BYTES. Screenshots and attachments pile
+ * up during a run, so replace the oldest images with a short note until the call fits. The
+ * latest message keeps its images; a call that still does not fit is sent unchanged and fails
+ * as before.
+ */
+export function fitDesktopModelContext(context: Context, budget = CONTEXT_FRAME_BUDGET): Context {
+  const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
+  let total = bytes(context);
+  if (total <= budget) return context;
+  const messages = [...context.messages];
+  for (let index = 0; index < messages.length - 1 && total > budget; index++) {
+    const message = messages[index]!;
+    if (!Array.isArray(message.content) || !message.content.some(block => block?.type === "image")) continue;
+    const before = bytes(message);
+    const content = message.content.map(block => block?.type === "image" ? { type: "text" as const, text: OMITTED_IMAGE_TEXT } : block);
+    const replaced = { ...message, content } as typeof message;
+    messages[index] = replaced;
+    total -= before - bytes(replaced);
+  }
+  return { ...context, messages };
+}
 
 /** Metadata and a run-scoped stream, never a provider token or refresh credential. */
 export function desktopModelCatalog(base: Models, config: AgentRunModel): Models {
@@ -21,7 +50,7 @@ export function desktopModelCatalog(base: Models, config: AgentRunModel): Models
             if (["apiKey", "headers", "fetch", "signal", "onResponse", "onPayload"].includes(key) || typeof value === "function" || value === undefined) continue;
             safe[key] = value;
           }
-          remote = await transport.open(context, safe);
+          remote = await transport.open(fitDesktopModelContext(context), safe);
           options?.signal?.throwIfAborted();
           for (;;) {
             const batch = await remote.read(); options?.signal?.throwIfAborted();
