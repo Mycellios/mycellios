@@ -13,6 +13,9 @@ import { MeshDatabase } from "../src/storage/database.js";
 import { MeshStore } from "../src/storage/store.js";
 import { addWorker } from "./helpers.js";
 
+// These tests exercise recovery, not selection: keep the best candidate fixed.
+const FIXED_CHOICE = { serviceBand: 0 };
+
 interface SentMessage {
   workerId: string;
   type: string;
@@ -59,7 +62,7 @@ describe("active-route recovery policy", () => {
     const worker = await addWorker(store, { id: "slow-chat", tokensPerSecond: 1.6 });
     hub.connected.add(worker.id);
     const request: ChatCompletionRequest = { model: "distributed-small", messages: [{ role: "user", content: "hello" }], max_tokens: 1024, deadline_ms: 900_000 };
-    service = await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 120_000, { modelRequestTimeoutsMs: { "distributed-small": 900_000 } });
+    service = await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 120_000, { modelRequestTimeoutsMs: { "distributed-small": 900_000 } });
     const handle = await service.submit(request);
     const job = (await store.getJob(handle.jobId))!;
     expect(job.deadlineAt - job.createdAt).toBeGreaterThan(890_000);
@@ -74,7 +77,7 @@ describe("active-route recovery policy", () => {
     try {
       const worker = await addWorker(store, { id: "slow-prefill", tokensPerSecond: 1.6 });
       hub.connected.add(worker.id);
-      service = await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 120_000, { modelRequestTimeoutsMs: { "distributed-small": 900_000 } });
+      service = await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 120_000, { modelRequestTimeoutsMs: { "distributed-small": 900_000 } });
       const handle = await service.submit({ model: "distributed-small", messages: [{ role: "user", content: "hello" }], max_tokens: 1024, deadline_ms: 900_000 });
       const lease = leaseOffers(hub)[0]!;
       hub.workerMessage({ v: 1, type: "lease.accept", workerId: worker.id, payload: { jobId: handle.jobId, leaseId: lease.payload.leaseId } });
@@ -89,7 +92,7 @@ describe("active-route recovery policy", () => {
   it("fails closed when only an anonymous worker can receive a sensitive boundary", async () => {
     const anonymous = (await addWorker(store, { id: "anonymous", trusted: false }));
     hub.connected.add(anonymous.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     await expect((async () => (await service.submit({ model: "distributed-small", messages: [{ role: "user", content: "private" }] })))()).rejects
       .toThrow(expect.objectContaining({ code: "trusted_boundary_unavailable", statusCode: 503 }));
     expect(hub.sent).toHaveLength(0);
@@ -98,7 +101,7 @@ describe("active-route recovery policy", () => {
   it("does not silently ignore an explicit boundary pin", async () => {
     const trusted = (await addWorker(store, { id: "trusted" }));
     hub.connected.add(trusted.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     await expect((async () => (await service.submit({ model: "distributed-small", messages: [{ role: "user", content: "private" }],
       privacy: { trust: "default", boundary: "pinned-edges", pinned_identity_ids: ["some-other-device"] } })))()).rejects
       .toThrow(expect.objectContaining({ code: "boundary_pin_unavailable", statusCode: 503 }));
@@ -114,7 +117,7 @@ describe("active-route recovery policy", () => {
     hub.connected.add(primary.id);
     service = (await MeshService.create(
       store,
-      new Scheduler(store),
+      new Scheduler(store, FIXED_CHOICE),
       hub as unknown as WorkerHub,
       30_000,
     ));
@@ -151,7 +154,7 @@ describe("active-route recovery policy", () => {
     hub.connected.add(primary.id);
     service = (await MeshService.create(
       store,
-      new Scheduler(store),
+      new Scheduler(store, FIXED_CHOICE),
       hub as unknown as WorkerHub,
       30_000,
     ));
@@ -197,7 +200,7 @@ describe("active-route recovery policy", () => {
     hub.connected.add(standby.id);
     service = (await MeshService.create(
       store,
-      new Scheduler(store),
+      new Scheduler(store, FIXED_CHOICE),
       hub as unknown as WorkerHub,
       30_000,
     ));
@@ -260,7 +263,7 @@ describe("active-route recovery policy", () => {
       tokensPerSecond: 30,
     }));
     for (const worker of [primary, staleStandby, healthyStandby]) hub.connected.add(worker.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "recover safely" }],
@@ -330,7 +333,7 @@ describe("active-route recovery policy", () => {
     hub.connected.add(standby.id);
     service = (await MeshService.create(
       store,
-      new Scheduler(store),
+      new Scheduler(store, FIXED_CHOICE),
       hub as unknown as WorkerHub,
       30_000,
     ));
@@ -390,7 +393,7 @@ describe("active-route recovery policy", () => {
     }));
     hub.connected.add(primary.id);
     hub.connected.add(standby.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "deterministic" }],
@@ -449,7 +452,7 @@ describe("active-route recovery policy", () => {
     const standby = (await addWorker(store, { id: "standby", modelDigest: "sha256:revision-a", tokensPerSecond: 30 }));
     hub.connected.add(primary.id);
     hub.connected.add(standby.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({ model: "distributed-small", messages: [{ role: "user", content: "deterministic" }], seed: 7 }));
     const first = leaseOffers(hub)[0]!;
     hub.workerMessage({ v: 1, type: "task.token", workerId: primary.id,
@@ -474,7 +477,7 @@ describe("active-route recovery policy", () => {
     const standby = (await addWorker(store, { id: "standby", modelDigest: "sha256:revision-a", tokensPerSecond: 30 }));
     hub.connected.add(primary.id);
     hub.connected.add(standby.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({ model: "distributed-small", messages: [{ role: "user", content: "deterministic" }], seed: 9 }));
     const first = leaseOffers(hub)[0]!;
     hub.workerMessage({ v: 1, type: "task.token", workerId: primary.id,
@@ -503,7 +506,7 @@ describe("active-route recovery policy", () => {
     hub.connected.add(primary.id);
     service = (await MeshService.create(
       store,
-      new Scheduler(store),
+      new Scheduler(store, FIXED_CHOICE),
       hub as unknown as WorkerHub,
       30_000,
     ));
@@ -564,7 +567,7 @@ describe("active-route recovery policy", () => {
     hub.connected.add(primary.id);
     service = (await MeshService.create(
       store,
-      new Scheduler(store),
+      new Scheduler(store, FIXED_CHOICE),
       hub as unknown as WorkerHub,
       30_000,
       { firstTokenTimeoutMs: 20 },
@@ -637,7 +640,7 @@ describe("active-route recovery policy", () => {
     }));
     hub.connected.add(physical.id);
     hub.connected.add(cell.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "hola" }],
@@ -677,7 +680,7 @@ describe("active-route recovery policy", () => {
       contextLimit: 128,
     }));
     hub.connected.add(primary.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "Reply with only OK" }],
@@ -729,7 +732,7 @@ describe("active-route recovery policy", () => {
       contextLimit: 128,
     }));
     hub.connected.add(primary.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "test" }],
@@ -784,7 +787,7 @@ describe("active-route recovery policy", () => {
       contextLimit: 128,
     }));
     hub.connected.add(primary.id);
-    service = (await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000));
+    service = (await MeshService.create(store, new Scheduler(store, FIXED_CHOICE), hub as unknown as WorkerHub, 30_000));
     const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "short prompt" }],
