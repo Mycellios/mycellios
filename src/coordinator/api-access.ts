@@ -1,3 +1,5 @@
+import { readFileSync, statSync } from "node:fs";
+import { z } from "zod";
 import { parseOperatorQuotaModels } from "../core/operator-quota-config.js";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { ChatCompletionRequest } from "../contracts/types.js";
@@ -13,6 +15,49 @@ export interface ApiAccessLimits {
   maxConcurrent: number;
   maxActiveKeys: number;
 }
+
+const accountLimitFileSchema = z.object({
+  schema: z.literal("mycellios-api-account-limits/1"),
+  accounts: z.record(z.string().uuid(), z.object({
+    maxConcurrent: z.number().int().min(1).max(64).optional(),
+    requestsPerMinute: z.number().int().min(1).max(6_000).optional(),
+    /** Audit: who approved the override, when and why. */
+    approvedBy: z.string().min(1).max(200),
+    approvedAt: z.string().datetime(),
+    reason: z.string().min(1).max(500),
+  }).strict()),
+}).strict();
+
+/**
+ * Reads operator-approved account overrides from a JSON file, re-checked at
+ * most every 10 s. A missing file means no overrides; an invalid file keeps
+ * the last valid overrides so a bad edit cannot silently lower limits.
+ */
+export function fileAccountLimitOverrides(path: string, now = () => Date.now()): () => ApiAccountLimitOverrides {
+  let cached: ApiAccountLimitOverrides = {};
+  let checkedAt = -Infinity;
+  let modifiedAt = -1;
+  return () => {
+    if (now() - checkedAt < 10_000) return cached;
+    checkedAt = now();
+    try {
+      const stat = statSync(path);
+      if (stat.mtimeMs === modifiedAt) return cached;
+      const parsed = accountLimitFileSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+      cached = Object.fromEntries(Object.entries(parsed.accounts).map(([userId, entry]) => [userId, {
+        ...(entry.maxConcurrent ? { maxConcurrent: entry.maxConcurrent } : {}),
+        ...(entry.requestsPerMinute ? { requestsPerMinute: entry.requestsPerMinute } : {}),
+      }]));
+      modifiedAt = stat.mtimeMs;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") { cached = {}; modifiedAt = -1; }
+    }
+    return cached;
+  };
+}
+
+/** Operator-approved per-account overrides of the shared request limits. */
+export type ApiAccountLimitOverrides = Readonly<Record<string, Readonly<Partial<Pick<ApiAccessLimits, "maxConcurrent" | "requestsPerMinute">>>>>;
 
 export interface ApiAccount {
   userId: string;
@@ -128,7 +173,17 @@ export class ApiAccessManager {
     readonly limits: ApiAccessLimits,
     private readonly operatorQuotaModels: Readonly<Record<string, readonly string[]>> = parseOperatorQuotaModels(process.env.MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON),
     private readonly contributionFundingEnabled = false,
+    private readonly accountOverrides: () => ApiAccountLimitOverrides = () => ({}),
   ) {}
+
+  /** Effective limits for one account; overrides may only raise shared limits. */
+  limitsFor(userId: string): Pick<ApiAccessLimits, "maxConcurrent" | "requestsPerMinute"> {
+    const override = this.accountOverrides()[userId] ?? {};
+    return {
+      maxConcurrent: Math.max(this.limits.maxConcurrent, override.maxConcurrent ?? 0),
+      requestsPerMinute: Math.max(this.limits.requestsPerMinute, override.requestsPerMinute ?? 0),
+    };
+  }
 
   async getOrCreateAccount(userId: string): Promise<ApiAccount> {
     return (await this.database.transaction(async () => {
@@ -230,6 +285,7 @@ export class ApiAccessManager {
     return (await this.database.transaction(async () => {
       const account = (await this.getOrCreateAccount(userId));
       const now = Date.now();
+      const limits = this.limitsFor(userId);
       const windowStart = now - 60_000;
       const recentRows = (await this.database.raw.prepare(
         `SELECT created_at
@@ -237,7 +293,7 @@ export class ApiAccessManager {
          WHERE user_id = ? AND created_at >= ?
          ORDER BY created_at ASC`,
       ).all(userId, windowStart)) as unknown as Array<{ created_at: number }>;
-      if (recentRows.length >= this.limits.requestsPerMinute) {
+      if (recentRows.length >= limits.requestsPerMinute) {
         const resetAt = Number(recentRows[0]!.created_at) + 60_000;
         throw new ApiAccessError(
           "rate_limit_exceeded",
@@ -249,10 +305,10 @@ export class ApiAccessManager {
       const pending = (await this.database.raw.prepare(
         "SELECT COUNT(*) AS count FROM api_usage WHERE user_id = ? AND status = 'pending'",
       ).get(userId)) as { count: number };
-      if (Number(pending.count) >= this.limits.maxConcurrent) {
+      if (Number(pending.count) >= limits.maxConcurrent) {
         throw new ApiAccessError(
           "concurrency_limit_exceeded",
-          `The account can run at most ${this.limits.maxConcurrent} concurrent requests.`,
+          `The account can run at most ${limits.maxConcurrent} concurrent requests.`,
           429,
           1,
         );
@@ -301,8 +357,8 @@ export class ApiAccessManager {
         reservedTokens,
         remainingTokens: account.tokenBalance - reservedTokens,
         rateLimit: {
-          limit: this.limits.requestsPerMinute,
-          remaining: Math.max(0, this.limits.requestsPerMinute - recentRows.length - 1),
+          limit: limits.requestsPerMinute,
+          remaining: Math.max(0, limits.requestsPerMinute - recentRows.length - 1),
           resetAt: recentRows.length === 0 ? now + 60_000 : Number(recentRows[0]!.created_at) + 60_000,
         },
       };
