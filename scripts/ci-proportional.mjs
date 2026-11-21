@@ -9,7 +9,13 @@ const transcriptionPython = new Set(['python/distributed_runtime/transcription_e
   'python/distributed_runtime/replica_gpu_guard.py', 'python/tests/test_transcription_engine.py',
   'python/tests/test_transcription_gpu_guard.py', 'scripts/qualify-transcription-gpu.py']);
 const installerPython = new Set(['deploy/installers/publisher.py', 'deploy/installers/test_publisher.py']);
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f));
+// Linear speculative drafting runs the real engine/server tests on CPU torch
+// from the hash-locked cp312 wheel set; no model download or GPU.
+const speculationPython = new Set(['python/distributed_runtime/speculation.py',
+  'python/distributed_runtime/server.py', 'python/distributed_runtime/draft_quality_runtime_benchmark.py',
+  'python/tests/test_speculation.py', 'python/tests/test_server.py', 'python/tests/test_draft_quality_runtime_benchmark.py']);
+const speculationTests = ['test_speculation.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py'];
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !speculationPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -51,6 +57,13 @@ export function planChecks(files, availableAgentTests) {
     add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...[...transcriptionPython].filter(f => existsSync(f))], 'native transcription Python syntax');
   }
   if (root || agent) add('.', 'npm', ['install', '--global', 'npm@10.9.8', '--no-audit', '--no-fund'], 'pinned npm toolchain');
+  if (files.some(f => speculationPython.has(f))) {
+    const venv = '.ci/speculation-venv';
+    add('.', 'python3', ['-c', 'import sys; assert sys.version_info[:2] == (3, 12), sys.version'], 'speculation runtime interpreter is CPython 3.12');
+    add('.', 'python3', ['-m', 'venv', venv], 'speculation runtime virtual environment');
+    add('.', `${venv}/bin/python`, ['-m', 'pip', 'install', '--require-hashes', '--only-binary=:all:', '--no-deps', '-r', 'scripts/wheel-locks/linux-x64-cp312.txt'], 'hash-locked CPU runtime wheels');
+    for (const test of speculationTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `speculation runtime ${test} (CPU, no model or GPU)`);
+  }
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);
     if (/\.test\.[cm]js$/.test(file) && file !== 'scripts/ci-fast-delivery.test.mjs' && file !== desktopDownloadBrowserTest) {
