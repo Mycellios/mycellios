@@ -83,19 +83,24 @@ class Forwarder:
                 return await self.reject(reader, writer)
             up_reader, up_writer = upstream
 
-            async def pump(source, destination):
+            async def pump(source, destination, client_side):
                 try:
                     while chunk := await source.read(65536):
                         destination.write(chunk)
                         await destination.drain()
-                    if destination.can_write_eof():
-                        destination.write_eof()  # half-close: the reply still flows back
+                    if client_side:
+                        # HTTP clients never half-close while awaiting a reply;
+                        # EOF means they gave up, so drop the replica connection
+                        # and let it stop the abandoned work.
+                        destination.close()
+                    elif destination.can_write_eof():
+                        destination.write_eof()
                 except OSError:
                     pass
 
             self.active[chosen] += 1
             try:
-                await asyncio.gather(pump(reader, up_writer), pump(up_reader, writer))
+                await asyncio.gather(pump(reader, up_writer, True), pump(up_reader, writer, False))
             finally:
                 self.active[chosen] -= 1
                 up_writer.close()
