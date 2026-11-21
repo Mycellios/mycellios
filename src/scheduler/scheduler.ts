@@ -728,7 +728,9 @@ function routePolicyRejections(
     reasons.push("candidate_boundary_trust_rejected");
   }
   if (policy.pinnedBoundaryIdentityIds && boundaryWorkers.some(
-    (worker) => !worker.identityId || !policy.pinnedBoundaryIdentityIds!.has(worker.identityId),
+    (worker) => !worker.identityId
+      || !policy.pinnedBoundaryIdentityIds!.has(worker.identityId)
+      || identityIdIsAmbiguous(worker, workerById),
   )) {
     reasons.push("candidate_boundary_pin_rejected");
   }
@@ -753,6 +755,21 @@ function routePolicyRejections(
     reasons.push("candidate_cost_exceeded");
   }
   return reasons;
+}
+
+/**
+ * Pins name an identity id without its kind. If schedulable workers of two
+ * different kinds share that id, neither can prove it is the pinned one, so
+ * the pin fails closed.
+ */
+function identityIdIsAmbiguous(
+  worker: StoredWorker,
+  workerById: ReadonlyMap<string, StoredWorker>,
+): boolean {
+  for (const other of workerById.values()) {
+    if (other.identityId === worker.identityId && other.identityKind !== worker.identityKind) return true;
+  }
+  return false;
 }
 
 function workerHasTrustedIdentity(worker: StoredWorker): boolean {

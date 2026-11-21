@@ -483,6 +483,15 @@ export class WorkerAdmissionAuthority {
         409,
       );
     }
+    // Routing pins name an identity id without its kind. One id must never
+    // belong to two kinds, or a new identity could answer for a pinned one.
+    if (admission.state === "identity_kind_conflict") {
+      throw new WorkerAdmissionError(
+        "worker_identity_kind_conflict",
+        "This worker identity id is already bound to another identity kind.",
+        409,
+      );
+    }
     if (admission.state === "fingerprint_in_use") {
       throw new WorkerAdmissionError(
         "worker_credential_reused",

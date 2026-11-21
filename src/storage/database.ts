@@ -59,7 +59,7 @@ export interface NodeOwnershipRow {
 
 export type WorkerAdmissionResult =
   | { state: "enrolled" | "accepted"; credential: WorkerAdmissionCredentialRow }
-  | { state: "revoked" | "key_mismatch" | "fingerprint_in_use"; credential: WorkerAdmissionCredentialRow };
+  | { state: "revoked" | "key_mismatch" | "fingerprint_in_use" | "identity_kind_conflict"; credential: WorkerAdmissionCredentialRow };
 
 export type WorkerCredentialRevocationResult =
   | { state: "revoked" | "already_revoked"; credential: WorkerAdmissionCredentialRow }
@@ -2223,11 +2223,11 @@ export class MeshDatabase {
                   status, protocol_version, created_at, updated_at, last_seen_at,
                   revoked_at, revocation_reason
            FROM worker_admission_credentials
-           WHERE fingerprint = ?`,
-        ).get(input.fingerprint)),
+           WHERE fingerprint = ? OR (identity_id = ? AND identity_kind <> ?) LIMIT 1`,
+        ).get(input.fingerprint, input.identityId, input.identityKind)),
       );
       if (reused) {
-        return { state: "fingerprint_in_use", credential: reused };
+        return { state: reused.fingerprint === input.fingerprint ? "fingerprint_in_use" : "identity_kind_conflict", credential: reused };
       }
 
       const now = Date.now();
