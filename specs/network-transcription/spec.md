@@ -17,8 +17,10 @@ converts recorded audio before upload; native inference accepts no media URL or
 compressed decoder. Spanish and English are supported. Bind results to the audio
 SHA256 and requested language. Silence or invalid results fail without settlement.
 
-Use deployment-owned MYCELLIOS_NETWORK_TRANSCRIPTION_IDENTITIES and the existing
-authenticated pinned-edge scheduler, never an HTTP placement override. Both the
+Paid transcription runs only on replicas whose fresh native qualification lets
+settlement verify it (specs/node-owner-privacy, D7); the
+MYCELLIOS_NETWORK_TRANSCRIPTION_IDENTITIES pin the Agent still sends is ignored,
+and there is never an HTTP placement override. Both the
 saved connection and requested Mico must belong to the authenticated account and
 Space. A failed paid request has no automatic replay or provider/funding fallback.
 Raw audio is not appended to durable inference conversations.

@@ -7,8 +7,17 @@ import { MeshServiceError, type MeshService } from "./mesh-service.js";
 import { chatCompletionRequestSchema } from "../contracts/schemas.js";
 import { withModelRequestDeadline } from "../core/model-request-deadline.js";
 
+/**
+ * Parses a public chat request. `privacy` (trusted-only, pinned identities) is
+ * still accepted so existing clients keep working, but it no longer narrows
+ * routing: there is no tier of trusted machines for public callers
+ * (specs/node-owner-privacy, D7). Every request gets the same protections, and
+ * paid work is kept on replicas that can settle it by the scheduler itself.
+ * Internal callers, such as native qualification, still pin their target.
+ */
 export function parseChatRequest(body: unknown, budgets?: Readonly<Record<string, number>>): ChatCompletionRequest {
-  return chatCompletionRequestSchema.parse(withModelRequestDeadline(body, budgets)) as ChatCompletionRequest;
+  const { privacy: _privacy, ...request } = chatCompletionRequestSchema.parse(withModelRequestDeadline(body, budgets)) as ChatCompletionRequest;
+  return request;
 }
 
 export async function waitForChatCapacity(

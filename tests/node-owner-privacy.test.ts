@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AdapterError, type InferenceAdapter } from "../src/adapters/base.js";
 import { workerConfigSchema } from "../src/contracts/schemas.js";
 import type { ChatCompletionRequest, JobPayload, WorkerCapabilities } from "../src/contracts/types.js";
+import { parseChatRequest } from "../src/coordinator/chat-admission.js";
 import { MeshService } from "../src/coordinator/mesh-service.js";
 import type { WorkerHub } from "../src/coordinator/worker-hub.js";
 import { WorkerRequestView } from "../src/coordinator/worker-request-view.js";
@@ -257,5 +258,19 @@ describe("a failed job leaves no content in the PC's log or in task.fail", () =>
     expect(failure).toMatchObject({ code: "adapter_error", message: "invalid_runtime_output" });
     expect(logged.join(" ")).toContain("job-private");
     expect(logged.join(" ")).not.toContain("secret");
+  });
+});
+
+describe("no trusted-machines tier for public callers (D7)", () => {
+  it("accepts but ignores a public privacy policy", () => {
+    const parsed = parseChatRequest({
+      model: "distributed-small",
+      messages: [{ role: "user", content: "hello" }],
+      privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: ["node-a"] },
+    });
+    expect(parsed).not.toHaveProperty("privacy");
+    expect(parsed.messages).toEqual([{ role: "user", content: "hello" }]);
+    expect(() => parseChatRequest({ model: "m", messages: [{ role: "user", content: "x" }],
+      privacy: { trust: "default", boundary: "pinned-edges" } })).toThrow();
   });
 });
