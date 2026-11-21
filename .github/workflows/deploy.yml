@@ -43,6 +43,9 @@ jobs:
             context: .
             dockerfile: src/agent/infra/compose/Dockerfile
             revision-arg: GIT_SHA
+            # Production serves the web build in this image under /agent/ (Nucleus promotes
+            # it with the API, so one deploy and one rollback cover both).
+            base-path-arg: APP_BASE_PATH=/agent/
           # The disposable desktop the sandbox supervisor starts for Agent tools. It is
           # published with every commit so the supervisor is pinned to an image that exists.
           - image: computer
@@ -69,7 +72,9 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.name.outputs.repository }}:sha-${{ github.sha }}
-          build-args: ${{ matrix.revision-arg }}=${{ github.sha }}
+          build-args: |
+            ${{ matrix.revision-arg }}=${{ github.sha }}
+            ${{ matrix.base-path-arg }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
