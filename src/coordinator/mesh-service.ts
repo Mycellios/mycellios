@@ -23,6 +23,7 @@ import { Scheduler } from "../scheduler/scheduler.js";
 import type { MeshStore, StoredJob } from "../storage/store.js";
 import type { WorkerHub } from "./worker-hub.js";
 import { WorkerRequestView } from "./worker-request-view.js";
+import { LeaseRejectionMonitor, type LeaseRejectionAnomaly } from "./lease-rejection-monitor.js";
 import type { RuntimeTransportSnapshot } from "./worker-hub.js";
 import {
   buildNetworkExecutionTrace,
@@ -99,6 +100,8 @@ const PRETOKEN_DEGRADATION_CODES = new Set([
 export interface MeshServiceOptions {
   firstTokenTimeoutMs?: number;
   modelRequestTimeoutsMs?: Readonly<Record<string, number>> | undefined;
+  /** Hold workers that reject an anomalous share of offers after reading them. */
+  leaseRejectionHold?: boolean | undefined;
 }
 
 interface MeshServiceEvents {
@@ -106,6 +109,8 @@ interface MeshServiceEvents {
   healthy: [{ jobId: string; model: string; workerId: string | null }];
   /** Every admitted request, served or not; drives native replica placement. */
   demand: [{ model: string; served: boolean }];
+  /** A worker rejected an anomalous share of offers it had already read. */
+  lease_rejection_anomaly: [LeaseRejectionAnomaly];
 }
 
 export class MeshService extends EventEmitter<MeshServiceEvents> {
@@ -131,6 +136,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
   private readonly activeSessions = new Map<string, string>();
   // Nodes see a per-worker session pseudonym, never the client's session id.
   private readonly workerRequestView = new WorkerRequestView();
+  private readonly leaseRejections: LeaseRejectionMonitor;
   private readonly recentTransportUsage: TransportUsageInterval[] = [];
 
   static async create(store: MeshStore, scheduler: Scheduler, hub: WorkerHub, requestTimeoutMs: number, options: MeshServiceOptions = {}): Promise<MeshService> {
@@ -147,6 +153,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     private readonly options: MeshServiceOptions = {},
   ) {
     super();
+    this.leaseRejections = new LeaseRejectionMonitor({ enforce: options.leaseRejectionHold === true });
     if (typeof hub.subscribeWorkerEvents === "function") {
       hub.subscribeWorkerEvents({
         envelope: envelope => this.enqueueEvent(() => this.handleWorkerEnvelope(envelope)),
@@ -217,7 +224,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       }
     }));
 
-    const routeOptions = routeOptionsForRequest(stableRequest, this.hub.connectedWorkerIds());
+    const routeOptions = routeOptionsForRequest(stableRequest, this.offerableWorkerIds());
     const routePlan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
       ...routeOptions,
       allowPipeline: false,
@@ -311,7 +318,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
   async hasCapacity(request: ChatCompletionRequest, requestedSessionId?: string): Promise<boolean> {
     const sessionId = requestedSessionId ?? request.session_id ?? newId("capacity");
     return (await this.scheduler.selectRoutePlan(cloneRequest(request), sessionId, {
-      ...routeOptionsForRequest(request, this.hub.connectedWorkerIds()),
+      ...routeOptionsForRequest(request, this.offerableWorkerIds()),
       allowPipeline: false,
       maxStandbyRoutes: request.model === TRANSCRIPTION_MODEL ? 0 : 2,
     })) !== null;
@@ -327,6 +334,11 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     runtime.queue.push({ type: "failed", code: "cancelled", message: "Request cancelled" });
     (await this.finishRuntime(jobId));
     return true;
+  }
+
+  /** Connected workers that are not held back for rejecting offers they read. */
+  private offerableWorkerIds(): ReadonlySet<string> {
+    return this.leaseRejections.offerable(this.hub.connectedWorkerIds());
   }
 
   private async dispatch(jobId: string, runtime: RuntimeJob, promote = false): Promise<void> {
@@ -354,7 +366,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return;
     }
     if (!(await this.scheduler.isRouteCurrentlyEligible(runtime.request, queued.sessionId, runtime.route, {
-      ...routeOptionsForRequest(runtime.request, this.hub.connectedWorkerIds()), allowPipeline: false,
+      ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds()), allowPipeline: false,
     }))) {
       await this.retryOrFail(jobId, "route_no_longer_eligible", "The planned route is no longer eligible");
       return;
@@ -375,6 +387,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       (await this.retryOrFail(jobId, "worker_unreachable"));
       return;
     }
+    this.leaseRejections.offered(stage.workerId);
     if (runtime.leaseTimer) clearTimeout(runtime.leaseTimer);
     runtime.leaseTimer = setTimeout(() => this.enqueueEvent(async () => (await this.retryOrFail(jobId, "lease_accept_timeout"))), 3_000);
   }
@@ -432,7 +445,10 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
 
   private async onLeaseRejected(envelope: WorkerEnvelope): Promise<void> {
     const payload = envelope.payload as { jobId: string; leaseId: string; reason?: string };
-    if (!(await this.validJobEnvelope(envelope.workerId, payload.jobId, payload.leaseId))) return;
+    const job = await this.validJobEnvelope(envelope.workerId, payload.jobId, payload.leaseId);
+    if (!job) return;
+    const anomaly = this.leaseRejections.rejected(envelope.workerId, payload.reason ?? "lease_rejected", job.deadlineAt <= Date.now());
+    if (anomaly) this.emit("lease_rejection_anomaly", anomaly);
     (await this.retryOrFail(payload.jobId, payload.reason ?? "lease_rejected"));
   }
 
@@ -618,7 +634,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
         runtime.request,
         job.sessionId,
         route,
-        { ...routeOptionsForRequest(runtime.request, this.hub.connectedWorkerIds()), allowPipeline: false },
+        { ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds()), allowPipeline: false },
       ))) continue;
       runtime.route = route;
       runtime.replayPrefix = replayingCommittedPrefix
