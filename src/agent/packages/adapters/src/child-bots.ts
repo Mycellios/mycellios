@@ -687,7 +687,7 @@ async function sharedTeamComputer(
   return computer;
 }
 
-const REMOTE_TEAM_SANDBOX_KINDS = new Set(["e2b", "daytona", "boat", "createos"]);
+export const REMOTE_TEAM_SANDBOX_KINDS = new Set(["e2b", "daytona", "boat", "createos"]);
 // The bot is already deleted; whatever this misses is removed when the computer next boots.
 const LIVE_CLEANUP_BUDGET_MS = 10_000;
 
@@ -737,7 +737,7 @@ async function removeTeamBrowserProfile(
 const PROFILE_BUSY_ATTEMPTS = 3;
 const PROFILE_BUSY_RETRY_MS = 1_000;
 
-function isBusyError(error: unknown) {
+export function isBusyError(error: unknown) {
   if (!(error instanceof Error)) return false;
   return (
     (error as NodeJS.ErrnoException).code === "EBUSY" ||
@@ -745,7 +745,7 @@ function isBusyError(error: unknown) {
   );
 }
 
-async function removeProfileOnceClosed(
+export async function removeProfileOnceClosed(
   sandbox: SandboxProvider,
   computer: ComputerRef,
   name: string,

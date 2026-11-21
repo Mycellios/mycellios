@@ -522,6 +522,8 @@ export const appContract = {
       )
       .output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
+    /** Close the Mico's browser and delete its profile; the next run starts signed out. */
+    resetBrowser: oc.input(botId).output(z.object({ ok: z.literal(true), computerOff: z.boolean() })),
     archive: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     remove: oc
