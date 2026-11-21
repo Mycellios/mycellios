@@ -449,11 +449,14 @@ Mico names and instructions stay: they are the content the user chose.
      after the wasted run, so the Speakr bridge still falls back at once.
      Unfunded and operator traffic, such as Jarvis memory backfill, is
      unchanged.
-  2. The Agent stops sending `privacy` for speech and dictation (with a
-     `src/agent/changelog.d` note), relying on rule 1 and on D1-D4.
-  3. The coordinator then drops `privacy` from public requests at admission,
-     keeping it only for its internal native qualification, which pins the
-     worker under test.
+  2. Done: the coordinator ignores `privacy` on public requests at admission
+     (`parseChatRequest`); it still accepts the field so existing clients keep
+     working. Internal callers keep it: native qualification pins the worker
+     under test, and Studio's `trusted-only` only requires a signed identity,
+     which every remote worker has.
+  3. Later cleanup: the Agent stops sending `privacy` for speech and dictation
+     (with a `src/agent/changelog.d` note) and its
+     `MYCELLIOS_NETWORK_*_IDENTITIES` settings can go.
 
 ### D8. Deterrence (principle 7)
 

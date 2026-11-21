@@ -118,6 +118,28 @@ describe("inference-only coordinator and worker", () => {
     expect((await runtime.store.listJobs())).toHaveLength(1);
   });
 
+  it("serves a public request whatever privacy pin it carries (specs/node-owner-privacy D7)", async () => {
+    const { runtime, address, agent, run } = await startNetwork();
+    cleanup.push(async () => {
+      await agent.stop();
+      await run;
+      await runtime.close();
+    });
+    const response = await fetch(new URL("v1/chat/completions", `${address}/`), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "distributed-small",
+        messages: [{ role: "user", content: "pinned elsewhere" }],
+        max_tokens: 80,
+        privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: ["a-node-that-does-not-exist"] },
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { x_network: { boundary_policy: string; pinned_identity_count: number } };
+    expect(body.x_network).toMatchObject({ boundary_policy: "trusted-edges", pinned_identity_count: 0 });
+  });
+
   it("returns OpenAI SSE chunks and a DONE marker", async () => {
     const { runtime, address, agent, run } = await startNetwork();
     cleanup.push(async () => {

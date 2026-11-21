@@ -385,6 +385,9 @@ These rules apply to the complete repository.
   shared format with `scripts/node-privacy-bait.mjs`); a followed link or tried
   key must answer exactly like an unknown page or invalid key and only log
   `tripwire_hit`. Off without `MYCELLIOS_TRIPWIRE_SECRET`. Check tests/tripwires.test.ts.
+- Public chat requests may still carry `privacy`, but `parseChatRequest` drops
+  it: there is no trusted-machines tier. Only internal callers (native
+  qualification) pin workers. Do not reintroduce public placement pins.
 - Contribution-funded requests only run on native replicas whose fresh,
   worker- and build-bound qualification lets settlement verify them; otherwise
   they fail before dispatch with 502 `settlement_evidence_unavailable`.
