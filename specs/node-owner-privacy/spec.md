@@ -452,23 +452,43 @@ Mico names and instructions stay: they are the content the user chose.
 - Audio bait is prerecorded speech containing tripwire phone numbers or
   emails.
 
-**Deposit (bond).**
+**Expulsion (implemented, `src/coordinator/node-owner-policy.ts`).**
+
+- An operator expels a node by revoking its credential through
+  `POST /public/v1/worker-credentials/device/<id>/revoke` with a reason that
+  starts with `node_privacy_violation` (for example
+  `node_privacy_violation: tripwire 2026-11-21`).
+- From then on its owner account cannot issue or redeem enrollments
+  (`node_owner_expelled_denied`, `node_enrollment_owner-expelled`) or accept
+  node transfers, and the owner cannot recover that node's credential
+  (`worker_ownership_expelled`). Other revocation reasons keep today's
+  behavior.
+
+**Deposit (bond), deferred.**
 
 - A node must hold a bond before receiving work. To avoid an upfront payment,
   the bond fills from the node's own earnings, which are held until it is
   complete. Decided by Daniel on 2026-11-21: 10 Credits per node.
-- A confirmed tripwire hit slashes the bond, revokes the credential and
-  ownership, bans the owner account from enrolling nodes and records the
-  physical identity hashes and network prefixes for review.
-- This touches the ledger: isolated PostgreSQL tests and Daniel's approval
-  before production.
+- A confirmed tripwire hit slashes the bond on top of the expulsion above.
+- Deferred until node payouts are enabled: today node earnings are internal
+  and `payout_enabled` is false, so a bond would hold value nobody can
+  withdraw. It touches the ledger: isolated PostgreSQL tests and Daniel's
+  approval before production.
 
 **Sybil resistance.**
 
-- Each node needs its own bond, so N nodes cost N bonds.
+- Each node will need its own bond, so N nodes cost N bonds.
 - Dispersion excludes by owner and network prefix, not only by worker.
-- At most 5 nodes per owner account unless an operator raises it (decided by
-  Daniel on 2026-11-21).
+- At most 5 active nodes per owner account (decided by Daniel on 2026-11-21),
+  enforced at enrollment and transfer once `MYCELLIOS_NODE_OWNER_LIMIT=5` is
+  set. `MYCELLIOS_NODE_OWNER_LIMIT_OVERRIDES=account=limit,...` raises it for
+  operator accounts, whose replicas enroll the same way; set both together.
+- **Unowned public cells.** Today any signed key can register a new `cell`
+  identity without an account, which escapes per-owner limits and expulsion.
+  `MYCELLIOS_CELL_ADMISSION=enrolled` admits only enrolled cells, cells the
+  operator starts with the network token and cells admitted before. It stays
+  `open` by default because public cells are an existing, tested way to join;
+  closing it is Daniel's decision.
 
 Node operators' terms must forbid keeping or using content and disclose that
 bait traffic exists.

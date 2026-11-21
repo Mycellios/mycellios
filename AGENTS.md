@@ -376,6 +376,11 @@ These rules apply to the complete repository.
   public network prefix (private and overlay addresses are ignored); exhaustion
   fails before dispatch with `dispersion_exhausted`, and dispatch rechecks
   standbys. Check tests/chunk-dispersion.test.ts and the bridge unit tests.
+- `NodeOwnerPolicy` gates enrollment, transfers and recovery: an operator
+  revocation reason starting with `node_privacy_violation` expels the owner
+  account; `MYCELLIOS_NODE_OWNER_LIMIT` (+ overrides) caps active nodes per
+  account; `MYCELLIOS_CELL_ADMISSION=enrolled` refuses new unowned cells. The
+  limit and the cell rule are off unless configured. Check tests/node-owner-policy.test.ts.
 - Session affinity must be revalidated and rescored from current worker capacity,
   exact deployments and measured forward/return links. Cached scores are not
   current capacity evidence. Respect disabled pipeline dispatch on cached routes.

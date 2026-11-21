@@ -1,3 +1,4 @@
+import { NodeOwnerPolicy } from "./node-owner-policy.js";
 import { SEALED_LEASES_HEADER } from "../contracts/sealed-lease.js";
 import { rateLimitClientKey, rateLimitKeyGenerator } from "./rate-limit-key.js";
 import {
@@ -681,10 +682,11 @@ export async function createCoordinator(
   const physicalContributionEvidence = new PhysicalContributionEvidenceAuthority(database);
   (await economicLedger.registerDefaultInternalPricing());
   const workerAdmission = new WorkerAdmissionAuthority(database);
-  const nodeEnrollments = new NodeEnrollmentStore(database);
+  const nodeOwnerPolicy = NodeOwnerPolicy.fromEnvironment(database);
+  const nodeEnrollments = new NodeEnrollmentStore(database, undefined, nodeOwnerPolicy);
   const nodeCommands = new NodeCommandStore(database);
   const nodeReconciliation = new NodeReconciliationStore(database, nodeCommands);
-  const nodeOwnershipTransfers = new NodeOwnershipTransferStore(database);
+  const nodeOwnershipTransfers = new NodeOwnershipTransferStore(database, undefined, nodeOwnerPolicy);
   const workerSessionPrincipals = new WeakMap<FastifyRequest, string>();
   const workerSessionContexts = new WeakMap<FastifyRequest, {
     workerId: string; identityKind: "device" | "cell"; identityId: string;
@@ -4490,6 +4492,12 @@ export async function createCoordinator(
             message: "Signed worker admission requires a stable device identity.",
           },
         });
+      }
+      // New unowned cells would escape per-owner limits and expulsion (D8).
+      const bearer = parseBearerToken(request.headers.authorization);
+      const fromOperator = Boolean(config.networkToken && bearer && constantTimeEqual(bearer, config.networkToken));
+      if (registration.identity.kind === "cell" && (await nodeOwnerPolicy.refusesNewCell(registration.identity.id, fromOperator))) {
+        return reply.code(403).send({ error: { code: "worker_cell_enrollment_required", message: "A new cell identity must be enrolled by an account." } });
       }
       let verified;
       try {
