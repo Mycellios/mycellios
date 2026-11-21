@@ -1,3 +1,4 @@
+import { SEALED_LEASES_HEADER } from "../contracts/sealed-lease.js";
 import { rateLimitClientKey, rateLimitKeyGenerator } from "./rate-limit-key.js";
 import {
   automaticRetryLabel,
@@ -4543,7 +4544,7 @@ export async function createCoordinator(
     const nodeOwnership = registration.identity?.kind === "device"
       ? (await database.getNodeOwnership("device", registration.identity.id))
       : null;
-    return reply.header("x-mycellios-host-memory-observation", "1").code(201).send({
+    return reply.header("x-mycellios-host-memory-observation", "1").header(SEALED_LEASES_HEADER, "1").code(201).send({
       workerId: worker.id,
       protocolVersion: admission.protocolVersion,
       ...(admission.credentialFingerprint

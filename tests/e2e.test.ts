@@ -61,6 +61,9 @@ describe("inference-only coordinator and worker", () => {
     };
     expect(response.status).toBe(200);
     expect(body.choices[0]?.message.content).toContain("prueba completa");
+    // The worker announced a per-connection key, so the request travelled sealed.
+    const [workerId] = [...runtime.hub.connectedWorkerIds()];
+    expect(runtime.hub.workerSealingKey(workerId!)).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(body.usage.prompt_tokens).toBeGreaterThan(0);
     expect(body.usage.completion_tokens).toBeGreaterThan(0);
     expect(body.x_network.active_ms).toBeGreaterThan(0);

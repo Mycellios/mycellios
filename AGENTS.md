@@ -354,6 +354,12 @@ These rules apply to the complete repository.
   existing headless preparer. Cancel superseded/disconnected preparations, keep
   their queue serial, and reject stale results without stopping running stages.
   Check the preparation-queue, runtime-start-race and headless-worker tests.
+- Lease offers to a worker that announced an X25519 key in `worker.hello` are
+  sealed (`src/transport/sealed-lease.ts`): per-lease ephemeral key, HKDF and
+  AES-256-GCM bound to job, lease, model digest and deadline. Workers announce
+  a key only when registration returned `x-mycellios-sealed-leases`, keep it in
+  memory for one connection and never fall back to plaintext for a sealed
+  offer. Check tests/sealed-lease.test.ts and tests/e2e.test.ts.
 - If a prepared root API port belongs to another local service, select a free
   loopback API port and translate only its authorized logical relay target.
   Reject direct offers for that remapped API; keep tensor routes unchanged and

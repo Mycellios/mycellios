@@ -327,6 +327,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
   connectedWorkerIds(): ReadonlySet<string> { return connectedWorkerIdentifiers(this.connections); }
   workerNetworkAddress(workerId: string): string | null { return this.connections.get(workerId)?.networkAddress ?? null; }
+  workerSealingKey(workerId: string): string | null { return this.connections.get(workerId)?.sealingPublicKey ?? null; }
 
   isConnected(workerId: string): boolean { return connectionIsReady(this.connections.get(workerId)); }
 
@@ -867,6 +868,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         }
         if (previous && previous !== state) previous.socket.close(4409, "superseded connection");
         state.workerId = envelope.workerId;
+        state.sealingPublicKey = (envelope.payload as { sealing?: { publicKey: string } }).sealing?.publicKey ?? null;
         state.pending = false;
         this.pendingConnections = Math.max(0, this.pendingConnections - 1);
         clearTimeout(state.helloTimer);

@@ -25,6 +25,7 @@ import type { WorkerHub } from "./worker-hub.js";
 import { WorkerRequestView } from "./worker-request-view.js";
 import { LeaseRejectionMonitor, type LeaseRejectionAnomaly } from "./lease-rejection-monitor.js";
 import { DispersionGroups, workerDispersionKeys } from "./dispersion-groups.js";
+import { sealLeaseRequest } from "../transport/sealed-lease.js";
 import type { RuntimeTransportSnapshot } from "./worker-hub.js";
 import {
   buildNetworkExecutionTrace,
@@ -421,7 +422,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     else (await this.store.setJobRoute(jobId, runtime.route, leaseId));
     const job = (await this.store.getJob(jobId));
     if (!job) return;
-    const payload: JobPayload = {
+    const plain: JobPayload = {
       jobId,
       leaseId,
       modelDigest: stage.modelDigest,
@@ -438,6 +439,13 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       }
       this.dispersion.reserve(group, jobId, keys);
     }
+    // A worker that announced a sealing key receives only ciphertext
+    // (specs/node-owner-privacy, D4); older workers keep the plaintext offer.
+    const sealingKey = this.hub.workerSealingKey?.(stage.workerId) ?? null;
+    const { request: offeredRequest, ...binding } = plain;
+    const payload = sealingKey
+      ? { ...binding, sealed: sealLeaseRequest(offeredRequest, sealingKey, binding) }
+      : plain;
     if (!this.hub.send(stage.workerId, "lease.offer", payload)) {
       (await this.retryOrFail(jobId, "worker_unreachable"));
       return;

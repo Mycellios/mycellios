@@ -27,6 +27,8 @@ import type { AdapterChunk, AdapterMetrics, InferenceAdapter } from "../adapters
 import { HeartbeatObservation } from "./heartbeat-observation.js";
 import { createAdapter } from "../adapters/factory.js";
 import { contentFreeFailure } from "./content-free-failure.js";
+import { SEALED_LEASES_HEADER, sealedLeaseSchema } from "../contracts/sealed-lease.js";
+import { leaseOfferJob, sealingHello, type WorkerSealingKey } from "./sealed-lease-offer.js";
 import { sha256Text } from "../core/json.js";
 import { estimateInputTokens } from "../core/request.js";
 import { observeHostMemory, withoutHostMemory } from "./host-memory.js";
@@ -202,7 +204,8 @@ export interface WorkerAgentOptions {
   logger?: Pick<Console, "info" | "warn" | "error">;
 }
 
-const MAX_SERVER_MESSAGE_BYTES = 2 * 1024 * 1024;
+// Sealed offers are base64url ciphertext of a request of up to ~2 MiB.
+const MAX_SERVER_MESSAGE_BYTES = 4 * 1024 * 1024;
 const MAX_OUTPUT_CHUNK_BYTES = 64 * 1024;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 const RECENT_JOB_LIMIT = 2_048;
@@ -278,9 +281,11 @@ const serverMessageSchema = z.discriminatedUnion("type", [
           leaseId: z.string().min(1).max(256),
           modelDigest: z.string().min(1).max(512),
           deadlineAt: z.number().int().positive(),
-          request: chatCompletionRequestSchema,
+          request: chatCompletionRequestSchema.optional(),
+          sealed: sealedLeaseSchema.optional(),
         })
-        .strict(),
+        .strict()
+        .refine((offer) => (offer.request === undefined) !== (offer.sealed === undefined), "Exactly one of request or sealed"),
     })
     .strict(),
   z
@@ -536,6 +541,8 @@ export class WorkerAgent {
   private workerSessionToken: string | undefined;
   private registeredNodeGeneration: number | undefined;
   private capabilities: WorkerCapabilities | null = null;
+  private coordinatorSealsLeases = false;
+  private sealingKey: WorkerSealingKey | null = null;
   private socket: WebSocket | null = null;
   private readonly coordinatorRttProbe: CoordinatorRttProbe;
   private stopped = false;
@@ -1220,6 +1227,7 @@ export class WorkerAgent {
     const body = registrationResponseSchema.parse(decoded);
     this.assertStartupActive(signal);
     this.registeredWorkerId = body.workerId;
+    this.coordinatorSealsLeases = response.headers.get(SEALED_LEASES_HEADER) === "1";
     this.workerSessionToken = body.workerSessionToken;
     this.registeredNodeGeneration = body.nodeGeneration;
   }
@@ -1254,7 +1262,9 @@ export class WorkerAgent {
           return;
         }
         opened = true;
-        this.sendMessage("worker.hello", {});
+        const sealing = sealingHello(this.coordinatorSealsLeases);
+        this.sealingKey = sealing.key;
+        this.sendMessage("worker.hello", sealing.hello);
         this.startRttProbe(socket);
       });
       socket.on("pong", (payload: Buffer) => {
@@ -1286,6 +1296,7 @@ export class WorkerAgent {
         signal.removeEventListener("abort", abortStartup);
         this.readyDeadline.clear(socket);
         this.coordinatorReady = false;
+        this.sealingKey = null;
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = null;
         this.stopRttProbe();
@@ -1394,11 +1405,17 @@ export class WorkerAgent {
         }
         break;
       }
-      case "lease.offer":
-        // Zod has already validated and normalized every field. The cast only
-        // bridges its optional-property representation under exactOptionalPropertyTypes.
-        void this.execute(message.payload as JobPayload);
+      case "lease.offer": {
+        // Zod has already validated and normalized every field; a sealed
+        // request is opened in memory and validated the same way.
+        let job: JobPayload;
+        try { job = leaseOfferJob(message.payload, this.sealingKey); } catch {
+          this.sendMessage("lease.reject", { jobId: message.payload.jobId, leaseId: message.payload.leaseId, reason: "sealed_lease_invalid" });
+          break;
+        }
+        void this.execute(job);
         break;
+      }
       case "task.cancel": {
         const { jobId } = message.payload;
         this.activeJobs.get(jobId)?.abort(new Error("Cancelled by coordinator"));

@@ -1,3 +1,4 @@
+import { sealingAnnouncementSchema } from "./sealed-lease.js";
 import { z } from "zod";
 import {
   activationCheckpointBeginSchema,
@@ -128,7 +129,8 @@ function envelopeSchema<TType extends string, TPayload extends z.ZodType>(
 
 export const workerHelloEnvelopeSchema = envelopeSchema(
   "worker.hello",
-  z.object({}).strict(),
+  // Only sent to coordinators that advertised sealed leases at registration.
+  z.object({ sealing: sealingAnnouncementSchema.optional() }).strict(),
 );
 
 export const workerHeartbeatEnvelopeSchema = envelopeSchema(
