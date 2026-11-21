@@ -22,6 +22,7 @@ import {
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { NativeDraftStrategyCatalog } from "../distribution/draft-strategy-catalog.js";
 import { readMeasuredActivationCatalog, buildMeasuredActivationCatalogEvidence } from "./measured-activation-catalog.js";
+import { loadNativeReplicaPlacementConfig, NativeReplicaPlacementBroker } from "./native-replica-placement.js";
 
 const runtimeRoot = resolve(import.meta.dirname, "../..");
 const runtimeMetadata = readNativeRuntimeBuildMetadata(runtimeRoot);
@@ -216,8 +217,24 @@ if (baseActivationConfig) {
   );
 }
 
+const replicaPlacementPath = process.env.MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG?.trim();
+const replicaPlacement = replicaPlacementPath
+  ? new NativeReplicaPlacementBroker(
+      runtime.store,
+      await loadNativeReplicaPlacementConfig(
+        isAbsolute(replicaPlacementPath) ? replicaPlacementPath : resolve(process.cwd(), replicaPlacementPath),
+      ),
+      { info: (message) => runtime.app.log.info(message), warn: (message) => runtime.app.log.warn(message) },
+      () => runtime.hub.connectedWorkerIds(),
+    )
+  : undefined;
+if (replicaPlacement) {
+  runtime.service.on("demand", ({ model, served }) => replicaPlacement.demand.record(model, served));
+  replicaPlacement.start();
+  runtime.app.log.info(`native replica placement enabled with ${replicaPlacementPath}`);
+}
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
-    void runtime.close().finally(() => process.exit(0));
+    void (replicaPlacement?.stop() ?? Promise.resolve()).then(() => runtime.close()).finally(() => process.exit(0));
   });
 }

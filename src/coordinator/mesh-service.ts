@@ -103,6 +103,8 @@ export interface MeshServiceOptions {
 interface MeshServiceEvents {
   degraded: [{ jobId: string; model: string; code: string; workerId: string | null }];
   healthy: [{ jobId: string; model: string; workerId: string | null }];
+  /** Every admitted request, served or not; drives native replica placement. */
+  demand: [{ model: string; served: boolean }];
 }
 
 export class MeshService extends EventEmitter<MeshServiceEvents> {
@@ -218,6 +220,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       allowPipeline: false,
       maxStandbyRoutes: stableRequest.model === TRANSCRIPTION_MODEL ? 0 : 2,
     }));
+    this.emit("demand", { model: stableRequest.model, served: routePlan !== null });
     if (!routePlan) {
       (await this.store.setJobStatus(jobId, "failed", "no_capacity"));
       const decision = (await this.scheduler.selectExecutionRouteDecision(stableRequest, sessionId, {
