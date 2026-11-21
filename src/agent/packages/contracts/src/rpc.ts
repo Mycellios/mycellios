@@ -23,6 +23,7 @@ import { ReferralOwnerInput, ReferralInviteSchema, ReferralRedemptionSchema } fr
 import { AppCoverId, AppCoverWrite } from "./app-covers.js";
 import { NotificationSettingsSchema, WebPushSubscriptionSchema } from "./notification-settings.js";
 import { eventIterator, oc } from "@orpc/contract";
+import { WhatsAppLinkSchema, WhatsAppSenderAddInput, WhatsAppSenderSchema } from "./whatsapp-link.js";
 import * as z from "zod";
 import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
@@ -1194,6 +1195,22 @@ export const appContract = {
         .input(z.object({ connectionId: Id, accept: z.boolean() }))
         .output(MessagingAgentConnectionSchema),
       revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+  },
+  /** WhatsApp numbers linked to this account through Mycellios Desktop. */
+  whatsapp: {
+    links: {
+      list: oc.output(z.array(WhatsAppLinkSchema)),
+      setBot: oc.input(z.object({ linkId: Id, botId: Id })).output(WhatsAppLinkSchema),
+      /** Forget the link; the Desktop that holds the session logs it out on its next sync. */
+      remove: oc.input(z.object({ linkId: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+    senders: {
+      add: oc.input(WhatsAppSenderAddInput).output(WhatsAppSenderSchema),
+      respond: oc
+        .input(z.object({ senderId: Id, accept: z.boolean() }))
+        .output(WhatsAppSenderSchema),
+      remove: oc.input(z.object({ senderId: Id })).output(z.object({ ok: z.literal(true) })),
     },
   },
   approvalRules: {

@@ -36,6 +36,7 @@ vi.mock("../lib/rpc", () => ({
   selectedSpaceId: () => null,
 }));
 vi.mock("./ExternalConversationSettings", () => ({ ExternalConversationSettings: () => null }));
+vi.mock("./settings/WhatsAppLinkSettings", () => ({ WhatsAppLinkSettings: () => null }));
 vi.mock("@lingui/react/macro", () => {
   const t = (parts: TemplateStringsArray, ...values: unknown[]) =>
     parts.reduce(

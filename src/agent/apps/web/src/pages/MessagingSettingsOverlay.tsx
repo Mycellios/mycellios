@@ -23,6 +23,7 @@ import { providerLabel } from "../lib/messaging";
 import { fetchFresh, useSpaceQueries, writeSaved } from "../lib/query";
 import { rpc } from "../lib/rpc";
 import { ExternalConversationSettings } from "./ExternalConversationSettings";
+import { WhatsAppLinkSettings } from "./settings/WhatsAppLinkSettings";
 
 const LINK_POLL_MS = 3_000;
 const NO_INSTALLATIONS: MessagingInstallationsStatus = { available: false, installations: [] };
@@ -432,6 +433,8 @@ export function MessagingSettingsOverlay({ onClose }: { onClose: () => void }) {
             </p>
           ) : null}
         </section>
+
+        <WhatsAppLinkSettings bots={bots} />
 
         {hasConversations ? (
           <section className="mt-8">

@@ -20,6 +20,7 @@ import {
 import { getLogger } from "@rakazo/logging";
 import { MessagingSendError } from "./chat-sdk-surface.js";
 import { splitOutboundBody } from "./messaging-platforms.js";
+import { mirrorWhatsAppDeviceRun } from "./whatsapp-device-delivery.js";
 
 /**
  * Margin under vendor consecutive-outbound caps (sendblue enforces one hard):
@@ -72,6 +73,8 @@ export async function mirrorMessagingOutbound(
   deps: MessagingDeliveryDeps,
   runId: string,
 ): Promise<void> {
+  // Desktop WhatsApp runs answer only through their own link outbox.
+  if (await mirrorWhatsAppDeviceRun(deps.prisma, runId)) return;
   await mirrorRun(deps, runId);
   await deps.prisma.run.updateMany({
     where: { id: runId, trigger: "messaging" },

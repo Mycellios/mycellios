@@ -50,6 +50,8 @@ export interface AppEnv {
   defaultModelContextWindow?: number;
   nodeEnv: string;
   desktopStackToken?: string;
+  /** WhatsApp linked-device connector routes (specs/whatsapp-linked-device); off by default. */
+  whatsappDeviceEnabled?: boolean;
   databaseUrl: string;
   realtimeDatabaseUrl: string;
   authSecret: string;
@@ -253,6 +255,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     databaseUrl: required(source, "DATABASE_URL"),
     realtimeDatabaseUrl: source.REALTIME_DATABASE_URL ?? required(source, "DATABASE_URL"),
     desktopStackToken: optional(source.RAKAZO_DESKTOP_STACK_TOKEN),
+    whatsappDeviceEnabled: source.MYCELLIOS_WHATSAPP_DEVICE_ENABLED === "true",
     authSecret,
     authUrl: source.BETTER_AUTH_URL ?? source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
     webOrigin: source.WEB_ORIGIN ?? "http://127.0.0.1:5173",

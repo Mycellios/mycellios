@@ -33,6 +33,7 @@ export function MarketplaceWorkspace(props: {
   activeBotId?: string;
   onExit: () => void;
   onMcp: () => void;
+  onWhatsAppLink?: () => void;
   onCreated: (bot: Bot) => void;
   onOpenBot: (id: string) => void;
   onBotsChanged: () => Promise<void>;
@@ -135,6 +136,7 @@ export function MarketplaceWorkspace(props: {
               activeBotId={props.activeBotId}
               onClose={props.onExit}
               onOpenMcp={props.onMcp}
+              onOpenWhatsAppLink={props.onWhatsAppLink}
             />
           ) : props.tab === "agents" ? (
             <AgentsMarketplace

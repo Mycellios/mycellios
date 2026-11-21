@@ -98,11 +98,14 @@ export function PluginsOverlay({
   onConnectedAppsChange,
   onClose,
   onOpenMcp,
+  onOpenWhatsAppLink,
   activeBotId,
 }: {
   onConnectedAppsChange?: (apps: ReturnType<typeof connectedAppMarks>) => void;
   onClose: () => void;
   onOpenMcp?: () => void;
+  /** Opens the WhatsApp linked-device settings (Messaging). */
+  onOpenWhatsAppLink?: () => void;
   activeBotId?: string;
 }) {
   const { t, i18n } = useLingui();
@@ -746,6 +749,16 @@ export function PluginsOverlay({
             </p>
             <Button variant="ghost" size="sm" onClick={() => void accountsQuery.refetch()}>
               <Trans>Retry</Trans>
+            </Button>
+          </div>
+        ) : null}
+        {onOpenWhatsAppLink && item.slug.toLowerCase() === "whatsapp" ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <p className="text-muted-foreground">
+              <Trans>Talk to a Mico from your own WhatsApp number through Mycellios Desktop.</Trans>
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={onOpenWhatsAppLink}>
+              <Trans>Link WhatsApp</Trans>
             </Button>
           </div>
         ) : null}

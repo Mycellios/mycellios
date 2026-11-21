@@ -41,6 +41,7 @@ export * from "./rpc.js";
 export * from "./run-logs.js";
 export * from "./runs.js";
 export * from "./workflows.js";
+export * from "./whatsapp-link.js";
 export * from "./search.js";
 export * from "./security-events.js";
 export * from "./task-cost.js";

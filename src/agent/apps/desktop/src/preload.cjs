@@ -105,6 +105,18 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
       return () => ipcRenderer.off("desktop.computer.configure", handler);
     },
   },
+  whatsapp: {
+    available: () => ipcRenderer.invoke("desktop.whatsapp.available"),
+    status: () => ipcRenderer.invoke("desktop.whatsapp.status"),
+    link: (input) => ipcRenderer.invoke("desktop.whatsapp.link", input),
+    cancel: (sessionKey) => ipcRenderer.invoke("desktop.whatsapp.cancel", sessionKey),
+    disconnect: (linkId) => ipcRenderer.invoke("desktop.whatsapp.disconnect", linkId),
+    onStatus: (listener) => {
+      const handler = (_event, status) => listener(status);
+      ipcRenderer.on("desktop.whatsapp.status", handler);
+      return () => ipcRenderer.off("desktop.whatsapp.status", handler);
+    },
+  },
   passkeys: {
     rpIds: () => ipcRenderer.invoke("desktop.passkeys.rpIds"),
   },

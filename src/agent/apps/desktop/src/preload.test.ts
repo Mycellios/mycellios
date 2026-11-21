@@ -139,8 +139,10 @@ describe("desktop preload bridge", () => {
       "settings",
       "update",
       "videoEdit",
+      "whatsapp",
       "window",
     ]);
+    expect(Object.keys(bridge.whatsapp!).sort()).toEqual(["available", "cancel", "disconnect", "link", "onStatus", "status"]);
     expect(Object.keys(bridge.window).sort()).toEqual([
       "close",
       "minimize",

@@ -66,8 +66,10 @@ export async function loadLocalDataKey(options: {
   platform: NodeJS.Platform;
   store: OsSecretStore;
   protectedDataExists: boolean;
+  /** A separate key record for another protected store (defaults to the local server's). */
+  fileName?: string;
 }): Promise<string> {
-  const file = path.join(options.userDataDir, LOCAL_DATA_KEY_FILE);
+  const file = path.join(options.userDataDir, options.fileName ?? LOCAL_DATA_KEY_FILE);
   const raw = await readPrivateFile(file, 4096);
   const saved = raw === null ? null : parseStoredKey(raw);
   if (saved) {

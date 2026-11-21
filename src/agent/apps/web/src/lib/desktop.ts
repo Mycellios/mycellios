@@ -1,4 +1,9 @@
-import type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@rakazo/contracts";
+import type {
+  RakazoDesktop,
+  RakazoDesktopOAuthCallback,
+  RakazoDesktopWhatsApp,
+  RakazoDesktopWhatsAppStatus,
+} from "@rakazo/contracts";
 import { DEFAULT_COMPUTER_MODE, type ComputerMode } from "@rakazo/contracts";
 
 export type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@rakazo/contracts";
@@ -94,4 +99,12 @@ export function desktopHidesTitleBar(desktop: RakazoDesktop | undefined = deskto
 
 export function desktopDragClass(desktop?: RakazoDesktop): string {
   return desktopHidesTitleBar(desktop) ? "app-drag" : "";
+}
+
+/** WhatsApp linked-device sessions held by this PC. Absent in browsers and older Desktop releases. */
+export type DesktopWhatsAppBridge = RakazoDesktopWhatsApp;
+export type DesktopWhatsAppStatus = RakazoDesktopWhatsAppStatus;
+
+export function whatsappBridge(): DesktopWhatsAppBridge | undefined {
+  return desktopBridge()?.whatsapp;
 }

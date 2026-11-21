@@ -8,6 +8,7 @@ import { installDesktopCompanions } from "./desktop-companions.js";
 import { windowIcon } from "./window-icon.js";
 import { FloatingChats } from "./floating-chats.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
+import { installWhatsApp } from "./whatsapp/whatsapp-ipc.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpace, type ManualPackageKind } from "./manual-update.js";
 import { publishedDesktopRelease } from "./published-desktop-release.js";
@@ -1812,6 +1813,16 @@ app.whenReady().then(async () => {
     });
     return cloudComputer;
   };
+  // Native account session for background connectors (account PC, WhatsApp), without a renderer.
+  const nativeAccountContext=async()=>{
+    if(currentSetup?.mode === "new")return null;
+    const base=projectServer() ?? normalizeServerUrl(currentSetup?.serverUrl ?? currentTargetUrl ?? (target.kind === "app" ? target.url : ""));
+    if(!base)return null;
+    if(mainWindow && projectServer()===base)accountComputerSession={base,session:mainWindow.webContents.session};
+    const nativeSession=accountComputerSession?.base===base?accountComputerSession.session:undefined;
+    if(!nativeSession)return null;
+    return {base,fetch:(url:string,init?:RequestInit)=>nativeSession.fetch(url,{...init,bypassCustomProtocolHandlers:true})};
+  };
   if(hostComputer) accountComputer = installAccountComputerBackground({
     agentExecution: 1,
     profile:userDataDir,host:hostComputer,nativeVersion:app.getVersion(),
@@ -1819,16 +1830,20 @@ app.whenReady().then(async () => {
     consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,
     keepRunningInBackground:()=>keepRunningInBackground,
     manageLoginPreference:false,
-    context:async()=>{
-      if(currentSetup?.mode === "new")return null;
-      const base=projectServer() ?? normalizeServerUrl(currentSetup?.serverUrl ?? currentTargetUrl ?? (target.kind === "app" ? target.url : ""));
-      if(!base)return null;
-      if(mainWindow && projectServer()===base)accountComputerSession={base,session:mainWindow.webContents.session};
-      const nativeSession=accountComputerSession?.base===base?accountComputerSession.session:undefined;
-      if(!nativeSession)return null;
-      return {base,fetch:(url,init)=>nativeSession.fetch(url,{...init,bypassCustomProtocolHandlers:true})};
+    context:nativeAccountContext,
+  });
+  const whatsApp = installWhatsApp({
+    ipcMain, userDataDir, platform: process.platform, store: safeStorage,
+    authorize: isCloudComputerRequest, context: nativeAccountContext,
+    space: async () => mainWindow && !mainWindow.isDestroyed() ? nativeProjectSpace(mainWindow) : null,
+    send: status => {
+      // QR payloads and pairing codes go only to the configured server's own page.
+      const server = projectServer(), win = mainWindow;
+      if (!server || !win || win.isDestroyed()) return;
+      try { if (new URL(win.webContents.getURL()).origin === new URL(server).origin) win.webContents.send("desktop.whatsapp.status", status); } catch { /* No page yet. */ }
     },
   });
+  app.once("before-quit", () => whatsApp.dispose());
   const projectBrowser = installProjectBrowser({
     getWindow: () => mainWindow,
     authorize: event => isCloudComputerRequest(event) || isManagedComputerRequest(event),
