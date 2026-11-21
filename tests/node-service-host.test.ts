@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { MycelliosNodeServiceHost } from "../src/node/service-host.js";
+import { EMPTY_LOCK_RECOVERY_AGE_MS, MycelliosNodeServiceHost } from "../src/node/service-host.js";
 
 const cleanup: string[] = [];
 afterEach(async () => Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true }))));
@@ -52,6 +52,26 @@ describe("MycelliosNodeServiceHost", () => {
     const host = new MycelliosNodeServiceHost(directory);
     await writeFile(host.lockPath, "truncated");
     await expect(host.acquire(1)).rejects.toThrow("mycellios_node_instance_lock_is_invalid");
+  });
+
+  it("recovers an old empty lock left by a crash between create and write", async () => {
+    const directory = await temporaryDirectory();
+    const host = new MycelliosNodeServiceHost(directory);
+    await writeFile(host.lockPath, "");
+    const old = new Date(Date.now() - EMPTY_LOCK_RECOVERY_AGE_MS - 1_000);
+    await utimes(host.lockPath, old, old);
+    await host.acquire(1);
+    expect(JSON.parse(await readFile(host.lockPath, "utf8"))).toMatchObject({ pid: process.pid });
+    expect((await readdir(directory)).filter((name) => name.includes(".tmp-"))).toEqual([]);
+    await host.release(1);
+  });
+
+  it("keeps a fresh empty lock closed because its owner may still be writing", async () => {
+    const directory = await temporaryDirectory();
+    const host = new MycelliosNodeServiceHost(directory);
+    await writeFile(host.lockPath, "");
+    await expect(host.acquire(1)).rejects.toThrow("mycellios_node_instance_lock_is_invalid");
+    expect((await readdir(directory)).filter((name) => name.includes(".tmp-"))).toEqual([]);
   });
 });
 

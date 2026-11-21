@@ -37,10 +37,19 @@ replicas from the deployments their workers advertise.
    waited forever with the process still "active". This happened on
    2026-11-16 (CPU) and 2026-11-18 (CUDA).
 2. **Stage executor node stopped reporting.** `node-c173…` (MSI GE60, node
-   0.2.108) stopped sending snapshots on 2026-11-10 17:27 UTC. Its stage
-   service fails owner admission ("node not ready") in a restart loop, so the
-   CPU pipeline lost a stage (`pipeline_stage_disconnected`). From
-   2026-11-11 every request failed with `no_capacity`.
+   0.2.108) stopped sending snapshots on 2026-11-10. Its stage service then
+   failed owner admission ("node not ready") in a restart loop, so the CPU
+   pipeline lost a stage (`pipeline_stage_disconnected`). From 2026-11-11
+   every request failed with `no_capacity`. Two faults kept the node down:
+   - A crash between creating and writing `state/instance.lock` left an
+     empty lock. `MycelliosNodeServiceHost.acquire` fails closed on an
+     unreadable lock, so every later start exited with
+     `mycellios_node_instance_lock_is_invalid`.
+   - Its coordinator URL was the private NetBird relay
+     (`https://100.102.50.179:18474`). After the 2026-11-19 migration the
+     relay's upstream answers `404` to `/internal/v1/workers/connect`
+     upgrades, so the node timed out before `ready`. The other nodes use
+     `https://www.mycellios.com`.
 3. **CUDA GPU reservation keeper not migrated.** The CUDA replica's keeper
    still targeted the retired SQLite store. Its last write was 2026-10-31
    23:01 UTC (`prepared`, never committed). Kokoro and Whisper got Postgres
@@ -69,18 +78,40 @@ detected VRAM (`src/node/main.ts`), so it is not a cause.
   stays visible as `scheduled` with a "persistent automatic retry" message.
   Deterministic failures still require a change. Covered by
   `tests/requested-model-api.test.ts`.
+- Node service host: the instance lock is written to a temporary file and
+  published with an exclusive hard link, so a crash can no longer leave an
+  empty or truncated lock. An empty lock older than 60 s (left by earlier
+  versions) is recovered; fresh empty and malformed locks still fail closed.
+  Covered by `tests/node-service-host.test.ts`.
 
 ## Operational recovery (2026-11-20)
 
 - Restarted `mycellios-embedding-worker` on the control server. It now waits
   for its stages and restarts every 10 s through systemd.
 - Rebooted the MSI GE60 through Jarvis Local Node after confirming 36 days of
-  console inactivity. Its node still does not report (open item).
+  console inactivity.
+- 2026-11-21: operator access to the HP, MSI GE60 and MRPUCCHI now goes
+  through NetBird SSH (JWT, `daniel-native-ssh` policy), not Jarvis.
+  The MSI rejoined NetBird as a new peer; it was moved back to its previous
+  address `100.102.242.239` and groups, and the duplicate peer was removed.
+- On the MSI: moved the empty lock aside
+  (`instance.lock.empty-20261110.bak`), pointed `node.json` at
+  `https://www.mycellios.com` (backup `node.json.before-public-coordinator-20261121`)
+  and restarted `MycelliosNode`. The node reached `ready`, stage 15-36
+  reached `admitted-stage-serving`, the CPU cell worker connected, and the
+  AntSeed seller re-advertised `mycellios-qwen3-embedding-4b` after an HTTP 200
+  health check.
+- The CUDA replica (`mycellios-embedding-gpu-mrpucchi-20261020`) remains
+  down: its runner exits with `embedding_gpu_qualification_lease_missing`
+  because no keeper renews its committed reservation. Kokoro (2048 MiB) and
+  Whisper (2048 MiB) hold the RTX 2060 safe budget (5221 MiB), so a third
+  2048 MiB reservation does not fit. Jarvis's bulk backfill uses this replica.
 
 ## Remaining work (follow-up PRs)
 
-1. Recover or replace stage 15-36 on a second node. This needs administrator
-   access to diagnose `MycelliosNode` 0.2.108 on the MSI GE60.
+1. Retire or fix the private relay route on `:18474` (its upstream rejects
+   worker WebSocket upgrades since the migration), and update the MSI GE60
+   from node 0.2.108.
 2. Bring the embedding runtime, stage service and GPU keeper sources into the
    repository so the coordinator can place replicas on any compatible node.
    Then add a native-node command to start or stop a qualified replica.
