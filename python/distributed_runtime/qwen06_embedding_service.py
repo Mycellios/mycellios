@@ -162,19 +162,26 @@ class ThermalGuard:
         self.soft_pause_s = soft_pause_s
         self.paused = False
 
+    def observe(self):
+        """Read the temperature and update the hysteresis state; None when unreadable."""
+        try:
+            temperature = self.read()
+        except Exception:
+            return None
+        if temperature is None:
+            return None
+        if self.paused and temperature < self.resume_c:
+            self.paused = False
+        elif not self.paused and temperature >= self.pause_c:
+            self.paused = True
+        return temperature
+
     def wait(self):
         waited = 0.0
         while True:
-            try:
-                temperature = self.read()
-            except Exception:
-                temperature = None
+            temperature = self.observe()
             if temperature is None:
                 return
-            if self.paused and temperature < self.resume_c:
-                self.paused = False
-            elif not self.paused and temperature >= self.pause_c:
-                self.paused = True
             if not self.paused:
                 if temperature >= self.soft_c:
                     self.sleep(self.soft_pause_s)
@@ -252,7 +259,11 @@ def make_handler(replica, token):
         def do_GET(self):
             if self.path != "/health":
                 return self.reply(404, {"error": {"code": "not_found"}})
-            self.reply(200, {"ready": replica.state == "ready", "state": replica.state, "model": MODEL_ID,
+            # A cooling replica reports not ready so the failover entry routes
+            # new work to other replicas instead of queueing it here.
+            cooling = replica.thermal is not None and replica.thermal.paused
+            self.reply(200, {"ready": replica.state == "ready" and not cooling,
+                             "state": "cooling" if cooling and replica.state == "ready" else replica.state, "model": MODEL_ID,
                              "revision": replica.config["revision"], "device": replica.config["device"]})
 
         def do_POST(self):
@@ -293,16 +304,22 @@ def main():
     thermal = None
     if config["device"] == "cuda":
         limits = config.get("thermal", {})
-        thermal = ThermalGuard(nvidia_temperature, limits.get("pauseC", 78), limits.get("resumeC", 72))
+        thermal = ThermalGuard(nvidia_temperature, limits.get("pauseC", 78), limits.get("resumeC", 72),
+                               max_wait_s=limits.get("maxWaitSeconds", 10))
     replica = Replica(config, gate=gate, thermal=thermal)
 
     def loop():
+        tick = 0
         while True:
-            try:
-                replica.reconcile()
-            except Exception as error:  # keep serving state; loading errors retry
-                replica.state = "load_failed:" + type(error).__name__
-            time.sleep(10)
+            if thermal is not None:
+                thermal.observe()
+            if tick % 3 == 0:
+                try:
+                    replica.reconcile()
+                except Exception as error:  # keep serving state; loading errors retry
+                    replica.state = "load_failed:" + type(error).__name__
+            tick += 1
+            time.sleep(3)
 
     threading.Thread(target=loop, daemon=True).start()
     server = ThreadingHTTPServer((config["host"], int(config["port"])), make_handler(replica, token))

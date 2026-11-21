@@ -53,6 +53,16 @@ class ForwarderTests(unittest.IsolatedAsyncioTestCase):
         await self.forwarder.refresh()
         self.assertEqual(await request(self.port), b"cpu:ping")
 
+    async def test_spreads_work_by_weighted_load(self):
+        gpu, cpu = ("127.0.0.1", self.ports[0]), ("127.0.0.1", self.ports[1])
+        self.forwarder.weights = {gpu: 4, cpu: 1}
+        await self.forwarder.refresh()
+        self.assertEqual(self.forwarder.ordered_ready()[0], gpu)
+        self.forwarder.active[gpu] = 4
+        self.assertEqual(self.forwarder.ordered_ready()[0], cpu)
+        self.forwarder.active[cpu] = 1
+        self.assertEqual(self.forwarder.ordered_ready()[0], gpu)
+
     async def test_answers_503_when_no_replica_is_ready(self):
         self.health = {port: False for port in self.ports}
         await self.forwarder.refresh()

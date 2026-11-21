@@ -27,7 +27,7 @@ models are never mixed: Jarvis stores 0.6B vectors in their own column.
 | Piece | Where |
 |---|---|
 | GPU replica (fp16, primary) | MRPUCCHI `100.102.221.91:18495`, Windows service `MycelliosQwen06` |
-| CPU replica (fp32, backup) | HP ProBook `100.102.123.237:18495` |
+| CPU replicas (share load) | HP ProBook `100.102.123.237:18495`, MSI GE60 `100.102.242.239:18495` |
 | Failover entry | control server `10.48.0.10:18495`, systemd `mycellios-qwen06-forwarder` |
 | Client | Jarvis API on prod-apps-01 (`10.48.0.6`) |
 
@@ -38,6 +38,19 @@ models are never mixed: Jarvis stores 0.6B vectors in their own column.
   only the control server to reach port 18495 on the replica group. Windows
   Firewall on each PC admits only `100.102.50.179`. The forwarder admits only
   Jarvis and loopback. Requests carry a bearer token.
+
+## Distribution
+
+The failover entry spreads requests by weighted least load (active
+connections per unit of weight: GPU 2, each CPU 1), so every ready replica in
+the network takes part instead of the GPU alone. A GPU replica reports
+`ready: false` (state `cooling`) while it is above its thermal pause
+threshold (81 °C, resume 76 °C on MRPUCCHI), so new work goes to the other
+replicas until it cools. Jarvis keeps four requests in flight with a
+180 s timeout (`backfillConcurrency`, `requestTimeoutMs` in its state file)
+so the slower CPU replicas stay busy too. Replicas fetch the pinned model
+over NetBird from the control server (`qwen06-artifacts-persist`, range
+requests, port 18496 for the replica group only).
 
 ## Contract
 
