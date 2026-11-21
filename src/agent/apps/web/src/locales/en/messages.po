@@ -13364,3 +13364,36 @@ msgstr "Could not copy the link. Select it and copy it."
 
 msgid "Could not load the link. Try again."
 msgstr "Could not load the link. Try again."
+
+msgid "The Mico is signed out of every website."
+msgstr "The Mico is signed out of every website."
+
+msgid "Its computer is off, so it still has its sessions there. Try again when the computer is on."
+msgstr "Its computer is off, so it still has its sessions there. Try again when the computer is on."
+
+msgid "The Mico is working. Try again when it finishes."
+msgstr "The Mico is working. Try again when it finishes."
+
+msgid "Could not close the sessions. Try again."
+msgstr "Could not close the sessions. Try again."
+
+msgid "Browser sessions"
+msgstr "Browser sessions"
+
+msgid "Sign this Mico out of every website. Its next task starts with an empty browser."
+msgstr "Sign this Mico out of every website. Its next task starts with an empty browser."
+
+msgid "Close browser sessions"
+msgstr "Close browser sessions"
+
+msgid "Close browser sessions?"
+msgstr "Close browser sessions?"
+
+msgid "The Mico loses its logins, cookies and saved site data. It will need to sign in again to use those websites."
+msgstr "The Mico loses its logins, cookies and saved site data. It will need to sign in again to use those websites."
+
+msgid "Closing…"
+msgstr "Closing…"
+
+msgid "Close sessions"
+msgstr "Close sessions"

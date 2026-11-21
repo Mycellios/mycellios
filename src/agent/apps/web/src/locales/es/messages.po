@@ -13742,3 +13742,36 @@ msgstr "No se pudo copiar el enlace. Selecciónalo y cópialo."
 
 msgid "Could not load the link. Try again."
 msgstr "No se pudo cargar el enlace. Inténtalo de nuevo."
+
+msgid "The Mico is signed out of every website."
+msgstr "El Mico ha cerrado sesión en todas las webs."
+
+msgid "Its computer is off, so it still has its sessions there. Try again when the computer is on."
+msgstr "Su ordenador está apagado, así que allí sigue teniendo sus sesiones. Vuelve a intentarlo cuando esté encendido."
+
+msgid "The Mico is working. Try again when it finishes."
+msgstr "El Mico está trabajando. Vuelve a intentarlo cuando termine."
+
+msgid "Could not close the sessions. Try again."
+msgstr "No se pudieron cerrar las sesiones. Vuelve a intentarlo."
+
+msgid "Browser sessions"
+msgstr "Sesiones del navegador"
+
+msgid "Sign this Mico out of every website. Its next task starts with an empty browser."
+msgstr "Cierra la sesión de este Mico en todas las webs. Su próxima tarea empezará con un navegador vacío."
+
+msgid "Close browser sessions"
+msgstr "Cerrar sesiones del navegador"
+
+msgid "Close browser sessions?"
+msgstr "¿Cerrar las sesiones del navegador?"
+
+msgid "The Mico loses its logins, cookies and saved site data. It will need to sign in again to use those websites."
+msgstr "El Mico pierde sus inicios de sesión, cookies y datos guardados de las webs. Tendrá que volver a iniciar sesión para usarlas."
+
+msgid "Closing…"
+msgstr "Cerrando…"
+
+msgid "Close sessions"
+msgstr "Cerrar sesiones"

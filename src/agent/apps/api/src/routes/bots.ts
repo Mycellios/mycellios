@@ -6,6 +6,8 @@ import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
 import type { getBotSecretMetadata } from "@rakazo/adapters";
 import {
   archiveBot,
+  BotBrowserBusyError,
+  resetBotBrowser,
   cancelComputerRunWork,
   checkpointAndRecordComputerWorkspace,
   discoverNativeEngines,
@@ -581,6 +583,20 @@ export function botsRoutes(ctx: RouterContext) {
           computerContext(context.actor, bot.id, "archive"),
         );
         return { ok: true as const };
+      }),
+      resetBrowser: authed.bots.resetBrowser.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        try {
+          const result = await resetBotBrowser(
+            { prisma: deps.prisma, sandbox: deps.sandbox, home: deps.home, dataDir: deps.dataDir },
+            bot,
+            computerContext(context.actor, bot.id, "reset-browser"),
+          );
+          return { ok: true as const, computerOff: result.computerOff };
+        } catch (error) {
+          if (error instanceof BotBrowserBusyError) throw new ORPCError("CONFLICT", { message: error.message });
+          throw error;
+        }
       }),
       restore: authed.bots.restore.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId, { includeArchived: true });
