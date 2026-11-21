@@ -15,7 +15,7 @@
     "@rakazo/contracts": "*",
     "@rakazo/core": "*",
     "@rakazo/logging": "*",
-    "hono": "4.13.14",
+    "hono": "4.13.18",
     "tsx": "4.23.15"
   },
   "devDependencies": {
