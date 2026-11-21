@@ -13,8 +13,9 @@ import asyncio
 import json
 from pathlib import Path
 
+_NO_REPLICA_BODY = b'{"error":{"code":"no_replica_available"}}'
 NO_REPLICA = (b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nConnection: close\r\n"
-              b"Content-Length: 43\r\n\r\n{\"error\":{\"code\":\"no_replica_available\"}}")
+              + b"Content-Length: " + str(len(_NO_REPLICA_BODY)).encode() + b"\r\n\r\n" + _NO_REPLICA_BODY)
 
 
 async def probe(host, port, timeout=3.0):
