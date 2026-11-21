@@ -69,6 +69,9 @@ class ForwarderTests(unittest.IsolatedAsyncioTestCase):
         response = await request(self.port)
         self.assertTrue(response.startswith(b"HTTP/1.1 503"))
         self.assertIn(b"no_replica_available", response)
+        head, _, body = response.partition(b"\r\n\r\n")
+        length = int(next(line.split(b":")[1] for line in head.split(b"\r\n") if line.lower().startswith(b"content-length")))
+        self.assertEqual(length, len(body))
 
     async def test_rejects_clients_outside_the_allowlist(self):
         self.forwarder.allowed = {"10.0.0.1"}
