@@ -14,7 +14,7 @@ it("uses the real network, explicit contribution funding and approved placement 
     const body = JSON.parse(String(init?.body));
     expect(body.model).toBe("mycellios-whisper-small");
     expect(new Headers(init?.headers).get("x-mycellios-funding")).toBe("contribution-credits");
-    expect(body.privacy).toEqual({ trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: pin });
+    expect(body).not.toHaveProperty("privacy");
     const request = JSON.parse(body.messages[0].content);
     expect(request.audio.sha256).toBe(createHash("sha256").update(audio()).digest("hex"));
     return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({

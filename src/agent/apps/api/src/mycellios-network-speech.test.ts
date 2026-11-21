@@ -53,8 +53,8 @@ it("uses the canonical network endpoint, explicit credit funding and verified WA
     language: "es",
     voice: "ef_dora",
     stream: false,
-    privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: ["qualified-speech-device"] },
   });
+  expect(JSON.parse(String(init?.body))).not.toHaveProperty("privacy");
 });
 
 it.each([{ workerIdentityIds: undefined }, { workerIdentityIds: [] }, { workerIdentityIds: ["unsafe/identity"] }, { workerIdentityIds: [""] }])("refuses unconfigured placement before any inference or credit reservation: %j", async ({ workerIdentityIds }) => {
@@ -64,12 +64,12 @@ it.each([{ workerIdentityIds: undefined }, { workerIdentityIds: [] }, { workerId
   expect(fetcher).not.toHaveBeenCalled();
 });
 
-it("never drops placement or retries another worker when a pinned worker is unavailable", async () => {
+it("does not retry another worker when the network is unavailable", async () => {
   const fetcher = vi.fn<typeof fetch>(async () => new Response("unavailable", {status:503}));
   await expect(renderNetworkSpeech("test-key", {text,language:"es",workerIdentityIds:["qualified-speech-device"]},fetcher))
     .rejects.toMatchObject({code:"SERVICE_UNAVAILABLE"});
   expect(fetcher).toHaveBeenCalledOnce();
-  expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body)).privacy.pinned_identity_ids).toEqual(["qualified-speech-device"]);
+  expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).not.toHaveProperty("privacy");
 });
 
 it("rejects invalid speech bytes and reports insufficient credits without retrying", async () => {

@@ -30,7 +30,8 @@ export async function renderNetworkTranscription(token: string, input: {
       method: "POST", redirect: "error", cache: "no-store",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-mycellios-funding": "contribution-credits" },
       body: JSON.stringify({ model: TRANSCRIPTION_MODEL, messages: [{ role: "user", content: JSON.stringify(envelope) }],
-        max_tokens: 1, deadline_ms: 55_000, stream: false, privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: identities } }), signal,
+        // No placement pin: the coordinator keeps paid dictation on replicas that can settle it (D7).
+        max_tokens: 1, deadline_ms: 55_000, stream: false }), signal,
     });
   } catch { throw unavailable(); }
   if (!response.ok) {
