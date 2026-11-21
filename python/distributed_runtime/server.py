@@ -1698,7 +1698,7 @@ def build_server(args: argparse.Namespace) -> DistributedMycelliosServer:
     if args.speculation_lookup == "fused":
         draft_provider = FusedLookupDraftProvider(
             max_draft_tokens=args.speculative_max_draft_tokens,
-            short_block_tokens=min(7, args.speculative_max_draft_tokens),
+            short_block_tokens=min(8, args.speculative_max_draft_tokens),
             draft_model=draft_provider,
             max_tracked_requests=max(1, args.max_active_sequences),
         )

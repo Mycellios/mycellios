@@ -213,7 +213,7 @@ class FusedLookupDraftProvider:
         self,
         *,
         max_draft_tokens: int = MAX_DRAFT_TOKENS,
-        short_block_tokens: int = 7,
+        short_block_tokens: int = 8,
         strong_match_tokens: int = 8,
         agree_tokens: int = 2,
         long_block_streak: int = 0,
@@ -273,6 +273,7 @@ class FusedLookupDraftProvider:
             max_match_tokens=max(int(strong_match_tokens), 8),
         )
         self._lock = threading.Lock()
+        self._lookup_cache: tuple[tuple[int, tuple[int, ...]], int, tuple[tuple[int, ...], int]] | None = None
         self._requests: OrderedDict[str | int, _FusedRequestState] = OrderedDict()
         self._counters = {
             "draftCalls": 0,
@@ -291,6 +292,85 @@ class FusedLookupDraftProvider:
         max_tokens: int | None = None,
     ) -> tuple[int, ...]:
         return self._draft(None, token_history, max_tokens)
+
+    def draft_sources(self, token_history: Sequence[int]) -> tuple[str, ...]:
+        """Order the draft sources worth trying for this step, at no cost.
+
+        ``lookup`` copies a strong match, ``weak`` copies a short match and
+        ``model`` pays for the draft model. The engine keeps separate
+        controller measurements per source and tries them in order: free
+        sources first, the paid model only where no free source is winning.
+        Free copies therefore never justify model drafts that lose on this
+        hardware, and probing a slow model does not tax steps a free match
+        already serves (measured: 22 against 16 tok/s on copy-heavy prompts).
+        Without a draft model there is a single combined source and no split
+        (empty tuple).
+        """
+
+        if self.draft_model is None:
+            return ()
+        lookup, width = self._match(tuple(token_history), self.max_draft_tokens)
+        if width >= self.strong_match_tokens:
+            return ("lookup",)
+        return ("weak", "model") if lookup else ("model",)
+
+    def for_source(self, source: str) -> "_FusedSourceView":
+        if source not in ("lookup", "model", "weak"):
+            raise ValueError("unknown fused draft source")
+        return _FusedSourceView(self, source)
+
+    def available_draft_tokens(
+        self,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+        source: str | None = None,
+    ) -> int:
+        """Upper bound on the next draft's length, without running the model.
+
+        A deferred controller decides before drafting. Without this bound it
+        assumes ``max_draft_tokens`` and keeps probing sizes this source can
+        never supply (a model draft is capped at the short block), paying for
+        the draft model on every step.
+        """
+
+        history = tuple(token_history)
+        limit = self.max_draft_tokens if max_tokens is None else min(
+            _validate_count("max_tokens", max_tokens), self.max_draft_tokens
+        )
+        if limit == 0:
+            return 0
+        lookup, width = self._match(history, self.max_draft_tokens)
+        strong = width >= self.strong_match_tokens
+        if source == "lookup" and not strong:
+            return 0
+        if strong and source in (None, "lookup"):
+            # Mirrors _draft: a strong match may use the long block only when
+            # no streak is required; otherwise report the short block.
+            cap = limit if self.long_block_streak == 0 else min(
+                limit, self.short_block_tokens
+            )
+            return min(len(lookup), cap)
+        cap = min(limit, self.short_block_tokens)
+        if source == "weak" or self.draft_model is None:
+            return min(len(lookup), cap)
+        return min(cap, int(self.draft_model.max_draft_tokens))
+
+    def _match(
+        self, history: tuple[int, ...], limit: int
+    ) -> tuple[tuple[int, ...], int]:
+        # draft_source and the following draft scan the same history; reuse
+        # the scan. A stale hit can only produce a different, still verified
+        # draft, never a different output.
+        key = (len(history), history[-16:])
+        with self._lock:
+            cached = self._lookup_cache
+        if cached is not None and cached[0] == key and cached[1] >= limit:
+            tokens, width = cached[2]
+            return tokens[:limit], width
+        result = self._lookup.draft_with_match(history, limit)
+        with self._lock:
+            self._lookup_cache = (key, limit, result)
+        return result
 
     def draft_for_request(
         self,
@@ -374,6 +454,7 @@ class FusedLookupDraftProvider:
         key: str | int | None,
         token_history: Sequence[int],
         max_tokens: int | None,
+        source: str | None = None,
     ) -> tuple[int, ...]:
         if isinstance(token_history, (str, bytes, bytearray)):
             raise ValueError("token_history must be a sequence of integer token ids")
@@ -385,7 +466,7 @@ class FusedLookupDraftProvider:
         self._count("draftCalls")
         if limit == 0:
             return ()
-        lookup, width = self._lookup.draft_with_match(history, limit)
+        lookup, width = self._match(history, limit)
         streak = self._streak(key, history)
         copying = width >= self.strong_match_tokens
         if copying and streak >= self.long_block_streak:
@@ -393,10 +474,17 @@ class FusedLookupDraftProvider:
         else:
             cap = min(limit, self.short_block_tokens)
 
-        if copying:
+        if source == "lookup" and not copying:
+            result = ()
+            self._count("emptyDrafts")
+        elif copying and source in (None, "lookup"):
             result = lookup[:cap]
             self._count("strongLookupDrafts")
+        elif source == "weak":
+            result = lookup[: min(limit, self.short_block_tokens)]
+            self._count("weakLookupDrafts" if result else "emptyDrafts")
         else:
+            cap = min(limit, self.short_block_tokens)
             model = self._model_draft(key, history, cap)
             agree = self.agree_tokens
             if (
@@ -410,7 +498,7 @@ class FusedLookupDraftProvider:
             elif model:
                 result = model[:cap]
                 self._count("modelDrafts")
-            elif lookup:
+            elif lookup and source is None:
                 result = lookup[:cap]
                 self._count("weakLookupDrafts")
             else:
@@ -442,6 +530,48 @@ class FusedLookupDraftProvider:
                 else None
             ),
         }
+
+
+class _FusedSourceView:
+    """One draft source of a fused provider, measured by its own controller."""
+
+    strategy = "fused-lookup"
+
+    def __init__(self, parent: FusedLookupDraftProvider, source: str) -> None:
+        self._parent = parent
+        self.source = source
+        self.max_draft_tokens = parent.max_draft_tokens
+        # Only the paid source is worth deferring until it is selected.
+        self.defer_until_selected = source == "model" and parent.defer_until_selected
+
+    def draft(
+        self,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+    ) -> tuple[int, ...]:
+        return self._parent._draft(None, token_history, max_tokens, self.source)
+
+    def draft_for_request(
+        self,
+        request_id: str | int,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+    ) -> tuple[int, ...]:
+        if isinstance(request_id, bool) or not isinstance(request_id, (str, Integral)):
+            raise ValueError("request id must be a string or integer")
+        key: str | int = (
+            int(request_id) if isinstance(request_id, Integral) else request_id
+        )
+        return self._parent._draft(key, token_history, max_tokens, self.source)
+
+    def available_draft_tokens(
+        self,
+        token_history: Sequence[int],
+        max_tokens: int | None = None,
+    ) -> int:
+        return self._parent.available_draft_tokens(
+            token_history, max_tokens, self.source
+        )
 
 
 @dataclass(frozen=True)
@@ -628,8 +758,26 @@ class AdaptiveSpeculationConfig:
     # delay cap stays at 1.
     delay_reference_ms: float = 25.0
     rtt_ewma_alpha: float = 0.2
+    # After warm-up, every ``exploration_interval``-th decision may re-probe a
+    # size whose optimistic bound still beats the incumbent's conservative
+    # bound, until it has ``max_exploration_observations``. Without this, a
+    # size judged on three noisy samples is never revisited. Zero disables.
+    exploration_interval: int = 4
+    max_exploration_observations: int = 32
 
     def __post_init__(self) -> None:
+        if (
+            not _is_int(self.exploration_interval)
+            or int(self.exploration_interval) < 0
+        ):
+            raise ValueError("exploration_interval must be a non-negative integer")
+        if (
+            not _is_int(self.max_exploration_observations)
+            or int(self.max_exploration_observations) < 0
+        ):
+            raise ValueError(
+                "max_exploration_observations must be a non-negative integer"
+            )
         if (
             not _is_int(self.max_draft_tokens)
             or not 1 <= int(self.max_draft_tokens) <= MAX_DRAFT_TOKENS
@@ -818,8 +966,10 @@ class AdaptiveSpeculationController:
         self._verification: dict[int, _VerificationMeasurements] = {}
         self._rtt_ewma_ms: float | None = None
         self._enabled_candidate_size: int | None = None
+        self._decisions = 0
 
     def reset(self) -> None:
+        self._decisions = 0
         self._classic = _ClassicMeasurements()
         self._verification.clear()
         self._rtt_ewma_ms = None
@@ -1118,7 +1268,49 @@ class AdaptiveSpeculationController:
             ).observations
             if observations < int(self.config.min_verify_observations):
                 return candidate
-        return None
+        return self._exploration_size(available)
+
+    def _exploration_size(self, available: int) -> int | None:
+        """Optimistic re-probe of a measured size that may still be the best.
+
+        A size is revisited while its optimistic speedup bound exceeds what is
+        already certain: the best conservative bound, or the activation
+        threshold when nothing is enabled. Bounds tighten as samples arrive,
+        so a size is either promoted by ``decide`` or stops being explored.
+        A source that clearly loses (a slow draft model) is never re-probed.
+        """
+
+        interval = int(self.config.exploration_interval)
+        if interval <= 0 or self._decisions % interval:
+            return None
+        estimates = [
+            estimate
+            for estimate in self.candidate_estimates()
+            if estimate.candidate_size <= available
+            and estimate.ready
+            and estimate.predicted_speedup is not None
+            and estimate.predicted_speedup_lower_bound is not None
+        ]
+        if not estimates:
+            return None
+        certain = max(
+            float(self.config.minimum_speedup),
+            max(float(e.predicted_speedup_lower_bound) for e in estimates),
+        )
+        best: tuple[float, int] | None = None
+        for estimate in estimates:
+            if estimate.candidate_size == self._enabled_candidate_size:
+                continue
+            if estimate.observations >= int(
+                self.config.max_exploration_observations
+            ):
+                continue
+            optimistic = 2.0 * float(estimate.predicted_speedup) - float(
+                estimate.predicted_speedup_lower_bound
+            )
+            if optimistic > certain and (best is None or optimistic > best[0]):
+                best = (optimistic, estimate.candidate_size)
+        return None if best is None else best[1]
 
     def decide(
         self,
@@ -1129,6 +1321,7 @@ class AdaptiveSpeculationController:
         history, available = self._validate_decision_inputs(
             history_tokens, available_draft_tokens
         )
+        self._decisions += 1
         available = self._capped_available(available)
         if history < int(self.config.min_token_history):
             return self._disabled("history_too_short")

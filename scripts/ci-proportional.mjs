@@ -20,8 +20,9 @@ const speculationPython = new Set(['python/distributed_runtime/speculation.py',
   'python/distributed_runtime/server.py', 'python/distributed_runtime/draft_quality_runtime_benchmark.py',
   'python/tests/test_speculation.py', 'python/tests/test_server.py', 'python/tests/test_draft_quality_runtime_benchmark.py',
   'python/distributed_runtime/macro_wave_adapter.py', 'python/tests/test_macro_wave_adapter.py',
-  'python/distributed_runtime/draft_model.py', 'python/tests/test_draft_model.py']);
-const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py'];
+  'python/distributed_runtime/draft_model.py', 'python/tests/test_draft_model.py',
+  'python/distributed_runtime/engine.py', 'python/tests/test_engine.py']);
+const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
 export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
