@@ -398,7 +398,7 @@ describe("automatic activation recovery", () => {
     expect(automaticActivationFailureIsTransient("unsupported_model_architecture:qwen-next")).toBe(false);
   });
 
-  it("uses bounded progressive retries and stops after the configured limit", () => {
+  it("uses progressive retries, then keeps retrying at the capped interval", () => {
     const first = nextAutomaticActivationRetry(0, "temporary", 1_000, [5_000, 15_000]);
     expect(first).toMatchObject({
       retryCount: 0,
@@ -407,7 +407,12 @@ describe("automatic activation recovery", () => {
     });
     const second = nextAutomaticActivationRetry(1, "temporary", 1_000, [5_000, 15_000]);
     expect(second?.nextAttemptAt).toBe(16_000);
-    expect(nextAutomaticActivationRetry(2, "temporary", 1_000, [5_000, 15_000])).toBeNull();
+    expect(nextAutomaticActivationRetry(2, "temporary", 1_000, [5_000, 15_000])).toMatchObject({
+      retryCount: 2,
+      nextAttemptAt: 16_000,
+    });
+    expect(nextAutomaticActivationRetry(500, "temporary", 1_000, [5_000, 15_000])?.nextAttemptAt).toBe(16_000);
+    expect(nextAutomaticActivationRetry(0, "temporary", 1_000, [])).toBeNull();
     expect(automaticActivationFailureIsTransient(
       "automatic_activation_retries_exhausted:2:managed_launch_agent_is_unavailable:desktop-test",
     )).toBe(false);

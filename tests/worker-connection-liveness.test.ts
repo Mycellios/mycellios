@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { workerConfigSchema } from "../src/contracts/schemas.js";
-import { WorkerAgent } from "../src/worker/agent.js";
+import { COORDINATOR_READY_TIMEOUT_MS, WorkerAgent } from "../src/worker/agent.js";
 
 describe("worker connection liveness", () => {
   afterEach(() => {
@@ -36,6 +36,26 @@ describe("worker connection liveness", () => {
     harness.stopRttProbe();
   });
 
+  it("terminates a coordinator socket that never becomes ready so reconnect regains control", async () => {
+    const { harness, socket, advance, logger } = setup();
+    socket.readyState = WebSocket.CONNECTING;
+    harness.readyDeadline.arm(socket as unknown as WebSocket);
+    await advance(COORDINATOR_READY_TIMEOUT_MS - 1);
+    expect(socket.terminate).not.toHaveBeenCalled();
+    await advance(1);
+    expect(socket.terminate).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("did not acknowledge"));
+  });
+
+  it("keeps a socket that the coordinator acknowledged in time", async () => {
+    const { harness, socket, advance } = setup();
+    harness.readyDeadline.arm(socket as unknown as WebSocket);
+    await advance(10_000);
+    harness.readyDeadline.clear();
+    await advance(COORDINATOR_READY_TIMEOUT_MS * 2);
+    expect(socket.terminate).not.toHaveBeenCalled();
+  });
+
   it("does not let an unrelated pong keep a dead transport alive", async () => {
     const { harness, socket, advance } = setup();
     harness.startRttProbe(socket as unknown as WebSocket);
@@ -49,6 +69,7 @@ describe("worker connection liveness", () => {
 function setup() {
   vi.useFakeTimers();
   const startedAt = Date.now();
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   vi.spyOn(process.hrtime, "bigint").mockImplementation(() => BigInt(Date.now() - startedAt) * 1_000_000n);
   const agent = new WorkerAgent(workerConfigSchema.parse({
     region: "test",
@@ -56,15 +77,16 @@ function setup() {
     limits: { maxConcurrency: 1, pauseWhenForeground: false },
     adapter: { kind: "mock", developmentOnly: true, model: "test", tokensPerSecond: 1_000, ttftMs: 0, failureRate: 0 },
     deployment: { modelDigest: "sha256:test", contextLimit: 8_192 },
-  }), { coordinatorUrl: "http://127.0.0.1:8080", logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } });
+  }), { coordinatorUrl: "http://127.0.0.1:8080", logger });
   const harness = agent as unknown as {
     startRttProbe(socket: WebSocket): void;
     stopRttProbe(): void;
     recordRttSample(payload: Buffer): void;
+    readyDeadline: { arm(socket: WebSocket): void; clear(socket?: WebSocket): void };
   };
-  const socket = { readyState: WebSocket.OPEN, ping: vi.fn<(payload: Buffer) => void>(), terminate: vi.fn() };
+  const socket: { readyState: number; ping: ReturnType<typeof vi.fn<(payload: Buffer) => void>>; terminate: ReturnType<typeof vi.fn> } = { readyState: WebSocket.OPEN, ping: vi.fn<(payload: Buffer) => void>(), terminate: vi.fn() };
   return {
-    agent, harness, socket,
+    agent, harness, socket, logger,
     advance: (ms: number) => vi.advanceTimersByTimeAsync(ms),
   };
 }

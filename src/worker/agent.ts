@@ -1,4 +1,6 @@
 import { MAX_TRANSCRIPTION_RESULT_BYTES } from "../contracts/transcription.js";
+import { COORDINATOR_READY_TIMEOUT_MS, CoordinatorReadyDeadline, delay, readResponseTextLimited, withAbort } from "./connection-timing.js";
+export { COORDINATOR_READY_TIMEOUT_MS } from "./connection-timing.js";
 import WebSocket from "ws";
 import { CoordinatorRttProbe } from "./coordinator-rtt-probe.js";
 import { RuntimePreparationQueue } from "./runtime-preparation-queue.js";
@@ -565,6 +567,7 @@ export class WorkerAgent {
   private readonly logger: Pick<Console, "info" | "warn" | "error">;
   private runtimeCapacityGeneration = 0;
   private runtimeDisconnectTimer: NodeJS.Timeout | null = null;
+  private readonly readyDeadline = new CoordinatorReadyDeadline(() => this.coordinatorReady || this.stopped, (message) => this.logger.warn(message));
   private contributionEnabled: boolean;
   private updateDraining = false;
   private coordinatorReady = false;
@@ -654,6 +657,7 @@ export class WorkerAgent {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = null;
     this.coordinatorReady = false;
+    this.readyDeadline.clear();
     this.clearRuntimeDisconnectTimer();
     this.clearRuntimeLinkProbes();
     await this.sendGoodbye("user_requested");
@@ -1232,11 +1236,13 @@ export class WorkerAgent {
       let opened = false;
       const socket = new WebSocket(url, {
         maxPayload: MAX_SERVER_MESSAGE_BYTES,
+        handshakeTimeout: COORDINATOR_READY_TIMEOUT_MS,
         ...(this.options.networkToken || this.workerSessionToken
           ? { headers: { authorization: `Bearer ${this.options.networkToken ?? this.workerSessionToken}` } }
           : {}),
       });
       this.socket = socket;
+      this.readyDeadline.arm(socket);
       const abortStartup = () => {
         if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
       };
@@ -1277,6 +1283,7 @@ export class WorkerAgent {
         const closeReason = reason.toString("utf8").replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 123);
         if (!this.stopped) this.logger.warn(`Coordinator connection closed (code ${code}, ready ${this.coordinatorReady}): ${closeReason || "no reason received"}`);
         signal.removeEventListener("abort", abortStartup);
+        this.readyDeadline.clear(socket);
         this.coordinatorReady = false;
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = null;
@@ -1340,6 +1347,7 @@ export class WorkerAgent {
         if (message.payload.workerId !== this.registeredWorkerId) {
           throw new Error("Coordinator acknowledged a different worker id");
         }
+        this.readyDeadline.clear();
         this.logger.info(`Worker ${this.registeredWorkerId ?? "unknown"} connected`);
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.clearRuntimeDisconnectTimer();
@@ -2608,61 +2616,6 @@ function coordinatorWebSocketUrl(base: URL, path: string): URL {
 
 function isLoopback(hostname: string): boolean {
   return LOOPBACK_HOSTS.has(hostname.toLowerCase());
-}
-
-async function readResponseTextLimited(response: Response, limitBytes: number): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let result = "";
-  let bytes = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > limitBytes) {
-        throw new Error(`Response body exceeds ${limitBytes} bytes`);
-      }
-      result += decoder.decode(value, { stream: true });
-    }
-    result += decoder.decode();
-    return result;
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(abortReason(signal));
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", abort);
-      resolve();
-    }, milliseconds);
-    const abort = () => {
-      clearTimeout(timer);
-      reject(abortReason(signal!));
-    };
-    signal?.addEventListener("abort", abort, { once: true });
-  });
-}
-
-function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(abortReason(signal));
-  return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(abortReason(signal));
-    signal.addEventListener("abort", abort, { once: true });
-    void operation.then(resolve, reject).finally(() => {
-      signal.removeEventListener("abort", abort);
-    });
-  });
-}
-
-function abortReason(signal: AbortSignal): Error {
-  return signal.reason instanceof Error
-    ? signal.reason
-    : new Error(String(signal.reason ?? "worker_start_cancelled"));
 }
 
 function errorText(error: unknown): string {

@@ -1,4 +1,15 @@
 import { rateLimitKeyGenerator } from "./rate-limit-key.js";
+import {
+  automaticRetryLabel,
+  DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS,
+  nextAutomaticActivationRetry,
+  type AutomaticActivationRetryState,
+} from "./activation-retry.js";
+export {
+  DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS,
+  nextAutomaticActivationRetry,
+  type AutomaticActivationRetryState,
+} from "./activation-retry.js";
 import { eventAgentAccess } from "./event-demo-agent-access.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
@@ -278,14 +289,6 @@ function safeSporeQuote(quote: SporeConversionQuote) {
   };
 }
 
-export const DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS = [
-  5_000,
-  15_000,
-  30_000,
-  120_000,
-  300_000,
-] as const;
-
 export const NETWORK_TELEMETRY_INTERVAL_MS = 10 * 60_000;
 export const NETWORK_TELEMETRY_RETENTION_DAYS = 90;
 
@@ -305,31 +308,6 @@ const networkHistoryRanges = {
   "30d": 30 * 24,
   "90d": NETWORK_TELEMETRY_RETENTION_DAYS * 24,
 } as const;
-
-export interface AutomaticActivationRetryState {
-  retryCount: number;
-  nextAttemptAt: number;
-  lastError: string;
-  updatedAt: number;
-  launching: boolean;
-}
-
-export function nextAutomaticActivationRetry(
-  retriesStarted: number,
-  message: string,
-  now = Date.now(),
-  delays: readonly number[] = DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS,
-): AutomaticActivationRetryState | null {
-  const delay = delays[retriesStarted];
-  if (delay === undefined) return null;
-  return {
-    retryCount: retriesStarted,
-    nextAttemptAt: now + Math.max(0, delay),
-    lastError: message,
-    updatedAt: now,
-    launching: false,
-  };
-}
 
 export interface CoordinatorRuntime {
   app: FastifyInstance;
@@ -1941,12 +1919,12 @@ export async function createCoordinator(
     const retryNumber = retry.launching ? retry.retryCount : retry.retryCount + 1;
     const secondsRemaining = Math.max(0, Math.ceil((retry.nextAttemptAt - Date.now()) / 1_000));
     const waitMessage = secondsRemaining > 0
-      ? `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} starts in ${secondsRemaining}s.`
-      : `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is ready and waiting for healthy capacity and a free activation slot.`;
+      ? `${automaticRetryLabel(retryNumber, automaticActivationRetryDelaysMs)} starts in ${secondsRemaining}s.`
+      : `${automaticRetryLabel(retryNumber, automaticActivationRetryDelaysMs)} is ready and waiting for healthy capacity and a free activation slot.`;
     return [{
       phase: retry.launching ? "retrying" : "retry_wait",
       message: retry.launching
-        ? `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is starting.`
+        ? `${automaticRetryLabel(retryNumber, automaticActivationRetryDelaysMs)} is starting.`
         : `${incident.title}. ${waitMessage}`,
       at: new Date(retry.updatedAt).toISOString(),
       state: "running",
@@ -1980,12 +1958,12 @@ export async function createCoordinator(
     });
     const retryNumber = retry.launching ? retry.retryCount : retry.retryCount + 1;
     if (retry.launching) {
-      return `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is starting.`;
+      return `${automaticRetryLabel(retryNumber, automaticActivationRetryDelaysMs)} is starting.`;
     }
     const secondsRemaining = Math.max(0, Math.ceil((retry.nextAttemptAt - Date.now()) / 1_000));
     return secondsRemaining > 0
-      ? `${incident.title}. Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} starts in ${secondsRemaining}s.`
-      : `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is ready and waiting for healthy capacity and a free activation slot.`;
+      ? `${incident.title}. ${automaticRetryLabel(retryNumber, automaticActivationRetryDelaysMs)} starts in ${secondsRemaining}s.`
+      : `${automaticRetryLabel(retryNumber, automaticActivationRetryDelaysMs)} is ready and waiting for healthy capacity and a free activation slot.`;
   };
   const activationIncidentForModel = async (
     modelId: string,
