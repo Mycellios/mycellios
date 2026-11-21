@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-21
+
+### Changed
+
+- Windows updates download only what changed: Mycellios reuses the parts of the installer it
+  already has and fetches the rest, falling back to a full download whenever that is not possible.
+- The Windows installer is about 40 MB smaller and the installed app uses about 200 MB less disk:
+  it no longer ships the debugging maps of its bundled libraries.
+
 ## [0.8.1] - 2026-11-21
 
 ### Fixed
