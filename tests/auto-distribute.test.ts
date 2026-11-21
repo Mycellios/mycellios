@@ -36,6 +36,31 @@ describe("automatic compatible-model distribution", () => {
     expect(compiled.launch.launchOrder.at(-1)?.kind).toBe("root-engine");
   });
 
+  it("keeps a model that fits one node unsplit when one stage is allowed", () => {
+    const value = configFixture();
+    value.distribution.minimumStages = 1;
+    const compiled = compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture());
+
+    // node-a is the faster node and holds the complete model, so a second
+    // stage would only add a network hop.
+    expect(compiled.boundaries).toEqual([0, 8]);
+    expect(compiled.manifest.plans.decode.stages.map((stage) => stage.anchor.memberId)).toEqual([
+      "node-a",
+    ]);
+    expect(compiled.launch.launchOrder.map((process) => process.kind)).toEqual(["root-engine"]);
+  });
+
+  it("still splits a model no single node can hold when one stage is allowed", () => {
+    const value = configFixture();
+    value.distribution.minimumStages = 1;
+    for (const node of value.nodes) node.memoryMiB = 768;
+    const compiled = compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture());
+
+    expect(compiled.manifest.plans.decode.stages).toHaveLength(2);
+    expect(compiled.boundaries[0]).toBe(0);
+    expect(compiled.boundaries.at(-1)).toBe(8);
+  });
+
   it("rejects a model.layers checkpoint when no adapter certified its architecture", () => {
     const profile = profileFixture();
     profile.compatibility = {
