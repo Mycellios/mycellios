@@ -1,6 +1,8 @@
 import type { AdapterContext, SandboxProvider } from "@rakazo/adapter-kit";
 import { nativeWorkProjectSession } from "@rakazo/core";
 import {
+  appendEventInTransaction,
+  createThreadMessageInTransaction,
   ensureComputerRecord,
   isOwnedRoutineThread,
   isOwnedWorkflowThread,
@@ -8,6 +10,10 @@ import {
   type PrismaClient,
   withTransactionRetry,
 } from "@rakazo/db";
+
+/** Shown in the chat when a This PC Mico's new message runs on the server instead. */
+export const OFFLINE_CLOUD_NOTICE =
+  "This PC is offline, so this message runs on the server, without this PC's files.";
 
 type Run = Pick<NonNullable<Awaited<ReturnType<PrismaClient["run"]["findUnique"]>>>,
   "id" | "spaceId" | "userId" | "botId" | "threadId" | "taskId" | "startedAt" | "checkpoint" | "cloudComputerId">;
@@ -61,6 +67,16 @@ export async function selectOfflineCloudWorkspace(
       data: { cloudComputerId: computer.id },
     });
     if (selected.count !== 1) throw new Error("The run or its computer assignment changed");
+    // The owner chose This PC; say in the chat that this message did not run there.
+    const blocks = [{ kind: "meta" as const, text: OFFLINE_CLOUD_NOTICE }];
+    const message = await createThreadMessageInTransaction(tx, {
+      threadId: run.threadId, botId, role: "system", blocks,
+      clientNonce: `offline-cloud:${run.id}`, markUnread: false,
+    });
+    await appendEventInTransaction(tx, {
+      spaceId, threadId: run.threadId, botId, type: "thread.message.created",
+      payload: { messageId: message.id, role: "system", blocks },
+    });
     return computer;
   }));
 }
