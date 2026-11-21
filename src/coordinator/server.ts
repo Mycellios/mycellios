@@ -45,7 +45,7 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
-import { dirname, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { z, ZodError } from "zod";
 import { registerNativeReplicaQualifications } from "./native-replica-qualification.js";
 import {
@@ -188,6 +188,7 @@ import {
   API_KEY_PREFIX,
   ApiAccessError,
   ApiAccessManager,
+  fileAccountLimitOverrides,
   apiAccountJson,
   apiKeyJson,
   apiUsageJson,
@@ -731,7 +732,9 @@ export async function createCoordinator(
     requestsPerMinute: config.apiRequestsPerMinute ?? 30,
     maxConcurrent: config.apiMaxConcurrent ?? 2,
     maxActiveKeys: config.apiMaxActiveKeys ?? 10,
-  }, undefined, Boolean(creditWallet));
+  }, undefined, Boolean(creditWallet), config.databasePath === ":memory:"
+    ? undefined
+    : fileAccountLimitOverrides(join(dirname(config.databasePath), "api-account-limits.json")));
   const studioAgents = new StudioAgentStore(database);
   const managedGateway = await initializeManagedProvider(config, database, creditWallet, apiAccess);
   const studioContext = new StudioContextStore(database);

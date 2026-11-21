@@ -327,3 +327,43 @@ describe("official macOS disk images", () => {
     expect(() => catalogManualRelease(patch("Mycellios-Desktop-0.3.41-macos-arm64.dmg"), "0.3.40", "macos-arm64")).toThrow();
   });
 });
+
+describe("download source", () => {
+  const github = `https://github.com/Mycellios/mycellios/releases/download/desktop-v${entry.version}-windows-preview/${entry.fileName}`;
+  async function source(installer: (url: string) => Response, sha256 = entry.sha256) {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-source-")); folders.push(directory);
+    const downloads: string[] = [];
+    const request = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/public/v1/desktop-downloads")) return new Response(JSON.stringify(catalog));
+      downloads.push(url);
+      return installer(url);
+    });
+    const published: ManualRelease = { version: entry.version, fileName: entry.fileName, bytes: entry.bytes, sha256, url: github };
+    const controller = new ManualUpdateController({ version: "0.3.13", directory: () => directory, fetch: request,
+      busy: () => false, prepare: async () => true, handoff: vi.fn(async () => {}), backgroundDownloads: true,
+      publishedRelease: async () => published });
+    return { controller, downloads, directory };
+  }
+  const githubDown = (url: string) => url.startsWith("https://github.com/") ? new Response(null, { status: 503 }) : new Response(bytes);
+
+  it("downloads the identical published file from GitHub before the website", async () => {
+    const { controller, downloads, directory } = await source(() => new Response(bytes));
+    expect(await controller.check(false)).toMatchObject({ phase: "ready", availableVersion: entry.version });
+    expect(downloads).toEqual([github]);
+    expect(await readFile(path.join(directory, entry.fileName))).toEqual(Buffer.from(bytes));
+  });
+
+  it("falls back to the website copy when the GitHub download fails", async () => {
+    const { controller, downloads } = await source(githubDown);
+    expect(await controller.check(false)).toMatchObject({ phase: "ready", availableVersion: entry.version });
+    expect(downloads).toEqual([github, `https://www.mycellios.com${entry.path}`]);
+  });
+
+  it("never treats a different file as a fallback copy", async () => {
+    const { controller, downloads } = await source(githubDown, "0".repeat(64));
+    await controller.check(true);
+    expect(downloads).toEqual([github]);
+    expect(controller.state().phase).not.toBe("ready");
+  });
+});

@@ -4467,6 +4467,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               answerableAskIds={answerableAskIds}
               dismissableAskIds={dismissableAskIds}
               running={transcriptRunning}
+              workingElsewhere={!inGroup && !transcriptRunning && Boolean(active && isRunWorking(active.status))}
               workingBots={workingBots}
               lastRun={activeSnapshot?.run}
               activeRun={workingRuns.find((run) => Boolean(run.startedAt)) ?? workingRuns[0]}

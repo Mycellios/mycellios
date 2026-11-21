@@ -6,6 +6,84 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-21
+
+### Fixed
+
+- When the server cancels a step running on your PC, Mycellios Desktop now stops that step
+  instead of finishing it unobserved and resending results the server no longer accepts.
+- A chat now says "Working in another conversation…" when its Mico is busy in another of its
+  conversations, instead of showing nothing while the sidebar says it is working.
+- Desktop updates download much faster: Mycellios now fetches the installer from the release's
+  download network, falling back to the website copy of the same verified file.
+- Updates on slow connections no longer fail after 15 minutes; a download is only abandoned when
+  it stops receiving data.
+
+## [0.8.0] - 2026-11-21
+
+### Added
+
+- The model picker lists new models from every connected provider as soon as they are released,
+  without waiting for a Mycellios update. Recent models carry a New label, and earlier models of
+  each provider fold under Older models; a search still finds every model.
+- Micos can watch public videos. Paste a YouTube, TikTok, Instagram, Facebook, Vimeo or X link
+  and ask for the highlights: the Mico reads the title, description and captions and looks at
+  still frames. Without captions, it transcribes the audio when speech recognition is set up in
+  Voice settings.
+- Build an app with a team of Micos. In the app editor, choose "Construir con equipo", pick
+  teammates and send the prepared request: the app's Mico splits the work and reviews it. While
+  they work, the private preview shows each Mico's named cursor at the part it is editing and
+  how many are building.
+- A server can now require a newer Mycellios Desktop. When the installed app is older than the
+  server's minimum version, a full-screen notice offers to download and install the update; "Not
+  now" hides it for an hour so you can finish unsaved work first.
+- On Windows, Micos can use the apps on your PC: they read your open windows and press buttons,
+  choose menu items and fill in fields, without needing a vision model. Turn it on in Settings >
+  Computer use. Each action asks for your approval, and Micos never control Mycellios, password
+  managers or system security prompts.
+- Share what your Micos make with anyone. Open a file in the Library and choose Share to get a
+  link that opens that version without signing in. Newer versions stay private until you share
+  them, and Stop sharing turns the link off for everyone.
+- Close a Mico's browser sessions from its Computer settings. The Mico is signed out of every
+  website and its next task starts with an empty browser. Your own PC's browser is not touched.
+
+### Changed
+
+- "Use free models" now always starts on Mycellios Free, served through AntSeed. When no free
+  AntSeed route is available it says so instead of switching to OpenCode's free models or another
+  free model.
+- Mycellios is now published under the PolyForm Shield License 1.0.0: you can use,
+  modify and share it, but not to build a competing product. Earlier versions keep their
+  original licenses, and code from other projects keeps its own.
+
+### Fixed
+
+- Tools from remote MCP servers can now take up to two minutes to answer. Before, a
+  slow answer was cut off after 30 seconds, the same limit used for connecting.
+- Show newly released ChatGPT models in the model picker. Before, a ChatGPT subscription only
+  listed the models that an older Codex release supported, and some showed their raw id and no
+  image support.
+- Restarting to update on Windows shows a progress window as soon as Mycellios closes, instead of
+  leaving the screen empty until the installer starts. The update also finishes faster, because it
+  no longer backs up development source copies.
+- An update no longer fails when Windows keeps one of the app's saved files busy for a moment
+  after it closes.
+- Mycellios removes old update downloads and backups after an update, instead of keeping every
+  installer it has downloaded.
+- The usage indicator keeps a ring for each connected subscription while its quota is being
+  checked, so accounts no longer disappear and reappear in the sidebar.
+- Right-clicking in the desktop app now opens a menu to copy an image, a link or selected text,
+  and to cut, copy and paste in text fields.
+- Micos that use a Claude subscription no longer fail on newer Claude models with "Claude Code
+  version too old". Mycellios now identifies with the current Claude Code release.
+
+### Self-host upgrade notes
+
+- The WhatsApp linked-device connector stays off until the API runs with
+  `MYCELLIOS_WHATSAPP_DEVICE_ENABLED=true`. Apply the database migrations first.
+  Desktop release builds do not include the WhatsApp runtime yet, so linking a number
+  is not available in the published app.
+
 ## [0.7.0] - 2026-11-20
 
 ### Security

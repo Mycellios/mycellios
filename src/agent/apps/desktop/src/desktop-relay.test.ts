@@ -47,6 +47,49 @@ it("still executes a newly delivered operation if the API rejects an orphan repo
   } finally { client.stop(); }
 });
 
+it("stops local work and stops posting when the API no longer holds the operation", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  let localSignal: AbortSignal | undefined;
+  // A long local stream: one frame now, more later, unless aborted.
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+    localSignal = init?.signal ?? undefined;
+    const encoder = new TextEncoder();
+    return new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"event":1}\n'));
+        localSignal?.addEventListener("abort", () => controller.error(new Error("aborted")), { once: true });
+      },
+    }));
+  });
+  const reports: { id: string; seq: number; done: boolean }[] = [];
+  let binding: unknown;
+  let delivered = false;
+  const client = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "http://127.0.0.1:1234",
+    localToken: "unused", revoked: vi.fn(),
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      const payload = JSON.parse(String(init?.body));
+      if (action === "identity") return Response.json(identity);
+      if (action === "bind") { binding = payload; return Response.json({ ok: true }); }
+      if (action === "poll") {
+        const operations = delivered || !binding ? [] : [{ id: "cancelled", binding, request: { method: "environment", botId: "bot" } }];
+        if (operations.length) delivered = true;
+        return Response.json({ identity, active: [], operations });
+      }
+      reports.push({ id: payload.id, seq: payload.seq, done: payload.done });
+      return new Response(null, { status: 409 });
+    },
+  });
+  try {
+    await client.bind("bot");
+    await vi.waitFor(() => expect(localSignal?.aborted).toBe(true), { timeout: 3_000 });
+    await new Promise(resolve => setTimeout(resolve, 200));
+    // One rejected frame; no retries and no extra failure report for a discarded operation.
+    expect(reports).toEqual([{ id: "cancelled", seq: 0, done: false }]);
+  } finally { client.stop(); }
+});
+
 it("retries one timed-out identity read without repeating an operation", async () => {
   const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
   const fetch = vi.fn().mockRejectedValueOnce(new DOMException("slow identity", "TimeoutError")).mockResolvedValueOnce(Response.json(identity));
