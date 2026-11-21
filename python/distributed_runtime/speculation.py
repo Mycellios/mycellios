@@ -208,7 +208,6 @@ class FusedLookupDraftProvider:
     """
 
     strategy = "fused-lookup"
-    defer_until_selected = False
 
     def __init__(
         self,
@@ -257,6 +256,16 @@ class FusedLookupDraftProvider:
         self.long_block_streak = int(long_block_streak)
         self.max_tracked_requests = int(max_tracked_requests)
         self.draft_model = draft_model
+        # A deferred model drafter must still run only for an enabled decision
+        # or an explicit probe. Drafting before every decision would add its
+        # cost to classic waves too, so the controller would compare
+        # speculation against an artificially slow baseline: a measured
+        # two-machine run enabled four-token waves at half the classic speed.
+        # Lookup alone is cheap and reports its real availability.
+        self.defer_until_selected = bool(
+            draft_model is not None
+            and getattr(draft_model, "defer_until_selected", False)
+        )
         # The match width must be able to reach the strong threshold.
         self._lookup = NgramDraftProvider(
             max_draft_tokens=self.max_draft_tokens,
@@ -424,7 +433,7 @@ class FusedLookupDraftProvider:
             "strongMatchTokens": self.strong_match_tokens,
             "agreeTokens": self.agree_tokens,
             "longBlockStreak": self.long_block_streak,
-            "deferredUntilSelected": False,
+            "deferredUntilSelected": self.defer_until_selected,
             "trackedRequests": tracked,
             **counters,
             "draftModel": (
