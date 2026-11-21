@@ -1,7 +1,14 @@
 import type { SandboxProvider } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
-import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
+import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
+import { OFFLINE_CLOUD_NOTICE, selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
+
+vi.mock("@rakazo/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@rakazo/db")>()),
+  createThreadMessageInTransaction: vi.fn(async () => ({ id: "notice" })),
+  appendEventInTransaction: vi.fn(async () => undefined),
+}));
 
 const run = {
   id: "run", botId: "mico", taskId: "task", threadId: "thread",
@@ -50,6 +57,15 @@ describe("offline cloud workspaces", () => {
       }),
       data: { cloudComputerId: "cloud" },
     });
+    // The owner chose This PC, so the chat says this message ran on the server.
+    const blocks = [{ kind: "meta", text: OFFLINE_CLOUD_NOTICE }];
+    expect(createThreadMessageInTransaction).toHaveBeenCalledWith(database, {
+      threadId: "thread", botId: "mico", role: "system", blocks,
+      clientNonce: "offline-cloud:run", markUnread: false,
+    });
+    expect(appendEventInTransaction).toHaveBeenCalledWith(database, expect.objectContaining({
+      type: "thread.message.created", payload: { messageId: "notice", role: "system", blocks },
+    }));
   });
 
   it("resumes the pinned workspace when the PC becomes available", async () => {
