@@ -3,7 +3,7 @@
 ## Privacy from node owners — merged, not yet in production, 2026-11-21
 
 `specs/node-owner-privacy/spec.md` phases 1-5 and the first parts of phase 7
-are in `main` (#412, #413, #416, #417, #419, #420, #422, #424). At the time of
+are in `main` (#412, #413, #416, #417, #419, #420, #422, #424, #427). At the time of
 writing the production coordinator still ran 0337e753; none of this has served
 a real request yet, and worker changes reach PCs with the next Desktop release.
 
@@ -23,6 +23,9 @@ What the code does, verified by focused unit and integration tests only:
   account; bait tripwires are logged when `MYCELLIOS_TRIPWIRE_SECRET` is set.
   The per-owner node limit, closed cell admission and the rejection hold are
   off until configured.
+- Contribution-funded requests run only on native replicas whose fresh,
+  worker- and build-bound qualification lets settlement verify them; otherwise
+  they fail before dispatch with the same 502 clients already received.
 
 Not established: any behavior on physical contributor PCs or across two
 physical computers, bait detection in practice, and protection against an
