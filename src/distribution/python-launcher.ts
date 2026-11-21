@@ -1522,9 +1522,7 @@ function appendPagedKvArguments(
 }
 
 function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationArguments {
-  const selected = policy.strategies.find(
-    (strategy) => strategy.id === policy.defaultStrategyId,
-  );
+  const selected = policy.strategies.find((strategy) => strategy.id === policy.defaultStrategyId);
   if (!selected) throw new Error("python_speculation_default_is_missing");
   if (policy.mode === "disabled" || selected.kind === "autoregressive") {
     return {
@@ -1541,11 +1539,7 @@ function pythonSpeculation(policy: RuntimeSpeculationPolicy): PythonSpeculationA
       lookup: "plain",
     };
   }
-  if (
-    selected.kind !== "ngram"
-    && selected.kind !== "draft-tree"
-    && selected.kind !== "draft-model"
-  ) {
+  if (selected.kind !== "ngram" && selected.kind !== "draft-tree" && selected.kind !== "draft-model") {
     throw new Error(`python_speculation_strategy_not_supported:${selected.kind}`);
   }
   if (selected.maxDraftTokens > 16) {

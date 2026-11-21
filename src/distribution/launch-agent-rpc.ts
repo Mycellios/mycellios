@@ -2185,14 +2185,7 @@ function validateSpeculation(value: unknown): void {
     assertExactKeys(
       strategy,
       ["id", "kind", "maxDraftTokens", "minAcceptanceRate", "maxWasteRatio", "priority"],
-      [
-        "artifactId",
-        "maxBranches",
-        "maxBranchTokens",
-        "maxKvBytes",
-        "maxWaveTokens",
-        "lookup",
-      ],
+      ["artifactId", "maxBranches", "maxBranchTokens", "maxKvBytes", "maxWaveTokens", "lookup"],
       "speculation.strategy",
     );
     assertIdentifier(strategy.id, "speculation.strategy.id");

@@ -270,10 +270,7 @@ export interface RuntimeSpeculationStrategy {
   parameterBytes?: number;
   /** Capacity reserved before loading the optional local drafter. */
   memoryReservationBytes?: number;
-  /**
-   * Fuse prompt-lookup copies with this strategy's drafts. Only linear
-   * `ngram` and `draft-model` strategies accept it; absent means plain lookup.
-   */
+  /** Fuse prompt-lookup copies with the drafts; `ngram` and `draft-model` only. */
   lookup?: "fused";
 }
 
@@ -1629,18 +1626,10 @@ function runtimeSpeculationIdentity(policy: RuntimeSpeculationPolicy): object {
       id: strategy.id,
       kind: strategy.kind,
       maxDraftTokens: strategy.maxDraftTokens,
-      ...(strategy.maxBranches !== undefined
-        ? { maxBranches: strategy.maxBranches }
-        : {}),
-      ...(strategy.maxBranchTokens !== undefined
-        ? { maxBranchTokens: strategy.maxBranchTokens }
-        : {}),
-      ...(strategy.maxKvBytes !== undefined
-        ? { maxKvBytes: strategy.maxKvBytes }
-        : {}),
-      ...(strategy.maxWaveTokens !== undefined
-        ? { maxWaveTokens: strategy.maxWaveTokens }
-        : {}),
+      ...(strategy.maxBranches !== undefined ? { maxBranches: strategy.maxBranches } : {}),
+      ...(strategy.maxBranchTokens !== undefined ? { maxBranchTokens: strategy.maxBranchTokens } : {}),
+      ...(strategy.maxKvBytes !== undefined ? { maxKvBytes: strategy.maxKvBytes } : {}),
+      ...(strategy.maxWaveTokens !== undefined ? { maxWaveTokens: strategy.maxWaveTokens } : {}),
       minAcceptanceRate: strategy.minAcceptanceRate,
       maxWasteRatio: strategy.maxWasteRatio,
       priority: strategy.priority,
@@ -2981,13 +2970,9 @@ function validateSpeculationPolicy(value: unknown): void {
     if (strategy.kind === "autoregressive" && strategy.maxDraftTokens !== 1) {
       throw new Error("runtime_autoregressive_draft_length_must_be_one");
     }
-    if (strategy.lookup !== undefined) {
-      if (strategy.lookup !== "fused") {
-        throw new Error("runtime_speculation_lookup_is_invalid");
-      }
-      if (strategy.kind !== "ngram" && strategy.kind !== "draft-model") {
-        throw new Error("runtime_speculation_lookup_requires_linear_strategy");
-      }
+    if (strategy.lookup !== undefined && strategy.lookup !== "fused") throw new Error("runtime_speculation_lookup_is_invalid");
+    if (strategy.lookup !== undefined && strategy.kind !== "ngram" && strategy.kind !== "draft-model") {
+      throw new Error("runtime_speculation_lookup_requires_linear_strategy");
     }
     const treeLimits = [
       strategy.maxBranches,
