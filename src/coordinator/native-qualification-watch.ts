@@ -15,6 +15,14 @@ export function reserveNativeQualificationAttempt(prior: z.infer<typeof attemptS
   const state = prior && now - prior.since < 86_400_000 ? prior : { count: 0, since: now, next: 0 };
   return { count: state.count + 1, since: state.since, next: now + 15 * 60_000 };
 }
+/**
+ * The daily cap and backoff bound failed and uncertain attempts. A confirmed qualification clears
+ * them: a coordinator restart drops every session's proof, and several deploys a day must not use
+ * up the refreshes that the cap keeps for holding back a failure loop.
+ */
+export function settleNativeQualificationAttempt(state: z.infer<typeof attemptSchema>, httpStatus: number | null): z.infer<typeof attemptSchema> | undefined {
+  return httpStatus !== null && httpStatus >= 200 && httpStatus < 300 ? undefined : state;
+}
 interface WorkerObservation { id: string; connected: boolean; status: string; authenticatedSessionId?: string;
   buildIdentity?: { sourceId: string }; deployments: Array<{ deploymentId: string; activationId?: string;
     modelDigest: string; freeSlots: number; nativeReplicaEvidence?: { sessionId: string; observedAt: number;
@@ -62,19 +70,28 @@ export async function runNativeQualificationWatch(path: string): Promise<never> 
         // Reserve the attempt before sending. A timeout is uncertain and never retried in this cycle.
         failures.set(t.workerId, state);
         const approved = new Set(nativeQualificationAllowlistSchema.parse(allowlist).targets.map(value => value.workerId));
-        const journal = { schema: "mycellios-native-qualification-attempts/1", attempts: [...failures]
-          .filter(([id]) => approved.has(id)).map(([workerId, value]) => ({ workerId, ...value })) };
-        const temporary = journalPath + `.${process.pid}.tmp`;
-        await writeFile(temporary, JSON.stringify(journalSchema.parse(journal)), { mode: 0o600 });
-        await rename(temporary, journalPath);
+        const persist = async () => {
+          const journal = { schema: "mycellios-native-qualification-attempts/1", attempts: [...failures]
+            .filter(([id]) => approved.has(id)).map(([workerId, value]) => ({ workerId, ...value })) };
+          const temporary = journalPath + `.${process.pid}.tmp`;
+          await writeFile(temporary, JSON.stringify(journalSchema.parse(journal)), { mode: 0o600 });
+          await rename(temporary, journalPath);
+        };
+        await persist();
+        let httpStatus: number | null = null;
         try {
           const response = await fetch(`${base}/internal/v1/native-replica-qualifications`, {
             method: "POST", headers, body: JSON.stringify({ workerId: t.workerId, deploymentId: t.deploymentId }),
             signal: AbortSignal.timeout(480_000),
           });
           await response.body?.cancel();
+          httpStatus = response.status;
           console.log(JSON.stringify({ phase: "native_qualification_refresh", workerId: t.workerId, http: response.status }));
         } catch { console.log(JSON.stringify({ phase: "native_qualification_refresh_uncertain", workerId: t.workerId })); }
+        if (!settleNativeQualificationAttempt(state, httpStatus)) {
+          failures.delete(t.workerId);
+          await persist();
+        }
       }
     } catch { console.log(JSON.stringify({ phase: "native_qualification_watch_unavailable" })); }
     await new Promise(resolve => setTimeout(resolve, 60_000));
