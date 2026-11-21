@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { flatMapAsync, mapAsync, filterAsync, everyAsync, someAsync } from "../core/async-collections.js";
 import type {
   ChatCompletionRequest,
@@ -52,7 +53,18 @@ export interface SchedulerEvidenceOptions {
    */
   runtimeLinkObservations?: (() => readonly RuntimeLinkObservation[]) | undefined;
   strictRuntimeLinks?: boolean | undefined;
+  /** Near-best band for uniform selection; tests may pass 0 for a fixed choice. */
+  serviceBand?: number | undefined;
+  randomIndex?: ((exclusiveMax: number) => number) | undefined;
 }
+
+/**
+ * Candidates within 10 % of the best score and of the best estimated service
+ * time are equally likely to be chosen (specs/node-owner-privacy, D2). Both
+ * limits are relative, so a clearly faster node keeps winning: spreading work
+ * must not slow the network.
+ */
+export const SCHEDULER_SERVICE_BAND = 0.1;
 
 interface Candidate {
   worker: StoredWorker;
@@ -155,14 +167,15 @@ export class Scheduler {
           ...(eligibilityRejections.get(routeCandidateId(route)) ?? []),
           ...routePolicyRejections(route, workerById, options),
         ];
+        const serviceMs = estimatedRouteServiceMs(route, workerById, request);
         return {
           id: routeCandidateId(route),
           kind: executionRouteKind(route, workerById, options.originWorkerId),
           route,
           score: route.score,
+          serviceMs,
           nodeCount: new Set(route.stages.map((stage) => stage.workerId)).size,
-          meetsSlo: estimatedRouteServiceMs(route, workerById, request)
-            <= (request.deadline_ms ?? 120_000),
+          meetsSlo: serviceMs <= (request.deadline_ms ?? 120_000),
           eligible: rejectionReasons.length === 0,
           rejectionReasons,
         };
@@ -176,6 +189,8 @@ export class Scheduler {
       ...(affinityCandidateId ? { affinityCandidateId } : {}),
       // Existing session semantics retain any healthy, unsaturated exact route.
       maxAffinityScorePenalty: Number.MAX_SAFE_INTEGER,
+      serviceBand: this.evidence.serviceBand ?? SCHEDULER_SERVICE_BAND,
+      randomIndex: this.evidence.randomIndex ?? randomInt,
     });
     if (decision.selected) {
       decision.selected.route = {
