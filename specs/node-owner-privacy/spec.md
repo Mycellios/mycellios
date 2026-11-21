@@ -284,28 +284,35 @@ working. Cost: nothing measurable.
 ### D2. Random selection within a service band (principle 2)
 
 `decideExecutionRoute` keeps its eligibility rules and SLO check. Among
-eligible candidates whose score is within `0.05` of the best score, it picks
-one uniformly with `crypto.randomInt`. Weighting by claimed capacity is not
-used, since that would reward inflated claims again. A healthy, unsaturated
-session affinity still wins.
+eligible candidates within 10 % of both the best score and the best estimated
+service time, it picks one uniformly with `crypto.randomInt`. A healthy,
+unsaturated session affinity still wins. Weighting by claimed capacity is not
+used, since that would reward inflated claims again.
 
-- A node that inflates its numbers only gets into the band. Inside it, it is
-  one of several equal choices.
-- With one eligible node (Whisper today) nothing changes.
-- The extra latency is bounded by the band: at most a 0.05 worse normalized
-  score, which in the interactive formula is a few percent of the deadline
-  risk. The band is a constant so it can be tuned after measuring.
+- Both limits are relative. An absolute score band was rejected after
+  measuring: the score has fixed terms, so with 64 output tokens a 30 tok/s
+  node scores within 12 % of a 50 tok/s node while being 65 % slower. The
+  service-time limit keeps a clearly faster node winning, so spreading work
+  never slows a request by more than the band.
+- Identical or near-identical nodes share offers instead of the lowest id
+  always winning. With one eligible node (Whisper and Kokoro today) nothing
+  changes.
+- **Still open (phase 2b): measured rates.** Scores use the throughput a node
+  reports for itself (every adapter except `mycellios-pipeline`), so a node
+  that overstates it still wins. The coordinator should score from rates it
+  measures itself (lease accept to completion, first token) and never let a
+  claim look better than the measurement.
 
 **Rejections after content.** A `lease.reject` arrives after the node has read
 the request. The coordinator counts these per worker in a rolling hour, except
-`duplicate_job` and `deadline_exceeded`, which it can check itself. Workers
-first report in their heartbeat whether they accept new work and which models
-their owner's policy allows right now, and the coordinator stops offering to a
-paused or excluding node before sending content. Only then does the penalty
-apply, and only to workers that report this state: above 3 counted rejections
-in an hour, the worker gets a maintenance hold (no new offers, active work
-continues) for one hour and a security audit event. Older workers are counted
-but never held, so an honest owner's schedule cannot get them penalized.
+`duplicate_job`, and `deadline_exceeded` when the deadline really passed. At 3
+or more rejections and over 20 % of offers it logs `lease_rejection_anomaly`.
+Workers advertise no free slot for models their owner's policy excludes right
+now (a paused or out-of-schedule worker already drains), so honest rejections
+become rare races. Holding an anomalous worker back from new offers for an
+hour is opt-in (`MYCELLIOS_LEASE_REJECTION_HOLD=1`) until workers with that
+change are widely deployed; older workers still reject for their owner's
+policy and must not be penalized.
 
 ### D3. Dispersion groups (principle 3)
 
@@ -456,7 +463,7 @@ bait traffic exists.
 | Change | Cost |
 |---|---|
 | D1 worker view | One HMAC per lease, negligible |
-| D2 random band | At most 0.05 normalized score per choice; none with one candidate |
+| D2 random band | At most 10 % on estimated service time per choice; none with one candidate |
 | D3 dispersion | None in the coordinator; long recordings get faster with several replicas. With one replica, chunks go to the fallback or fail, per policy |
 | D4 sealing | Under 1 ms per lease |
 | D5 identifiers | None |
@@ -471,7 +478,8 @@ that changes behavior for users is merged without Daniel's explicit OK.
 
 1. **Worker view, F0 and content-free failures** (D1, D7 F0 fix, first part
    of D6). Coordinator and worker. Highest protection for the lowest risk.
-2. **Random band and rejection accounting** (D2).
+2. **Random band and rejection accounting** (D2), then **2b, measured rates**
+   so self-reported throughput cannot win the band.
 3. **Dispersion groups** (D3). Coordinator first, then the bridge. The bridge
    and parallel chunks are owned operationally by the session "Mycellios:
    huellas Qwen sin redistribución"; coordinate with it before deploying.
