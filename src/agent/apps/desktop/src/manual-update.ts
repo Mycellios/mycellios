@@ -16,6 +16,8 @@ export const DESKTOP_CATALOG_ALL_URL = `${ORIGIN}/public/v1/desktop-downloads?in
 const MAX_BYTES = 2_000_000_000;
 const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
 const MIN_INSTALL_BYTES = 6 * 1024 ** 3;
+/** A download is abandoned (and the next source tried) after this long without data. */
+const DOWNLOAD_STALL_MS = 60_000;
 
 /** The package this installation owns; each one is published under its own entry. */
 export type ManualPackageKind = "windows-x64" | "fedora-x64" | "linux-x64" | "macos-arm64" | "macos-x64";
@@ -93,6 +95,8 @@ export async function verifyManualInstaller(file: string, release: ManualRelease
 export class ManualUpdateController {
   private current: DesktopUpdateState;
   private release: ManualRelease | null = null;
+  /** Another feed's URL for the identical file (same name, size and SHA-256). */
+  private mirror: string | null = null;
   private file: string | null = null;
   private operation: Promise<DesktopUpdateState> | null = null;
   private intent = 0;
@@ -135,8 +139,11 @@ export class ManualUpdateController {
     const staged = this.file ? this.release : null;
     if (!staged) this.current = { ...this.current, phase: "checking", message: null };
     try {
-      const feeds = [this.catalogRelease()];
+      // The published GitHub release comes first: for the same version its CDN is far
+      // faster than the website, which stays the fallback for the identical file.
+      const feeds: Promise<ManualRelease | null>[] = [];
       if (this.options.publishedRelease) feeds.push(Promise.resolve().then(() => this.options.publishedRelease!()));
+      feeds.push(this.catalogRelease());
       const results = await Promise.allSettled(feeds);
       if (this.current.installPending) return this.state();
       const available = results.flatMap(r => r.status === "fulfilled" ? [r.value] : []);
@@ -146,6 +153,8 @@ export class ManualUpdateController {
       if (staged && (!release || !newerRelease(release.version, staged.version))) return this.state();
       this.file = null;
       this.release = release;
+      this.mirror = available.find(r => r && release && r.url !== release.url && r.version === release.version &&
+        r.fileName === release.fileName && r.sha256 === release.sha256 && r.bytes === release.bytes)?.url ?? null;
       this.current = { ...this.current, phase: this.release ? "available" : "idle",
         availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString(), handoffComplete: false };
       if (this.release && (this.options.autoDownload?.() ?? true)) await this.runDownload();
@@ -187,35 +196,57 @@ export class ManualUpdateController {
     const directory = this.options.directory();
     await mkdir(directory, { recursive: true, mode: 0o700 });
     const destination = path.join(directory, release.fileName);
+    let origin = release.url;
     try { await verifyManualInstaller(destination, release); this.file = destination; }
     catch {
       const temporary = destination + ".part";
-      this.current = { ...this.current, phase: "downloading", percent: 0 };
-      try {
-        const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, release.url, AbortSignal.timeout(15 * 60_000), release.sha256);
-        if (!response.ok || !response.body) throw Error("Installer unavailable");
-        let bytes = 0;
-        const hash = createHash("sha256");
-        const check = new Transform({ transform: (chunk: Buffer, _encoding, done) => {
-          bytes += chunk.length;
-          if (bytes > release.bytes) return done(Error("Installer exceeds catalog size"));
-          hash.update(chunk);
-          this.current = { ...this.current, percent: Math.floor(bytes / release.bytes * 100) };
-          done(null, chunk);
-        } });
-        await pipeline(Readable.fromWeb(response.body as ReadableStream), check,
-          createWriteStream(temporary, { flags: "wx", mode: 0o600 }));
-        if (bytes !== release.bytes || hash.digest("hex") !== release.sha256) throw Error("Installer differs from catalog");
-        await rename(temporary, destination);
-        this.file = destination;
-      } catch { await rm(temporary, { force: true }); this.fail(); return; }
+      let source: string | null = null;
+      for (const url of [release.url, ...(this.mirror ? [this.mirror] : [])]) {
+        this.current = { ...this.current, phase: "downloading", percent: 0 };
+        try {
+          await this.transfer(url, release, temporary);
+          await rename(temporary, destination);
+          source = url;
+          break;
+        } catch { await rm(temporary, { force: true }); }
+      }
+      if (!source) { this.fail(); return; }
+      this.file = destination;
+      origin = source;
     }
     // Preserve Windows' normal downloaded-file checks; never remove its zone mark.
     if (process.platform === "win32") {
-      try { await writeFile(destination + ":Zone.Identifier", `[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=${release.url}\r\n`, { mode: 0o600 }); }
+      try { await writeFile(destination + ":Zone.Identifier", `[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=${origin}\r\n`, { mode: 0o600 }); }
       catch { this.file = null; this.fail(); return; }
     }
     this.current = { ...this.current, phase: "ready", percent: 100, message: null };
+  }
+  /**
+   * Stream one source into `temporary`, verifying size and SHA-256. A large installer on a slow
+   * link may take longer than any fixed total deadline, so only a stalled transfer is abandoned.
+   */
+  private async transfer(url: string, release: ManualRelease, temporary: string) {
+    const controller = new AbortController();
+    let stall: NodeJS.Timeout | undefined;
+    const arm = () => { clearTimeout(stall); stall = setTimeout(() => controller.abort(), DOWNLOAD_STALL_MS); stall.unref?.(); };
+    arm();
+    try {
+      const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, url, controller.signal, release.sha256);
+      if (!response.ok || !response.body) throw Error("Installer unavailable");
+      let bytes = 0;
+      const hash = createHash("sha256");
+      const check = new Transform({ transform: (chunk: Buffer, _encoding, done) => {
+        arm();
+        bytes += chunk.length;
+        if (bytes > release.bytes) return done(Error("Installer exceeds catalog size"));
+        hash.update(chunk);
+        this.current = { ...this.current, percent: Math.floor(bytes / release.bytes * 100) };
+        done(null, chunk);
+      } });
+      await pipeline(Readable.fromWeb(response.body as ReadableStream), check,
+        createWriteStream(temporary, { flags: "wx", mode: 0o600 }), { signal: controller.signal });
+      if (bytes !== release.bytes || hash.digest("hex") !== release.sha256) throw Error("Installer differs from catalog");
+    } finally { clearTimeout(stall); }
   }
   install(force = false): Promise<DesktopUpdateState> {
     if (force && this.current.phase === "ready" && this.current.installPending && !this.committed) {
