@@ -16,6 +16,8 @@ import {
   computerMaxActiveMs,
   DEFAULT_COMPUTER_MAX_ACTIVE_MS,
   DEFAULT_SANDBOX_IDLE_MS,
+  freeSpaceComputerSlot,
+  isSpaceComputerLimitError,
   sandboxIdleMs,
   scheduleComputerSleep,
   sleepComputerIfIdle,
@@ -1198,3 +1200,21 @@ function processExit(child: ReturnType<typeof spawn>): Promise<number> {
     child.on("close", (code) => resolve(code ?? 1));
   });
 }
+
+describe("space computer slot", () => {
+  it("recognizes only the sandbox's per-Space limit refusal", () => {
+    expect(isSpaceComputerLimitError(new Error("Computer limit reached for space (max: 1)"))).toBe(true);
+    expect(isSpaceComputerLimitError(new Error("sandbox provision failed: 500"))).toBe(false);
+    expect(isSpaceComputerLimitError("Computer limit reached for space (max: 1)")).toBe(false);
+  });
+
+  it("frees nothing when the Space has no other running server computer", async () => {
+    const findMany = vi.fn(async () => []);
+    const deps = { prisma: { computer: { findMany } } } as unknown as Parameters<typeof freeSpaceComputerSlot>[0];
+    await expect(freeSpaceComputerSlot(deps, "space", "mine")).resolves.toBe(false);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ spaceId: "space", id: { not: "mine" }, state: "running", kind: { not: "desktop" } }),
+      orderBy: { updatedAt: "asc" },
+    }));
+  });
+});

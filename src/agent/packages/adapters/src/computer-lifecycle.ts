@@ -27,6 +27,7 @@ import {
   revokeScreenControl,
 } from "./computer-control.js";
 import { toComputerRef } from "./computer-support.js";
+import { freeSpaceComputerSlot, isSpaceComputerLimitError } from "./computer-idle.js";
 import {
   checkpointComputerWorkspace,
   deletedTeamBotFolders,
@@ -362,21 +363,32 @@ export async function provisionComputer(
     await onProgress?.("recreating");
     const ref = await getLogger().withContext(
       { "computer.id": computerId, "run.id": context.runId, previousState: existing.state },
-      () =>
-        deps.sandbox.provision(
-          {
-            botId: existing.homeKey,
-            homePath,
-            providerRef: existing.providerRef ?? undefined,
-            providerKind: existing.kind as ComputerRef["kind"],
-            // A save from an older release has no time; the provider keeps its own state then.
-            savedAt:
-              existing.homeRevision === "empty"
-                ? undefined
-                : (existing.homeRevisionAt ?? undefined),
-          },
-          context,
-        ),
+      async () => {
+        const provision = () =>
+          deps.sandbox.provision(
+            {
+              botId: existing.homeKey,
+              homePath,
+              providerRef: existing.providerRef ?? undefined,
+              providerKind: existing.kind as ComputerRef["kind"],
+              // A save from an older release has no time; the provider keeps its own state then.
+              savedAt:
+                existing.homeRevision === "empty"
+                  ? undefined
+                  : (existing.homeRevisionAt ?? undefined),
+            },
+            context,
+          );
+        try {
+          return await provision();
+        } catch (error) {
+          // A full Space waits for nobody: an idle computer of the Space sleeps and frees
+          // its slot. Busy computers keep it, and the original refusal is reported.
+          if (!isSpaceComputerLimitError(error)) throw error;
+          if (!(await freeSpaceComputerSlot(deps, existing.spaceId, computerId))) throw error;
+          return provision();
+        }
+      },
     );
     provisioned = ref;
     await deps.sandbox.prepare(ref, context);

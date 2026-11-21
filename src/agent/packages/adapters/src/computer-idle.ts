@@ -15,7 +15,7 @@ import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { recordComputerRunEnd } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { expireComputerControl, hasActiveComputerControl } from "./computer-control.js";
-import { toComputerRef } from "./computer-lifecycle.js";
+import { toComputerRef } from "./computer-support.js";
 import { checkpointComputerWorkspace, deletedTeamBotFolders } from "./computer-workspace.js";
 import { isSandboxGoneError } from "./sandbox-errors.js";
 
@@ -307,6 +307,50 @@ export async function touchRunningComputer(
   }
   scheduleComputerSleep(deps.jobs, computer.id);
   await deps.sandbox.keepAlive?.(toComputerRef(computer));
+}
+
+/** The sandbox refused a new computer because the Space already has its configured maximum. */
+export function isSpaceComputerLimitError(error: unknown): boolean {
+  return error instanceof Error && /^Computer limit reached for space \(max: \d+\)/.test(error.message);
+}
+
+/**
+ * Under a per-Space computer cap, put the least recently used idle computer of that Space to
+ * sleep so another Mico can start, instead of refusing the run. sleepComputerIfIdle keeps every
+ * hold of the regular idle sleep (executing runs, user control, takeover grace, background work)
+ * and saves the workspace first. Resolves whether a computer stopped running.
+ */
+export async function freeSpaceComputerSlot(
+  deps: Parameters<typeof sleepComputerIfIdle>[0],
+  spaceId: string,
+  exceptComputerId: string,
+): Promise<boolean> {
+  const candidates = await deps.prisma.computer.findMany({
+    where: {
+      spaceId,
+      id: { not: exceptComputerId },
+      state: "running",
+      kind: { not: "desktop" },
+      providerRef: { not: null },
+    },
+    orderBy: { updatedAt: "asc" },
+    select: { id: true },
+    take: 8,
+  });
+  for (const { id } of candidates) {
+    try {
+      await sleepComputerIfIdle(deps, id);
+    } catch (error) {
+      getLogger().warn("computer.space_slot_sleep_failed", { "computer.id": id, error });
+      continue;
+    }
+    const after = await deps.prisma.computer.findUnique({ where: { id }, select: { state: true } });
+    if (after && after.state !== "running") {
+      getLogger().info("computer.space_slot_freed", { "computer.id": id, "space.id": spaceId });
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function sleepComputerIfIdle(
