@@ -123,3 +123,13 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
 - Abandoned requests are cancelled. The entry closes the replica connection
   when the client goes away, and the replica stops between micro-batches. A
   started request waits through a thermal pause instead of failing.
+
+- The HP ProBook CPU replica measured 20 tokens/s (fp32, cosine 0.999998
+  against the GPU). It is registered as a backup replica (`"backup": true`).
+  The entry first holds up to `holdSeconds` for a regular replica that is
+  only cooling, and uses backups only if none returns, so the network keeps
+  answering when MRPUCCHI is down without slowing the normal path. Without
+  administrator access it runs as a user process, started at logon from the
+  user's Startup folder, not as a service.
+- The temporary artifact server and its NetBird policy were removed after the
+  replicas downloaded the model.

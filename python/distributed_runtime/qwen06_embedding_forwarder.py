@@ -43,6 +43,9 @@ class Forwarder:
         # per unit of weight, so a GPU takes most requests and CPUs share the rest.
         self.weights = {(item["host"], int(item["port"])): max(1, int(item.get("weight", 1))) for item in backends}
         self.active = {backend: 0 for backend in self.backends}
+        # Backup replicas (far slower, e.g. a laptop CPU) only take work while
+        # no regular replica is ready, so they add survival, not timeouts.
+        self.backups = {(item["host"], int(item["port"])) for item in backends if item.get("backup")}
         self.allowed = set(allowed)
         self.probe = probe_fn
         # While every replica is briefly unavailable (a GPU cooling down),
@@ -53,7 +56,9 @@ class Forwarder:
     def ordered_ready(self):
         """Ready replicas, least loaded relative to their weight first; config order breaks ties."""
         rank = {backend: index for index, backend in enumerate(self.backends)}
-        return sorted(self.ready, key=lambda b: ((self.active[b] + 1) / self.weights[b], rank[b]))
+        regular = [b for b in self.ready if b not in self.backups]
+        pool = regular or [b for b in self.ready if b in self.backups]
+        return sorted(pool, key=lambda b: ((self.active[b] + 1) / self.weights[b], rank[b]))
 
     async def refresh(self):
         results = await asyncio.gather(*(self.probe(host, port) for host, port in self.backends))
@@ -65,7 +70,9 @@ class Forwarder:
             if not peer or peer[0] not in self.allowed:
                 return
             waited = 0.0
-            while not self.ready and waited < self.hold_seconds:
+            # Wait for a regular replica first (a GPU may only be cooling);
+            # backups take the request only if none returns within the hold.
+            while not any(b not in self.backups for b in self.ready) and waited < self.hold_seconds:
                 await asyncio.sleep(self.poll_seconds)
                 waited += self.poll_seconds
             if not self.ready:
