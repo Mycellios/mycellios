@@ -31,10 +31,10 @@ export function nativeComputerFetch(
         .catch(() => null);
       const botId = payload?.json?.botId;
       if (typeof botId === "string" && botId.length > 0 && botId.length <= 256) {
-        await admit(botId);
+        const native = await admit(botId);
         request.signal.throwIfAborted();
         const taskThreadId = payload?.json?.taskThreadId;
-        if (typeof taskThreadId === "string" && computer.prepareTask) {
+        if (native && typeof taskThreadId === "string" && computer.prepareTask) {
           await computer.prepareTask({ botId, taskThreadId });
           request.signal.throwIfAborted();
         }
@@ -47,11 +47,13 @@ export function nativeComputerFetch(
 /** Account/session checks stay in native main; these promises only serialize admission. */
 export function nativeComputerAdmission(
   computer: Computer,
-  prepareWorkspace: (botId: string) => Promise<void> = async () => undefined,
+  // false: the Mico runs on its own server computer, so the PC is not bound for it.
+  prepareWorkspace: (botId: string) => Promise<boolean | void> = async () => undefined,
 ) {
-  const connecting = new Map<string, Promise<void>>();
-  let admission: Promise<void> = Promise.resolve();
-  return (botId: string): Promise<void> => {
+  const connecting = new Map<string, Promise<boolean>>();
+  let admission: Promise<unknown> = Promise.resolve();
+  /** Resolves whether the turn uses this PC. */
+  return (botId: string): Promise<boolean> => {
     let pending = connecting.get(botId);
     if (!pending) {
       pending = admission.then(async () => {
@@ -61,10 +63,11 @@ export function nativeComputerAdmission(
           throw new Error("Local computer access was not allowed. The message was not sent.");
         // Prepare owned instructions before native provisioning. This admission
         // preserves the saved Team/dedicated assignment.
-        await prepareWorkspace(botId);
+        if ((await prepareWorkspace(botId)) === false) return false;
         await computer.connect!(botId);
         if (!(await computer.connected!(botId)))
           throw new Error("The local computer is disconnected. The message was not sent.");
+        return true;
       });
       admission = pending.catch(() => undefined);
       pending = pending.finally(() => connecting.delete(botId));
