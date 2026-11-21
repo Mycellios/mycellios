@@ -109,6 +109,9 @@ export const chatCompletionRequestSchema = z.object({
   workload_class: z.enum(["interactive", "batch", "benchmark"]).default("interactive"),
   preferred_region: z.string().min(1).optional(),
   deadline_ms: z.number().int().min(1_000).max(3_600_000).optional(),
+  // Pieces of one recording share an opaque group so no node receives two of
+  // them. Coordinator-only: never part of the worker request or input hash.
+  dispersion: z.object({ group: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/) }).strict().optional(),
   privacy: z.object({
     trust: z.enum(["default", "trusted-only"]).default("default"),
     boundary: z.enum(["trusted-edges", "pinned-edges"]).default("trusted-edges"),

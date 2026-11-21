@@ -267,6 +267,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       authorizedWorkerId?: (request: FastifyRequest) => string | null;
       authorizedSession?: (request: FastifyRequest) => AuthorizedWorkerSession | null;
       sessionIsCurrent?: (session: AuthorizedWorkerSession) => boolean | Promise<boolean>;
+      clientAddress?: (request: FastifyRequest) => string | null;
     } = {},
   ): void {
     this.logger = app.log;
@@ -287,6 +288,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         messageWindowStartedAt: Date.now(),
         messagesInWindow: 0,
         sessionId: `session-${randomUUID()}`,
+        networkAddress: options.clientAddress?.(request) ?? null,
       };
       this.pendingConnections += 1;
       this.allConnections.add(state);
@@ -324,6 +326,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   beforeDisconnect(observer: WorkerDisconnectObserver): () => void { return this.workerEvents.beforeDisconnect(observer); }
 
   connectedWorkerIds(): ReadonlySet<string> { return connectedWorkerIdentifiers(this.connections); }
+  workerNetworkAddress(workerId: string): string | null { return this.connections.get(workerId)?.networkAddress ?? null; }
 
   isConnected(workerId: string): boolean { return connectionIsReady(this.connections.get(workerId)); }
 
