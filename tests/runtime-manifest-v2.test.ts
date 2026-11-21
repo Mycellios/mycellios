@@ -871,6 +871,53 @@ describe("GDLP/2 runtime manifest", () => {
     );
   });
 
+  it("seals a fused lookup only on linear draft strategies", () => {
+    const policy = (lookup: unknown, kind: "ngram" | "intermediate-head" = "ngram") => {
+      const request = runtimeRequest(1);
+      request.speculation = {
+        mode: "adaptive",
+        controller: "acceptance-adaptive",
+        defaultStrategyId: "draft",
+        fallbackStrategyId: "autoregressive",
+        acceptanceWindowTokens: 64,
+        strategies: [
+          {
+            id: "draft",
+            kind,
+            maxDraftTokens: 4,
+            minAcceptanceRate: 0.55,
+            maxWasteRatio: 0.35,
+            priority: 10,
+            ...(kind === "ngram" ? {} : { artifactId: `sha256:${"a".repeat(64)}` }),
+            ...(lookup === undefined ? {} : { lookup: lookup as "fused" }),
+          },
+          {
+            id: "autoregressive",
+            kind: "autoregressive",
+            maxDraftTokens: 1,
+            minAcceptanceRate: 1,
+            maxWasteRatio: 0,
+            priority: 0,
+          },
+        ],
+      };
+      return request;
+    };
+
+    const plain = buildRuntimePipelineManifest(policy(undefined));
+    const fused = buildRuntimePipelineManifest(policy("fused"));
+
+    expect(fused.plans.decode.speculation.strategies[0]!.lookup).toBe("fused");
+    expect(fused.pipelineId).not.toBe(plain.pipelineId);
+    expect(() => validateRuntimePipelineManifest(fused)).not.toThrow();
+    expect(() => buildRuntimePipelineManifest(policy("plain"))).toThrow(
+      "runtime_speculation_lookup_is_invalid",
+    );
+    expect(() => buildRuntimePipelineManifest(policy("fused", "intermediate-head"))).toThrow(
+      "runtime_speculation_lookup_requires_linear_strategy",
+    );
+  });
+
   it("rejects unknown speculation references and non-autoregressive fallback", () => {
     const unknown = buildRuntimePipelineManifest(runtimeRequest(1));
     unknown.plans.decode.speculation.defaultStrategyId = "missing";

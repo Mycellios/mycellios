@@ -156,6 +156,7 @@ function manifest(): RuntimePipelineManifestV2 {
 
 function speculativeConveyorManifest(
   microBatchSize = 1,
+  lookup?: "fused",
 ): RuntimePipelineManifestV2 {
   const input = request();
   if (!input.phasePlans?.prefill || !input.phasePlans.decode) {
@@ -177,6 +178,7 @@ function speculativeConveyorManifest(
         minAcceptanceRate: 0.5,
         maxWasteRatio: 0.4,
         priority: 10,
+        ...(lookup === undefined ? {} : { lookup }),
       },
       {
         id: "autoregressive",
@@ -1215,6 +1217,19 @@ describe("GDLP/2 Python launch compiler", () => {
       expect(stage.command.args).not.toContain("--speculative-inflight-bytes");
     }
     expect(() => validatePythonLaunchDescription(description)).not.toThrow();
+  });
+
+  it("passes a sealed fused lookup to the root engine only", () => {
+    const plain = compile(speculativeConveyorManifest());
+    const fused = compile(speculativeConveyorManifest(1, "fused"));
+
+    expect(root(plain).command.args).not.toContain("--speculation-lookup");
+    expect(argumentValue(root(fused).command.args, "--speculation-lookup")).toBe("fused");
+    for (const stage of remotes(fused)) {
+      expect(stage.command.args).not.toContain("--speculation-lookup");
+    }
+    expect(fused.launchId).not.toBe(plain.launchId);
+    expect(() => validatePythonLaunchDescription(fused)).not.toThrow();
   });
 
   it("seals a resolved signed draft strategy into every process wire identity", () => {
