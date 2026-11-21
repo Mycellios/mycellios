@@ -70,7 +70,7 @@ The project is under active development. Multi-host GPU performance, models that
 - [Guías en español](https://www.mycellios.com/es/guias)
 - [Compare AI agent workspaces](https://www.mycellios.com/compare)
 - [Download Mycellios Desktop](https://www.mycellios.com/downloads/desktop)
-- [View the open-source project](https://github.com/Mycellios/mycellios)
+- [View the source code](https://github.com/Mycellios/mycellios)
 
 Source: https://www.mycellios.com/
 

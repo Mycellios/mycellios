@@ -41,7 +41,7 @@ export async function prepareLinuxInstaller({ desktopRoot, runtimeDeb, runtimeSh
       { from: path.join(desktopRoot, '../web/dist'), to: 'web', filter: ['**/*', '!**/*.map'] },
       { from: path.join(agentRoot, 'infra/compose/docker-compose.images.yml'), to: 'stack/docker-compose.images.yml' },
       { from: path.join(agentRoot, 'infra/compose/stack-env.example'), to: 'stack/stack-env.example' },
-      { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-GPL-3.0.txt' },
+      { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-PolyForm-Shield-1.0.0.txt' },
       { from: path.join(agentRoot, 'LICENSE'), to: 'licenses/Agent-upstream-Apache-2.0.txt' },
       { from: path.join(repository, 'THIRD_PARTY.md'), to: 'licenses/THIRD_PARTY.md' },
     ],

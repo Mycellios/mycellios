@@ -8,7 +8,7 @@
   "main": ".vite/build/main.cjs",
   "author": "mycellios",
   "description": "mycellios: heterogeneous distributed LLM inference runtime and scheduler.",
-  "license": "GPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tych0s/mycellios.git"

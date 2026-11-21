@@ -138,7 +138,7 @@ const basePages = {
         { href: "/es/guias", label: "Guías en español" },
         { href: "/compare", label: "Compare AI agent workspaces" },
         { href: "/downloads/desktop", label: "Download Mycellios Desktop" },
-        { href: "https://github.com/Mycellios/mycellios", label: "View the open-source project" },
+        { href: "https://github.com/Mycellios/mycellios", label: "View the source code" },
       ],
     },
     structuredData: {

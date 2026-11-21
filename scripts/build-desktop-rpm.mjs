@@ -103,7 +103,7 @@ export function renderRpmSpec({ version, root, fileList, rpmRelease = 1 }) {
   return [
     "%global debug_package %{nil}", "%global __os_install_post %{nil}", "%global _build_id_links none",
     "Name: mycellios-desktop", `Version: ${version}`, `Release: ${rpmRelease}`, "Summary: Mycellios Desktop with the contribution runtime",
-    "License: GPL-3.0-only AND Apache-2.0 AND MIT AND BSD-3-Clause", "URL: https://www.mycellios.com",
+    "License: LicenseRef-PolyForm-Shield-1.0.0 AND Apache-2.0 AND MIT AND BSD-3-Clause", "URL: https://www.mycellios.com",
     "BuildArch: x86_64", "AutoReqProv: no", `Requires: ${FEDORA_REQUIRES.join(", ")}`,
     "", "%description", "Mycellios agents and projects with an optional account-enrolled contribution runtime.",
     "", "%install", 'mkdir -p "%{buildroot}"', `cp -a ${stage}/. "%{buildroot}/"`,

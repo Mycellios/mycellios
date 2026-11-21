@@ -10,7 +10,11 @@ Internal `@rakazo` package names are retained for compatibility, not as a separa
 publication destination. The npm migration is not yet release-qualified.
 
 Unless a file states otherwise, Mycellios source code is licensed under the
-GNU General Public License, version 3 only (`GPL-3.0-only`).
+PolyForm Shield License 1.0.0 (`LICENSE`). Revisions published before
+2026-11-21 remain available under `GPL-3.0-only` (repository root) and
+`Apache-2.0` (`src/agent`). Code that Mycellios incorporates from Rakazo remains
+under Apache-2.0; Mycellios modifications and additions in `src/agent` are
+licensed under PolyForm Shield 1.0.0 (see `src/agent/NOTICE`).
 
 Mycellios uses open-source libraries for model loading, tensor execution,
 transport and its user interfaces. These dependencies do not replace the
@@ -104,12 +108,14 @@ use.
 
 ## WhatsApp linked device
 
-Desktop bundles Baileys 7.0.0-rc14 (WhiskeySockets, MIT) in
-`dist/whatsapp-runtime.js` for the optional WhatsApp linked-device connector,
-together with its Signal dependencies `libsignal` 6.0.0 (GPL-3.0) and
-`whatsapp-rust-bridge` 0.5.4 (WebAssembly that contains AGPL-3.0 code). These
-builds are distributed under GPL-3.0-compatible terms; the bundle is loaded only
-when the owner links a number and is not part of the hosted API or worker. See
+The WhatsApp connector needs Baileys 7.0.0-rc14 (WhiskeySockets, MIT), whose Signal
+dependencies are `libsignal` 6.0.0 (GPL-3.0) and `whatsapp-rust-bridge` 0.5.4
+(WebAssembly that contains AGPL-3.0 code). Those licenses are incompatible with
+PolyForm Shield, so Desktop release builds do not include this runtime and report
+WhatsApp as unavailable; `verify-release.cjs` refuses to package it. It can be
+built only for local, non-distributed testing with
+`MYCELLIOS_DESKTOP_WHATSAPP_RUNTIME=local-gpl`. Shipping WhatsApp requires a
+Signal implementation under a compatible license. See
 `specs/whatsapp-linked-device/spec.md`.
 
 ## Integrated development tooling
