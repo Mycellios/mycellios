@@ -27,7 +27,8 @@ models are never mixed: Jarvis stores 0.6B vectors in their own column.
 | Piece | Where |
 |---|---|
 | GPU replica (fp16, primary) | MRPUCCHI `100.102.221.91:18495`, Windows service `MycelliosQwen06` |
-| CPU replicas (share load) | HP ProBook `100.102.123.237:18495`, MSI GE60 `100.102.242.239:18495` |
+| Apple GPU replica (MPS fp16, shares load) | MacBook Air M1 `100.102.252.212:18495`, user LaunchAgent `io.mycellios.qwen06` |
+| CPU replicas (backup / disabled) | HP ProBook `100.102.123.237:18495`, MSI GE60 `100.102.242.239:18495` |
 | Failover entry | control server `10.48.0.10:18495`, systemd `mycellios-qwen06-forwarder` |
 | Client | Jarvis API on prod-apps-01 (`10.48.0.6`) |
 
@@ -133,3 +134,16 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   user's Startup folder, not as a service.
 - The temporary artifact server and its NetBird policy were removed after the
   replicas downloaded the model.
+
+- On 2026-11-21 a MacBook Air M1 (8 GB) joined as a regular replica on the
+  Apple GPU (MPS, fp16, weight 2). It measured 380 tokens/s with 64-text
+  batches and a minimum cosine of 0.999996 against MRPUCCHI's vectors for
+  documents and queries. It runs from `~/Mycellios/qwen06` with its own Python
+  3.12 venv (torch 2.13.0, transformers 5.14.1, tokenizers 0.22.2, the same
+  pins as the HP) and the hash-verified model. It starts as the user
+  LaunchAgent `io.mycellios.qwen06`, so it serves only while the user is
+  logged in and the Mac is awake. The forwarder fails over when it sleeps. Its
+  peer is in the `mycellios-embedding-replicas` NetBird group. Roll back by
+  removing it from the forwarder configuration
+  (`config.json.before-macbook-20261121`) and running
+  `launchctl bootout gui/$(id -u)/io.mycellios.qwen06`.
