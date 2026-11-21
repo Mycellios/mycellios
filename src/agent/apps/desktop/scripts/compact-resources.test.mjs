@@ -23,6 +23,8 @@ async function fixture() {
   await put('node_modules/native-shim/index.cjs',`module.exports=require('plain-cjs');`);
   await put('node_modules/native-shim/vendor/native.exe',Buffer.from([1,2,3]));
   await put('node_modules/plain-js/LICENSE','Fixture license preserved');
+  await put('node_modules/plain-js/index.js.map','{"version":3,"mappings":"dependency map"}');
+  await put('dist/desktop-local-entry.js.map','{"version":3,"mappings":"own bundle map"}');
   await put('dist/desktop-local-entry.js',`import value from 'plain-js';import native from '../node_modules/native-shim/index.cjs';let denied=false;try{await import('native-shim/private.js')}catch(e){denied=e.code==='ERR_PACKAGE_PATH_NOT_EXPORTED'}process.parentPort.postMessage({esm:value===42,nativeDependency:native===42,exportsDenied:denied});`);
   const receipt=await compactServer(source,target);
   return {root,source,target,receipt};
@@ -31,7 +33,11 @@ async function fixture() {
 test('keeps every JavaScript/license byte and external native package without a duplicate tree',async()=>{
   const f=await fixture();
   try {
-    assert.equal(f.receipt.sourceFiles,12);
+    assert.equal(f.receipt.sourceFiles,14);
+    assert.equal(f.receipt.omittedSourceMaps,1);
+    const packed=asar.listPackage(path.join(f.target,'runtime.asar')).map(p=>p.replaceAll('\\','/'));
+    assert.ok(!packed.some(p=>p.endsWith('node_modules/plain-js/index.js.map')),'dependency source maps stay out of the archive');
+    assert.equal(asar.extractFile(path.join(f.target,'runtime.asar'),path.normalize('dist/desktop-local-entry.js.map')).toString(),'{"version":3,"mappings":"own bundle map"}');
     assert.deepEqual(f.receipt.nativeRoots,['node_modules/native-shim']);
     assert.equal(asar.extractFile(path.join(f.target,'runtime.asar'),path.normalize('node_modules/plain-js/LICENSE')).toString(),'Fixture license preserved');
     assert.deepEqual(await readFile(path.join(f.target,'node_modules/native-shim/vendor/native.exe')),Buffer.from([1,2,3]));

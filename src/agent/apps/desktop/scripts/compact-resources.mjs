@@ -48,13 +48,17 @@ export async function compactPlan(source) {
     .filter((p,i,all)=>!all.slice(0,i).some(parent=>p.startsWith(parent+'/')));
   const external = file => file==='package.json' || file==='prisma.config.mjs' ||
     file.startsWith('prisma/') || nativeRoots.some(p=>file===p || file.startsWith(p+'/'));
-  const packed = files.filter(f=>!external(f));
-  return {files,nativeRoots,packed,external};
+  // Third-party source maps only improve stack traces and are about a quarter of the
+  // server's bytes. Keep our own bundle's map for diagnostics; nothing loads the rest.
+  const omitted = file => !external(file) && dependencySourceMap.test(file);
+  const packed = files.filter(f=>!external(f) && !omitted(f));
+  return {files,nativeRoots,packed,external,omitted};
 }
+const dependencySourceMap = /(^|\/)node_modules\/.+\.map$/;
 
 export async function compactServer(source, target) {
   await mkdir(target, {recursive:true});
-  const {files,nativeRoots,packed,external}=await compactPlan(source);
+  const {files,nativeRoots,packed,external,omitted}=await compactPlan(source);
   const archive = path.join(target, 'runtime.asar');
   await asar.createPackageFromFiles(source, archive, packed.map(f=>path.join(source,f)));
   for (const file of files.filter(external)) {
@@ -67,13 +71,15 @@ export async function compactServer(source, target) {
   // Check byte-for-byte preservation, including native modules and licenses.
   const digest = createHash('sha256');
   for (const file of files) {
+    if (omitted(file)) continue;
     const input = await readFile(path.join(source,file));
     const output = external(file) ? await readFile(path.join(target,file)) : asar.extractFile(archive,path.normalize(file));
     if (!input.equals(output)) throw Error('Compact resource differs: '+file);
     digest.update(file+'\n').update(createHash('sha256').update(input).digest());
   }
   const receipt = {schema:'mycellios-compact-resources/1',sourceFiles:files.length,
-    packedFiles:packed.length,physicalFiles:files.length-packed.length+4,nativeRoots,
+    packedFiles:packed.length,omittedSourceMaps:files.filter(omitted).length,
+    physicalFiles:files.filter(external).length+4,nativeRoots,
     preservedTreeSha256:digest.digest('hex')};
   await writeFile(path.join(target,'compact-resources.json'),JSON.stringify(receipt,null,2));
   return receipt;
