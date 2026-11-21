@@ -311,7 +311,7 @@ export async function touchRunningComputer(
 
 /** The sandbox refused a new computer because the Space already has its configured maximum. */
 export function isSpaceComputerLimitError(error: unknown): boolean {
-  return error instanceof Error && /^Computer limit reached for space/.test(error.message);
+  return error instanceof Error && /^Computer limit reached for space \(max: \d+\)/.test(error.message);
 }
 
 /**
