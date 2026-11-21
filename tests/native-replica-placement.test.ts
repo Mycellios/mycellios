@@ -227,3 +227,28 @@ describe("NativeReplicaPlacementBroker", () => {
     await database.close();
   });
 });
+
+describe("recordJobDemand", () => {
+  it("turns durable jobs into served and unserved demand after the cursor", async () => {
+    const { recordJobDemand } = await import("../src/coordinator/native-replica-placement-runner.js");
+    const database = await MeshDatabase.open(":memory:");
+    const store = new MeshStore(database);
+    const insert = (id: string, model: string, failure: string | null, at: number) => database.raw.prepare(
+      `INSERT INTO jobs(id, session_id, model, workload_class, status, failure_code, deadline_at, created_at, updated_at)
+       VALUES (?, 's', ?, 'interactive', ?, ?, ?, ?, ?)`,
+    ).run(id, model, failure ? "failed" : "completed", failure, at + 1_000, at, at);
+    await insert("old", "embedding", "no_capacity", 5);
+    await insert("a", "embedding", "no_capacity", 20);
+    await insert("b", "embedding", "no_capacity", 30);
+    await insert("c", "other", "no_capacity", 40);
+    const ledger = new ReplicaDemandLedger(new Set(["embedding", "other"]));
+    const cursor = await recordJobDemand(store, ledger, ["embedding"], 10);
+    expect(cursor).toBe(30);
+    expect(ledger.forReplica({ requestModels: ["embedding"] })).toEqual({ lastRequestAt: 30, unservedSince: 20 });
+    expect(ledger.forReplica({ requestModels: ["other"] })).toEqual({ lastRequestAt: 0, unservedSince: null });
+    await insert("d", "embedding", null, 50);
+    expect(await recordJobDemand(store, ledger, ["embedding"], cursor)).toBe(50);
+    expect(ledger.forReplica({ requestModels: ["embedding"] })).toEqual({ lastRequestAt: 50, unservedSince: null });
+    await database.close();
+  });
+});
