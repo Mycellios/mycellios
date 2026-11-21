@@ -65,6 +65,18 @@ replica. Phase 1 needs no new node command and no change on the PCs.
   metadata and the canary that its runner's guard requires. Without the
   variable or the file nothing changes.
 
+### Standalone runner
+
+The coordinator is not yet promoted automatically through Nucleus (only Agent
+is). `src/coordinator/native-replica-placement-runner.ts` runs the same broker
+as its own container from the published coordinator image, like the former
+keepers: `node dist/coordinator/native-replica-placement-runner.js <config>`
+with `MYCELLIOS_DATABASE_URL_FILE`. It reads demand from the durable `jobs`
+table (`no_capacity` = unserved, anything else = served) and ignores offline
+workers when detecting busy replicas. Run exactly one broker per network:
+keep the runner's configuration outside the coordinator's default path, and
+stop the runner before enabling the in-process broker.
+
 ### Rollout
 
 1. Write the configuration from the existing keeper configurations (Kokoro,

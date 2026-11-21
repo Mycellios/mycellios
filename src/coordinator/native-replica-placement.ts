@@ -370,7 +370,7 @@ function busyModels(workers: readonly StoredWorker[], connected: ReadonlySet<str
   const online = new Set(connected);
   const busy = new Set<string>();
   for (const worker of workers) {
-    if (online.size > 0 && !online.has(worker.id)) continue;
+    if (worker.status !== "online" || (online.size > 0 && !online.has(worker.id))) continue;
     for (const deployment of worker.capabilities.deployments) {
       if (deployment.freeSlots < deployment.maxConcurrency) busy.add(deployment.model);
     }
