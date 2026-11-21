@@ -1,0 +1,117 @@
+"""Private failover entry for the Qwen3-Embedding-0.6B replicas.
+
+Listens on the control server's private address, admits only configured
+client addresses, and relays each TCP connection to the first replica whose
+`/health` reports ready, in configured priority order (GPU first, CPU
+backups after). With no ready replica it answers HTTP 503
+`no_replica_available` so callers back off instead of hanging.
+
+Contract: specs/memory-embedding-qwen06/spec.md
+"""
+import argparse
+import asyncio
+import json
+from pathlib import Path
+
+NO_REPLICA = (b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nConnection: close\r\n"
+              b"Content-Length: 43\r\n\r\n{\"error\":{\"code\":\"no_replica_available\"}}")
+
+
+async def probe(host, port, timeout=3.0):
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout)
+        try:
+            writer.write(f"GET /health HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n".encode())
+            await writer.drain()
+            # The replica closes after replying; headers and body may arrive separately.
+            raw = await asyncio.wait_for(reader.read(), timeout)
+            if len(raw) > 65536:
+                return False
+        finally:
+            writer.close()
+        head, _, body = raw.partition(b"\r\n\r\n")
+        return head.split(b" ", 2)[1:2] == [b"200"] and json.loads(body).get("ready") is True
+    except (OSError, asyncio.TimeoutError, ValueError):
+        return False
+
+
+class Forwarder:
+    def __init__(self, backends, allowed, probe_fn=probe):
+        self.backends = [(item["host"], int(item["port"])) for item in backends]
+        self.allowed = set(allowed)
+        self.probe = probe_fn
+        self.ready = []
+
+    async def refresh(self):
+        results = await asyncio.gather(*(self.probe(host, port) for host, port in self.backends))
+        self.ready = [backend for backend, ok in zip(self.backends, results) if ok]
+
+    async def handle(self, reader, writer):
+        peer = writer.get_extra_info("peername")
+        try:
+            if not peer or peer[0] not in self.allowed:
+                return
+            if not self.ready:
+                return await self.reject(reader, writer)
+            upstream = None
+            for host, port in list(self.ready):
+                try:
+                    upstream = await asyncio.wait_for(asyncio.open_connection(host, port), 5)
+                    break
+                except (OSError, asyncio.TimeoutError):
+                    continue
+            if upstream is None:
+                return await self.reject(reader, writer)
+            up_reader, up_writer = upstream
+
+            async def pump(source, destination):
+                try:
+                    while chunk := await source.read(65536):
+                        destination.write(chunk)
+                        await destination.drain()
+                    if destination.can_write_eof():
+                        destination.write_eof()  # half-close: the reply still flows back
+                except OSError:
+                    pass
+
+            try:
+                await asyncio.gather(pump(reader, up_writer), pump(up_reader, writer))
+            finally:
+                up_writer.close()
+        finally:
+            writer.close()
+
+    async def reject(self, reader, writer):
+        # Read the bounded request head first so the client receives the reply.
+        try:
+            await asyncio.wait_for(reader.read(65536), 2)
+        except (OSError, asyncio.TimeoutError):
+            pass
+        writer.write(NO_REPLICA)
+        await writer.drain()
+        if writer.can_write_eof():
+            writer.write_eof()
+
+
+async def serve(config):
+    forwarder = Forwarder(config["backends"], config["allowedClients"])
+
+    async def health_loop():
+        while True:
+            await forwarder.refresh()
+            await asyncio.sleep(5)
+
+    asyncio.create_task(health_loop())
+    server = await asyncio.start_server(forwarder.handle, config["host"], int(config["port"]))
+    async with server:
+        await server.serve_forever()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    asyncio.run(serve(json.loads(Path(parser.parse_args().config).read_text())))
+
+
+if __name__ == "__main__":
+    main()
