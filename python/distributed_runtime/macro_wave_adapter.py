@@ -449,6 +449,15 @@ def prepare_linear_macro_wave(
             else ()
         )
         selected_size = min(selected_size, len(available))
+        if (
+            is_probe
+            and decision.enabled
+            and selected_size <= decision.candidate_size
+        ):
+            # A deferred drafter may return fewer tokens than the probe asked
+            # for (EOS, context limit, short lookup). The truncated wave is
+            # then no larger than the enabled decision, so it is not a probe.
+            is_probe = False
     else:
         available = _tokens(
             _draft_tokens_for_request(provider, request_id, history, limit),
