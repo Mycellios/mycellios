@@ -461,3 +461,46 @@ it("leaves a turn retryable when the Desktop check times out before anything is 
     vi.unstubAllGlobals();
   }
 });
+
+it("runs a routine's tools and its failure report on Desktop when the engine adds a steering yield signal", async () => {
+  const profile = await mkdtemp(path.join(tmpdir(), "desktop-routine-tools-"));
+  const scope = "c".repeat(64), token = "d".repeat(64);
+  const seenOnDesktop: unknown[] = [];
+  const engine = createDesktopAgentEngine(profile, () => scope, () => ({
+    describe, abort: vi.fn(), async *run(input) {
+      // The cloud keeps steering detection, so a Desktop engine never polls across the bridge.
+      seenOnDesktop.push(input.steeringPending);
+      // Desktop 0.17.0's engines put an AbortSignal in every tool observer.
+      const yieldSignal = new AbortController().signal;
+      const shell = await input.executeTool!("shell", { command: "echo ok" }, "call-shell", undefined, { onShellStillRunning: () => undefined, yieldSignal });
+      const fetched = await input.executeTool!("web_fetch", { url: "https://example.com" }, "call-fetch", undefined, { yieldSignal });
+      const failed = await input.executeTool!("routine_report_failure", { reason: "source down" }, "call-fail", undefined, { yieldSignal });
+      yield { type: "text", text: JSON.stringify([shell, fetched, failed]) };
+      yield { type: "done" };
+    },
+  }));
+  const host = await startHostComputerServer({ root: profile, token, hostname: "127.0.0.1", agentRuntime: engine });
+  host.setEnabled(true);
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = (input: HostComputerRequest, ctx: AdapterContext) => fetch(`http://127.0.0.1:${host.port}/computer`, {
+    method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(input), signal: ctx.signal,
+  });
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
+  const observers: Array<{ yieldSignal?: unknown }> = [];
+  const tool = vi.fn(async (name: string, _args: unknown, _id: string, _route: unknown, observer?: { yieldSignal?: unknown }) => {
+    observers.push(observer ?? {});
+    return { ok: name, at: new Date("2026-11-22T21:30:00.000Z") };
+  });
+  const steeringPending = vi.fn(async () => false);
+  const input: AgentRunRequest = { ...request(), routineId: "routine", allowSilentEmpty: true, executeTool: tool, steeringPending };
+  try {
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of runtime.run(input, context)) events.push(event);
+    expect(tool.mock.calls.map(([name]) => name)).toEqual(["shell", "web_fetch", "routine_report_failure"]);
+    expect(events).toContainEqual({ type: "text", text: JSON.stringify(["shell", "web_fetch", "routine_report_failure"].map(ok => ({ ok, at: "2026-11-22T21:30:00.000Z" }))) });
+    expect(events.at(-1)?.type).toBe("done");
+    expect(seenOnDesktop).toEqual([undefined]);
+    // The cloud gives each tool its own yield signal for the person's waiting message.
+    for (const observer of observers) expect(observer.yieldSignal).toBeInstanceOf(AbortSignal);
+  } finally { await host.close(); await rm(profile, { recursive: true, force: true }); }
+});
