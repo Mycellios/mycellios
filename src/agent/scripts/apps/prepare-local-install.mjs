@@ -104,11 +104,11 @@ if (process.argv.includes("--apply")) {
   main = main.replace(matches[0][0], hook + matches[0][0]);
   const bridge =
     '  appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },\n';
-  assert.equal(preload.split('contextBridge.exposeInMainWorld("rakazoDesktop", {').length, 2);
-  preload = preload.replace(
-    'contextBridge.exposeInMainWorld("rakazoDesktop", {',
-    'contextBridge.exposeInMainWorld("rakazoDesktop", {\n' + bridge,
-  );
+  const marker = preload.includes("const desktopBridge = {")
+    ? "const desktopBridge = {"
+    : 'contextBridge.exposeInMainWorld("rakazoDesktop", {';
+  assert.equal(preload.split(marker).length, 2, "Unknown installed Desktop bridge.");
+  preload = preload.replace(marker, marker + "\n" + bridge);
   const changes = new Map([
     ["dist/main.js", Buffer.from(main)],
     ["dist/preload.cjs", Buffer.from(preload)],

@@ -3,12 +3,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { beforeDevelopmentExecution } from "./development-execution";
 
 afterEach(() => {
-  delete window.rakazoDesktop;
+  delete window.mycelliosDesktop;
 });
 it("connects development before submitting work and refuses the request when setup fails", async () => {
   const connect = vi.fn(async () => {}),
     dedicated = vi.fn(async () => {});
-  window.rakazoDesktop = { development: { isDevelopment: true, connect } } as any;
+  window.mycelliosDesktop = { development: { isDevelopment: true, connect } } as any;
   await beforeDevelopmentExecution(["threads", "send"], { botId: "bot" }, dedicated);
   expect(dedicated).toHaveBeenCalledWith("bot");
   expect(connect).toHaveBeenCalledWith("bot");
@@ -21,9 +21,9 @@ it("connects development before submitting work and refuses the request when set
 it("does not change stable-window execution or read-only requests", async () => {
   const dedicated = vi.fn(),
     connect = vi.fn();
-  window.rakazoDesktop = { development: { isDevelopment: false, connect } } as any;
+  window.mycelliosDesktop = { development: { isDevelopment: false, connect } } as any;
   await beforeDevelopmentExecution(["threads", "send"], { botId: "bot" }, dedicated);
-  window.rakazoDesktop!.development!.isDevelopment = true;
+  window.mycelliosDesktop!.development!.isDevelopment = true;
   await beforeDevelopmentExecution(["bots", "list"], {}, dedicated);
   expect(dedicated).not.toHaveBeenCalled();
   expect(connect).not.toHaveBeenCalled();

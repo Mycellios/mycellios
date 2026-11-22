@@ -58,7 +58,7 @@ export interface DesktopUpdateState {
   waitingFor?: "local_work" | "unsaved_work";
 }
 
-export interface RakazoDesktopUpdate {
+export interface MycelliosDesktopUpdate {
   preferences?: () => Promise<DesktopUpdatePreferences>;
   savePreferences?: (patch: { autoDownload?: boolean; autoInstall?: boolean }) => Promise<DesktopUpdatePreferences>;
   restartWhenIdle?: () => Promise<DesktopUpdateState>;
@@ -85,7 +85,7 @@ export interface DesktopUpdatePreferences {
 }
 
 /** One WhatsApp number on this PC: a link in progress or an established linked device. */
-export interface RakazoDesktopWhatsAppStatus {
+export interface MycelliosDesktopWhatsAppStatus {
   /** Local handle for this socket; stable while the link lives on this PC. */
   sessionKey: string;
   /** Server link id once the number is registered. */
@@ -99,7 +99,7 @@ export interface RakazoDesktopWhatsAppStatus {
   error?: string;
 }
 
-export interface RakazoDesktopWhatsAppLinkInput {
+export interface MycelliosDesktopWhatsAppLinkInput {
   botId: string;
   mode: "personal" | "dedicated";
   method: "qr" | "pairing_code";
@@ -108,22 +108,22 @@ export interface RakazoDesktopWhatsAppLinkInput {
 }
 
 /** WhatsApp linked device (specs/whatsapp-linked-device). Keys never leave native main. */
-export interface RakazoDesktopWhatsApp {
+export interface MycelliosDesktopWhatsApp {
   available: () => Promise<boolean>;
-  status: () => Promise<RakazoDesktopWhatsAppStatus[]>;
-  link: (input: RakazoDesktopWhatsAppLinkInput) => Promise<{ sessionKey: string }>;
+  status: () => Promise<MycelliosDesktopWhatsAppStatus[]>;
+  link: (input: MycelliosDesktopWhatsAppLinkInput) => Promise<{ sessionKey: string }>;
   cancel: (sessionKey: string) => Promise<void>;
   disconnect: (linkId: string) => Promise<void>;
   /** Receives the full status array on every change; returns an unsubscribe function. */
-  onStatus: (listener: (status: RakazoDesktopWhatsAppStatus[]) => void) => () => void;
+  onStatus: (listener: (status: MycelliosDesktopWhatsAppStatus[]) => void) => () => void;
 }
 
-export interface RakazoDesktopOAuthCallback {
+export interface MycelliosDesktopOAuthCallback {
   code: string;
   state?: string;
 }
 
-export interface RakazoDesktop {
+export interface MycelliosDesktop {
   /** Chat-only window. Native settings and execution remain in the main window. */
   chatWindow?: {
     kind: "floating";
@@ -235,7 +235,7 @@ export interface RakazoDesktop {
     onConfigure: (listener: () => void) => () => void;
   };
   /** Absent in older desktop releases. */
-  whatsapp?: RakazoDesktopWhatsApp;
+  whatsapp?: MycelliosDesktopWhatsApp;
   /** Optional for compatibility with older desktop releases. */
   passkeys?: {
     /** Relying parties this build is associated with for system passkeys (macOS); others fail. */
@@ -250,7 +250,7 @@ export interface RakazoDesktop {
     toggleMaximize: () => Promise<void>;
     state: () => Promise<{ minimized: boolean; maximized: boolean; fullScreen: boolean }>;
   };
-  update: RakazoDesktopUpdate;
+  update: MycelliosDesktopUpdate;
   oauth: {
     /**
      * Open system-browser auth. A redirect_uri must be HTTP loopback with state;
@@ -262,7 +262,7 @@ export interface RakazoDesktop {
      * Authorization codes captured from the system browser or a legacy popup.
      * Returns an unsubscribe function.
      */
-    onCallback: (listener: (callback: RakazoDesktopOAuthCallback) => void) => () => void;
+    onCallback: (listener: (callback: MycelliosDesktopOAuthCallback) => void) => () => void;
   };
 }
 
@@ -360,7 +360,7 @@ export type DesktopSetupLink = "docker-desktop" | "orbstack" | "docker-engine";
 
 /**
  * Bridge exposed only to the first-run setup window. The app window keeps the
- * narrower `rakazoDesktop` bridge so a connected server can never re-point the app.
+ * narrower `mycelliosDesktop` bridge so a connected server can never re-point the app.
  */
 export interface RakazoSetup {
   servers?: () => Promise<(DesktopSetup & { name: string })[]>;

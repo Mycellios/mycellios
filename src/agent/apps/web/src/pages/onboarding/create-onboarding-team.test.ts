@@ -1,4 +1,4 @@
-import { FIRST_MICO_SPAWN_KEY, type RakazoDesktop } from "@mycellios/contracts";
+import { FIRST_MICO_SPAWN_KEY, type MycelliosDesktop } from "@mycellios/contracts";
 import { beforeEach, expect, it, vi } from "vitest";
 import { desktopBridge } from "../../lib/desktop";
 import { createOnboardingTeam, type OnboardingTeamMember } from "./create-onboarding-team";
@@ -83,7 +83,7 @@ it("stops starting new profile writes after leaving setup", async () => {
 });
 
 it.each([false, true])("keeps ordinary model/API profiles isolated with Desktop available=%s", async desktop => {
-  vi.mocked(desktopBridge).mockReturnValue(desktop ? {} as RakazoDesktop : undefined);
+  vi.mocked(desktopBridge).mockReturnValue(desktop ? {} as MycelliosDesktop : undefined);
   const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
   await createOnboardingTeam(members, { list: async () => [], create });
   expect(create).toHaveBeenCalledTimes(members.length);
@@ -97,7 +97,7 @@ it.each([
   ["codex", false, "team"], ["claude", false, "team"],
   ["codex", true, "dedicated"], ["claude", true, "dedicated"],
 ] as const)("keeps every proposed role for installed %s with Desktop=%s on %s", async (agentEngine, desktop, computerMode) => {
-  vi.mocked(desktopBridge).mockReturnValue(desktop ? {} as RakazoDesktop : undefined);
+  vi.mocked(desktopBridge).mockReturnValue(desktop ? {} as MycelliosDesktop : undefined);
   const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
   await createOnboardingTeam(members, { list: async () => [], create, agentEngine });
   expect(create).toHaveBeenCalledTimes(members.length);
@@ -105,7 +105,7 @@ it.each([
 });
 
 it("never reassigns an existing profile when a retry chooses an installed account", async () => {
-  vi.mocked(desktopBridge).mockReturnValue({} as RakazoDesktop);
+  vi.mocked(desktopBridge).mockReturnValue({} as MycelliosDesktop);
   const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
   const existing = { id: "bot-lead", spawnKey: FIRST_MICO_SPAWN_KEY, computerMode: "isolated" };
   await createOnboardingTeam(members, { list: async () => [existing], create, agentEngine: "codex" });

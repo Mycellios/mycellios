@@ -1,3 +1,4 @@
+import { desktopBridge } from "./desktop";
 import { eventAgentContext, eventAgentSpace, withEventAgentHeaders } from "./event-demo-agent";
 import { startupFetch } from "./startup-fetch";
 import { getGeneralPreferences } from "./general-preferences";
@@ -26,7 +27,7 @@ type RpcClientContext = { spaceId?: string | null };
 
 export function selectedSpaceId(): string | null {
   if (eventAgentContext()) return eventAgentSpace();
-  const floatingSpace = typeof window === "undefined" ? undefined : window.rakazoDesktop?.chatWindow?.spaceId;
+  const floatingSpace = desktopBridge()?.chatWindow?.spaceId;
   if (floatingSpace) return floatingSpace;
   if (typeof window === "undefined" || !restoreSavedSpace) return null;
   try {
@@ -38,7 +39,7 @@ export function selectedSpaceId(): string | null {
 
 export function selectSpace(id: string): boolean {
   if (eventAgentContext()) { eventAgentSpace(id); return true; }
-  const floatingSpace = typeof window === "undefined" ? undefined : window.rakazoDesktop?.chatWindow?.spaceId;
+  const floatingSpace = desktopBridge()?.chatWindow?.spaceId;
   if (floatingSpace) return id === floatingSpace;
   restoreSavedSpace = true;
   try {
@@ -56,7 +57,7 @@ export function selectSpace(id: string): boolean {
 
 export function clearSpaceSelection(): void {
   if (eventAgentContext()) return;
-  if (typeof window !== "undefined" && window.rakazoDesktop?.chatWindow) return;
+  if (desktopBridge()?.chatWindow) return;
   try {
     window.localStorage.removeItem(SPACE_STORAGE_KEY);
   } catch {
@@ -138,7 +139,7 @@ let leavingSpace: Promise<void> | null = null;
  * spaces the user has; if the selected one is not among them, reload into their default space.
  */
 export function leaveUnavailableSpace(spaceId: string): Promise<void> {
-  if (typeof window !== "undefined" && window.rakazoDesktop?.chatWindow) return Promise.resolve();
+  if (desktopBridge()?.chatWindow) return Promise.resolve();
   leavingSpace ??= (async () => {
     try {
       const { spaces } = await rpc.spaces.list(undefined, { context: { spaceId: null } });

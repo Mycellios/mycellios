@@ -31,7 +31,7 @@ try{
    let window;
    const deadline=Date.now()+60000;
    while(!window&&Date.now()<deadline){
-    for(const page of client.windows())if(await page.evaluate(()=>Boolean(window.rakazoDesktop)).catch(()=>false)){window=page;break;}
+    for(const page of client.windows())if(await page.evaluate(()=>Boolean(window.mycelliosDesktop ?? window.rakazoDesktop)).catch(()=>false)){window=page;break;}
     if(!window)await new Promise(resolve=>setTimeout(resolve,100));
    }
    if(!window)throw Error('No main window with the native Desktop bridge');

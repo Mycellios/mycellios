@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defaultComputerMode,
+  desktopBridge,
   desktopDragClass,
   desktopOAuthCode,
   oauthStateOf,
   onDesktopOAuthCallback,
-  type RakazoDesktop,
-  type RakazoDesktopOAuthCallback,
+  type MycelliosDesktop,
+  type MycelliosDesktopOAuthCallback,
   windowChromeKind,
 } from "./desktop.js";
 
-function desktop(platform: string): RakazoDesktop {
+function desktop(platform: string): MycelliosDesktop {
   const updateState = {
     phase: "unsupported" as const,
     currentVersion: "0.1.0",
@@ -37,13 +38,24 @@ function desktop(platform: string): RakazoDesktop {
   };
 }
 
+describe("Desktop bridge", () => {
+  it("prefers the new bridge and supports older Desktop builds", () => {
+    const previous = desktop("linux");
+    const current = desktop("win32");
+    const host = { rakazoDesktop: previous };
+    expect(desktopBridge(host)).toBe(previous);
+    expect(desktopBridge({ ...host, mycelliosDesktop: current })).toBe(current);
+    expect(desktopBridge({})).toBeUndefined();
+  });
+});
+
 describe("window chrome", () => {
   it("does not paint fake traffic lights in the browser", () => {
     expect(windowChromeKind(undefined)).toBe("spacer");
   });
   it("defaults new Micos to this PC in Desktop and to isolation elsewhere", () => {
     expect(defaultComputerMode(undefined)).toBe("isolated");
-    const host = { connect: async () => undefined } as unknown as NonNullable<RakazoDesktop["computer"]>;
+    const host = { connect: async () => undefined } as unknown as NonNullable<MycelliosDesktop["computer"]>;
     for (const platform of ["linux", "win32", "darwin"]) {
       expect(defaultComputerMode({ ...desktop(platform), computer: host })).toBe("dedicated");
       // A Desktop build without local computer access cannot host the Mico.
@@ -92,20 +104,20 @@ describe("attempt correlation", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   function bridgeEmitting() {
-    let emit: (callback: RakazoDesktopOAuthCallback) => void = () => undefined;
+    let emit: (callback: MycelliosDesktopOAuthCallback) => void = () => undefined;
     const unsubscribe = vi.fn();
     vi.stubGlobal("window", {
-      rakazoDesktop: {
+      mycelliosDesktop: {
         ...desktop("linux"),
         oauth: {
-          onCallback: (listener: (callback: RakazoDesktopOAuthCallback) => void) => {
+          onCallback: (listener: (callback: MycelliosDesktopOAuthCallback) => void) => {
             emit = listener;
             return unsubscribe;
           },
         },
       },
     });
-    return { emit: (c: RakazoDesktopOAuthCallback) => emit(c), unsubscribe };
+    return { emit: (c: MycelliosDesktopOAuthCallback) => emit(c), unsubscribe };
   }
 
   it("reads the attempt state out of the authorize URL", () => {

@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { I18nProvider } from "@lingui/react";
 import { setupI18n } from "@lingui/core";
 import { AppsOverlay } from "../../apps/web/src/pages/AppsOverlay";
+import { desktopBridge } from "../../apps/web/src/lib/desktop";
 import "../../apps/web/src/styles.css";
 
 const host = document.createElement("div");
@@ -17,7 +18,7 @@ function render() {
   const space = localStorage.getItem("mycellios:space-id");
   const next = `${owner}:${space}`;
   const allowed = Boolean(
-    window.rakazoDesktop?.appsStudio && /\/app(?:\/|$)/.test(location.pathname),
+    desktopBridge()?.appsStudio && /\/app(?:\/|$)/.test(location.pathname),
   );
   if (scope !== next || !allowed) opened = false;
   scope = next;

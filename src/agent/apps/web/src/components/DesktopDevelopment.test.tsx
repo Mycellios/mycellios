@@ -22,13 +22,13 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
-  delete window.rakazoDesktop;
+  delete window.mycelliosDesktop;
   vi.unstubAllGlobals();
 });
 it("hides the launcher in browsers, older builds and development itself", async () => {
   await act(async () => root.render(<DesktopDevelopment />));
   expect(host.textContent).toBe("");
-  window.rakazoDesktop = { development: { isDevelopment: true } } as any;
+  window.mycelliosDesktop = { development: { isDevelopment: true } } as any;
   await act(async () => root.render(<DesktopDevelopment />));
   expect(host.textContent).toBe("");
 });
@@ -40,7 +40,7 @@ it("opens development once, preserving retry after a native failure", async () =
         done = resolve;
       }),
   );
-  window.rakazoDesktop = {
+  window.mycelliosDesktop = {
     computer: { requestAccess: async () => true },
     development: { open },
   } as any;

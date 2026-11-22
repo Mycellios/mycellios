@@ -7,7 +7,7 @@ import { applyResolvedAppearance } from "../../src/lib/ui-appearance";
 
 const bridge = (window as unknown as { studioFixture(input: unknown): Promise<unknown> })
   .studioFixture;
-window.rakazoDesktop = { appsStudio: { request: bridge } } as never;
+window.mycelliosDesktop = { appsStudio: { request: bridge } } as never;
 document.documentElement.lang = "es";
 applyResolvedAppearance("light");
 createRoot(document.getElementById("root")!).render(

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
-import type { RakazoDesktop, RakazoSetup } from "@mycellios/contracts";
+import type { MycelliosDesktop, RakazoSetup } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
 
 function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: unknown; send?: unknown } = {}) {
@@ -37,7 +37,7 @@ it("activates a companion only for a trusted primary pointer gesture without exp
 
 it("exposes bounded native notification operations and removes click listeners", async () => {
   const f = runPreload("preload.cjs");
-  const bridge = f.exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+  const bridge = f.exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
   await bridge.notifications!.status(); await bridge.notifications!.openSettings(); await bridge.notifications!.clear();
   const input = { title: "Mycellios", body: "Test", url: "/app", tag: "test", silent: true };
   await bridge.notifications!.show(input);
@@ -49,14 +49,23 @@ it("exposes bounded native notification operations and removes click listeners",
 });
 
 describe("desktop preload bridge", () => {
+  it.each(["preload.cjs", "floating-chat-preload.cjs", "development-preload.cjs"])(
+    "publishes matching bridge bindings in %s",
+    (file) => {
+      const { exposeInMainWorld } = runPreload(file);
+      const bridge = exposeInMainWorld.mock.calls[0]?.[1];
+      expect(exposeInMainWorld.mock.calls.map(([name]) => name)).toEqual(["mycelliosDesktop", "rakazoDesktop"]);
+      expect(exposeInMainWorld.mock.calls[1]?.[1]).toBe(bridge);
+    },
+  );
   it("exposes only named device-local connection identity edits", async () => {
-    const f=runPreload("preload.cjs"), bridge=f.exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const f=runPreload("preload.cjs"), bridge=f.exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     await bridge.servers!.updateIdentity!("https://a.test",{name:"Team",color:"#334455"});
     expect(f.invoke).toHaveBeenCalledWith("desktop.servers.updateIdentity","https://a.test",{name:"Team",color:"#334455"});
   });
   it("keeps floating chat access limited to its pinned Space and update acknowledgement", async () => {
     const { invoke, exposeInMainWorld } = runPreload("floating-chat-preload.cjs");
-    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     expect(Object.keys(bridge).sort()).toEqual(["chatWindow", "nativeWindowFrame", "platform"]);
     expect(bridge.chatWindow?.spaceId).toBe("space-a");
     await bridge.chatWindow!.returnToMain();
@@ -64,21 +73,21 @@ describe("desktop preload bridge", () => {
   });
   it("exposes settings as named IPC methods without a raw IPC capability", async () => {
     const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
-    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     await bridge.settings!.state(); await bridge.settings!.update({ keepAwake: true });
     expect(invoke.mock.calls).toEqual([["desktop.settings.state"], ["desktop.settings.update", { keepAwake: true }]]);
     expect((bridge as unknown as Record<string, unknown>).ipcRenderer).toBeUndefined();
   });
   it("exposes only named local script settings, never the connection key or an RPC proxy", async () => {
     const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
-    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     await bridge.localScripts!.state(); await bridge.localScripts!.configure({ enabled: true, requestsPerHour: 30 });
     expect(invoke.mock.calls).toEqual([["desktop.localScripts.state"], ["desktop.localScripts.configure", { enabled: true, requestsPerHour: 30 }]]);
     expect(Object.keys(bridge.localScripts!).sort()).toEqual(["configure", "state"]);
   });
   it("acknowledges only bounded native update requests without exposing IPC events", async () => {
     const { on, off, send, exposeInMainWorld } = runPreload("preload.cjs");
-    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     const listener = vi.fn(() => true), unsubscribe = bridge.update.onPrepare!(listener);
     const handler = on.mock.calls.find(([channel]) => channel === "desktop.update.prepare")![1];
     await handler({ privateEvent: true }, "invalid"); expect(send).not.toHaveBeenCalled();
@@ -89,7 +98,7 @@ describe("desktop preload bridge", () => {
   });
   it("exposes bounded preview and development operations without raw IPC", async () => {
     const { invoke, on, off, exposeInMainWorld } = runPreload("preload.cjs");
-    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     expect(bridge.development?.isDevelopment).toBe(false);
     expect(Object.keys(bridge.development!).sort()).toEqual(["identity", "isDevelopment", "open", "status", "stop"]);
     await bridge.development!.open("mico");
@@ -114,9 +123,7 @@ describe("desktop preload bridge", () => {
   it("exposes the scoped desktop bridges", async () => {
     const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
 
-    expect(exposeInMainWorld).toHaveBeenCalledTimes(1);
-    const [globalName, bridge] = exposeInMainWorld.mock.calls[0] as [string, RakazoDesktop];
-    expect(globalName).toBe("rakazoDesktop");
+    const [, bridge] = exposeInMainWorld.mock.calls[0] as [string, MycelliosDesktop];
     expect(bridge.platform).toBe("linux");
     expect(bridge.nativeWindowFrame).toBe(true);
     expect(Object.keys(bridge).sort()).toEqual([
@@ -209,7 +216,7 @@ describe("desktop preload bridge", () => {
 
   it("exposes update choices and idle-restart commands without a general IPC escape hatch", async () => {
     const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
-    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as MycelliosDesktop;
     await bridge.update.preferences!();
     await bridge.update.savePreferences!({ autoDownload: false });
     await bridge.update.restartWhenIdle!(); await bridge.update.cancelRestart!();
@@ -227,7 +234,7 @@ describe("desktop preload bridge", () => {
     const off = vi.fn();
     const { exposeInMainWorld } = runPreload("preload.cjs", { on, off });
 
-    const [, bridge] = exposeInMainWorld.mock.calls[0] as [string, RakazoDesktop];
+    const [, bridge] = exposeInMainWorld.mock.calls[0] as [string, MycelliosDesktop];
     const received: unknown[] = [];
     const unsubscribe = bridge.oauth.onCallback((callback) => received.push(callback));
 

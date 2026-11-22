@@ -20,7 +20,7 @@ import { MicoBehaviorSettings } from "./MicoBehaviorSettings";
 let root: Root, el: HTMLDivElement;
 const bots = [{ id: "one", name: "Mico One", color: "green" }, { id: "two", name: "Mico Two", color: "purple" }] as Bot[];
 const initial = (): MicoSettingsState => ({ ownerId: "owner", spaceId: "space", revision: 1, defaults: { localScripts: false, agentNewChat: false, showPlan: false, gitCoauthor: true }, bots: [{ id: "one", preferences: {} }, { id: "two", preferences: { showPlan: true } }] });
-beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); el = document.createElement("div"); document.body.append(el); root = createRoot(el); delete window.rakazoDesktop; });
+beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); el = document.createElement("div"); document.body.append(el); root = createRoot(el); delete window.mycelliosDesktop; });
 afterEach(async () => { await act(async () => root.unmount()); el.remove(); });
 const busy = vi.fn();
 async function render() { await act(async () => root.render(<MicoBehaviorSettings bots={bots} onBusyChange={busy} />)); }

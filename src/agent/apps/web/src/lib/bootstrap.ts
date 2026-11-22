@@ -1,3 +1,4 @@
+import { desktopBridge } from "./desktop";
 import type { AppBootstrap } from "@mycellios/contracts";
 import { ATTACHMENT_MAX_BYTES, attachmentMaxBytes } from "@mycellios/contracts";
 import { displayIdentityResult } from "@mycellios/core";
@@ -33,7 +34,7 @@ let primedBootstrap: {
 
 const initialTarget = initialBootstrapTarget(
   appRoute(window.location.pathname),
-  Boolean(window.rakazoDesktop),
+  Boolean(desktopBridge()),
 );
 if (initialTarget) {
   const { botId } = initialTarget;

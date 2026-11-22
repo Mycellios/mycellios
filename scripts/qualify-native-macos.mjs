@@ -21,7 +21,7 @@ for(let launch=0;launch<2;launch++){
   await expect.poll(()=>instance.windows().some(p=>p.url().startsWith('data:text/html')),{timeout:60000}).toBe(true);
   const page=instance.windows().find(p=>p.url().startsWith('data:text/html'));
   await expect(page.getByText('Mycellios native release')).toBeVisible();
-  assert.equal(await page.evaluate(()=>window.rakazoDesktop?.platform),'darwin');
+  assert.equal(await page.evaluate(()=>(window.mycelliosDesktop ?? window.rakazoDesktop)?.platform),'darwin');
   assert.equal(await instance.evaluate(({app})=>app.isPackaged),true);
  }finally{await instance.close();}
 }

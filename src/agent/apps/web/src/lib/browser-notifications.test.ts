@@ -55,7 +55,7 @@ function context(overrides: Partial<BrowserNotificationContext> = {}): BrowserNo
 describe("browser notifications", () => {
   it("uses native Desktop delivery without also posting a browser notification", async () => {
     const show = vi.fn(async () => undefined), browser = vi.fn();
-    vi.stubGlobal("window", { rakazoDesktop: { notifications: { show } } }); vi.stubGlobal("Notification", browser);
+    vi.stubGlobal("window", { mycelliosDesktop: { notifications: { show } } }); vi.stubGlobal("Notification", browser);
     try {
       await showSystemNotification("Mico", "Ready", "account:thread", "/app/mico", false);
       expect(show).toHaveBeenCalledWith(expect.objectContaining({ title: "Mico", body: "Ready", silent: true, url: expect.stringMatching(/\/app\/mico$/) }));

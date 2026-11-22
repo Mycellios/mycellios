@@ -32,7 +32,7 @@ function desktopWindow() {
   };
   const open = vi.fn(() => popup);
   const close = vi.fn();
-  vi.stubGlobal("window", { rakazoDesktop: {}, location, open, close });
+  vi.stubGlobal("window", { mycelliosDesktop: {}, location, open, close });
   const begin = vi.fn(async (_disableRedirect: boolean, callbackURL: (url: string) => string) => {
     returnTo = callbackURL("/app");
     return result;

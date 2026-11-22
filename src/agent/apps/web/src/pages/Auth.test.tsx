@@ -87,7 +87,7 @@ afterEach(async () => {
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  delete window.rakazoDesktop;
+  delete window.mycelliosDesktop;
 });
 async function render(mode: "in" | "up" | "forgot" = "in", entry = "/") {
   await act(async () =>
@@ -158,7 +158,7 @@ it("keeps a rejected central callback on the retry screen", async () => {
 });
 
 it("starts first-party Desktop login in the main window without an intermediate button", async () => {
-  window.rakazoDesktop = {} as NonNullable<Window["rakazoDesktop"]>;
+  window.mycelliosDesktop = {} as NonNullable<Window["mycelliosDesktop"]>;
   vi.mocked(fetchAuthCapabilities).mockResolvedValue({
     ...capabilities,
     passwordAuth: false,
@@ -175,7 +175,7 @@ it("starts first-party Desktop login in the main window without an intermediate 
 });
 
 it("keeps a failed first-party Desktop sign-in retryable without repeatedly opening login", async () => {
-  window.rakazoDesktop = {} as NonNullable<Window["rakazoDesktop"]>;
+  window.mycelliosDesktop = {} as NonNullable<Window["mycelliosDesktop"]>;
   vi.mocked(fetchAuthCapabilities).mockResolvedValue({ ...capabilities, mycelliosAccount: true, sso: { name: "Mycellios", availability: "available" } });
   vi.mocked(authClient.signIn.social).mockResolvedValue({ data: null, error: { message: "Unavailable", status: 503, statusText: "Unavailable" } });
   const open = vi.spyOn(window, "open");
@@ -249,7 +249,7 @@ it("hides SSO in password recovery", async () => {
 
 it("selects a non-redirecting SSO request on desktop", async () => {
   vi.spyOn(window, "open").mockReturnValue({ close: vi.fn() } as unknown as Window);
-  window.rakazoDesktop = {} as NonNullable<Window["rakazoDesktop"]>;
+  window.mycelliosDesktop = {} as NonNullable<Window["mycelliosDesktop"]>;
   vi.mocked(fetchAuthCapabilities).mockResolvedValue(capabilities);
   vi.mocked(authClient.signIn.social).mockResolvedValue({
     data: null,
