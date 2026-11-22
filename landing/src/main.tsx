@@ -1,6 +1,7 @@
 import { lazy, StrictMode, Suspense, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { loadMushroomStage, wantsMushroom } from "./rebrand/HeroMushroom";
+import { legacyAccountRedirect } from "../../src/contracts/agent-account-links";
 import { resolveLandingSurface, retiredMarketingDestination } from "./routing";
 import "./button-style.css";
 import "./logo-style.css";
@@ -69,6 +70,9 @@ const isRebrandRoute = window.location.pathname === "/rebrand" || window.locatio
 if (isRebrandRoute) window.history.replaceState({}, "", "/");
 const retiredDestination = retiredMarketingDestination(window.location.pathname);
 if (retiredDestination) window.history.replaceState({}, "", `${retiredDestination}${window.location.search}`);
+// API keys moved to the Agent account; old dashboard links keep working.
+const movedAccountPage = legacyAccountRedirect(window.location.pathname, window.location.search);
+if (movedAccountPage) window.location.replace(movedAccountPage);
 if (window.location.pathname === "/join" || window.location.pathname === "/join/") {
   window.history.replaceState({}, "", "/earn");
 }

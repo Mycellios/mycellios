@@ -37,6 +37,7 @@ import {
   CloudDownload,
   Cpu,
   CreditCard,
+  KeyRound,
   ListChecks,
   MousePointer2,
   Search,
@@ -72,6 +73,7 @@ import {
   MobileSettingsPanel,
   VoiceEntryPanel,
 } from "./settings/CompanionPanels";
+import { ApiKeysSettingsPanel } from "./settings/ApiKeysSettings";
 import { NotificationsPanel } from "./settings/NotificationsPanel";
 import { settingsKeywords, settingsMatch } from "./settings/navigation";
 import { UpdatesPanel } from "./settings/UpdatesPanel";
@@ -296,6 +298,7 @@ export function SettingsOverlay({
     ...(developerMode ? [{ id: "logs" as const, label: t`Logs`, icon: ListChecks }] : []),
     { id: "profile", label: t`Profile`, icon: UserRound, group: "account" as const },
     { id: "billing" as const, label: t`Billing`, icon: CreditCard, group: "account" as const },
+    { id: "api-keys" as const, label: t`API keys`, icon: KeyRound, group: "account" as const },
     { id: "mobile", label: t`Mobile connection`, icon: Smartphone, group: "account" as const },
     { id: "app-behavior" as const, label: t`Application behavior`, icon: Power, group: "computer" as const },
     { id: "dynamic-island" as const, label: t`Mycellios Island`, icon: PanelTop, group: "computer" as const },
@@ -613,6 +616,7 @@ export function SettingsOverlay({
                   />
                 ) : null}
                 {section === "mobile" ? <MobileSettingsPanel accountId={userId ?? undefined} /> : null}
+                {section === "api-keys" ? <ApiKeysSettingsPanel key={userId ?? "signed-out"} accountId={userId ?? undefined} /> : null}
                 {section === "app-behavior" ? <AppBehaviorPanel onBusyChange={setBehaviorBusy} /> : null}
                 {section === "space" && space ? (
                   <SpaceSettingsPanel

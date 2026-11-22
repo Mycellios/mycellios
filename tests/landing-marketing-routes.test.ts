@@ -67,4 +67,15 @@ describe("marketing route entries", () => {
     expect(response.body).toContain("Mycellios Changelog");
     expect((await app.inject("/changelog/?product=agent")).headers.location).toBe("/changelog?product=agent");
   });
+  it("sends old dashboard API key links to the Agent account", async () => {
+    const app = await site();
+    for (const url of ["/account?tab=api", "/account?tab=api&from=landing"]) {
+      const response = await app.inject(url);
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toBe("https://www.mycellios.com/agent/app?settings=api-keys");
+    }
+    expect((await app.inject("/account/?tab=api")).headers.location).toBe("/account?tab=api");
+    expect((await app.inject("/account?tab=billing")).statusCode).toBe(200);
+    expect((await app.inject("/account")).statusCode).toBe(200);
+  });
 });

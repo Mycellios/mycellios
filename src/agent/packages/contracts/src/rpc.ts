@@ -180,6 +180,13 @@ import {
 import { ModelHeadersSchema } from "./model-headers.js";
 import { ModelRoleSchema, ModelRoleUpdateSchema, ModelRoleViewSchema } from "./model-roles.js";
 import { MycelliosAccountSchema } from "./mycellios-account.js";
+import {
+  MycelliosApiKeyCreatedSchema,
+  MycelliosApiKeyCreateInput,
+  MycelliosApiKeyListInput,
+  MycelliosApiKeyListSchema,
+  MycelliosApiKeyRevokeInput,
+} from "./mycellios-api-keys.js";
 import { MessageReactionSchema } from "./reactions.js";
 import { RoutineWatchSchema } from "./routine-watch.js";
 import { RunLogsInputSchema, RunLogsOutputSchema } from "./run-logs.js";
@@ -260,6 +267,11 @@ const threadSendInput = threadTarget
 const spaceName = z.string().trim().min(1).max(60);
 
 export const appContract = {
+  mycelliosApiKeys: {
+    list: oc.input(MycelliosApiKeyListInput).output(MycelliosApiKeyListSchema),
+    create: oc.input(MycelliosApiKeyCreateInput).output(MycelliosApiKeyCreatedSchema),
+    revoke: oc.input(MycelliosApiKeyRevokeInput).output(z.object({ revoked: z.literal(true) })),
+  },
   referrals: {
     invite: oc.input(ReferralOwnerInput).output(ReferralInviteSchema),
     redeem: oc.input(ReferralOwnerInput).output(ReferralRedemptionSchema),

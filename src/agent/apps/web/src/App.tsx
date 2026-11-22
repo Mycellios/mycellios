@@ -23,6 +23,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PageLoading } from "./components/PageLoading";
 import { SubscriptionGate } from "./components/SubscriptionGate";
 import { appPath, appRoute } from "./lib/app-path";
+import { signInDestination, signInNextFor } from "./lib/sign-in-next";
 import { authClient } from "./lib/auth";
 import { getTicketBoardEnabled, subscribeTicketBoardEnabled } from "./lib/bootstrap";
 import { desktopBridge } from "./lib/desktop";
@@ -110,8 +111,7 @@ function EventAccessEnded() {
 
 function SessionApp() {
   const [searchParams] = useSearchParams();
-  const signInDestination =
-    searchParams.get("next") === "/integrations/setup" ? "/integrations/setup" : "/app";
+  const signInTarget = signInDestination(searchParams.get("next"));
   const ticketBoardEnabled = useSyncExternalStore(
     subscribeTicketBoardEnabled,
     getTicketBoardEnabled,
@@ -129,7 +129,9 @@ function SessionApp() {
     const timer = window.setTimeout(() => setDemoExpired(true), Math.max(0, demo.endsAt - Date.now()));
     return () => clearTimeout(timer);
   }, [demo?.endsAt]);
-  const pathname = useLocation().pathname;
+  const location = useLocation();
+  const pathname = location.pathname;
+  const signInNext = signInNextFor(pathname, location.search);
   const screen = analyticsScreen(pathname);
   const analyticsUserId = session.data?.user.id;
   const { productAnalytics, analyticsAccountId } = useGeneralPreferences();
@@ -194,7 +196,7 @@ function SessionApp() {
             <Route
               path="/sign-in"
               element={
-                user ? <Navigate to={signInDestination} replace /> : <AuthPage key="in" mode="in" />
+                user ? <Navigate to={signInTarget} replace /> : <AuthPage key="in" mode="in" />
               }
             />
             <Route
@@ -231,7 +233,7 @@ function SessionApp() {
                     <Outlet />
                   </SubscriptionGate>
                 ) : (
-                  <Navigate to="/sign-in" replace />
+                  <Navigate to={signInNext ? `/sign-in?next=${signInNext}` : "/sign-in"} replace />
                 )
               }
             >
