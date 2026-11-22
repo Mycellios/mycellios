@@ -6,6 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { chatCompletionRequestSchema } from "../contracts/schemas.js";
 import { createNativeReplicaEvidence, type NativeReplicaEvidenceInput } from "../contracts/native-replica-evidence.js";
 import { KOKORO_MODEL, KOKORO_WEIGHT_DIGEST, verifiedSpeechEnvelope } from "../contracts/speech.js";
+import { MEMORY_EMBEDDING_CANARY_MIN_COSINE, MEMORY_EMBEDDING_CANARY_QUERY, MEMORY_EMBEDDING_SCHEMA, approvedMemoryEmbeddingExecution, isMemoryEmbeddingDeployment, memoryEmbeddingCanaryCosine, memoryEmbeddingInputSchema, verifiedMemoryEmbeddingEnvelope } from "../contracts/memory-embedding.js";
 import { sha256CanonicalEvidence, sha256Text } from "../core/json.js";
 import type { ChatCompletionRequest, ModelDeployment } from "../contracts/types.js";
 import type { MeshStore, StoredWorker } from "../storage/store.js";
@@ -42,14 +43,28 @@ function plan(deployment: ModelDeployment) {
   if (String(deployment.adapter) === "embedding" && deployment.model === EMBEDDING_MODEL && deployment.modelDigest === EMBEDDING_DIGEST) {
     return { kind: "embedding" as const, content: JSON.stringify({ schema: "mycellios-embeddings/1", input: [TEXT], dimensions: 32 }) };
   }
+  if (isMemoryEmbeddingDeployment(deployment)) {
+    if (!approvedMemoryEmbeddingExecution(deployment.execution)) return deny("memory_embedding_execution_not_approved", 422);
+    return { kind: "memory-embedding" as const, content: JSON.stringify({ schema: MEMORY_EMBEDDING_SCHEMA, input: [MEMORY_EMBEDDING_CANARY_QUERY], input_type: "query" }) };
+  }
   if (deployment.adapter === "kokoro" && deployment.model === KOKORO_MODEL && deployment.modelDigest === KOKORO_WEIGHT_DIGEST) {
     return { kind: "speech" as const, content: SPEECH_TEXT };
   }
   return deny("native_replica_model_is_not_supported", 422);
 }
 /** Returned bytes are validated without representing audio or vector components as text tokens. */
-export function verifyNativeQualificationResult(kind: "embedding" | "speech" | "transcription", text: string): void {
+export function verifyNativeQualificationResult(kind: "embedding" | "memory-embedding" | "speech" | "transcription", text: string): void {
   if (Buffer.byteLength(text) > 1_500_000) deny("native_replica_response_too_large", 422);
+  if (kind === "memory-embedding") {
+    // The canary must match the pinned CPU fp32 reference vector, which also
+    // proves that the runtime applied Qwen's query instruction itself.
+    let vector: number[];
+    try {
+      vector = verifiedMemoryEmbeddingEnvelope(text, memoryEmbeddingInputSchema.parse({ schema: MEMORY_EMBEDDING_SCHEMA, input: [MEMORY_EMBEDDING_CANARY_QUERY], input_type: "query" })).result.data[0]!.embedding;
+    } catch { return deny("native_replica_vector_is_invalid", 422); }
+    if (!(memoryEmbeddingCanaryCosine(vector) >= MEMORY_EMBEDDING_CANARY_MIN_COSINE)) deny("memory_embedding_canary_drift", 422);
+    return;
+  }
   if (kind === "transcription") {
     const audio = readFileSync(process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH!);
     const result = verifiedTranscriptionEnvelope(text, transcriptionInputSchema.parse({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" }));
@@ -147,7 +162,7 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
       const evidence = createNativeReplicaEvidence({ schema: "mycellios-native-replica-qualification/1",
         workerId: worker.id, sessionId, deploymentId: deployment.deploymentId, activationId: deployment.activationId!,
         model: deployment.model, modelDigest: deployment.modelDigest, physicalNodeId,
-        buildSourceId: worker.capabilities.buildIdentity!.sourceId, responseKind: selectedPlan.kind,
+        buildSourceId: worker.capabilities.buildIdentity!.sourceId, responseKind: selectedPlan.kind === "memory-embedding" ? "embedding" : selectedPlan.kind,
         challengeId, promptDigest: sha256Text(selectedPlan.content), issuedAt, observedAt: Date.now(), samples });
       const capabilities = structuredClone(latest.capabilities);
       capabilities.deployments = capabilities.deployments.map(d => d.deploymentId === deployment.deploymentId

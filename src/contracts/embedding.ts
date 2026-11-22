@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { ChatCompletionRequest, ModelDeployment } from "./types.js";
+import { MEMORY_EMBEDDING_DIGEST, MEMORY_EMBEDDING_MODEL } from "./memory-embedding.js";
 
 export const EMBEDDING_MODEL = "mycellios-qwen3-embedding-4b";
 export const EMBEDDING_REVISION = "5cf2132abc99cad020ac570b19d031efec650f2b";
@@ -16,7 +17,7 @@ export const embeddingInputSchema = z.object({
   dimensions: z.number().int().min(32).max(2560).default(2560),
 }).strict();
 export const embeddingWorkerAdapterSchema = z.object({
-  kind: z.literal("embedding"), model: z.literal(EMBEDDING_MODEL),
+  kind: z.literal("embedding"), model: z.enum([EMBEDDING_MODEL, MEMORY_EMBEDDING_MODEL]),
   baseUrl: z.string().url().refine((value) => {
     const url = new URL(value);
     return url.protocol === "http:" && ["127.0.0.1", "[::1]", "localhost"].includes(url.hostname)
@@ -44,6 +45,10 @@ export function verifiedEmbeddingEnvelope(content: string, request: ReturnType<t
     if (row.index !== index || row.embedding.length !== request.dimensions || Math.abs(norm - 1) > 0.002) throw new Error("embedding_vector_integrity_failure");
   }
   return envelope;
+}
+/** Pinned artifact digest of each model served through the embedding adapter. */
+export function embeddingDigestFor(model: string): string | undefined {
+  return model === EMBEDDING_MODEL ? EMBEDDING_DIGEST : model === MEMORY_EMBEDDING_MODEL ? MEMORY_EMBEDDING_DIGEST : undefined;
 }
 export function isEmbeddingDeployment(deployment: Pick<ModelDeployment, "adapter" | "model" | "modelDigest"> | undefined) {
   return deployment?.adapter === "embedding" && deployment.model === EMBEDDING_MODEL && deployment.modelDigest === EMBEDDING_DIGEST;
