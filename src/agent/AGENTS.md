@@ -529,6 +529,36 @@
   expose that endpoint from an independent task or label it New conversation.
   Verify the task navigation and NewChatControl regression tests.
 
+- Side conversations stay visible from the main chat and the sidebar
+  (specs/conversation-surfaces/spec.md; the reference product is a behavior reference only).
+  The side panel's Conversations pane (from Chat tools) lists the open conversations and the
+  draft by activity with ThreadStatusMark and time, "Waiting for you: N" (state waiting), and
+  opens one in the chat or beside it as a pane tab (Open in the chat, Close; closing shows the
+  right, then left neighbour, else the list; phones have no beside view). A beside view and a
+  mirrored request each use their own immutable client bound to that thread, read first, and
+  mark read only once its messages loaded. development.requests lists pending asks and takeovers
+  of the Mico's open conversations (owner/Space/Mico-checked, decrypted through the client); the
+  main chat shows them as compact cards that answer questions, approvals and plans only through
+  threads.answer with that taskThreadId; credentials and takeovers link to the conversation.
+  The roster carries unreadCount (main-chat replies after the read cursor and the person's last
+  message, no progress notes, capped at 100, shown 99+) and a conversations summary (open,
+  unread, waiting, working, revision) from one metadata query per list; a failed read keeps the
+  roster. Rows show the number, else a numberless badge for replies only in conversations, and
+  rosterRowSignal order: answer, takeover, conversation waiting, error, working, unread, then
+  conversation unread. A desktop Mico row expands (stored per device) to the conversations
+  needing a look plus 3 recent (Show N more/Show less), read again when revision moves. Mico Mark
+  as Read uses threads.markAllRead({botId}) (main chat and open conversations, never archived or
+  deleting); Mark as Unread makes the newest reply unread; the view menu's Mark all as read calls
+  markAllRead per Space. "Needs you" sits above the roster only while something waits and leaves
+  rows in their folders; the device filter (Micos, groups, unread, working, folders) and Recent
+  activity sort are opt-in: never change the default order or grouping. The transcript shows
+  "N new messages" with Jump and Mark as read while the New divider is out of sight. Verify
+  ConversationsPane, SideConversationView, MirroredRequests, SidebarMicoConversations,
+  BotContextMenu, transcript-new-messages, sidebar-filter, conversation-pane, needs-you,
+  sidebar-conversations, roster-status, sidebar-chat-order, thread-read(-routes) and db
+  conversation-surfaces tests, `node --import tsx scripts/verify-conversation-surfaces-db.ts`
+  and `node scripts/verify-mico-tasks-ui.mjs`.
+
 - A Mico opens its own side conversations with start_task/message_task/close_task
   (specs/mico-side-tasks/spec.md; the reference product is a behavior reference only).
   Offer and accept them only in its own main chat and owned routine threads, refuse them
@@ -2002,6 +2032,8 @@
 - Roster hover previews use existing scoped row messages and real run states.
   Do not fetch threads or mark messages read on hover; keep clicks, context menus
   and drag reordering intact, and suppress previews on touch and during dragging.
+  A Mico with open conversations gets a 700 ms card that lists only conversations already
+  loaded (else the roster summary); its links open a conversation, nothing more.
   In the expanded desktop roster, place the existing Create menu beside Search;
   keep one trigger, Ctrl/Cmd-N, and the mobile/collapsed header entry intact.
   Call sections Folders in UI while preserving `botSections`/`sectionId` contracts.
@@ -2041,7 +2073,8 @@
 - Agent clarification uses ask_user and the inline questionnaire: up to three short
   questions, optional option descriptions and multiple selection, free text and Skip.
   API and native runtimes share the same bounded parser. Persist/redact the whole
-  questionnaire and resume only via the existing scoped, fenced answer operation.
+  questionnaire and resume only via the existing scoped, fenced answer operation
+  (a side conversation's card mirrored into the main chat answers through that same operation).
   Skip supplies no authorization. Credentials and protected actions keep their
   dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.
 

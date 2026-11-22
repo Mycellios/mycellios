@@ -112,6 +112,7 @@ export const Transcript = memo(function Transcript({
   onOpenComputer,
   onOpenImportSetup,
   onOpenImport,
+  onMarkRead,
 }: {
   headerTabs?: boolean;
   /** Above the messages, e.g. who opened this conversation. */
@@ -169,6 +170,8 @@ export const Transcript = memo(function Transcript({
   onOpenComputer: (botId?: string) => void;
   onOpenImportSetup?: (target: ImportSetupTarget) => void;
   onOpenImport?: () => void;
+  /** "Mark as read" on the new-messages banner: the divider goes and the chat counts as read. */
+  onMarkRead?: () => void;
 }) {
   const { t } = useLingui();
   const touchLayout = useIsMobile();
@@ -269,6 +272,27 @@ export const Transcript = memo(function Transcript({
   const taskCosts = useTaskCosts(shownMessages, running);
   const costMessageIds = useMemo(() => taskCostMessageId(shownMessages), [shownMessages]);
   const unreadDividerId = unreadDividerMessageId(shownMessages, unreadAfterSeq, olderCursor);
+  const newMessageCount = unreadDividerId && unreadAfterSeq !== null
+    ? shownMessages.filter(message => message.role === "bot" && message.seq !== undefined && message.seq > unreadAfterSeq).length
+    : 0;
+  // In a long chat the New divider can be out of sight; a banner then says how many are new.
+  const [dividerInView, setDividerInView] = useState(true);
+  useEffect(() => {
+    const root = scrollRef.current;
+    const divider = unreadDividerId ? root?.querySelector<HTMLElement>('[data-testid="unread-divider"]') : null;
+    if (!root || !divider || typeof IntersectionObserver === "undefined") { setDividerInView(true); return; }
+    const observer = new IntersectionObserver(([entry]) => setDividerInView(Boolean(entry?.isIntersecting)), { root });
+    observer.observe(divider);
+    return () => observer.disconnect();
+  }, [unreadDividerId, scrollRef, messages.length]);
+  const jumpToUnread = useCallback(() => {
+    const divider = scrollRef.current?.querySelector<HTMLElement>('[data-testid="unread-divider"]');
+    if (!divider) return;
+    following.current = false;
+    autoScrolling.current = false;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    divider.scrollIntoView({ block: "start", behavior: reducedMotion ? "auto" : "smooth" });
+  }, [scrollRef]);
   const [quoteDraft, setQuoteDraft] = useState<{
     message: ThreadMessage;
     text: string;
@@ -816,6 +840,16 @@ export const Transcript = memo(function Transcript({
         {footer}
         </div>
       </div>
+      {newMessageCount > 0 && !dividerInView ? (
+        <div data-testid="new-messages-banner" role="status"
+          className="absolute top-2 left-1/2 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-popover py-1 ps-3 pe-1 text-xs text-popover-foreground shadow-md">
+          <span className="shrink-0 font-medium text-unread">
+            {newMessageCount === 1 ? t`1 new message` : t`${newMessageCount} new messages`}
+          </span>
+          <Button size="xs" variant="ghost" className="shrink-0" onClick={jumpToUnread}>{t`Jump`}</Button>
+          {onMarkRead ? <Button size="xs" variant="ghost" className="shrink-0" onClick={onMarkRead}>{t`Mark as read`}</Button> : null}
+        </div>
+      ) : null}
       {quoteDraft ? (
         <QuoteSelectionButton
           range={quoteDraft.range}

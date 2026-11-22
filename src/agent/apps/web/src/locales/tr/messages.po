@@ -6699,3 +6699,223 @@ msgstr "Bu mesaj artık bu sohbette değil."
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "Sabitlenmiş mesaj açılamadı."
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "Seni bekleyen: {count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "{botName} sohbetleri"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "Sohbette aç"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "Sohbetleri kapat"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "Henüz sohbet yok"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "Taslak"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "Sohbetin yanından kapat"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "Sohbetin yanında aç"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "Zaten sohbette açık"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "Sunucu bu sohbeti döndürmedi."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "Bu sohbet yüklenemedi."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "Mesaj gönderilemedi. Tekrar deneyin."
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName} çalışıyor…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "{title} içinde onay gerekiyor"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "{title} içinde onaylanacak plan"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "{title} içinde bir kimlik bilgisi gerekiyor"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "{title} içinde kontrolü devralmanız gerekiyor"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "{title} içinde soru"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "Sohbetlerden gelen istekler"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "Bilgisayarı devralmak için sohbeti açın."
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "Yanıtlamak için sohbeti açın."
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "{hidden} tane daha göster"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "Sohbetler: {open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "Sohbetlerde yeni yanıtlar"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "Görmek için satırı genişletin"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "Yanıtını bekliyor"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "Kontrolü devralmanı bekliyor"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "{0} sohbet seni bekliyor"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "Bir sohbet seni bekliyor"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "Devral"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "İncele"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "Son etkinlik"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "Sohbetleri filtrele ve sırala, filtreler açık"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "Sohbetleri filtrele ve sırala"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "Göster"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "Tüm sohbetler"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "Klasörler"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "Filtreleri temizle"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "Sohbetleri sırala"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "Tümünü okundu olarak işaretle"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "Bu filtrelere uyan sohbet yok"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr ", {unreadText} okunmamış"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr ", sohbetlerde yeni yanıtlar"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "{0} sohbetlerini gizle"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "{0} sohbetlerini göster"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "Sohbetleri gizle"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "Sohbetleri göster"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "Bir sohbetin sana ihtiyacı var"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "Bir sohbette çalışıyor…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "1 yeni mesaj"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "{newMessageCount} yeni mesaj"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "Git"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "Okundu olarak işaretle"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "Tüm sohbetler okundu olarak işaretlenemedi. Tekrar deneyin."
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "Sohbetler okundu olarak işaretlenemedi. Tekrar deneyin."

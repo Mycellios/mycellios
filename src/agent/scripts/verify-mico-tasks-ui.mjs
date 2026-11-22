@@ -18,8 +18,9 @@ const server = await createServer({ root, configFile: path.join(root, "vite.conf
   server: { host: "127.0.0.1", port: 0, strictPort: false },
   plugins: [{ name: "private-task-acceptance", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
-      if (req.url !== "/__task_acceptance") return next();
-      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/mico-task-preview.tsx"></script></body></html>');
+      const fixture = req.url === "/__task_acceptance" ? "mico-task-preview" : req.url === "/__surfaces_acceptance" ? "conversation-surfaces-preview" : null;
+      if (!fixture) return next();
+      const html = await server.transformIndexHtml(req.url, `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/${fixture}.tsx"></script></body></html>`);
       res.setHeader("content-type", "text/html"); res.end(html);
     });
   } }],
@@ -212,6 +213,99 @@ try {
   assert.ok((await page.getByRole("dialog").boundingBox()).width > 1000, "desktop workflow editor must use the available width");
   assert.ok((await page.getByLabel("Workflow canvas").boundingBox()).width > 700, "desktop graph must remain visible beside its properties");
   await page.screenshot({ path: path.join(output, "workflow-desktop.png"), animations: "disabled" });
+
+  // Conversation surfaces: the side panel's Conversations pane, a conversation beside the chat,
+  // requests mirrored into the main chat, the sidebar's Mico rows, Needs you and Mark all as read.
+  await page.goto(`http://127.0.0.1:${address.port}/__surfaces_acceptance`);
+  const pane = () => page.getByTestId("conversations-pane");
+  await pane().waitFor({ timeout: 90_000 });
+  const opened = () => page.getByTestId("opened").textContent();
+  const sidebar = () => page.getByTestId("fixture-sidebar");
+  for (const [name, width, height, theme] of [["surfaces-desktop", 1440, 900, "light"], ["surfaces-desktop-dark", 1440, 900, "dark"], ["surfaces-mobile", 390, 844, "light"], ["surfaces-mobile-dark", 390, 844, "dark"]]) {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(theme => document.documentElement.setAttribute("data-theme", theme), theme);
+    await noOverflow();
+    await page.getByTestId("mirrored-requests").waitFor();
+    await page.screenshot({ path: path.join(output, `${name}.png`), animations: "disabled", fullPage: width < 768 });
+  }
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const paneRows = await pane().locator("[data-conversation-row]").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-conversation-row")));
+  assert.deepEqual(paneRows, ["plan", "asks", "offers", "invoices", "notes", "budget", "recipes", "travel"]);
+  assert.equal(await pane().getByTestId("conversations-waiting").textContent(), "Waiting for you: 1");
+  const besideToggle = (id) => pane().locator(`[data-conversation-row="${id}"] button[aria-pressed]`);
+  await besideToggle("offers").click();
+  await page.locator('[data-side-conversation="offers"]').getByText("Two options look good", { exact: false }).waitFor();
+  await pane().getByRole("tab", { name: "Conversations" }).click();
+  await besideToggle("notes").click();
+  await page.locator('[data-side-conversation="notes"]').waitFor();
+  await page.screenshot({ path: path.join(output, "surfaces-split-view.png"), animations: "disabled" });
+  // Closing the shown tab shows its neighbour; Open in the chat moves it into the chat.
+  await pane().getByRole("button", { name: "Actions for Meeting notes" }).click();
+  await page.getByRole("menuitem", { name: "Close", exact: true }).click();
+  await page.locator('[data-side-conversation="offers"]').waitFor();
+  await page.locator('[data-side-conversation="offers"]').getByRole("button", { name: "Open in the chat" }).click();
+  assert.equal(await opened(), "/app/mico?task=offers");
+  await pane().locator('[data-conversation-row="offers"]').waitFor();
+  assert.equal(await page.locator("[data-side-conversation]").count(), 0);
+
+  // A conversation's approval, answered from the main chat through that conversation.
+  const mirrored = page.getByTestId("mirrored-requests");
+  assert.match(await mirrored.textContent(), /Approval needed in Choose a supplier/);
+  await page.screenshot({ path: path.join(output, "surfaces-mirrored-request.png"), animations: "disabled" });
+  await mirrored.getByRole("button", { name: "Allow once" }).click();
+  await page.locator('[data-mirrored-request="asks"]').waitFor({ state: "detached" });
+  assert.equal(await page.locator('[data-mirrored-request="plan"]').count(), 1);
+  await page.locator('[data-mirrored-request="plan"]').getByRole("button", { name: "Open conversation" }).click();
+  assert.equal(await opened(), "/app/mico?task=plan");
+
+  // Sidebar: the main chat's count, a numberless badge for replies only in conversations, Needs you.
+  assert.equal(await sidebar().locator('[data-roster-bot-id="mico"] [data-roster-unread-count]').textContent(), "3");
+  assert.equal(await sidebar().locator('[data-roster-bot-id="writer"] [data-roster-conversation-unread]').count(), 1);
+  const needs = await sidebar().getByTestId("sidebar-needs-you").locator("[data-needs-you]").evaluateAll(nodes =>
+    nodes.map(node => `${node.getAttribute("data-needs-you-bot")}:${node.getAttribute("data-needs-you")}`));
+  assert.deepEqual(needs, ["helper:answer"]);
+  // A Mico row expands into its conversations: those needing a look, three recent, then Show more.
+  await sidebar().locator('[data-roster-expand="mico"]').click();
+  const listedInSidebar = () => sidebar().locator("[data-sidebar-conversation]").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-sidebar-conversation")));
+  await sidebar().getByTestId("sidebar-mico-conversations").waitFor();
+  assert.deepEqual(await listedInSidebar(), ["plan", "asks", "offers", "invoices", "notes", "budget", "recipes"]);
+  await sidebar().getByRole("button", { name: "Show 1 more" }).click();
+  assert.equal((await listedInSidebar()).at(-1), "travel");
+  await page.screenshot({ path: path.join(output, "surfaces-sidebar-expanded.png"), animations: "disabled" });
+  await sidebar().getByRole("button", { name: "Show less" }).click();
+  await sidebar().locator('[data-sidebar-conversation="budget"]').click();
+  assert.equal(await opened(), "/app/mico?task=budget");
+  // Resting on a Mico opens its card after a pause; it shows loaded conversations and reads nothing.
+  await sidebar().locator('[data-roster-bot-id="writer"]').hover();
+  await page.getByTestId("roster-conversation-card").waitFor({ timeout: 5_000 });
+  assert.match(await page.getByTestId("roster-conversation-card").textContent(), /Draft the forum post/);
+  await page.screenshot({ path: path.join(output, "surfaces-hover-card.png"), animations: "disabled" });
+  assert.equal(await sidebar().locator('[data-roster-bot-id="writer"] [data-roster-conversation-unread]').count(), 1);
+  await page.mouse.move(900, 600);
+
+  // Mark all as read from the sidebar's view menu; then a Mico's Mark as Unread and Mark as Read.
+  await page.getByTestId("sidebar-view-menu").click();
+  await page.getByRole("button", { name: "Recent activity" }).waitFor();
+  await page.screenshot({ path: path.join(output, "surfaces-view-menu.png"), animations: "disabled" });
+  await page.getByRole("button", { name: "Mark all as read" }).click();
+  await sidebar().locator("[data-roster-unread-count]").waitFor({ state: "detached" });
+  assert.equal(await sidebar().locator("[data-roster-conversation-unread]").count(), 0);
+  await sidebar().locator('[data-roster-bot-id="mico"]').click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Mark as Unread", exact: true }).click();
+  await sidebar().locator('[data-roster-bot-id="mico"] [data-roster-unread-count]').waitFor();
+  await sidebar().locator('[data-roster-bot-id="mico"]').click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Mark as Read", exact: true }).click();
+  await sidebar().locator("[data-roster-unread-count]").waitFor({ state: "detached" });
+  // A filter with no match says so and clears; the default order and grouping never change.
+  await page.getByTestId("sidebar-view-menu").click();
+  await page.getByRole("button", { name: "Unread", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await sidebar().getByTestId("sidebar-filter-empty").waitFor();
+  await sidebar().getByRole("button", { name: "Clear filters" }).click();
+  await sidebar().locator('[data-roster-bot-id="mico"]').waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow();
   assert.deepEqual(errors, []);
   const result = { passed: true, fixtureOnly: true, productionAccess: false, screenshots: output, checks: [
     "desktop and mobile overflow", "light and dark theme", "select private task", "status marks on tabs and picker rows",
@@ -220,6 +314,11 @@ try {
     "tab menu with close, rename, archive and delete; delete disabled while working", "archive closes the tab",
     "delete hides the tab with Undo that restores its place", "Mico-started conversation opens as a background tab",
     "Delete key, Ctrl+Shift+O and Alt+Shift+Up", "compact switcher below 200 px", "phone delete asks first",
-    "return to main chat", "change Mico concurrency", "save and execute visual workflow", "stop workflow", "no browser errors"] };
+    "return to main chat", "change Mico concurrency", "save and execute visual workflow", "stop workflow",
+    "Conversations pane lists open conversations with state, time and Waiting for you", "a conversation opens beside the chat and its tab menu closes it with neighbour fallback",
+    "Open in the chat moves a beside conversation into the chat", "a conversation's approval answers from the main chat and resolves there",
+    "sidebar unread count, numberless conversation badge and Needs you", "expanded Mico row with Show more / Show less opens a conversation",
+    "hover card after a pause shows loaded conversations without reading them", "Mark all as read, Mico Mark as Unread and Mark as Read",
+    "filter empty state and Clear filters", "surfaces at desktop and phone widths in light and dark", "no browser errors"] };
   await writeFile(path.join(output, "result.json"), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
 } finally { await browser?.close(); await server.close(); }

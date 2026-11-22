@@ -305,6 +305,8 @@ async function memberSpaceNavigation(
           preview: bot.preview,
           status: bot.status,
           runErrorId: bot.runErrorId,
+          ...(bot.unreadCount ? { unreadCount: bot.unreadCount } : {}),
+          ...(bot.conversations ? { conversations: bot.conversations } : {}),
           updatedAt: bot.updatedAt,
         })),
         groups: spaceGroups.map((group) => ({

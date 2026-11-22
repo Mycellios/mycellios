@@ -6699,3 +6699,223 @@ msgstr "ההודעה הזו כבר לא נמצאת בשיחה."
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "לא ניתן היה לפתוח את ההודעה המוצמדת."
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "ממתינות לך: {count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "השיחות של {botName}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "פתיחה בצ׳אט"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "סגירת השיחות"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "עדיין אין שיחות"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "טיוטה"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "סגירה לצד הצ׳אט"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "פתיחה לצד הצ׳אט"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "כבר פתוחה בצ׳אט"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "השרת לא החזיר את השיחה הזו."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "לא ניתן לטעון את השיחה הזו."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "לא ניתן לשלוח את ההודעה. נסו שוב."
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName} עובד…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "נדרש אישור ב{title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "תוכנית לאישור ב{title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "נדרשים פרטי גישה ב{title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "נדרשת השתלטות ב{title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "שאלה ב{title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "בקשות מהשיחות"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "פתחו את השיחה כדי להשתלט על המחשב."
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "פתחו את השיחה כדי לענות."
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "הצגת {hidden} נוספות"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "שיחות: {open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "תשובות חדשות בשיחות"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "הרחיבו את השורה כדי לראות אותן"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "ממתין לתשובה שלך"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "ממתין שתשתלטו"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "{0} שיחות ממתינות לך"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "שיחה ממתינה לך"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "השתלטות"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "בדיקה"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "פעילות אחרונה"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "סינון ומיון צ׳אטים, מסננים פעילים"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "סינון ומיון צ׳אטים"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "הצגה"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "כל הצ׳אטים"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "תיקיות"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "ניקוי מסננים"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "מיון צ׳אטים"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "סימון הכול כנקרא"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "אין צ׳אטים שתואמים למסננים האלה"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr ", {unreadText} שלא נקראו"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr ", תשובות חדשות בשיחות"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "הסתרת השיחות של {0}"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "הצגת השיחות של {0}"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "הסתרת שיחות"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "הצגת שיחות"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "שיחה צריכה אותך"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "עובד בשיחה…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "הודעה חדשה אחת"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "{newMessageCount} הודעות חדשות"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "מעבר"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "סימון כנקרא"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "לא ניתן לסמן את כל הצ׳אטים כנקראו. נסו שוב."
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "לא ניתן לסמן את הצ׳אטים כנקראו. נסו שוב."

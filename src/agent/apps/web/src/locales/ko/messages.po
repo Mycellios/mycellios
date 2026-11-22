@@ -6699,3 +6699,223 @@ msgstr "이 메시지는 더 이상 이 대화에 없습니다."
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "고정된 메시지를 열 수 없습니다."
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "응답 대기: {count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "{botName}의 대화"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "채팅에서 열기"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "대화 닫기"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "아직 대화가 없습니다"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "초안"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "채팅 옆에서 닫기"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "채팅 옆에 열기"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "이미 채팅에서 열려 있습니다"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "서버가 이 대화를 반환하지 않았습니다."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "이 대화를 불러올 수 없습니다."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "메시지를 보낼 수 없습니다. 다시 시도하세요."
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName}이(가) 작업 중…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "{title}에서 승인이 필요합니다"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "{title}에서 확인할 계획"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "{title}에서 자격 증명이 필요합니다"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "{title}에서 제어를 넘겨받아야 합니다"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "{title}의 질문"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "대화의 요청"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "컴퓨터 제어를 넘겨받으려면 대화를 여세요."
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "답하려면 대화를 여세요."
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "{hidden}개 더 보기"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "대화: {open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "대화에 새 답장"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "행을 펼치면 볼 수 있습니다"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "답변을 기다리는 중"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "제어를 넘겨받기를 기다리는 중"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "대화 {0}개가 기다리는 중"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "대화 하나가 기다리는 중"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "넘겨받기"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "검토"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "최근 활동"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "채팅 필터 및 정렬, 필터 켜짐"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "채팅 필터 및 정렬"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "표시"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "모든 채팅"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "폴더"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "필터 지우기"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "채팅 정렬"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "모두 읽음으로 표시"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "이 필터와 일치하는 채팅이 없습니다"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr ", 읽지 않음 {unreadText}개"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr ", 대화에 새 답장"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "{0}의 대화 숨기기"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "{0}의 대화 보기"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "대화 숨기기"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "대화 보기"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "대화에서 응답이 필요합니다"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "대화에서 작업 중…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "새 메시지 1개"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "새 메시지 {newMessageCount}개"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "이동"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "읽음으로 표시"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "모든 채팅을 읽음으로 표시하지 못했습니다. 다시 시도하세요."
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "채팅을 읽음으로 표시하지 못했습니다. 다시 시도하세요."

@@ -54,7 +54,7 @@ function editableWithText(target: EventTarget | null) {
 /** Conversations belong to the existing Mico; a tab never creates another model or agent. */
 export function MicoTaskTabs({
   botId, taskThreadId, newConversationOpen = false, rpc, onSelect, scope, inMenu = false, messageCount = 0,
-  confirmDelete = false,
+  confirmDelete = false, refreshKey,
 }: {
   botId: string;
   taskThreadId?: string;
@@ -68,6 +68,8 @@ export function MicoTaskTabs({
   messageCount?: number;
   /** Phones ask before deleting instead of offering Undo. */
   confirmDelete?: boolean;
+  /** Changes when the roster reports that the Mico's conversations moved, so the list is read again. */
+  refreshKey?: string;
 }) {
   const { t } = useLingui();
   /** A short marker for threads the user did not start as a conversation. */
@@ -182,7 +184,7 @@ export function MicoTaskTabs({
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => { active = false; window.clearTimeout(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
-  }, [rpc, botId, revision, taskThreadId, messageCount]);
+  }, [rpc, botId, revision, taskThreadId, messageCount, refreshKey]);
 
   const draftTab: TaskTab = { threadId: NEW_CONVERSATION_TAB, title: "" };
   const tabIds = [...tabState.ids];

@@ -6,11 +6,12 @@ export type Panel =
   | "create-group"
   | "group-settings"
   | "import-agent"
+  | "conversations"
   | null;
 export type RightPanelState = { panel: Panel; routineId?: string };
 
 /** Panels that are safe to remember across reloads. */
-const durablePanels: readonly Panel[] = ["computer", "settings", "routine", "group-settings", null];
+const durablePanels: readonly Panel[] = ["computer", "settings", "routine", "group-settings", "conversations", null];
 
 export function rightPanelStorageKey(
   userId: string,

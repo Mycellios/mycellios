@@ -20,6 +20,7 @@ import {
 import { ModelHeadersSchema } from "./model-headers.js";
 import { RoutineWatchSchema, RoutineWatchStateSchema } from "./routine-watch.js";
 import { RunTriggerSchema } from "./runs.js";
+import { MicoConversationSummarySchema } from "./side-threads.js";
 import { SettingsScopeSchema } from "./settings-scope.js";
 
 export const ComputerModeSchema = z.enum(["isolated", "team", "dedicated"]);
@@ -121,6 +122,10 @@ export const BotSchema = z.object({
   preview: z.string(),
   status: z.string(),
   runErrorId: Id.nullable().default(null),
+  /** Replies in the main chat the person has not read yet, at most 100. Older servers omit it. */
+  unreadCount: z.number().int().nonnegative().optional(),
+  /** The Mico's open side conversations; omitted when it has none. */
+  conversations: MicoConversationSummarySchema.optional(),
   computerMode: ComputerModeSchema,
   updatedAt: z.string(),
   createdAt: z.string(),
@@ -262,6 +267,8 @@ export const SpaceBotSchema = BotSchema.pick({
   preview: true,
   status: true,
   runErrorId: true,
+  unreadCount: true,
+  conversations: true,
   updatedAt: true,
 });
 export type SpaceBot = z.infer<typeof SpaceBotSchema>;

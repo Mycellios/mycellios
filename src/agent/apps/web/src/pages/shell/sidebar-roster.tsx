@@ -1,5 +1,10 @@
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { orderSidebarChats } from "../../lib/sidebar-chat-order";
+import { filterSidebarGroups, sidebarFilterActive, useSidebarFilter, writeSidebarFilter, EMPTY_SIDEBAR_FILTER } from "../../lib/sidebar-filter";
+import { micoConversationScope, setMicoConversationsOpen, useOpenMicoConversations, useSidebarConversationRows } from "../../lib/sidebar-conversations";
+import { useConversationRows } from "../../lib/thread-tabs";
+import { type RpcClient, rpcForSpace } from "../../lib/rpc";
+import { HoverConversations, SidebarMicoConversations } from "../../components/SidebarMicoConversations";
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -20,17 +25,19 @@ import {
   ContextMenuTrigger,
   GroupAvatar,
 } from "@mycellios/ui-web";
-import { Check, ChevronDown, CircleAlert, Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, CircleAlert, Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
-import { Suspense, useMemo } from "react";
+import { Fragment, Suspense, useMemo, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { RosterReplyIndicator } from "../../components/RosterReplyIndicator";
 import { RosterMessagePreview } from "../../components/RosterMessagePreview";
 import type { BotsSidebarDensity } from "../../lib/bots-sidebar-density-pref";
 import {
   compactRosterStatusLabel,
+  rosterConversationStatusLabel,
   rosterHasUndismissedRunError,
   rosterWorkStatusLabel,
+  unreadBadgeText,
 } from "../../lib/roster-status";
 import type { RosterDropAction, RosterDropTarget } from "./roster-drop";
 import type { sidebarGroupsForSpaces } from "./space-sidebar";
@@ -69,6 +76,10 @@ export function SidebarRoster({
   mini = false,
   mobile = false,
   activeSpaceId,
+  userId,
+  activeThreadId,
+  onOpenConversation,
+  conversationClient = rpcForSpace,
 }: {
   sidebarGroups: ReturnType<
     typeof sidebarGroupsForSpaces<Space["bots"][number], Space["groups"][number]>
@@ -105,6 +116,14 @@ export function SidebarRoster({
   mini?: boolean;
   mobile?: boolean;
   activeSpaceId?: string | null;
+  /** Keys the conversation lists shared with each Mico's tabs. */
+  userId?: string;
+  /** The conversation open in the chat, marked in its Mico's expanded list. */
+  activeThreadId?: string;
+  /** Opens one of a Mico's conversations in the chat. */
+  onOpenConversation?: (spaceId: string, botId: string, threadId: string) => void;
+  /** Reads an expanded Mico's conversations in its own Space. */
+  conversationClient?: (spaceId: string) => Pick<RpcClient, "development">;
 }) {
   const { t } = useLingui();
   const { sidebarChatOrder } = useGeneralPreferences();
@@ -113,12 +132,25 @@ export function SidebarRoster({
     if (bootstrapMe?.spaceId) trees.set(bootstrapMe.spaceId, sidebarFolderTree(botSections));
     return trees;
   }, [spaces, botSections, bootstrapMe?.spaceId]);
-  const allGroups = orderSidebarChats(sidebarGroups, sidebarChatOrder, t`Unread`);
-  const orderedGroups = allGroups.filter(group => mini || !group.ancestorKeys.some(key => collapsedSidebarSections.has(key)));
+  const sidebarFilter = useSidebarFilter();
+  const openMicos = useOpenMicoConversations();
+  const allFolders = useMemo(() => [...folderTrees.values()].flat(), [folderTrees]);
+  const filtering = !mini && sidebarFilterActive(sidebarFilter);
+  const orderedChats = orderSidebarChats(sidebarGroups, sidebarChatOrder, t`Unread`);
+  const allGroups = filtering ? filterSidebarGroups(orderedChats, sidebarFilter, allFolders) : orderedChats;
+  const orderedGroups = allGroups.filter(group => mini || filtering || !group.ancestorKeys.some(key => collapsedSidebarSections.has(key)));
+  const conversationsOf = (spaceId: string, botId: string, threadId: string) => onOpenConversation?.(spaceId, botId, threadId);
   return (
     <>
+      {filtering && orderedGroups.every(group => group.bots.length === 0) ? (
+        <div data-testid="sidebar-filter-empty" className="flex flex-col items-center gap-2 px-3 py-6 text-center text-sm text-muted-foreground">
+          <p>{t`No chats match these filters`}</p>
+          <Button size="sm" variant="secondary" onClick={() => writeSidebarFilter(EMPTY_SIDEBAR_FILTER)}>{t`Clear filters`}</Button>
+        </div>
+      ) : null}
       {orderedGroups.map((group, groupIndex) => {
-        const collapsed = Boolean(group.title) && collapsedSidebarSections.has(group.key);
+        // A filter shows its matches even inside closed folders.
+        const collapsed = !filtering && Boolean(group.title) && collapsedSidebarSections.has(group.key);
         const currentMobileSpace = mobile && group.spaceId === activeSpaceId;
         const title = currentMobileSpace
           ? group.subtitle ?? (group.title === group.spaceName && !group.emptySpaceId ? t`Micos` : group.title)
@@ -319,6 +351,15 @@ export function SidebarRoster({
                 const compact = !mobile && botsSidebarDensity === "compact";
                 const workStatusLabel =
                   item.kind === "bot" ? rosterWorkStatusLabel(item.chat.status) : null;
+                // The main chat is idle but a conversation waits or works: say so in its place.
+                const conversationLabel =
+                  item.kind === "bot" ? rosterConversationStatusLabel(item.chat) : null;
+                const conversationCount = item.kind === "bot" ? (item.chat.conversations?.open ?? 0) : 0;
+                const conversationWaiting = item.kind === "bot" && (item.chat.conversations?.waiting ?? 0) > 0;
+                const expandable = item.kind === "bot" && !mini && !mobile && conversationCount > 0;
+                const expanded = expandable && openMicos.includes(item.chat.id);
+                const unreadText = item.chat.unread && item.kind === "bot" ? unreadBadgeText(item.chat.unreadCount) : null;
+                const conversationUnread = item.kind === "bot" && !item.chat.unread && (item.chat.conversations?.unread ?? 0) > 0;
                 const rowError =
                   item.kind === "bot" &&
                   (rosterHasUndismissedRunError(item.chat.runErrorId, dismissedRunErrorIds) ||
@@ -327,11 +368,11 @@ export function SidebarRoster({
                   (compact || mini) && item.kind === "bot"
                     ? rowError
                       ? t`Error`
-                      : compactRosterStatusLabel(item.chat.status)
+                      : (compactRosterStatusLabel(item.chat.status) ?? conversationLabel)
                     : null;
                 const rosterLine = compact
                   ? compactStatusLabel
-                  : (workStatusLabel ??
+                  : (workStatusLabel ?? conversationLabel ??
                     (item.kind === "bot"
                       ? item.chat.preview || (item.chat.status !== "idle" ? item.chat.status : "")
                       : item.chat.preview ||
@@ -478,6 +519,10 @@ export function SidebarRoster({
                             {compactStatusLabel}
                           </span>
                         ) : null}
+                        {conversationUnread ? (
+                          <span aria-hidden="true" data-roster-conversation-unread
+                            className="absolute -end-0.5 top-0 size-2 rounded-full border-[1.5px] border-unread bg-sidebar" />
+                        ) : null}
                         {item.chat.unread ? (
                           <>
                             <span
@@ -512,8 +557,10 @@ export function SidebarRoster({
                             </span>
                             {item.chat.unread ? (
                               <span className="sr-only">
-                                <Trans> (unread)</Trans>
+                                {unreadText ? t`, ${unreadText} unread` : <Trans> (unread)</Trans>}
                               </span>
+                            ) : conversationUnread ? (
+                              <span className="sr-only">{t`, new replies in conversations`}</span>
                             ) : null}
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5">
@@ -525,11 +572,27 @@ export function SidebarRoster({
                                 {formatRosterTime(item.chat.updatedAt)}
                               </span>
                             ) : null}
-                            {item.chat.unread ? (
+                            {unreadText ? (
+                              <span
+                                aria-hidden="true"
+                                data-roster-unread-dot
+                                data-roster-unread-count={unreadText}
+                                className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-[10px] font-semibold leading-none text-white tabular-nums"
+                              >
+                                {unreadText}
+                              </span>
+                            ) : item.chat.unread ? (
                               <span
                                 aria-hidden="true"
                                 data-roster-unread-dot
                                 className="inline-block h-2 w-2 rounded-full bg-unread"
+                              />
+                            ) : conversationUnread ? (
+                              <span
+                                aria-hidden="true"
+                                data-roster-conversation-unread
+                                title={t`New replies in conversations`}
+                                className="inline-block size-2 rounded-full border-[1.5px] border-unread"
                               />
                             ) : null}
                           </div>
@@ -560,10 +623,13 @@ export function SidebarRoster({
                         ) : (
                           <div
                             dir="auto"
-                            data-roster-preview={!workStatusLabel ? "true" : undefined}
-                            className={`truncate ${mobile ? "mt-0.5 text-sm" : "mt-1 text-label"} ${
+                            data-roster-preview={!workStatusLabel && !conversationLabel ? "true" : undefined}
+                            data-roster-conversation-status={conversationLabel ? "true" : undefined}
+                            className={`truncate ${expandable ? "pe-6" : ""} ${mobile ? "mt-0.5 text-sm" : "mt-1 text-label"} ${
                               workStatusLabel
                                 ? "font-semibold text-status-working"
+                                : conversationLabel
+                                  ? conversationWaiting ? "font-medium text-warning" : "font-medium text-status-working"
                                 : item.chat.unread
                                   ? "font-medium text-foreground/75"
                                   : "text-muted-foreground"
@@ -576,9 +642,15 @@ export function SidebarRoster({
                     ) : null}
                   </ContextMenuTrigger>
                 );
+                const conversationCard = item.kind === "bot" && conversationCount > 0 && !mobile ? (
+                  <HoverConversationsFor scope={micoConversationScope(userId, item.chat.spaceId, item.chat.id)}
+                    summary={item.chat.conversations}
+                    onOpen={threadId => conversationsOf(item.chat.spaceId, item.chat.id, threadId)} />
+                ) : undefined;
+                const needsLook = conversationWaiting || conversationUnread;
                 return (
+                  <Fragment key={`${item.kind}:${item.chat.id}`}>
                   <div
-                    key={`${item.kind}:${item.chat.id}`}
                     className="group/row relative"
                     style={{
                       opacity: item.kind === "bot" && draggedBotId === item.chat.id ? 0.55 : 1,
@@ -600,7 +672,8 @@ export function SidebarRoster({
                     >
                       {item.kind === "bot" ? (
                         <RosterMessagePreview name={item.chat.name} status={item.chat.status} preview={item.chat.preview}
-                          hasError={rowError} mini={mini} disabled={mobile || Boolean(draggedBotId) || Boolean(botMenu)}>
+                          hasError={rowError} mini={mini} disabled={mobile || Boolean(draggedBotId) || Boolean(botMenu)}
+                          conversations={conversationCard}>
                           {chatTrigger}
                         </RosterMessagePreview>
                       ) : mini ? (
@@ -621,7 +694,24 @@ export function SidebarRoster({
                         <Suspense fallback={null}>{botMenuContent}</Suspense>
                       ) : null}
                     </ContextMenu>
+                    {expandable ? (
+                      <Button size="icon-xs" variant="ghost" data-roster-expand={item.chat.id}
+                        aria-expanded={expanded}
+                        aria-label={expanded ? t`Hide conversations of ${item.chat.name}` : t`Show conversations of ${item.chat.name}`}
+                        title={expanded ? t`Hide conversations` : t`Show conversations`}
+                        className={`absolute end-2 ${compact ? "bottom-1" : "bottom-2"} size-5 rounded text-muted-foreground hover:bg-background hover:text-foreground focus-visible:opacity-100 ${expanded || needsLook ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"}`}
+                        onClick={() => setMicoConversationsOpen(item.chat.id, !expanded)}
+                      >
+                        <ChevronRight size={13} aria-hidden="true" className={`transition-transform rtl:-scale-x-100 ${expanded ? "rotate-90 rtl:-rotate-90" : ""}`} />
+                      </Button>
+                    ) : null}
                   </div>
+                  {expanded && item.kind === "bot" ? (
+                    <ExpandedMicoConversations spaceId={item.chat.spaceId} botId={item.chat.id} userId={userId} clientFor={conversationClient}
+                      revision={item.chat.conversations?.revision} activeThreadId={selected ? activeThreadId : undefined}
+                      onOpen={threadId => conversationsOf(item.chat.spaceId, item.chat.id, threadId)} />
+                  ) : null}
+                  </Fragment>
                 );
               })}
             </CollapsibleContent>
@@ -666,4 +756,32 @@ function formatRosterTime(isoDate?: string | null): string {
   } catch {
     return "";
   }
+}
+
+/** A Mico row's hover card part: its conversations as already loaded, never read on hover. */
+function HoverConversationsFor({ scope, summary, onOpen }: {
+  scope: string;
+  summary?: Space["bots"][number]["conversations"];
+  onOpen: (threadId: string) => void;
+}) {
+  const rows = useConversationRows(scope);
+  return <HoverConversations rows={rows} summary={summary} onOpen={onOpen} />;
+}
+
+/** The list under an expanded Mico row, read again whenever the roster says its conversations moved. */
+function ExpandedMicoConversations({ spaceId, botId, userId, revision, activeThreadId, onOpen, clientFor }: {
+  clientFor: (spaceId: string) => Pick<RpcClient, "development">;
+  spaceId: string;
+  botId: string;
+  userId?: string;
+  revision?: string;
+  activeThreadId?: string;
+  onOpen: (threadId: string) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const scope = micoConversationScope(userId, spaceId, botId);
+  const client = useMemo(() => clientFor(spaceId), [clientFor, spaceId]);
+  const { rows, loaded } = useSidebarConversationRows({ enabled: true, rpc: client, scope, botId, revision });
+  return <SidebarMicoConversations rows={rows} all={all} onToggleAll={() => setAll(value => !value)}
+    activeThreadId={activeThreadId} onOpen={onOpen} loading={!loaded} />;
 }

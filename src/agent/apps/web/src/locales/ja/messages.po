@@ -6700,3 +6700,223 @@ msgstr "このメッセージはもうこの会話にありません。"
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "ピン留めされたメッセージを開けませんでした。"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "あなたの対応待ち: {count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "{botName} の会話"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "チャットで開く"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "会話を閉じる"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "まだ会話はありません"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "下書き"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "チャットの横から閉じる"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "チャットの横に開く"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "すでにチャットで開いています"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "サーバーがこの会話を返しませんでした。"
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "この会話を読み込めませんでした。"
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "メッセージを送信できませんでした。もう一度お試しください。"
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName} が作業中…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "{title} で承認が必要です"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "{title} で確認待ちの計画"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "{title} で認証情報が必要です"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "{title} で操作の引き継ぎが必要です"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "{title} での質問"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "会話からのリクエスト"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "コンピューターの操作を引き継ぐには会話を開いてください。"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "回答するには会話を開いてください。"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "さらに {hidden} 件を表示"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "会話: {open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "会話に新しい返信"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "行を展開すると表示されます"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "あなたの回答を待っています"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "操作の引き継ぎを待っています"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "{0} 件の会話があなたを待っています"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "会話があなたを待っています"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "引き継ぐ"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "確認"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "最近のアクティビティ"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "チャットの絞り込みと並べ替え、絞り込み中"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "チャットの絞り込みと並べ替え"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "表示"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "すべてのチャット"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "フォルダー"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "絞り込みを解除"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "チャットの並べ替え"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "すべて既読にする"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "この条件に合うチャットはありません"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr "、未読 {unreadText} 件"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr "、会話に新しい返信"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "{0} の会話を隠す"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "{0} の会話を表示"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "会話を隠す"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "会話を表示"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "会話で対応が必要です"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "会話で作業中…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "新着メッセージ 1 件"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "新着メッセージ {newMessageCount} 件"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "移動"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "既読にする"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "すべてのチャットを既読にできませんでした。もう一度お試しください。"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "チャットを既読にできませんでした。もう一度お試しください。"

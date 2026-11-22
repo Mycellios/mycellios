@@ -27,7 +27,7 @@ import { WhatsAppLinkSchema, WhatsAppSenderAddInput, WhatsAppSenderSchema } from
 import * as z from "zod";
 import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
-import { SideThreadSchema, SideThreadTargetSchema } from "./side-threads.js";
+import { SideThreadRequestSchema, SideThreadSchema, SideThreadTargetSchema } from "./side-threads.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
@@ -580,6 +580,8 @@ export const appContract = {
     rename: oc.input(z.object({botId:Id,taskThreadId:Id,title:z.string().max(1000)})).output(z.object({threadId:Id,title:z.string()})),
     /** Lifecycle fields come from the thread; older servers omit them. */
     list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(SideThreadSchema)),
+    /** Pending questions, approvals and takeovers of the Mico's open conversations, newest first. */
+    requests: oc.input(z.object({botId:Id})).output(z.array(SideThreadRequestSchema).max(50)),
     /** Stops the conversation (queued messages, runs, delegated work), then archives it. */
     archive: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),archivedAt:IsoDate})),
     /** Undoes a pending delete, or else reopens an archived conversation. */
@@ -739,10 +741,20 @@ export const appContract = {
     markRead: oc
       .input(threadTarget)
       .output(z.object({ ok: z.literal(true), unreadAfterSeq: z.number().int().nullable() })),
-    /** With `messageId`, the chat reads as unread from that message: the next open puts New above it. */
+    /**
+     * With `messageId`, the chat reads as unread from that message: the next open puts New above it.
+     * Without it, the newest reply becomes unread.
+     */
     markUnread: oc
       .input(threadTarget.and(z.object({ messageId: Id.optional() })))
       .output(z.object({ ok: z.literal(true) })),
+    /**
+     * Reads every chat at once in this Space: with `botId`, that Mico's main chat and all of its
+     * open conversations; without it, every main chat, group and open conversation of the person.
+     */
+    markAllRead: oc
+      .input(z.object({ botId: Id.optional() }))
+      .output(z.object({ ok: z.literal(true), threads: z.number().int().nonnegative() })),
   },
   computer: {
     status: oc.input(botId).output(ComputerStatusSchema),

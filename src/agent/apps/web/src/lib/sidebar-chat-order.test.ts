@@ -32,3 +32,12 @@ it("puts a read chat back into its saved section and orders activity newest firs
   const readAgain = groups.map(group => ({ ...group, bots: group.bots.map(item => ({ ...item, chat: { ...item.chat, unread: false } })) }));
   expect(orderSidebarChats(readAgain, "unread-group", "Unread").some(group => group.key.endsWith(":unread"))).toBe(false);
 });
+it("sorts each folder by recent activity on request, keeping pins and the saved order untouched", () => {
+  const before = JSON.stringify(groups);
+  const pinned = { key: "pinned", spaceId: "s1", bots: [row("old-pin", false, "2026-11-01", "idle", true), row("new-pin", false, "2026-11-12", "idle", true)] };
+  const result = orderSidebarChats([pinned, { key: "folder", spaceId: "s1", bots: [row("a", false, "2026-11-01"), row("b", true, "2026-11-12"), row("c", false, "2026-11-05")] }], "recent", "Unread");
+  expect(result[0]!.bots.map(item => item.chat.id)).toEqual(["old-pin", "new-pin"]);
+  expect(result[1]!.bots.map(item => item.chat.id)).toEqual(["b", "c", "a"]);
+  expect(result.some(group => group.key.endsWith(":unread"))).toBe(false);
+  expect(JSON.stringify(groups)).toBe(before);
+});

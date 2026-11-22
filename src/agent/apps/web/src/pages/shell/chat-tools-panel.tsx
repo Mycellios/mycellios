@@ -1,6 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
-import { AudioLines, Ellipsis, FolderOpen, Monitor, PanelRightOpen, Settings, X } from "lucide-react";
+import { AudioLines, Ellipsis, FolderOpen, MessageSquareText, Monitor, PanelRightOpen, Settings, X } from "lucide-react";
+import { WaitingForYouBadge } from "../../components/ConversationsPane";
 
 import type { ReactNode, Ref } from "react";
 import { useState } from "react";
@@ -13,17 +14,21 @@ export type ChatToolsActions = {
   onVoice?: () => void;
 };
 
-export function ChatHeaderTools({ open, onToggle, triggerRef }: {
+export function ChatHeaderTools({ open, onToggle, triggerRef, attention = false }: {
   open: boolean;
   onToggle: () => void;
   triggerRef?: Ref<HTMLButtonElement>;
+  /** A conversation of this Mico waits for the person; the panel lists it. */
+  attention?: boolean;
 }) {
   const { t } = useLingui();
   return <Button ref={triggerRef} variant="ghost" size="icon-sm"
-    className="app-no-drag size-8 shrink-0 rounded-lg text-muted-foreground"
+    className="app-no-drag relative size-8 shrink-0 rounded-lg text-muted-foreground"
     aria-label={t`Chat tools`} aria-expanded={open} aria-controls="chat-tools-sidebar"
+    title={attention ? t`A conversation waits for you` : undefined}
     onClick={onToggle}>
     <PanelRightOpen size={17} strokeWidth={1.75} aria-hidden />
+    {attention ? <span aria-hidden="true" data-tools-attention className="absolute end-1 top-1 size-1.5 rounded-full bg-warning" /> : null}
   </Button>;
 }
 
@@ -83,9 +88,12 @@ export function MobileChatToolLinks({ onFiles, onSettings, onVoice, close }: Omi
   );
 }
 
-export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClose, children }: ChatToolsActions & {
+export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClose, children, onConversations, conversationsWaiting = 0 }: ChatToolsActions & {
   onClose: () => void;
   children?: (close: () => void) => ReactNode;
+  /** Opens the Mico's Conversations pane; groups have none. */
+  onConversations?: () => void;
+  conversationsWaiting?: number;
 }) {
   const { t } = useLingui();
   const actions = [
@@ -100,6 +108,10 @@ export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClos
         <Button variant="ghost" size="icon-sm" className="app-no-drag" aria-label={t`Close tools`} onClick={onClose}><X size={15} /></Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 px-6 pb-[51px]">
+        {onConversations ? <Button variant="ghost" className="h-9 justify-start gap-3 rounded-md bg-muted/50 text-sm font-normal" onClick={onConversations}>
+          <MessageSquareText size={15} strokeWidth={1.6} className="text-muted-foreground" />{t`Conversations`}
+          <WaitingForYouBadge count={conversationsWaiting} className="ms-auto" />
+        </Button> : null}
         {actions.map(({ label, icon: Icon, onClick }) => <Button key={label} variant="ghost" className="h-9 justify-start gap-3 rounded-md bg-muted/50 text-sm font-normal" onClick={onClick}><Icon size={15} strokeWidth={1.6} className="text-muted-foreground" />{label}</Button>)}
         {children ? <div className="mt-3 space-y-1.5 border-t border-border pt-3 [&_[data-mobile-chat-action]]:h-9 [&_[data-mobile-chat-action]]:w-full [&_[data-mobile-chat-action]]:max-w-none [&_[data-mobile-chat-action]]:justify-start [&_[data-mobile-chat-action]]:gap-3 [&_[data-mobile-chat-action]]:rounded-md [&_[data-mobile-chat-action]]:px-3 [&_[data-mobile-chat-action]]:text-sm [&_[data-mobile-chat-action]]:font-normal">{children(onClose)}</div> : null}
       </div>

@@ -6700,3 +6700,223 @@ msgstr "वह संदेश अब इस बातचीत में नह
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "पिन किया गया संदेश खोला नहीं जा सका।"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "आपकी प्रतीक्षा में: {count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "{botName} की बातचीत"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "चैट में खोलें"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "बातचीत बंद करें"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "अभी कोई बातचीत नहीं"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "ड्राफ़्ट"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "चैट के बगल से बंद करें"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "चैट के बगल में खोलें"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "पहले से चैट में खुली है"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "सर्वर ने यह बातचीत नहीं लौटाई।"
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "यह बातचीत लोड नहीं हो सकी।"
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "संदेश नहीं भेजा जा सका। फिर से कोशिश करें।"
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName} काम कर रहा है…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "{title} में स्वीकृति चाहिए"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "{title} में पुष्टि के लिए योजना"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "{title} में एक क्रेडेंशियल चाहिए"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "{title} में नियंत्रण लेना होगा"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "{title} में प्रश्न"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "बातचीत से अनुरोध"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "कंप्यूटर का नियंत्रण लेने के लिए बातचीत खोलें।"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "उत्तर देने के लिए बातचीत खोलें।"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "{hidden} और दिखाएँ"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "बातचीत: {open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "बातचीत में नए जवाब"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "उन्हें देखने के लिए पंक्ति खोलें"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "आपके उत्तर की प्रतीक्षा"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "आपके नियंत्रण लेने की प्रतीक्षा"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "{0} बातचीत आपकी प्रतीक्षा में हैं"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "एक बातचीत आपकी प्रतीक्षा में है"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "नियंत्रण लें"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "देखें"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "हाल की गतिविधि"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "चैट फ़िल्टर और क्रमबद्ध करें, फ़िल्टर चालू"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "चैट फ़िल्टर और क्रमबद्ध करें"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "दिखाएँ"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "सभी चैट"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "फ़ोल्डर"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "फ़िल्टर हटाएँ"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "चैट क्रमबद्ध करें"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "सभी को पढ़ा हुआ चिह्नित करें"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "इन फ़िल्टर से कोई चैट मेल नहीं खाती"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr ", {unreadText} अपठित"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr ", बातचीत में नए जवाब"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "{0} की बातचीत छिपाएँ"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "{0} की बातचीत दिखाएँ"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "बातचीत छिपाएँ"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "बातचीत दिखाएँ"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "एक बातचीत को आपकी ज़रूरत है"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "एक बातचीत में काम कर रहा है…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "1 नया संदेश"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "{newMessageCount} नए संदेश"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "जाएँ"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "पढ़ा हुआ चिह्नित करें"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "सभी चैट को पढ़ा हुआ चिह्नित नहीं किया जा सका। फिर से कोशिश करें।"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "चैट को पढ़ा हुआ चिह्नित नहीं किया जा सका। फिर से कोशिश करें।"
