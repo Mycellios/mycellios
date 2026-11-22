@@ -50,6 +50,11 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
   const previousExpandedRef = useRef(false);
   const composerAnimationsRef = useRef<Animation[]>([]);
   const expanded = composerExpanded || hasChips;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const expandedRef = useRef(composerExpanded);
+  expandedRef.current = composerExpanded;
+  const scheduleHeightRef = useRef<(() => void) | null>(null);
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
@@ -66,7 +71,7 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
       }
       const contentHeight = measureTextareaHeight(textarea);
       textarea.style.height = `${contentHeight}px`;
-      if (draft.length === 0) {
+      if (draftRef.current.length === 0) {
         setComposerExpanded(false);
         return;
       }
@@ -74,13 +79,16 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
         setComposerExpanded(true);
         return;
       }
+      // The collapsed field already occupies the available single-line width.
+      // Only an expanded composer needs the second, narrower collapse probe.
+      if (!expandedRef.current) return;
       const attach = attachButtonRef.current;
       const actions = composerActionsRef.current;
       if (!attach || !actions) return;
-      const besideControls =
-        actions.getBoundingClientRect().left -
-        attach.getBoundingClientRect().right -
-        2 * COMPOSER_ONE_LINE_GAP_PX;
+      const actionsBox = actions.getBoundingClientRect();
+      const attachBox = attach.getBoundingClientRect();
+      const besideControls = (document.documentElement.dir === "rtl"
+        ? attachBox.left - actionsBox.right : actionsBox.left - attachBox.right) - 2 * COMPOSER_ONE_LINE_GAP_PX;
       const heightBeside = measureTextareaHeight(
         textarea,
         besideControls - COMPOSER_COLLAPSE_SLACK_PX,
@@ -89,19 +97,29 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
       if (heightBeside <= COMPOSER_SINGLE_LINE_MAX_PX) setComposerExpanded(false);
     }
 
-    syncHeight();
-    let lastWidth = el.getBoundingClientRect().width;
-    const observer = new ResizeObserver(() => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      const width = textarea.getBoundingClientRect().width;
+    let frame: number | undefined;
+    const schedule = () => {
+      frame ??= requestAnimationFrame(() => { frame = undefined; syncHeight(); });
+    };
+    scheduleHeightRef.current = schedule;
+    schedule();
+    let lastWidth: number | undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry?.contentRect.width;
+      if (width === undefined) return;
       if (width === lastWidth) return;
       lastWidth = width;
-      syncHeight();
+      schedule();
     });
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [draft]);
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      scheduleHeightRef.current = null;
+    };
+  }, []);
+
+  useLayoutEffect(() => { scheduleHeightRef.current?.(); }, [draft, hasChips]);
 
   useLayoutEffect(() => {
     if (previousExpandedRef.current === expanded) return;

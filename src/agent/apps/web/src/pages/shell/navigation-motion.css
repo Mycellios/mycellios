@@ -1,0 +1,52 @@
+/* Existing Base UI primitives retain focus, dismissal and interrupted-close handling. */
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(.16, 1, .3, 1);
+}
+[data-slot="popover-content"][data-closed],
+[data-slot="dropdown-menu-content"][data-closed],
+[data-slot="dropdown-menu-sub-content"][data-closed] {
+  animation-duration: 120ms;
+}
+
+.rk-mobile-navigation[data-slot="sheet-content"] {
+  width: 80vw;
+  max-width: 80vw;
+  gap: 0;
+  border: 0;
+  background: var(--background);
+  padding: max(20px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom));
+  transition: transform 260ms cubic-bezier(.16, 1, .3, 1), opacity 180ms ease-out;
+}
+.rk-mobile-navigation[data-side="left"]:is([data-starting-style], [data-ending-style]) { transform: translateX(-100%); }
+.rk-mobile-navigation[data-side="right"]:is([data-starting-style], [data-ending-style]) { transform: translateX(100%); }
+.rk-mobile-navigation[data-ending-style] { transition-duration: 180ms; }
+[data-slot="sheet-overlay"]:has(~ .rk-mobile-navigation) { backdrop-filter: none; }
+.rk-mobile-workspace-menu { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.rk-mobile-workspace-links { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.rk-mobile-workspace-links > button {
+  justify-content: flex-start; gap: 14px; width: 100%; min-height: 48px;
+  height: auto; padding: 10px 8px; text-align: start; font-size: 16px; font-weight: 400;
+}
+.rk-mobile-workspace-links > button > svg { width: 21px; height: 21px; flex-shrink: 0; }
+.rk-mobile-workspace-links > button > span { white-space: normal; }
+.rk-mobile-workspace-links > button[aria-current="page"] { background: var(--muted); font-weight: 500; }
+
+@media (max-width: 767px) {
+  [data-testid="bots-sidebar"] {
+    transition: transform 260ms cubic-bezier(.16, 1, .3, 1), border-radius 260ms ease-out;
+  }
+  [data-mobile-navigation-open] [data-testid="bots-sidebar"] {
+    transform: translateX(80vw);
+    border-start-start-radius: 32px;
+    border-end-start-radius: 32px;
+    overflow: hidden;
+  }
+  [dir="rtl"] [data-mobile-navigation-open] [data-testid="bots-sidebar"] { transform: translateX(-80vw); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"] { animation: none; }
+  .rk-mobile-navigation[data-slot="sheet-content"], [data-testid="bots-sidebar"], [data-slot="sheet-overlay"] { transition: none; }
+}

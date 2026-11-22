@@ -48,6 +48,7 @@
 @media (prefers-reduced-motion: reduce) { .rk-settings-swatches button { transition: none; } }
 @import "@mycellios/ui-web/styles.css";
 @import "./typography.css";
+@import "./pages/shell/navigation-motion.css";
 
 @theme {
   --font-sans: var(--mycellios-font-family);

@@ -38,6 +38,8 @@ import {
   settleComposerDraftSubmission,
   subscribeComposerDraftAccepted,
   writeComposerDraft,
+  scheduleComposerDraft,
+  flushComposerDrafts,
 } from "../../lib/composer-draft";
 import { isFileDrag, isFilePaste } from "../../lib/pending-attachments";
 import { ComposerReplyPreview } from "./chat-context";
@@ -337,6 +339,7 @@ export const Composer = memo(function Composer({
     };
   }, []);
   useEffect(() => setAgentDrop(null), [draftKey]);
+  useEffect(() => () => { flushComposerDrafts(); }, [draftKey]);
 
   function pickAttachments(files: FileList | readonly File[] | null) {
     if (!files?.length) return;
@@ -345,7 +348,7 @@ export const Composer = memo(function Composer({
 
   function updateDraft(value: string) {
     markEdited();
-    writeComposerDraft(draftKey, value);
+    scheduleComposerDraft(draftKey, value);
     setDraft(value);
     const mentionMatch = /(?:^|\s)@([\w-]*)$/.exec(value);
     setMentionQuery(mentionMatch ? (mentionMatch[1] ?? "") : null);

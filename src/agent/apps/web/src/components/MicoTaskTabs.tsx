@@ -198,20 +198,26 @@ export function MicoTaskTabs({
     return tab ? [tab] : threadId === taskThreadId ? [{ threadId, title: "" }] : [];
   });
   const displayedTabs = fitConversationTabs(visibleTabs, current, availableWidth);
-  const warmTabs = JSON.stringify(displayedTabs
-    .filter(tab => tab.threadId !== current && tab.threadId !== NEW_CONVERSATION_TAB)
-    .slice(-2).map(tab => tab.threadId));
+  // On a phone only the active tab may fit. Include picker destinations so
+  // responsive layout does not disable preloading the next conversation.
+  const warmCandidates = threadPickerOpen ? tabs : inMenu ? [] : [...displayedTabs, ...tabs];
+  const warmTabs = JSON.stringify([...new Set(warmCandidates
+    .filter(tab => tab.threadId !== current && tab.threadId !== NEW_CONVERSATION_TAB && !tab.deleteAfter)
+    .map(tab => tab.threadId))].slice(0, 2));
+
+  function warmThread(threadId: string) {
+    if (threadId !== current && threadId !== NEW_CONVERSATION_TAB && document.visibilityState === "visible") {
+      void onWarm?.(botId, threadId).catch(() => undefined);
+    }
+  }
+
   useEffect(() => {
-    if (!onWarm || inMenu) return;
-    let cancelled = false;
-    void (async () => {
-      for (const threadId of JSON.parse(warmTabs) as string[]) {
-        if (cancelled || document.visibilityState !== "visible") break;
-        await onWarm(botId, threadId);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [botId, inMenu, onWarm, warmTabs]);
+    if (!onWarm || document.visibilityState !== "visible") return;
+    // At most two reads; one slow destination must not block the other.
+    for (const threadId of JSON.parse(warmTabs) as string[]) {
+      void onWarm(botId, threadId).catch(() => undefined);
+    }
+  }, [botId, onWarm, warmTabs]);
   const displayedIds = new Set(displayedTabs.map(tab => tab.threadId));
   const listed = tabs.filter(row => !row.deleteAfter);
   const picker = pickerConversations(listed);
@@ -487,6 +493,7 @@ export function MicoTaskTabs({
           className={`h-full min-w-0 flex-1 shrink justify-start gap-1.5 overflow-hidden bg-transparent px-2 font-normal hover:bg-transparent ${draft ? "italic" : ""}`}
           aria-current={active ? "page" : undefined} title={title}
           aria-keyshortcuts={`Delete${renamable(tab) ? " F2" : ""} Alt+Shift+ArrowLeft Alt+Shift+ArrowRight`}
+          onPointerEnter={() => warmThread(tab.threadId)} onPointerDown={() => warmThread(tab.threadId)} onFocus={() => warmThread(tab.threadId)}
           onClick={() => !active ? select(tab.threadId) : renamable(tab) ? startRename(tab) : undefined}
           onDoubleClick={() => { if (renamable(tab)) startRename(tab); }}
           onMouseDown={event => { if (event.button === 1) event.preventDefault(); }}
@@ -522,6 +529,7 @@ export function MicoTaskTabs({
         className={`h-auto ${inMenu ? "min-h-11" : "min-h-8"} min-w-0 flex-1 justify-start gap-2 bg-transparent py-1.5 text-start hover:bg-muted/60`} aria-current={tab.threadId === taskThreadId ? "page" : undefined}
         disabled={busy} aria-busy={busy || undefined}
         title={closed ? t`Restore and open` : undefined}
+        onPointerEnter={() => warmThread(tab.threadId)} onPointerDown={() => warmThread(tab.threadId)} onFocus={() => warmThread(tab.threadId)}
         onClick={() => closed ? void restore(tab) : select(tab.threadId)}>
         {status ? <ThreadStatusMark status={status} /> : null}
         <span className="line-clamp-2 min-w-0 whitespace-normal break-words" title={titleOf(tab)} dir="auto">{titleOf(tab)}</span>
