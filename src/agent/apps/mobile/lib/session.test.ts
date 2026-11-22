@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import { legacySecureStoreKey } from "./secure-store";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearAppBadge, syncAppBadge } from "./app-badge";
 import { artifactCacheSession } from "./artifact-cache-session";
@@ -166,9 +167,14 @@ describe("mobile session storage", () => {
     vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error("device locked"));
     await expect(loadSessionToken()).resolves.toBe("");
 
-    expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(2);
+    // An empty current key falls back to the name saved before the rename.
+    expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(3);
     expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(1, "mycellios.session_token");
-    expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(2, "mycellios.session_token");
+    expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(
+      2,
+      legacySecureStoreKey("mycellios.session_token"),
+    );
+    expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(3, "mycellios.session_token");
   });
 
   it("restores the active session in memory when persistence is unavailable", async () => {
