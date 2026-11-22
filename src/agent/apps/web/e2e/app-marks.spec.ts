@@ -11,7 +11,7 @@ for (const theme of ["light", "dark"]) {
   test(`familiar app suggestions are visible in the mobile navigation footer in ${theme}`, async ({
     page,
   }, testInfo) => {
-    await page.addInitScript((theme) => localStorage.setItem("rakazo.uiAppearance", theme), theme);
+    await page.addInitScript((theme) => localStorage.setItem("mycellios.uiAppearance", theme), theme);
     for (const app of catalogApps) {
       await page.route(`https://logos.composio.dev/api/${app}`, (route) =>
         route.fulfill({

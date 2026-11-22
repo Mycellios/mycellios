@@ -60,7 +60,7 @@ test("the only space is named in the sidebar and chat creation requires approval
   await supportSpace.getByRole("button", { name: "Open Customer support" }).click();
   await page.waitForURL(/\/(onboarding|app)/);
   await expect
-    .poll(() => page.evaluate(() => window.localStorage.getItem("rakazo:space-id")))
+    .poll(() => page.evaluate(() => window.localStorage.getItem("mycellios:space-id")))
     .toBe(supportSpaceId);
   await completeOnboarding(page);
 
@@ -78,7 +78,7 @@ test("the only space is named in the sidebar and chat creation requires approval
   await personalSpace.getByRole("button", { name: /^Mico/ }).click();
   await page.waitForURL(/\/app\/[^/]+$/);
   await expect
-    .poll(() => page.evaluate(() => window.localStorage.getItem("rakazo:space-id")))
+    .poll(() => page.evaluate(() => window.localStorage.getItem("mycellios:space-id")))
     .toBe(personalSpaceId);
   await expect(sidebar.getByText("Customer support", { exact: true })).toBeVisible();
 });
@@ -216,7 +216,7 @@ test("a space's menu opens its settings in place, and settings can switch space"
     expect(url.pathname).toBe(chatPath);
     expect(url.searchParams.get("settings")).toBe("space");
   };
-  const selected = await page.evaluate(() => localStorage.getItem("rakazo:space-id"));
+  const selected = await page.evaluate(() => localStorage.getItem("mycellios:space-id"));
   await page.evaluate(() => {
     document.documentElement.dataset.settingsTest = "same-document";
   });
@@ -229,7 +229,7 @@ test("a space's menu opens its settings in place, and settings can switch space"
   const picker = settings.getByTestId("settings-space");
   await expect(picker).toHaveText("Personal");
   onChat();
-  expect(await page.evaluate(() => localStorage.getItem("rakazo:space-id"))).toBe(selected);
+  expect(await page.evaluate(() => localStorage.getItem("mycellios:space-id"))).toBe(selected);
   await expect(page.locator("html")).toHaveAttribute("data-settings-test", "same-document");
   await captureScreenshot(page, testInfo, "space-settings-from-menu");
 
@@ -240,7 +240,7 @@ test("a space's menu opens its settings in place, and settings can switch space"
   await expect(picker).toHaveText("Support");
   await expect(settings).toHaveAttribute("data-settings-section", "space");
   onChat();
-  expect(await page.evaluate(() => localStorage.getItem("rakazo:space-id"))).toBe(selected);
+  expect(await page.evaluate(() => localStorage.getItem("mycellios:space-id"))).toBe(selected);
   await expect(page.locator("html")).toHaveAttribute("data-settings-test", "same-document");
 
   // Models, voice, and approvals follow the account until this space customizes them.

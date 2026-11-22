@@ -36,7 +36,7 @@ it("uses live call, recording, transcription, attachment and draft guards before
     setComposerUnsavedWork(false);
     writeComposerDraft("bot:update-proof", "Do not lose this message");
     expect(await updates.applyUpdate()).toBe(false);
-    expect(localStorage.getItem("rakazo.composerDraft.bot:update-proof")).toBe("Do not lose this message");
+    expect(localStorage.getItem("mycellios.composerDraft.bot:update-proof")).toBe("Do not lose this message");
     expect(recoveryReload).not.toHaveBeenCalled();
     writeComposerDraft("bot:update-proof", "");
     expect(await updates.applyUpdate()).toBe(true);

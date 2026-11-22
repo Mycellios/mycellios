@@ -48,7 +48,7 @@ test("remote markdown images in bot replies load only after the reader asks", as
 
   // With the setting on, remote images load at once.
   requests.length = 0;
-  await page.evaluate(() => localStorage.setItem("rakazo.loadRemoteImages", "on"));
+  await page.evaluate(() => localStorage.setItem("mycellios.loadRemoteImages", "on"));
   await page.reload();
   await expect(image).toBeVisible({ timeout: 20_000 });
   await expect(placeholder).toHaveCount(0);

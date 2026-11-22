@@ -41,7 +41,7 @@ async function wallet() {
 try {
   browser = await chromium.launch(); context = await browser.newContext({ viewport: { width: 1440, height: 1000 },
     ...(resume ? {storageState: JSON.parse(savedState)} : {}) });
-  await context.addInitScript(() => { localStorage.setItem("rakazo.uiLocale", "en"); localStorage.setItem("mycellios.uiLocaleConfirmed", "en"); });
+  await context.addInitScript(() => { localStorage.setItem("mycellios.uiLocale", "en"); localStorage.setItem("mycellios.uiLocaleConfirmed", "en"); });
   page = await context.newPage();
   page.on("response", response => { const url = new URL(response.url()); if (url.origin === origin && response.status() >= 400) result.diagnostic.push({ path: url.pathname, status: response.status() }); });
   await page.goto(origin + "/agent/demo/" + event, { waitUntil: "domcontentloaded", timeout: 60000 });

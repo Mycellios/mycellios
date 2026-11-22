@@ -17,7 +17,7 @@ import { identityLabels } from "./identity-display";
 import { reportClientError } from "./monitoring";
 import { taskThreadInput, taskThreadResult, type TaskThreadScope } from "./task-thread-scope";
 
-const SPACE_STORAGE_KEY = "rakazo:space-id";
+const SPACE_STORAGE_KEY = "mycellios:space-id";
 // Read once: changing this preference never changes the active Space.
 let restoreSavedSpace = shouldRestoreSavedSpace(getGeneralPreferences().restoreLastWorkspace,
   typeof window === "undefined" ? "" : window.location?.pathname ?? "");

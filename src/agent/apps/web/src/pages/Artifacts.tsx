@@ -56,7 +56,7 @@ import { WindowChrome } from "./WindowChrome";
 type ViewMode = "grid" | "list";
 type DateFilter = "all" | "today" | "week" | "month";
 type FileFilter = "all" | "images" | "documents" | "media" | "other";
-const VIEW_MODE_STORAGE_KEY = "rakazo:artifacts-view-mode";
+const VIEW_MODE_STORAGE_KEY = "mycellios:artifacts-view-mode";
 const LIST_PAGE_SIZE = 60;
 const GRID_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 

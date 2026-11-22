@@ -12,7 +12,7 @@ for (const viewport of [
     }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.addInitScript(
-        (value) => localStorage.setItem("rakazo.uiAppearance", value),
+        (value) => localStorage.setItem("mycellios.uiAppearance", value),
         appearance,
       );
       const errors: string[] = [];

@@ -1,7 +1,7 @@
 export const INTERFACE_SIZES = ["67", "75", "80", "90", "100", "110", "125", "150", "175", "200"] as const;
 export type InterfaceSize = (typeof INTERFACE_SIZES)[number];
 
-const storageKey = "rakazo.interfaceSize";
+const storageKey = "mycellios.interfaceSize";
 let current: InterfaceSize | undefined;
 
 export function getInterfaceSize(): InterfaceSize {

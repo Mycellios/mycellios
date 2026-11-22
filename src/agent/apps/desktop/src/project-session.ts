@@ -2,7 +2,7 @@ import type { BrowserWindow } from "electron";
 
 export async function nativeProjectSpace(stable: BrowserWindow): Promise<string | null> {
   const value: unknown = await stable.webContents.executeJavaScript(
-    'localStorage.getItem("rakazo:space-id")',
+    'localStorage.getItem("mycellios:space-id")',
   );
   if (value === null) return null;
   if (
@@ -20,7 +20,7 @@ export async function nativePreviewContext(
   stable: BrowserWindow,
 ): Promise<[string | null, string | null]> {
   const value = await stable.webContents.executeJavaScript(
-    '([document.documentElement.getAttribute("data-preview-owner"), localStorage.getItem("rakazo:space-id")])',
+    '([document.documentElement.getAttribute("data-preview-owner"), localStorage.getItem("mycellios:space-id")])',
   );
   if (
     !Array.isArray(value) ||

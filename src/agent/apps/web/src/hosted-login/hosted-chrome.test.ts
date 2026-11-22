@@ -6,8 +6,8 @@ describe("hosted sign-in chrome", () => {
   beforeEach(() => localStorage.clear());
 
   it("uses the saved dark appearance and Hebrew direction", () => {
-    localStorage.setItem("rakazo.uiAppearance", "dark");
-    localStorage.setItem("rakazo.uiLocale", "he");
+    localStorage.setItem("mycellios.uiAppearance", "dark");
+    localStorage.setItem("mycellios.uiLocale", "he");
     expect(applyHostedChrome(document.documentElement, localStorage, true)).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(document.documentElement.lang).toBe("he");
@@ -16,9 +16,9 @@ describe("hosted sign-in chrome", () => {
   });
 
   it("follows the system appearance only when that preference is saved", () => {
-    localStorage.setItem("rakazo.uiAppearance", "system");
+    localStorage.setItem("mycellios.uiAppearance", "system");
     expect(applyHostedChrome(document.documentElement, localStorage, false)).toBe("dark");
-    localStorage.setItem("rakazo.uiAppearance", "light");
+    localStorage.setItem("mycellios.uiAppearance", "light");
     expect(applyHostedChrome(document.documentElement, localStorage, false)).toBe("light");
   });
 });
