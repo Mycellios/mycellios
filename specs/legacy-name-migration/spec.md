@@ -108,8 +108,13 @@ Verify: Agent workspace typechecks and the affected tests.
 - One storage adapter per surface (web, Desktop renderer, mobile secure store)
   reads the new key, falls back to the legacy key, copies the value and removes
   the legacy key. The mobile session token keeps the user signed in.
-- Memory provider container keys: read both prefixes when searching; write the new
-  prefix; migrate existing containers with a bounded, idempotent worker job.
+- Supermemory reads both prefixes, writes the new prefix, and purges both versions
+  of each explicitly cleared history generation. Upgrade all readers and purgers
+  before relying on new writes, and keep that compatibility in any rollback.
+  Existing provider data stays readable in place. A separate bounded migration
+  must qualify the provider merge on isolated data before moving existing tags.
+  The provider deletes source tags on a successful merge. Coordinate with history
+  writers and purges before moving any generation.
 - Desktop preload exposes `window.mycelliosDesktop` and keeps the legacy alias
   pointing at the same object. The web app prefers the new name and falls back to
   the alias, so a new web build works with old Desktop builds and the reverse.
