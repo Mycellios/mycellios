@@ -4119,6 +4119,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           spaceId: run.spaceId,
           userId: run.userId,
           botId: bot.id,
+          botName: bot.name,
           runId,
           cloudWorkspace: cloudComputer ? { workerId, runFence: fence } : undefined,
           isolatedWorkspace: (cloudComputer ?? bot.computer)?.scope === "isolated",

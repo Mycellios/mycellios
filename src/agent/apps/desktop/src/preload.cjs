@@ -96,6 +96,8 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     connected: (botId) => ipcRenderer.invoke("desktop.computer.connected", botId),
     chooseProject: (botId) => ipcRenderer.invoke("desktop.computer.chooseProject", botId),
     project: (botId) => ipcRenderer.invoke("desktop.computer.project", botId),
+    micoFolder: (botId) => ipcRenderer.invoke("desktop.computer.micoFolder", botId),
+    openMicoFolder: (botId) => ipcRenderer.invoke("desktop.computer.openMicoFolder", botId),
     projectAvailable: () => ipcRenderer.invoke("desktop.computer.projectAvailable"),
     appControl: () => ipcRenderer.invoke("desktop.computer.appControl"),
     setAppControl: (value) => ipcRenderer.invoke("desktop.computer.setAppControl", value),

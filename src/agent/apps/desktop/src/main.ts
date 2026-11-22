@@ -44,6 +44,7 @@ import { createSystemNotifications } from "./system-notifications.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
+import { installMicoFolderIpc } from "./mico-folder-ipc.js";
 import { createDesktopAgentEngine } from "@mycellios/adapters/desktop-agent-engine";
 import { appControlBinary } from "@mycellios/adapters/host-computer-server";
 import { startDesktopExecutor } from "./executor-startup.js";
@@ -1523,8 +1524,12 @@ app.whenReady().then(async () => {
   // legacy stack listens beyond loopback. The native stack and the account/cloud relays
   // connect over 127.0.0.1; other machines on the network must not reach the executor.
   const hostComputerListen = nativeLocalStack ? { hostname: "127.0.0.1" } : {};
+  // New This PC Micos get a visible folder in the OS home; an isolated profile keeps its own.
+  const micoFolders = PERFORMANCE_USER_DATA
+    ? path.join(userDataDir, "Mycellios", "Micos")
+    : path.join(app.getPath("home"), "Mycellios", "Micos");
   for (;;) {
-    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine, hostComputerListen, appControlComponent()), {
+    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine, hostComputerListen, appControlComponent(), micoFolders), {
       // A development launcher may have exited and closed stderr. Report through
       // the desktop reporter so a diagnostic cannot itself throw EPIPE.
       report: code => reportDesktopError(new Error(`Desktop executor startup failed (${code})`), "desktop.startup"),
@@ -2118,6 +2123,13 @@ app.whenReady().then(async () => {
     const scope = await micoFolderScope(event, botId);
     const attached = attachedFolders.get(botId);
     return attached?.scope === scope && attached.folder.path === project.path ? attached.folder : project;
+  });
+  installMicoFolderIpc({
+    ipcMain,
+    trusted: event => isManagedComputerRequest(event) || isCloudComputerRequest(event),
+    host: () => hostComputer,
+    owns: micoFolderScope,
+    open: folder => shell.openPath(folder),
   });
   ipcMain.handle("desktop.computer.connected", async (event, botId: unknown) => {
     if (typeof botId !== "string" || !botId || botId.length > 256 || !hostComputer?.isEnabled()) return false;

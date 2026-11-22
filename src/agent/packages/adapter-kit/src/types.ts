@@ -11,6 +11,8 @@ export interface AdapterContext {
   spaceId: string;
   userId: string;
   botId?: string;
+  /** Display name of `botId`; names a new PC folder for that Mico, never authorizes anything. */
+  botName?: string;
   runId?: string;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
