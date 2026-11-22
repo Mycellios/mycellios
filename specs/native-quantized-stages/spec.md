@@ -251,9 +251,11 @@ What remains before selection is automatic, in order:
    never failed by it. This makes renewal work. It does not solve the first
    profile: with an authority configured, planning admits only nodes that
    already hold a profile, so a network without profiles never activates and
-   never gets plans. The bootstrap needs a decision: plan the first route from
-   runtime performance profiles (and relax the engine-bound link evidence for
-   it), or issue the first challenge from a planned but not yet launched route.
+   never gets plans. Decided 2026-11-22 and done: while fewer nodes than the
+   minimum stage count hold a current engine profile, the coordinator plans
+   from runtime performance profiles alone, without engine-bound link
+   evidence. That route's challenges create the profiles, and later
+   activations return to the strict rule.
 4. The Python launcher and the launch agent accept `--native-gguf-executor
    llama-cpp` only when it is bound to the sealed engine authority. The stage
    artifact preparer supplies the pinned build directory and the view cache.

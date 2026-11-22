@@ -152,20 +152,18 @@ export function buildConnectedExecutorActivationSnapshot(
     );
     return profile ? [[executor.nodeId, profile] as const] : [];
   }));
-  const planningExecutors = engineAuthority
+  const certifiedExecutors = engineAuthority
     ? profiledExecutors.filter(({ executor }) => engineProfilesByNode.has(executor.nodeId))
     : profiledExecutors;
-  if (planningExecutors.length < minimumStages) {
-    return {
-      capacityNodes,
-      config: null,
-      readinessDetails: executors.map(({ executor }) =>
-        engineProfilesByNode.has(executor.nodeId)
-          ? `${executor.nodeId}: certified engine profile verified.`
-          : `${executor.nodeId}: waiting for a certified engine profile matching this activation.`
-      ),
-    };
-  }
+  // Engine profiles come from challenges stored when a route commits, so a
+  // network without enough of them could never activate and never get one.
+  // Until enough nodes hold a profile, plan from runtime performance profiles
+  // alone, without engine-bound link evidence; the challenges of that first
+  // route create the profiles that later activations require.
+  const engineBootstrap = engineAuthority !== undefined && certifiedExecutors.length < minimumStages;
+  const planningExecutors = engineBootstrap ? profiledExecutors : certifiedExecutors;
+  const planningEngineAuthority = engineBootstrap ? undefined : engineAuthority;
+  const planningEngineProfiles = engineBootstrap ? new Map<string, never>() : engineProfilesByNode;
 
   const decodeScales = deriveDecodeScales(planningExecutors.map(({ executor, worker }) => ({
     nodeId: executor.nodeId,
@@ -178,7 +176,7 @@ export function buildConnectedExecutorActivationSnapshot(
   const nodes = planningExecutors.map(({ worker, executor, performance }) => {
     const host = hostMemoryObservationSchema.safeParse(worker.capabilities.hostMemory);
     const hostFresh = host.success && isFreshHostMemory(host.data, activationNow / 1000);
-    const engineProfile = engineProfilesByNode.get(executor.nodeId) ?? null;
+    const engineProfile = planningEngineProfiles.get(executor.nodeId) ?? null;
     const ownerRoles = baseConfig.nodes.find(node => node.id === executor.nodeId)?.stageRoles;
     const memoryMiB = worker.capabilities.gpus.reduce(
       (sum, gpu) => sum + gpu.offeredVramMb,
@@ -229,9 +227,9 @@ export function buildConnectedExecutorActivationSnapshot(
       const observation = selectPreferredRuntimeLinkObservation(
         (observationsByLink.get(linkKey(from.executor.nodeId, to.executor.nodeId)) ?? [])
           .filter((candidate) => {
-            if (!engineAuthority) return true;
-            const fromProfile = engineProfilesByNode.get(from.executor.nodeId);
-            const toProfile = engineProfilesByNode.get(to.executor.nodeId);
+            if (!planningEngineAuthority) return true;
+            const fromProfile = planningEngineProfiles.get(from.executor.nodeId);
+            const toProfile = planningEngineProfiles.get(to.executor.nodeId);
             return fromProfile !== undefined
               && toProfile !== undefined
               && candidate.measuredAt <= activationNow
@@ -243,8 +241,8 @@ export function buildConnectedExecutorActivationSnapshot(
         baseConfig.workload.minRouteAvailability,
       );
       if (!observation) return [];
-      const fromProfile = engineProfilesByNode.get(from.executor.nodeId);
-      const toProfile = engineProfilesByNode.get(to.executor.nodeId);
+      const fromProfile = planningEngineProfiles.get(from.executor.nodeId);
+      const toProfile = planningEngineProfiles.get(to.executor.nodeId);
       return [{
         from: from.executor.nodeId,
         to: to.executor.nodeId,

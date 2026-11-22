@@ -443,6 +443,49 @@ describe("connected executor activation", () => {
     );
     expect(futurePath.config).toBeNull();
   });
+
+  it("plans the first route from performance profiles until enough engine profiles exist", () => {
+    const first = worker("worker-a", "node-a", "node-a.relay", 9_850, 4_096, 3_500, 10);
+    const second = worker("worker-b", "node-b", "node-b.relay", 9_850, 4_096, 3_500, 10);
+    const descriptor = {
+      model: { modelId: "source-model", revision: "1".repeat(40) },
+      targets: [{ backend: "cuda", runtimeAbi: "cuda-12", quantizations: ["bf16"] }],
+    };
+    const authority = { descriptor, certification: {
+      certificationId: `sha256:${"b".repeat(64)}`,
+      artifactManifestDigest: `sha256:${"c".repeat(64)}`,
+    } } as never;
+    const measuredAt = Date.now() - 1_000;
+    const links = measuredLinks("node-a", "node-b", measuredAt - 10_000);
+
+    // No node holds an engine profile: the route is planned anyway, from
+    // runtime performance, and its links are not bound to engine profiles.
+    const empty = buildConnectedExecutorActivationSnapshot(
+      baseConfig(), [first, second], new Set([first.id, second.id]), links, authority,
+    );
+    expect(empty.config?.nodes.map((node) => node.id).sort()).toEqual(["node-a", "node-b"]);
+    expect(empty.config?.links[0]?.evidence).not.toHaveProperty("fromEngineProfileId");
+
+    // One profile is still not enough for a two-stage minimum.
+    first.capabilities.distributedExecutor!.engineProfiles = [
+      certifiedEngineProfile(first, authority, measuredAt, "d"),
+    ];
+    const partial = buildConnectedExecutorActivationSnapshot(
+      baseConfig(), [first, second], new Set([first.id, second.id]), links, authority,
+    );
+    expect(partial.config?.nodes).toHaveLength(2);
+    expect(partial.config?.links[0]?.evidence).not.toHaveProperty("fromEngineProfileId");
+
+    // Once both nodes hold profiles, the strict rule returns: these links
+    // predate the profiles, so no route is planned.
+    second.capabilities.distributedExecutor!.engineProfiles = [
+      certifiedEngineProfile(second, authority, measuredAt, "e"),
+    ];
+    const certified = buildConnectedExecutorActivationSnapshot(
+      baseConfig(), [first, second], new Set([first.id, second.id]), links, authority,
+    );
+    expect(certified.config).toBeNull();
+  });
 });
 
 function deployment(deploymentId: string, model: string, tokensPerSecond: number) {
