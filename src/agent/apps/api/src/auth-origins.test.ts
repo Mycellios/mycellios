@@ -72,13 +72,20 @@ describe("mobile auth origins", () => {
     }
   });
 
-  it("keeps the app scheme, Expo web dev server and web origin", async () => {
+  it("allows both app callback schemes, the Expo web dev server and the web origin", async () => {
     for (const url of [
       "rakazo://sign-in",
+      "mycellios://sign-in",
+      "mycellios://account?error=account_not_linked",
       "http://localhost:8081/sign-in",
       "https://app.example.test/sign-in",
     ]) {
       expect(await trusted(url), url).toBe(true);
+    }
+  });
+  it("allows the renamed scheme only for the two native callback authorities", async () => {
+    for (const url of ["mycellios://", "mycellios://notifications", "mycellios://sign-in.example"]) {
+      expect(await trusted(url), url).toBe(false);
     }
   });
 });
