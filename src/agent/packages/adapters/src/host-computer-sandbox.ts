@@ -70,7 +70,9 @@ export class HostComputerSandbox implements SandboxProvider {
         context = { ...context, ...owner };
       }
     }
-    input = { ...input, botId: context.botId ?? input.botId, ...(context.projectSessionId?{projectSessionId:context.projectSessionId}:{}) };
+    // The name travels only with its own Mico id; the PC uses it to name a new folder.
+    const botName = context.botId ? context.botName?.trim().slice(0, 200) : undefined;
+    input = { ...input, botId: context.botId ?? input.botId, ...(botName ? { botName } : {}), ...(context.projectSessionId?{projectSessionId:context.projectSessionId}:{}) };
     if ((!this.url || !this.token) && !this.transport)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
     const ownedInput = { ...input, ...(context.runId ? { runId: context.runId } : {}) };

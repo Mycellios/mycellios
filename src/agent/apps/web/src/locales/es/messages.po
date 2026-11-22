@@ -13920,3 +13920,9 @@ msgstr "Obtener código de vinculación"
 
 msgid "Talk to a Mico from your own WhatsApp number through Mycellios Desktop."
 msgstr "Habla con un Mico desde tu propio número de WhatsApp a través de Mycellios Desktop."
+
+msgid "Folder on this PC"
+msgstr "Carpeta en este PC"
+
+msgid "Open folder"
+msgstr "Abrir carpeta"

@@ -1,5 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { BotBrowserReset } from "../../components/BotBrowserReset";
+import { MicoPcFolder } from "../../components/MicoPcFolder";
 import type {
   AgentSkillCatalogEntry,
   Bot,
@@ -782,6 +783,7 @@ export function BotSettings({
             </Button>
           ) : null}
           <ComputerModeDescription mode={computerMode} />
+          {bot.computerMode === "dedicated" && computerMode === "dedicated" ? <MicoPcFolder botId={bot.id} /> : null}
           {bot.computerMode !== "dedicated" ? <BotBrowserReset botId={bot.id} /> : null}
 
             <div className="mt-4 text-sm text-foreground">

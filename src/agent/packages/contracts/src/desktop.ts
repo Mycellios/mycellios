@@ -223,6 +223,10 @@ export interface RakazoDesktop {
     chooseProject?: (botId: string) => Promise<DesktopMicoFolder | null>;
     prepareTask?: (request: { botId: string; taskThreadId: string }) => Promise<void>;
     project?: (botId: string) => Promise<DesktopMicoFolder | null>;
+    /** This PC folder of an owned Mico, once it exists; absent in older releases. */
+    micoFolder?: (botId: string) => Promise<string | null>;
+    /** Opens that same folder in the system file manager. */
+    openMicoFolder?: (botId: string) => Promise<void>;
     projectAvailable?: () => Promise<boolean>;
     /** Accessibility control of this PC's apps: shipped component and the owner's opt-in. */
     appControl?: () => Promise<{ available: boolean; enabled: boolean }>;
