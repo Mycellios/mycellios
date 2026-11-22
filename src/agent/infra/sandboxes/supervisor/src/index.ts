@@ -492,10 +492,16 @@ app.post("/computers/:id/exec", async (c) => {
   });
 });
 
-app.post("/computers/:id/browser", async (c) => {
+app.post("/computers/:id/browser/:mode?", async (c) => {
   // Read eagerly so the Node HTTP adapter observes disconnects during screen setup too.
   const signal = c.req.raw.signal;
   signal.throwIfAborted();
+  const mode = c.req.param("mode");
+  if (mode && mode !== "scoped") return c.notFound();
+  const input = await c.req.json();
+  const conversationKey = mode === "scoped"
+    ? z.object({ conversationKey: z.string().regex(/^[a-f0-9]{64}$/) }).parse(input).conversationKey
+    : undefined;
   const body = z
     .discriminatedUnion("command", [
       z.object({
@@ -539,7 +545,9 @@ app.post("/computers/:id/browser", async (c) => {
           .max(24),
       }),
     ])
-    .parse(await c.req.json());
+    .parse(input);
+  const browserCommand = conversationKey ? `scoped-${body.command}` : body.command;
+  const browserArgs = JSON.stringify({ ...body, ...(conversationKey ? { conversationKey } : {}) });
   const carriesSavedLogin =
     body.command === "act" && body.actions.some((step) => "origin" in step && step.origin);
   try {
@@ -557,8 +565,8 @@ app.post("/computers/:id/browser", async (c) => {
       // argv copy so a computer still on an older image keeps working until it is replaced.
       [
         "/usr/local/bin/rakazo-page-browser",
-        body.command,
-        ...(carriesSavedLogin ? [] : [JSON.stringify(body)]),
+        browserCommand,
+        ...(carriesSavedLogin ? [] : [browserArgs]),
       ],
       {
         env: [
@@ -574,7 +582,7 @@ app.post("/computers/:id/browser", async (c) => {
         ],
         timeoutMs: 25_000,
         signal,
-        stdin: `${JSON.stringify(body)}\n`,
+        stdin: `${browserArgs}\n`,
       },
     );
     // A nonzero exit or malformed output cannot establish which mutations ran.

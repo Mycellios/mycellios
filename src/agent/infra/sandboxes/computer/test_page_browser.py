@@ -6,6 +6,7 @@ import struct
 import os
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
@@ -16,6 +17,30 @@ loader.exec_module(helper)
 
 
 class PageBrowserTest(unittest.TestCase):
+    def test_conversations_reuse_only_their_own_tabs(self):
+        pages = []
+
+        def call(method, _params=None):
+            if method == "Target.getTargets":
+                return {"targetInfos": pages[:]}
+            self.assertEqual(method, "Target.createTarget")
+            target = str(len(pages) + 1) * 32
+            pages.append({"targetId": target, "type": "page"})
+            return {"targetId": target}
+
+        client = Mock()
+        client.call.side_effect = call
+        with TemporaryDirectory() as directory:
+            one = Path(directory) / ("a" * 64)
+            two = Path(directory) / ("b" * 64)
+            self.assertEqual(helper.scoped_target(client, one, create=True), "1" * 32)
+            self.assertIsNone(helper.scoped_target(client, two, create=False))
+            self.assertEqual(helper.scoped_target(client, two, create=True), "2" * 32)
+            self.assertEqual(helper.scoped_target(client, one, create=False), "1" * 32)
+            pages.pop(0)
+            self.assertIsNone(helper.scoped_target(client, one, create=False))
+            self.assertEqual(helper.scoped_target(client, two, create=False), "2" * 32)
+
     def test_closed_stdin_cancels_helper_without_a_browser(self):
         with subprocess.Popen([sys.executable, str(Path(__file__).with_name("rakazo-page-browser")), "snapshot", "{}"],
                               env={**os.environ, "RAKAZO_BROWSER_WATCH_STDIN": "1", "RAKAZO_CDP_PORT": "0"},

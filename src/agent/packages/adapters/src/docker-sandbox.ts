@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 import type {
   AdapterContext,
   CommandRequest,
@@ -242,10 +243,14 @@ export class DockerSandboxProvider implements SandboxProvider {
     request: PageBrowserCommand,
     context: AdapterContext,
   ): Promise<PageBrowserResult> {
-    const res = await fetch(this.url(`/computers/${computer.id}/browser`), {
+    const conversationKey = context.browserThreadId
+      ? createHash("sha256").update(JSON.stringify([context.spaceId, context.userId, context.botId, context.browserThreadId])).digest("hex")
+      : undefined;
+    const endpoint = conversationKey ? "browser/scoped" : "browser";
+    const res = await fetch(this.url(`/computers/${computer.id}/${endpoint}`), {
       method: "POST",
       headers: { ...this.headers(context, computer.botId), "content-type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify({ ...request, ...(conversationKey ? { conversationKey } : {}) }),
       redirect: "error",
       signal: context.signal,
     });

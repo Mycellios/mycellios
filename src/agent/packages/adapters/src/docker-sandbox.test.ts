@@ -504,6 +504,21 @@ describe("Docker sandbox", () => {
 describe("Docker page browser", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it("never falls back to the focused tab on an older supervisor", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new DockerSandboxProvider("http://supervisor.test", "test-token");
+    await expect(provider.pageBrowser(
+      { id: "computer", botId: "team-home", kind: "docker", providerRef: "computer" },
+      { command: "snapshot" },
+      { ...context, browserThreadId: "owned-thread" },
+    )).rejects.toThrow("page browser failed: 404");
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      "http://supervisor.test/computers/computer/browser/scoped",
+      expect.objectContaining({ body: expect.stringMatching(/"conversationKey":"[a-f0-9]{64}"/) }),
+    );
+  });
+
   it("uses the owned computer screen and lease instead of the generic exec endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json({ ok: true, title: "Fixture", url: "https://example.test" }),

@@ -12,15 +12,18 @@ import base64
 import hashlib
 import json
 import os
+import re
 import socket
 import stat
 import struct
 import sys
+import tempfile
 import time
 import threading
 import urllib.request
 from urllib.parse import urlsplit
 from typing import Any
+from pathlib import Path
 
 
 def display_num() -> int:
@@ -358,6 +361,78 @@ def attach_page(client: CdpClient) -> str:
         raise RuntimeError("No unambiguous visible browser tab. Use desktop tools to select a tab.")
     ensure_world(client, selected)
     return selected
+
+
+def scoped_target(client: CdpClient, mapping: Path, create: bool) -> str | None:
+    """Reuse only the conversation's target. Never infer ownership from focus or URL."""
+    try:
+        with os.fdopen(os.open(mapping, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "r") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise RuntimeError("Invalid browser tab mapping")
+            saved = stream.read(65).strip()
+    except FileNotFoundError:
+        saved = ""
+    if re.fullmatch(r"[a-fA-F0-9]{32}", saved):
+        targets = client.call("Target.getTargets").get("targetInfos") or []
+        if any(t.get("type") == "page" and t.get("targetId") == saved for t in targets):
+            return saved
+    if not create:
+        return None
+    target = client.call("Target.createTarget", {"url": "about:blank", "background": True})["targetId"]
+    if not re.fullmatch(r"[a-fA-F0-9]{32}", target):
+        raise RuntimeError("Chromium returned an invalid browser tab")
+    with tempfile.NamedTemporaryFile(mode="w", dir=mapping.parent, delete=False) as stream:
+        temp = stream.name
+        stream.write(target)
+    try:
+        os.replace(temp, mapping)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+    return target
+
+
+def run_scoped(client: CdpClient, port: int, command: str, args: dict[str, Any]) -> dict[str, Any]:
+    import fcntl
+
+    key = args.get("conversationKey")
+    if not isinstance(key, str) or not re.fullmatch(r"[a-f0-9]{64}", key):
+        raise RuntimeError("Invalid browser conversation scope")
+    directory = Path(f"/tmp/mycellios-browser-{os.getuid()}-{port}")
+    directory.mkdir(mode=0o700, exist_ok=True)
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise RuntimeError("Browser tab storage is not private")
+    # Activation and real keyboard input share a display. Serialize a whole
+    # command, including target selection, so input cannot leak to another tab.
+    lock_fd = os.open(directory / "display.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    with os.fdopen(lock_fd, "r+") as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise RuntimeError("Invalid browser display lock")
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        target = scoped_target(client, directory / key, create=command == "navigate")
+        if target is None:
+            if command == "snapshot":
+                return {"ok": True, "url": "about:blank", "title": "", "tree": "", "elements": []}
+            return {"ok": False, "completed": 0, "uncertain": False,
+                    "error": "Open a page in this conversation first."}
+        if command != "snapshot":
+            client.call("Target.activateTarget", {"targetId": target})
+        session_id = client.call("Target.attachToTarget", {"targetId": target, "flatten": True})["sessionId"]
+        client.call("Page.enable", session_id=session_id)
+        ensure_world(client, session_id)
+        return run_page_command(client, session_id, command, args)
+
+
+def run_page_command(client: CdpClient, session_id: str, command: str, args: dict[str, Any]) -> dict[str, Any]:
+    if command == "navigate":
+        return navigate(client, session_id, str(args.get("url") or ""))
+    if command == "snapshot":
+        return snapshot(client, session_id)
+    actions = args.get("actions")
+    if not isinstance(actions, list):
+        raise RuntimeError("actions must be an array")
+    return act(client, session_id, actions)
 
 
 def ensure_world(client: CdpClient, session_id: str) -> None:
@@ -1169,6 +1244,11 @@ def run(argv: list[str]) -> int:
         )
         return 2
     command = argv[1]
+    scoped = command.startswith("scoped-")
+    command = command.removeprefix("scoped-")
+    if command not in ("navigate", "snapshot", "act"):
+        print(json.dumps({"ok": False, "error": "Unknown browser command.", "fallback": "computer_act"}))
+        return 2
     args: dict[str, Any] = {}
     raw_args = stdin_args if stdin_args is not None else (argv[2] if len(argv) >= 3 else "")
     if raw_args.strip():
@@ -1180,24 +1260,9 @@ def run(argv: list[str]) -> int:
         client = CdpClient(ws_url)
         client.connect()
         try:
-            session_id = attach_page(client)
-            if command == "navigate":
-                result = navigate(client, session_id, str(args.get("url") or ""))
-            elif command == "snapshot":
-                result = snapshot(client, session_id)
-            elif command == "act":
-                actions = args.get("actions")
-                if not isinstance(actions, list):
-                    raise RuntimeError("actions must be an array")
-                result = act(client, session_id, actions)
-            else:
-                result = {
-                    "ok": False,
-                    "error": f"unknown command: {command}",
-                    "fallback": "computer_act",
-                }
-                print(json.dumps(result))
-                return 2
+            result = run_scoped(client, port, command, args) if scoped else run_page_command(
+                client, attach_page(client), command, args
+            )
             print(json.dumps(result))
             return 0  # Structured failures preserve partial action progress.
         finally:

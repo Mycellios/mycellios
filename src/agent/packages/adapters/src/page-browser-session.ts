@@ -333,8 +333,10 @@ export class PageBrowserSessionStore {
  */
 export function pageBrowserSessionKey(
   computer: { id: string; botId: string },
-  context?: { botId?: string },
+  context?: { botId?: string; browserThreadId?: string },
 ): string {
   const bot = context?.botId?.trim() || computer.botId;
-  return `${computer.id}::${bot}`;
+  return context?.browserThreadId
+    ? JSON.stringify([computer.id, bot, context.browserThreadId])
+    : `${computer.id}::${bot}`;
 }
