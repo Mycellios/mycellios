@@ -479,9 +479,14 @@ export function SidebarRoster({
                       reorderRosterBot(item.chat.id, target, groupBotIds);
                     }}
                     onClick={() => {
+                      const params = new URLSearchParams();
+                      if (item.kind === "bot" && item.chat.status === "waiting_input") {
+                        params.set("respond", "1");
+                        if (item.chat.waitingTaskThreadId) params.set("task", item.chat.waitingTaskThreadId);
+                      }
                       openSpaceChat(
                         item.chat.spaceId,
-                        item.kind === "bot" ? `/app/${item.chat.id}${item.chat.status === "waiting_input" ? "?respond=1" : ""}` : `/app/g/${item.chat.id}`,
+                        item.kind === "bot" ? `/app/${item.chat.id}${params.size ? `?${params}` : ""}` : `/app/g/${item.chat.id}`,
                       );
                     }}
                     // Focus the row so closing the menu returns focus here.

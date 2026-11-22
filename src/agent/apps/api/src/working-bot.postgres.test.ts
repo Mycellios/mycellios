@@ -1,4 +1,5 @@
 import type { SandboxProvider } from "@mycellios/adapter-kit";
+import { setTimeout as delay } from "node:timers/promises";
 import type { Actor } from "@mycellios/contracts";
 import type { ThreadEvents } from "@mycellios/db";
 import {
@@ -42,6 +43,31 @@ describe.skipIf(!enabled)("working bot visibility (PostgreSQL)", () => {
         });
         const target = await resolveThreadTarget(prisma, actor, { botId: bot.id });
         const groupTarget = await resolveThreadTarget(prisma, actor, { groupId: group.id });
+        const sideThread = await prisma.thread.create({
+          data: { spaceId: actor.spaceId, userId: actor.userId, taskBotId: bot.id,
+            projectKey: `mico:${bot.id}`, taskKey: `mico-task:${bot.id}:waiting-fixture` },
+        });
+        const sideTarget = await resolveThreadTarget(prisma, actor, { botId: bot.id, taskThreadId: sideThread.id });
+        const sideScope = { spaceId: actor.spaceId, userId: actor.userId, botId: bot.id, threadId: sideThread.id };
+        const sideTask = await prisma.task.create({
+          data: { ...sideScope, prompt: "Waiting for a city", status: "running" },
+        });
+        const waiting = await prisma.run.create({
+          data: { ...sideScope, taskId: sideTask.id, status: "waiting_input", trigger: "user" },
+        });
+        expect((await repos.listBots(actor)).find(row => row.id === bot.id)?.waitingTaskThreadId).toBe(sideThread.id);
+        expect((await repos.listSpaceBotsForSpaces(actor, [actor.spaceId]))
+          .find(row => row.id === bot.id)?.waitingTaskThreadId).toBe(sideThread.id);
+        // Hold the same row lock used by a writer. A reader must still see the
+        // last committed conversation, including its waiting run.
+        await prisma.$transaction(async tx => {
+          await tx.$queryRaw`SELECT id FROM threads WHERE id = ${sideThread.id} FOR UPDATE`;
+          await expect(Promise.race([
+            threadSnapshot({ prisma }, sideTarget),
+            delay(2_000, "blocked by thread writer"),
+          ])).resolves.toMatchObject({ threadId: sideThread.id, run: { id: waiting.id, status: "waiting_input" } });
+        });
+        await prisma.run.update({ where: { id: waiting.id }, data: { status: "completed" } });
         const scope = {
           spaceId: actor.spaceId,
           userId: actor.userId,
@@ -160,6 +186,7 @@ describe.skipIf(!enabled)("working bot visibility (PostgreSQL)", () => {
       });
     } finally {
       await runAsSystem("test fixture cleanup", async () => {
+        await prisma.chatGroup.deleteMany({ where: { spaceId: identity.spaceId, userId: identity.userId } });
         await prisma.organization.delete({ where: { id: identity.spaceId } });
         await prisma.user.delete({ where: { id: identity.userId } });
       });

@@ -571,6 +571,11 @@
   and open-tab state across the scoped remount without a whole-page loading frame.
   A seeded tab switch reads the destination's history directly without duplicating it
   through bootstrap. While the first read is pending, show loading in the chat pane.
+  Preload a bounded number of visible tabs and pending asks in the scoped memory
+  cache. Roster replies target the owned task thread and scroll to its loaded card.
+  Read messages, active runs, and the event cursor in one Repeatable Read snapshot
+  without taking a thread row lock. Verify the navigation and lock regressions in
+  conversation-tab-history.spec.ts and working-bot.postgres.test.ts.
   Verify MicoTaskTabs, query cache isolation, auto-read,
   development-conversations, side-threads, thread-deletion, core thread-lifecycle,
   DB messages and history-retrieval(.postgres) tests plus

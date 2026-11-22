@@ -13,6 +13,7 @@ export type NeedsYouEntry = Readonly<{
   color: string;
   status: string;
   action: NeedsYouAction;
+  waitingTaskThreadId?: string;
   /** Waiting conversations, for a review entry. */
   count: number;
 }>;
@@ -23,6 +24,7 @@ type NeedsYouBot = {
   name: string;
   color: string;
   status: string;
+  waitingTaskThreadId?: string;
   conversations?: { waiting: number } | null;
 };
 
@@ -34,7 +36,7 @@ export function needsYouEntries(spaces: readonly { bots: readonly NeedsYouBot[] 
       if (seen.has(bot.id)) continue;
       seen.add(bot.id);
       const base = { botId: bot.id, spaceId: bot.spaceId, name: bot.name, color: bot.color, status: bot.status };
-      if (bot.status === "waiting_input") entries.push({ ...base, key: `${bot.id}:answer`, action: "answer", count: 0 });
+      if (bot.status === "waiting_input") entries.push({ ...base, key: `${bot.id}:answer`, action: "answer", count: 0, waitingTaskThreadId: bot.waitingTaskThreadId });
       else if (bot.status === "waiting_takeover") entries.push({ ...base, key: `${bot.id}:takeover`, action: "takeover", count: 0 });
       const waiting = bot.conversations?.waiting ?? 0;
       if (waiting > 0) entries.push({ ...base, key: `${bot.id}:review`, action: "review", count: waiting });
@@ -44,7 +46,10 @@ export function needsYouEntries(spaces: readonly { bots: readonly NeedsYouBot[] 
 }
 
 /** Where an entry's action leads: the chat with its question, or the main chat whose cards mirror the conversations. */
-export function needsYouPath(entry: Pick<NeedsYouEntry, "botId" | "action">): string {
+export function needsYouPath(entry: Pick<NeedsYouEntry, "botId" | "action" | "waitingTaskThreadId">): string {
   const base = `/app/${encodeURIComponent(entry.botId)}`;
-  return entry.action === "answer" ? `${base}?respond=1` : base;
+  if (entry.action !== "answer") return base;
+  const params = new URLSearchParams({ respond: "1" });
+  if (entry.waitingTaskThreadId) params.set("task", entry.waitingTaskThreadId);
+  return `${base}?${params}`;
 }

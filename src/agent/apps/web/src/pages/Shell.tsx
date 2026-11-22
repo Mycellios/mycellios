@@ -219,6 +219,7 @@ import {
   lastChatOf,
   primeConversationSeed,
   queryClient,
+  readConversationHistory,
   seedOnLeave,
   spaceQueries,
   spaceSeedKey,
@@ -471,8 +472,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     return { seed: cached, startChat: botId || groupId || !getGeneralPreferences().restoreLastWorkspace ? undefined : lastChatOf(cached, lastChat) };
   });
   const [conversationSwitch] = useState(() => locationState?.conversationSwitch === true);
-  const loadingConversation = Boolean(taskScope || conversationSwitch);
-  const [threadLoadFailed, setThreadLoadFailed] = useState(false);
+  const [failedThreadBotId, setFailedThreadBotId] = useState<string | null>(null);
   const [threadLoadAttempt, setThreadLoadAttempt] = useState(0);
   const routerNavigate = useNavigate();
   const navigateRef = useRef(routerNavigate);
@@ -1519,13 +1519,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     return snap;
   }
 
-  async function refreshThread(id: string, signal?: AbortSignal) {
+  async function refreshThread(id: string, signal?: AbortSignal, read?: () => Promise<ThreadSnapshot>) {
     markOnce("rk:renderer:thread-request-start");
     const epoch = historyEpoch.current;
     const request = ++threadRefreshEpoch.current;
     // Apply threads.get as soon as it returns so stop/takeover status is not held behind
     // routines/skills/screen fetches (progress can advance the cursor meanwhile).
-    const snap = await rpc.threads.get({ botId: id }, signal ? { signal } : undefined);
+    const snap = await (read ? read() : rpc.threads.get({ botId: id }, signal ? { signal } : undefined));
     markOnce("rk:renderer:thread-response");
     if (
       signal?.aborted ||
@@ -1905,10 +1905,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const teammateRuns = createTeammateRunTracker();
     const routineRuns = new Set<string>();
     const abort = new AbortController();
-    // Full history has a longer read budget than the lightweight cursor probe.
-    const historySignal = () => threadSnapshotSignal(abort.signal,
-      loadingConversation ? CONVERSATION_HISTORY_TIMEOUT_MS : THREAD_SNAPSHOT_TIMEOUT_MS);
-    setThreadLoadFailed(false);
+    const historySignal = () => threadSnapshotSignal(abort.signal, CONVERSATION_HISTORY_TIMEOUT_MS);
+    const loadHistory = () => readConversationHistory(userId ?? null, shellSpaceId, active.id, taskScope);
+    setFailedThreadBotId(null);
     setLiveThreadConnection("live");
     void runThreadSubscription({
       signal: abort.signal,
@@ -1916,15 +1915,17 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       loadInitial: async () => {
         const primed = bootstrappedThread.current;
         bootstrappedThread.current = null;
-        // Pending search jumps load the around-page separately; avoid replacing it with latest.
-        const initial = await (primed?.botId === active.id
-          ? primed
-          : pendingJump
+        try {
+          // Pending search jumps load the around-page separately.
+          const initial = await (primed?.botId === active.id ? primed : pendingJump
             ? rpc.threads.get({ botId: active.id }, { signal: historySignal() })
-            : refreshThread(active.id, historySignal()));
-        // The task's own snapshot came through this client, which now accepts its read.
-        if (taskScope && !abort.signal.aborted) setTaskThreadLoaded(true);
-        return initial;
+            : refreshThread(active.id, abort.signal, loadHistory));
+          if (taskScope && !abort.signal.aborted) setTaskThreadLoaded(true);
+          return initial;
+        } catch (error) {
+          if (!abort.signal.aborted) setFailedThreadBotId(active.id);
+          throw error;
+        }
       },
       loadHead: () =>
         rpc.threads.head({ botId: active.id }, { signal: threadSnapshotSignal(abort.signal) }),
@@ -2002,7 +2003,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         }
       },
     }).then(() => {
-      if (!abort.signal.aborted && loadingConversation) setThreadLoadFailed(true);
+      if (!abort.signal.aborted) setFailedThreadBotId(active.id);
     });
     return () => {
       setLiveThreadConnection("live");
@@ -2164,6 +2165,28 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           : [],
     [bootstrapMe, botSections, bots, groups, spaces],
   );
+  const warmConversation = useCallback(async (id: string, threadId?: string, pendingQuestion = false) => {
+    if (!userId || document.visibilityState !== "visible") return;
+    const scope = threadId ? { botId: id, taskThreadId: threadId } : undefined;
+    const key = spaceQueries(userId, shellSpaceId, scope).threads.get.queryKey({ input: { botId: id } });
+    const cached = queryClient.getQueryData(key);
+    if (cached && (!pendingQuestion || answerableAskMessageIds(cached).size > 0)) return;
+    await readConversationHistory(userId, shellSpaceId, id, scope).catch(() => undefined);
+  }, [userId, shellSpaceId]);
+  const waitingChats = JSON.stringify(bots.filter(bot => bot.status === "waiting_input" &&
+    (bot.id !== active?.id || bot.waitingTaskThreadId !== taskScope?.taskThreadId))
+    .slice(0, 2).map(bot => [bot.id, bot.waitingTaskThreadId ?? null]));
+  useEffect(() => {
+    // Prefetch only the first few pending questions, without marking them read.
+    let cancelled = false;
+    void (async () => {
+      for (const [id, threadId] of JSON.parse(waitingChats) as [string, string | null][]) {
+        if (cancelled) break;
+        await warmConversation(id, threadId ?? undefined, true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [waitingChats, warmConversation]);
   const sidebarGroups = useMemo(
     () =>
       sidebarGroupsForSpaces(sidebarSpaces, miniSidebar ? "" : query, {
@@ -2212,9 +2235,33 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       setMobileSidebarOpen(false);
       const request = ++spaceSwitchRequest.current;
       const previousEffective = selectedSpaceId() ?? bootstrapMe?.spaceId;
+      const destination = new URL(path, window.location.origin);
+      const target = initialBootstrapTarget(destination.pathname, false);
+      const taskThreadId = destination.searchParams.get("task");
+      const destinationTask = taskThreadId && target?.botId
+        ? { botId: target.botId, taskThreadId } : undefined;
       // Persist the active space (including primary) so voice/RPC headers match the chat.
       if (previousEffective === spaceId) {
-        if (selectSpace(spaceId)) navigate(path);
+        if (!selectSpace(spaceId)) return;
+        const state = seedStateRef.current;
+        if (state?.me && target?.botId) {
+          const { chat: _chat, me, ...lists } = state;
+          if (shellSpaceId === null && me.spaceId === spaceId) {
+            // An implicit primary Space becomes explicit on the first roster click.
+            const input = { botId: target.botId };
+            const cached = queryClient.getQueryData(
+              spaceQueries(userId ?? null, null, destinationTask).threads.get.queryKey({ input }),
+            );
+            if (cached) {
+              queryClient.setQueryData(
+                spaceQueries(userId ?? null, spaceId, destinationTask).threads.get.queryKey({ input }),
+                current => current ?? cached,
+              );
+            }
+          }
+          primeConversationSeed(userId ?? null, spaceId, { ...lists, me }, target.botId, destinationTask);
+        }
+        navigate(path, { state: { conversationSwitch: true } });
         return;
       }
       const reload = () => {
@@ -2223,7 +2270,6 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       // Another space is an auth boundary: its bootstrap is loaded first, under that
       // space's header, then the shell remounts so none of this space's state survives.
       // A call in progress, or a page outside the shell, still reloads.
-      const target = initialBootstrapTarget(path, false);
       if (!target || getCallSnapshot()) {
         reload();
         return;
@@ -2240,7 +2286,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       // A space visited before opens at once with what it showed then, refreshing behind it.
       const cached = queryClient.getQueryData(spaceSeedKey(userId ?? null, spaceId));
       const primed = primeSpaceBootstrap(spaceId, target.botId, cached);
-      const remount = () =>
+      const remount = (seed: AppBootstrap) =>
         remountShellForSpace(() => {
           const action = decision();
           if (action !== "commit") {
@@ -2257,17 +2303,20 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             discardPrimedBootstrap(primed);
             return false;
           }
+          if (destinationTask) {
+            primeConversationSeed(userId ?? null, spaceId, seed, destinationTask.botId, destinationTask);
+          }
           // Playback belongs to the conversation being left.
           speaker.stop();
-          navigate(path);
+          navigate(path, destinationTask ? { state: { conversationSwitch: true } } : undefined);
           return true;
         });
       if (cached) {
-        remount();
+        remount(cached);
         return;
       }
       primed.then(
-        () => {
+        (bootstrap) => {
           if (!current()) {
             discardPrimedBootstrap(primed);
             return;
@@ -2278,7 +2327,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             reload();
             return;
           }
-          remount();
+          remount(bootstrap);
         },
         () => {
           discardPrimedBootstrap(primed);
@@ -2286,7 +2335,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         },
       );
     },
-    [bootstrapMe?.spaceId, navigate, userId],
+    [bootstrapMe?.spaceId, navigate, shellSpaceId, userId],
   );
   const flushBotOrder = useCallback(async () => {
     if (savingBotOrderRef.current) return;
@@ -2536,9 +2585,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     ? snapshot?.groupId === groupId
       ? snapshot
       : null
-    : snapshot?.botId === active?.id
+    : snapshot?.botId === active?.id && (!taskScope || snapshot?.threadId === taskScope.taskThreadId)
       ? snapshot
-      : null;
+      : active && !searchParams.has("m")
+        ? queryClient.getQueryData(cachedThreadKey({ botId: active.id })) ?? null
+        : null;
   const pendingSendScope = JSON.stringify([userId, currentSpaceId]);
   const {
     visible: pendingMessages, begin: beginPendingSend, accept: acceptPendingSend,
@@ -2575,17 +2626,22 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     navigate({ pathname: `/app/${encodeURIComponent(botId)}`, search: `?${params}` });
   }, [navigate, rpc, t]);
   const currentRuns = activeThreadRuns(activeSnapshot);
+  const waitingForAnswer = currentRuns.some(run => run.status === "waiting_input");
   const answerableAskIds = useMemo(() => answerableAskMessageIds(activeSnapshot), [activeSnapshot]);
   useEffect(() => {
     if (searchParams.get("respond") !== "1" || inGroup || !activeSnapshot) return;
     const question = activeSnapshot.messages.findLast(message => answerableAskIds.has(message.id));
     // Wait for the pending card to arrive if a roster refresh preceded its message.
-    if (!question && activeSnapshot.run?.status === "waiting_input") return;
+    if (!question && waitingForAnswer) return;
     const next = new URLSearchParams(searchParams);
     next.delete("respond");
-    if (question) next.set("m", question.id);
+    if (question) {
+      // The card is already in this transcript. An around-page jump would fetch
+      // the same history again and could block scrolling to the pending question.
+      setScrollRequest({ messageId: jumpTargetId(transcriptRef.current, question.id), nonce: ++jumpGeneration.current });
+    }
     setSearchParams(next, { replace: true });
-  }, [searchParams, inGroup, activeSnapshot, answerableAskIds, setSearchParams]);
+  }, [searchParams, inGroup, activeSnapshot, waitingForAnswer, answerableAskIds, setSearchParams]);
   const dismissableAskIds = useMemo(
     () => dismissableAskMessageIds(activeSnapshot, userId),
     [activeSnapshot, userId],
@@ -4340,6 +4396,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       confirmDelete={isMobileSidebar}
       messageCount={activeSnapshot?.messages.length ?? 0}
       refreshKey={active.conversations?.revision}
+      onWarm={warmConversation}
       onSelect={threadId => {
         close?.();
         selectConversation(threadId);
@@ -4883,8 +4940,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             </div>
           ) : newConversation && active && !inGroup ? (
             <NewConversationIntro bot={active} />
-          ) : !activeSnapshot && active && loadingConversation ? (
-            threadLoadFailed ? (
+          ) : !activeSnapshot && active ? (
+            failedThreadBotId === active.id ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3">
                 <p role="status"><Trans>Could not load this chat.</Trans></p>
                 <Button variant="ghost" onClick={() => setThreadLoadAttempt(attempt => attempt + 1)}>

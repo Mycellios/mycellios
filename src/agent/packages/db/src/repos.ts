@@ -35,6 +35,19 @@ import { withTransactionRetry } from "./transaction-retry.js";
 /** Newest messages loaded for sidebar preview; enough to skip a short peer-run tail. */
 const SIDEBAR_PREVIEW_MESSAGE_WINDOW = 16;
 
+const rosterRunSelection = {
+  ...activeRunSelection,
+  select: { ...activeRunSelection.select, thread: { select: { taskBotId: true } } },
+} as const;
+
+function waitingTaskThreadId(botId: string, run: {
+  status: string;
+  threadId: string;
+  thread?: { taskBotId: string | null };
+} | undefined) {
+  return run?.status === "waiting_input" && run.thread?.taskBotId === botId ? run.threadId : undefined;
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }
@@ -215,7 +228,7 @@ export function createRepos(
             unread: true,
           },
         },
-        runs: activeRunSelection,
+        runs: rosterRunSelection,
       },
       orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
     });
@@ -241,6 +254,7 @@ export function createRepos(
         parentBotId: bot.parentBotId,
         preview: previewFromBlocks(newestRosterMessage(bot.thread.messages)?.blocks),
         status: activeRun?.status ?? "idle",
+        waitingTaskThreadId: waitingTaskThreadId(bot.id, activeRun),
         runErrorId: rosterRunErrorId(bot.thread.runs[0], primaryActiveRun(bot.runs, bot.thread.id)),
         updatedAt: rosterUpdatedAt(newestRosterMessage(bot.thread.messages), bot.updatedAt).toISOString(),
       };
@@ -269,7 +283,7 @@ export function createRepos(
             },
             include: {
               thread: true,
-              runs: activeRunSelection,
+              runs: rosterRunSelection,
               computer: { select: { scope: true } },
             },
             orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
@@ -370,7 +384,7 @@ export function createRepos(
             if (messages.length === 0) break;
           }
           const activeRun = primaryActiveRun(bot.runs);
-          return mapBot(
+          const mapped = mapBot(
             bot,
             preview,
             activeRun?.status ?? "idle",
@@ -382,6 +396,8 @@ export function createRepos(
                 : [],
             ),
           );
+          const threadId = waitingTaskThreadId(bot.id, activeRun);
+          return threadId ? { ...mapped, waitingTaskThreadId: threadId } : mapped;
         }),
       );
       return listed.map((bot) => {
