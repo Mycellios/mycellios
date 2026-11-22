@@ -1,5 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { DesktopRelayBroker, desktopRelayKey, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
+import { createServer } from "node:http";
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DesktopUnreachableError } from "./computer-errors.js";
+import { DesktopRelayBroker, desktopAgentSelection, desktopRelayAvailable, desktopRelayKey, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
 const owner = { userId: "user", spaceId: "space", sessionId: "session" };
 const binding = { deviceId: "device", botId: "bot", generation: "generation" };
 const context = () => ({ userId: "user", spaceId: "space", botId: "bot", operationId: "op", traceId: "trace", signal: new AbortController().signal });
@@ -340,4 +344,57 @@ it("never lets a start the PC already received run again after it disconnects",a
   expect(JSON.parse(await received.text())).toMatchObject({code:"desktop_disconnected",dispatched:true});
   broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
   expect(()=>broker.dispatch({...run,sessionId:crypto.randomUUID()},context())).toThrow("already dispatched");
+});
+
+describe("Desktop availability checks", () => {
+  const key = desktopRelayKey("fixture-relay-secret");
+  const servers: Server[] = [];
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    for (const server of servers.splice(0)) await new Promise((done) => server.close(done));
+  });
+  /** A relay that answers every probe with this status and body. */
+  async function relay(status: number, body: unknown) {
+    const server = createServer((request, response) => {
+      request.resume().on("end", () => {
+        response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+      });
+    });
+    servers.push(server);
+    await new Promise<void>((ready) => server.listen(0, "127.0.0.1", ready));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/desktop-relay/internal`;
+  }
+
+  it("takes availability only from the relay's own answer", async () => {
+    await expect(desktopRelayAvailable(await relay(200, { available: true }), key)(context())).resolves.toBe(true);
+    await expect(desktopRelayAvailable(await relay(404, { available: false }), key)(context())).resolves.toBe(false);
+    await expect(desktopAgentSelection(await relay(200, { agentExecution: 1, available: false, preferred: true }), key)(context()))
+      .resolves.toEqual({ available: false, preferred: true });
+  });
+
+  it.each([409, 429, 503])("never reads a busy relay (%i) as an offline PC", async (status) => {
+    const url = await relay(status, { error: "busy" });
+    await expect(desktopRelayAvailable(url, key)(context())).rejects.toBeInstanceOf(DesktopUnreachableError);
+    await expect(desktopAgentSelection(url, key)(context())).rejects.toBeInstanceOf(DesktopUnreachableError);
+  });
+
+  it("reports a timed-out or lost check as no answer, not as offline", async () => {
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(timeout).mockRejectedValueOnce(new TypeError("fetch failed")));
+    const timedOut = await desktopRelayAvailable("http://relay.invalid/internal", key)(context()).catch((error: unknown) => error);
+    expect(timedOut).toBeInstanceOf(DesktopUnreachableError);
+    expect((timedOut as Error).cause).toBe(timeout);
+    await expect(desktopAgentSelection("http://relay.invalid/internal", key)(context()))
+      .rejects.toBeInstanceOf(DesktopUnreachableError);
+  });
+
+  it("keeps the caller's own cancellation a cancellation", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const url = await relay(200, { available: true });
+    const cancelled = await desktopAgentSelection(url, key)({ ...context(), signal: controller.signal })
+      .catch((error: unknown) => error);
+    expect(cancelled).not.toBeInstanceOf(DesktopUnreachableError);
+    expect(cancelled).toMatchObject({ name: "AbortError" });
+  });
 });

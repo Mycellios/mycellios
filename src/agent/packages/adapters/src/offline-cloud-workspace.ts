@@ -10,6 +10,7 @@ import {
   type PrismaClient,
   withTransactionRetry,
 } from "@mycellios/db";
+import { DesktopUnreachableError } from "./computer-errors.js";
 
 /** Shown in the chat when a This PC Mico's new message runs on the server instead. */
 export const OFFLINE_CLOUD_NOTICE =
@@ -37,11 +38,18 @@ export async function selectOfflineCloudWorkspace(
   if (!sandbox?.provisionKind || run.startedAt || run.checkpoint || (assignment && assignment.kind !== "desktop")) return;
   const provider = sandbox.describe().id;
   if (provider === "none" || provider === "desktop") return;
+  const signal = AbortSignal.timeout(5_000);
   const context: AdapterContext = {
-    operationId: run.id, traceId: run.id, runId: run.id, spaceId, userId, botId,
-    signal: AbortSignal.timeout(5_000),
+    operationId: run.id, traceId: run.id, runId: run.id, spaceId, userId, botId, signal,
   };
-  if (await sandbox.provisionKind(context) !== provider) return;
+  const kind = await sandbox.provisionKind(context).catch((error: unknown) => {
+    // Running out of time is no answer: the PC may be online, so this message must not move
+    // to a server workspace. The caller retries it as a setup failure.
+    throw signal.aborted && !(error instanceof DesktopUnreachableError)
+      ? new DesktopUnreachableError({ cause: error })
+      : error;
+  });
+  if (kind !== provider) return;
 
   const [thread, task] = await Promise.all([
     prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),

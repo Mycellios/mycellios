@@ -290,6 +290,7 @@ import {
 } from "./composio-connector.js";
 import { computerAvailable as admittedComputerAvailable } from "./computer-availability.js";
 import { BACKGROUND_WORK_LAUNCH, scheduleComputerSleep } from "./computer-idle.js";
+import { DesktopUnreachableError } from "./computer-errors.js";
 import type { ComputerExecutionLease } from "./computer-lifecycle.js";
 import {
   acquireComputerExecutionLease,
@@ -3857,9 +3858,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const cloudSelection = await selectOfflineCloudWorkspace(
         deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
       ).catch((error: unknown) => {
-        if (error instanceof ComputerLimitError) return error;
+        if (error instanceof ComputerLimitError || error instanceof DesktopUnreachableError) return error;
         throw error;
       });
+      if (cloudSelection instanceof DesktopUnreachableError) {
+        await retryUnansweredDesktopCheck(
+          deps, run, { workerId, fence }, resumeCheckpoint, heldForTakeover, cloudSelection,
+        );
+        return;
+      }
       const cloudLimitReached = cloudSelection instanceof ComputerLimitError;
       const cloudComputer = cloudLimitReached ? undefined : cloudSelection;
       const assignedComputerId = cloudComputer?.id ?? leaseTarget.computerId;
@@ -3967,6 +3974,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       let desktopUpdateDispatched = false;
       // Once a turn reaches the PC it may have local effects; it is never replayed.
       let desktopRunDispatched = false;
+      // The first runtime event or tool call starts the turn; it may have effects from then on.
+      let turnStarted = false;
       let runCompleted = false;
       let lastLeaseCheckAt = 0;
       let retainComputerLease = false;
@@ -8646,6 +8655,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         };
         const applyTool = async (...params: Parameters<typeof dispatchTool>) => {
+          turnStarted = true;
           if (desktopUpdateRequested) return pauseForRestart();
           try {
             try {
@@ -9175,6 +9185,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             context,
           );
           for await (const event of withRuntimeCleanup(runtimeEvents, runAbortController)) {
+            turnStarted = true;
             if (desktopUpdateRequested) { await pauseForRestart(); return; }
             if (approvalPausePending || restartPausePending) return;
             if (!leaseValid) return;
@@ -9810,6 +9821,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if(!messagingChannelRun)await scheduleLocalMemoryReview({prisma:deps.prisma,jobs:deps.jobs},thread.id).catch(error=>getLogger().error("memory.review enqueue failed",error));
         } catch (caughtError) {
           if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
+          // A Desktop check that got no answer before the turn started or reached the PC is
+          // a setup failure: retry it with the others instead of failing the message.
+          if (caughtError instanceof DesktopUnreachableError && !turnStarted && !desktopRunDispatched) {
+            throw caughtError;
+          }
           let error = caughtError;
           // A refused account limit needs user/operator action, not setup-job retries.
           // Keep the provisioning error even if aborting the model masked it.
@@ -9963,14 +9979,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           fence,
           resumeCheckpoint,
           heldForTakeover,
-          retryForever ? null : "Run setup failed; retrying",
+          retryForever ? null : RUN_SETUP_RETRY_ERROR,
         );
         if (released) {
           await deps.prisma.attempt.update({
             where: { id: attempt.id },
             data: {
               status: "setup_failed",
-              error: retryForever ? null : "Run setup failed; retrying",
+              error: retryForever ? null : RUN_SETUP_RETRY_ERROR,
               finishedAt: new Date(),
             },
           });
@@ -9981,7 +9997,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             });
             return;
           }
-          throw new Error("Run setup failed; retrying", { cause: reportedSetupError });
+          throw new Error(RUN_SETUP_RETRY_ERROR, { cause: reportedSetupError });
         }
       } finally {
         getLogger().info("run.computer", {
@@ -10383,6 +10399,8 @@ async function renewRunLease(
 
 /** Consecutive setup failures, including this one, after which a run fails instead of retrying. */
 const RUN_SETUP_FAILURE_LIMIT = 8;
+/** Run and attempt error of a counted setup failure that will be retried. */
+const RUN_SETUP_RETRY_ERROR = "Run setup failed; retrying";
 
 /**
  * Setup failures in a row before the current attempt. Busy-computer and database waits are
@@ -11388,6 +11406,52 @@ async function requeueComputerRun(
   if (!released) return;
   await deps.jobs.enqueue({
     ...runContinueJob(runId),
+    availableAt: new Date(Date.now() + computerRetryDelay(fence)),
+  });
+}
+
+/**
+ * The offline-workspace check runs before the attempt starts. When it gets no answer, nothing
+ * was sent to the PC and no server workspace was chosen, so it counts as a setup failure: the
+ * run waits and retries, and ends with the check's own sentence once the limit runs out.
+ */
+async function retryUnansweredDesktopCheck(
+  deps: ExecutorDeps,
+  run: Parameters<typeof failRunBeforeTurn>[1],
+  lease: { workerId: string; fence: number },
+  resumeCheckpoint: TakeoverResumeCheckpoint | null,
+  heldForTakeover: boolean,
+  error: DesktopUnreachableError,
+): Promise<void> {
+  const { workerId, fence } = lease;
+  // Recheck ownership before recording an attempt; never settle a stolen lease.
+  const owned = await deps.prisma.run.updateMany({
+    where: { id: run.id, status: "running", leaseOwner: workerId, leaseFence: fence },
+    data: { error: RUN_SETUP_RETRY_ERROR },
+  });
+  if (owned.count !== 1) return;
+  getLogger().warn("run.desktop_check_unanswered", {
+    "run.id": run.id, trigger: run.trigger,
+    reason: error.cause instanceof Error ? error.cause.name : "relay_busy",
+  });
+  const attempt = await deps.prisma.attempt.create({ data: { runId: run.id, fence, status: "running" } });
+  if ((await setupFailureStreak(deps.prisma, run.id)) >= RUN_SETUP_FAILURE_LIMIT - 1) {
+    const bot = await deps.prisma.bot.findUnique({ where: { id: run.botId }, select: { name: true } });
+    await failRunBeforeTurn(deps, run, bot?.name ?? "", { attemptId: attempt.id, workerId, fence }, error.message);
+    return;
+  }
+  const released = await writeComputerRunRequeue(
+    deps, run.id, workerId, fence, resumeCheckpoint, heldForTakeover, RUN_SETUP_RETRY_ERROR,
+  );
+  await deps.prisma.attempt.update({
+    where: { id: attempt.id },
+    data: released
+      ? { status: "setup_failed", error: RUN_SETUP_RETRY_ERROR, finishedAt: new Date() }
+      : { status: "interrupted", finishedAt: new Date() },
+  });
+  if (!released) return;
+  await deps.jobs.enqueue({
+    ...runContinueJob(run.id),
     availableAt: new Date(Date.now() + computerRetryDelay(fence)),
   });
 }
