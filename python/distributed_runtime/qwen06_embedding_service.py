@@ -357,8 +357,9 @@ PINNED_FILES = {
     "tokenizer_config.json": "253153d0738ceb4c668d2eff957714dd2bea0b56de772a9fdccd96cbf517e6a0",
     "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
 }
-# GPU pairs measured against CPU fp32; DirectML float16 drifted (cosine 0.987).
-NATIVE_EXECUTIONS = {("cuda", "float16"), ("mps", "float16"), ("directml", "float32")}
+# Pairs measured against CPU fp32 (the reference itself is admitted too);
+# DirectML float16 drifted (cosine 0.987). Same list as memory-embedding.ts.
+NATIVE_EXECUTIONS = {("cuda", "float16"), ("mps", "float16"), ("directml", "float32"), ("cpu", "float32")}
 NATIVE_MAX_TEXT_CHARS = 32_768
 
 

@@ -36,25 +36,31 @@ export const MEMORY_EMBEDDING_DIGEST = "sha256:" + createHash("sha256").update([
 ].join("\0")).digest("hex");
 
 /**
- * GPU device/precision pairs whose vectors matched CPU fp32 (minimum cosine
- * 0.999996). DirectML float16 drifted to 0.987 and is not admitted. Native
- * qualification covers single-stage GPU replicas only, so CPU backups stay on
- * the private forwarder.
+ * Device/precision pairs whose vectors matched CPU fp32 (minimum cosine
+ * 0.999996; CPU fp32 is the reference itself). DirectML float16 drifted to
+ * 0.987 and is not admitted. Each pair runs as one non-fallback stage, and
+ * every replica still has to pass the same canary cosine gate to qualify.
+ * `priorTokensPerSecond` is the speed measured on 2026-11-21/22 for that kind
+ * of device (for CPU, the slowest one). The coordinator sizes a replica's
+ * first piece with it and then uses the speed it measures itself.
  */
-export const MEMORY_EMBEDDING_EXECUTIONS: ReadonlyArray<{ backend: string; precision: string }> = Object.freeze([
-  { backend: "cuda", precision: "float16" },
-  { backend: "mps", precision: "float16" },
-  { backend: "directml", precision: "float32" },
+export const MEMORY_EMBEDDING_EXECUTIONS: ReadonlyArray<{ backend: string; precision: string; priorTokensPerSecond: number }> = Object.freeze([
+  { backend: "cuda", precision: "float16", priorTokensPerSecond: 380 },
+  { backend: "mps", precision: "float16", priorTokensPerSecond: 380 },
+  { backend: "directml", precision: "float32", priorTokensPerSecond: 114 },
+  { backend: "cpu", precision: "float32", priorTokensPerSecond: 7 },
 ]);
 
 type Execution = ModelDeployment["execution"];
-/** One non-fallback stage whose backend/precision is an approved pair. */
+/** One non-fallback stage whose backend/precision is an approved pair, on the matching device type. */
 export function approvedMemoryEmbeddingExecution(execution: Execution): { backend: string; precision: string } | null {
   if (!execution || execution.fallback || execution.stages?.length !== 1) return null;
   const stage = execution.stages[0]!;
+  const deviceType = stage.backend === "cpu" ? "cpu" : "gpu";
   if (stage.fallback || stage.backend !== execution.backend || stage.precision !== execution.precision
-    || execution.deviceType !== "gpu" || stage.deviceType !== "gpu") return null;
-  return MEMORY_EMBEDDING_EXECUTIONS.find((pair) => pair.backend === stage.backend && pair.precision === stage.precision) ?? null;
+    || execution.deviceType !== deviceType || stage.deviceType !== deviceType) return null;
+  const pair = MEMORY_EMBEDDING_EXECUTIONS.find((candidate) => candidate.backend === stage.backend && candidate.precision === stage.precision);
+  return pair ? { backend: pair.backend, precision: pair.precision } : null;
 }
 
 /**
@@ -84,6 +90,25 @@ export const MEMORY_EMBEDDING_PHONE_DIGEST = "sha256:" + createHash("sha256").up
 ].join("\0")).digest("hex");
 /** Phone backend/precision pairs measured on a physical phone at cosine ≥ the canary gate. None yet. */
 export const MEMORY_EMBEDDING_PHONE_EXECUTIONS: ReadonlyArray<{ backend: string; precision: string }> = Object.freeze([]);
+
+/** Starting speed of an approved execution, before the coordinator has measured the replica. */
+export function memoryEmbeddingPriorTokensPerSecond(execution: Execution): number | null {
+  const approved = approvedMemoryEmbeddingExecution(execution);
+  return MEMORY_EMBEDDING_EXECUTIONS.find((pair) => pair.backend === approved?.backend
+    && pair.precision === approved.precision)?.priorTokensPerSecond ?? null;
+}
+
+/**
+ * Coordinator-side size of one text, without the tokenizer: about four
+ * characters per token plus the end token, capped at the runtime's
+ * truncation. Piece sizing and measured throughput both use this estimate,
+ * so a systematic tokenizer difference cancels out.
+ */
+export function estimatedMemoryEmbeddingTokens(text: string): number {
+  return Math.min(MEMORY_EMBEDDING_MAX_INPUT_TOKENS, Math.ceil(text.length / 4) + 1);
+}
+/** Fixed cost of one piece (offer, lease, transport), counted apart from the replica's speed. */
+export const MEMORY_EMBEDDING_PIECE_OVERHEAD_MS = 750;
 
 export const memoryEmbeddingInputSchema = z.object({
   schema: z.literal(MEMORY_EMBEDDING_SCHEMA),

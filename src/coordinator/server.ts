@@ -15,7 +15,7 @@ export {
 } from "./activation-retry.js";
 import { eventAgentAccess } from "./event-demo-agent-access.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
-import { createInferenceSettlement } from "./settle-completed-inference.js";
+import { completedParts, createInferenceSettlement, pieceSummary, withPieceReceipts } from "./settle-completed-inference.js";
 import { beginContributionUsage } from "./contribution-funding.js";
 import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
 import { initializeManagedProvider, isManagedModel } from "./managed-provider.js";
@@ -4757,7 +4757,7 @@ export async function createCoordinator(
     }
     let handle: Awaited<ReturnType<MeshService["submit"]>>;
     try {
-      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey, undefined, { requireSettlementEvidence: funded }));
+      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey, undefined, { requireSettlementEvidence: funded, splitMemoryEmbedding: !parsed.stream }));
     } catch (error) {
       if (usage) (await apiAccess.failUsage(usage.id, "submission_failed"));
       throw error;
@@ -4905,7 +4905,7 @@ export async function createCoordinator(
         if (event.type === "failed") {
           throw new MeshServiceError(event.code, event.message, 502);
         }
-        if (event.type === "completed") result = (await attachExecutionReceipt(event, parsed.model, routeClass));
+        if (event.type === "completed") result = (await withPieceReceipts(event, (part) => attachExecutionReceipt(part, parsed.model, routeClass)));
       }
       if (!result) {
         throw new MeshServiceError("missing_result", "Worker stream ended without a result", 502);
@@ -4920,16 +4920,16 @@ export async function createCoordinator(
       throw error;
     }
     if (usage) {
-      if (result.result.networkTrace) (await settleCompletedInference({
+      for (const part of completedParts(result)) if (part.networkTrace) (await settleCompletedInference({
         userId: usage.userId,
-        jobId: handle.jobId,
+        jobId: part.jobId,
         modelId: parsed.model,
         routeClass,
-        inputTokens: result.result.metrics.inputTokens,
-        outputTokens: result.result.metrics.outputTokens,
-        networkTrace: result.result.networkTrace,
-        recovery: result.result.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
-        executionReceiptId: result.result.executionReceiptId!,
+        inputTokens: part.metrics.inputTokens,
+        outputTokens: part.metrics.outputTokens,
+        networkTrace: part.networkTrace,
+        recovery: part.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
+        executionReceiptId: part.executionReceiptId!,
       }));
       try {
         if (funded && creditWallet) await creditWallet.assertSettled(usage.id);
@@ -4958,7 +4958,7 @@ export async function createCoordinator(
         reused_kv_tokens: result.result.metrics.reusedKvTokens ?? 0,
         execution_trace: result.result.networkTrace ?? null,
         execution_recovery: result.result.recovery ?? null,
-        execution_receipt_id: result.result.executionReceiptId ?? null,
+        execution_receipt_id: result.result.executionReceiptId ?? null, ...pieceSummary(result),
         execution_privacy: result.result.privacy ?? null,
       },
     }));
@@ -4991,7 +4991,7 @@ export async function createCoordinator(
         recovery_mode: result.result.recovery?.mode ?? "none",
         recovery_attempts: result.result.recovery?.attempts ?? 1,
         replayed_token_events: result.result.recovery?.replayedTokenEvents ?? 0,
-        execution_receipt_id: result.result.executionReceiptId ?? null,
+        execution_receipt_id: result.result.executionReceiptId ?? null, ...pieceSummary(result),
         trust_policy: result.result.privacy?.trust ?? "default",
         boundary_policy: result.result.privacy?.boundary ?? "trusted-edges",
         pinned_identity_count: result.result.privacy?.pinnedIdentityHashes.length ?? 0,

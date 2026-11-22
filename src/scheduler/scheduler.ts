@@ -45,6 +45,12 @@ export interface SchedulerOptions {
      * qualification evidence (the same binding verifiedContributionCanary checks).
      */
     requireSettlementEvidence?: boolean;
+    /**
+     * Every stage of the deployment runs on a GPU. Economic settlement only
+     * verifies GPU stages, so contribution-funded memory embeddings skip the
+     * qualified CPU replicas that unfunded requests may use.
+     */
+    requireGpuStages?: boolean;
   };
 }
 
@@ -795,7 +801,8 @@ function routePolicyRejections(
   if (policy.requireSettlementEvidence && route.stages.some((stage) => {
     const worker = workerById.get(stage.workerId);
     const deployment = worker?.capabilities.deployments.find((candidate) => candidate.deploymentId === stage.deploymentId);
-    return !worker || !deployment || !nativeReplicaCanSettle(worker, deployment, options.now ?? Date.now());
+    return !worker || !deployment || !nativeReplicaCanSettle(worker, deployment, options.now ?? Date.now())
+      || (policy.requireGpuStages === true && !deploymentRunsOnGpu(deployment));
   })) {
     reasons.push("candidate_evidence_missing");
   }
@@ -820,6 +827,11 @@ function identityIdIsAmbiguous(
 const NATIVE_REPLICA_ADAPTERS = new Set(["kokoro", "transcription", "embedding"]);
 
 /** Native replicas settle only with fresh qualification bound to this worker and build. */
+function deploymentRunsOnGpu(deployment: ModelDeployment): boolean {
+  const stages = deployment.execution?.stages ?? [];
+  return stages.length > 0 && stages.every((stage) => stage.deviceType === "gpu");
+}
+
 function nativeReplicaCanSettle(worker: StoredWorker, deployment: ModelDeployment, now: number): boolean {
   if (!NATIVE_REPLICA_ADAPTERS.has(deployment.adapter)) return true;
   const evidence = deployment.nativeReplicaEvidence;

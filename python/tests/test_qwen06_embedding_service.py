@@ -248,8 +248,10 @@ class NativeSettingsTests(unittest.TestCase):
     def test_native_listener_is_loopback_pinned_and_approved_only(self):
         self.assertEqual(service.native_settings(NATIVE_CONFIG)["host"], "127.0.0.1")
         self.assertIsNone(service.native_settings(CONFIG))
+        cpu = service.native_settings({**NATIVE_CONFIG, "device": "cpu", "dtype": "float32"})
+        self.assertEqual(cpu["activationId"], NATIVE_CONFIG["native"]["activationId"])
         for change in ({"native": {**NATIVE_CONFIG["native"], "host": "0.0.0.0"}},
-                       {"device": "directml", "dtype": "float16"}, {"device": "cpu", "dtype": "float32"},
+                       {"device": "directml", "dtype": "float16"}, {"device": "cpu", "dtype": "bfloat16"},
                        {"revision": "0" * 40}, {"native": {"port": 0}}):
             with self.assertRaises(ValueError):
                 service.native_settings({**NATIVE_CONFIG, **change})
