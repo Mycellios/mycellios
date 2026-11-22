@@ -59,7 +59,7 @@ function renderMessage(
   blocks: ThreadMessage["blocks"],
   peerBot: PeerBot,
   mentions?: ReturnType<typeof planner>[],
-  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean; runEnded?: boolean; onBranch?: (message: ThreadMessage) => void; branchDisabled?: boolean } = {},
+  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean; runEnded?: boolean; onBranch?: (message: ThreadMessage) => void; branchDisabled?: boolean; onDelete?: (message: ThreadMessage) => void } = {},
 ) {
   const onShowBot = vi.fn();
   const message: ThreadMessage = {
@@ -99,6 +99,7 @@ function renderMessage(
         onMarkUnread={vi.fn()}
         onReact={vi.fn()}
         onBranch={options.onBranch}
+        onDelete={options.onDelete}
         branchDisabled={options.branchDisabled}
       /></ResponseStyleContext.Provider>,
     ),
@@ -438,6 +439,16 @@ it("labels teammate messages by what they ask and keeps their text folded until 
 const menuItem = (text: string) =>
   Array.from(document.querySelectorAll<HTMLElement>("[role=\"menuitem\"]")).find((item) => item.textContent === text);
 const openMore = () => act(() => container.querySelector<HTMLButtonElement>("button[aria-label=\"More\"]")!.click());
+
+it("opens delete for the exact message when the transcript offers it", () => {
+  const onDelete = vi.fn();
+  renderMessage([{ kind: "text", text: "My note" }], existingBot, undefined, { id: "original", role: "user", onDelete });
+  openMore();
+  const item = menuItem("Delete");
+  expect(item).toBeDefined();
+  act(() => item!.click());
+  expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: "original" }));
+});
 
 it("offers Branch in new conversation in the message menu only where the transcript allows it", () => {
   const onBranch = vi.fn();
