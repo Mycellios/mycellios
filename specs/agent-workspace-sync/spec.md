@@ -65,6 +65,21 @@ recorded in the canonical status document when achieved.
 ### Conversation follow-up
 
 - New bot replies remain distinct from read conversations awaiting continuation.
+- Tasks keeps its seven sections (Pinned, Needs you, New replies, Working, Waiting,
+  To continue, Archived). A conversation that has not finished a turn yet is listed in
+  Waiting. Rows read how the last turn ended from the thread (`outcome`, falling back to
+  the latest run on older servers): Answered, Failed or Stopped. Failed and stopped
+  rows are red, rows that need the person (a question, a takeover, a due reminder) are
+  amber, and the status always says it in words. Conversations a Mico opened by itself
+  (`startedBy: agent`) are marked. Archived rows list the most recently archived first,
+  five before "Show all".
+- The task panel answers questions inline and loads older pages; "Answer in the chat"
+  opens the conversation at that question, and a takeover opens the chat. The panel is
+  resizable from its edge by pointer or keyboard: at least 320 px, leaving the list at
+  least 320 px, with the width remembered on the device.
+- The Mico picker searches by name and says when nothing matches. After Start, the line
+  "{Mico} took “{title}”" keeps Undo and the Mico change for six seconds; its Open starts
+  the task at once and shows it.
 - Pins are stored on existing owner/Space inbox metadata, rendered once at the top.
 - Optional one-shot reminders persist as UTC instants; date entry uses device local time. The existing worker reconciler claims bounded due batches and uses the existing privacy-aware native/Web Push channels, with explicit task-thread links. No inference or billing is performed. A due marker remains until dismissed or rescheduled; absent/disabled delivery does not consume the reminder.
 - Archive cancels reminders and unpins. Cancellation/rescheduling invalidates pending Web Push delivery. A worker crash can retry an expired claim; native network acceptance is at-least-once across a crash, while the Web Push outbox deduplicates device/reminder/date.

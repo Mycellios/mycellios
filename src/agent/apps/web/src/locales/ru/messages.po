@@ -6964,3 +6964,31 @@ msgstr "На 24 часа"
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "Until I turn it back on"
 msgstr "Пока я не включу снова"
+
+#: src/pages/tasks/TaskDetail.tsx
+msgid "Answer in the chat"
+msgstr "Ответить в чате"
+
+#: src/pages/tasks/TaskComposer.tsx
+msgid "No Mico matches “{search}”"
+msgstr "Ни один Mico не подходит под «{search}»"
+
+#: src/pages/tasks/TasksWorkspace.tsx
+msgid "{name} took “{title}”"
+msgstr "{name}: задача «{title}» принята"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Hand a task to a Mico."
+msgstr "Поручите задачу Mico."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Pick up the <0>answer</0> later."
+msgstr "<0>Ответ</0> можно забрать позже."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Your Micos can work on several tasks at once."
+msgstr "Ваши Mico могут работать над несколькими задачами одновременно."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Their answers stay here until you archive them."
+msgstr "Их ответы остаются здесь, пока вы их не архивируете."

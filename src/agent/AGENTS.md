@@ -748,7 +748,13 @@
   turns remain reviewable until archived. Verify verify-task-conversations-db.ts
   and the task section/navigation tests when changing this bridge.
   Follow-up uses InboxTask.pinned/remindAt and existing read cursors. Separate new
-  replies from read conversations awaiting continuation. The existing worker
+  replies from read conversations awaiting continuation. Keep the seven Tasks
+  sections; a conversation with no finished turn sits in Waiting, never To continue.
+  Rows take the thread outcome before the last run (red failed/stopped, amber when
+  the person is needed, always with words) and mark conversations the Mico opened.
+  Questions stay answerable inline; "Answer in the chat" opens ?task=&m= at the
+  question. The detail panel resizes (320 px for it and the list, width kept per
+  device) and Open on a pending start commits it at once. The existing worker
   reconciler claims due reminders; no model Run or Credit charge. Archive cancels
   reminders, rescheduling invalidates queued notices, and delivery rechecks owner,
   membership and notification/privacy policy. Preserve UTC instants through Web

@@ -3,13 +3,14 @@ import { ChatMarkdown } from "@mycellios/chat-ui/web";
 import type { Bot, InboxTask, ThreadSnapshot } from "@mycellios/contracts";
 import { Button, Spinner } from "@mycellios/ui-web";
 import { Archive, ArchiveRestore, ArrowLeft, Maximize2, MessageCircle, Square, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { AskCard } from "../../components/AskCard";
+import { ConversationFailureCard } from "../../components/NewConversationIntro";
 import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { TaskComposer } from "./TaskComposer";
 import { TaskFollowUp } from "./TaskFollowUp";
-import { taskIsActive } from "./task-sections";
+import { taskIsActive, taskOutcome } from "./task-sections";
 
 export function TaskDetail({
   item,
@@ -22,6 +23,8 @@ export function TaskDetail({
   onOpenChat,
   transcribe,
   scope,
+  width,
+  edge,
 }: {
   item: InboxTask;
   client: RpcClient;
@@ -30,9 +33,14 @@ export function TaskDetail({
   onChanged: () => void;
   expanded: boolean;
   onExpand: () => void;
-  onOpenChat: () => void;
+  /** Opens the conversation in the chat; with a message, at that message. */
+  onOpenChat: (messageId?: string) => void;
   transcribe?: boolean;
   scope: string;
+  /** The panel's width beside the list, in pixels. */
+  width?: number;
+  /** The panel's resizable edge, when it has one. */
+  edge?: ReactNode;
 }) {
   const { t } = useLingui();
   const draftKey = `mycellios:task:${scope}:${item.id}`;
@@ -160,19 +168,28 @@ export function TaskDetail({
       localStorage.setItem(`${draftKey}:draft`, "");
     });
   }
+  const name = bot?.name ?? t`Mico`;
+  const failed = taskOutcome(current) === "failed";
   return (
     <aside
       className={`rk-task-detail ${expanded ? "rk-task-detail-expanded" : ""}`}
       aria-label={t`Task conversation`}
       data-testid="task-detail"
+      style={width ? ({ "--task-panel-width": `${width}px` } as CSSProperties) : undefined}
     >
+      {expanded ? null : edge}
       <header>
         {expanded ? (
           <Button variant="ghost" size="icon-sm" aria-label={t`Back to tasks`} onClick={onExpand}>
             <ArrowLeft size={15} />
           </Button>
         ) : null}
-        <div className="rk-task-detail-title"><h2 title={item.title}>{item.title}</h2><p>{bot?.name ?? t`Mico`}</p></div>
+        <div className="rk-task-detail-title">
+          <h2 title={item.title}>{item.title}</h2>
+          <p data-testid={current.startedBy === "agent" ? "task-started-by-mico" : undefined}>
+            {current.startedBy === "agent" ? t`${name} opened this conversation` : name}
+          </p>
+        </div>
         {taskIsActive(current) ? (
           <Button
             variant="ghost"
@@ -206,7 +223,7 @@ export function TaskDetail({
         >
           <Maximize2 size={15} />
         </Button>
-        <Button variant="ghost" size="icon-sm" aria-label={t`Open conversation`} title={t`Open conversation`} onClick={onOpenChat}>
+        <Button variant="ghost" size="icon-sm" aria-label={t`Open conversation`} title={t`Open conversation`} onClick={() => onOpenChat()}>
           <MessageCircle size={15} />
         </Button>
         <Button variant="ghost" size="icon-sm" aria-label={t`Close task`} onClick={onClose}>
@@ -252,34 +269,46 @@ export function TaskDetail({
                 block.kind === "text" ? (
                   <ChatMarkdown key={index}>{block.text}</ChatMarkdown>
                 ) : block.kind === "ask" ? (
-                  <AskCard
-                    key={index}
-                    block={block}
-                    canAnswer={block.status !== "answered" && taskIsActive(current)}
-                    canDismiss={block.status !== "answered" && taskIsActive(current)}
-                    onAnswer={async (answer, username) => {
-                      await client.taskInbox.answer({
-                        id: item.id,
-                        messageId: message.id,
-                        runId: message.runId ?? current.runId!,
-                        answer,
-                        username,
-                      });
-                      refresh((value) => value + 1);
-                      onChanged();
-                    }}
-                    onDismiss={async () => {
-                      await client.taskInbox.answer({
-                        id: item.id,
-                        messageId: message.id,
-                        runId: message.runId ?? current.runId!,
-                        answer: "",
-                        dismiss: true,
-                      });
-                      refresh((value) => value + 1);
-                      onChanged();
-                    }}
-                  />
+                  <div key={index} className="rk-task-ask">
+                    <AskCard
+                      block={block}
+                      canAnswer={block.status !== "answered" && taskIsActive(current)}
+                      canDismiss={block.status !== "answered" && taskIsActive(current)}
+                      onAnswer={async (answer, username) => {
+                        await client.taskInbox.answer({
+                          id: item.id,
+                          messageId: message.id,
+                          runId: message.runId ?? current.runId!,
+                          answer,
+                          username,
+                        });
+                        refresh((value) => value + 1);
+                        onChanged();
+                      }}
+                      onDismiss={async () => {
+                        await client.taskInbox.answer({
+                          id: item.id,
+                          messageId: message.id,
+                          runId: message.runId ?? current.runId!,
+                          answer: "",
+                          dismiss: true,
+                        });
+                        refresh((value) => value + 1);
+                        onChanged();
+                      }}
+                    />
+                    {block.status !== "answered" && taskIsActive(current) ? (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="rk-task-ask-chat"
+                        onClick={() => onOpenChat(message.id)}
+                      >
+                        <MessageCircle size={13} aria-hidden="true" />
+                        {t`Answer in the chat`}
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : block.kind === "progress" ? (
                   <p key={index} className="text-xs text-muted-foreground">
                     {block.text}
@@ -319,15 +348,25 @@ export function TaskDetail({
         )}
         {taskIsActive(current) ? (
           <p className="rk-task-live" role="status">
-            <span className="rk-task-spinner" />
-            {current.status === "waiting_input"
-              ? t`Needs your answer`
-              : current.progress || t`Working`}
+            {current.status === "waiting_takeover" ? (
+              <>
+                {t`Needs you`}
+                <Button variant="ghost" size="xs" onClick={() => onOpenChat()}>
+                  <MessageCircle size={13} aria-hidden="true" />
+                  {t`Open in the chat`}
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="rk-task-spinner" />
+                {current.status === "waiting_input"
+                  ? t`Needs your answer`
+                  : current.progress || t`Working`}
+              </>
+            )}
           </p>
-        ) : current.error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {current.error}
-          </p>
+        ) : failed ? (
+          <ConversationFailureCard error={current.lastError || current.error} />
         ) : null}
       </div>
       <div className="rk-task-detail-composer">

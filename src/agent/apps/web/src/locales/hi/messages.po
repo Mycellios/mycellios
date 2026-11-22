@@ -6964,3 +6964,31 @@ msgstr "24 घंटे के लिए"
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "Until I turn it back on"
 msgstr "जब तक मैं फिर से चालू न करूँ"
+
+#: src/pages/tasks/TaskDetail.tsx
+msgid "Answer in the chat"
+msgstr "चैट में जवाब दें"
+
+#: src/pages/tasks/TaskComposer.tsx
+msgid "No Mico matches “{search}”"
+msgstr "“{search}” से कोई Mico मेल नहीं खाता"
+
+#: src/pages/tasks/TasksWorkspace.tsx
+msgid "{name} took “{title}”"
+msgstr "{name} ने “{title}” लिया"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Hand a task to a Mico."
+msgstr "किसी Mico को काम सौंपें।"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Pick up the <0>answer</0> later."
+msgstr "<0>जवाब</0> बाद में लें।"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Your Micos can work on several tasks at once."
+msgstr "आपके Micos एक साथ कई कामों पर काम कर सकते हैं।"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Their answers stay here until you archive them."
+msgstr "उनके जवाब यहीं रहते हैं, जब तक आप उन्हें संग्रहित नहीं करते।"

@@ -39,7 +39,7 @@ export function useTaskInbox(client: RpcClient, scope: string, initialBotId: str
     [refresh, setRefresh] = useState(0);
   const alive = useRef(true),
     pendingRef = useRef(pending),
-    sending = useRef(false);
+    sending = useRef<Promise<InboxTask | null> | null>(null);
   pendingRef.current = pending;
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -104,9 +104,14 @@ export function useTaskInbox(client: RpcClient, scope: string, initialBotId: str
       clearTimeout(timer);
     };
   }, [client, refresh]);
-  async function commit(value: PendingTask) {
-    if (sending.current) return;
-    sending.current = true;
+  /** Starts the pending task once; a second call while it is on its way gets the same answer. */
+  function commit(value: PendingTask): Promise<InboxTask | null> {
+    if (sending.current) return sending.current;
+    const request = send(value);
+    sending.current = request;
+    return request;
+  }
+  async function send(value: PendingTask): Promise<InboxTask | null> {
     storePending({ ...value, phase: "sending" });
     if (alive.current) setBusy(true);
     try {
@@ -122,6 +127,7 @@ export function useTaskInbox(client: RpcClient, scope: string, initialBotId: str
         setError("");
         setItems((current) => [result, ...current.filter((item) => item.id !== result.id)]);
       }
+      return result;
     } catch (cause) {
       const code = cause && typeof cause === "object" && "code" in cause ? String(cause.code) : "";
       if (["BAD_REQUEST", "FORBIDDEN", "UNAUTHORIZED", "NOT_FOUND", "CONFLICT"].includes(code)) {
@@ -135,8 +141,9 @@ export function useTaskInbox(client: RpcClient, scope: string, initialBotId: str
         if (alive.current) setDraft(restored);
       } else storePending({ ...value, phase: "uncertain" });
       if (alive.current) setError(errorText(cause));
+      return null;
     } finally {
-      sending.current = false;
+      sending.current = null;
       if (alive.current) setBusy(false);
     }
   }
@@ -205,6 +212,16 @@ export function useTaskInbox(client: RpcClient, scope: string, initialBotId: str
     retry: () => {
       const value = pendingRef.current;
       if (value?.phase === "uncertain") void commit(value);
+    },
+    /**
+     * Opening the task ends its undo window: it starts now instead of after six seconds. While it
+     * is already on its way, this waits for it. Null when nothing was started.
+     */
+    startNow: (): Promise<InboxTask | null> => {
+      const value = pendingRef.current;
+      if (sending.current) return sending.current;
+      if (value?.phase !== "scheduled") return Promise.resolve(null);
+      return commit(value);
     },
   };
 }

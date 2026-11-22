@@ -3,9 +3,9 @@ import type { Bot } from "@mycellios/contracts";
 import type { ReactNode } from "react";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DictationSnapshot, dictation } from "../../lib/dictation";
-import { TaskComposer } from "./TaskComposer";
+import { matchingMicos, TaskAgentSelect, TaskComposer } from "./TaskComposer";
 
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({
@@ -140,4 +140,52 @@ it("installs only the dictation model on Desktop versions that support separate 
   expect(native.prepareModel).toHaveBeenCalledWith("asr");
   expect(native.prepare).not.toHaveBeenCalled();
   expect(dictation.listen).toHaveBeenCalledOnce();
+});
+
+describe("Mico picker", () => {
+  const micos = [
+    { id: "a", name: "Investigación", color: "#9B5CF6" },
+    { id: "b", name: "DevOps", color: "#10B981" },
+    { id: "c", name: "Diseño", color: "#F59E0B" },
+  ] as Bot[];
+  let picker: ReturnType<typeof createRoot>, host: HTMLDivElement;
+  const choose = vi.fn();
+  const options = () => [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+  const search = (text: string) =>
+    act(() => {
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="Search Micos"]')!;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, text);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  beforeEach(async () => {
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    Element.prototype.scrollIntoView = () => undefined;
+    host = document.createElement("div");
+    document.body.append(host);
+    picker = createRoot(host);
+    await act(async () => picker.render(<TaskAgentSelect bots={micos} botId="a" onChange={choose} />));
+    await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Assign task to Mico"]')!.click());
+  });
+  afterEach(async () => {
+    await act(async () => picker.unmount());
+    host.remove();
+  });
+  it("finds Micos by name and gives the task to the one chosen", async () => {
+    expect(options().map((option) => option.textContent)).toEqual(["Investigación", "DevOps", "Diseño"]);
+    expect(options()[0]?.getAttribute("data-checked")).toBe("true");
+    search("dev");
+    expect(options().map((option) => option.textContent)).toEqual(["DevOps"]);
+    await act(async () => options()[0]!.click());
+    expect(choose).toHaveBeenCalledExactlyOnceWith("b");
+  });
+  it("says when no Mico matches the search", () => {
+    search("Ventas");
+    expect(options()).toHaveLength(0);
+    expect(document.body.textContent).toContain("No Mico matches “Ventas”");
+    expect(choose).not.toHaveBeenCalled();
+  });
+  it("matches names whatever their case and ignores surrounding spaces", () => {
+    expect(matchingMicos(micos, "  DISE ").map((bot) => bot.id)).toEqual(["c"]);
+    expect(matchingMicos(micos, "")).toHaveLength(3);
+  });
 });

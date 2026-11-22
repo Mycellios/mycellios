@@ -1,5 +1,5 @@
 import { botColors } from "@mycellios/ui-tokens";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot } from "@mycellios/contracts";
 import { BotAvatar } from "@mycellios/ui-web";
 import { CircleCheck, CircleDashed, LoaderCircle } from "lucide-react";
@@ -10,15 +10,17 @@ export function TaskEmptyPitch() {
   return (
     <div className="rk-task-pitch">
       <h1>
-        <span>{t`Delegate the work.`}</span>
+        <span>{t`Hand a task to a Mico.`}</span>
         <span>
-          {t`Come back and find an`} <em>{t`answer`}</em>.
+          <Trans>
+            Pick up the <em>answer</em> later.
+          </Trans>
         </span>
       </h1>
       <p>
-        {t`Your agents work on tasks in parallel.`}
+        {t`Your Micos can work on several tasks at once.`}
         <br />
-        {t`Every answer is waiting here.`}
+        {t`Their answers stay here until you archive them.`}
       </p>
     </div>
   );
@@ -65,7 +67,7 @@ export function TaskEmptyBoard({ bots }: { bots: Bot[] }) {
             <span className="rk-task-row-title">{sample.title}</span>
             <span className={slot === 0 ? "rk-task-answered" : ""}>
               {slot === 0
-                ? t({ context: "task status", message: "Answered" })
+                ? t`Answered`
                 : slot === 1
                   ? sample.progress
                   : t`Waiting`}

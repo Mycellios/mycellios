@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob } from "@mycellios/adapter-kit";
 import type { Actor, InboxTask } from "@mycellios/contracts";
-import { automaticThreadTitle, MODEL_REQUIRED_SEND_ERROR, THREAD_OUTCOMES } from "@mycellios/core";
+import { automaticThreadTitle, MODEL_REQUIRED_SEND_ERROR, THREAD_OUTCOMES, THREAD_STARTED_BY } from "@mycellios/core";
 import { AnswerTooLongError, IsolationError, reopenSideThreadForSend } from "@mycellios/db";
 import { archiveSideThread, restoreSideThread } from "../side-threads.js";
 import { assertTeachingSendAllowed } from "../taught-skills.js";
@@ -33,6 +33,7 @@ type Row = {
   archivedAt: Date | null;
   outcome?: string | null;
   lastError?: string | null;
+  startedBy?: string | null;
   createdAt: Date;
   clientNonce: string;
 };
@@ -43,7 +44,7 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
       await deps.prisma.$queryRaw<
         Row[]
       >`SELECT i.id,i."botId",i."threadId",i.title,i."readSeq",i.pinned,i."remindAt",i."createdAt",i."clientNonce",
-          t."archivedAt",t.outcome,t."lastError"
+          t."archivedAt",t.outcome,t."lastError",t."startedBy"
         FROM task_inbox i JOIN threads t ON t.id=i."threadId" AND t."spaceId"=i."spaceId" AND t."userId"=i."userId"
         WHERE i.id=${id} AND i."spaceId"=${actor.spaceId} AND i."userId"=${actor.userId} AND t."deleteAfter" IS NULL`
     )[0];
@@ -105,6 +106,7 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
       archivedAt: row.archivedAt?.toISOString() ?? null,
       outcome: THREAD_OUTCOMES.find((outcome) => outcome === row.outcome) ?? null,
       lastError: row.lastError ?? null,
+      startedBy: THREAD_STARTED_BY.find((startedBy) => startedBy === row.startedBy) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: (run?.updatedAt ?? row.createdAt).toISOString(),
     };
@@ -160,6 +162,7 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
                 archivedAt: true,
                 outcome: true,
                 lastError: true,
+                startedBy: true,
                 runs: {
                   orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                   take: 1,
@@ -185,7 +188,8 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
         const items = await Promise.all(
           rows.map((row) =>
             dto({ ...row, title: row.thread.title ?? row.title, readSeq: Math.max(row.readSeq, row.thread.lastReadSeq),
-              archivedAt: row.thread.archivedAt, outcome: row.thread.outcome, lastError: row.thread.lastError }, {
+              archivedAt: row.thread.archivedAt, outcome: row.thread.outcome, lastError: row.thread.lastError,
+              startedBy: row.thread.startedBy }, {
               run: row.thread.runs[0] ?? null,
               message: row.thread.messages[0] ?? null,
               event: row.thread.events[0] ?? null,

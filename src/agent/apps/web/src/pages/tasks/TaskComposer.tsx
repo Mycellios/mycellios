@@ -2,52 +2,107 @@ import { getGeneralPreferences } from "../../lib/general-preferences";
 import { botColors } from "@mycellios/ui-tokens";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@mycellios/contracts";
-import { Textarea,
+import {
   BotAvatar,
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Textarea,
 } from "@mycellios/ui-web";
-import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, X } from "lucide-react";
+import { ArrowUp, ChevronDown, LoaderCircle, Mic, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type DictationSnapshot, dictation } from "../../lib/dictation";
 
+/** Micos whose name contains the search, ignoring case; every Mico for an empty search. */
+export function matchingMicos(bots: Bot[], query: string) {
+  const needle = query.trim().toLocaleLowerCase();
+  return needle ? bots.filter((bot) => bot.name.toLocaleLowerCase().includes(needle)) : bots;
+}
+
+/** Who gets the task: a searchable list of the Micos, with the chosen one checked. */
 export function TaskAgentSelect({
   bots,
   botId,
   onChange,
   disabled,
+  compact,
 }: {
   bots: Bot[];
   botId: string;
   onChange: (id: string) => void;
   disabled?: boolean;
+  /** Only the avatar shows, for a line that already names the Mico. */
+  compact?: boolean;
 }) {
   const { t } = useLingui();
+  const [open, setOpen] = useState(false),
+    [query, setQuery] = useState("");
   const bot = bots.find((item) => item.id === botId);
+  const shown = matchingMicos(bots, query);
+  const search = query.trim();
+  function toggle(next: boolean) {
+    setOpen(next);
+    if (!next) setQuery("");
+  }
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Popover open={open} onOpenChange={toggle}>
+      <PopoverTrigger
         disabled={disabled}
-        className="rk-task-agent"
+        className={`rk-task-agent ${compact ? "rk-task-agent-compact" : ""}`}
         aria-label={t`Assign task to Mico`}
+        title={compact ? bot?.name : undefined}
       >
         <BotAvatar identity={bot?.id ?? "task"} color={bot?.color ?? botColors[3]} size={18} />
-        <span className="truncate">{bot?.name ?? t`Choose a Mico`}</span>
+        {compact ? null : <span className="truncate">{bot?.name ?? t`Choose a Mico`}</span>}
         <ChevronDown size={11} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="max-h-80 overflow-y-auto" align="start">
-        {bots.map((item) => (
-          <DropdownMenuItem key={item.id} onClick={() => onChange(item.id)}>
-            <BotAvatar identity={item.id} color={item.color} size={18} />
-            <span className="flex-1">{item.name}</span>
-            {item.id === botId ? <Check size={14} /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverTrigger>
+      {open ? (
+        <PopoverContent align="start" className="w-64 gap-0 overflow-hidden p-0" data-testid="task-agent-picker">
+          {/* cmdk names its search box after this label. */}
+          <Command shouldFilter={false} label={t`Search Micos`}>
+            <CommandInput
+              value={query}
+              onValueChange={setQuery}
+              aria-label={t`Search Micos`}
+              placeholder={t`Search Micos…`}
+              autoFocus
+            />
+            <CommandList className="max-h-72 p-1">
+              {search ? (
+                <CommandEmpty className="px-3 py-4 text-center text-xs text-muted-foreground">
+                  {t`No Mico matches “${search}”`}
+                </CommandEmpty>
+              ) : null}
+              {shown.length ? (
+                <CommandGroup className="p-0">
+                  {shown.map((item) => (
+                    <CommandItem
+                      key={item.id}
+                      value={item.id}
+                      data-checked={item.id === botId}
+                      onSelect={() => {
+                        onChange(item.id);
+                        toggle(false);
+                      }}
+                    >
+                      <BotAvatar identity={item.id} color={item.color} size={18} />
+                      <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : null}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      ) : null}
+    </Popover>
   );
 }
 export function TaskComposer({

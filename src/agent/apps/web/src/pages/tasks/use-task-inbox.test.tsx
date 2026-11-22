@@ -115,3 +115,36 @@ it("recovers a refused pending send after leaving the page", async () => {
   expect(state.draft).toBe("Keep this task");
   expect(api.start).toHaveBeenCalledTimes(1);
 });
+it("starts a task at once when it is opened during its undo window, and only once", async () => {
+  await act(async () => state.start("Do this"));
+  let opened: Promise<InboxTask | null>;
+  await act(async () => {
+    opened = state.startNow();
+  });
+  expect(api.start).toHaveBeenCalledTimes(1);
+  expect(await opened!).toEqual(item);
+  expect(state.pending).toBeNull();
+  expect(state.receipt?.id).toBe(item.id);
+  await act(async () => vi.advanceTimersByTimeAsync(10000));
+  expect(api.start).toHaveBeenCalledTimes(1);
+});
+it("waits for a start already on its way instead of sending it again", async () => {
+  let finish: (task: InboxTask) => void = () => {};
+  api.start.mockReturnValueOnce(new Promise<InboxTask>((resolve) => {
+    finish = resolve;
+  }));
+  await act(async () => state.start("Do this"));
+  await act(async () => vi.advanceTimersByTimeAsync(6000));
+  expect(state.pending?.phase).toBe("sending");
+  let opened: Promise<InboxTask | null>;
+  await act(async () => {
+    opened = state.startNow();
+  });
+  await act(async () => finish(item));
+  expect(await opened!).toEqual(item);
+  expect(api.start).toHaveBeenCalledTimes(1);
+});
+it("opens nothing when no task is waiting to start", async () => {
+  await expect(state.startNow()).resolves.toBeNull();
+  expect(api.start).not.toHaveBeenCalled();
+});

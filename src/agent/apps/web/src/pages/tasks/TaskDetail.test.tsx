@@ -18,7 +18,7 @@ async function render(item=row){await act(()=>root.render(<TaskDetail item={item
 it('opens the existing conversation without sending or confusing it with expanding the panel',async()=>{
  await render();
  await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="Open conversation"]')!.click());
- expect(open).toHaveBeenCalledOnce();expect(expand).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();
+ expect(open).toHaveBeenCalledExactlyOnceWith();expect(expand).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();
  await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="Expand conversation"]')!.click());
  expect(expand).toHaveBeenCalledOnce();expect(read).toHaveBeenCalledWith({id:"inbox-kuma"});
 });
@@ -33,4 +33,43 @@ it('archives and restores metadata of the same thread without deleting the conve
  await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="Restore task"]')!.click());
  expect(archive).toHaveBeenLastCalledWith({id:"inbox-kuma",archived:false});
  expect(send).not.toHaveBeenCalled();
+});
+const ask={id:"m-ask",threadId:"kuma",runId:"run-1",seq:4,role:"bot",createdAt:new Date().toISOString(),blocks:[{kind:"ask",text:"Which cluster?",status:"pending"}]};
+it('offers to answer a pending question in the chat, at that question',async()=>{
+ const waiting={...row,runId:"run-1",status:"waiting_input" as const};
+ read.mockResolvedValue({item:waiting,thread:{messages:[ask],olderCursor:null}});
+ await render(waiting);
+ const button=[...host.querySelectorAll('button')].find(button=>button.textContent==="Answer in the chat");
+ expect(button).toBeTruthy();
+ await act(()=>button!.click());
+ expect(open).toHaveBeenCalledExactlyOnceWith("m-ask");
+ expect(send).not.toHaveBeenCalled();
+});
+it('does not offer the chat for a question that was already answered',async()=>{
+ const done={...row,runId:"run-1",status:"completed" as const};
+ read.mockResolvedValue({item:done,thread:{messages:[{...ask,blocks:[{...ask.blocks[0],status:"answered",answer:"prod"}]}],olderCursor:null}});
+ await render(done);
+ expect([...host.querySelectorAll('button')].some(button=>button.textContent==="Answer in the chat")).toBe(false);
+});
+it('sends a takeover to the chat, where the computer can be handed over',async()=>{
+ const takeover={...row,runId:"run-1",status:"waiting_takeover" as const};
+ read.mockResolvedValue({item:takeover,thread:{messages:[],olderCursor:null}});
+ await render(takeover);
+ const button=[...host.querySelectorAll('button')].find(button=>button.textContent==="Open in the chat");
+ await act(()=>button!.click());
+ expect(open).toHaveBeenCalledExactlyOnceWith();
+});
+it('says the Mico opened the conversation and shows why its last turn failed',async()=>{
+ const failed={...row,runId:"run-1",status:"completed" as const,outcome:"failed" as const,lastError:"The cluster refused the token.",startedBy:"agent" as const};
+ read.mockResolvedValue({item:failed,thread:{messages:[],olderCursor:null}});
+ await act(()=>root.render(<TaskDetail item={failed} bot={{id:"devops",name:"DevOps"} as never} client={client} scope="owner/space" onClose={()=>{}} onChanged={()=>{}} expanded={false} onExpand={expand} onOpenChat={open}/>));
+ expect(host.querySelector('[data-testid="task-started-by-mico"]')?.textContent).toBe("DevOps opened this conversation");
+ expect(host.querySelector('[data-testid="conversation-failure"]')?.textContent).toContain("The cluster refused the token.");
+});
+it('keeps its resizable edge beside the list and drops it when expanded',async()=>{
+ await act(()=>root.render(<TaskDetail item={row} client={client} scope="owner/space" onClose={()=>{}} onChanged={()=>{}} expanded={false} onExpand={expand} onOpenChat={open} width={512} edge={<hr data-testid="edge"/>}/>));
+ expect(host.querySelector<HTMLElement>('[data-testid="task-detail"]')!.style.getPropertyValue("--task-panel-width")).toBe("512px");
+ expect(host.querySelector('[data-testid="edge"]')).toBeTruthy();
+ await act(()=>root.render(<TaskDetail item={row} client={client} scope="owner/space" onClose={()=>{}} onChanged={()=>{}} expanded onExpand={expand} onOpenChat={open} width={512} edge={<hr data-testid="edge"/>}/>));
+ expect(host.querySelector('[data-testid="edge"]')).toBeNull();
 });
