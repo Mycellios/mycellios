@@ -5,6 +5,7 @@ import {
   loadBotMessageContext,
   messageBot,
   returnBotMessageOutcome,
+  settleAgentTaskTeammateReply,
 } from "./bot-messages.js";
 import type { ExecutorDeps } from "./executor.js";
 
@@ -28,6 +29,8 @@ function deps(
     /** Simulate a unique (threadId, clientNonce) race after both retries miss. */
     uniqueConflictOnCommit?: boolean;
     transactionConflictOnce?: boolean;
+    /** Conversations the source turn opened with start_task. */
+    startedTasks?: string[];
   } = {},
 ) {
   const enqueue = vi.fn().mockResolvedValue(undefined);
@@ -72,7 +75,16 @@ function deps(
         ),
     },
     message: { findUnique: messageFindUnique, findMany: vi.fn().mockResolvedValue([]) },
-    run: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    run: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    externalEffect: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue((options.startedTasks ?? []).map((taskId) => ({ result: { taskId } }))),
+    },
     $transaction: vi.fn(async (fn: (client: unknown) => unknown) => {
       transactionAttempts += 1;
       if (options.transactionConflictOnce && transactionAttempts === 1) {
@@ -741,5 +753,76 @@ describe("automatic outcome return", () => {
     expect(returned).toBe(true);
     expect(harness.enqueue).not.toHaveBeenCalled();
     expect(harness.deps.prisma.run.updateMany).toHaveBeenCalled();
+  });
+});
+
+describe("teammate reply after tasks the request opened", () => {
+  const request = {
+    kind: "bot_message_received",
+    fromBotId: "bot-target",
+    fromBotName: "Coordinator",
+    text: "research this",
+    hop: 1,
+    intent: "request",
+    returnToMessageId: "message-request",
+  };
+  function taskHarness(options: { pending?: boolean; lastReport?: { id: string; status: string } | null; answers?: string[] }) {
+    const harness = deps({ hopBlocks: [request], startedTasks: ["task-1"] });
+    const prisma = harness.deps.prisma as unknown as {
+      run: { findUnique: ReturnType<typeof vi.fn>; findFirst: ReturnType<typeof vi.fn> };
+      message: { findMany: ReturnType<typeof vi.fn> };
+    };
+    prisma.run.findUnique.mockResolvedValue({
+      ...run,
+      sourceMessageId: "message-source",
+      status: "completed",
+      trigger: "bot_message",
+      createdAt: new Date(0),
+      botOutcomeReturnedAt: null,
+      bot: { name: "Researcher" },
+    });
+    prisma.run.findFirst
+      .mockResolvedValueOnce(options.pending ? { id: "task-run" } : null)
+      .mockResolvedValueOnce(options.lastReport ?? null);
+    prisma.message.findMany.mockImplementation(async () =>
+      (options.answers ?? []).map((text) => ({ blocks: [{ kind: "text", text }] })),
+    );
+    return harness;
+  }
+
+  it("holds the reply, with no interim status, while a task still works", async () => {
+    const harness = taskHarness({ pending: true });
+    const returned = await returnBotMessageOutcome(
+      harness.deps,
+      { ...run, sourceMessageId: "message-source" },
+      sender,
+      "I started a task for this.",
+    );
+    expect(returned).toBe(false);
+    expect(harness.tx.message.create).not.toHaveBeenCalled();
+    expect(harness.enqueue).not.toHaveBeenCalled();
+    expect(harness.deps.prisma.run.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("replies with the answer to the last report once every task has reported", async () => {
+    const harness = taskHarness({ lastReport: { id: "report-run", status: "completed" }, answers: ["Status: done\nResult: the thread is drafted"] });
+    const state = await settleAgentTaskTeammateReply(harness.deps, run.id);
+    expect(state).toBe("delivered");
+    const outbound = harness.tx.message.create.mock.calls[0]?.[0] as { data: { blocks: Array<{ text: string; intent: string }> } };
+    expect(outbound.data.blocks[0]).toMatchObject({ text: "Status: done\nResult: the thread is drafted", intent: "result" });
+    expect(harness.tx.message.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { threadId_clientNonce: { threadId: "thread-target", clientNonce: "bot-message:auto-outcome:run-1" } } }),
+    );
+    expect(harness.deps.prisma.run.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: run.id, botOutcomeReturnedAt: null }) }),
+    );
+  });
+
+  it("sends what exists, marked as stopped work, when the task closed before it reported", async () => {
+    const harness = taskHarness({ lastReport: null, answers: ["First half of the draft"] });
+    expect(await settleAgentTaskTeammateReply(harness.deps, run.id)).toBe("delivered");
+    const outbound = harness.tx.message.create.mock.calls[0]?.[0] as { data: { blocks: Array<{ text: string; intent: string }> } };
+    expect(outbound.data.blocks[0]?.intent).toBe("status");
+    expect(outbound.data.blocks[0]?.text).toMatch(/^Status: blocked\.[\s\S]*First half of the draft/);
   });
 });

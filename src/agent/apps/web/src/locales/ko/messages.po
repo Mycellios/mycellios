@@ -6438,3 +6438,15 @@ msgstr "위임됨"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "기타"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "{name}의 업데이트 보기"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "{name}의 업데이트 숨기기"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "{author}에게서"

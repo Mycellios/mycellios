@@ -13553,3 +13553,15 @@ msgstr "Delegated"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "Other"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "Show the update from {name}"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "Hide the update from {name}"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "From {author}"

@@ -330,6 +330,15 @@ async function expireOne(
       getLogger().error("stuck work continuation", error);
     });
   }
+  if (expired.taskReport) {
+    const report = expired.taskReport;
+    await deps.events?.notify(report.threadId, report.seq).catch((error) => {
+      getLogger().error("stuck work task report notification", error);
+    });
+    await deps.jobs.enqueue(runContinueJob(report.runId)).catch((error) => {
+      getLogger().error("stuck work task report", error);
+    });
+  }
   if (!deps.notifications || !noticesEnabled(run)) return;
   const stopped = stuckWorkStoppedNotification(run.status, run.bot.name);
   await sendStuckNotice(deps.notifications, run, {

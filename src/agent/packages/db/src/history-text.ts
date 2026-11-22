@@ -17,6 +17,8 @@ export function historyMessageText(blocks: Prisma.JsonValue): string {
         "bot_message_received",
         "bot_message_sent",
         "handoff",
+        "task_brief",
+        "task_report",
       ].includes(block.kind) &&
         "text" in block &&
         typeof block.text === "string"

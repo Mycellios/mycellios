@@ -6439,3 +6439,15 @@ msgstr "Gedelegeerd"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "Overig"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "Update van {name} tonen"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "Update van {name} verbergen"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "Van {author}"

@@ -144,6 +144,11 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       // which lines came from another bot rather than the user.
       if (block.kind === "bot_message_received") return `[from ${block.fromBotName}] ${block.text}`;
       if (block.kind === "bot_message_sent") return `[to ${block.toBotName}] ${block.text}`;
+      // A conversation the Mico opened: its own brief, and the reports it sent back.
+      if (block.kind === "task_brief") return `[from your main chat] ${block.text}`;
+      if (block.kind === "task_report") {
+        return `[report from task "${block.title}" (taskId ${block.taskId}), ${block.outcome}] ${block.text}`;
+      }
       if (block.kind === "handoff") {
         return `[handoff ${block.fromBotId} -> ${block.toBotId}] ${block.text}`;
       }

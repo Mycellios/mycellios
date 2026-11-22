@@ -101,6 +101,10 @@ const ChartBlock = z
     });
   });
 
+/** How the turn a task report relays ended. */
+export const TASK_REPORT_OUTCOMES = ["completed", "failed", "stopped", "interrupted"] as const;
+export type TaskReportOutcome = (typeof TASK_REPORT_OUTCOMES)[number];
+
 export const SecretAskPurpose = z.enum(["otp", "password", "api_key"]);
 export type SecretAskPurpose = z.infer<typeof SecretAskPurpose>;
 
@@ -378,6 +382,32 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     returnToMessageId: Id.optional(),
     /** Links in a bot-started chain; absent when a person started it. */
     hop: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    /**
+     * What a Mico wrote into a conversation it opened itself: the brief that starts it, or a
+     * later message from its main chat. The input of that conversation's next turn.
+     */
+    kind: z.literal("task_brief"),
+    fromBotId: Id,
+    fromBotName: z.string(),
+    text: z.string(),
+  }),
+  z.object({
+    /**
+     * A finished turn of a conversation the Mico opened, delivered into its own main chat,
+     * where it starts the turn that gives the person the result. Shown folded.
+     */
+    kind: z.literal("task_report"),
+    fromBotId: Id,
+    fromBotName: z.string(),
+    /** The conversation (side thread) the report comes from. */
+    taskId: Id,
+    title: z.string(),
+    outcome: z.enum(TASK_REPORT_OUTCOMES),
+    /** The turn's answer (cut with a closing "[…]"), its error, or the title when neither exists. */
+    text: z.string(),
+    truncated: z.literal(true).optional(),
   }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;

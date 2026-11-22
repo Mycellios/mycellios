@@ -22,6 +22,10 @@ export const RUN_TRIGGERS = [
   "project_prepare",
   "delegated_task",
   "task_return",
+  /** A turn in a conversation the Mico opened itself (start_task or message_task). */
+  "agent_task",
+  /** A main-chat turn that relays a finished turn of one of those conversations. */
+  "task_report",
 ] as const;
 export const RunTriggerSchema = z.enum(RUN_TRIGGERS);
 export type RunTrigger = z.infer<typeof RunTriggerSchema>;

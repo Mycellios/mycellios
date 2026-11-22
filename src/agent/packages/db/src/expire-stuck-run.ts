@@ -11,6 +11,7 @@ import {
 import { createThreadMessageInTransaction } from "./messages.js";
 import { clearEndedRunState } from "./run-secrets.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
+import { type QueuedTaskReport, queueTaskReportInTransaction } from "./agent-tasks.js";
 
 export interface ExpireStuckRunInput {
   runId: string;
@@ -24,6 +25,7 @@ export interface ExpireStuckRunInput {
 export interface ExpireStuckRunResult {
   seq: number;
   continuationRunId: string | null;
+  taskReport?: QueuedTaskReport | null;
 }
 
 /**
@@ -142,10 +144,17 @@ export async function expireStuckRun(
     where: { runId: input.runId },
     data: { runId: null, claimedAt: null },
   });
+  // A conversation the Mico opened tells its main chat that this turn will not finish.
+  const taskReport = await queueTaskReportInTransaction(tx, {
+    threadId: run.threadId,
+    runIds: [input.runId],
+    outcome: "interrupted",
+    error: text,
+  });
   const continuationRunId = await createPendingSteeringRun(tx, {
     spaceId: run.spaceId,
     threadId: run.threadId,
     botId: run.botId,
   });
-  return { seq: cancelledEvent.seq, continuationRunId };
+  return { seq: cancelledEvent.seq, continuationRunId, ...(taskReport ? { taskReport } : {}) };
 }

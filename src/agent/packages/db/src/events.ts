@@ -10,6 +10,7 @@ import {
 } from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
+  agentTaskMessagePrompt,
   blocksToAgentHistoryText,
   callIdFromClientNonce,
   composioBatchActions,
@@ -49,6 +50,7 @@ import { isRunResponse, readRunTimingFields } from "./run-timing.js";
 import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
+import { type QueuedTaskReport, queueTaskReportInTransaction } from "./agent-tasks.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -137,6 +139,8 @@ export interface ClaimedSteeringMessage {
 
 export interface FinalizeRunResult {
   continuationRunId: string | null;
+  /** A report this turn queued in the Mico's main chat (conversations it opened itself). */
+  taskReport?: QueuedTaskReport | null;
 }
 
 interface FinalizeRunBase {
@@ -1585,6 +1589,8 @@ export async function finalizeRun(
   const committed = await withTransactionRetry(() => finalizeRunOnce(prisma, input));
   if (!committed) return false;
   await notifyRealtime(realtime, committed.threadId, committed.seq);
+  if (committed.taskReport)
+    await notifyRealtime(realtime, committed.taskReport.threadId, committed.taskReport.seq);
   const timing = await readRunTimingFields(prisma, input.runId);
   if (committed.firstResponse) {
     getLogger().info("run.first_response", { "run.id": input.runId, ...timing });
@@ -1598,7 +1604,10 @@ export async function finalizeRun(
     "bot.id": input.botId,
   });
   void captureRunAnalytics(prisma, analytics, input.runId, `run.${input.outcome}`);
-  return { continuationRunId: committed.continuationRunId };
+  return {
+    continuationRunId: committed.continuationRunId,
+    ...(committed.taskReport ? { taskReport: committed.taskReport } : {}),
+  };
 }
 
 /** Stamps one turn-level wall-clock duration on the final tool block. */
@@ -1631,6 +1640,7 @@ async function finalizeRunOnce(
   seq: number;
   continuationRunId: string | null;
   firstResponse: boolean;
+  taskReport: QueuedTaskReport | null;
 } | null> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
@@ -1756,6 +1766,14 @@ async function finalizeRunOnce(
       payload: input.outcome === "completed" ? {} : { error: input.error },
     });
     await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
+    // A conversation the Mico opened reports this turn to its main chat in the same commit,
+    // so a crash after the turn ends cannot lose the report.
+    const taskReport = await queueTaskReportInTransaction(tx, {
+      threadId: input.threadId,
+      runIds: [input.runId],
+      outcome: input.outcome,
+      ...(input.outcome === "failed" ? { error: input.error } : {}),
+    });
     if (writableRun) {
       await deleteRunSecretsInTransaction(tx, [
         { id: input.runId, userId: writableRun.userId, spaceId: input.spaceId },
@@ -1772,7 +1790,13 @@ async function finalizeRunOnce(
     }
     const continuationRunId = await createPendingSteeringRun(tx, input);
     await tx.bot.update({ where: { id: input.botId }, data: { updatedAt: now } });
-    return { threadId: lastEvent.threadId, seq: lastEvent.seq, continuationRunId, firstResponse };
+    return {
+      threadId: lastEvent.threadId,
+      seq: lastEvent.seq,
+      continuationRunId,
+      firstResponse,
+      taskReport,
+    };
   }, FINALIZE_TRANSACTION_OPTIONS);
 }
 
@@ -1857,7 +1881,9 @@ export async function createPendingSteeringRun(
       prompt:
         origin === "webhook"
           ? blocksToAgentHistoryText(source.message.blocks as MessageBlock[])
-          : STEERING_CONTINUATION_PROMPT,
+          : origin === "agent_task"
+            ? agentTaskMessagePrompt(batch.map((item) => taskBriefText(item.message.blocks)))
+            : STEERING_CONTINUATION_PROMPT,
       status: "queued",
     },
   });
@@ -1875,6 +1901,8 @@ export async function createPendingSteeringRun(
       trigger:
         origin === "webhook"
           ? "webhook"
+          : origin === "agent_task"
+            ? "agent_task"
           : origin === "private" &&
               batch.every(
                 (item) => (item.originTrigger === null || item.originTrigger === "queued_user") && !hasChannelMessage(item.message.blocks),
@@ -1916,6 +1944,11 @@ function continuationModelPin(
   };
 }
 
+function taskBriefText(blocks: unknown): string {
+  const list = Array.isArray(blocks) ? (blocks as MessageBlock[]) : [];
+  return list.flatMap((block) => (block.kind === "task_brief" ? [block.text] : [])).join("\n\n");
+}
+
 function hasChannelMessage(blocks: unknown): boolean {
   return (blocks as MessageBlock[]).some((block) => block.kind === "channel_message");
 }
@@ -1925,6 +1958,8 @@ function steeringOrigin(item: {
   message: { blocks: unknown };
 }): string {
   if (item.originTrigger === "webhook") return "webhook";
+  // A message_task follow-up gets its own turn, apart from what the person wrote there.
+  if (item.originTrigger === "agent_task") return "agent_task";
   if (item.originTrigger !== "messaging") return "private";
   const channelId = messagingChannelId(item.message.blocks as MessageBlock[] | undefined);
   return channelId ? `channel:${channelId}` : "private";

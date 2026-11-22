@@ -6438,3 +6438,15 @@ msgstr "מואצל"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "אחר"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "הצגת העדכון מאת {name}"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "הסתרת העדכון מאת {name}"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "מאת {author}"

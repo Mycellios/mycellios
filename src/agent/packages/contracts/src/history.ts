@@ -14,16 +14,26 @@ export const HistorySearchInputSchema = z.object({
   after: HistoryDateBoundary.optional(),
   beforeSeq: z.number().int().nonnegative().optional(),
   limit: z.number().int().min(1).max(20).optional(),
+  /** Search a conversation this Mico opened itself instead of the current one. */
+  taskId: Id.optional(),
 });
-export const HistoryReadInputSchema = z.object({
-  messageId: Id,
-  linkedRunId: Id.optional(),
-  runAfterId: Id.optional(),
-  artifactAfterId: Id.optional(),
-  outcomeAfterSeq: z.number().int().nonnegative().optional(),
-  textOffset: z.number().int().nonnegative().optional(),
-  direction: z.enum(["around", "older", "newer"]).optional(),
-  limit: z.number().int().min(1).max(20).optional(),
-});
+export const HistoryReadInputSchema = z
+  .object({
+    messageId: Id.optional(),
+    /** A conversation this Mico opened itself; read from its main chat or a routine thread. */
+    taskId: Id.optional(),
+    /** Page cursor (a message sequence) returned as nextCursor by a taskId read. */
+    before: z.number().int().nonnegative().optional(),
+    linkedRunId: Id.optional(),
+    runAfterId: Id.optional(),
+    artifactAfterId: Id.optional(),
+    outcomeAfterSeq: z.number().int().nonnegative().optional(),
+    textOffset: z.number().int().nonnegative().optional(),
+    direction: z.enum(["around", "older", "newer"]).optional(),
+    limit: z.number().int().min(1).max(20).optional(),
+  })
+  .refine((input) => Boolean(input.messageId || input.taskId), {
+    message: "Give messageId, or taskId to read a conversation you started",
+  });
 export type HistorySearchInput = z.infer<typeof HistorySearchInputSchema>;
 export type HistoryReadInput = z.infer<typeof HistoryReadInputSchema>;

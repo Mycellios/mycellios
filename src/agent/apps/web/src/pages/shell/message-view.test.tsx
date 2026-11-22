@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ResponseStyle } from "../../lib/response-style";
 import { ResponseStyleContext } from "../../lib/response-style";
@@ -299,4 +300,86 @@ it("shows a card still marked generating as stopped once its run has ended", () 
   expect(container.querySelector(".rk-image-gen")?.getAttribute("data-status")).toBe(
     "interrupted",
   );
+});
+
+function renderInRouter(message: ThreadMessage) {
+  act(() =>
+    root.render(
+      <MemoryRouter>
+        <ResponseStyleContext.Provider value="classic">
+          <MessageView
+            artifactTarget={{ botId: "mico" }}
+            canAnswer={false}
+            canDismiss={false}
+            message={message}
+            onAnswer={vi.fn()}
+            onShowBot={vi.fn()}
+            onOpenPeerMessages={vi.fn()}
+            onTogglePeerReplies={vi.fn()}
+            peerBot={existingBot}
+            onRefresh={vi.fn()}
+            onBotChanged={vi.fn()}
+            onAddRoutine={vi.fn()}
+            voiceReady={false}
+            speaking={false}
+            onSpeak={vi.fn()}
+            onOpenComputer={vi.fn()}
+            showToolActivity={false}
+            onReply={vi.fn()}
+            onMarkUnread={vi.fn()}
+            onReact={vi.fn()}
+          />
+        </ResponseStyleContext.Provider>
+      </MemoryRouter>,
+    ),
+  );
+}
+
+it("folds a task report in the main chat behind an update marker that opens its conversation", () => {
+  renderInRouter({
+    id: "report",
+    threadId: "main",
+    seq: 4,
+    role: "user",
+    createdAt: new Date().toISOString(),
+    blocks: [
+      {
+        kind: "task_report",
+        fromBotId: "mico",
+        fromBotName: "Mico",
+        taskId: "task-1",
+        title: "Forum thread",
+        outcome: "completed",
+        text: "The draft is ready.",
+      },
+    ],
+  });
+  const toggle = container.querySelector<HTMLButtonElement>('[data-testid="task-report-toggle"]')!;
+  expect(toggle.textContent).toContain("Update from Mico");
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(container.textContent).not.toContain("The draft is ready.");
+  expect(container.querySelector('[data-testid="message-user-bubble"]')).toBeNull();
+  act(() => toggle.click());
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(container.querySelector('[data-testid="task-report-body"]')?.textContent).toContain("The draft is ready.");
+  expect(container.querySelector('[data-testid="task-report-body"]')?.textContent).toContain("Forum thread");
+  expect(container.querySelector('[data-testid="task-report-open"]')?.getAttribute("href")).toBe("/app/mico?task=task-1");
+  act(() => toggle.click());
+  expect(container.querySelector('[data-testid="task-report-body"]')).toBeNull();
+});
+
+it("shows a Mico's brief on its side of the task conversation", () => {
+  renderInRouter({
+    id: "brief",
+    threadId: "task-1",
+    seq: 0,
+    role: "user",
+    createdAt: new Date().toISOString(),
+    blocks: [{ kind: "task_brief", fromBotId: "mico", fromBotName: "Mico", text: "Draft the forum thread" }],
+  });
+  const brief = container.querySelector('[data-testid="task-brief"]');
+  expect(brief?.textContent).toContain("From Mico");
+  expect(brief?.textContent).toContain("Draft the forum thread");
+  expect(container.querySelector('[data-testid="message-user-bubble"]')).toBeNull();
+  expect(brief?.parentElement?.className).not.toContain("items-end");
 });
