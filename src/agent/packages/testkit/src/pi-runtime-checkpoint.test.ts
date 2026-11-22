@@ -300,7 +300,7 @@ describe("paused turn context", () => {
         workState: savedState,
       }));
 
-      expect(executeTool.mock.calls).toEqual([
+      expect(executeTool.mock.calls.map(([name, args]) => [name, args])).toEqual([
         ["read_file", { path: "before.txt" }],
         ["remember", { content: "Morning summary", path: "MEMORY.md" }],
         ["read_file", { path: "after.txt" }],
