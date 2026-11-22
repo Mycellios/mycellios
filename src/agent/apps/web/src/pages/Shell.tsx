@@ -3,6 +3,7 @@ import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
 import { deferThreadProgressPresentation } from "../lib/thread-events";
 import { usePendingThreadSends } from "./shell/use-pending-thread-sends";
+import { useConversationMotion } from "./shell/use-conversation-motion";
 import { DesktopCompanions } from "../components/DesktopCompanions";
 import { FloatingChatButton } from "../components/FloatingChatButton";
 import { MicoEdgeDock } from "../components/MicoEdgeDock";
@@ -87,6 +88,9 @@ import {
   InputGroupButton,
   InputGroupInput,
   Sidebar,
+  Sheet,
+  SheetContent,
+  SheetTitle,
   Spinner,
   toast,
 } from "@mycellios/ui-web";
@@ -473,7 +477,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const lastChat = queryClient.getQueryData(lastChatKey(userId ?? null, shellSpaceId));
     return { seed: cached, startChat: botId || groupId || !getGeneralPreferences().restoreLastWorkspace ? undefined : lastChatOf(cached, lastChat) };
   });
+  // Tab switches already have the sidebar and account metadata. Only the destination
+  // transcript needs an initial read; bootstrap would fetch it a second time.
   const [conversationSwitch] = useState(() => locationState?.conversationSwitch === true);
+  const conversationElement = useConversationMotion(JSON.stringify([botId, groupId, taskScope?.taskThreadId]), conversationSwitch);
   const [failedThreadBotId, setFailedThreadBotId] = useState<string | null>(null);
   const [threadLoadAttempt, setThreadLoadAttempt] = useState(0);
   const routerNavigate = useNavigate();
@@ -745,6 +752,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     useState<ReadonlySet<string>>(readSeenRunErrorIds);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const mobileSidebarSwipeRef = useRef<{ startX: number; startY: number } | null>(null);
   const [draggedBotId, setDraggedBotId] = useState<string | null>(null);
   const [rosterDropKey, setRosterDropKey] = useState<string | null>(null);
@@ -762,7 +770,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");
     function closeMobileSidebar() {
-      if (desktop.matches) setMobileSidebarOpen(false);
+      if (desktop.matches) { setMobileSidebarOpen(false); setMobileNavigationOpen(false); }
     }
     closeMobileSidebar();
     desktop.addEventListener("change", closeMobileSidebar);
@@ -4591,6 +4599,28 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       )}
     </MobileChatActions>
   );
+  const workspaceNavigation = (mobile = false) => <WorkspaceRail
+    mobile={mobile}
+    header={mobile ? <div className="mb-5 flex items-start justify-between gap-2">
+      <div className="min-w-0"><SheetTitle className="text-2xl font-semibold">Mycellios</SheetTitle>
+        <p className="mt-1 truncate text-sm text-muted-foreground">{spaces.find(space => space.id === currentSpaceId)?.name}</p></div>
+      <Button variant="ghost" size="icon-lg" className="-me-2 -mt-1 size-11 shrink-0" aria-label={t`Close navigation`} onClick={() => setMobileNavigationOpen(false)}><X aria-hidden /></Button>
+    </div> : undefined}
+    footer={mobile ? sidebarFooter(() => setMobileNavigationOpen(false)) : undefined}
+    onNavigate={mobile ? () => setMobileNavigationOpen(false) : undefined}
+    apps={appsOpen} library={libraryView} onApps={openApps}
+    marketplace={marketplaceView && !appsOpen} scope={JSON.stringify([userId, currentSpaceId])}
+    usage={usageView} schedule={scheduleView} onSchedule={showSchedule}
+    tasks={taskView} onTasks={showTasks} activity={activityMode}
+    workflows={workflowView} onWorkflows={showWorkflows} routines={routineView} onRoutines={showRoutines}
+    onChats={() => { exitRoutineView(); if (activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); if (mobile) setMobileSidebarOpen(true); }}
+    onActivity={() => { exitRoutineView(); if (!activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); if (mobile) setMobileSidebarOpen(true); }}
+    onArtifacts={() => showLibrary()} onIntegrations={() => setOverlay({ kind: "integrations" })}
+    onUsage={showUsage} onSettings={() => openSettings("general")}
+    onModels={isMobileSidebar ? undefined : () => openSettings("models")}
+    onWhatsNew={() => setReleaseNotesOpen(true)}
+    onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
+  />;
   const shell = (
     <>
     <ServerConnectionDialogs ownerId={userId ?? null} />
@@ -4599,6 +4629,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       bots={bots} spaceId={currentSpaceId} scope={JSON.stringify([userId, currentSpaceId])} activeId={active?.id}
       onOpen={id => openSpaceChat(currentSpaceId, `/app/${encodeURIComponent(id)}`)} onCreate={() => setCreateBotOpen(true)} /> : null}
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
+    {isMobileSidebar && !floatingChat ? <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
+      <SheetContent side={document.documentElement.dir === "rtl" ? "right" : "left"}
+        showCloseButton={false} className="rk-mobile-navigation" aria-describedby={undefined}>
+        {workspaceNavigation(true)}
+      </SheetContent>
+    </Sheet> : null}
     <BotsSidebarLayout
       userId={userId}
       collapsed={botsSidebarCollapsed}
@@ -4619,6 +4655,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       data-task-desktop={Boolean(desktopBridge())}
       data-window-buttons={desktopHidesTitleBar() ? "darwin" : undefined}
       data-testid="shell-root"
+      data-mobile-navigation-open={mobileNavigationOpen || undefined}
       data-ready={shellReady}
       className={`${marketplaceView ? "rk-task-shell rk-market-shell" : usageView ? "rk-task-shell rk-usage-shell" : scheduleView ? "rk-task-shell rk-schedule-shell" : taskView ? "rk-task-shell" : ""} relative flex h-full min-h-0 min-w-0 overflow-hidden bg-background text-foreground/90 [&[data-resizing-sidebar]_*[data-slot=sidebar-gap]]:transition-none [&[data-resizing-sidebar]_*[data-slot=sidebar-container]]:transition-none`}
       onTouchStartCapture={(event) => {
@@ -4671,32 +4708,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       {bootstrapMe !== undefined ? (
         <HostComputerPrompt initialMe={bootstrapMe ?? undefined} onMeUpdated={setBootstrapMe} />
       ) : null}
-      {!floatingChat && <WorkspaceRail
-        apps={appsOpen}
-        library={libraryView}
-        onApps={openApps}
-        marketplace={marketplaceView && !appsOpen}
-        scope={JSON.stringify([userId, currentSpaceId])}
-        usage={usageView}
-        schedule={scheduleView}
-        onSchedule={showSchedule}
-        tasks={taskView}
-        onTasks={showTasks}
-        activity={activityMode}
-        workflows={workflowView}
-        onWorkflows={showWorkflows}
-        routines={routineView}
-        onRoutines={showRoutines}
-        onChats={() => { exitRoutineView(); if (activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); }}
-        onActivity={() => { exitRoutineView(); if (!activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); }}
-        onArtifacts={() => showLibrary()}
-        onIntegrations={() => setOverlay({ kind: "integrations" })}
-        onUsage={showUsage}
-        onSettings={() => openSettings("general")}
-        onModels={isMobileSidebar ? undefined : () => openSettings("models")}
-        onWhatsNew={() => setReleaseNotesOpen(true)}
-        onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
-      />}
+      {!floatingChat && workspaceNavigation()}
       <FrozenWhileCovered covered={overlay?.kind === "settings"}>
       {!floatingChat && ((!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen) ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
@@ -4720,6 +4732,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           onTasks={showTasks} onSchedule={showSchedule} onUsage={showUsage}
           mini={miniSidebar}
           mobileMenu={isMobileSidebar ? mobileRosterMenu : undefined}
+          onOpenNavigation={isMobileSidebar ? () => setMobileNavigationOpen(true) : undefined}
           search={!isMobileSidebar ? sidebarSearch : undefined}
           onCreateFolder={() => { const spaceId = currentSpaceId ?? bootstrapMe?.spaceId; if (spaceId) setNewSectionTarget({ kind: "folder", parentId: null, spaceId }); }}
           createMenuOpen={createMenuOpen}
@@ -4845,6 +4858,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
 
       {/* Keep the composer's z-index inside the chat so phone overlays like the side panel cover it. */}
       <main
+        ref={conversationElement}
         data-space-switch="main"
         aria-hidden={(mobileSidebarOpen || (isMobileSidebar && reviewWorkspace?.open)) || undefined}
         inert={mobileSidebarOpen || (isMobileSidebar && reviewWorkspace?.open)}
