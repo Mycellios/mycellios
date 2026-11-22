@@ -224,6 +224,95 @@ describe("paused turn context", () => {
       await model.close();
     }
   });
+  it("gives an answered questionnaire a fresh tool budget and keeps its pending plan", async () => {
+    const executeTool = vi.fn(async (_name: string, _args: Record<string, unknown>) => ({
+      evidence: "fixture verified",
+    }));
+    const pending = [{ id: "summary", title: "Set up the daily summary", status: "running" }];
+    let savedState: unknown;
+    const captures = new Map<string, () => string>();
+    const model = await startModelEmulator({
+      steps: [
+        {
+          expect() {},
+          response: { type: "tool", id: "plan", name: "update_work_plan", arguments: { steps: pending } },
+        },
+        {
+          expect() {},
+          response: { type: "tool", id: "before", name: "read_file", arguments: { path: "before.txt" } },
+        },
+        {
+          expect() {},
+          response: {
+            type: "tool", id: "ask", name: "ask_user",
+            arguments: { question: "When should I send the summary?", options: ["Morning", "Evening"] },
+          },
+        },
+        {
+          expect(request) {
+            const resultOf = (id: string) => request.messages.find(
+              (message) => message.role === "tool" && message.tool_call_id === id,
+            )?.content;
+            expect(resultOf("plan")).toContain("Set up the daily summary");
+            expect(resultOf("before")).toContain("fixture verified");
+            expect(resultOf("ask")).toBe("Morning");
+          },
+          response: { type: "tool", id: "write", name: "remember", arguments: { content: "Morning summary" } },
+        },
+        {
+          expect() {},
+          response: { type: "tool", id: "verify", name: "read_file", arguments: { path: "after.txt" } },
+        },
+        {
+          expect() {},
+          response: {
+            type: "tool", id: "done", name: "update_work_plan",
+            arguments: { steps: pending.map((step) => ({ ...step, status: "done" })) },
+          },
+        },
+        { expect() {}, response: { type: "text", text: "Morning summary configured." } },
+      ],
+    });
+    const request: AgentRunRequest = {
+      runId: "fixture-answered-question-budget",
+      botId: "fixture-bot",
+      threadId: "fixture-thread",
+      instructions: "Set up the daily summary.",
+      prompt: "Set up a summary.",
+      history: [],
+      model: model.model,
+      tools: builtinAgentTools.filter((tool) => ["ask_user", "read_file", "remember"].includes(tool.name)),
+      onCheckpoint: async (capture, executionId) => { captures.set(executionId, capture); },
+      saveWorkState: async (state) => { savedState = state; },
+      executeTool,
+    };
+    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "3");
+    try {
+      const runtime = new PiAgentRuntime();
+      const paused = await collect(runtime.run(request));
+      expect(paused).toContainEqual(expect.objectContaining({ type: "ask" }));
+      expect(savedState).toMatchObject({ steps: pending });
+      expect(executeTool).toHaveBeenCalledOnce();
+      const resumed = await collect(runtime.run({
+        ...request,
+        turnCheckpoint: captures.get(JSON.stringify(["pi-tool", "main", "ask"]))!(),
+        resumeToolResult: { content: [{ type: "text", text: "Morning" }] },
+        workState: savedState,
+      }));
+
+      expect(executeTool.mock.calls).toEqual([
+        ["read_file", { path: "before.txt" }],
+        ["remember", { content: "Morning summary", path: "MEMORY.md" }],
+        ["read_file", { path: "after.txt" }],
+      ]);
+      expect(savedState).toMatchObject({ steps: [{ status: "done" }] });
+      expect(resumed.at(-1)).toEqual({ type: "done", text: "Morning summary configured." });
+      model.assertComplete();
+    } finally {
+      vi.unstubAllEnvs();
+      await model.close();
+    }
+  });
   it.each(["approval", "ask_user", "request_takeover", "request_secret"])(
     "restores earlier evidence and the pending %s result before the first model call",
     async (pause) => {
