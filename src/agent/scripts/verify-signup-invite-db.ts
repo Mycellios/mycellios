@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -13,6 +13,7 @@ import EmbeddedPostgres from "embedded-postgres";
 process.env.CONTENT_ENCRYPTION = "off";
 const { createDb, asSystem, SIGNUP_INVITE_COOKIE, signupInviteId } = await import("@mycellios/db");
 const { createAuth } = await import("@mycellios/auth");
+const { signupInviteHttp } = await import("../apps/api/src/signup-invite-http.js");
 
 const socket = createServer();
 await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
@@ -140,6 +141,81 @@ try {
   assert.equal(await system.signupInviteRedemption.count({ where: { inviteId: signupInviteId(code) } }), 10);
   assert.equal(await system.signupInviteRedemption.count({ where: { inviteId: signupInviteId(next) } }), 1);
 
+  const primaryPool = db.pool;
+  await primaryPool.query(`
+    CREATE SCHEMA auth;
+    CREATE SCHEMA extensions;
+    CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+    CREATE TABLE auth.users (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      email text UNIQUE NOT NULL,
+      raw_user_meta_data jsonb NOT NULL,
+      raw_app_meta_data jsonb NOT NULL
+    );
+  `);
+  await primaryPool.query(await readFile("../../deploy/primary-account-beta.sql", "utf8"));
+  const createIdentity = (email: string, proof?: string, provider = "email") =>
+    primaryPool.query(
+      "INSERT INTO auth.users(email, raw_user_meta_data, raw_app_meta_data) VALUES ($1, $2, $3)",
+      [email, proof ? { mycellios_invite_proof: proof } : {}, { provider }],
+    );
+  await createIdentity("existing@example.invalid");
+  const proofKey = createHash("sha256").update(`mycellios:primary-signup:key:v1:${code}`).digest();
+  await primaryPool.query(
+    "INSERT INTO mycellios_beta.signup_policy (proof_key, capacity) VALUES ($1, $2)",
+    [proofKey, 10],
+  );
+  const inviteHttp = signupInviteHttp({
+    signupInvite: { code, limit: 10 },
+    authUrl: `${origin}/api/auth`,
+    webOrigin: origin,
+  });
+  const requestProof = (email: string, cookie?: string, requestOrigin = origin) =>
+    inviteHttp.request("/api/invite/proof", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: requestOrigin,
+        ...(cookie ? { cookie: `${SIGNUP_INVITE_COOKIE}=${cookie}` } : {}),
+      },
+      body: JSON.stringify({ email }),
+    });
+  const proofFor = async (email: string): Promise<string> => {
+    const response = await requestProof(email, code);
+    assert.equal(response.status, 200);
+    return (await response.json()).proof;
+  };
+  assert.equal((await requestProof("missing@example.invalid")).status, 404);
+  assert.equal(
+    (await requestProof("origin@example.invalid", code, "https://other.example.test")).status,
+    404,
+  );
+  await assert.rejects(createIdentity("closed@example.invalid"), /Registration is closed/);
+  const unrelatedProof = await proofFor("unrelated@example.invalid");
+  await assert.rejects(createIdentity("other@example.invalid", unrelatedProof), /Registration is closed/);
+  await assert.rejects(
+    createIdentity("unrelated@example.invalid", unrelatedProof, "google"),
+    /Registration is closed/,
+  );
+  await assert.rejects(createIdentity("existing@example.invalid", await proofFor("existing@example.invalid")));
+  const candidates = await Promise.all(
+    racers.map(async (email) => ({ email, proof: await proofFor(email) })),
+  );
+  const identities = await Promise.allSettled(
+    candidates.map(({ email, proof }) => createIdentity(email, proof)),
+  );
+  assert.equal(identities.filter((result) => result.status === "fulfilled").length, 10);
+  assert.ok(identities.every(
+    (result) => result.status === "fulfilled" || /Registration is closed/.test(String(result.reason)),
+  ));
+  const primary = await primaryPool.query(
+    "SELECT email, raw_user_meta_data ? 'mycellios_invite_proof' AS has_proof FROM auth.users",
+  );
+  assert.equal(primary.rowCount, 11);
+  assert.ok(primary.rows.every((user) => !user.has_proof));
+  assert.ok(primary.rows.some((user) => user.email === "existing@example.invalid"));
+  await assert.rejects(createIdentity("eleventh@example.invalid", await proofFor("eleventh@example.invalid")));
+
   console.log(
     JSON.stringify(
       {
@@ -151,6 +227,7 @@ try {
           "a full batch refuses before writing an account",
           "admitted accounts sign in without the link",
           "a new code starts a new batch and keeps earlier places",
+          "primary identity admission requires an email-bound proof and caps concurrent inserts",
         ],
         modelsCalled: 0,
         productionAccess: false,
