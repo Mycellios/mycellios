@@ -14765,3 +14765,7 @@ msgstr "No requests with your API keys yet."
 #: src/pages/settings/MycelliosApiSettings.tsx
 msgid "Last {limit} requests by model"
 msgstr "Last {limit} requests by model"
+
+#: src/pages/Shell.tsx
+msgid "Could not delete the message. Try again."
+msgstr "Could not delete the message. Try again."

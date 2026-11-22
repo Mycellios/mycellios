@@ -15172,3 +15172,7 @@ msgstr "Aún no hay peticiones con tus claves de API."
 #: src/pages/settings/MycelliosApiSettings.tsx
 msgid "Last {limit} requests by model"
 msgstr "Últimas {limit} peticiones por modelo"
+
+#: src/pages/Shell.tsx
+msgid "Could not delete the message. Try again."
+msgstr "No se ha podido eliminar el mensaje. Inténtalo de nuevo."
