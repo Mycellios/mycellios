@@ -1,13 +1,17 @@
+import { createHash, createHmac } from "node:crypto";
 import { productAppUrl } from "@mycellios/contracts";
 import {
   SIGNUP_INVITE_COOKIE,
   SIGNUP_INVITE_COOKIE_MAX_AGE_SECONDS,
+  signupInviteCodeFromCookie,
   signupInviteCodeMatches,
 } from "@mycellios/db";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "./env.js";
 
 type InviteEnv = Pick<AppEnv, "signupInvite" | "authUrl" | "webOrigin">;
+const proofLifetimeSeconds = 300;
 
 /**
  * `GET /api/invite/<code>` is the link an operator shares for a closed beta. It only stores
@@ -16,6 +20,29 @@ type InviteEnv = Pick<AppEnv, "signupInvite" | "authUrl" | "webOrigin">;
  */
 export function signupInviteHttp(env: InviteEnv): Hono {
   const app = new Hono();
+  app.post("/api/invite/proof", bodyLimit({ maxSize: 1024 }), async (c) => {
+    c.header("cache-control", "no-store");
+    const invite = env.signupInvite;
+    if (
+      !invite ||
+      c.req.header("origin") !== new URL(env.webOrigin).origin ||
+      !signupInviteCodeMatches(signupInviteCodeFromCookie(c.req.header("cookie")), invite)
+    ) {
+      return c.notFound();
+    }
+    const body: unknown = await c.req.json().catch(() => null);
+    const address = body && typeof body === "object" && "email" in body ? body.email : undefined;
+    const email = typeof address === "string" ? address.trim().toLowerCase() : "";
+    if (!email || Buffer.byteLength(email) > 254 || !/^[^\s@]+@[^\s@]+$/.test(email)) {
+      return c.json({ error: "invalid_email" }, 400);
+    }
+    const expiry = Math.floor(Date.now() / 1000) + proofLifetimeSeconds;
+    const key = createHash("sha256").update(`mycellios:primary-signup:key:v1:${invite.code}`).digest();
+    const signature = createHmac("sha256", key)
+      .update(`mycellios:primary-signup:proof:v1:${expiry}:${email}`)
+      .digest("hex");
+    return c.json({ proof: `${expiry}.${signature}` });
+  });
   app.get("/api/invite/:code", (c) => {
     const invite = env.signupInvite;
     const code = c.req.param("code");

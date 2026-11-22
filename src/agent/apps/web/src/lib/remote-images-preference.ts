@@ -1,5 +1,6 @@
 import type { RemoteImagesPreference } from "@mycellios/core";
 import { normalizeRemoteImagesPreference, REMOTE_IMAGES_STORAGE_KEY } from "@mycellios/core";
+import { readStorage } from "./legacy-storage";
 
 export type { RemoteImagesPreference };
 
@@ -16,7 +17,8 @@ function getLocalStorage(): Pick<Storage, "getItem" | "setItem"> | null {
 
 function readStored(): string | null {
   try {
-    return getLocalStorage()?.getItem(REMOTE_IMAGES_STORAGE_KEY) ?? null;
+    const storage = getLocalStorage();
+    return storage ? readStorage(storage, REMOTE_IMAGES_STORAGE_KEY) : null;
   } catch {
     return null;
   }

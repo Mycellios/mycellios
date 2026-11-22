@@ -1,11 +1,11 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { invalidateArtifactCacheSession } from "./artifact-cache-session";
 import { stopLiveNotifications } from "./live-notifications";
 import { clearNetworkCache } from "./network-cache";
 import { clearFailedSends } from "./thread-feedback";
 
-const SESSION_KEY = "rakazo.session_token";
-const INTEGRATIONS_SCOPE_KEY = "rakazo.integrations-scope";
+const SESSION_KEY = "mycellios.session_token";
+const INTEGRATIONS_SCOPE_KEY = "mycellios.integrations-scope";
 
 export type VerifiedIntegrationsScope = {
   apiBase: string;

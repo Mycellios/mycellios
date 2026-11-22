@@ -6,9 +6,9 @@ export interface StartupErrorStorage {
   setItem(key: string, value: string): void;
 }
 
-const KEY = "rakazo.startup-error";
+const KEY = "mycellios.startup-error";
 const MAX_LENGTH = 8_192;
-const EXPO_LOG_KEY = "rakazo.expo-error-window";
+const EXPO_LOG_KEY = "mycellios.expo-error-window";
 
 type ExpoErrorWindow = { server: string; since: number; reportedThrough: number };
 

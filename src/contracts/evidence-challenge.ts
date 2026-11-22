@@ -48,8 +48,31 @@ export const runtimePerformanceChallengeSchema = z.object({
   minimumSamples: z.number().int().min(7).max(10_000),
 }).strict();
 
+/** Backends each probe kind can qualify. */
+export const ENGINE_RUNTIME_PROBE_BACKENDS = {
+  "qwen3-dense-v1": ["cuda", "rocm"],
+  "llama-cpp-gguf-v1": ["cpu", "vulkan"],
+} as const;
+
+const httpsUrlSchema = z.string().url().max(2_048).refine((value) => value.startsWith("https://"));
+
+/**
+ * The pinned GGUF a llama.cpp probe builds its stage from, exactly as a route
+ * would (native_gguf_remote fetch-stage). Required by, and only valid for,
+ * the llama-cpp-gguf-v1 probe.
+ */
+export const engineRuntimeGgufSourceSchema = z.object({
+  artifactUrl: httpsUrlSchema,
+  artifactSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  artifactSizeBytes: z.number().int().positive().safe(),
+  tensorManifestUrl: httpsUrlSchema,
+  tensorManifestId: z.string().regex(/^[0-9a-f]{64}$/),
+  modelSource: z.string().trim().min(1).max(512),
+}).strict();
+
 const engineRuntimeChallengeRequestFields = {
-  probeKind: z.literal("qwen3-dense-v1"),
+  probeKind: z.enum(["qwen3-dense-v1", "llama-cpp-gguf-v1"]),
+  gguf: engineRuntimeGgufSourceSchema.optional(),
   descriptorDigest: digestSchema,
   certificationId: digestSchema,
   artifactManifestDigest: digestSchema,
@@ -87,8 +110,15 @@ function validateEngineRuntimeChallengeRequest(
     });
   }
   const layerCount = challenge.expectedLayerEnd - challenge.expectedLayerStart;
+  if ((challenge.probeKind === "llama-cpp-gguf-v1") !== (challenge.gguf !== undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "engine_runtime_challenge_gguf_source_is_invalid",
+      path: ["gguf"],
+    });
+  }
   if (
-    !["cuda", "rocm"].includes(challenge.backend)
+    !(ENGINE_RUNTIME_PROBE_BACKENDS[challenge.probeKind] as readonly string[]).includes(challenge.backend)
     ||
     challenge.hiddenSize !== challenge.attentionHeads * challenge.headDim
     || challenge.attentionHeads % challenge.kvHeads !== 0

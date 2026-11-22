@@ -101,6 +101,15 @@ class LlamaCppProfileTests(unittest.TestCase):
         self.assertTrue(profile_stage(_FakeRunner(0, 6, 12, [1, 2]), 1, _args())["exactness"]["exactSpeculation"])
         self.assertFalse(profile_stage(_FakeRunner(0, 6, 12, [1]), 1, _args())["exactness"]["exactSpeculation"])
 
+    def test_exactness_reports_the_backend_the_child_found(self) -> None:
+        gpu = _FakeRunner(0, 6, 12, [1])
+        gpu.info.update(backend="vulkan", gpu_devices=[["vulkan", "AMD Radeon(TM) 890M Graphics"]])
+        exactness = profile_stage(gpu, 1, _args())["exactness"]
+        self.assertEqual(exactness["backend"], "vulkan")
+        self.assertEqual(exactness["gpuDevices"], ["AMD Radeon(TM) 890M Graphics"])
+        # An old child that reports no backend ran on the CPU.
+        self.assertEqual(profile_stage(_FakeRunner(0, 6, 12, [1]), 1, _args())["exactness"]["backend"], "cpu")
+
     def test_every_sample_restarts_from_the_same_prompt(self) -> None:
         runner = _FakeRunner(6, 12, 12, [1])
         profile_stage(runner, 1, _args(samples=7))

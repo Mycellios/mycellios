@@ -225,7 +225,7 @@ describe("mobile i18n", () => {
     await setUiLocale("en");
     expect(getActiveUiLocale()).toBe("en");
     expect(t("Language")).toBe("Language");
-    expect(setItemAsync).toHaveBeenCalledWith("rakazo.uiLocale", "en");
+    expect(setItemAsync).toHaveBeenCalledWith("mycellios.uiLocale", "en");
     expect(applyMobileUiDirection).toHaveBeenCalledWith("en");
   });
 
@@ -277,7 +277,7 @@ describe("mobile i18n", () => {
     await Promise.all([first, second]);
 
     expect(getActiveUiLocale()).toBe("zh-CN");
-    expect(setItemAsync).toHaveBeenLastCalledWith("rakazo.uiLocale", "zh-CN");
+    expect(setItemAsync).toHaveBeenLastCalledWith("mycellios.uiLocale", "zh-CN");
     expect(applyMobileUiDirection).toHaveBeenLastCalledWith("zh-CN");
   });
 });

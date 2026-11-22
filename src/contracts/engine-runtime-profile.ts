@@ -1,5 +1,20 @@
 import { z } from "zod";
 import { sha256CanonicalEvidence } from "../core/json.js";
+import type { EngineRuntimeChallengeRequest } from "./evidence-challenge.js";
+
+/**
+ * A llama.cpp probe must report the exactness of the backend and build it was
+ * challenged on; other probe kinds must not claim one.
+ */
+export function engineRuntimeExactnessMatches(
+  challenge: Pick<EngineRuntimeChallengeRequest, "probeKind" | "backend" | "runtimeAbi">,
+  measurement: { exactness?: EngineRuntimeExactness | undefined },
+): boolean {
+  if (challenge.probeKind !== "llama-cpp-gguf-v1") return measurement.exactness === undefined;
+  return measurement.exactness !== undefined
+    && measurement.exactness.backend === challenge.backend
+    && measurement.exactness.runtimeAbi === challenge.runtimeAbi;
+}
 
 export const ENGINE_RUNTIME_PROFILE_SCHEMA =
   "mycellios-engine-runtime-profile/1" as const;
@@ -41,6 +56,34 @@ const engineRuntimeFeaturesSchema = z.object({
     .max(5),
 }).strict();
 
+/**
+ * What the llama.cpp batch-class self-test found on this node: the backend
+ * and build that ran, and the micro-batch sizes whose results are
+ * bit-identical to one-position decoding. A route's speculation is exact on
+ * this node only when `exactSpeculation` is true.
+ */
+export const engineRuntimeExactnessSchema = z.object({
+  runtimeAbi: identifierSchema,
+  backend: z.enum(["cpu", "vulkan"]),
+  exactMicroBatchSizes: z.array(z.number().int().min(1).max(64)).min(1).max(64),
+  exactSpeculation: z.boolean(),
+}).strict().superRefine((exactness, context) => {
+  const sizes = exactness.exactMicroBatchSizes;
+  if (
+    sizes[0] !== 1
+    || sizes.some((size, index) => index > 0 && size <= sizes[index - 1]!)
+    || exactness.exactSpeculation !== (sizes.length > 1)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "engine_runtime_exactness_is_invalid",
+      path: ["exactMicroBatchSizes"],
+    });
+  }
+});
+
+export type EngineRuntimeExactness = z.infer<typeof engineRuntimeExactnessSchema>;
+
 const engineRuntimeMeasurementBaseSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
   samples: z.number().int().min(7).max(100_000),
@@ -48,6 +91,7 @@ const engineRuntimeMeasurementBaseSchema = z.object({
   capacity: engineRuntimeCapacitySchema,
   costs: engineRuntimeCostsSchema,
   features: engineRuntimeFeaturesSchema,
+  exactness: engineRuntimeExactnessSchema.optional(),
 }).strict();
 
 export const engineRuntimeMeasurementSchema = engineRuntimeMeasurementBaseSchema
@@ -76,6 +120,7 @@ const engineRuntimeProfileInputSchema = z.object({
   capacity: engineRuntimeCapacitySchema,
   costs: engineRuntimeCostsSchema,
   features: engineRuntimeFeaturesSchema,
+  exactness: engineRuntimeExactnessSchema.optional(),
   evidence: z.object({
     deploymentCanaryEvidenceId: digestSchema,
     runtimePerformanceEvidenceId: digestSchema,
