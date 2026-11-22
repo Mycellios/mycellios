@@ -1,0 +1,43 @@
+name: Hosted login candidate
+
+on:
+  push:
+    branches: [beta/hosted-login-artifact]
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SOURCE_REVISION: 5a0a0341609df4a09918cfac8074df1806c49b06
+      FIRST_PARTY_CLIENTS_PATH: /oauth/consent-assets/clients-e6175ea3009d3096.json
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: 5a0a0341609df4a09918cfac8074df1806c49b06
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+      - name: Install the locked Agent dependencies
+        run: npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
+      - name: Build and seal the hosted sign-in bundle
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          export LOGIN_OUT_DIR="$RUNNER_TEMP/hosted-login"
+          node src/agent/apps/web/src/hosted-login/build.cjs
+          cd "$LOGIN_OUT_DIR"
+          grep -lF '/agent/api/invite/proof' login-*.js
+          grep -lF "$FIRST_PARTY_CLIENTS_PATH" login-*.js
+          printf '%s\n' "$SOURCE_REVISION" > revision
+          sha256sum -- build.json login-* *.woff2 revision > SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: hosted-login-${{ env.SOURCE_REVISION }}
+          path: ${{ runner.temp }}/hosted-login/
+          if-no-files-found: error
+          retention-days: 7
