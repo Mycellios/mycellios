@@ -3,6 +3,7 @@ import { resolveSupervisorToken } from "@mycellios/core";
 import { beforeEach, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({ exec: vi.fn(), inspect: vi.fn(), stdin: [] as string[] }));
+const pageBrowserHelper = "/usr/local/bin/rakazo-page-browser";
 vi.mock("dockerode", () => ({
   default: class {
     getContainer() {
@@ -28,7 +29,7 @@ beforeEach(() => {
       Duplex.from({
         readable: Readable.from([
           Buffer.from(
-            options.Cmd.includes("/usr/local/bin/rakazo-page-browser")
+            options.Cmd.includes(pageBrowserHelper)
               ? JSON.stringify({
                   ok: true,
                   url: "https://example.test",
@@ -69,7 +70,7 @@ it("forwards only a validated scoped command without weakening the display fence
   const key = "a".repeat(64);
   expect(await (await snapshot("scoped", "first", "run:2", "home", key)).json()).toMatchObject({ ok: true });
   expect(mock.exec.mock.calls.at(-1)?.[0].Cmd).toEqual([
-    "/usr/local/bin/rakazo-page-browser", "scoped-snapshot", JSON.stringify({ command: "snapshot", conversationKey: key }),
+    pageBrowserHelper, "scoped-snapshot", JSON.stringify({ command: "snapshot", conversationKey: key }),
   ]);
   expect(JSON.parse(mock.stdin.join("").trim())).toMatchObject({ conversationKey: key });
   mock.exec.mockClear();

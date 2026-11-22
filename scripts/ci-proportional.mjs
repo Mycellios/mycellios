@@ -34,8 +34,8 @@ const llamaCppTests = ['test_llama_cpp_runtime.py', 'test_llama_cpp_stage.py', '
 // The Kokoro speech engine's unit tests use fake pipelines on CPU torch from the same lock.
 const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'python/tests/test_kokoro_engine.py']);
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
-const pageBrowserFiles = new Set(['src/agent/infra/sandboxes/computer/rakazo-page-browser', 'src/agent/infra/sandboxes/computer/test_page_browser.py']);
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !pageBrowserFiles.has(f));
+const pageBrowserFile = file => /^src\/agent\/infra\/sandboxes\/computer\/(?:[^/]+-page-browser|test_page_browser\.py)$/.test(file);
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !pageBrowserFile(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -71,7 +71,7 @@ export function planChecks(files, availableAgentTests) {
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
   // Private names (people, companies, retired products) never return; see the script.
   add('.', 'node', ['scripts/verify-private-terms.mjs'], 'private terms');
-  if (files.some(f => pageBrowserFiles.has(f))) {
+  if (files.some(pageBrowserFile)) {
     add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'src/agent/infra/sandboxes/computer', '-p', 'test_page_browser.py'], 'conversation browser tab protocol');
   }
   if (files.some(f => installerPython.has(f))) {
