@@ -14,7 +14,12 @@ try{
  await fs.mkdir(path.dirname(output),{recursive:true});
  await fs.writeFile(output,JSON.stringify({artifact:'final-readonly-dmg',dmgSha256:await digest(dmg),asarSha256:distributed,...signature,physicalMac:false,browserDownloadLaunch:false},null,2));
 }finally{
- if(attached)execFileSync('/usr/bin/hdiutil',['detach',mount],{stdio:'pipe',timeout:60000});
+ // Hosted runners can report the read-only volume busy for a moment after reads finish.
+ // Retry, then force only this read-only mount; an unresolved detach still throws.
+ if(attached)for(let attempt=1;;attempt++){
+  try{execFileSync('/usr/bin/hdiutil',attempt<5?['detach',mount]:['detach','-force',mount],{stdio:'pipe',timeout:60000});break;}
+  catch(error){if(attempt>=5)throw error;await new Promise(resolve=>setTimeout(resolve,3000*attempt));}
+ }
  // A failed detach must stop before deleting a mounted volume.
  await fs.rm(mount,{recursive:true,force:true});
 }
