@@ -1,4 +1,4 @@
-appId: com.rakazo.app
+appId: com.mycellios.agent
 ---
 - runFlow: launch-app.yaml
 - runFlow:
@@ -10,9 +10,9 @@ appId: com.rakazo.app
     visible: "Sign in to Mycellios"
     timeout: 15000
 - tapOn: "Email"
-- inputText: ${RAKAZO_ACTIVE_EMAIL}
+- inputText: ${MYCELLIOS_ACTIVE_EMAIL}
 - tapOn: "Password"
-- inputText: ${RAKAZO_SCREENSHOT_PASSWORD}
+- inputText: ${MYCELLIOS_SCREENSHOT_PASSWORD}
 - hideKeyboard
 - tapOn: "Sign in"
 - tapOn:

@@ -1,10 +1,10 @@
-appId: com.rakazo.app
+appId: com.mycellios.agent
 name: Onboarding
 ---
 - runFlow:
     file: ../subflows/sign-in.yaml
     env:
-      RAKAZO_ACTIVE_EMAIL: ${RAKAZO_SCREENSHOT_EMPTY_EMAIL}
+      MYCELLIOS_ACTIVE_EMAIL: ${MYCELLIOS_SCREENSHOT_EMPTY_EMAIL}
 - extendedWaitUntil:
     visible: "Personal|Tap \\+ to create a bot"
     timeout: 20000
