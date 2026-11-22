@@ -141,6 +141,10 @@ export function planChecks(files, availableAgentTests) {
     const available = availableAgentTests ?? execFileSync('git', ['ls-files', '-z', 'src/agent'], { encoding: 'utf8' }).split('\0').filter(f => /\.test\.[jt]sx?$/.test(f)).map(f => f.slice('src/agent/'.length));
     const affected = agentAffectedTestFiles(related, available).filter(file => !tests.includes(file));
     if (affected.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...affected, '--maxWorkers', '2'], 'Agent affected tests');
+    if (files.some(file => /^src\/agent\/(?:apps\/web\/(?:src\/components\/(?:MicoTaskTabs|ThreadMenu)\.tsx|e2e\/fixtures\/mico-task-preview\.tsx)|scripts\/verify-mico-tasks-ui\.mjs)$/.test(file))) {
+      add('src/agent', 'npm', ['exec', '--', 'playwright', 'install', 'chromium'], 'Mobile conversation menu Chromium');
+      add('src/agent', 'env', ['MICO_ACCEPTANCE_OUTPUT=../../../../.ci/mobile-conversation-menu', 'node', 'scripts/verify-mico-tasks-ui.mjs', '--mobile-menu-only'], 'Mobile conversation menu and delete confirmation in Chromium');
+    }
     for (const [pattern, script, label] of [
       [/event-waits?[-.]|verify-autonomy-waits|event_wait_delegation_state|packages\/db\/src\/work-delegation/, 'verify-autonomy-waits-db.ts', 'event wait migration and automatic return on isolated PostgreSQL'],
       [/sidebar.fold|bot-folders|20261115130000_sidebar_folders/, 'verify-sidebar-folders-db.ts', 'folder migration, isolation and hierarchy'],

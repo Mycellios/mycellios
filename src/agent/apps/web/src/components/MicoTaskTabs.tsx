@@ -13,7 +13,8 @@ import {
   useConversationRows, useConversationTabs, writeConversationRows,
 } from "../lib/thread-tabs";
 import { errorText } from "../lib/user-error";
-import { DeleteConversationDialog, ThreadMenu } from "./ThreadMenu";
+import { WaitingForYouBadge } from "./ConversationsPane";
+import { DeleteConversationDialog, ThreadMenu, ThreadMenuButton } from "./ThreadMenu";
 import { ThreadStatusMark } from "./ThreadStatusMark";
 
 type TaskTab = ConversationRow;
@@ -199,7 +200,9 @@ export function MicoTaskTabs({
   const displayedIds = new Set(displayedTabs.map(tab => tab.threadId));
   const listed = tabs.filter(row => !row.deleteAfter);
   const picker = pickerConversations(listed);
-  const hiddenReplies = picker.open.some(row => row.unread && !displayedIds.has(row.threadId));
+  const unread = picker.open.filter(row => row.unread);
+  const read = inMenu ? picker.open.filter(row => !row.unread) : [];
+  const hiddenReplies = unread.some(row => inMenu || !displayedIds.has(row.threadId));
   const showPicker = inMenu || loadFailed || listed.length > 0;
   const compact = !inMenu && availableWidth > 0 && availableWidth < COMPACT_TABS_WIDTH;
   const minimal = compact && availableWidth < MINIMAL_TABS_WIDTH;
@@ -318,7 +321,7 @@ export function MicoTaskTabs({
 
   function requestDelete(tab: TaskTab) {
     if (working(tab) || busyIds.has(tab.threadId)) return;
-    if (confirmDelete) setDeleteTarget(tab);
+    if (confirmDelete || inMenu) setDeleteTarget(tab);
     else void remove(tab, true);
   }
 
@@ -497,24 +500,36 @@ export function MicoTaskTabs({
     const status = conversationStatus(tab);
     const busy = busyIds.has(tab.threadId);
     const when = tab.updatedAt ? formatRelativeTime(tab.updatedAt) : "";
-    return <ContextMenu key={tab.threadId}>
-      <ContextMenuTrigger render={<div />} className="group/conversation-row flex min-w-0 items-center gap-1 rounded-md has-[[aria-current=page]]:bg-muted">
-      {renameTarget?.threadId === tab.threadId && threadPickerOpen ? titleEditor() : <Button size="sm" variant="ghost"
-        className="h-auto min-h-8 min-w-0 flex-1 justify-start gap-2 bg-transparent py-1.5 text-start hover:bg-muted/60" aria-current={tab.threadId === taskThreadId ? "page" : undefined}
+    const rowClass = "group/conversation-row flex min-w-0 items-center gap-1 rounded-md has-[[aria-current=page]]:bg-muted";
+    const editing = renameTarget?.threadId === tab.threadId && threadPickerOpen;
+    const row = <>
+      {editing ? titleEditor() : <Button size="sm" variant="ghost"
+        className={`h-auto ${inMenu ? "min-h-11" : "min-h-8"} min-w-0 flex-1 justify-start gap-2 bg-transparent py-1.5 text-start hover:bg-muted/60`} aria-current={tab.threadId === taskThreadId ? "page" : undefined}
         disabled={busy} aria-busy={busy || undefined}
         title={closed ? t`Restore and open` : undefined}
         onClick={() => closed ? void restore(tab) : select(tab.threadId)}>
         {status ? <ThreadStatusMark status={status} /> : null}
         <span className="line-clamp-2 min-w-0 whitespace-normal break-words" title={titleOf(tab)} dir="auto">{titleOf(tab)}</span>
+        {inMenu && !closed && tab.unread && status !== "unread" ? <ThreadStatusMark status="unread" /> : null}
         {kind ? <span data-thread-kind={tab.kind} className="ms-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{kind}</span> : null}
         {when ? <time dateTime={tab.updatedAt ?? undefined} data-thread-time className={`${kind ? "" : "ms-auto "}shrink-0 text-xs text-muted-foreground`}>{when}</time> : null}
       </Button>}
+    </>;
+    const actions = ownConversation(tab)
+      ? { ...conversationActions(tab), label: t`Actions for ${titleOf(tab)}`, onRename: () => startRename(tab, true) }
+      : null;
+    if (inMenu) return <div key={tab.threadId} className={rowClass} data-mobile-conversation={tab.threadId}>
+      {row}
+      {actions && !editing ? <ThreadMenuButton {...actions} /> : null}
+    </div>;
+    return <ContextMenu key={tab.threadId}>
+      <ContextMenuTrigger render={<div />} className={rowClass}>
+      {row}
       {closed && ownConversation(tab) ? <Button size="icon-sm" variant="ghost" className="shrink-0 text-muted-foreground opacity-0 group-hover/conversation-row:opacity-100 group-focus-within/conversation-row:opacity-100 [@media(hover:none)]:opacity-100"
         aria-label={t`Restore conversation`} disabled={busy} onClick={() => void restore(tab)}><ArchiveRestore size={14} aria-hidden="true" /></Button> : null}
       {renamable(tab) ? <Button size="icon-sm" variant="ghost" className="shrink-0 text-muted-foreground opacity-0 group-hover/conversation-row:opacity-100 group-focus-within/conversation-row:opacity-100 [@media(hover:none)]:opacity-100" aria-label={t`Rename conversation`} onClick={() => startRename(tab, true)}><Pencil size={14} aria-hidden="true" /></Button> : null}
       </ContextMenuTrigger>
-      {ownConversation(tab) ? <ThreadMenu label={t`Actions for ${titleOf(tab)}`} {...conversationActions(tab)}
-        onRename={() => startRename(tab, true)} /> : null}
+      {actions ? <ThreadMenu {...actions} /> : null}
     </ContextMenu>;
   }
 
@@ -524,7 +539,7 @@ export function MicoTaskTabs({
   const pickerElement = showPicker || minimal || (compact && current) ? <Popover open={threadPickerOpen} onOpenChange={setThreadPickerOpen}>
       <PopoverTrigger render={compact && !minimal
         ? <Button size="sm" variant="ghost" aria-label={pickerLabel} title={currentTitle} className="relative h-7 min-w-0 flex-1 justify-between gap-1 px-2 font-normal" />
-        : <Button size="icon-sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className={inMenu ? undefined : "relative"} data-mobile-chat-action={inMenu || undefined} />}>
+        : <Button size="icon-sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative" data-mobile-chat-action={inMenu || undefined} />}>
         {inMenu ? <><MessageCircle aria-hidden /><Trans>Conversations</Trans></>
           : compact && !minimal ? <><span className="min-w-0 truncate" dir="auto">{currentTitle}</span><ChevronDown size={15} aria-hidden="true" className="shrink-0" /></>
           : <ChevronDown size={15} aria-hidden="true" />}
@@ -532,12 +547,22 @@ export function MicoTaskTabs({
       </PopoverTrigger>
       <PopoverContent align="end" className="max-h-[60dvh] w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-y-auto p-1 [&_button]:font-normal">
         <div className="mb-1 border-b border-border pb-1">
-          <Button size="sm" variant="ghost" className="w-full justify-start gap-2" onClick={openDraft}>
+          <Button size="sm" variant="ghost" className={`w-full justify-start gap-2 ${inMenu ? "min-h-11" : ""}`} onClick={openDraft}>
             <MessageCirclePlus size={15} aria-hidden="true" /><Trans>New conversation</Trans>
           </Button>
         </div>
-        <Button size="sm" variant="ghost" className="justify-start aria-[current=page]:bg-muted" aria-current={!current ? "page" : undefined} onClick={() => select()}><Trans>Main chat</Trans></Button>
-        {picker.open.map(pickerRow)}
+        <Button size="sm" variant="ghost" className={`justify-start aria-[current=page]:bg-muted ${inMenu ? "min-h-11" : ""}`} aria-current={!current ? "page" : undefined} onClick={() => select()}><Trans>Main chat</Trans></Button>
+        {inMenu ? <>
+          <WaitingForYouBadge count={picker.open.filter(row => row.state === "waiting").length} className="mx-2 my-1 self-start" />
+          {unread.length ? <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Unread</Trans> · {unread.length}</legend>
+            {unread.map(pickerRow)}
+          </fieldset> : null}
+          {read.length ? <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Read</Trans></legend>
+            {read.map(pickerRow)}
+          </fieldset> : null}
+        </> : picker.open.map(pickerRow)}
         {picker.archived.length ? <div className="mt-1 border-t border-border pt-1">
           <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Archived</Trans></legend>

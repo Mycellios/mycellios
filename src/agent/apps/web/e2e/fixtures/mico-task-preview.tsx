@@ -33,6 +33,7 @@ const rows: Row[] = savedRows ? JSON.parse(savedRows) as Row[] : [
   { threadId: "task-archived", title: "Old budget", kind: "conversation", archived: true, archivedAt: at(2000), state: "closed", createdAt: at(3000), updatedAt: at(2000) },
 ];
 const scope = "fixture";
+const phoneMenu = new URLSearchParams(window.location.search).has("phone-menu");
 const draftKey = "bot:mico-fixture:new-conversation";
 // The two ordinary conversations start as open tabs; the rest stay in the picker.
 if (!localStorage.getItem("mycellios:open-task-tabs:fixture")) localStorage.setItem("mycellios:open-task-tabs:fixture", JSON.stringify(["task-one", "task-two"]));
@@ -114,7 +115,7 @@ function Preview() {
     <header className="mb-4 text-sm font-medium">Mycellios · Mico</header>
     <div className={`flex min-w-0 items-center gap-1 ${narrow ? "w-[180px]" : ""}`} data-testid="tab-row">
       <MicoTaskTabs key={draftOpen ? "draft" : threadId ?? "main"} botId="mico-fixture" scope={scope} taskThreadId={threadId}
-        newConversationOpen={draftOpen} confirmDelete={phone} messageCount={refresh} rpc={rpc}
+        newConversationOpen={draftOpen} inMenu={phoneMenu} confirmDelete={phone} messageCount={refresh} rpc={rpc}
         onSelect={target => { if (target === NEW_CONVERSATION_TAB) { setDraftOpen(true); select(undefined); } else { setDraftOpen(false); select(target); } }} />
       {narrow ? null : <MicoWorkMenu botId="mico-fixture" runId="run-fixture" userId="fixture" onOpenTask={() => undefined} />}
       {narrow ? null : <Button size="sm" variant="ghost" onClick={() => showFlows(true)}>Workflows</Button>}
