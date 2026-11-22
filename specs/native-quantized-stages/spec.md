@@ -283,9 +283,16 @@ At scale, packages must be cheap to build and reusable across nodes:
 
 - Cut points come from a small fixed set per model, for example every eighth
   of the blocks. Two nodes holding the same range then hold the same package.
-- A node builds its own package from the published model GGUF.
-  `native_gguf.py` already copies only the selected raw tensors, so a node can
-  fetch just those byte ranges instead of the whole model.
+- A node builds its own package from the published model GGUF. Done in
+  `native_gguf_remote.py`: the coordinator publishes a content-addressed
+  *tensor manifest* computed once from the complete file (artifact SHA-256 and
+  size, header SHA-256, every tensor's offset, size and SHA-256, and the exact
+  `config.json` text). A node fetches the header and its stage's tensors with
+  HTTPS range requests, checks each against the manifest and builds the
+  package. The result is byte-identical to a package built from the complete
+  file. For SmolLM2-1.7B (Q4_K_M, 1056 MB) a 12-block stage fetched 559-581 MB
+  and an 8-block middle stage 326 MB; a tail fetched from Hugging Face over
+  HTTPS had the same package id as the local build.
 - The package identity is its content hash, as today. The coordinator can name
   a package in a challenge without having built it.
 - Packages are cached under the owner's disk limit and evicted least recently
