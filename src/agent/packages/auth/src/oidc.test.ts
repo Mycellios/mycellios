@@ -523,7 +523,7 @@ describe("OIDC callbacks", () => {
   });
   it("hands the native browser callback to Expo with a valid bearer session", async () => {
     setup();
-    const callback = await start(undefined, false, "rakazo://sign-in");
+    const callback = await start(undefined, false, "mycellios://sign-in");
     const authorize = `${issuer}/authorize?state=${new URL(`${origin}${callback}`).searchParams.get("state")}`;
     const proxy = await request(
       `/expo-authorization-proxy?${new URLSearchParams({ authorizationURL: authorize })}`,
@@ -531,7 +531,8 @@ describe("OIDC callbacks", () => {
     expect(proxy.headers.get("location")).toBe(authorize);
     const returned = await request(callback);
     const destination = new URL(returned.headers.get("location")!);
-    expect(destination.protocol).toBe("rakazo:");
+    expect(destination.protocol).toBe("mycellios:");
+    expect(destination.host).toBe("sign-in");
     const signed = destination.searchParams
       .get("cookie")!
       .match(/(?:__Secure-)?better-auth\.session_token=([^;]+)/)![1]!;
@@ -1048,7 +1049,7 @@ describe("SSO-only account deletion", () => {
       "/sign-in/social",
       {
         provider: "oidc",
-        callbackURL: "rakazo://sign-in",
+        callbackURL: "mycellios://account",
         additionalData: { reauthenticate: true },
       },
       token,
@@ -1075,7 +1076,8 @@ describe("SSO-only account deletion", () => {
       `/callback/oidc?state=${url.searchParams.get("state")}&code=native-reauth`,
     );
     const destination = new URL(returned.headers.get("location")!);
-    expect(destination.protocol).toBe("rakazo:");
+    expect(destination.protocol).toBe("mycellios:");
+    expect(destination.host).toBe("account");
     const signed = destination.searchParams
       .get("cookie")!
       .match(/(?:__Secure-)?better-auth\.session_token=([^;]+)/)![1]!;
