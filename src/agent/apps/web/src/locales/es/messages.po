@@ -14501,3 +14501,27 @@ msgstr "Cancelar la espera"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Esperando un evento"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "Ramificar en una conversación nueva"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Espera a que termine el turno actual para ramificar esta conversación."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "No se pudo ramificar la conversación. Inténtalo de nuevo."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Ramificada de una conversación eliminada"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Ramificada de {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Abrir donde empezó esta rama"
