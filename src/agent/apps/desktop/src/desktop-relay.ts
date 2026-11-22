@@ -14,6 +14,15 @@ import {
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
+/** Below this silence the PC still shows as connected. */
+const ONLINE_MS = 40_000;
+/**
+ * Running work survives a server stall this long. A busy API can hold relay
+ * requests for 20-40 s; the server's presence lease (90 s) outlasts this.
+ */
+const RELAY_STALL_MS = 85_000;
+const RESULT_ATTEMPT_MS = 15_000;
+
 /** A delivery the broker has already accepted must be forgotten, never aborted or replayed. */
 export function missingOperationAction(
   id: string,
@@ -185,9 +194,9 @@ export class DesktopRelayClient {
   }
   connected(botId: string) {
     return !this.stopped && this.grants.has(botId) &&
-      (this.options.now ?? Date.now)() - this.lastContact < 40_000;
+      (this.options.now ?? Date.now)() - this.lastContact < ONLINE_MS;
   }
-  online() { return !this.stopped && this.lastContact>0 && (this.options.now??Date.now)()-this.lastContact<40_000; }
+  online() { return !this.stopped && this.lastContact>0 && (this.options.now??Date.now)()-this.lastContact<ONLINE_MS; }
   resumeBindings(): UpdateResumeBinding[] {
     const identity = this.accountIdentity ?? (this.owner ? JSON.parse(this.owner) : undefined);
     if (!identity) return [];
@@ -252,7 +261,7 @@ export class DesktopRelayClient {
         for(const raw of state.bindings){const b=parseDesktopBinding(raw);if(b.deviceId!==this.deviceId)continue;grants.set(b.botId,{generation:b.generation});}
         this.grants=grants;
       }
-      if (!this.lastContact || (this.options.now ?? Date.now)() - this.lastContact >= 40_000) recordDesktopDiagnostic("relay_connected");
+      if (!this.lastContact || (this.options.now ?? Date.now)() - this.lastContact >= ONLINE_MS) recordDesktopDiagnostic("relay_connected");
       this.lastContact = (this.options.now ?? Date.now)();
       for (const [id, controller] of this.active) {
         const action = missingOperationAction(id, state.active, this.settled);
@@ -301,7 +310,9 @@ export class DesktopRelayClient {
       }
     } catch (error) {
       if (!this.stopped && !pollController.signal.aborted) recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
-      if ((this.options.now ?? Date.now)() - this.lastContact > 40_000) {
+      // A slow server is not an outage: running work keeps its operations until
+      // the stall outlasts what the server's own presence lease tolerates.
+      if ((this.options.now ?? Date.now)() - this.lastContact > RELAY_STALL_MS) {
         if (this.active.size) recordDesktopDiagnostic("relay_expired", {active:this.active.size,code:"desktop_disconnected",stage:"poll"});
         // Stop uncertain commands, but retain the approved binding while the
         // network is unavailable. A fresh authenticated poll must precede work.
@@ -328,17 +339,34 @@ export class DesktopRelayClient {
       const next = delivery.then(async () => {
         if (closed) return;
         const body = {deviceId:this.deviceId,id:operation.id,seq,data:Buffer.from(data).toString("base64"),done};
-        const attempts = done ? 4 : 1;
+        // The server accepts the same sequence and bytes again as a lost
+        // acknowledgement, so a stalled API delays this frame instead of ending the run.
+        const deadline = (this.options.now ?? Date.now)() + RELAY_STALL_MS;
         for (let attempt = 0; ; attempt++) {
           if (done) this.settled.add(operation.id);
-          try { await this.post("result", body, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])); break; }
+          try {
+            await this.post("result", body, AbortSignal.any([controller.signal, AbortSignal.timeout(RESULT_ATTEMPT_MS)]));
+            this.lastContact = (this.options.now ?? Date.now)();
+            break;
+          }
           catch (error) {
-            if (done) this.settled.delete(operation.id);
+            const status = relayStatus(error);
+            const wait = Math.min(1_000 * 2 ** attempt, 5_000);
             // 409: the server no longer holds this operation (cancelled, timed out or
             // already closed). Retrying cannot deliver it, and nobody reads the output:
             // stop the local work instead of finishing it unobserved.
-            if (relayStatus(error) === 409) { discarded = true; stage = "result_ack"; controller.abort(); throw error; }
-            if (attempt >= attempts || controller.signal.aborted || this.stopped) {stage="result_ack";throw error;}
+            const discard = status === 409;
+            // A final frame the server may already hold stays settled while it is resent,
+            // so a poll in between does not abort it as an orphan.
+            if (discard || (status !== undefined && status < 500 && status !== 429) || controller.signal.aborted || this.stopped ||
+                (this.options.now ?? Date.now)() + wait >= deadline) {
+              if (done) this.settled.delete(operation.id);
+              stage = "result_ack";
+              if (discard) { discarded = true; controller.abort(); }
+              throw error;
+            }
+            await pause(wait, controller.signal);
+            if (controller.signal.aborted || this.stopped) {if (done) this.settled.delete(operation.id);stage="result_ack";throw error;}
           }
         }
         seq++;
@@ -430,6 +458,14 @@ export class DesktopRelayClient {
       }
     } finally { this.updateNotices.delete(operation.id); }
   }
+}
+
+function pause(ms: number, signal: AbortSignal) {
+  return new Promise<void>(resolve => {
+    const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); resolve(); };
+    const timer = setTimeout(finish, ms);
+    signal.addEventListener("abort", finish, { once: true });
+  });
 }
 
 function relayStatus(error: unknown): number | undefined {

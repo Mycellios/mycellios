@@ -125,6 +125,49 @@ it("stops local work and stops posting when the API no longer holds the operatio
   } finally { client.stop(); }
 });
 
+it("keeps running work through a stalled server by resending the same frame", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  let localSignal: AbortSignal | undefined;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+    localSignal = init?.signal ?? undefined;
+    return new Response('{"event":1}\n{"event":2}\n');
+  });
+  const reports: { seq: number; done: boolean; text: string }[] = [];
+  let binding: unknown;
+  let delivered = false;
+  let stalls = 2;
+  const client = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "http://127.0.0.1:1234",
+    localToken: "unused", revoked: vi.fn(),
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      const payload = JSON.parse(String(init?.body));
+      if (action === "identity") return Response.json(identity);
+      if (action === "bind") { binding = payload; return Response.json({ ok: true }); }
+      if (action === "poll") {
+        const operations = delivered || !binding ? [] : [{ id: "slow", binding, request: { method: "environment", botId: "bot" } }];
+        if (operations.length) delivered = true;
+        return Response.json({ identity, active: delivered ? ["slow"] : [], operations });
+      }
+      reports.push({ seq: payload.seq, done: payload.done, text: Buffer.from(payload.data, "base64").toString() });
+      // The first frame meets a stalled API twice: one timeout, one gateway error.
+      if (payload.seq === 0 && stalls-- > 0) {
+        if (stalls === 1) throw new DOMException("slow relay", "TimeoutError");
+        return new Response(null, { status: 503 });
+      }
+      return Response.json({ ok: true });
+    },
+  });
+  try {
+    await client.bind("bot");
+    await vi.waitFor(() => expect(reports.at(-1)?.done).toBe(true), { timeout: 8_000 });
+    expect(reports.map(({ seq, done }) => [seq, done])).toEqual([[0, false], [0, false], [0, false], [1, true]]);
+    expect(new Set(reports.slice(0, 3).map(report => report.text)).size).toBe(1);
+    expect(reports.some(report => report.text.includes("interrupted"))).toBe(false);
+    expect(localSignal?.aborted).toBe(false);
+  } finally { client.stop(); }
+}, 10_000);
+
 it("retries one timed-out identity read without repeating an operation", async () => {
   const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
   const fetch = vi.fn().mockRejectedValueOnce(new DOMException("slow identity", "TimeoutError")).mockResolvedValueOnce(Response.json(identity));
