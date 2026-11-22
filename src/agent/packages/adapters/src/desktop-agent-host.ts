@@ -38,6 +38,9 @@ export class DesktopAgentHost {
       const checkpoint = request.onCheckpoint as unknown as (blob: string, id: string) => Promise<void>;
       request.onCheckpoint = (capture, id) => checkpoint(capture(), id);
     }
+    // The engine's steering watch would hand each tool call an AbortSignal, which cannot cross
+    // back to the server; an older server still sends steeringPending, so ignore it here.
+    request.steeringPending = undefined;
     const fail = (error: unknown) => { queue.fail(error instanceof Error ? error : Error("Desktop agent failed")); controller.abort(); };
     this.sessions.set(sessionId, { botId, runId, projectSessionId: context.projectSessionId, rpc, fail });
     const abort = () => { controller.abort(); queue.end(); void this.runtime.abort(runId); };
