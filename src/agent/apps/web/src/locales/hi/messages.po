@@ -6431,3 +6431,11 @@ msgstr "कभी नहीं"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "पुराने मॉडल"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "सौंपा गया"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "अन्य"

@@ -7,7 +7,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 import { queryClient } from "../lib/query";
 
-type TaskTab = { threadId: string; title: string };
+type TaskThreadKind = "conversation" | "routine" | "workflow" | "delegation" | "project" | "other";
+/** `kind` and `archived` come from the server; an older server omits them and every row reads as ordinary. */
+type TaskTab = { threadId: string; title: string; kind?: TaskThreadKind; archived?: boolean };
+
+/** Only ordinary conversations take a user title; the server keeps the others' names. */
+function renamable(tab: TaskTab) {
+  return !tab.kind || tab.kind === "conversation";
+}
 
 /** Keep readable tabs; the picker retains every conversation, including closed tabs. */
 export function fitConversationTabs<T extends TaskTab>(tabs: T[], activeId: string | undefined, width: number): T[] {
@@ -40,6 +47,10 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
   messageCount?: number;
 }) {
   const { t } = useLingui();
+  /** A short marker for threads the user did not start as a conversation. */
+  const kindLabel = (kind: TaskThreadKind | undefined) =>
+    kind === "routine" ? t`Routine` : kind === "workflow" ? t`Workflow` : kind === "delegation" ? t`Delegated`
+      : kind === "project" || kind === "other" ? t`Other` : null;
   const cacheKey = ["conversation-tabs", scope];
   const [tabs, setTabs] = useState<TaskTab[]>(() => queryClient.getQueryData<TaskTab[]>(cacheKey) ?? []);
   function writeTabs(update: (rows: TaskTab[]) => TaskTab[]) {
@@ -191,6 +202,22 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       }} />;
   }
 
+  function pickerRow(tab: TaskTab) {
+    const kind = kindLabel(tab.kind);
+    return <ContextMenu key={tab.threadId}>
+      <ContextMenuTrigger render={<div />} className="group/conversation-row flex min-w-0 items-center gap-1 rounded-md has-[[aria-current=page]]:bg-muted">
+      {renameTarget?.threadId === tab.threadId && threadPickerOpen ? titleEditor() : <Button size="sm" variant="ghost"
+        className="h-auto min-h-8 min-w-0 flex-1 justify-start gap-2 bg-transparent py-1.5 text-start hover:bg-muted/60" aria-current={tab.threadId === taskThreadId ? "page" : undefined}
+        onClick={() => { setThreadPickerOpen(false); onSelect(tab.threadId); }}>
+        <span className="line-clamp-2 min-w-0 whitespace-normal break-words" title={tab.title || t`New conversation`} dir="auto">{tab.title || t`New conversation`}</span>
+        {kind ? <span data-thread-kind={tab.kind} className="ms-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{kind}</span> : null}
+      </Button>}
+      {renamable(tab) ? <Button size="icon-sm" variant="ghost" className="shrink-0 text-muted-foreground opacity-0 group-hover/conversation-row:opacity-100 group-focus-within/conversation-row:opacity-100 [@media(hover:none)]:opacity-100" aria-label={t`Rename conversation`} onClick={() => startRename(tab, true)}><Pencil size={14} aria-hidden="true" /></Button> : null}
+      </ContextMenuTrigger>
+      {renamable(tab) ? <ContextMenuContent><ContextMenuItem onClick={() => startRename(tab)}><Pencil size={14} aria-hidden="true" /><Trans>Rename conversation</Trans></ContextMenuItem></ContextMenuContent> : null}
+    </ContextMenu>;
+  }
+
   return <nav ref={nav} aria-label={t`Conversations`} className={inMenu ? "min-w-0" : "flex min-w-0 flex-1 items-center gap-1 md:ms-1 md:border-s md:border-border md:ps-3"}>
     {!inMenu ? <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
       {displayedTabs.map(tab => (
@@ -200,7 +227,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
           {renameTarget?.threadId === tab.threadId && !threadPickerOpen ? titleEditor() : <Button ref={tab.threadId === taskThreadId ? activeTab : undefined} size="sm" variant="ghost"
             className="h-full min-w-0 flex-1 shrink justify-start gap-1.5 overflow-hidden bg-transparent px-2 font-normal hover:bg-transparent"
             aria-current={tab.threadId === taskThreadId ? "page" : undefined} title={tab.title || t`New conversation`}
-            onClick={() => tab.threadId === taskThreadId ? startRename(tab) : onSelect(tab.threadId)}>
+            onClick={() => tab.threadId !== taskThreadId ? onSelect(tab.threadId) : renamable(tab) ? startRename(tab) : undefined}>
             <MessageCircle size={14} aria-hidden="true" />
             <span className="min-w-0 truncate" dir="auto">{tab.title || t`New conversation`}</span>
           </Button>}
@@ -209,7 +236,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
             <X size={13} aria-hidden="true" />
           </Button>
         </ContextMenuTrigger>
-        <ContextMenuContent><ContextMenuItem onClick={() => startRename(tab)}><Pencil size={14} aria-hidden="true" /><Trans>Rename conversation</Trans></ContextMenuItem></ContextMenuContent>
+        {renamable(tab) ? <ContextMenuContent><ContextMenuItem onClick={() => startRename(tab)}><Pencil size={14} aria-hidden="true" /><Trans>Rename conversation</Trans></ContextMenuItem></ContextMenuContent> : null}
         </ContextMenu>
       ))}
     </div> : null}
@@ -225,19 +252,13 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
           </Button>
         </div>
         <Button size="sm" variant="ghost" className="justify-start aria-[current=page]:bg-muted" aria-current={!taskThreadId ? "page" : undefined} onClick={() => { setThreadPickerOpen(false); onSelect(); }}><Trans>Main chat</Trans></Button>
-        {tabs.map(tab => (
-          <ContextMenu key={tab.threadId}>
-          <ContextMenuTrigger render={<div />} className="group/conversation-row flex min-w-0 items-center gap-1 rounded-md has-[[aria-current=page]]:bg-muted">
-          {renameTarget?.threadId === tab.threadId && threadPickerOpen ? titleEditor() : <Button size="sm" variant="ghost"
-            className="h-auto min-h-8 min-w-0 flex-1 justify-start bg-transparent py-1.5 text-start hover:bg-muted/60" aria-current={tab.threadId === taskThreadId ? "page" : undefined}
-            onClick={() => { setThreadPickerOpen(false); onSelect(tab.threadId); }}>
-            <span className="line-clamp-2 min-w-0 whitespace-normal break-words" title={tab.title || t`New conversation`} dir="auto">{tab.title || t`New conversation`}</span>
-          </Button>}
-          <Button size="icon-sm" variant="ghost" className="shrink-0 text-muted-foreground opacity-0 group-hover/conversation-row:opacity-100 group-focus-within/conversation-row:opacity-100 [@media(hover:none)]:opacity-100" aria-label={t`Rename conversation`} onClick={() => startRename(tab, true)}><Pencil size={14} aria-hidden="true" /></Button>
-          </ContextMenuTrigger>
-          <ContextMenuContent><ContextMenuItem onClick={() => startRename(tab)}><Pencil size={14} aria-hidden="true" /><Trans>Rename conversation</Trans></ContextMenuItem></ContextMenuContent>
-          </ContextMenu>
-        ))}
+        {tabs.filter(tab => !tab.archived).map(pickerRow)}
+        {tabs.some(tab => tab.archived) ? <div className="mt-1 border-t border-border pt-1">
+          <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Archived</Trans></legend>
+            {tabs.filter(tab => tab.archived).map(pickerRow)}
+          </fieldset>
+        </div> : null}
         {loadFailed ? <Button size="sm" variant="ghost" onClick={() => setRevision(value => value + 1)}><Trans>Retry</Trans></Button> : null}
       </PopoverContent>
     </Popover>

@@ -80,6 +80,25 @@ describe("queued automatic reads", () => {
     );
   });
 
+  it("reads an opened task conversation once its own snapshot loads, without touching the main chat dot", () => {
+    // The pinned task client refuses writes before that load; reading on mount used to fail silently.
+    expect(shell).toContain("useState(!taskScope)");
+    const open = slice(
+      "// A task conversation is read once its own snapshot loads",
+      "useEffect(() => {\n    if (!active) return;",
+    );
+    expect(open).toContain("if (!active || !taskThreadLoaded) return;");
+    expect(open).toContain("markBotReadIfVisible(active.id)");
+    expect(open).toContain("[active?.id, markBotReadIfVisible, taskThreadLoaded]");
+    const load = slice("loadInitial: async () => {", "loadHead:");
+    expect(load).toContain("if (taskScope && !abort.signal.aborted) setTaskThreadLoaded(true);");
+    expect(load.indexOf("setTaskThreadLoaded(true)")).toBeGreaterThan(load.indexOf("await ("));
+    const read = slice("const markBotRead = useCallback(", "const markBotUnread = useCallback(");
+    expect(read.indexOf("if (taskScope?.botId === id) return answer.unreadAfterSeq;")).toBeLessThan(
+      read.indexOf("updateBotUnread(id, false)"),
+    );
+  });
+
   it("drops a group's hold when its chat-list Mark as Unread fails", () => {
     const toggle = slice("onToggleUnread={() => {", "onMoveToSection=");
     const failure = toggle.slice(toggle.indexOf(".catch("));

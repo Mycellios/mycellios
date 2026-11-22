@@ -13545,3 +13545,11 @@ msgstr "Folder on this PC"
 
 msgid "Open folder"
 msgstr "Open folder"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "Delegated"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "Other"

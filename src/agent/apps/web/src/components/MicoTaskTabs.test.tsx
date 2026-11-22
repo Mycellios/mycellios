@@ -74,6 +74,38 @@ describe("Mico task navigation", () => {
     expect(document.querySelector("input")).toBeNull();
   });
 
+  it("marks each non-ordinary thread's kind and lists archived conversations last", async () => {
+    const host=document.createElement("div"); document.body.append(host);
+    const root=createRoot(host); roots.push(root);
+    const select=vi.fn();
+    const list=vi.fn().mockResolvedValue([
+      {threadId:"old",title:"Old budget",kind:"conversation",archived:true},
+      {threadId:"plan",title:"Plan",kind:"conversation",archived:false},
+      {threadId:"daily",title:"Daily digest",kind:"routine",archived:false},
+      {threadId:"flow",title:"Publish step",kind:"workflow",archived:false},
+      {threadId:"help",title:"Check prices",kind:"delegation",archived:false},
+      {threadId:"legacy",title:"Legacy"},
+      {threadId:"night",title:"Nightly report",kind:"routine",archived:true},
+    ]);
+    const rpc={development:{list,open:vi.fn()}} as unknown as RpcClient;
+    await act(()=>root.render(<MicoTaskTabs botId="mico" scope="kinds" rpc={rpc} onSelect={select} />));
+    await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="Conversations"]')!.click());
+    const popup=document.querySelector('[data-slot="popover-content"]')!;
+    const rows=Array.from(popup.querySelectorAll<HTMLButtonElement>('button:not([aria-label])')).map(button=>button.textContent);
+    expect(rows).toEqual(["New conversation","Main chat","Plan","Daily digestRoutine","Publish stepWorkflow",
+      "Check pricesDelegated","Legacy","Old budget","Nightly reportRoutine"]);
+    const archived=popup.querySelector("fieldset")!;
+    expect(archived.querySelector("legend")!.textContent).toBe("Archived");
+    expect(Array.from(archived.querySelectorAll("button:not([aria-label])")).map(button=>button.textContent)).toEqual(["Old budget","Nightly reportRoutine"]);
+    // Only conversations the user owns the title of offer a rename.
+    const renames=Array.from(popup.querySelectorAll('button[aria-label="Rename conversation"]'))
+      .map(button=>button.parentElement!.querySelector("span[dir]")!.textContent);
+    expect(renames).toEqual(["Plan","Legacy","Old budget"]);
+    const reopen=Array.from(archived.querySelectorAll<HTMLButtonElement>("button:not([aria-label])")).find(button=>button.textContent==="Old budget")!;
+    await act(()=>reopen.click());
+    expect(select).toHaveBeenLastCalledWith("old");
+  });
+
   it("refreshes the generated title after a message and saves a manual rename", async () => {
     const host = document.createElement("div"); document.body.append(host);
     const root = createRoot(host); roots.push(root);

@@ -13926,3 +13926,11 @@ msgstr "Carpeta en este PC"
 
 msgid "Open folder"
 msgstr "Abrir carpeta"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "Delegado"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "Otro"

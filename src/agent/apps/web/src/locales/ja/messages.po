@@ -6431,3 +6431,11 @@ msgstr "しない"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "以前のモデル"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "委任"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "その他"

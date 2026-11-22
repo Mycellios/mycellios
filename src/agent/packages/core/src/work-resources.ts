@@ -4,6 +4,19 @@ export function isMicoTaskThread(thread: { taskBotId?: string | null; projectKey
     thread.taskKey?.startsWith(`mico-task:${thread.taskBotId}:`));
 }
 
+export type TaskThreadKind = "conversation" | "routine" | "workflow" | "delegation" | "project" | "other";
+
+/** What started a Mico's side thread, for labels only; it never grants or narrows access. */
+export function taskThreadKind(thread: { taskBotId?: string | null; projectKey?: string | null; taskKey?: string | null }): TaskThreadKind {
+  const task = thread.taskKey ?? "", project = thread.projectKey ?? "";
+  // Delegated work may inherit its requester's project key, so its own task key decides first.
+  if (task.startsWith("delegation:") || task.startsWith("work-transfer:")) return "delegation";
+  if (task.startsWith("routine:") || project.startsWith("routine:")) return "routine";
+  if (task.startsWith("workflow:") || project.startsWith("workflow:")) return "workflow";
+  if (project.startsWith("project:")) return "project";
+  return isMicoTaskThread(thread) ? "conversation" : "other";
+}
+
 export function nativeWorkProjectSession(
   thread: { id: string; taskBotId?: string | null; projectKey?: string | null; taskKey?: string | null },
   task: { delegationState?: string | null },

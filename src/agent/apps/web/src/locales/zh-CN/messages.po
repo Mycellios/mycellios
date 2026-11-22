@@ -6430,3 +6430,11 @@ msgstr "从不"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "较早的模型"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "委派"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "其他"
