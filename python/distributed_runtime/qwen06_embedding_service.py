@@ -121,11 +121,14 @@ class ReservationGate:
 
 
 class TorchEmbedder:
-    def __init__(self, path, device, dtype, revision, micro_batch_tokens=MICRO_BATCH_TOKENS):
+    def __init__(self, path, device, dtype, revision, micro_batch_tokens=MICRO_BATCH_TOKENS, device_index=None, threads=None):
         import torch
         from transformers import AutoModel, AutoTokenizer
         self.torch = torch
-        self.device = device
+        if threads:
+            # The node passes the owner's CPU share as the thread budget.
+            torch.set_num_threads(int(threads))
+        self.device = device if device_index is None or device not in ("cuda",) else "cuda:%d" % int(device_index)
         self.revision = revision
         self.micro_batch_tokens = micro_batch_tokens
         self.tokenizer = AutoTokenizer.from_pretrained(path, padding_side="left")
@@ -135,7 +138,7 @@ class TorchEmbedder:
         self.no_grad = torch.inference_mode
         if device == "directml":
             import torch_directml
-            self.device = torch_directml.device()
+            self.device = torch_directml.device() if device_index is None else torch_directml.device(int(device_index))
             self.no_grad = torch.no_grad
             options["attn_implementation"] = "eager"
         self.model = AutoModel.from_pretrained(path, torch_dtype=torch_dtype, **options).to(self.device).eval()
@@ -162,7 +165,7 @@ class TorchEmbedder:
 
     def close(self):
         del self.model
-        if self.device == "cuda":
+        if str(self.device).startswith("cuda"):
             self.torch.cuda.empty_cache()
 
 
@@ -227,7 +230,8 @@ class Replica:
         self.config = config
         self.thermal = thermal
         self.load = load or (lambda: TorchEmbedder(config["modelPath"], config["device"], config["dtype"], config["revision"],
-                                                   int(config.get("microBatchTokens", MICRO_BATCH_TOKENS))))
+                                                   int(config.get("microBatchTokens", MICRO_BATCH_TOKENS)),
+                                                   config.get("deviceIndex"), config.get("threads")))
         self.gate = gate
         self.embedder = None
         self.state = "starting"
@@ -474,13 +478,40 @@ def make_native_handler(replica, settings, identity, clock=time.time):
     return Handler
 
 
+def lower_priority():
+    """Run below normal priority so the owner's own work comes first (before torch loads)."""
+    import os
+    import sys
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            below_normal = 0x00004000
+            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), below_normal)
+        else:
+            os.nice(10)
+    except Exception:
+        pass
+
+
+def node_managed(config):
+    """A paired node's own replica: native loopback only, no bearer listener (spec "Automatic node replicas")."""
+    return "tokenFile" not in config and "host" not in config and "port" not in config
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     config = json.loads(Path(parser.parse_args().config).read_text(encoding="utf-8-sig"))
-    token = Path(config["tokenFile"]).read_text(encoding="utf-8").strip()
-    if len(token) < 32:
-        raise ValueError("token_too_short")
+    if config.get("lowPriority"):
+        lower_priority()
+    managed = node_managed(config)
+    if managed and not config.get("native"):
+        raise ValueError("node_managed_replica_requires_native")
+    token = None
+    if not managed:
+        token = Path(config["tokenFile"]).read_text(encoding="utf-8").strip()
+        if len(token) < 32:
+            raise ValueError("token_too_short")
     native = native_settings(config)
     identity = verify_artifact(config["modelPath"]) if native else None
     gate = ReservationGate(config["reservation"]) if config.get("reservation") else None
@@ -508,6 +539,9 @@ def main():
     if native:
         native_server = ThreadingHTTPServer((native["host"], native["port"]), make_native_handler(replica, native, identity))
         native_server.daemon_threads = True
+        if managed:
+            native_server.serve_forever()
+            return
         threading.Thread(target=native_server.serve_forever, daemon=True).start()
     server = ThreadingHTTPServer((config["host"], int(config["port"])), make_handler(replica, token))
     server.daemon_threads = True

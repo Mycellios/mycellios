@@ -29,6 +29,18 @@ export const MEMORY_EMBEDDING_FILES: Readonly<Record<string, string>> = Object.f
   "tokenizer_config.json": "253153d0738ceb4c668d2eff957714dd2bea0b56de772a9fdccd96cbf517e6a0",
   "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
 });
+/** Exact byte sizes of the pinned files (Hugging Face tree at the pinned revision); a download must match both size and sha256. */
+export const MEMORY_EMBEDDING_FILE_BYTES: Readonly<Record<string, number>> = Object.freeze({
+  "config.json": 727,
+  "generation_config.json": 117,
+  "merges.txt": 1_671_853,
+  "model.safetensors": 1_191_586_416,
+  "tokenizer.json": 11_423_705,
+  "tokenizer_config.json": 9_706,
+  "vocab.json": 2_776_833,
+});
+/** Pinned source of the files above; nodes fetch only `<base>/<file>` at this exact revision. */
+export const MEMORY_EMBEDDING_SOURCE_BASE_URL = `https://huggingface.co/${MEMORY_EMBEDDING_UPSTREAM_MODEL}/resolve/${MEMORY_EMBEDDING_REVISION}`;
 /** Same construction as `artifact_identity()` in qwen06_embedding_service.py. */
 export const MEMORY_EMBEDDING_DIGEST = "sha256:" + createHash("sha256").update([
   "mycellios-memory-embedding/1", MEMORY_EMBEDDING_REVISION,

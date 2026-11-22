@@ -162,6 +162,19 @@ the native cases in `python/tests/test_qwen06_embedding_service.py`.
   `native_qualification_unavailable`. With no replica at all, it is the usual
   503 `no_capacity`. Only the internal, identity-pinned qualification probe
   can reach an unqualified replica.
+- **Owner-scoped placement.** Requests for this model carry private memory
+  text, so the coordinator places them only on nodes whose active ownership
+  (a paired device, or an enrolled standalone replica cell) belongs to the
+  requesting API account (`src/coordinator/memory-embedding-owner-scope.ts`).
+  The rule is bound to the model on the coordinator. It applies to planning,
+  the dispatch-time recheck, standby retries, capacity checks and every piece
+  of a split request. A request without an authenticated account gets 403
+  `memory_embedding_owner_required` before any work is created. When the
+  caller's own nodes have no replica, the answer is the usual `no_capacity`,
+  so other accounts' replicas are never revealed. No public `privacy` field is
+  involved. The only exemption is the internal, identity-pinned qualification
+  probe, which carries only the fixed public canary query. Tests:
+  `tests/memory-embedding-owner-scope.test.ts`.
 - Each worker has one slot (`maxConcurrency: 1`), so a busy replica takes
   no further work. A non-streaming request is split across the idle replicas
   (see "Splitting across replicas"), so one request already uses the whole
@@ -304,6 +317,149 @@ Rollback at any step:
 
 Vectors from both paths are interchangeable, so nothing has to be re-embedded.
 
+## Automatic node replicas
+
+Status: implemented and unit-tested. Off until the operator configures it
+(see "Enabling"). Not yet run on a physical node through the coordinator.
+
+An idle paired native node (Mycellios Desktop or the headless native node)
+starts, serves and qualifies this replica by itself while its owner account
+has demand. There is no per-device pairing bundle and nothing to click. The
+standalone worker path above still works unchanged.
+
+### Coordinator
+
+- **Demand.** Every memory embedding request reports its owner account with
+  the `demand` event, including requests that found only unqualified
+  replicas. `MemoryEmbeddingOwnerDemand` (`src/coordinator/node-replica-demand.ts`)
+  keeps the last request time per approved account, in memory.
+- **Desired state.** `GET /internal/v1/nodes/<nodeId>/replicas` answers only
+  the node's own device session (the same authentication as node commands)
+  with `mycellios-node-replicas/1` (`src/contracts/node-replicas.ts`).
+  `desired` is true only while the node's owner is listed in
+  `MYCELLIOS_MEMORY_EMBEDDING_NODE_REPLICA_ACCOUNTS` and that same account made a
+  request within the last 10 minutes (the placement idle window). A node never
+  learns about another account's traffic. Older nodes never call the route,
+  and a node treats a 404 from an older coordinator as "not desired".
+- **Qualification.** The qualification watch accepts a model-bound policy
+  next to its explicit `targets` (`src/coordinator/native-qualification-watch.ts`):
+
+  ```json
+  { "targets": [],
+    "memoryEmbedding": {
+      "model": "mycellios-qwen3-embedding-0.6b",
+      "modelDigest": "sha256:7ced807793a552878c586b4fc420c5f9edef134abe30e4202b9f2022487cdd55",
+      "ownerAccountId": "<operator account id>",
+      "buildSourceIds": ["sha256:<approved node build source>"],
+      "executions": [{ "backend": "cuda", "precision": "float16" }, { "backend": "mps", "precision": "float16" },
+                     { "backend": "directml", "precision": "float32" }, { "backend": "cpu", "precision": "float32" }],
+      "maxWorkers": 8 } }
+  ```
+
+  The model and artifact identity are literals, so a new artifact is never
+  approved implicitly. Every pair must be one of the measured pairs.
+  Build sources are explicit, so source drift (a new node build) still needs
+  an operator to add its `buildSourceId`. Worker, activation and physical
+  node ids are not listed: they are read from the current snapshot, and only
+  connected, online workers owned by `ownerAccountId` qualify. The snapshot
+  (`/internal/v1/workers`, network token) now includes each worker's
+  `ownerAccountId`. Every candidate still runs the same three-sample canary
+  (cosine ≥ 0.9995), with the existing three-attempts-a-day cap and backoff.
+
+### Node
+
+Code: `src/node/memory-embedding-replica.ts`, `src/node/memory-embedding-artifact.ts`,
+the `nativeReplica` slot of `WorkerAgent` (`src/worker/native-replica-slot.ts`)
+and the node-managed mode of `qwen06_embedding_service.py`. Tests:
+`tests/memory-embedding-node-replica.test.ts`, the replica case in
+`tests/worker-hardening.test.ts` and `NodeManagedTests` in the Python suite.
+
+- **Identity.** The node's own `WorkerAgent` advertises the deployment next to
+  its executor and routes only that deployment's leases to the replica adapter.
+  The replica therefore uses the node's device identity, owner, sealed
+  leases, session and build identity, and its qualification binds to them.
+  One activation id is created per start, and the deployment has one slot.
+- **Device.** Chosen from the accelerator the node already verified:
+  - CUDA → fp16;
+  - DirectML → fp32 with 1024-token micro-batches, eager attention and
+    `no_grad`;
+  - Apple Silicon → MPS fp16;
+  - everything else (including ROCm and XPU, which have no measured pair) →
+    CPU fp32.
+  A GPU choice that does not fit the owner's VRAM offer uses the CPU. A GPU
+  backend that fails to load twice falls back to the CPU on that node.
+- **Files.** Only the seven pinned files, from the pinned revision, over HTTPS.
+  Each file is installed only after its exact size and sha256 match. Partial
+  files resume with range requests. The runtime re-hashes all files before
+  it listens. The files (1.12 GiB) live under
+  `<cache>/memory-embedding/<identity>`, so the owner's disk limit measures
+  them. Nothing is downloaded unless the measured cache plus the missing bytes
+  stays at least 256 MiB below `maxDiskMiB` and 1 GiB of disk stays free. This
+  prevents a repeat of the 2026-11-21 incident. Other identities are evicted.
+- **Owner limits.**
+  - The replica starts only while contribution is enabled, the node is not
+    draining and the owner's work policy admits the model.
+  - It needs room within the owner's RAM limit (node RSS plus 2–3.5 GiB,
+    depending on the device) and enough free memory. Free memory is not
+    checked on macOS, which reports cache as used.
+  - Its thread count is the owner's CPU share.
+  - It runs below normal priority (Windows priority class, `nice` elsewhere),
+    inside the Windows kill-on-close Job when the node has the broker.
+  - CUDA pauses at the owner's temperature limit minus 4 °C and resumes at
+    minus 9 °C.
+  - It runs offline from Hugging Face (`HF_HUB_OFFLINE`).
+  - It stops at once when the owner pauses or drains, when the policy or
+    limits change, and before the node prepares or starts a distributed stage
+    (stages have priority). It does not restart while a stage runs.
+- **Unload.** The coordinator keeps the replica desired for 10 minutes after
+  the owner's last request. After that, the node stops it once it is idle and
+  has run for at least 3 minutes (the placement minimum residency).
+- **Python runtime.** A configuration without `tokenFile`, `host` and
+  `port` is node-managed. It serves only the native loopback listener;
+  there is no bearer-token listener. `qwen06_embedding_service` is now part of
+  the shipped Python product (`scripts/native-python-product-policy.mjs`).
+
+### Enabling
+
+1. Coordinator: set `MYCELLIOS_MEMORY_EMBEDDING_NODE_REPLICA_ACCOUNTS=<operator account id>`.
+2. Qualification watch: add the `memoryEmbedding` policy above, with the
+   build source of the node release that carries this code.
+3. Jarvis (or another client) calls the coordinator with the operator's API
+   key, as described in "Jarvis access". The first request answers 503 while
+   nodes download and load; the client retries with backoff.
+
+Rollback: unset the variable and restart the coordinator through Nucleus
+(nodes stop their replica within about a minute), then remove the policy. The standalone and forwarder paths are
+unchanged.
+
+### Release path
+
+Node code ships only in a new native node build:
+- `node-build.yml` and `installer-release.yml` build the installers;
+- Desktop embeds the pinned runtime MSI.
+Nodes do not update their JavaScript by themselves. A paired node gets it
+when its owner installs the new release, or when the operator sends an
+`update` node command for a published, signed component. That command
+updates only `python-product`, so it cannot deliver this change alone.
+Desktop preview upgrades stay manual while Windows packages are unsigned.
+
+### Measured versus tested
+
+- **Measured** (2026-11-21/22, forwarder path): the device pairs and their
+  speeds.
+- **Unit and in-memory tests only:**
+  - owner-scoped placement, including split pieces;
+  - the demand route;
+  - the qualification policy binding;
+  - device selection per hardware;
+  - hash-checked download, resume and disk budget;
+  - the replica lifecycle and gates;
+  - lease routing in `WorkerAgent`;
+  - the node-managed Python mode.
+- **Not yet run:** a real node downloading the files and qualifying through
+  the coordinator, and the DirectML pack's `transformers` version against the
+  qualified PC replica (4.57.1). The canary gate refuses drift in both cases.
+
 ## Phone replicas (Android)
 
 Status: phone-side safety pieces merged, disabled. No phone advertises or
@@ -400,6 +556,8 @@ Package `com.mycellios.android.embedding`, not wired into the app:
 ## Follow-ups
 
 - Physically qualify the native replica (see "Migration and rollback").
+- Run an automatic node replica on a physical paired node through the
+  coordinator, after a node release carries it (see "Automatic node replicas").
 - Measure the phone path on a physical Android phone (see "Phone replicas").
 - Let economic settlement verify CPU stages, so CPU pieces can earn credit.
 - Add more CPU backups once nodes have spare RAM (the MSI GE60 has about

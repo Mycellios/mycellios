@@ -4,6 +4,7 @@ import { DECISION_DEADLINE_MS, DECISION_MODEL, isDecisionDeployment, parseDecisi
 import { EMBEDDING_MODEL, isEmbeddingDeployment, parseEmbeddingRequest, verifiedEmbeddingEnvelope } from "../contracts/embedding.js";
 import { estimatedMemoryEmbeddingTokens, isMemoryEmbeddingDeployment, MEMORY_EMBEDDING_MODEL, MEMORY_EMBEDDING_PIECE_OVERHEAD_MS, memoryEmbeddingPriorTokensPerSecond, parseMemoryEmbeddingRequest, verifiedMemoryEmbeddingEnvelope } from "../contracts/memory-embedding.js";
 import { MemoryEmbeddingSplitRun, type MemoryEmbeddingSplitHost, type SplitReplica } from "./memory-embedding-split.js";
+import { ownerScopedWorkerIds, requiresOwnerScopedPlacement } from "./memory-embedding-owner-scope.js";
 import { replicaOutputByteLimit, validateSpeechCompletion } from "./speech-completion.js";
 import { EventEmitter } from "node:events";
 import type {
@@ -63,6 +64,8 @@ interface RuntimeJob {
   requireSettlementEvidence: boolean;
   /** Contribution-funded memory embeddings: settlement verifies GPU stages only. */
   requireGpuStages: boolean;
+  /** Owner-scoped model: only nodes actively owned by this account may serve it. */
+  ownerAccountId: string | null;
   route: ScheduledRoute;
   routePlan: ScheduledRoute[];
   routeDecision: ExecutionRouteDecisionRecord;
@@ -117,8 +120,8 @@ export interface MeshServiceOptions {
 interface MeshServiceEvents {
   degraded: [{ jobId: string; model: string; code: string; workerId: string | null }];
   healthy: [{ jobId: string; model: string; workerId: string | null }];
-  /** Every admitted request, served or not; drives native replica placement. */
-  demand: [{ model: string; served: boolean }];
+  /** Every admitted request, served or not; drives native replica placement. `ownerAccountId` is set for owner-scoped models. */
+  demand: [{ model: string; served: boolean; ownerAccountId?: string | null }];
   /** A worker rejected an anomalous share of offers it had already read. */
   lease_rejection_anomaly: [LeaseRejectionAnomaly];
 }
@@ -190,6 +193,8 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       splitMemoryEmbedding?: boolean;
       /** Internal: one piece of a split request, pinned to these workers. */
       memoryEmbeddingPiece?: { workerIds: ReadonlySet<string> };
+      /** Authenticated caller account; owner-scoped models run only on its own nodes. */
+      ownerAccountId?: string | null;
     } = {},
   ): Promise<JobHandle> {
     if (operatorReleaseRevision && !/^[a-f0-9]{40}$/.test(operatorReleaseRevision)) throw new Error("Invalid operator release revision");
@@ -203,6 +208,13 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       );
     }
     const stableRequest = cloneRequest(request);
+    // The internal qualification probe is the only identity-pinned request; it carries a fixed public canary.
+    const qualificationProbe = stableRequest.privacy?.boundary === "pinned-edges" && (stableRequest.privacy.pinned_identity_ids?.length ?? 0) > 0;
+    // Private memory text runs only on the caller's own nodes (memory-embedding-owner-scope.ts).
+    const ownerAccountId = requiresOwnerScopedPlacement(stableRequest.model) && !qualificationProbe ? submitOptions.ownerAccountId ?? null : null;
+    if (requiresOwnerScopedPlacement(stableRequest.model) && !qualificationProbe && !ownerAccountId) {
+      throw new MeshServiceError("memory_embedding_owner_required", "Memory embeddings run only on nodes owned by the requesting account", 403);
+    }
     const jobId = newId("job");
     // Reserve synchronously before the first database wait.
     this.activeSessions.set(sessionId, jobId);
@@ -246,25 +258,23 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     }));
 
     const pinnedPiece = submitOptions.memoryEmbeddingPiece?.workerIds;
-    const connected = pinnedPiece
-      ? new Set([...this.offerableWorkerIds()].filter((workerId) => pinnedPiece.has(workerId)))
-      : this.offerableWorkerIds();
+    const eligible = await this.eligibleWorkerIds(ownerAccountId);
+    const connected = pinnedPiece ? new Set([...eligible].filter((workerId) => pinnedPiece.has(workerId))) : eligible;
     // Memory vectors are only taken from replicas with fresh native
     // qualification. The qualification probe itself is the one internal,
     // identity-pinned request that may reach a replica before that evidence.
-    const requireQualifiedReplica = stableRequest.model === MEMORY_EMBEDDING_MODEL
-      && !(stableRequest.privacy?.boundary === "pinned-edges" && (stableRequest.privacy.pinned_identity_ids?.length ?? 0) > 0);
+    const requireQualifiedReplica = stableRequest.model === MEMORY_EMBEDDING_MODEL && !qualificationProbe;
     const requireSettlementEvidence = submitOptions.requireSettlementEvidence === true || requireQualifiedReplica;
     const requireGpuStages = submitOptions.requireSettlementEvidence === true && stableRequest.model === MEMORY_EMBEDDING_MODEL;
     if (submitOptions.splitMemoryEmbedding === true && requireQualifiedReplica && !requireGpuStages && !operatorReleaseRevision
       && !stableRequest.stream && !stableRequest.dispersion && !pinnedPiece) {
-      const split = await MemoryEmbeddingSplitRun.start(this.splitHost, { jobId, sessionId, request: stableRequest, deadlineAt },
+      const split = await MemoryEmbeddingSplitRun.start(this.splitHost(ownerAccountId), { jobId, sessionId, request: stableRequest, deadlineAt },
         (event) => { queue.push(event); if (event.type !== "accepted") queue.close(); }, async (run) => {
           this.splitRuns.set(jobId, run);
           (await this.store.setJobStatus(jobId, "running"));
         });
       if (split) {
-        this.emit("demand", { model: stableRequest.model, served: true });
+        this.emit("demand", { model: stableRequest.model, served: true, ownerAccountId });
         return { jobId, sessionId, events: queue };
       }
     }
@@ -295,6 +305,8 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       })
       : await planRoute(connected);
     if (!routePlan && requireQualifiedReplica && submitOptions.requireSettlementEvidence !== true && (await planRoute(connected, false)).plan) {
+      // Unqualified replicas still count as demand, so they stay loaded until qualified.
+      if (!pinnedPiece) this.emit("demand", { model: stableRequest.model, served: false, ownerAccountId });
       (await this.store.setJobStatus(jobId, "failed", "native_qualification_unavailable"));
       throw new MeshServiceError("native_qualification_unavailable",
         "A replica is connected but has no current native qualification for this model", 503);
@@ -307,7 +319,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       throw new MeshServiceError("settlement_evidence_unavailable",
         "No replica that can settle contribution-funded work is available right now", 502);
     }
-    if (!pinnedPiece) this.emit("demand", { model: stableRequest.model, served: routePlan !== null });
+    if (!pinnedPiece) this.emit("demand", { model: stableRequest.model, served: routePlan !== null, ownerAccountId });
     if (!routePlan) {
       (await this.store.setJobStatus(jobId, "failed", "no_capacity"));
       const decision = (await this.scheduler.selectExecutionRouteDecision(stableRequest, sessionId, {
@@ -336,6 +348,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       request: stableRequest,
       requireSettlementEvidence,
       requireGpuStages,
+      ownerAccountId,
       route,
       routePlan: [routePlan.primary, ...routePlan.standbys],
       routeDecision: structuredClone(routePlan.decision),
@@ -394,10 +407,13 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     return (await this.cancel(activeJobId)) ? activeJobId : null;
   }
 
-  async hasCapacity(request: ChatCompletionRequest, requestedSessionId?: string): Promise<boolean> {
+  async hasCapacity(request: ChatCompletionRequest, requestedSessionId?: string, ownerAccountId?: string | null): Promise<boolean> {
     const sessionId = requestedSessionId ?? request.session_id ?? newId("capacity");
+    const scope = requiresOwnerScopedPlacement(request.model) ? ownerAccountId ?? null : null;
+    // An admission hint only: without the caller's account, submit() decides and refuses it.
+    if (requiresOwnerScopedPlacement(request.model) && !scope) return true;
     return (await this.scheduler.selectRoutePlan(cloneRequest(request), sessionId, {
-      ...routeOptionsForRequest(request, this.offerableWorkerIds()),
+      ...routeOptionsForRequest(request, await this.eligibleWorkerIds(scope)),
       allowPipeline: false,
       maxStandbyRoutes: request.model === TRANSCRIPTION_MODEL ? 0 : 2,
     })) !== null;
@@ -420,11 +436,11 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     return true;
   }
 
-  /** Split memory embedding runs use ordinary, worker-pinned jobs for their pieces. */
-  private readonly splitHost: MemoryEmbeddingSplitHost = {
+  /** Split memory embedding runs use ordinary, worker-pinned jobs for their pieces, on the caller's own nodes. */
+  private splitHost(ownerAccountId: string | null): MemoryEmbeddingSplitHost { return {
     idleReplicas: async (request, excludeWorkerIds) => {
       const excluded = new Set(excludeWorkerIds);
-      const options = { ...routeOptionsForRequest(request, this.offerableWorkerIds(), true), allowPipeline: false };
+      const options = { ...routeOptionsForRequest(request, await this.eligibleWorkerIds(ownerAccountId), true), allowPipeline: false };
       const replicas: SplitReplica[] = [];
       for (let inspected = 0; inspected < 256; inspected++) {
         const route = await this.scheduler.selectRoute(request, "memory-embedding-split", { ...options, excludeWorkerIds: excluded });
@@ -440,7 +456,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return replicas;
     },
     submitPiece: async (request, workerId) => await this.submit(request, newId("ses"), undefined, undefined,
-      { memoryEmbeddingPiece: { workerIds: new Set([workerId]) } }),
+      { memoryEmbeddingPiece: { workerIds: new Set([workerId]) }, ownerAccountId }),
     cancel: async (jobId) => await this.cancel(jobId),
     completeParent: async (jobId, metrics) => { await this.store.completeJob(jobId, metrics); },
     failParent: async (jobId, status, code) => { await this.store.setJobStatus(jobId, status, code); },
@@ -448,11 +464,17 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       this.splitRuns.delete(jobId);
       if (this.activeSessions.get(sessionId) === jobId) this.activeSessions.delete(sessionId);
     },
-  };
+  }; }
 
   /** Connected workers that are not held back for rejecting offers they read. */
   private offerableWorkerIds(): ReadonlySet<string> {
     return this.leaseRejections.offerable(this.hub.connectedWorkerIds());
+  }
+
+  /** Offerable workers, narrowed to the caller's own nodes for an owner-scoped request. */
+  private async eligibleWorkerIds(ownerAccountId: string | null): Promise<ReadonlySet<string>> {
+    const offerable = this.offerableWorkerIds();
+    return ownerAccountId === null ? offerable : await ownerScopedWorkerIds(this.store, offerable, ownerAccountId);
   }
 
   private async dispersionKeys(workerId: string): Promise<string[]> {
@@ -501,7 +523,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return;
     }
     if (!(await this.scheduler.isRouteCurrentlyEligible(runtime.request, queued.sessionId, runtime.route, {
-      ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds(), runtime.requireSettlementEvidence, runtime.requireGpuStages), allowPipeline: false,
+      ...routeOptionsForRequest(runtime.request, await this.eligibleWorkerIds(runtime.ownerAccountId), runtime.requireSettlementEvidence, runtime.requireGpuStages), allowPipeline: false,
     }))) {
       await this.retryOrFail(jobId, "route_no_longer_eligible", "The planned route is no longer eligible");
       return;
@@ -815,7 +837,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
         runtime.request,
         job.sessionId,
         route,
-        { ...routeOptionsForRequest(runtime.request, this.offerableWorkerIds(), runtime.requireSettlementEvidence, runtime.requireGpuStages), allowPipeline: false },
+        { ...routeOptionsForRequest(runtime.request, await this.eligibleWorkerIds(runtime.ownerAccountId), runtime.requireSettlementEvidence, runtime.requireGpuStages), allowPipeline: false },
       ))) continue;
       runtime.route = route;
       runtime.replayPrefix = replayingCommittedPrefix

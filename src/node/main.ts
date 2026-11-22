@@ -33,6 +33,9 @@ import { NodeEnrollmentBootstrap } from "./enrollment-bootstrap.js";
 import { activateNativeNodeAccelerator, prepareNativeNodeAccelerator } from "./native-accelerator.js";
 import { DEFAULT_NODE_WORK_POLICY, evaluateNodeWorkPolicy } from "../contracts/node-work-policy.js";
 import { probeRuntimePerformanceProfile } from "../performance/runtime-profile-probe.js";
+import { createNodeMemoryEmbeddingReplica, trackStageActivity, type MemoryEmbeddingNodeReplica } from "./memory-embedding-replica.js";
+import { MemoryEmbeddingArtifactStore } from "./memory-embedding-artifact.js";
+import { measureCacheDiskBytes } from "./cache-disk-usage.js";
 
 const configPath = argument("--config") ?? defaultNodeConfigurationPath();
 const allowLegacyMigration = process.argv.includes("--confirm-legacy-migration");
@@ -77,6 +80,7 @@ let commandClient: Promise<void> | null = null;
 let failure: unknown = null;
 let lastIncident: { code: string; occurredAt: string } | null = null;
 let componentInUseLease: ComponentInUseLease | null = null;
+let memoryReplica: MemoryEmbeddingNodeReplica | null = null;
 try {
   const activePythonProduct = await resolveNodePythonProduct(config);
   if (activePythonProduct && componentLifecycle) {
@@ -92,6 +96,9 @@ try {
   if (accelerator) environment = activateNativeNodeAccelerator(environment, accelerator);
   const runtime = await createNativeNodeRuntime(environment);
   if (config.runtime.transport === "relay-only") runtime.executor.directTransport = { enabled: false };
+  // Distributed stages have priority: the memory embedding replica yields before one prepares or starts.
+  const stageActivity = trackStageActivity(runtime.executor.launchAgent, async () => { await memoryReplica?.yieldToStage(); });
+  runtime.executor.launchAgent = stageActivity.agent;
   const device = runtime.verifiedGpuRuntime ? runtime.physicalProbe.devices[0] : undefined;
   const detectedVramMiB = device
     ? Math.floor(Math.min(device.totalMemoryBytes, device.runtimeTotalMemoryBytes) / (1024 * 1024))
@@ -100,6 +107,19 @@ try {
     ? Math.min(detectedVramMiB, config.limits.maxVramMiB || detectedVramMiB)
     : Math.max(512, Math.floor(config.limits.maxRamMiB / 2));
   const workerConfig = loadWorkerConfig(environment.configPath);
+  // Operator memory embeddings start here only on demand from this node's owner (specs/memory-embedding-qwen06).
+  memoryReplica = createNodeMemoryEmbeddingReplica({
+    nodeId: config.nodeId, coordinatorUrl: environment.coordinatorUrl, cachePath: config.runtime.cachePath,
+    workspace: join(host.stateDirectory, "memory-embedding-replica"), pythonExecutable: environment.pythonExecutable,
+    pythonPath: environment.pythonPath, windowsJobBrokerExecutable: environment.windowsJobBrokerExecutable,
+    accelerator, detectedVramMiB, session: () => agent?.nodeControlSession ?? null,
+    config: async () => (await store.load()).config, control: async () => await controlStore.load(),
+    contributionEnabled: () => agent?.isContributionEnabled ?? false,
+    policyRejection: (policy, model, at) => evaluateNodeWorkPolicy(policy ?? DEFAULT_NODE_WORK_POLICY, model, at),
+    activeStages: stageActivity.active, cacheBytes: async () => await measureCacheDiskBytes(config.runtime.cachePath),
+    artifacts: new MemoryEmbeddingArtifactStore(join(config.runtime.cachePath, "memory-embedding")),
+    logger: { info: (message) => console.log(message), warn: (message) => console.warn(message) },
+  });
   const admissionSigner = await new NodeIdentityStore(
     config.coordinator.identityPath,
     platformSecretStore(),
@@ -125,6 +145,7 @@ try {
     beforeSignedAdmission: (input) => enrollmentBootstrap.redeem(input),
     reconnect: true,
     advertiseDeployment: false,
+    nativeReplica: memoryReplica,
     agentVersion: version,
     ...(runtimeMetadata.buildIdentity ? { buildIdentity: runtimeMetadata.buildIdentity } : {}),
     ...(runtime.verifiedGpuRuntime ? { verifiedGpuRuntime: runtime.verifiedGpuRuntime } : {}),
@@ -191,6 +212,7 @@ try {
   );
   snapshotResourceObserver.resetCpuBaseline();
   governor.start();
+  memoryReplica.start();
   if (pendingComponentActivation && componentLifecycle) {
     await componentLifecycle.markActivationHealthy();
     pendingComponentActivation = false;
@@ -312,6 +334,7 @@ try {
   commandClientAbort?.abort();
   await commandClient?.catch(() => undefined);
   governor?.stop();
+  await memoryReplica?.stop().catch(() => undefined);
   await agent?.stop().catch(() => undefined);
   await componentInUseLease?.release().catch(() => undefined);
   try {

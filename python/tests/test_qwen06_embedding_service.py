@@ -266,6 +266,65 @@ class NativeSettingsTests(unittest.TestCase):
                 service.verify_artifact(folder, files)
 
 
+class NodeManagedTests(unittest.TestCase):
+    """A paired node's own replica serves only the native loopback listener (spec "Automatic node replicas")."""
+
+    def test_only_a_config_without_the_private_listener_is_node_managed(self):
+        private = {**NATIVE_CONFIG, "tokenFile": "token", "host": "100.102.0.1", "port": 18495}
+        self.assertTrue(service.node_managed(NATIVE_CONFIG))
+        self.assertFalse(service.node_managed(private))
+        for key in ("tokenFile", "host", "port"):
+            self.assertFalse(service.node_managed({**NATIVE_CONFIG, key: private[key]}))
+
+    def test_main_serves_loopback_only_and_never_reads_a_token(self):
+        managed = {key: value for key, value in NATIVE_CONFIG.items() if key not in ("tokenFile", "host", "port")}
+        managed.update({"lowPriority": True, "threads": 2, "deviceIndex": 0, "modelPath": "unused"})
+        servers = []
+
+        class FakeServer:
+            def __init__(self, address, handler):
+                servers.append(address)
+                self.daemon_threads = False
+
+            def serve_forever(self):
+                return None
+
+        originals = (service.ThreadingHTTPServer, service.verify_artifact, service.lower_priority, service.Replica.reconcile)
+        lowered = []
+        try:
+            service.ThreadingHTTPServer = FakeServer
+            service.verify_artifact = lambda path: service.artifact_identity()
+            service.lower_priority = lambda: lowered.append(True)
+            service.Replica.reconcile = lambda self: None
+            with tempfile.TemporaryDirectory() as folder:
+                path = Path(folder, "replica.json")
+                path.write_text(json.dumps(managed), encoding="utf-8")
+                import sys
+                argv = sys.argv
+                sys.argv = ["qwen06_embedding_service", "--config", str(path)]
+                try:
+                    service.main()
+                finally:
+                    sys.argv = argv
+        finally:
+            (service.ThreadingHTTPServer, service.verify_artifact, service.lower_priority, service.Replica.reconcile) = originals
+        self.assertEqual(servers, [("127.0.0.1", managed["native"]["port"])])
+        self.assertEqual(lowered, [True])
+
+    def test_a_node_managed_config_requires_the_native_listener(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "replica.json")
+            path.write_text(json.dumps({"device": "cpu", "dtype": "float32", "modelPath": folder}), encoding="utf-8")
+            import sys
+            argv = sys.argv
+            sys.argv = ["qwen06_embedding_service", "--config", str(path)]
+            try:
+                with self.assertRaises(ValueError):
+                    service.main()
+            finally:
+                sys.argv = argv
+
+
 class NativeHttpTests(unittest.TestCase):
     def setUp(self):
         self.replica = service.Replica(NATIVE_CONFIG, load=FakeEmbedder)
