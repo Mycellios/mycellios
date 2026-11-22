@@ -1966,8 +1966,10 @@
   throws DesktopUnreachableError: never "offline", never a move to a server workspace.
   Before the turn starts or reaches the PC it is a counted setup failure (same requeue,
   backoff and RUN_SETUP_FAILURE_LIMIT) that ends with that error's own sentence; after
-  either, it is never replayed. Verify desktop-relay, offline-cloud-workspace,
-  desktop-agent-runtime and executor-lazy-computer tests.
+  either, it is never replayed. It only holds back work whose computer is the PC:
+  Micos on server computers keep running as if the PC were offline. Verify desktop-relay,
+  host-aware-sandbox, offline-cloud-workspace, desktop-agent-runtime and
+  executor-lazy-computer tests.
 
 - Desktop diagnostics reuse the relay and native lifecycle hooks. Keep fixed
   failure codes, phase/stage and operation UUIDs through the transport and safe

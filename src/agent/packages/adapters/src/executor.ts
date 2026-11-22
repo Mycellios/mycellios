@@ -4475,7 +4475,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           },
           () => runAbortController?.abort(),
         );
-        const provisionKind = await deps.sandbox.provisionKind?.(context);
+        // A relay that gives no answer only holds back a Mico whose computer is the PC.
+        const provisionKind = await deps.sandbox.provisionKind?.(context).catch((error: unknown) => {
+          if (error instanceof DesktopUnreachableError && storedComputer.kind !== "desktop") return undefined;
+          throw error;
+        });
         const computerKind = provisionKind ?? storedComputer.kind;
         const computerAvailable = !(context.isolatedWorkspace && ["desktop", "none"].includes(deps.sandbox.describe().id)) && admittedComputerAvailable(
           deps.sandbox.describe().id,

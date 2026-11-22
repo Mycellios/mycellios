@@ -14,6 +14,7 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "@mycellios/db";
+import { DesktopUnreachableError } from "./computer-errors.js";
 import { cancelComputerRunWork } from "./computer-idle.js";
 import { manageComputerWorkspaceDirectories } from "./computer-workspace.js";
 import { desktopRelayAvailable, desktopRelayTransport } from "./desktop-relay.js";
@@ -107,6 +108,20 @@ export class HostAwareSandbox implements SandboxProvider {
     return computer.kind === "desktop" ? this.host : this.isolated;
   }
 
+  /**
+   * Whether the PC can take this work. A check that got no answer only matters when the
+   * work belongs on the PC; anything else keeps using the server computer, as it would
+   * with the PC offline, so a busy relay never blocks Micos that do not use a PC.
+   */
+  private async hostAvailable(context: AdapterContext, pcRequired: boolean) {
+    try {
+      return await this.hostEnabled(context);
+    } catch (error) {
+      if (!pcRequired && error instanceof DesktopUnreachableError) return false;
+      throw error;
+    }
+  }
+
   async provisionKind(context?: AdapterContext) {
     const provider = !context?.cloudWorkspace && !context?.isolatedWorkspace && (await this.hostEnabled(context))
       ? this.host : this.isolated;
@@ -122,7 +137,8 @@ export class HostAwareSandbox implements SandboxProvider {
     },
     context: AdapterContext,
   ) {
-    const enabled = !context.cloudWorkspace && !context.isolatedWorkspace && (await this.hostEnabled(context));
+    const enabled = !context.cloudWorkspace && !context.isolatedWorkspace &&
+      (await this.hostAvailable(context, request.providerKind === "desktop"));
     if (request.providerKind === "desktop" && !enabled)
       throw new Error(
         "The selected local computer is disconnected. Reconnect Desktop before continuing this project.",
@@ -139,7 +155,8 @@ export class HostAwareSandbox implements SandboxProvider {
   }
 
   async isRunning(computer: ComputerRef, context: AdapterContext): Promise<boolean> {
-    const provider = !context.cloudWorkspace && !context.isolatedWorkspace && (await this.hostEnabled(context))
+    const provider = !context.cloudWorkspace && !context.isolatedWorkspace &&
+      (await this.hostAvailable(context, computer.kind === "desktop"))
       ? this.host : this.isolated;
     if (provider.describe().id !== computer.kind) return false;
     return provider.isRunning?.(computer, context) ?? false;
