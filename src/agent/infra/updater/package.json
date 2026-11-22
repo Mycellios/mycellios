@@ -15,7 +15,7 @@
     "@mycellios/contracts": "*",
     "@mycellios/core": "*",
     "@mycellios/logging": "*",
-    "hono": "4.13.14",
+    "hono": "4.13.16",
     "tsx": "4.23.15"
   },
   "devDependencies": {
