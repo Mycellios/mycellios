@@ -10,7 +10,6 @@ import EmbeddedPostgres from "embedded-postgres";
 
 // Closed-beta invitation link on isolated PostgreSQL: the actual migration, real Better Auth
 // email signups racing for the places, and the bootstrap that follows an admitted one.
-process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
 const { createDb, asSystem, SIGNUP_INVITE_COOKIE, signupInviteId } = await import("@mycellios/db");
 const { createAuth } = await import("@mycellios/auth");
