@@ -365,9 +365,23 @@ export const MessageView = memo(function MessageView({
           }
           if (block.kind === "bot_message_sent" || block.kind === "bot_message_received") {
             const sent = block.kind === "bot_message_sent";
-            const peer = sent ? block.toBotName : block.fromBotName;
+            const firstPeer = sent ? block.toBotName : block.fromBotName;
             const peerBotId = sent ? block.toBotId : block.fromBotId;
-            const label = sent ? t`Messaged ${peer}` : t`Message from ${peer}`;
+            const recipients = sent ? (block.recipients ?? []).map((recipient) => recipient.botName) : [];
+            const peer =
+              recipients.length > 1
+                ? new Intl.ListFormat(i18n.locale || "en", { type: "conjunction" }).format(recipients)
+                : firstPeer;
+            // Requests and questions ask for an answer; results, statuses and updates inform.
+            const asks = block.intent === undefined || block.intent === "request" || block.intent === "question";
+            const answersRequest = !sent && Boolean(message.replyToMessageId);
+            const label = sent
+              ? asks
+                ? t`Messaged ${peer}`
+                : t`Informed ${peer}`
+              : asks && !answersRequest
+                ? t`Message from ${peer}`
+                : t`Update from ${peer}`;
             return (
               <CollaborationMarker
                 key={i}
@@ -375,7 +389,9 @@ export const MessageView = memo(function MessageView({
                 color={peerBot(peerBotId)?.color ?? FALLBACK_BOT_COLOR}
                 identity={peerBotId}
                 label={label}
-                onClick={() => onOpenPeerMessages({ peerBotId, peerBotName: peer })}
+                onClick={() => onOpenPeerMessages({ peerBotId, peerBotName: firstPeer })}
+                body={block.text}
+                toggleLabels={{ expand: t`Expand ${label}`, collapse: t`Collapse ${label}` }}
                 replies={
                   !sent && peerReplies
                     ? {

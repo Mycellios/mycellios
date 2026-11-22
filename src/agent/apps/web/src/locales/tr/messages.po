@@ -7059,3 +7059,111 @@ msgstr "Beklemeyi iptal et"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Bir olay bekleniyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Yanıtlar bekleniyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{total} yanıttan {done} tanesi geldi"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "{group} içinde"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} sıradaki olarak ele alacak"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} üzerinde çalışıyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} sana ihtiyaç duyuyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} yanıtladı"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} bitiremedi"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} durduruldu"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "{name} durdur"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Bu listeyi gizle"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "Liste güncellenemedi. Tekrar dene."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} görevini durduruyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "{name} için görev durduruldu"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Yeniden ata…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} başka bir işi bekliyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} devredilen bir görev üzerinde çalışıyor"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Görevi iptal et"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "Görevi yeniden ata"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "{peer} bilgilendirildi"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "{peer} güncellemesi"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Amaç"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "Bu grup ne için?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Lider"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Hiçbir üyeyi anmayan mesajları alır ve başka bir üye daha uygunsa ona devreder."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Gruba gönder"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "{groupName} grubuna gönder"

@@ -7060,3 +7060,111 @@ msgstr "प्रतीक्षा रद्द करें"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "किसी इवेंट की प्रतीक्षा"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "जवाबों का इंतज़ार"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{total} में से {done} जवाब आए"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "{group} में"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} इसे आगे लेगा"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} इस पर काम कर रहा है"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} को आपकी ज़रूरत है"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} ने जवाब दिया"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} पूरा नहीं कर सका"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} को रोक दिया गया"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "{name} को रोकें"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "यह सूची छिपाएँ"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "सूची अपडेट नहीं हो सकी। फिर से कोशिश करें।"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} अपना काम रोक रहा है"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "{name} का काम रुका हुआ है"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "फिर से सौंपें…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} दूसरे काम का इंतज़ार कर रहा है"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} सौंपे गए काम पर लगा है"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "काम रद्द करें"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "काम फिर से सौंपें"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "{peer} को सूचित किया"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "{peer} से अपडेट"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "उद्देश्य"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "यह समूह किसलिए है?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "प्रमुख"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "जिन संदेशों में किसी सदस्य का नाम नहीं होता, उन्हें लेता है, और कोई दूसरा सदस्य बेहतर हो तो उसे सौंप देता है।"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "समूह को भेजें"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "{groupName} को भेजें"

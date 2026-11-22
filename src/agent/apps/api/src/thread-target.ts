@@ -13,8 +13,11 @@ import type {
 import { GROUP_MEMBER_MIN, MessageBlock as MessageBlockSchema } from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
+  addressedGroupBotIds,
   BACKGROUND_RUN_TRIGGERS,
   callIdFromClientNonce,
+  groupContinuePrompt,
+  isContinueRequest,
   isConversationalRun,
   isMicoTaskThread,
   messageReaction,
@@ -41,6 +44,7 @@ import {
   queueTaskReportInTransaction,
   recordThreadTurnOutcome,
   retireWaitingQuestionInTransaction,
+  settleStoppedRecipientsInTransaction,
   touchGroupUpdatedAt,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
@@ -301,6 +305,15 @@ async function lockAndLoadGroupMembers(
   actor: Actor,
   target: Extract<ThreadTarget, { kind: "group" }>,
 ) {
+  return (await lockAndLoadGroup(tx, actor, target)).members;
+}
+
+/** The group's active members in order, and the lead the person chose (null: first member). */
+async function lockAndLoadGroup(
+  tx: Prisma.TransactionClient,
+  actor: Actor,
+  target: Extract<ThreadTarget, { kind: "group" }>,
+) {
   await lockOwnedGroup(tx, actor, target.groupId);
   const group = await tx.chatGroup.findFirst({
     where: {
@@ -319,11 +332,14 @@ async function lockAndLoadGroupMembers(
     },
   });
   if (!group || group.members.length < GROUP_MEMBER_MIN) throw new IsolationError();
-  return group.members.map((member) => ({
-    botId: member.bot.id,
-    name: member.bot.name,
-    color: member.bot.color,
-  }));
+  return {
+    leadBotId: group.leadBotId ?? null,
+    members: group.members.map((member) => ({
+      botId: member.bot.id,
+      name: member.bot.name,
+      color: member.bot.color,
+    })),
+  };
 }
 
 export async function resolveThreadTarget(
@@ -932,14 +948,29 @@ export async function sendThreadMessage(
         return { message, runs: [run], eventSeq: event.seq };
       }
 
-      const members = await lockAndLoadGroupMembers(tx, actor, target);
+      const { members, leadBotId } = await lockAndLoadGroup(tx, actor, target);
       const memberBotIds = members.map((member) => member.botId);
       const mentionTargets = splitMentionTargets(input.mentions);
-      const targetBotIds = resolveGroupTargetBotIds({
+      const memberRefs = members.map((member) => ({ id: member.botId, name: member.name }));
+      const addressed = addressedGroupBotIds({
         text: input.text ?? "",
-        members: members.map((member) => ({ id: member.botId, name: member.name })),
+        members: memberRefs,
         explicitMentions: mentionTargets.botMentionIds,
       });
+      // "continue" with nobody named picks up the stopped work of the newest request; any
+      // other message names its members or goes to the lead. Routing never asks a model.
+      const continuing =
+        addressed.length === 0 && isContinueRequest(input.text ?? "")
+          ? await stoppedGroupWork(tx, target.threadId, memberBotIds)
+          : undefined;
+      const targetBotIds =
+        continuing?.botIds ??
+        resolveGroupTargetBotIds({
+          text: input.text ?? "",
+          members: memberRefs,
+          explicitMentions: mentionTargets.botMentionIds,
+          leadBotId,
+        });
       const { blocks: attachmentBlocks, artifacts } = await resolveGroupSendAttachments(
         { prisma: tx },
         actor,
@@ -1030,7 +1061,9 @@ export async function sendThreadMessage(
             threadId: target.threadId,
             userId: actor.userId,
             prompt: withResponseLanguage(
-              buildSendPrompt(input.text, artifacts, connectorNames),
+              continuing
+                ? groupContinuePrompt(continuing.requestText)
+                : buildSendPrompt(input.text, artifacts, connectorNames),
               input.responseLocale,
             ),
             status: "queued",
@@ -1348,7 +1381,7 @@ export async function stopThreadRuns(
   target: ThreadTarget,
   only?: string[] | { runId: string; trigger: "project_prepare" },
 ) {
-  const { runIds, computers, leases, eventSeq, taskReport } = await deps.prisma.$transaction(async (tx) => {
+  const { runIds, computers, leases, eventSeq, taskReport, resumeRunIds } = await deps.prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
@@ -1429,8 +1462,16 @@ export async function stopThreadRuns(
         },
       });
     }
-    return { runIds: ids, computers, leases, eventSeq, taskReport };
+    // A stopped turn that answered another Mico's request settles that recipient; when it was
+    // the last one, the sender's turn with every answer is queued here.
+    const resumeRunIds = ids.length ? await settleStoppedRecipientsInTransaction(tx, ids) : [];
+    return { runIds: ids, computers, leases, eventSeq, taskReport, resumeRunIds };
   });
+  for (const resumeRunId of resumeRunIds) {
+    await deps.jobs?.enqueue(runContinueJob(resumeRunId)).catch((error) => {
+      getLogger().error("teammate answers enqueue", error);
+    });
+  }
   if (eventSeq !== null) {
     // The events are durable; subscribers refetch from their persisted cursor.
     await deps.events.notify(target.threadId, eventSeq).catch((error) => {
@@ -1607,4 +1648,45 @@ export async function setThreadUnreadState(
     data: { unread },
   });
   if (result.count > 1) throw new IsolationError();
+}
+
+/**
+ * The members whose work on the newest person's request in a group stopped before it finished:
+ * stopped turns first, failed ones only when none was stopped. Undefined when nothing stopped.
+ */
+async function stoppedGroupWork(
+  tx: Prisma.TransactionClient,
+  threadId: string,
+  memberBotIds: readonly string[],
+): Promise<{ botIds: string[]; requestText: string } | undefined> {
+  const request = await tx.message.findFirst({
+    where: { threadId, role: "user", sourceRuns: { some: {} } },
+    orderBy: { seq: "desc" },
+    select: { createdAt: true, blocks: true },
+  });
+  if (!request) return undefined;
+  const runs = await tx.run.findMany({
+    where: {
+      threadId,
+      botId: { in: [...memberBotIds] },
+      createdAt: { gte: request.createdAt },
+      trigger: { in: ["user", "follow_up"] },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { botId: true, status: true },
+    take: 100,
+  });
+  const latestByBot = new Map<string, string>();
+  for (const run of runs) if (!latestByBot.has(run.botId)) latestByBot.set(run.botId, run.status);
+  if ([...latestByBot.values()].some((status) => ACTIVE_RUN_STATUSES.includes(status as never))) return undefined;
+  const stopped = [...latestByBot].filter(([, status]) => status === "cancelled").map(([botId]) => botId);
+  const failed = [...latestByBot].filter(([, status]) => status === "failed").map(([botId]) => botId);
+  const botIds = stopped.length ? stopped : failed;
+  if (!botIds.length) return undefined;
+  const blocks = Array.isArray(request.blocks) ? (request.blocks as MessageBlock[]) : [];
+  const requestText = blocks
+    .flatMap((block) => (block.kind === "text" ? [block.text] : []))
+    .join("\n\n")
+    .trim();
+  return { botIds, requestText };
 }

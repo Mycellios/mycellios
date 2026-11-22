@@ -50,6 +50,7 @@ function deps(
         .mockResolvedValue(options.senderRunning === false ? null : { id: "run-1" }),
       findUnique: vi.fn().mockResolvedValue({ status: "running" }),
       create: vi.fn().mockResolvedValue({ id: "run-2" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     bot: {
       findFirst: vi.fn().mockResolvedValue(options.targetArchived ? null : { id: "bot-target" }),
@@ -62,6 +63,12 @@ function deps(
     },
     event: { create: vi.fn().mockResolvedValue({ seq: 7 }) },
     thread: { update: vi.fn().mockResolvedValue({}) },
+    botMessageRequest: { create: vi.fn().mockResolvedValue({ id: "request-1" }) },
+    botMessageRecipient: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
   };
   let transactionAttempts = 0;
   const prisma = {
@@ -824,5 +831,154 @@ describe("teammate reply after tasks the request opened", () => {
     const outbound = harness.tx.message.create.mock.calls[0]?.[0] as { data: { blocks: Array<{ text: string; intent: string }> } };
     expect(outbound.data.blocks[0]?.intent).toBe("status");
     expect(outbound.data.blocks[0]?.text).toMatch(/^Status: blocked\.[\s\S]*First half of the draft/);
+  });
+});
+
+describe("messages to several teammates", () => {
+  const team = [
+    { id: "bot-sender", name: "Researcher", title: "", thread: { id: "thread-sender" } },
+    { id: "bot-a", name: "Analyst", title: "", thread: { id: "thread-a" } },
+    { id: "bot-b", name: "Writer", title: "", thread: { id: "thread-b" } },
+  ];
+
+  it("delivers one copy and one turn per recipient and opens one request for their answers", async () => {
+    const harness = deps({ bots: team });
+    let nextRun = 0;
+    harness.tx.run.create.mockImplementation(async () => ({ id: `run-new-${++nextRun}` }));
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_ids: ["bot-a", "bot-b", "bot-a"],
+      message: "Check the draft numbers",
+    });
+
+    expect(sent).toMatchObject({
+      ok: true,
+      recipients: [
+        { botId: "bot-a", name: "Analyst" },
+        { botId: "bot-b", name: "Writer" },
+      ],
+    });
+    expect(sent.ok && sent.note).toContain("come back together");
+    const created = harness.tx.message.create.mock.calls.map(
+      ([call]) => (call as { data: { threadId: string; blocks: Array<Record<string, unknown>> } }).data,
+    );
+    expect(created.map((row) => row.threadId)).toEqual(["thread-sender", "thread-a", "thread-b"]);
+    expect(created[0]?.blocks[0]).toMatchObject({
+      kind: "bot_message_sent",
+      recipients: [
+        { botId: "bot-a", botName: "Analyst" },
+        { botId: "bot-b", botName: "Writer" },
+      ],
+    });
+    expect(created[1]?.blocks[0]).toMatchObject({ kind: "bot_message_received", recipientCount: 2 });
+    expect(harness.tx.botMessageRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ senderBotId: "bot-sender", senderThreadId: "thread-sender" }),
+      }),
+    );
+    expect(harness.tx.botMessageRecipient.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({ requestId: "request-1", botId: "bot-a", runId: "run-new-1" }),
+        expect.objectContaining({ requestId: "request-1", botId: "bot-b", runId: "run-new-2" }),
+      ],
+    });
+    expect(harness.enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses more than 32 recipients", async () => {
+    const harness = deps({ bots: team });
+    const sent = await messageBot(harness.deps, run, sender, {
+      bot_ids: Array.from({ length: 33 }, (_, index) => `bot-${index}`),
+      message: "hello",
+    });
+    expect(sent).toEqual({ ok: false, error: "message at most 32 teammates at once" });
+    expect(harness.tx.message.create).not.toHaveBeenCalled();
+  });
+
+  it("sends information that expects no reply as an update without a request", async () => {
+    const harness = deps({ bots: team });
+    await messageBot(harness.deps, run, sender, {
+      bot_ids: ["bot-a"],
+      message: "The release moved to Friday",
+      expects_reply: false,
+    });
+    const inbound = harness.tx.message.create.mock.calls[1]?.[0] as {
+      data: { blocks: Array<Record<string, unknown>> };
+    };
+    expect(inbound.data.blocks[0]).toMatchObject({ kind: "bot_message_received", intent: "fyi" });
+    expect(harness.tx.botMessageRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("shares attached files with every recipient", async () => {
+    const harness = deps({ bots: team });
+    const file = { kind: "file" as const, artifactId: "artifact-1", mimeType: "text/csv", name: "q3.csv", size: 12 };
+    await messageBot(harness.deps, run, sender, {
+      bot_ids: ["bot-a", "bot-b"],
+      message: "Numbers attached",
+      attachments: [file],
+    });
+    const blocks = harness.tx.message.create.mock.calls.map(
+      ([call]) => (call as { data: { blocks: unknown[] } }).data.blocks,
+    );
+    expect(blocks.every((row) => row.includes(file))).toBe(true);
+  });
+
+  it("holds an answer while another recipient of the same request still works", async () => {
+    const harness = deps({
+      bots: team,
+      hopBlocks: [
+        {
+          kind: "bot_message_received",
+          fromBotId: "bot-a",
+          fromBotName: "Analyst",
+          text: "look this up",
+          hop: 1,
+          intent: "request",
+          returnToMessageId: "message-request",
+          recipientCount: 2,
+        },
+      ],
+    });
+    harness.tx.run.findFirst.mockResolvedValue({ id: "run-1", status: "completed" });
+    harness.tx.botMessageRecipient.findUnique.mockResolvedValue({ id: "recipient-1", requestId: "request-1" });
+    const recipients = [
+      { id: "recipient-1", botId: "bot-sender", runId: "run-1", state: "asked", answerMessageId: null, bot: { name: "Researcher" } },
+      { id: "recipient-2", botId: "bot-b", runId: "run-9", state: "asked", answerMessageId: null, bot: { name: "Writer" } },
+    ];
+    Object.assign(harness.tx, {
+      botMessageRequest: {
+        create: vi.fn(),
+        findUnique: vi.fn().mockResolvedValue({
+          id: "request-1",
+          spaceId: run.spaceId,
+          userId: run.userId,
+          senderBotId: "bot-a",
+          senderThreadId: "thread-a",
+          groupId: null,
+          settledAt: null,
+          resumeRunId: null,
+          recipients,
+        }),
+        updateMany: vi.fn(),
+      },
+    });
+
+    const sent = await messageBot(
+      harness.deps,
+      { ...run, sourceMessageId: "message-source" },
+      sender,
+      { bot_id: "bot-a", message: "Status: done", intent: "result", deliveryKey: "auto-outcome:run-1" },
+      { allowTerminalSource: true },
+    );
+
+    expect(sent.ok).toBe(true);
+    expect(harness.tx.botMessageRecipient.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "recipient-1", state: "asked" }),
+        data: expect.objectContaining({ state: "replied", answerMessageId: "message-1" }),
+      }),
+    );
+    // The answer is in the sender's chat, but no turn starts until the other recipient settles.
+    expect(harness.tx.run.create).not.toHaveBeenCalled();
+    expect(harness.enqueue).not.toHaveBeenCalled();
   });
 });

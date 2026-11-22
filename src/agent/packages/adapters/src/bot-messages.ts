@@ -1,10 +1,17 @@
 import { runContinueJob } from "@mycellios/adapter-kit";
-import type { BotMessageIntent, MessageBlock } from "@mycellios/contracts";
+import {
+  BOT_MESSAGE_MAX_FILES,
+  BOT_MESSAGE_MAX_RECIPIENTS,
+  type BotMessageIntent,
+  type MessageBlock,
+} from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
   BOT_MESSAGE_MAX_LENGTH,
   botMessageContext,
+  botMessageExpectsReply,
   botMessageHopExhausted,
+  botMessageIntentFor,
   buildBotMessageWakePrompt,
   clampBotMessage,
   interruptedTaskReply,
@@ -14,10 +21,17 @@ import {
   taskReportNoncePrefix,
 } from "@mycellios/core";
 import {
+  addBotMessageRecipientsInTransaction,
   agentTasksStartedByRun,
   appendEventInTransaction,
+  createBotMessageRequestInTransaction,
   createThreadMessageInTransaction,
+  lockRequestOfRecipientRun,
+  markRequestSettledInTransaction,
+  type Prisma,
   type PrismaClient,
+  releaseBotMessageRequestInTransaction,
+  settleRecipientInTransaction,
   withTransactionRetry,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
@@ -67,6 +81,14 @@ export async function loadBotMessageContext(
   return { ...context, repliesToRequest };
 }
 
+type AttachmentBlock = Extract<MessageBlock, { kind: "file" | "image" }>;
+
+/**
+ * Deliver a message from one Mico to one or more teammates (1 to 32), each into its own chat
+ * where it wakes its own turn. Files are shared as owner/Space artifacts already attached by
+ * the caller. A request or question opens a request row: answers from several recipients are
+ * held until every one has answered, failed or been stopped, then come back in one turn.
+ */
 export async function messageBot(
   deps: Pick<ExecutorDeps, "prisma" | "events" | "jobs">,
   run: {
@@ -80,9 +102,13 @@ export async function messageBot(
   sender: { id: string; name: string },
   input: {
     bot_id?: string;
+    bot_ids?: readonly string[];
     confirm_name?: string;
     message: string;
     intent?: BotMessageIntent;
+    expects_reply?: boolean;
+    reply_to_message_id?: string;
+    attachments?: readonly AttachmentBlock[];
     deliveryKey?: string;
   },
   options?: { allowTerminalSource?: boolean; forceUnread?: boolean },
@@ -95,30 +121,58 @@ export async function messageBot(
       error: `message exceeds the ${BOT_MESSAGE_MAX_LENGTH} character limit`,
     };
   }
+  const attachments = [...(input.attachments ?? [])];
+  if (attachments.length > BOT_MESSAGE_MAX_FILES) {
+    return { ok: false as const, error: `share at most ${BOT_MESSAGE_MAX_FILES} files per message` };
+  }
 
   const sourceContext = await loadBotMessageContext(deps.prisma, run.sourceMessageId);
-  const intent = input.intent ?? "request";
+  const intent = botMessageIntentFor(input.intent, input.expects_reply);
   const hop = nextBotMessageHop(sourceContext?.hop);
 
   const candidates = await deps.prisma.bot.findMany({
     where: { spaceId: run.spaceId, userId: run.userId, archivedAt: null },
     select: { id: true, name: true, title: true, thread: { select: { id: true } } },
   });
-  const target = resolveBotAddress(candidates, {
-    botId: input.bot_id,
-    name: input.confirm_name,
-  });
-  if (!target) return { ok: false as const, error: "no bot found with that id or name" };
-  if (target.id === sender.id) return { ok: false as const, error: "a bot cannot message itself" };
-  if (!target.thread)
-    return { ok: false as const, error: `${target.name} has no chat to deliver to` };
+  const requestedIds = [
+    ...new Set(
+      [...(input.bot_ids ?? []), ...(input.bot_id ? [input.bot_id] : [])]
+        .map((id) => String(id).trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (requestedIds.length > BOT_MESSAGE_MAX_RECIPIENTS) {
+    return {
+      ok: false as const,
+      error: `message at most ${BOT_MESSAGE_MAX_RECIPIENTS} teammates at once`,
+    };
+  }
+  const targets: typeof candidates = [];
+  if (requestedIds.length) {
+    for (const botId of requestedIds) {
+      const found = resolveBotAddress(candidates, { botId });
+      if (!found) return { ok: false as const, error: "no bot found with that id or name" };
+      targets.push(found);
+    }
+  } else {
+    const found = resolveBotAddress(candidates, { name: input.confirm_name });
+    if (!found) return { ok: false as const, error: "no bot found with that id or name" };
+    targets.push(found);
+  }
+  if (targets.some((target) => target.id === sender.id))
+    return { ok: false as const, error: "a bot cannot message itself" };
+  const unreachable = targets.find((target) => !target.thread);
+  if (unreachable)
+    return { ok: false as const, error: `${unreachable.name} has no chat to deliver to` };
+  const single = targets.length === 1 ? targets[0] : undefined;
+  const replyTarget = single && sourceContext?.fromBotId === single.id ? single : undefined;
   const returnsToSender =
     options?.allowTerminalSource === true &&
     (intent === "result" || intent === "status") &&
     (sourceContext?.intent === undefined ||
       sourceContext.intent === "request" ||
       sourceContext.intent === "question") &&
-    sourceContext?.fromBotId === target.id;
+    Boolean(replyTarget);
   if (botMessageHopExhausted(hop) && !returnsToSender) {
     return {
       ok: false as const,
@@ -126,57 +180,58 @@ export async function messageBot(
         "bot-to-bot message limit reached for this chain; report back to the user instead of messaging another bot",
     };
   }
-
-  const targetThreadId = target.thread.id;
+  if (input.reply_to_message_id && !single) {
+    return { ok: false as const, error: "reply_to_message_id needs exactly one recipient" };
+  }
+  const senderMainThreadId = candidates.find((bot) => bot.id === sender.id)?.thread?.id ?? run.threadId;
+  const opensRequest = botMessageExpectsReply(intent);
+  // An answer goes back to the teammate whose request woke this turn.
+  const answersRequest = Boolean(replyTarget) && (intent === "result" || intent === "status");
 
   // A tool call can be re-executed after a lease expiry, so a delivery has to be
   // replayable: without this the recipient is messaged twice and woken twice.
   const deliveryKey = input.deliveryKey ? `bot-message:${input.deliveryKey}` : undefined;
+  const names = targets.map((target) => target.name);
   const replayed = () =>
     ({
       ok: true as const,
-      botId: target.id,
-      name: target.name,
+      botId: targets[0]!.id,
+      name: targets[0]!.name,
+      ...(single ? {} : { recipients: targets.map((target) => ({ botId: target.id, name: target.name })) }),
       delivered: message,
       replayed: true as const,
-      note: `Already sent to ${target.name} in this turn; it was not sent again.`,
+      note: `Already sent to ${names.join(", ")} in this turn; it was not sent again.`,
     }) as const;
 
   const wakePrompt = buildBotMessageWakePrompt({ from: sender, text: message, intent });
   const outboundBlock: MessageBlock = {
     kind: "bot_message_sent",
-    toBotId: target.id,
-    toBotName: target.name,
+    toBotId: targets[0]!.id,
+    toBotName: targets[0]!.name,
     text: message,
     intent,
+    ...(single ? {} : { recipients: targets.map((target) => ({ botId: target.id, botName: target.name })) }),
   };
 
-  let committed:
-    | {
-        ok: true;
-        runId: string;
-        targetEventSeq: number;
-        senderEventSeq: number;
-      }
-    | {
-        ok: false;
-        error: string;
-      }
-    | {
-        ok: true;
-        replayed: true;
-      };
+  type Committed =
+    | { ok: true; runIds: string[]; notices: Array<{ threadId: string; seq: number }>; requestId?: string; held: boolean }
+    | { ok: false; error: string }
+    | { ok: true; replayed: true };
+  let committed: Committed;
   try {
     committed = await withTransactionRetry(() =>
-      deps.prisma.$transaction(async (tx) => {
-        for (const threadId of [run.threadId, targetThreadId].sort()) {
+      deps.prisma.$transaction(async (tx): Promise<Committed> => {
+        const threadIds = [...new Set([run.threadId, ...targets.map((target) => target.thread!.id)])].sort();
+        for (const threadId of threadIds) {
           await tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
         }
         // Claim the delivery key inside the transaction so a concurrent retry
         // either sees the winner or loses on the unique (threadId, clientNonce).
         if (deliveryKey) {
           const already = await tx.message.findUnique({
-            where: { threadId_clientNonce: { threadId: targetThreadId, clientNonce: deliveryKey } },
+            where: {
+              threadId_clientNonce: { threadId: targets[0]!.thread!.id, clientNonce: deliveryKey },
+            },
             select: { id: true },
           });
           if (already) return { ok: true as const, replayed: true as const };
@@ -193,88 +248,136 @@ export async function messageBot(
               ? { in: ["completed", "failed", "cancelled"] }
               : "running",
           },
-          select: { id: true },
+          select: { id: true, status: true },
         });
         if (!senderStillRunning)
           return { ok: false as const, error: "source run is no longer active" };
 
-        // Re-read the target inside the transaction: it can be archived between
+        // Re-read the targets inside the transaction: one can be archived between
         // resolving it above and committing here.
-        const stillAddressable = await tx.bot.findFirst({
-          where: {
-            id: target.id,
-            spaceId: run.spaceId,
-            userId: run.userId,
-            archivedAt: null,
-          },
-          select: { id: true },
-        });
-        if (!stillAddressable)
-          return { ok: false as const, error: `${target.name} is no longer available` };
+        for (const target of targets) {
+          const stillAddressable = await tx.bot.findFirst({
+            where: { id: target.id, spaceId: run.spaceId, userId: run.userId, archivedAt: null },
+            select: { id: true },
+          });
+          if (!stillAddressable)
+            return { ok: false as const, error: `${target.name} is no longer available` };
+        }
+
+        let replyToMessageId: string | undefined;
+        if (input.reply_to_message_id) {
+          const replied = await tx.message.findFirst({
+            where: {
+              id: input.reply_to_message_id,
+              threadId: { in: [...new Set([run.threadId, senderMainThreadId])] },
+            },
+            select: { blocks: true },
+          });
+          const received = (Array.isArray(replied?.blocks) ? (replied.blocks as MessageBlock[]) : []).find(
+            (block): block is Extract<MessageBlock, { kind: "bot_message_received" }> =>
+              block.kind === "bot_message_received" && block.fromBotId === single!.id,
+          );
+          if (!received)
+            return {
+              ok: false as const,
+              error: `reply_to_message_id is not a message ${single!.name} sent you`,
+            };
+          replyToMessageId = received.returnToMessageId;
+        }
+
+        // The request this message answers, locked so a stop or the reconciler cannot settle
+        // it at the same time.
+        const answering = answersRequest ? await lockRequestOfRecipientRun(tx, run.id) : null;
+        const answerRequest = answering && !answering.request.settledAt ? answering : null;
+        const answerSettles =
+          Boolean(answerRequest) &&
+          (intent === "result" || senderStillRunning.status !== "running");
+        const holdsAnswer = Boolean(answerRequest) && answerRequest!.request.recipients.length > 1;
 
         // Echo into the sender's chat in the same transaction so a failed notify
         // cannot leave one side delivered and the other blank.
         const outbound = await createThreadMessageInTransaction(tx, {
           threadId: run.threadId,
           role: "bot",
-          blocks: [outboundBlock],
+          blocks: [outboundBlock, ...attachments],
           botId: run.botId,
           runId: run.id,
           markUnread: options?.forceUnread === true,
           allowCancelledRun: options?.allowTerminalSource === true,
         });
-        const inboundBlock: MessageBlock = {
-          kind: "bot_message_received",
-          fromBotId: sender.id,
-          fromBotName: sender.name,
-          text: message,
-          hop,
-          intent,
-          returnToMessageId: outbound.id,
-        };
-        const inbound = await createThreadMessageInTransaction(tx, {
-          threadId: targetThreadId,
-          role: "user",
-          blocks: [inboundBlock],
-          replyToMessageId:
-            sourceContext?.fromBotId === target.id && intent !== "fyi"
-              ? sourceContext.returnToMessageId
-              : undefined,
-          clientNonce: deliveryKey,
-          markUnread: options?.forceUnread === true,
-        });
-        const task = await tx.task.create({
-          data: {
-            spaceId: run.spaceId,
-            botId: target.id,
+        const requestId = opensRequest
+          ? await createBotMessageRequestInTransaction(tx, {
+              spaceId: run.spaceId,
+              userId: run.userId,
+              senderBotId: sender.id,
+              senderThreadId: senderMainThreadId,
+              senderRunId: run.id,
+            })
+          : undefined;
+        const runIds: string[] = [];
+        const notices: Array<{ threadId: string; seq: number }> = [];
+        const recipients: Array<{ botId: string; runId: string }> = [];
+        for (const target of targets) {
+          const targetThreadId = target.thread!.id;
+          const inboundBlock: MessageBlock = {
+            kind: "bot_message_received",
+            fromBotId: sender.id,
+            fromBotName: sender.name,
+            text: message,
+            hop,
+            intent,
+            returnToMessageId: outbound.id,
+            ...(single ? {} : { recipientCount: targets.length }),
+          };
+          const inbound = await createThreadMessageInTransaction(tx, {
             threadId: targetThreadId,
-            userId: run.userId,
-            prompt: wakePrompt,
-            status: "queued",
-          },
-        });
-        const nextRun = await tx.run.create({
-          data: {
+            role: "user",
+            blocks: [inboundBlock, ...attachments],
+            replyToMessageId:
+              replyToMessageId ??
+              (replyTarget && intent !== "fyi" ? sourceContext?.returnToMessageId : undefined),
+            clientNonce: deliveryKey,
+            markUnread: options?.forceUnread === true,
+          });
+          let nextRunId: string | null = null;
+          if (answerRequest && answerSettles) {
+            const state = senderStillRunning.status === "running" || senderStillRunning.status === "completed"
+              ? "replied"
+              : "failed";
+            const { remaining } = await settleRecipientInTransaction(
+              tx,
+              answerRequest.request,
+              answerRequest.recipientId,
+              state,
+              inbound.id,
+            );
+            if (holdsAnswer) {
+              // Answers to a request sent to several teammates start the sender's turn together.
+              if (remaining === 0) {
+                nextRunId = (await releaseBotMessageRequestInTransaction(tx, answerRequest.request)).runId;
+              }
+            } else {
+              nextRunId = await queueWakeRun(tx, run, target.id, targetThreadId, wakePrompt, inbound.id);
+              await markRequestSettledInTransaction(tx, answerRequest.request.id, nextRunId);
+            }
+          } else if (!(answerRequest && holdsAnswer)) {
+            nextRunId = await queueWakeRun(tx, run, target.id, targetThreadId, wakePrompt, inbound.id);
+          }
+          if (nextRunId) {
+            runIds.push(nextRunId);
+            if (requestId) recipients.push({ botId: target.id, runId: nextRunId });
+          }
+          const inboundEvent = await appendEventInTransaction(tx, {
             spaceId: run.spaceId,
-            botId: target.id,
             threadId: targetThreadId,
-            taskId: task.id,
-            userId: run.userId,
-            status: "queued",
-            trigger: "bot_message",
-            sourceMessageId: inbound.id,
-          },
-          select: { id: true },
-        });
-        await tx.message.update({ where: { id: inbound.id }, data: { runId: nextRun.id } });
-        const inboundEvent = await appendEventInTransaction(tx, {
-          spaceId: run.spaceId,
-          threadId: targetThreadId,
-          botId: target.id,
-          type: "thread.message.created",
-          runId: nextRun.id,
-          payload: { messageId: inbound.id, role: "user", blocks: [inboundBlock] },
-        });
+            botId: target.id,
+            type: "thread.message.created",
+            runId: nextRunId ?? undefined,
+            payload: { messageId: inbound.id, role: "user", blocks: [inboundBlock, ...attachments] },
+          });
+          notices.push({ threadId: targetThreadId, seq: inboundEvent.seq });
+        }
+        if (requestId) await addBotMessageRecipientsInTransaction(tx, run, requestId, recipients);
         const outboundEvent = await appendEventInTransaction(tx, {
           spaceId: run.spaceId,
           threadId: run.threadId,
@@ -282,14 +385,10 @@ export async function messageBot(
           type: "thread.message.created",
           runId: run.id,
           allowCancelledRun: options?.allowTerminalSource === true,
-          payload: { messageId: outbound.id, role: "bot", blocks: [outboundBlock] },
+          payload: { messageId: outbound.id, role: "bot", blocks: [outboundBlock, ...attachments] },
         });
-        return {
-          ok: true as const,
-          runId: nextRun.id,
-          targetEventSeq: inboundEvent.seq,
-          senderEventSeq: outboundEvent.seq,
-        };
+        notices.push({ threadId: run.threadId, seq: outboundEvent.seq });
+        return { ok: true as const, runIds, notices, requestId, held: Boolean(answerRequest && holdsAnswer) };
       }),
     );
   } catch (error) {
@@ -297,7 +396,9 @@ export async function messageBot(
     // loser hits the unique key. Treat that as a successful replay.
     if (deliveryKey && isUniqueConstraintError(error)) {
       const winner = await deps.prisma.message.findUnique({
-        where: { threadId_clientNonce: { threadId: targetThreadId, clientNonce: deliveryKey } },
+        where: {
+          threadId_clientNonce: { threadId: targets[0]!.thread!.id, clientNonce: deliveryKey },
+        },
         select: { id: true },
       });
       if (winner) return replayed();
@@ -307,23 +408,59 @@ export async function messageBot(
   if ("replayed" in committed) return replayed();
   if (!committed.ok) return committed;
 
-  await deps.events.notify(targetThreadId, committed.targetEventSeq).catch((error) => {
-    getLogger().error("bot message realtime notification", error);
-  });
-  await deps.events.notify(run.threadId, committed.senderEventSeq).catch((error) => {
-    getLogger().error("bot message sender echo notification", error);
-  });
-  await deps.jobs.enqueue(runContinueJob(committed.runId)).catch((error) => {
-    // The queued run is durable; the job reconciler repairs a missed wake.
-    getLogger().error("bot message enqueue", error);
-  });
+  for (const notice of committed.notices) {
+    await deps.events.notify(notice.threadId, notice.seq).catch((error) => {
+      getLogger().error("bot message realtime notification", error);
+    });
+  }
+  for (const runId of committed.runIds) {
+    await deps.jobs.enqueue(runContinueJob(runId)).catch((error) => {
+      // The queued run is durable; the job reconciler repairs a missed wake.
+      getLogger().error("bot message enqueue", error);
+    });
+  }
+  const waiting = !committed.requestId
+    ? " Continue independent work; send another update later only if it adds something new."
+    : targets.length > 1
+      ? " Their answers come back together in one later turn, once each has answered or been stopped. Continue independent work, then end this turn; do not poll or wait."
+      : " A reply wakes you later as a new message. Continue independent work; send another update later only if it adds something new.";
   return {
     ok: true as const,
-    botId: target.id,
-    name: target.name,
+    botId: targets[0]!.id,
+    name: targets[0]!.name,
+    ...(single ? {} : { recipients: targets.map((target) => ({ botId: target.id, name: target.name })) }),
     delivered: message,
-    note: `Sent to ${target.name}. Delivery is async; a reply wakes you later as a new message. Continue independent work; send another update later only if it adds something new.`,
+    ...(attachments.length ? { files: attachments.map((block) => block.name) } : {}),
+    note: `Sent to ${names.join(", ")}. Delivery is async.${waiting}`,
   };
+}
+
+async function queueWakeRun(
+  tx: Prisma.TransactionClient,
+  run: { spaceId: string; userId: string },
+  botId: string,
+  threadId: string,
+  prompt: string,
+  sourceMessageId: string,
+): Promise<string> {
+  const task = await tx.task.create({
+    data: { spaceId: run.spaceId, botId, threadId, userId: run.userId, prompt, status: "queued" },
+  });
+  const nextRun = await tx.run.create({
+    data: {
+      spaceId: run.spaceId,
+      botId,
+      threadId,
+      taskId: task.id,
+      userId: run.userId,
+      status: "queued",
+      trigger: "bot_message",
+      sourceMessageId,
+    },
+    select: { id: true },
+  });
+  await tx.message.update({ where: { id: sourceMessageId }, data: { runId: nextRun.id } });
+  return nextRun.id;
 }
 
 /** Return a delegated run's terminal outcome unless it already sent one explicitly. */

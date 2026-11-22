@@ -7059,3 +7059,111 @@ msgstr "대기 취소"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "이벤트 대기 중"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "답장 기다리는 중"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "답장 {total}개 중 {done}개 도착"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "{group}에서"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name}이(가) 곧 시작합니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name}이(가) 작업 중입니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name}에게 도움이 필요합니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name}이(가) 답장했습니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name}이(가) 마치지 못했습니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name}이(가) 중지되었습니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "{name} 중지"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "이 목록 숨기기"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "목록을 업데이트하지 못했습니다. 다시 시도하세요."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name}이(가) 작업을 중지하는 중입니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "{name}의 작업이 중지되었습니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "다시 배정…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name}이(가) 다른 작업을 기다리고 있습니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name}이(가) 위임된 작업을 하고 있습니다"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "작업 취소"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "작업 다시 배정"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "{peer}에게 알렸습니다"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "{peer}의 업데이트"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "목적"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "이 그룹은 무엇을 위한 것인가요?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "리더"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "아무 멤버도 지목하지 않은 메시지를 받고, 다른 멤버가 더 적합하면 넘깁니다."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "그룹에 보내기"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "{groupName}에 보내기"

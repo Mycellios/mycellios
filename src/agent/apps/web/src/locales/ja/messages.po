@@ -7060,3 +7060,111 @@ msgstr "待機をキャンセル"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "イベントを待機中"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "返信待ち"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{total} 件中 {done} 件の返信"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "{group} で"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} が次に対応します"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} が作業中です"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} があなたを必要としています"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} が返信しました"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} は完了できませんでした"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} は停止されました"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "{name} を停止"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "このリストを非表示"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "リストを更新できませんでした。もう一度お試しください。"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} がタスクを停止しています"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "{name} のタスクは停止中です"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "再割り当て…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} は他の作業を待っています"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} が委任されたタスクに取り組んでいます"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "タスクをキャンセル"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "タスクを再割り当て"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "{peer}に知らせました"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "{peer}からの更新"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "目的"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "このグループの目的は？"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "リーダー"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "どのメンバーも指名していないメッセージを受け取り、ほかのメンバーが適任ならそちらに渡します。"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "グループに送信"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "{groupName} に送信"

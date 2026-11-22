@@ -22,6 +22,8 @@ vi.mock("@mycellios/ui-web", async (importOriginal) => {
     BotAvatar: () => <span />,
     Button: (props: ComponentProps<"button">) => <button {...props} />,
     Input: (props: ComponentProps<"input">) => <input {...props} />,
+    Textarea: (props: ComponentProps<"textarea">) => <textarea {...props} />,
+    NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
     AlertDialog: ({
       children,
       onOpenChange,
@@ -355,5 +357,43 @@ describe("GroupSettings", () => {
         .querySelector('[role="checkbox"][aria-label="Remove Researcher from the group"]')
         ?.getAttribute("aria-checked"),
     ).toBe("true");
+  });
+});
+
+describe("group purpose and lead", () => {
+  const setValue = async (element: HTMLTextAreaElement | HTMLSelectElement, value: string) => {
+    await act(async () => {
+      const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLSelectElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(element, value);
+      element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
+    });
+  };
+
+  it("shows the first member as lead until the person chooses one, and saves only what changed", async () => {
+    const onSave = vi.fn(async () => undefined);
+    await render({ onSave });
+    const lead = container.querySelector<HTMLSelectElement>("select")!;
+    expect(lead.value).toBe("bot-1");
+    expect([...lead.options].map((option) => option.value)).toEqual(["bot-1", "bot-2"]);
+    await setValue(container.querySelector("textarea")!, "  Ship the Q3 launch  ");
+    await setValue(lead, "bot-2");
+    await click("Save");
+    expect(onSave).toHaveBeenCalledWith({
+      name: undefined,
+      botIds: undefined,
+      purpose: "Ship the Q3 launch",
+      leadBotId: "bot-2",
+    });
+  });
+
+  it("keeps a saved purpose and lead when nothing changed", async () => {
+    const onSave = vi.fn(async () => undefined);
+    await render({ onSave, group: { ...group, purpose: "Reviews", leadBotId: "bot-2" } });
+    expect(container.querySelector("textarea")!.value).toBe("Reviews");
+    expect(container.querySelector<HTMLSelectElement>("select")!.value).toBe("bot-2");
+    await click("Save");
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: undefined, leadBotId: undefined }),
+    );
   });
 });

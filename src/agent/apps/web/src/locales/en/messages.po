@@ -14118,3 +14118,107 @@ msgstr "Cancel the wait"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Waiting for an event"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Waiting for replies"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{done} of {total} replies in"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "in {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} picks it up next"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} is working on it"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} needs you"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} replied"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} could not finish"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} was stopped"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "Stop {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Hide this list"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "The list could not be updated. Try again."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} is stopping its task"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "The task for {name} is stopped"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Reassign…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} waits on other work"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} is working on a delegated task"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Cancel task"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "Informed {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Update from {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Purpose"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "What is this group for?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Lead"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Takes the messages that name no member, and hands them on when another member fits better."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Send to group"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "Send to {groupName}"

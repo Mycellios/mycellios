@@ -70,7 +70,7 @@ export function filterBuiltinToolsForThread<T extends { name: string }>(
     (tool) =>
       // In a group the room is the shared surface: hand the stage to a member
       // rather than starting a private thread off to one side.
-      !groupId || tool.name !== "message_bot",
+      !groupId || (tool.name !== "message_bot" && tool.name !== "send_to_group"),
   );
 }
 

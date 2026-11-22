@@ -410,3 +410,25 @@ it("shows a Mico's brief on its side of the task conversation", () => {
   expect(container.querySelector('[data-testid="message-user-bubble"]')).toBeNull();
   expect(brief?.parentElement?.className).not.toContain("items-end");
 });
+
+it("labels teammate messages by what they ask and keeps their text folded until toggled", () => {
+  const label = () => container.querySelector('[data-testid="peer-receipt-chip"]')?.getAttribute("aria-label");
+  renderMessage([{ kind: "bot_message_sent", toBotId: "a", toBotName: "Analyst", text: "Check it", intent: "request" }], existingBot);
+  expect(label()).toBe("Messaged Analyst");
+  renderMessage([{ kind: "bot_message_sent", toBotId: "a", toBotName: "Analyst", text: "FYI", intent: "fyi" }], existingBot);
+  expect(label()).toBe("Informed Analyst");
+  renderMessage([{
+    kind: "bot_message_sent", toBotId: "a", toBotName: "Analyst", text: "Both of you, check it",
+    recipients: [{ botId: "a", botName: "Analyst" }, { botId: "w", botName: "Writer" }],
+  }], existingBot);
+  expect(label()).toBe("Messaged Analyst and Writer");
+  renderMessage([{ kind: "bot_message_received", fromBotId: "a", fromBotName: "Analyst", text: "Please check" }], existingBot, undefined, { role: "user" });
+  expect(label()).toBe("Message from Analyst");
+  renderMessage([{ kind: "bot_message_received", fromBotId: "a", fromBotName: "Analyst", text: "Moved to Friday", intent: "fyi" }], existingBot, undefined, { role: "user" });
+  expect(label()).toBe("Update from Analyst");
+  expect(container.textContent).not.toContain("Moved to Friday");
+  const toggle = container.querySelector<HTMLButtonElement>('[data-testid="peer-replies-toggle"]')!;
+  expect(toggle.getAttribute("aria-label")).toBe("Expand Update from Analyst");
+  act(() => toggle.click());
+  expect(container.querySelector('[data-testid="peer-message-body"]')?.textContent).toBe("Moved to Friday");
+});

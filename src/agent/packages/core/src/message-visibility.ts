@@ -60,9 +60,10 @@ function isAskBlock(block: MessageBlock): boolean {
 }
 
 /**
- * Another bot handing this bot new work: a request or question that does not thread back to a
- * message of this bot's. The run's reply goes back to that bot. Anything else (results, statuses,
- * FYIs, and questions about work this bot delegated) wakes it to speak to the user.
+ * Another bot handing this bot new work or an update: a request, question or FYI that does not
+ * thread back to a message of this bot's. A request's reply goes back to that bot; an update's
+ * quiet reply stays with it. Both fold under the marker. Results, statuses and questions about
+ * work this bot delegated wake it to speak to the user, so their replies stay inline.
  */
 function startsPeerWork(message: PresentableMessage): boolean {
   return (
@@ -70,7 +71,10 @@ function startsPeerWork(message: PresentableMessage): boolean {
     message.blocks.some(
       (block) =>
         block.kind === "bot_message_received" &&
-        (block.intent === undefined || block.intent === "request" || block.intent === "question"),
+        (block.intent === undefined ||
+          block.intent === "request" ||
+          block.intent === "question" ||
+          block.intent === "fyi"),
     )
   );
 }

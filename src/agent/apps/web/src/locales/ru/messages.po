@@ -7060,3 +7060,111 @@ msgstr "Отменить ожидание"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Ждёт события"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Ожидание ответов"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "Получено ответов: {done} из {total}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "в {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} займётся этим следующим"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} работает над этим"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} нужна ваша помощь"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name}: ответ получен"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name}: не удалось закончить"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name}: остановлено"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "Остановить {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Скрыть этот список"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "Не удалось обновить список. Попробуйте ещё раз."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name}: задача останавливается"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "Задача для {name} остановлена"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Переназначить…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} ждёт другую работу"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} работает над делегированной задачей"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Отменить задачу"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "Переназначить задачу"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "Отправлено уведомление {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Обновление от {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Назначение"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "Для чего эта группа?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Ведущий"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Получает сообщения, в которых не назван ни один участник, и передаёт их, если другой участник подходит лучше."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Отправить в группу"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "Отправить в {groupName}"

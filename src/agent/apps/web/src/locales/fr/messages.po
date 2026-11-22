@@ -7060,3 +7060,111 @@ msgstr "Annuler l’attente"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "En attente d’un événement"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "En attente de réponses"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{done} réponses reçues sur {total}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "dans {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} s’en charge ensuite"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} s’en occupe"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} a besoin de vous"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} a répondu"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} n’a pas pu terminer"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} a été arrêté"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "Arrêter {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Masquer cette liste"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "Impossible de mettre à jour la liste. Réessayez."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} arrête sa tâche"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "La tâche de {name} est arrêtée"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Réattribuer…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} attend un autre travail"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} travaille sur une tâche déléguée"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Annuler la tâche"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "Réattribuer la tâche"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "A informé {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Mise à jour de {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Objectif"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "À quoi sert ce groupe ?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Responsable"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Reçoit les messages qui ne nomment aucun membre et les transmet quand un autre membre convient mieux."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Envoyer au groupe"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "Envoyer à {groupName}"

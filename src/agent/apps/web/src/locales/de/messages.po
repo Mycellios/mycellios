@@ -7060,3 +7060,111 @@ msgstr "Warten abbrechen"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Wartet auf ein Ereignis"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Warten auf Antworten"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{done} von {total} Antworten da"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "in {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} übernimmt es als Nächstes"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} arbeitet daran"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} braucht dich"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} hat geantwortet"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} konnte nicht fertig werden"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} wurde gestoppt"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "{name} stoppen"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Diese Liste ausblenden"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "Die Liste konnte nicht aktualisiert werden. Versuche es erneut."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} stoppt die Aufgabe"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "Die Aufgabe für {name} ist gestoppt"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Neu zuweisen…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} wartet auf andere Arbeit"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} arbeitet an einer delegierten Aufgabe"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Aufgabe abbrechen"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "Aufgabe neu zuweisen"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "{peer} informiert"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Update von {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Zweck"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "Wofür ist diese Gruppe da?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Leitung"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Bekommt die Nachrichten, die kein Mitglied nennen, und gibt sie weiter, wenn ein anderes Mitglied besser passt."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "An Gruppe senden"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "An {groupName} senden"

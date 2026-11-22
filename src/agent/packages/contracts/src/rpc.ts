@@ -29,6 +29,11 @@ import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.j
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
 import { SideThreadRequestSchema, SideThreadSchema, SideThreadTargetSchema } from "./side-threads.js";
 import { CancelOpenWaitResultSchema, OpenWaitSchema } from "./event-waits.js";
+import {
+  AwaitingRepliesSchema,
+  HideAwaitingRepliesInputSchema,
+  StopAwaitingReplyInputSchema,
+} from "./awaiting-replies.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
@@ -1405,6 +1410,12 @@ export const appContract = {
     waits: oc.input(z.object({ botId: Id, threadId: Id })).output(z.array(OpenWaitSchema)),
     /** "Cancel the wait": the existing durable cancellation; a wait that already woke is not cancelled. */
     cancelWait: oc.input(z.object({ waitId: Id })).output(CancelOpenWaitResultSchema),
+    /** The "Waiting for replies" list of a Mico main chat: its requests to other Micos and delegated tasks. */
+    awaitingReplies: oc.input(z.object({ botId: Id })).output(AwaitingRepliesSchema),
+    /** Stop one recipient of a request; the request settles once every recipient has. */
+    stopAwaitingReply: oc.input(StopAwaitingReplyInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** "Hide this list" on settled requests. */
+    hideAwaitingReplies: oc.input(HideAwaitingRepliesInputSchema).output(z.object({ ok: z.literal(true) })),
 
     get: oc.input(z.object({ runId: Id })).output(
       z.object({

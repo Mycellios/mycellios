@@ -31,6 +31,8 @@ type GroupRecord = {
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  purpose?: string | null;
+  leadBotId?: string | null;
   thread: {
     id: string;
     unread: boolean;
@@ -81,7 +83,15 @@ function mapGroup(group: GroupRecord): Group {
     unread: group.thread.unread,
     updatedAt: group.updatedAt.toISOString(),
     createdAt: group.createdAt.toISOString(),
+    purpose: group.purpose ?? "",
+    leadBotId: groupLeadOf(group),
   };
+}
+
+/** The chosen lead while it is still an active member; otherwise null (the first member leads). */
+function groupLeadOf(group: Pick<GroupRecord, "leadBotId" | "members">): string | null {
+  const lead = group.leadBotId ?? null;
+  return lead && group.members.some((member) => member.bot.id === lead) ? lead : null;
 }
 
 function mapSpaceGroup(group: SpaceGroupRecord): SpaceGroup {
@@ -407,8 +417,14 @@ export function createGroupRepos(prisma: PrismaClient) {
       return group;
     },
 
-    async createGroup(actor: Actor, input: { name: string; botIds: string[] }): Promise<Group> {
+    async createGroup(
+      actor: Actor,
+      input: { name: string; botIds: string[]; purpose?: string; leadBotId?: string },
+    ): Promise<Group> {
       const members = await assertOwnedBots(prisma, actor, input.botIds);
+      if (input.leadBotId && !members.some((member) => member.botId === input.leadBotId)) {
+        throw new IsolationError("The lead must be a member");
+      }
       const created = await prisma.$transaction(async (tx) => {
         await lockSpaceForContentCreation(tx, {
           spaceId: actor.spaceId,
@@ -419,6 +435,8 @@ export function createGroupRepos(prisma: PrismaClient) {
             spaceId: actor.spaceId,
             userId: actor.userId,
             name: displayName(input.name, ""),
+            purpose: input.purpose?.trim() || null,
+            leadBotId: input.leadBotId ?? null,
           },
         });
         await tx.chatGroupMember.createMany({
@@ -452,6 +470,8 @@ export function createGroupRepos(prisma: PrismaClient) {
         expectedBotIds?: string[];
         pinned?: boolean;
         sectionId?: string | null;
+        purpose?: string;
+        leadBotId?: string | null;
       },
     ): Promise<{ group: Group; cancelledRunIds: string[] }> {
       const members = input.botIds ? await assertOwnedBots(prisma, actor, input.botIds) : undefined;
@@ -514,6 +534,26 @@ export function createGroupRepos(prisma: PrismaClient) {
           await tx.chatGroup.update({
             where: { id: input.groupId },
             data: { name: displayName(input.name, "") },
+          });
+        }
+        // The lead must stay a member: naming a non-member is refused, and removing the lead
+        // from the group hands its role back to the first member.
+        if (input.leadBotId && !nextBotIds.has(input.leadBotId)) {
+          throw new IsolationError("The lead must be a member");
+        }
+        const leadBotId =
+          input.leadBotId !== undefined
+            ? input.leadBotId
+            : current.leadBotId && !nextBotIds.has(current.leadBotId)
+              ? null
+              : undefined;
+        if (input.purpose !== undefined || leadBotId !== undefined) {
+          await tx.chatGroup.update({
+            where: { id: input.groupId },
+            data: {
+              ...(input.purpose !== undefined ? { purpose: input.purpose.trim() || null } : {}),
+              ...(leadBotId !== undefined ? { leadBotId } : {}),
+            },
           });
         }
         if (members) {

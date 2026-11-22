@@ -82,6 +82,8 @@ export const DELEGATION_TOOL_NAMES = new Set<string>([
   "delete_bot",
   "handoff_to_bot",
   "message_bot",
+  "interrupt_agent",
+  "send_to_group",
   ...FLEET_TOOL_NAMES,
 ]);
 
@@ -1707,23 +1709,96 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "message_bot",
     description:
-      'Send a useful update, question, or result to another of the user\'s bots. You must call this tool to actually deliver it — writing the message in your own reply text (e.g. "[to Comms] ...") does not send anything and the recipient never sees it. Delivery is async and does not end your turn. Continue independent work; do not poll or send ack-only messages. Later updates only if they add something new.',
+      'Send a useful update, question, request or result to one or more of the user\'s other bots (up to 32 at once), optionally with up to 10 files from your workspace. You must call this tool to actually deliver it — writing the message in your own reply text (e.g. "[to Comms] ...") does not send anything and the recipient never sees it. Delivery is async and does not end your turn. When you ask several teammates, their answers come back together in one later turn, naming anyone who did not answer. Continue independent work; do not poll, wait, or send ack-only or thank-you messages. Later updates only if they add something new.',
     inputSchema: {
       type: "object",
       properties: {
         bot_id: { type: "string", description: "Target bot id from your teammate list." },
+        bot_ids: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          maxItems: 32,
+          description: "Several target bot ids, to send the same message to each of them.",
+        },
         confirm_name: {
           type: "string",
-          description: "Exact name of the target bot when bot_id is omitted.",
+          description: "Exact name of the target bot when no id is given.",
         },
-        message: { type: "string", description: "What to send." },
+        message: {
+          type: "string",
+          description: "What to send. Each recipient sees only this, so make it stand on its own.",
+        },
         intent: {
           type: "string",
           enum: ["request", "result", "question", "status", "fyi"],
           description: "What the recipient should do with this message. Defaults to request.",
         },
+        expects_reply: {
+          type: "boolean",
+          description:
+            "Default true for requests and questions. false sends information the recipient must not answer; it may stay quiet.",
+        },
+        reply_to_message_id: {
+          type: "string",
+          description: "Id of a message that teammate sent you, when this answers that message.",
+        },
+        paths: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 10,
+          description:
+            "Workspace files to share with every recipient; each gets a copy in its own workspace.",
+        },
       },
       required: ["message"],
+    },
+  },
+  {
+    name: "list_agents",
+    readOnly: true,
+    description:
+      "List your teammates (the user's other bots in this space) with what each is doing now: working, queued or ready, queued messages, when its current turn started, whether it waits on the person, its last activity and its open waits. Call it before browsing for something or asking the person to sign in to a site, and before handing out work.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "interrupt_agent",
+    description:
+      "Stop a teammate's current work on something you sent it (a message_bot request or update, or its part of a send_to_group request), for example when the request changed or is no longer needed. It stops only work you started; work the person, a routine or another teammate started is refused. The teammate is told who stopped it and why; answers it already sent stay.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        bot_id: { type: "string", description: "Teammate bot id." },
+        confirm_name: { type: "string", description: "Exact teammate name when bot_id is omitted." },
+        reason: {
+          type: "string",
+          minLength: 1,
+          maxLength: 500,
+          description: "One line on why it should stop.",
+        },
+      },
+      required: ["reason"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "send_to_group",
+    description:
+      "Start work in one of your groups from this chat. The brief goes to the members it names (bot_ids, or @Name in the text), otherwise to the group's lead, and they work on it in the group where the person can follow. Each member's result comes back to your main chat as a teammate answer (together, when several members work on it). The brief must stand on its own: members do not see this chat. Inside a group, use handoff_to_bot instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        group_id: { type: "string", description: "Group id from your groups list." },
+        message: { type: "string", minLength: 1, description: "The self-contained brief." },
+        bot_ids: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 10,
+          description: "Members to give it to; omit to let the lead take it.",
+        },
+      },
+      required: ["group_id", "message"],
+      additionalProperties: false,
     },
   },
   {

@@ -16,7 +16,7 @@ describe("collaboration transcript markers", () => {
 
     expect(html).toContain('data-testid="peer-receipt-chip"');
     expect(html).toContain('aria-label="Message from Research"');
-    expect(html).toContain('class="flex justify-start"');
+    expect(html).toContain('class="flex max-w-full justify-start"');
     expect(html).toContain('class="inline-flex max-w-full');
     expect(html).toContain('class="truncate"');
     expect(html).toContain('data-mico-avatar="plush"');
@@ -54,6 +54,36 @@ describe("collaboration transcript markers", () => {
         onToggle: () => undefined,
       }),
     ).toContain('aria-expanded="true"');
+  });
+
+  it("keeps the message text folded until its own toggle opens it", () => {
+    const html = renderToString(
+      <CollaborationMarker
+        ariaLabel="Update from Research"
+        color="#14B8A6"
+        identity="research"
+        label="Update from Research"
+        onClick={() => undefined}
+        body="The release moved to Friday"
+        toggleLabels={{ expand: "Expand Update from Research", collapse: "Collapse Update from Research" }}
+      />,
+    );
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-label="Expand Update from Research"');
+    expect(html).not.toContain("The release moved to Friday");
+    const open = renderToString(
+      <CollaborationMarker
+        ariaLabel="Update from Research"
+        color="#14B8A6"
+        identity="research"
+        label="Update from Research"
+        onClick={() => undefined}
+        body="The release moved to Friday"
+        replies={{ expanded: true, label: "Collapse Update from Research", onToggle: () => undefined }}
+      />,
+    );
+    expect(open).toContain('data-testid="peer-message-body"');
+    expect(open).toContain("The release moved to Friday");
   });
 
   it("animates the active bot glyph from its run status", () => {

@@ -8,15 +8,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@mycellios/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
-import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, X } from "lucide-react";
+import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Users, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { MessagePinsContext } from "../../components/PinnedMessages";
+import { SEND_TO_GROUP_MENU_LIMIT, SendToGroupContext } from "../../components/SendToGroup";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
 import { copyableMessageText } from "../../lib/message-text";
 
@@ -38,6 +42,7 @@ export function MessageTouchActions({
   message, onReply, onMarkUnread, markedUnread, onReact, onAddRoutine, children,
 }: MessageActions & { children: ReactNode }) {
   const { t } = useLingui();
+  const sendToGroup = useContext(SendToGroupContext);
   const pins=useContext(MessagePinsContext);
   const pinnable=Boolean(pins && !message.id.includes(":") && (message.role==="user"||message.role==="bot"));
   const pinned=pins?.ids.has(message.id)??false;
@@ -107,6 +112,10 @@ export function MessageTouchActions({
           <SheetClose render={<Button variant="ghost" />} onClick={() => onReply(message)}><Reply />{t`Reply`}</SheetClose>
           {onAddRoutine && message.role === "user" && copyableMessageText(message) ? <SheetClose render={<Button variant="ghost" />} onClick={() => onAddRoutine(copyableMessageText(message).slice(0, 80), copyableMessageText(message))}><Repeat2 />{t`Repeat automatically`}</SheetClose> : null}
           {copyableMessageText(message) ? <SheetClose render={<Button variant="ghost" />} onClick={() => copyMessage(message)}><Copy />{t`Copy`}</SheetClose> : null}
+          {sendToGroup && copyableMessageText(message) ? sendToGroup.groups.slice(0, SEND_TO_GROUP_MENU_LIMIT).map((group) => {
+            const groupName = group.name;
+            return <SheetClose key={group.id} render={<Button variant="ghost" />} onClick={() => sendToGroup.send(group.id, copyableMessageText(message))}><Users />{t`Send to ${groupName}`}</SheetClose>;
+          }) : null}
           {canMarkMessageUnread(message) && !markedUnread ? (
             <SheetClose render={<Button variant="ghost" />} onClick={() => onMarkUnread(message)}><MessageSquareDot />{t`Mark as unread`}</SheetClose>
           ) : null}
@@ -126,6 +135,7 @@ export function MessageHoverActions({
   onAddRoutine,
 }: MessageActions & { side: "start" | "end" }) {
   const { t, i18n } = useLingui();
+  const sendToGroup = useContext(SendToGroupContext);
   const pins=useContext(MessagePinsContext);
   const pinnable=Boolean(pins && !message.id.includes(":") && (message.role==="user"||message.role==="bot"));
   const pinned=pins?.ids.has(message.id)??false;
@@ -212,6 +222,27 @@ export function MessageHoverActions({
               <Copy size={14} strokeWidth={1.7} />
               <Trans>Copy</Trans>
             </DropdownMenuItem>
+            {sendToGroup?.groups.length && copyableMessageText(message) ? (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger data-testid="send-to-group">
+                  <Users size={14} strokeWidth={1.7} />
+                  <Trans>Send to group</Trans>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {sendToGroup.groups.slice(0, SEND_TO_GROUP_MENU_LIMIT).map((group) => (
+                    <DropdownMenuItem
+                      key={group.id}
+                      onClick={() => {
+                        setMoreOpen(false);
+                        sendToGroup.send(group.id, copyableMessageText(message));
+                      }}
+                    >
+                      <span dir="auto" className="truncate">{group.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

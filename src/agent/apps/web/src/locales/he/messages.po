@@ -7059,3 +7059,111 @@ msgstr "בטל את ההמתנה"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "ממתין לאירוע"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "ממתין לתשובות"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "התקבלו {done} מתוך {total} תשובות"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "ב-{group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} יטפל בזה בהמשך"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} עובד על זה"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} צריך אותך"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} השיב"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} לא הצליח לסיים"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} נעצר"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "עצור את {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "הסתר רשימה זו"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "לא ניתן לעדכן את הרשימה. נסה שוב."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} עוצר את המשימה"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "המשימה של {name} נעצרה"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "הקצה מחדש…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} ממתין לעבודה אחרת"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} עובד על משימה שהואצלה"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "בטל משימה"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "הקצה משימה מחדש"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "נשלח עדכון אל {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "עדכון מ-{peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "מטרה"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "למה משמשת הקבוצה הזו?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "מוביל"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "מקבל את ההודעות שלא מזכירות אף חבר, ומעביר אותן כשחבר אחר מתאים יותר."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "שלח לקבוצה"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "שלח אל {groupName}"
