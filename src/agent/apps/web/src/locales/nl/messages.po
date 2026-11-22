@@ -7061,6 +7061,210 @@ msgstr "Wachten annuleren"
 msgid "Waiting for an event"
 msgstr "Wacht op een gebeurtenis"
 
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "Er draait nu een routine."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "De Mico werkt hier aan een eigen taak."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "De huidige beurt wacht op je antwoord."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "Hier draait nu niets."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "Dit bericht is al gestart of verwijderd."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "Dit bericht wordt ergens anders bewerkt."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "Deze bewerking is ergens anders gesloten."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "De wachtrij is intussen veranderd. Hij is vernieuwd; probeer het opnieuw."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "Een bericht in de wachtrij heeft tekst of een bestand nodig."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "Alleen een bericht dat je alleen naar deze Mico hebt gestuurd, kan naar een nieuw gesprek."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "Niet doorgegeven: {reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "De wachtrij kon niet worden bijgewerkt. Probeer het opnieuw."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "Bericht in de wachtrij opgeslagen."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "Bericht uit de wachtrij verwijderd."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "Verplaatst naar positie {position} van {total}."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "Verplaatst naar een nieuw gesprek: {title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "Wacht terwijl de computer of de server opnieuw start."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "Gepauzeerd: de laatste beurt bereikte een gebruiks- of tegoedlimiet. Verstuur er nu een als je klaar bent."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "Gepauzeerd: de laatste beurt heeft een aanmelding of een werkende sleutel nodig. Los dat op en verstuur er dan nu een."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "Gepauzeerd terwijl een bericht wordt bewerkt."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "Ze gaan één voor één, na de huidige beurt."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "Berichten die wachten om te worden verstuurd"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "Bericht {position} van {total} in de wachtrij: {preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "Bericht in de wachtrij bewerken"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "Wordt ergens anders bewerkt"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "Wordt bewerkt"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "Toevoegen aan de beurt die nu loopt"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "Toegevoegd aan de huidige beurt."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "De huidige beurt stoppen en dit bericht als volgende versturen"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "Dit bericht wordt nu verstuurd."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "Naar een nieuw gesprek verplaatsen"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "Meer acties voor dit bericht"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "Je bewerkte tekst"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "Wacht op verzenden"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "De wachtrij wacht tot je opslaat of annuleert."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "Niet doorgegeven"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "Nu doorgeven"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "Nu versturen"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "In plaats daarvan hier bewerken"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "Gebruik de pijltjestoetsen omhoog en omlaag om het geselecteerde bericht in de wachtrij te verplaatsen."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "Bericht uit de wachtrij verwijderen?"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "Het wordt ergens anders bewerkt. Verwijderen gooit die bewerking ook weg."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "Behouden"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "Bewerking niet opgeslagen"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "Het bericht is gestart, verwijderd of ergens anders bewerkt voordat je opsloeg. Je tekst staat hieronder."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "In het berichtvak zetten"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, one {Wacht op een vrije plek: # gesprek van deze Mico is bezig.} other {Wacht op een vrije plek: # gesprekken van deze Mico zijn bezig.}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, one {# bestand} other {# bestanden}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "Wachten op werk op de achtergrond…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "Deze runtime voert één taak tegelijk uit, de hoofdchat inbegrepen."
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "Extra taken wachten op hun beurt. De hoofdchat heeft een eigen plek en wacht nooit achter ze."
+
 #: src/pages/shell/message-hover-actions.tsx
 msgid "Branch in new conversation"
 msgstr "Aftakken naar een nieuw gesprek"

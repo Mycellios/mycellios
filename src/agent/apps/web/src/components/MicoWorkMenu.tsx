@@ -206,7 +206,9 @@ export function MicoWorkMenu({
               </NativeSelect>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {policy && policy.effectiveLimit !== policy.limit ? <Trans>This runtime currently runs one task at a time.</Trans> : <Trans>Extra tasks wait their turn.</Trans>}
+              {policy && policy.effectiveLimit !== policy.limit
+                ? <Trans>This runtime runs one task at a time, the main chat included.</Trans>
+                : <Trans>Extra tasks wait their turn. The main chat has its own place and never waits behind them.</Trans>}
             </p>
           </div>
           {error ? (

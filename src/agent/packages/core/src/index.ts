@@ -74,6 +74,7 @@ export * from "./retry-policy.js";
 export * from "./room-settings.js";
 export * from "./run-error.js";
 export * from "./run-state.js";
+export * from "./message-queue.js";
 export * from "./sandbox-command.js";
 export * from "./screen-lease.js";
 export * from "./screen-reconnect.js";

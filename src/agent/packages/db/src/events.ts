@@ -22,6 +22,7 @@ import {
   messagingChannelId,
   planCardResumeText,
   QUEUE_HOLDING_RUN_STATUSES,
+  queueHoldingFailure,
   releasedTakeoverComputerBlocks,
   resolveAskChoice,
   STEERING_CONTINUATION_PROMPT,
@@ -52,6 +53,7 @@ import { recordSecurityEvent } from "./security-events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
 import { type QueuedTaskReport, queueTaskReportInTransaction } from "./agent-tasks.js";
 import { type QueuedRoutineRunMarker, queueRoutineRunMarkerInTransaction } from "./routine-run-markers.js";
+import { compareQueuedRows } from "./queue-order.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -1816,7 +1818,12 @@ async function finalizeRunOnce(
         data: { runId: null },
       });
     }
-    const continuationRunId = await createPendingSteeringRun(tx, input);
+    // A failure the next queued message would repeat (a usage limit, a sign-in) leaves the
+    // queue waiting for the person instead of spending it. A routine's own reported failure
+    // is an answer, not such a failure.
+    const continuationRunId = await createPendingSteeringRun(tx, input, {
+      holdQueue: input.outcome === "failed" && queueHoldingFailure(error) !== null,
+    });
     await tx.bot.update({ where: { id: input.botId }, data: { updatedAt: now } });
     return {
       threadId: lastEvent.threadId,
@@ -1870,10 +1877,17 @@ export async function discardAnsweredSteering(
   });
 }
 
-/** Queue one follow-up when this bot still has unclaimed steering and no live run. */
+/**
+ * Queue one follow-up when this bot still has unclaimed steering and no live run.
+ * The person's queue (queued_user) goes one message per turn in its own order (position),
+ * and stops at a message being edited. It takes its turn among other waiting messages at the
+ * time of its oldest message. `preferMessageId` (Send now) starts that queued message next;
+ * `holdQueue` leaves the queue waiting after a failure the next message would repeat.
+ */
 export async function createPendingSteeringRun(
   tx: Prisma.TransactionClient,
   input: { spaceId: string; threadId: string; botId: string },
+  options: { preferMessageId?: string; holdQueue?: boolean } = {},
 ): Promise<string | null> {
   const active = await tx.run.findFirst({
     where: {
@@ -1894,12 +1908,25 @@ export async function createPendingSteeringRun(
     orderBy: [{ message: { seq: "asc" } }, { id: "asc" }],
   });
   if (pending.length === 0) return null;
+  const queued = pending.filter((item) => item.originTrigger === "queued_user").sort(compareQueuedRows);
+  const others = pending.filter((item) => item.originTrigger !== "queued_user");
+  const preferred = options.preferMessageId
+    ? queued.find((item) => item.messageId === options.preferMessageId && !item.heldBy)
+    : undefined;
+  const head = options.holdQueue || queued[0]?.heldBy ? undefined : queued[0];
+  const queueSeq = Math.min(...queued.map((item) => item.message.seq));
+  const firstOther = others[0];
   // One origin per continuation so a group channel and the owner's private chat are not answered
   // together. The app and the owner's direct line are one private conversation.
-  const origin = steeringOrigin(pending[0]!);
-  const batch = pending[0]!.originTrigger === "queued_user"
-    ? [pending[0]!]
-    : pending.filter((item) => item.originTrigger !== "queued_user" && steeringOrigin(item) === origin);
+  const batch = preferred
+    ? [preferred]
+    : firstOther && (!head || firstOther.message.seq < queueSeq)
+      ? others.filter((item) => steeringOrigin(item) === steeringOrigin(firstOther))
+      : head
+        ? [head]
+        : [];
+  if (batch.length === 0) return null;
+  const origin = steeringOrigin(batch[0]!);
   const source = batch.at(-1)!;
   const modelPin = continuationModelPin(batch);
   const task = await tx.task.create({

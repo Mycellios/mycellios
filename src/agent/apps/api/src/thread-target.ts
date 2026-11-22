@@ -131,7 +131,7 @@ async function resolveThreadLinks(
 }
 
 /** Tells the model which of its conversations the person pointed at, by their titles. */
-function threadLinkPrompt(prompt: string, links: ReadonlyArray<{ title: string }>) {
+export function threadLinkPrompt(prompt: string, links: ReadonlyArray<{ title: string }>) {
   if (!links.length) return prompt;
   const titles = links.map((link) => `“${link.title || "Untitled conversation"}”`).join(", ");
   const line = `The person points at these conversations of yours: ${titles}.`;
@@ -854,7 +854,8 @@ export async function sendThreadMessage(
               botId: target.botId,
               userId: actor.userId,
               runId: input.delivery === "queue" ? null : steersUserMessage(active) ? active.id : null,
-              ...(input.delivery === "queue" ? { originTrigger: "queued_user" } : {}),
+              // A queued message waits at the end of the queue, in the order it was sent.
+              ...(input.delivery === "queue" ? { originTrigger: "queued_user", position: message.seq } : {}),
             },
           });
           await tx.message.update({ where: { id: message.id }, data: { runId: active.id } });
@@ -1017,7 +1018,8 @@ export async function sendThreadMessage(
               botId,
               userId: actor.userId,
               runId: input.delivery === "queue" ? null : steersUserMessage(active) ? active.id : null,
-              ...(input.delivery === "queue" ? { originTrigger: "queued_user" } : {}),
+              // A queued message waits at the end of the queue, in the order it was sent.
+              ...(input.delivery === "queue" ? { originTrigger: "queued_user", position: message.seq } : {}),
             },
           });
           runs.push(active);

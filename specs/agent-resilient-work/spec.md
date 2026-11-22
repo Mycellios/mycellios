@@ -85,8 +85,11 @@ Failure notifications respect existing per-Mico and device preferences and hide
 names when notification previews are disabled.
 
 Pi Micos admit up to four concurrent turns (configurable 1–4), atomically under
-the Bot row lock across workers. One thread still has one live turn. Native engines
-retain one turn until their shared provider sessions are qualified for concurrency.
+the Bot row lock across workers. One thread still has one live turn. The main chat is a
+lane of its own: its turn never counts toward that limit, so it never waits behind side
+conversations, delegated work or routines; side conversations past the limit wait for a
+free slot (specs/mico-message-queue). Native engines retain one turn in total, main chat
+included, until their shared provider sessions are qualified for concurrency.
 Private Pi tasks acquire the existing exclusive computer lease lazily before their
 first file, command or screen operation. This permits independent model/app work
 without overlapping operations on the same computer. No filesystem or provider

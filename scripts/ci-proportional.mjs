@@ -150,6 +150,7 @@ export function planChecks(files, availableAgentTests) {
       [/thread-lifecycle|side-threads|thread-deletion|20261122120000_thread_lifecycle/, 'verify-thread-lifecycle-db.ts', 'conversation lifecycle migration, archive, delete and lock races on isolated PostgreSQL'],
       [/routine-thread|routine-run-markers|verify-routine-isolation|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
       [/conversation-surfaces/, 'verify-conversation-surfaces-db.ts', 'sidebar counts, mark all read and mirrored requests on isolated PostgreSQL'],
+      [/message-queue|queue-order|mico-concurrency|routes\/threads\.ts|20261123090000_message_queue_controls/, 'verify-message-queue-db.ts', 'message queue migration, order, edit holds, Send now, takeover and the main-chat lane on isolated PostgreSQL'],
       [/conversation-branch|thread-lifecycle|artifact-versions/, 'verify-conversation-branch-db.ts', 'branch copies, encryption, idempotency and isolation on isolated PostgreSQL'],
     ]) {
       if (files.some(file => (file.startsWith('src/agent/') || file === primaryAccountBeta) && pattern.test(file)))
