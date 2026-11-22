@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { AppState } from "react-native";
 import { configureMobileMonitoring, reportMobileError, resetMobileMonitoring } from "./monitoring";
 import { API_BASE_STORAGE_KEY, DEFAULT_API } from "./server-config";

@@ -240,7 +240,7 @@ export function isRunTerminalEvent(event: { type: string }): boolean {
   );
 }
 
-export const RESPONSE_STREAMING_STORAGE_KEY = "rakazo.responseStreaming";
+export const RESPONSE_STREAMING_STORAGE_KEY = "mycellios.responseStreaming";
 export type ResponseStreamingPreference = "on" | "off";
 
 /** Nothing saved streams. Only an explicit "off" hides live reply text. Unknown values stay off. */
