@@ -190,4 +190,4 @@ export * from "./web-push.js";
 export * from "./android-fcm.js";
 export * from "./task-reminders.js";
 
-export { reconcileLocalMemoryReviews } from "./local-memory-review.js";
+export { reconcileLocalMemoryReviews, scheduleLocalMemoryReview } from "./local-memory-review.js";

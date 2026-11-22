@@ -21,7 +21,10 @@ export function boundedReviewItems<T>(items:T[],maximum:number,newestFirst=false
  for(const item of newestFirst?[...items].reverse():items){const size=JSON.stringify(item).length+1;if(used+size>maximum)break;result.push(item);used+=size;}
  return newestFirst?result.reverse():result;
 }
-export function reviewDue(userTurns:number,lastMessageAt:Date,interval:number,now=Date.now()){return userTurns>=interval||(userTurns>=3&&now-lastMessageAt.getTime()>=REVIEW_IDLE_MS);}
+export function reviewDue(userTurns: number, lastMessageAt: Date, interval: number, now = Date.now(), archived = false) {
+  return userTurns >= interval ||
+    (userTurns >= 3 && (archived || now - lastMessageAt.getTime() >= REVIEW_IDLE_MS));
+}
 export function reviewPath(scope:"general"|"mico"|"task",key:string,threadId:string){return `${scope==="task"?`tasks/${threadId}/`:""}reviews/${key}.md`;}
 function connection(model:AgentRunModel){
  if(!model.apiKey||!model.baseUrl||!model.id.startsWith("mycellios/managed/"))return null;
@@ -35,12 +38,13 @@ async function call(deps:LocalMemoryReviewDeps,model:AgentRunModel,base:string,p
 }
 /** Scheduling only reads local state and enqueues one replaceable background job. */
 export async function scheduleLocalMemoryReview(deps:Pick<LocalMemoryReviewDeps,"prisma"|"jobs">,threadId:string){
- const thread=await deps.prisma.thread.findUnique({where:{id:threadId}});if(!thread || !(thread.taskBotId??thread.botId) || thread.groupId || thread.externalConversationId)return;
+ const thread=await deps.prisma.thread.findUnique({where:{id:threadId}});if(!thread || thread.deleteAfter || !(thread.taskBotId??thread.botId) || thread.groupId || thread.externalConversationId)return;
  const user=await deps.prisma.user.findUnique({where:{id:thread.userId},select:{micoDefaults:true}});const settings=policy(user?.micoDefaults);if(!settings.enabled||settings.dailyLimitMicrounits===0)return;
  const previous=await deps.prisma.localMemoryReview.findFirst({where:{threadId,generation:thread.historyCompactionGeneration,status:"completed"},orderBy:{lastSeq:"desc"}});
  const turns=await deps.prisma.message.count({where:{threadId,role:"user",seq:{gt:Math.max(previous?.lastSeq??-1,thread.contextStartSeq-1)}}});
  if(turns<3)return;
- await deps.jobs.enqueue(memoryReviewJob(threadId,turns>=settings.interval?undefined:new Date(Date.now()+REVIEW_IDLE_MS)));
+ const runNow = Boolean(thread.archivedAt) || turns >= settings.interval;
+ await deps.jobs.enqueue(memoryReviewJob(threadId, runNow ? undefined : new Date(Date.now() + REVIEW_IDLE_MS)));
 }
 /** Single paid intent per batch. Only receipt GET-equivalent reconciliation follows uncertainty. */
 export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:string):Promise<void>{
@@ -60,10 +64,11 @@ export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:stri
   }catch{return;}
  }
  if(!record){
+  if(thread.deleteAfter)return;
   const previous=await db.localMemoryReview.findFirst({where:{...scope,threadId,generation:thread.historyCompactionGeneration,status:"completed"},orderBy:{lastSeq:"desc"}});
   const messages=(await db.message.findMany({where:{threadId,seq:{gt:Math.max(previous?.lastSeq??-1,thread.contextStartSeq-1)}},orderBy:{seq:"desc"},take:100,select:{id:true,seq:true,role:true,blocks:true,createdAt:true}})).reverse();
   const userTurns=messages.filter(m=>m.role==="user").length;const last=messages.at(-1);if(!last)return;
-  if(!reviewDue(userTurns,last.createdAt,settings.interval)){if(userTurns>=3)await deps.jobs.enqueue(memoryReviewJob(threadId,new Date(last.createdAt.getTime()+REVIEW_IDLE_MS)));return;}
+  if(!reviewDue(userTurns,last.createdAt,settings.interval,Date.now(),Boolean(thread.archivedAt))){if(userTurns>=3)await deps.jobs.enqueue(memoryReviewJob(threadId,new Date(last.createdAt.getTime()+REVIEW_IDLE_MS)));return;}
   const generation=thread.historyCompactionGeneration;
   if(await db.localMemoryReview.findUnique({where:{threadId_generation_lastSeq:{threadId,generation,lastSeq:last.seq}}}))return;
   const bot=await db.bot.findFirst({where:{id:scope.botId,userId:scope.userId,spaceId:scope.spaceId},select:{memoryScope:true}});if(!bot)return;
@@ -90,7 +95,7 @@ export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:stri
   const freshUser=await db.user.findUnique({where:{id:scope.userId},select:{micoDefaults:true}});
   const freshPolicy=policy(freshUser?.micoDefaults);
   const stillOwned=await db.spaceMember.findFirst({where:{spaceId:scope.spaceId,userId:scope.userId},select:{userId:true}});
-  const stillCurrent=await db.thread.findFirst({where:{id:threadId,userId:scope.userId,spaceId:scope.spaceId,historyCompactionGeneration:record.generation,contextStartSeq:thread.contextStartSeq,nextMessageSeq:thread.nextMessageSeq}});
+  const stillCurrent=await db.thread.findFirst({where:{id:threadId,userId:scope.userId,spaceId:scope.spaceId,deleteAfter:null,historyCompactionGeneration:record.generation,contextStartSeq:thread.contextStartSeq,nextMessageSeq:thread.nextMessageSeq}});
   const freshModel=await deps.resolveModel(scope);
   const dailyNow=await db.localMemoryReview.aggregate({where:{userId:scope.userId,spaceId:scope.spaceId,createdAt:{gte:day}},_sum:{maximumMicrounits:true}});
   if(!freshPolicy.enabled||!stillOwned||!stillCurrent||connection(freshModel)?.digest!==conn.digest||(dailyNow._sum.maximumMicrounits??0)>freshPolicy.dailyLimitMicrounits){
@@ -106,7 +111,7 @@ export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:stri
  if(!record||record.status!=="ready")return;
  const result=record.result as any;const facts=Facts.parse(result.facts).facts;
  for(const fact of facts){
-  const freshThread=await db.thread.findFirst({where:{id:threadId,...{userId:scope.userId,spaceId:scope.spaceId},OR:[{botId:scope.botId},{taskBotId:scope.botId}],historyCompactionGeneration:record.generation}});if(!freshThread||freshThread.contextStartSeq!==result.contextStartSeq||freshThread.nextMessageSeq!==result.snapshotSeq){await db.localMemoryReview.update({where:{id:record.id},data:{status:"failed"}});return;}
+  const freshThread=await db.thread.findFirst({where:{id:threadId,...{userId:scope.userId,spaceId:scope.spaceId},OR:[{botId:scope.botId},{taskBotId:scope.botId}],deleteAfter:null,historyCompactionGeneration:record.generation}});if(!freshThread||freshThread.contextStartSeq!==result.contextStartSeq||freshThread.nextMessageSeq!==result.snapshotSeq){await db.localMemoryReview.update({where:{id:record.id},data:{status:"failed"}});return;}
   if(await db.run.findFirst({where:{threadId,status:{in:ACTIVE}},select:{id:true}})){await deps.jobs.enqueue(memoryReviewJob(threadId,new Date(Date.now()+REVIEW_IDLE_MS)));return;}
   const freshUser=await db.user.findUnique({where:{id:scope.userId},select:{micoDefaults:true}});if(!policy(freshUser?.micoDefaults).enabled)return;
   const bot=await db.bot.findFirst({where:{id:scope.botId,userId:scope.userId,spaceId:scope.spaceId},select:{memoryScope:true}});if(!bot)return;

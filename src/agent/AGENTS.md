@@ -212,7 +212,10 @@
   Essential selection is revision-guarded and capped at 8 KiB per scope; searchable
   memories use local lexical relevance and bounded snippets, with no embeddings.
 - memory.review runs outside the answering turn after 20 turns or 15 idle minutes
-  with at least three new user messages (configurable/off). It uses only the Mico's
+  with at least three new user messages (configurable/off). Archiving an owned
+  conversation makes an otherwise eligible review due immediately with the same
+  three-message minimum. Check for pending deletion before submitting a review
+  and before applying its facts. Use only the Mico's
   existing first-party model with a verifiable Credit quote; no unpriced fallback.
   Defaults reserve at most 0.01 Credits per Space/UTC day, 0.002 per review. Claim
   worst-case cost transactionally before a single paid POST, retain uncertain

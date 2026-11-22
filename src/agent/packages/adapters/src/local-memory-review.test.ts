@@ -1,9 +1,39 @@
 import {expect,it,vi} from "vitest";
-import {boundedReviewItems,reviewDue,reviewPath,sanitizeReviewText,reviewLocalMemory} from "./local-memory-review.js";
+import { memoryReviewJob } from "@mycellios/adapter-kit";
+import {boundedReviewItems,reviewDue,reviewPath,sanitizeReviewText,reviewLocalMemory,scheduleLocalMemoryReview} from "./local-memory-review.js";
 it("reviews after the interval or enough new turns and an idle pause",()=>{
  const at=new Date(1000000);expect(reviewDue(20,at,20,1000000)).toBe(true);
  expect(reviewDue(3,at,20,1900000)).toBe(true);expect(reviewDue(2,at,20,9999999)).toBe(false);
  expect(reviewDue(3,at,20,1100000)).toBe(false);
+ expect(reviewDue(3,at,20,1100000,true)).toBe(true);
+ expect(reviewDue(2,at,20,1100000,true)).toBe(false);
+});
+
+it("advances an eligible archived conversation's existing review job", async () => {
+  const enqueue = vi.fn();
+  const conversation = {
+    id: "task", userId: "user", taskBotId: "mico", archivedAt: new Date(),
+    historyCompactionGeneration: 1, contextStartSeq: 4, deleteAfter: null as Date | null,
+  };
+  const count = vi.fn().mockResolvedValue(3);
+  const prisma = {
+    thread: { findUnique: vi.fn().mockResolvedValue(conversation) },
+    user: { findUnique: vi.fn().mockResolvedValue({ micoDefaults: {
+      memoryReview: { enabled: true, interval: 20, dailyLimitMicrounits: 10000 },
+    } }) },
+    localMemoryReview: { findFirst: vi.fn().mockResolvedValue({ lastSeq: 6 }) },
+    message: { count },
+  };
+  const deps = { prisma: prisma as never, jobs: { enqueue } as never };
+  await scheduleLocalMemoryReview(deps, "task");
+  expect(count).toHaveBeenCalledWith({ where: { threadId: "task", role: "user", seq: { gt: 6 } } });
+  expect(enqueue).toHaveBeenCalledWith(memoryReviewJob("task"));
+
+  count.mockResolvedValueOnce(2);
+  await scheduleLocalMemoryReview(deps, "task");
+  conversation.deleteAfter = new Date();
+  await scheduleLocalMemoryReview(deps, "task");
+  expect(enqueue).toHaveBeenCalledTimes(1);
 });
 it("keeps task paths tied to the actual conversation",()=>{
  expect(reviewPath("task","railway","thread-a")).toBe("tasks/thread-a/reviews/railway.md");

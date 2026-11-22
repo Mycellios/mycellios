@@ -1,4 +1,5 @@
 import { threadDeleteJob } from "@mycellios/adapter-kit";
+import { scheduleLocalMemoryReview } from "@mycellios/adapters";
 import type { Actor, SideThread } from "@mycellios/contracts";
 import {
   deriveThreadState,
@@ -85,7 +86,11 @@ export async function archiveSideThread(
     // A request parked on await_event stays parked: its wait brings the conversation back.
     await stopWorkForThread(deps, actor, target.threadId, { keepEventWaits: true });
     try {
-      return await deps.prisma.$transaction((tx) => archiveSideThreadInTransaction(tx, actor, ids));
+      const archived = await deps.prisma.$transaction((tx) => archiveSideThreadInTransaction(tx, actor, ids));
+      await scheduleLocalMemoryReview(deps, ids.threadId).catch((error) => {
+        getLogger().error("memory review enqueue failed after conversation archive", error);
+      });
+      return archived;
     } catch (error) {
       if (!(error instanceof ThreadLifecycleError) || error.code !== "busy" || now() >= deadline)
         throw error;
