@@ -398,10 +398,10 @@ export async function threadSnapshot(
   deps: { prisma: PrismaClient },
   target: ThreadTarget,
 ): Promise<ThreadSnapshot> {
-  // Lock the thread row so messages, the event cursor, active runs, and live
-  // progress are read from one consistent commit. A torn Promise.all can
-  // otherwise advance the client cursor past thread.message.created while the
-  // ask message page still omits it — leaving waiting_input with no AskCard.
+  // Read messages, the event cursor, runs and progress from one MVCC snapshot.
+  // Repeatable Read keeps the cursor aligned with the ask card without waiting
+  // for a writer that holds the thread row lock.
+  const readOptions = { isolationLevel: "RepeatableRead", timeout: 15_000, maxWait: 5_000 } as const;
   if (target.kind === "bot") {
     const [busyBotName, core] = await Promise.all([
       resolveBusyBotName(deps.prisma, {
@@ -411,7 +411,6 @@ export async function threadSnapshot(
       }),
       deps.prisma.$transaction(
         async (tx) => {
-          await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR SHARE`;
           const [messagePage, last, activeRuns, busyOrFailed] = await Promise.all([
             loadMessagePage(tx, target.threadId, undefined, THREAD_MESSAGE_PAGE_SIZE),
             tx.event.findFirst({
@@ -489,7 +488,7 @@ export async function threadSnapshot(
               : [];
           return { messagePage, last, run: currentRun, activeRuns, liveEvents };
         },
-        { timeout: 15_000, maxWait: 5_000 },
+        readOptions,
       ),
     ]);
     return {
@@ -506,7 +505,6 @@ export async function threadSnapshot(
 
   const core = await deps.prisma.$transaction(
     async (tx) => {
-      await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR SHARE`;
       const [messagePage, last, activeRuns, recentTerminals] = await Promise.all([
         loadMessagePage(tx, target.threadId, undefined, THREAD_MESSAGE_PAGE_SIZE),
         tx.event.findFirst({
@@ -567,7 +565,7 @@ export async function threadSnapshot(
         liveEvents,
       };
     },
-    { timeout: 15_000, maxWait: 5_000 },
+    readOptions,
   );
   const primaryActiveRun = pickPrimaryActiveRun(core.activeRuns);
   return {

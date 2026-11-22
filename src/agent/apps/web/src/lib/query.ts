@@ -1,7 +1,7 @@
 import type { RouterUtils } from "@orpc/tanstack-query";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import type { AppBootstrap } from "@mycellios/contracts";
-import { isRetryableError } from "@mycellios/core";
+import { anySignal, isRetryableError } from "@mycellios/core";
 import type { DataTag, QueryFunction, QueryKey } from "@tanstack/react-query";
 import { hashKey, isCancelledError, QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
@@ -56,6 +56,25 @@ export function spaceQueries(userId: string | null, spaceId: string | null, task
  */
 export function spaceSeedKey(userId: string | null, spaceId: string | null, taskScope?: TaskThreadScope) {
   return spaceQueries(userId, spaceId, taskScope).bootstrap.queryKey({ input: {} });
+}
+
+/** Preloads and navigation share an in-flight read for the same account, Space and thread. */
+export function readConversationHistory(
+  userId: string | null,
+  spaceId: string | null,
+  botId: string,
+  taskScope?: TaskThreadScope,
+) {
+  const input = { botId };
+  const queryKey = spaceQueries(userId, spaceId, taskScope).threads.get.queryKey({ input });
+  return queryClient.fetchQuery({
+    queryKey,
+    queryFn: ({ signal }) => createSpaceRpc(spaceId, taskScope).threads.get(input, {
+      signal: anySignal([signal, AbortSignal.timeout(15_000)]),
+    }),
+    retry: false,
+    staleTime: 0,
+  });
 }
 
 /** Paint navigation immediately, retaining the destination's own snapshot only.

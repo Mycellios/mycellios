@@ -16,6 +16,7 @@ it("lists what waits for the person: answers, takeovers and conversations to rev
 
 it("leads an answer to the question and the rest to the Mico's main chat", () => {
   expect(needsYouPath({ botId: "a b", action: "answer" })).toBe("/app/a%20b?respond=1");
+  expect(needsYouPath({ botId: "mico", action: "answer", waitingTaskThreadId: "side" })).toBe("/app/mico?respond=1&task=side");
   expect(needsYouPath({ botId: "mico", action: "review" })).toBe("/app/mico");
   expect(needsYouPath({ botId: "mico", action: "takeover" })).toBe("/app/mico");
 });

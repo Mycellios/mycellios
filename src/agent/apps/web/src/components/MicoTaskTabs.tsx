@@ -54,7 +54,7 @@ function editableWithText(target: EventTarget | null) {
 
 /** Conversations belong to the existing Mico; a tab never creates another model or agent. */
 export function MicoTaskTabs({
-  botId, taskThreadId, newConversationOpen = false, rpc, onSelect, scope, inMenu = false, messageCount = 0,
+  botId, taskThreadId, newConversationOpen = false, rpc, onSelect, onWarm, scope, inMenu = false, messageCount = 0,
   confirmDelete = false, refreshKey,
 }: {
   botId: string;
@@ -64,6 +64,7 @@ export function MicoTaskTabs({
   rpc: RpcClient;
   /** A thread id, NEW_CONVERSATION_TAB for the draft, or nothing for the main chat. */
   onSelect: (target?: string) => void;
+  onWarm?: (botId: string, taskThreadId: string) => Promise<unknown>;
   scope: string;
   inMenu?: boolean;
   messageCount?: number;
@@ -197,6 +198,20 @@ export function MicoTaskTabs({
     return tab ? [tab] : threadId === taskThreadId ? [{ threadId, title: "" }] : [];
   });
   const displayedTabs = fitConversationTabs(visibleTabs, current, availableWidth);
+  const warmTabs = JSON.stringify(displayedTabs
+    .filter(tab => tab.threadId !== current && tab.threadId !== NEW_CONVERSATION_TAB)
+    .slice(-2).map(tab => tab.threadId));
+  useEffect(() => {
+    if (!onWarm || inMenu) return;
+    let cancelled = false;
+    void (async () => {
+      for (const threadId of JSON.parse(warmTabs) as string[]) {
+        if (cancelled || document.visibilityState !== "visible") break;
+        await onWarm(botId, threadId);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [botId, inMenu, onWarm, warmTabs]);
   const displayedIds = new Set(displayedTabs.map(tab => tab.threadId));
   const listed = tabs.filter(row => !row.deleteAfter);
   const picker = pickerConversations(listed);
