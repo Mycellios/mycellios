@@ -509,6 +509,61 @@ describe("paused turn context", () => {
       }
     },
   );
+  it("resumes with a user turn when the restored transcript ends with the Mico and its tools changed", async () => {
+    const model = await startModelEmulator({
+      steps: [
+        {
+          expect() {},
+          response: {
+            type: "tool", id: "ask", name: "ask_user",
+            arguments: { question: "Which fixture?", options: ["One", "Two"] },
+          },
+        },
+        {
+          expect(request) {
+            // Anthropic rejects a system message right after the assistant, so the
+            // resumed request must end with a person's turn, not the Mico's note.
+            const turns = request.messages.filter(
+              (message) => message.role !== "system" && message.role !== "developer",
+            );
+            expect(turns.at(-1)?.role).toBe("user");
+            expect(JSON.stringify(turns.at(-1)?.content)).toContain("internal continuation");
+            expect(JSON.stringify(request.messages)).toContain("mico-progress-note");
+          },
+          response: { type: "text", text: "Done." },
+        },
+      ],
+    });
+    let capture: (() => string) | undefined;
+    const request: AgentRunRequest = {
+      runId: "checkpoint-assistant-tail",
+      botId: "fixture-bot",
+      threadId: "fixture-thread",
+      instructions: "Complete the fixture.",
+      prompt: "Ask which fixture to use.",
+      history: [],
+      tools: builtinAgentTools.filter((tool) => ["ask_user", "read_file"].includes(tool.name)),
+      model: model.model,
+      onCheckpoint: async (snapshot) => { capture = snapshot; },
+      executeTool: async () => ({ result: "unused" }),
+    };
+    try {
+      await collect(new PiAgentRuntime().run(request));
+      expect(capture, "pause must preserve a durable transcript").toBeDefined();
+      const resumed = await collect(new PiAgentRuntime().run({
+        ...request,
+        turnCheckpoint: capture!(),
+        // A newer build offers another tool, and the Mico wrote a note while it waited.
+        tools: builtinAgentTools.filter((tool) => ["ask_user", "read_file", "remember"].includes(tool.name)),
+        history: [{ id: "mico-note", role: "assistant", content: "mico-progress-note" }],
+        resumeToolResult: { content: [{ type: "text", text: "One" }] },
+      }));
+      expect(resumed.at(-1)).toEqual({ type: "done", text: "Done." });
+      model.assertComplete();
+    } finally {
+      await model.close();
+    }
+  });
   it("retains completed siblings and never replays an unresolved parallel sibling", async () => {
     const executed = vi.fn(async () => ({ ok: true }));
     const model = await startModelEmulator({

@@ -1220,17 +1220,22 @@ export class PiAgentRuntime implements AgentRuntime {
               }
               // UI replies can have arrived while the turn was waiting. Keep their
               // assistant role, then explicitly resume the resolved tool turn.
+              // Prompt rather than queue a follow-up: continue() only drains
+              // follow-ups when the transcript literally ends in the assistant,
+              // and the tool update above would send the model an assistant turn
+              // followed by system messages, which providers reject.
               if (
                 agent.state.messages.findLast((message) => message.role !== "system")?.role ===
                 "assistant"
               ) {
-                agent.followUp({
+                await agent.prompt({
                   role: "user",
                   content: CHECKPOINT_RESUME_PROMPT,
                   timestamp: Date.now(),
                 });
+              } else {
+                await agent.continue();
               }
-              await agent.continue();
             }
           } else {
             getLogger().info("pi.prompt_started", {
@@ -3147,6 +3152,10 @@ function bookkeepingLimit(budget: ToolCallBudget) {
 
 function withToolCallBudget(context: Context, budget: ToolCallBudget): Context {
   if (budget.limit <= 0) return context;
+  // A system note with text may follow only the person's or a tool's turn
+  // (Anthropic rejects one after the assistant), so skip it rather than break the call.
+  if (context.messages.findLast((message) => message.role !== "system")?.role === "assistant")
+    return context;
   const remaining = Math.max(0, budget.limit - budget.taskCount);
   const instruction = remaining === 0
     ? "No task tool calls remain. Use existing results to answer what you verified and identify any unverified work. Use the plan tool only to record steps already verified."
