@@ -25,6 +25,43 @@ describe("integrated direct Desktop feed",()=>{
   const {fetcher,file}=feed(kind);expect(await publishedDesktopRelease("0.3.54",kind,fetcher)).toMatchObject({fileName:file.fileName,version});
   expect(fetcher.mock.calls.every(([url])=>!String(url).includes("www.mycellios.com"))).toBe(true);
  });
+ it("keeps the direct Windows download when release asset metadata exceeds 512 KB", async () => {
+   const { fetcher, list, file } = feed("windows-x64");
+   const windowsReceipt = {
+     schema: "mycellios-desktop-release-package/1", version, tag, platform: "windows-x64",
+     revision: manifest.revision, tree: manifest.tree, automaticUpdates: false,
+     qualifiedStartup: true, qualifiedInstallation: true, signature: "unsigned-preview",
+     artifact: file,
+   };
+   const [published] = list;
+   const historicalReleases = Array.from({ length: 19 }, (_, index) => ({
+     tag_name: `v0.2.${index}`, draft: false,
+     assets: Array.from({ length: 30 }, (_, asset) => ({
+       name: `release-asset-${asset}`,
+       browser_download_url: `https://github.com/Mycellios/mycellios/releases/download/v0.2.${index}/release-asset-${asset}`,
+       uploader: { login: "github-actions[bot]" },
+       digest: `sha256:${"b".repeat(64)}`,
+       url: `https://api.github.com/repos/Mycellios/mycellios/releases/assets/${asset}`,
+       size: 123456,
+       content_type: "application/octet-stream",
+       created_at: "2026-11-22T08:00:00Z",
+       updated_at: "2026-11-22T08:00:00Z",
+       download_count: 0,
+       label: "Desktop release artifact metadata ".repeat(15),
+     })),
+   }));
+   fetcher.mockResolvedValueOnce(new Response(JSON.stringify([{
+     ...published, assets: [{ name: "desktop-release.json" }, ...published!.assets],
+   }, ...historicalReleases])));
+   fetcher.mockResolvedValueOnce(new Response(JSON.stringify(manifest)));
+   fetcher.mockResolvedValueOnce(new Response(JSON.stringify(windowsReceipt)));
+
+   await expect(publishedDesktopRelease("0.3.54", "windows-x64", fetcher)).resolves.toMatchObject({
+     url: `https://github.com/Mycellios/mycellios/releases/download/${tag}/${file.fileName}`,
+     bytes: file.bytes,
+     sha256: file.sha256,
+   });
+ });
  it("offers the verified Mac package while the website mirror is unavailable, without installing",async()=>{
   const f=feed("macos-arm64"),handoff=vi.fn(async()=>{});
   const controller=new ManualUpdateController({version:"0.3.54",directory:()=>"unused-fixture",packageKind:"macos-arm64",

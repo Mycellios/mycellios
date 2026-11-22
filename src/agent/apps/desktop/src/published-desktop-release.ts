@@ -3,6 +3,8 @@ import type { ManualRelease, ManualPackageKind } from "./manual-update.js";
 
 const REPOSITORY = "https://github.com/Mycellios/mycellios/releases/download/";
 const API = "https://api.github.com/repos/Mycellios/mycellios/releases?per_page=20";
+// A page includes metadata for every asset in each release, including other platforms.
+const MAX_RELEASE_LIST_BYTES = 2 * 1024 * 1024;
 const MAX_BYTES = 2_000_000_000;
 const VERSION = "(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})";
 const TAG = new RegExp(`^desktop-v${VERSION}-windows-preview$`);
@@ -74,7 +76,7 @@ export function publishedWindowsArtifact(manifest: unknown, version: string): Ma
 export async function publishedWindowsRelease(current: string, fetcher: typeof fetch = fetch): Promise<ManualRelease | null> {
   const signal = AbortSignal.timeout(30_000);
   const list = await json(await fetcher(API, {redirect: "error", credentials: "omit", signal,
-    headers: {Accept: "application/vnd.github+json"}}), 512_000);
+    headers: {Accept: "application/vnd.github+json"}}), MAX_RELEASE_LIST_BYTES);
   if (!Array.isArray(list) || list.length > 20) throw Error("Invalid published release list");
   const releases = list.flatMap((r: {tag_name?: unknown; draft?: unknown; assets?: unknown}) => {
     if (!r || r.draft !== false || typeof r.tag_name !== "string" || !TAG.test(r.tag_name) || !Array.isArray(r.assets)) return [];
@@ -120,7 +122,7 @@ export function publishedDesktopArtifact(manifest: unknown, version: string, kin
 export async function publishedDesktopRelease(current: string, kind: ManualPackageKind, fetcher: typeof fetch = fetch): Promise<ManualRelease | null> {
   const signal = AbortSignal.timeout(30_000);
   const list = await json(await fetcher(API, { redirect: "error", credentials: "omit", signal,
-    headers: { Accept: "application/vnd.github+json" } }), 512_000);
+    headers: { Accept: "application/vnd.github+json" } }), MAX_RELEASE_LIST_BYTES);
   if (!Array.isArray(list) || list.length > 20) throw Error("Invalid published release list");
   const candidates = list.filter(r => r && r.draft === false && r.author?.login === "github-actions[bot]" &&
     typeof r.tag_name === "string" && TAG.test(r.tag_name) && Array.isArray(r.assets) &&
