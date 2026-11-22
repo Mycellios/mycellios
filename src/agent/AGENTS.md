@@ -1883,7 +1883,9 @@
   active. Preserve owner/generation fencing, queued cancellation and distinct
   queue-pressure/disconnection errors without automatic command replay.
   Quitting or update restarts call the `release` action, ending presence at once
-  while keeping consent and the execution preference (unlike `revoke`). A start the
+  while keeping consent and the execution preference (unlike `revoke`). Wait at
+  most two seconds for pending notices before closing the windows. An offline
+  profile skips the relay wait. A start the
   PC never claimed requeues the run as not dispatched and frees its segment; a
   claimed start stays uncertain. Verify the broker, stream, runtime and API relay tests.
 
