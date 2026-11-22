@@ -56,6 +56,11 @@ test('installer publishing changes execute real signing, catalog and recovery bo
  assert.deepEqual(uncoveredNativeFiles(['deploy/installers/new-native.py']),['deploy/installers/new-native.py']);
 });
 
+test('Kokoro engine changes run its CPU unit tests', () => {
+  const files = ['python/tests/test_kokoro_engine.py'];
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  assert.ok(planChecks(files).some(c => c.args.includes('test_kokoro_engine.py')));
+});
 test('documentation requires no dependency installation', () => {
   const plan = planChecks(['docs/DEVELOPMENT.md', 'AGENTS.md']);
   assert.ok(plan.some(c => c.label === 'CI policy tests'));
