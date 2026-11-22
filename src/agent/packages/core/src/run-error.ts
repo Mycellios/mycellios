@@ -190,6 +190,13 @@ export type RunErrorKind =
 export const DESKTOP_RUN_INTERRUPTED_ERROR =
   "Desktop execution interrupted; check existing results before retrying";
 
+/**
+ * Several of the owner's PCs are online and none holds this Mico alone. Sending a
+ * message from Desktop binds the Mico to that PC; the turn never moves to the cloud.
+ */
+export const DESKTOP_OWNER_UNRESOLVED_ERROR =
+  "More than one of your PCs is connected and none is clearly this Mico's. Send it a message from Mycellios Desktop on the PC that should run it.";
+
 const DESKTOP_SETUP_INTERRUPTED_PREFIX = "Desktop turn interrupted while preparing its computer: ";
 
 /**

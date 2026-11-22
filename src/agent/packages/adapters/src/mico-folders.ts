@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import path from "node:path";
 
 /** Folder name for a Mico whose name is unknown when its folder is first created. */
@@ -88,6 +89,30 @@ export class MicoFolders {
     if (visible) return visible;
     const hidden = this.hidden(key);
     return existsSync(hidden) ? hidden : undefined;
+  }
+
+  /**
+   * Keys of the homes that exist on this PC, at most `limit`: visible Mico folders first,
+   * then private homes. Only keys leave this PC, never folder names or paths.
+   */
+  keys(limit: number): string[] {
+    const found = new Set<string>();
+    for (const key of this.folders.keys()) {
+      if (found.size >= limit) return [...found];
+      const folder = this.visible(key);
+      if (folder && existsSync(folder)) found.add(key);
+    }
+    let homes: Dirent[] = [];
+    try {
+      homes = readdirSync(this.options.hiddenRoot, { withFileTypes: true });
+    } catch {
+      // No private homes yet.
+    }
+    for (const home of homes) {
+      if (found.size >= limit) break;
+      if (home.isDirectory() && /^[a-f0-9]{64}$/.test(home.name)) found.add(home.name);
+    }
+    return [...found];
   }
 
   /**

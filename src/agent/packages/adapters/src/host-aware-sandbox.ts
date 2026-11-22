@@ -17,7 +17,8 @@ import type { PrismaClient } from "@mycellios/db";
 import { DesktopUnreachableError } from "./computer-errors.js";
 import { cancelComputerRunWork } from "./computer-idle.js";
 import { manageComputerWorkspaceDirectories } from "./computer-workspace.js";
-import { desktopRelayAvailable, desktopRelayTransport } from "./desktop-relay.js";
+import { desktopRelayPresence, desktopRelayTransport } from "./desktop-relay.js";
+import type { DesktopPresence } from "./desktop-relay.js";
 import { assertHostCommandsAllowed, DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { createSandboxProvider, type SandboxProviderOptions } from "./sandbox-factory.js";
@@ -42,7 +43,8 @@ export function createRunSandbox(
     });
   }
   const primary = createSandboxProvider(kind, opts);
-  if (opts.desktopRelay)
+  if (opts.desktopRelay) {
+    const presence = desktopRelayPresence(opts.desktopRelay.url, opts.desktopRelay.key);
     return new HostAwareSandbox(
       primary,
       new HostComputerSandbox(
@@ -50,8 +52,10 @@ export function createRunSandbox(
         "",
         desktopRelayTransport(opts.desktopRelay.url, opts.desktopRelay.key),
       ),
-      desktopRelayAvailable(opts.desktopRelay.url, opts.desktopRelay.key),
+      async (context) => await presence(context) === "connected",
+      presence,
     );
+  }
   if (
     !opts.prisma ||
     (kind !== "docker" && !(kind === "none" && opts.hostComputerUrl && opts.hostComputerToken))
@@ -77,6 +81,8 @@ export class HostAwareSandbox implements SandboxProvider {
     private readonly isolated: SandboxProvider,
     private readonly host: SandboxProvider,
     private readonly hostEnabled: (context?: AdapterContext) => Promise<boolean>,
+    /** Tells an offline PC apart from one that is online without this Mico; absent: enabled or offline. */
+    private readonly presence?: (context: AdapterContext) => Promise<DesktopPresence>,
   ) {
     if (host.appControl) {
       this.appControl = (computer, request, context) => {
@@ -126,6 +132,11 @@ export class HostAwareSandbox implements SandboxProvider {
     const provider = !context?.cloudWorkspace && !context?.isolatedWorkspace && (await this.hostEnabled(context))
       ? this.host : this.isolated;
     return provider.describe().id as ComputerRef["kind"];
+  }
+
+  async hostPresence(context: AdapterContext): Promise<DesktopPresence> {
+    if (this.presence) return this.presence(context);
+    return (await this.hostEnabled(context)) ? "connected" : "offline";
   }
 
   async provision(

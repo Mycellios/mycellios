@@ -142,6 +142,12 @@ export interface SandboxProvider {
    * choose between kinds at provision time implement it.
    */
   provisionKind?(context?: AdapterContext): Promise<ComputerRef["kind"]>;
+  /**
+   * Whether the owner's PC can run this Mico now. "unresolved": a PC of the account
+   * is online but none could take this Mico, which is not an offline PC. Only
+   * providers that route to a connected PC implement it.
+   */
+  hostPresence?(context: AdapterContext): Promise<"connected" | "unresolved" | "offline">;
   /** Read-only probe: true only when this exact reference is already running. */
   isRunning?(computer: ComputerRef, context: AdapterContext): Promise<boolean>;
   /** Perform idempotent provider setup after the lifecycle has captured the reference. */

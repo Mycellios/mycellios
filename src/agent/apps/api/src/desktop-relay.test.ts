@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -380,4 +380,41 @@ it("reports actual disconnection distinctly from queue pressure without acceptin
  const app=fixture();const body=JSON.stringify({scope:{userId:owner.userId,spaceId:owner.spaceId},request:{method:"environment",botId:"test-bot"},nonce:randomUUID()}),time=String(Date.now());
  const r=await app.request("/api/desktop-relay/internal",{method:"POST",headers:{"x-desktop-time":time,"x-desktop-signature":signDesktopRelay(desktopRelayKey("test-purpose-secret"),time,body)},body});
  expect(r.status).toBe(409);expect(r.headers.get("x-mycellios-desktop-error")).toBe("desktop_disconnected");expect(await r.json()).toMatchObject({code:"desktop_disconnected"});
+});
+
+it("routes a Mico to the PC that reports its folder and reports an unchosen one as unresolved", async () => {
+  const app = new Hono();
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    desktopExecution: async () => true,
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes"
+      ? { actor: owner, sessionId: request.headers.get("x-test-session") ?? "session-a" }
+      : null,
+    ownsBot: async (_actor, id) => id === "test-bot" || id === "other-bot",
+  });
+  const call = (session: string, action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "x-test-session": session, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const probe = async (botId: string, agentExecution = true) => {
+    const body = JSON.stringify({ probe: botId, ...(agentExecution ? { agentExecution: 1 } : {}), scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+    const time = String(Date.now());
+    return (await app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body })).json();
+  };
+  const windows = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await call("session-a", "identity", {})).json(), agentExecution: 1 };
+  const mac = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await call("session-b", "identity", {})).json(), agentExecution: 1 };
+  // The account response tells a new Desktop that this server accepts its folder report.
+  expect(await (await call("session-a", "account", windows)).json()).toMatchObject({ ownership: 1 });
+  expect((await call("session-b", "account", mac)).status).toBe(200);
+  expect(await probe("test-bot")).toEqual({ agentExecution: 1, available: false, preferred: true, unresolved: true });
+  expect(await probe("test-bot", false)).toEqual({ available: false, unresolved: true });
+  const folder = createHash("sha256").update("test-bot").digest("hex");
+  expect((await call("session-b", "account", { ...mac, workspaces: [folder] })).status).toBe(200);
+  expect(await probe("test-bot")).toEqual({ agentExecution: 1, available: true, preferred: true });
+  expect(await probe("other-bot")).toEqual({ agentExecution: 1, available: false, preferred: true, unresolved: true });
+  // Only folder keys are accepted, never names or paths.
+  expect((await call("session-b", "account", { ...mac, workspaces: ["Writer"] })).status).toBe(409);
+  expect((await call("session-b", "account", { ...mac, workspaces: Array.from({ length: 257 }, (_, n) => createHash("sha256").update(String(n)).digest("hex")) })).status).toBe(409);
 });

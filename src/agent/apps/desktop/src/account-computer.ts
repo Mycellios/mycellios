@@ -41,6 +41,8 @@ type Host = {
   grant(scope: string): Promise<void>;
   activate(value: boolean): void;
   isEnabled(): boolean;
+  /** Keys of the Mico folders on this PC; the server routes those Micos here. */
+  workspaceKeys?(): string[];
 };
 type Context = { base: string; fetch: (url: string, init?: RequestInit) => Promise<Response> };
 
@@ -227,6 +229,7 @@ export class AccountComputerConnection {
             deviceId: this.deviceId,
             agentExecution: this.options.agentExecution,
             awake: this.options.awake,
+            workspaces: this.options.host.workspaceKeys ? () => this.options.host.workspaceKeys!() : undefined,
             restoreUpdate: this.options.nativeVersion ? identity => restoreUpdateBinding(this.options.profile, this.options.nativeVersion!, context.base, identity) : undefined,
             revoked: () => {
               this.clients.get(spaceId)?.stop();

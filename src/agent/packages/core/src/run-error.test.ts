@@ -2,6 +2,7 @@ import { COMPUTER_RATE_LIMIT_ERROR } from "@mycellios/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   APPROVED_ACTION_NOT_RUN_ERROR,
+  DESKTOP_OWNER_UNRESOLVED_ERROR,
   HOSTED_MODEL_CREDITS_REQUIRED_ERROR,
   isModelRequiredSendError,
   isUncertainDesktopRun,
@@ -53,6 +54,10 @@ describe("normalizeRunError", () => {
     expect(normalizeRunError("Bot has no computer").summary).toBe(
       "This Mico needs a workspace to run this task.",
     );
+  });
+  it("tells users which PC to message when several are online and none holds the Mico", () => {
+    expect(normalizeRunError(DESKTOP_OWNER_UNRESOLVED_ERROR).summary).toBe(DESKTOP_OWNER_UNRESOLVED_ERROR);
+    expect(isUncertainDesktopRun(DESKTOP_OWNER_UNRESOLVED_ERROR)).toBe(false);
   });
   it("tells users where to reopen a task tied to a PC", () => {
     const details = "This task is bound to your Desktop. Reconnect the PC to resume it.";

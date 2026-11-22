@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { SandboxProvider } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
@@ -20,7 +23,7 @@ const run = {
 const lease = { workerId: "worker", fence: 3 };
 const desktop = { id: "local", scope: "dedicated", kind: "desktop" };
 
-function fixture(kind: "desktop" | "docker" = "docker") {
+function fixture(kind: "desktop" | "docker" = "docker", presence?: "connected" | "unresolved" | "offline") {
   const database = {
     thread: { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "thread", taskBotId: null }) },
     task: { findUniqueOrThrow: vi.fn().mockResolvedValue({ resources: [] }) },
@@ -33,9 +36,12 @@ function fixture(kind: "desktop" | "docker" = "docker") {
   };
   database.$transaction.mockImplementation((action) => action(database));
   const provisionKind = vi.fn().mockResolvedValue(kind);
-  const sandbox = { describe: () => ({ id: "docker" }), provisionKind } as unknown as SandboxProvider;
+  const hostPresence = vi.fn().mockResolvedValue(presence);
+  const sandbox = {
+    describe: () => ({ id: "docker" }), provisionKind, ...(presence ? { hostPresence } : {}),
+  } as unknown as SandboxProvider;
   const prisma = database as unknown as PrismaClient;
-  return { database, provisionKind, sandbox, prisma };
+  return { database, provisionKind, hostPresence, sandbox, prisma };
 }
 
 describe("offline cloud workspaces", () => {
@@ -137,6 +143,45 @@ describe("offline cloud workspaces", () => {
       expect(relayFetch).toHaveBeenCalledTimes(2);
     } finally {
       vi.unstubAllGlobals();
+    }
+  });
+
+  it("never moves a Mico to the server while one of the owner's PCs is online", async () => {
+    for (const presence of ["unresolved", "connected"] as const) {
+      const { database, prisma, sandbox, hostPresence, provisionKind } = fixture("docker", presence);
+      await expect(selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease)).resolves.toBeUndefined();
+      expect(hostPresence).toHaveBeenCalledOnce();
+      expect(provisionKind).not.toHaveBeenCalled();
+      expect(database.$transaction).not.toHaveBeenCalled();
+    }
+    const { prisma, sandbox } = fixture("docker", "offline");
+    await expect(selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease))
+      .resolves.toMatchObject({ id: "cloud" });
+  });
+
+  it("moves a native-engine Mico only where the server may run native agents for its owner", async () => {
+    const dataDir = await mkdtemp(path.join(tmpdir(), "offline-native-grant-"));
+    try {
+      const codex = { agentEngine: "codex", dataDir };
+      const denied = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(denied.prisma, denied.sandbox, run, desktop, lease, codex))
+        .resolves.toBeUndefined();
+      expect(denied.hostPresence).not.toHaveBeenCalled();
+      expect(denied.database.$transaction).not.toHaveBeenCalled();
+      const pi = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(pi.prisma, pi.sandbox, run, desktop, lease, { agentEngine: "pi", dataDir }))
+        .resolves.toMatchObject({ id: "cloud" });
+      await writeFile(path.join(dataDir, "native-agents.json"),
+        JSON.stringify({ authorizedScopes: [{ userId: run.userId, spaceId: run.spaceId }] }));
+      const granted = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(granted.prisma, granted.sandbox, run, desktop, lease, codex))
+        .resolves.toMatchObject({ id: "cloud" });
+      await writeFile(path.join(dataDir, "native-agents.json"), "{ unreadable");
+      const unreadable = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(unreadable.prisma, unreadable.sandbox, run, desktop, lease, codex))
+        .resolves.toBeUndefined();
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
     }
   });
 });
