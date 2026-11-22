@@ -18,6 +18,7 @@ import { authClient } from "../lib/auth";
 import type { AuthCapabilities } from "../lib/auth-capabilities";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
 import { clearSpaceSelection } from "../lib/rpc";
+import { signInDestination } from "../lib/sign-in-next";
 import { runSsoFlow } from "../lib/sso-flow";
 import { authErrorText, credentialIssueText } from "../lib/user-error";
 import { PRIVACY_URL, TERMS_URL } from "../lib/legal-links";
@@ -207,9 +208,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             disableRedirect,
             provider: "oidc",
             newUserCallbackURL: callbackURL("/onboarding"),
-            callbackURL: callbackURL(
-              searchParams.get("next") === "/integrations/setup" ? "/integrations/setup" : "/app",
-            ),
+            callbackURL: callbackURL(signInDestination(searchParams.get("next"))),
             errorCallbackURL: callbackURL("/sign-in"),
           }),
         ["/app", "/onboarding", "/integrations/setup", "/sign-in"],

@@ -20,6 +20,7 @@ const SETTINGS_SECTIONS = [
   "logs",
   "computer",
   "billing",
+  "api-keys",
   "updates",
 ] as const;
 

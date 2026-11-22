@@ -70,10 +70,9 @@ describe("AccountDetails", () => {
       onRetryRole={() => undefined}
       onSignOut={() => undefined}
     />);
-    expect(markup).toContain("Sign-in methods");
+    expect(markup).not.toContain("Métodos de inicio de sesión");
     expect(markup).not.toContain(">Google</button>");
     expect(markup).not.toContain(">X</button>");
-    expect(markup).toContain("No additional sign-in methods are available");
     expect(markup).not.toContain(">MetaMask</button>");
   });
 
@@ -94,9 +93,9 @@ describe("AccountDetails", () => {
       onSignOut={() => undefined}
     />);
     expect(markup).toContain("person@example.com");
-    expect(markup).toContain("Network role unverified");
-    expect(markup).toContain("Admin tools remain locked.");
-    expect(markup).toContain("Retry");
+    expect(markup).toContain("No se han podido comprobar los permisos de red.");
+    expect(markup).toContain("Las herramientas de administración siguen bloqueadas.");
+    expect(markup).toContain("Reintentar");
     expect(markup).not.toContain("account-usage-summary");
   });
 
@@ -124,8 +123,8 @@ describe("AccountDetails", () => {
 });
 
 describe("AccountModal", () => {
-  const apiTabProps = {
-    initialTab: "api" as const,
+  const signedInProps = {
+    initialTab: "account" as const,
     config: { enabled: true, apiAccessEnabled: true, publicApiBaseUrl: "https://api.example/v1" },
     session: { accessToken: "session", refreshToken: "refresh", expiresAt: 1, user: { id: "owner", email: "owner@example.com" } },
     identity: null,
@@ -138,24 +137,27 @@ describe("AccountModal", () => {
     onClose: () => undefined,
   };
 
-  it("shows the shared API endpoint and key management to the signed-in account", () => {
-    const markup = renderToStaticMarkup(<AccountModal {...apiTabProps} />);
-    expect(markup).toContain("https://api.example/v1");
-    expect(markup).toContain("Create key");
-    expect(markup).toContain("The full key is shown only once.");
-    expect(markup).toContain("Copy URL");
+  it("keeps the dashboard account minimal and sends account management to Agent", () => {
+    const markup = renderToStaticMarkup(<AccountModal {...signedInProps} />);
+    expect(markup).toContain("owner@example.com");
+    expect(markup).toContain("Cuenta en Mycellios Agent");
+    expect(markup).toContain('href="https://www.mycellios.com/agent/app?settings=profile"');
+    expect(markup).toContain("Cerrar sesión");
+    expect(markup).not.toContain("Create key");
+    expect(markup).not.toContain("API keys");
   });
 
-  it("requires a session on the API deep link", () => {
-    const markup = renderToStaticMarkup(<AccountModal {...apiTabProps} session={null} />);
+  it("keeps the API plan and usage that Agent does not show yet", () => {
+    const markup = renderToStaticMarkup(<AccountModal {...signedInProps} initialTab="usage" />);
+    expect(markup).toContain("Uso de la API");
+    expect(markup).toContain("Plan");
+    expect(markup).toContain("LAST 50 REQUESTS BY MODEL");
+  });
+
+  it("asks a signed-out visitor to sign in", () => {
+    const markup = renderToStaticMarkup(<AccountModal {...signedInProps} session={null} />);
     expect(markup).toContain("Sign in securely");
-    expect(markup).not.toContain("Create key");
-  });
-
-  it("offers no key operations when the coordinator disables API access", () => {
-    const markup = renderToStaticMarkup(<AccountModal {...apiTabProps} config={{ ...apiTabProps.config, apiAccessEnabled: false }} />);
-    expect(markup).toContain("API key management is unavailable");
-    expect(markup).not.toContain("Create key");
+    expect(markup).not.toContain("Cuenta en Mycellios Agent");
   });
 
   it("waits for session restoration before presenting sign-in controls", () => {

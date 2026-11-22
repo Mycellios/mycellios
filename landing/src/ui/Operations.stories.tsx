@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ComponentProps } from "react";
 import { AssistantAdmin, Jobs, Models, NetworkHistoryReport, Nodes, SystemLogs, Tests } from "../Panel";
-import { ApiAccessPanel } from "../ApiAccessPanel";
 import { BillingAccountPanel } from "../BillingAccountPanel";
 import type { BillingAccountOverview } from "../billing";
 
@@ -39,6 +38,5 @@ export const Logs: Story = { render: () => <SystemLogs snapshot={snapshot} conne
 export const Benchmarks: Story = { render: () => <Tests canRunLocally={false} loadBenchmarkRuns={noBenchmarks} /> };
 export const NetworkHistory: Story = { render: () => <section className="minimal-screen"><NetworkHistoryReport history={history} /></section> };
 export const Administration: Story = { render: () => <AssistantAdmin apiOrigin="" adminToken="" authSession={null} onAdminTokenChange={() => {}} /> };
-export const ApiAccess: Story = { render: () => <ApiAccessPanel enabled apiBaseUrl="https://api.example.test/v1" accessToken={null} account={null} availableModels={0} onSignIn={() => {}} /> };
 export const BillingUnavailable: Story = { render: () => <BillingAccountPanel session={session} titleId="billing-preview" account={null} loadOverview={loadBilling} navigate={() => {}} /> };
 export const BillingError: Story = { render: () => <BillingAccountPanel session={session} titleId="billing-error-preview" account={null} loadOverview={failedBilling} navigate={() => {}} /> };

@@ -14450,3 +14450,142 @@ msgstr "Branched from {name}"
 #: src/components/BranchOriginDivider.tsx
 msgid "Open where this branch started"
 msgstr "Open where this branch started"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Select and copy it manually"
+msgstr "Select and copy it manually"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Your Mycellios session expired. Sign in again to manage API keys."
+msgstr "Your Mycellios session expired. Sign in again to manage API keys."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "API keys are available when you sign in with your Mycellios account."
+msgstr "API keys are available when you sign in with your Mycellios account."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "You have reached the limit of active keys. Revoke one before creating another."
+msgstr "You have reached the limit of active keys. Revoke one before creating another."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Mycellios Agent uses this key for your Credits, so it cannot be revoked here."
+msgstr "Mycellios Agent uses this key for your Credits, so it cannot be revoked here."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "This account cannot manage API keys."
+msgstr "This account cannot manage API keys."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Too many requests. Wait a moment and try again."
+msgstr "Too many requests. Wait a moment and try again."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Could not load your API keys. Try again."
+msgstr "Could not load your API keys. Try again."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Could not create the key. Try again."
+msgstr "Could not create the key. Try again."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Could not revoke the key. Try again."
+msgstr "Could not revoke the key. Try again."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Use a key to call Mycellios models from your own apps and scripts with any OpenAI-compatible client. Requests made with a key count against this account."
+msgstr "Use a key to call Mycellios models from your own apps and scripts with any OpenAI-compatible client. Requests made with a key count against this account."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Loading API keys…"
+msgstr "Loading API keys…"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "API base URL"
+msgstr "API base URL"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Copy URL"
+msgstr "Copy URL"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "New key"
+msgstr "New key"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Copy your new key now. You will not be able to see it again."
+msgstr "Copy your new key now. You will not be able to see it again."
+
+#. placeholder {0}: created.name
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "New key for {0}"
+msgstr "New key for {0}"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Copy key"
+msgstr "Copy key"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Key name, for example My app"
+msgstr "Key name, for example My app"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Key name"
+msgstr "Key name"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Create key"
+msgstr "Create key"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "You have no API keys yet."
+msgstr "You have no API keys yet."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Your keys"
+msgstr "Your keys"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Used by Mycellios Agent"
+msgstr "Used by Mycellios Agent"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Created {createdOn}"
+msgstr "Created {createdOn}"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Creation date unavailable"
+msgstr "Creation date unavailable"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Last used {usedOn}"
+msgstr "Last used {usedOn}"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Never used"
+msgstr "Never used"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Mycellios Agent uses this key to pay for your Micos with Credits. It cannot be revoked here."
+msgstr "Mycellios Agent uses this key to pay for your Micos with Credits. It cannot be revoked here."
+
+#. placeholder {0}: key.name
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Revoke {0}"
+msgstr "Revoke {0}"
+
+#. placeholder {0}: revoking?.name ?? ""
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Revoke {0}?"
+msgstr "Revoke {0}?"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Apps that use this key will stop working immediately. This cannot be undone."
+msgstr "Apps that use this key will stop working immediately. This cannot be undone."
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Revoking…"
+msgstr "Revoking…"
+
+#: src/pages/settings/ApiKeysSettings.tsx
+msgid "Revoke key"
+msgstr "Revoke key"

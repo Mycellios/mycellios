@@ -1,6 +1,7 @@
 import { AccountModal } from "./AccountModal";
+import { Overview } from "./NetworkOverview";
 import { AgentNavigationLink, Sidebar, SidebarFooter } from "./ui/Sidebar";
-import { Badge as UiBadge, DialogPanel as UiDialogPanel, Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Select as UiSelect, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
+import { Badge as UiBadge, DialogPanel as UiDialogPanel, Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
 import { AppSelect, Toggle, PageTitle, PanelDisclosure, SummaryStrip, Metric, Empty, PanelLoading } from "./ui/patterns";
 import {
   Activity,
@@ -16,7 +17,6 @@ import {
   CirclePower,
   Code2,
   Coins,
-  Copy,
   Cpu,
   Download,
   ExternalLink,
@@ -30,11 +30,9 @@ import {
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
-  Maximize2,
   MemoryStick,
   Menu,
   MessageSquareText,
-  Minus,
   Network,
   PanelLeftClose,
   PanelLeftOpen,
@@ -82,7 +80,6 @@ import type {
 import { isAvailableInferenceWorker } from "./inference-selection";
 import { ModelReadiness, friendlyActivationFailure } from "./model-readiness";
 import type { NetworkExecutionTrace } from "../../src/contracts/types";
-import { projectObservedTopology } from "./network-topology";
 import { type ProductStatePresentation } from "./product-state";
 import type { NativeBuildIdentity } from "../../src/contracts/build-identity";
 import type { BenchmarkMeasurement, BenchmarkRun } from "../../src/benchlab/types";
@@ -136,7 +133,7 @@ import "./panel-downloads.css";
 import "./panel-desktop.css";
 import "./ui/dark-theme.css";
 
-export { AccountModal };
+export { AccountModal, Overview };
 
 type PanelView = "overview" | "history" | "nodes" | "models" | "jobs" | "tests" | "logs" | "contribute" | "join" | "downloads" | "admin";
 type PanelMode = "simple" | "developer";
@@ -389,9 +386,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   const identityRequestSeq = useRef(0);
   const [authReady, setAuthReady] = useState(false);
   const [apiAccount, setApiAccount] = useState<ApiAccount | null>(null);
-  const [accountApiEntry, setAccountApiEntry] = useState(() =>
-    accountEntry && new URLSearchParams(window.location.search).get("tab") === "api"
-  );
   const [authOpen, setAuthOpen] = useState(accountEntry);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     const saved = window.localStorage.getItem("mycellios.theme");
@@ -805,10 +799,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   }
 
   const publicLink = (path: string) => path;
-  const configuredApiBase = authConfig.publicApiBaseUrl ?? "/v1";
-  const apiBaseUrl = configuredApiBase.startsWith("http")
-    ? configuredApiBase
-    : `${window.location.origin}${configuredApiBase.startsWith("/") ? "" : "/"}${configuredApiBase}`;
 
   async function disconnectAccount() {
     const session = authSessionRef.current;
@@ -825,7 +815,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
       window.history.replaceState({}, "", "/dashboard");
       applySeoMetadata("/dashboard");
     }
-    setAccountApiEntry(false);
     setAuthOpen(false);
   }, [accountEntry]);
 
@@ -887,7 +876,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
           <div className="panel-content-scale">
             {loading && snapshot.capturedAt === EMPTY.capturedAt ? <PanelLoading /> : (
               <>
-              {view === "overview" && <Overview snapshot={snapshot} connectionError={coordinatorError} onNavigate={navigate} publicLink={publicLink} external={false} apiBaseUrl={apiBaseUrl} earnUrl={`${window.location.origin}/earn`} developerMode={panelMode === "developer"} theme={theme} />}
+              {view === "overview" && <Overview snapshot={snapshot} connectionError={coordinatorError} onAddDevice={() => navigate("contribute")} />}
               {view === "history" && <NetworkHistory endpoint="/public/v1/history" />}
               {view === "nodes" && advancedAccess && <Nodes snapshot={snapshot} onRemove={removeWorker} onClearOffline={clearOfflineWorkers} onListCredentials={listWorkerCredentials} onRevokeCredential={revokeWorkerCredential} />}
               {view === "models" && advancedAccess && <Models snapshot={snapshot} onSearch={searchHubModels} onRequest={requestModel} onRemove={removeRequestedModel} adminToken={modelAdminToken} requiresAdminToken={requiresModelAdminToken} secureTokenStorage={false} />}
@@ -953,7 +942,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
               if (identityRequestSeq.current === requestSeq) setApiAccount(account);
             }).catch(() => undefined);
           }
-          if (!accountApiEntry) closeAccount();
+          closeAccount();
         }}
         onRetryRole={async () => {
           const session = await getValidSession();
@@ -963,8 +952,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
           if (identityRequestSeq.current === requestSeq && authSessionRef.current?.accessToken === session.accessToken) setNetworkIdentity(identity);
         }}
         onSignOut={() => { closeAccount(); void disconnectAccount(); }}
-        onSignInAgain={() => void disconnectAccount()}
-        initialTab={accountApiEntry ? "api" : accountEntry && window.location.pathname === "/account" ? "billing" : "account"}
+        initialTab={accountEntry && window.location.pathname === "/account" ? "billing" : "account"}
         onClose={closeAccount}
       />}
       </div>
@@ -1765,95 +1753,6 @@ function formatHistoryChartTime(value: string): string {
   }).format(new Date(value)).replace(",", "");
 }
 
-export function DashboardConnect({
-  apiBaseUrl,
-  earnUrl,
-  downloadsUrl,
-  browserUrl,
-  external,
-  onOpenEarn,
-}: {
-  apiBaseUrl: string;
-  earnUrl: string;
-  downloadsUrl: string;
-  browserUrl: string;
-  external: boolean;
-  onOpenEarn: () => void;
-}) {
-  const titleId = useId();
-  const [copied, setCopied] = useState<"api" | "link" | null>(null);
-  const [copyError, setCopyError] = useState<"api" | "link" | null>(null);
-  const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const externalProps = external ? { target: "_blank", rel: "noreferrer" } as const : {};
-
-  useEffect(() => () => {
-    if (resetRef.current) clearTimeout(resetRef.current);
-  }, []);
-
-  async function copyValue(kind: "api" | "link", value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      setCopyError(null);
-    } catch {
-      setCopied(null);
-      setCopyError(kind);
-    }
-    if (resetRef.current) clearTimeout(resetRef.current);
-    resetRef.current = setTimeout(() => {
-      setCopied(null);
-      setCopyError(null);
-    }, 2200);
-  }
-
-  const copyLabel = (kind: "api" | "link") => copied === kind ? "Copied" : copyError === kind ? "Try again" : "Copy";
-
-  return (
-    <UiCard className="dashboard-connect" aria-labelledby={titleId}>
-      <header>
-        <div><strong id={titleId}>Connect</strong></div>
-        <UiLink href="https://github.com/tych0s/mycellios#readme" target="_blank" rel="noreferrer">Full docs <ArrowRight size={13} /></UiLink>
-      </header>
-      <div className="dashboard-connect-grid">
-        <section>
-          <span>1 · NATIVE PACKAGES</span>
-          <UiLink className="dashboard-connect-field install" href={downloadsUrl} {...externalProps}>
-            <Download size={15} />
-            <code>Check native packages</code>
-            <b>open</b>
-          </UiLink>
-        </section>
-        <section>
-          <span>API ENDPOINT</span>
-          <div className="dashboard-connect-field endpoint">
-            <Globe2 size={15} />
-            <code>{apiBaseUrl}</code>
-            <UiButton type="button" onClick={() => void copyValue("api", apiBaseUrl)} aria-label={`${copyLabel("api")} API endpoint`}>
-              {copied === "api" ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copied === "api" ? "copied" : "configured target"}</span>
-            </UiButton>
-          </div>
-        </section>
-        <section className="dashboard-connect-join">
-          <span>2 · CONNECT</span>
-          <div className="dashboard-connect-command">
-            <code>{earnUrl}</code>
-            <UiButton type="button" className={copyError === "link" ? "error" : copied === "link" ? "copied" : ""} onClick={() => void copyValue("link", earnUrl)}>
-              {copied === "link" ? <Check size={14} /> : <Copy size={14} />}
-              {copyLabel("link")}
-            </UiButton>
-          </div>
-          <UiText>Open the Earn link to choose how this device connects. Native packages are listed when published. The configured API uses the OpenAI-compatible <code>/v1</code> interface.</UiText>
-        </section>
-      </div>
-      <footer>
-        <UiLink href={browserUrl} {...externalProps}><Smartphone size={14} />Start a browser node <ExternalLink size={12} /></UiLink>
-        <UiButton type="button" onClick={onOpenEarn}>View every option <ChevronRight size={13} /></UiButton>
-      </footer>
-    </UiCard>
-  );
-}
-
 export interface OverviewSnapshotEvidence {
   state: "waiting" | "fresh" | "delayed" | "stale" | "degraded";
   label: string;
@@ -1886,71 +1785,6 @@ export function overviewSnapshotEvidence(
   return { state: "stale", label: "STALE SNAPSHOT", detail: `Captured ${relativeTime(capturedAt, now)}`, capturedAt, ageMs };
 }
 
-export function Overview({ snapshot, connectionError, onNavigate, publicLink, external, apiBaseUrl, earnUrl, developerMode, theme }: { snapshot: PublicSnapshot; connectionError: string | null; onNavigate: (view: PanelView) => void; publicLink: (path: string) => string; external: boolean; apiBaseUrl: string; earnUrl: string; developerMode: boolean; theme: "dark" | "light" }) {
-  const evidence = overviewSnapshotEvidence(snapshot.capturedAt, connectionError);
-  const active = snapshot.workers.filter((worker) => worker.connected);
-  const operational = active.filter((worker) => worker.status === "online");
-  const activeGpus = operational.flatMap((worker) => worker.gpus);
-  const activeDeployments = operational.flatMap((worker) => worker.deployments);
-  const telemetryGpus = activeGpus.filter((gpu) => gpu.utilizationPct !== undefined);
-  const poweredGpus = activeGpus.filter((gpu) => (gpu.powerW ?? 0) > 0);
-  const sharedMemory = activeGpus.reduce((total, gpu) => total + gpu.offeredVramMb, 0);
-  const freeMemory = Math.min(sharedMemory, activeGpus.reduce((total, gpu) => total + gpu.freeOfferedVramMb, 0));
-  const measured = activeDeployments.filter(isMeasuredDeployment);
-  const throughput = measured.reduce((total, deployment) => total + deployment.tokensPerSecond, 0);
-  const execution = summarizeDeploymentExecution(activeDeployments);
-  const inflight = snapshot.jobs.filter((job) => ["queued", "leasing", "running", "streaming"].includes(job.status)).length;
-  return <section className="overview-page overview-minimal">
-    <header className="overview-heading">
-      <div><UiHeading as="h1">Overview</UiHeading><span className={`overview-status ${evidence.state}`} role="status" title={evidence.detail}><i />{evidence.state === "fresh" ? "Live network" : evidence.state === "waiting" ? "Waiting for data" : evidence.detail}</span></div>
-      <div className="overview-actions"><UiButton variant="primary" onClick={() => onNavigate("contribute")}>Add a device <ArrowRight size={15} /></UiButton></div>
-    </header>
-    {evidence.state === "waiting" ? <UiCard className="overview-no-evidence"><CircleAlert /><div><UiHeading as="h2">Waiting for the coordinator</UiHeading><UiText>Network data will appear when the connection is restored.</UiText></div></UiCard> : <>
-      <dl className="overview-summary" aria-label="Network summary">
-        <div><dt>Connected nodes</dt><dd>{snapshot.summary.connected}</dd></div>
-        <div><dt>Available models</dt><dd>{snapshot.models.length}</dd></div>
-        <div><dt>Shared memory</dt><dd>{formatMemory(sharedMemory)}</dd></div>
-        <div><dt>Tasks in progress</dt><dd>{inflight}</dd></div>
-      </dl>
-      <NetworkModelCatalog snapshot={snapshot} developerMode={developerMode} theme={theme} onNavigate={onNavigate} compact />
-      <section className="overview-details" aria-label="Network details">
-        <UiHeading as="h2">Details</UiHeading>
-        <OverviewDetail title="Devices & network" icon={Network}>
-          <ConnectedPeersTable workers={snapshot.workers} />
-          <InteractiveMesh workers={active} traces={snapshot.recentNetworkTraces ?? []} registeredWorkers={snapshot.summary.registered} sharedVramMb={sharedMemory} publicLink={publicLink} external={external} developerMode={developerMode} onNavigate={onNavigate} />
-        </OverviewDetail>
-        <OverviewDetail title="Models & performance" icon={Cpu}>
-          <div className="overview-runtime">
-            <ExecutionBadge execution={execution} workers={snapshot.workers} />
-            <dl><div><dt>Free memory</dt><dd>{formatMemory(freeMemory)}</dd></div><div><dt>Memory in use</dt><dd>{formatMemory(Math.max(0, sharedMemory - freeMemory))}</dd></div><div><dt>Runtime stages</dt><dd>{execution.verified ? execution.unitCount : "Unverified"}</dd></div><div><dt>Measured speed</dt><dd>{throughput > 0 ? `${formatCompactNumber(throughput)} tok/s` : "Not measured"}</dd></div>{developerMode && <><div><dt>Average GPU load</dt><dd>{telemetryGpus.length > 0 ? `${(telemetryGpus.reduce((sum, gpu) => sum + (gpu.utilizationPct ?? 0), 0) / telemetryGpus.length).toFixed(0)}%` : "No telemetry"}</dd></div><div><dt>Observed GPU draw</dt><dd>{poweredGpus.length > 0 ? formatPower(poweredGpus.reduce((sum, gpu) => sum + (gpu.powerW ?? 0), 0)) : "No telemetry"}</dd></div></>}</dl>
-          </div>
-          <NetworkModelCatalog snapshot={snapshot} developerMode={developerMode} theme={theme} onNavigate={onNavigate} />
-        </OverviewDetail>
-        <OverviewDetail title="API & connection" icon={Code2}>
-          <DashboardConnect apiBaseUrl={apiBaseUrl} earnUrl={earnUrl} downloadsUrl={publicLink("/downloads")} browserUrl={publicLink("/browser/?autostart=1")} external={external} onOpenEarn={() => window.location.assign("/earn")} />
-        </OverviewDetail>
-        <OverviewDetail title="Recent activity" icon={History}>
-          <div className="overview-activity-heading"><span>{formatCompactNumber(snapshot.summary.completedJobs)} tasks completed</span>{developerMode && <UiButton onClick={() => onNavigate("jobs")}>View all <ArrowRight size={14} /></UiButton>}</div>
-          <div className="activity-list">
-            {snapshot.jobs.slice(0, 5).map((job) => <div key={job.id}><i className={job.status} /><div><strong>{job.model}</strong><span>{relativeTime(job.updatedAt)}</span></div><b>{job.status}</b></div>)}
-            {snapshot.jobs.length === 0 && <UiText>No recent tasks.</UiText>}
-          </div>
-        </OverviewDetail>
-      </section>
-    </>}
-  </section>;
-}
-
-function OverviewDetail({ title, icon: Icon, children }: { title: string; icon: typeof Network; children: ReactNode }) {
-  return <UiDisclosure className="overview-detail">
-    <UiDisclosureSummary><Icon size={17} aria-hidden="true" /><span>{title}</span><ChevronDown size={16} aria-hidden="true" /></UiDisclosureSummary>
-    <div className="overview-detail-content">{children}</div>
-  </UiDisclosure>;
-}
-
-type PeerSortKey = "id" | "hosted" | "version" | "vram" | "share" | "seen" | "role" | "status";
-type PeerFilter = "all" | "serving" | "connected" | "offline";
-
 interface ConnectedPeerRow {
   worker: PublicWorker;
   hosted: string;
@@ -1973,495 +1807,11 @@ function workerPeerRole(worker: PublicWorker): ConnectedPeerRow["role"] {
   return worker.kind === "cell" ? "Host" : worker.kind === "browser" ? "Browser" : "Worker";
 }
 
-function ConnectedPeersTable({ workers }: { workers: PublicWorker[] }) {
-  const pageSize = TABLE_PAGE_SIZE;
-  const [filter, setFilter] = useState<PeerFilter>("all");
-  const [sortKey, setSortKey] = useState<PeerSortKey>("status");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [page, setPage] = useState(0);
-  const connectedVramMb = workers.filter((worker) => worker.connected).reduce((total, worker) => total + worker.offeredVramMb, 0);
-  const rows = useMemo<ConnectedPeerRow[]>(() => workers.map((worker) => {
-    const models = [...new Set(worker.deployments.map((deployment) => deployment.model))];
-    return {
-      worker,
-      hosted: models[0] ?? "—",
-      hostedCount: models.length,
-      version: worker.agentVersion ? `v${worker.agentVersion}` : "Legacy",
-      vramMb: worker.offeredVramMb,
-      sharePercent: connectedVramMb > 0 && worker.connected ? worker.offeredVramMb / connectedVramMb * 100 : 0,
-      seenAt: Date.parse(worker.lastSeenAt) || 0,
-      role: workerPeerRole(worker),
-      status: workerPeerStatus(worker),
-    };
-  }), [connectedVramMb, workers]);
-  const filteredRows = useMemo(() => {
-    const filtered = rows.filter((row) => filter === "all"
-      || filter === "serving" && row.status === "serving"
-      || filter === "connected" && row.status === "connected"
-      || filter === "offline" && (row.status === "offline" || row.status === "attention"));
-    return filtered.sort((left, right) => {
-      const leftValue = peerSortValue(left, sortKey);
-      const rightValue = peerSortValue(right, sortKey);
-      const comparison = typeof leftValue === "number" && typeof rightValue === "number"
-        ? leftValue - rightValue
-        : String(leftValue).localeCompare(String(rightValue));
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
-  }, [filter, rows, sortDirection, sortKey]);
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const visiblePage = Math.min(page, pageCount - 1);
-  const visibleRows = filteredRows.slice(visiblePage * pageSize, visiblePage * pageSize + pageSize);
-  const rangeStart = filteredRows.length === 0 ? 0 : visiblePage * pageSize + 1;
-  const rangeEnd = Math.min(filteredRows.length, (visiblePage + 1) * pageSize);
-
-  useEffect(() => {
-    if (page >= pageCount) setPage(pageCount - 1);
-  }, [page, pageCount]);
-
-  function toggleSort(nextKey: PeerSortKey) {
-    if (sortKey === nextKey) {
-      setSortDirection((current) => current === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(nextKey);
-      setSortDirection("asc");
-    }
-    setPage(0);
-  }
-
-  const sortableHeader = (label: string, key: PeerSortKey) => (
-    <UiButton type="button" className={sortKey === key ? `active ${sortDirection}` : ""} onClick={() => toggleSort(key)}>
-      {label}<ChevronDown size={11} />
-    </UiButton>
-  );
-
-  return (
-    <UiCard className="connected-peers-card" aria-labelledby="connected-peers-title">
-      <header>
-        <strong id="connected-peers-title">Registered peers</strong>
-        <div className="connected-peers-controls">
-          <span>{filteredRows.length} total</span>
-          <UiFieldLabel><SlidersHorizontal size={12} /><span>Filter</span><UiSelect aria-label="Filter peers" value={filter} onChange={(event) => { setFilter(event.target.value as PeerFilter); setPage(0); }}><option value="all">All peers</option><option value="serving">Serving</option><option value="connected">Connected</option><option value="offline">Needs attention</option></UiSelect></UiFieldLabel>
-        </div>
-      </header>
-      <UiText className="panel-table-scroll-hint">Swipe sideways to see all peer details →</UiText>
-      <div className="connected-peers-scroll" role="region" aria-label="Scrollable peer details" tabIndex={0}>
-        <UiTable>
-          <UiTableHead><UiTableRow>
-            <UiTableHeader aria-sort={sortKey === "id" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("ID", "id")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "hosted" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Hosted", "hosted")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "version" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Version", "version")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "vram" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("VRAM", "vram")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "share" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Share", "share")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "seen" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Last seen", "seen")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "role" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Role", "role")}</UiTableHeader>
-            <UiTableHeader aria-sort={sortKey === "status" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Status", "status")}</UiTableHeader>
-          </UiTableRow></UiTableHead>
-          <UiTableBody>
-            {visibleRows.map((row) => (
-              <UiTableRow key={row.worker.id}>
-                <UiTableCell><strong>{shortId(row.worker.id)}</strong><small>{workerLabel(row.worker)}</small></UiTableCell>
-                <UiTableCell><code>{row.hosted}</code>{row.hostedCount > 1 && <small>+{row.hostedCount - 1} more</small>}</UiTableCell>
-                <UiTableCell><code>{row.version}</code></UiTableCell>
-                <UiTableCell><strong>{formatMemory(row.vramMb)}</strong></UiTableCell>
-                <UiTableCell><div className="peer-share"><i><b style={{ width: `${Math.min(100, row.sharePercent)}%` }} /></i><span>{Math.round(row.sharePercent)}%</span></div></UiTableCell>
-                <UiTableCell><code>{relativeTime(row.worker.lastSeenAt)}</code></UiTableCell>
-                <UiTableCell><span className={`peer-role ${row.role.toLowerCase()}`}>{row.role}</span></UiTableCell>
-                <UiTableCell><UiBadge className={`peer-state ${row.status}`}><i />{peerStatusLabel(row.status)}</UiBadge></UiTableCell>
-              </UiTableRow>
-            ))}
-            {visibleRows.length === 0 && <UiTableRow><UiTableCell className="connected-peers-empty" colSpan={8}><Server size={18} /><span><strong>No peers in this view</strong><small>Change the filter or connect a new device.</small></span></UiTableCell></UiTableRow>}
-          </UiTableBody>
-        </UiTable>
-      </div>
-      {filteredRows.length > pageSize && <TablePagination label="peers" page={visiblePage} pageCount={pageCount} total={filteredRows.length} onPageChange={setPage} />}
-    </UiCard>
-  );
-}
-
-function peerSortValue(row: ConnectedPeerRow, key: PeerSortKey): string | number {
-  switch (key) {
-    case "id": return row.worker.id;
-    case "hosted": return row.hosted;
-    case "version": return row.version;
-    case "vram": return row.vramMb;
-    case "share": return row.sharePercent;
-    case "seen": return row.seenAt;
-    case "role": return row.role;
-    case "status": return { serving: 0, connected: 1, attention: 2, offline: 3 }[row.status];
-  }
-}
-
 function peerStatusLabel(status: ConnectedPeerRow["status"]): string {
   if (status === "serving") return "Serving";
   if (status === "connected") return "Connected";
   if (status === "attention") return "Attention";
   return "Offline";
-}
-
-interface NetworkCatalogEntry {
-  id: string;
-  state: "active" | "queued";
-  replicas: number;
-  pipelines: number;
-  request: RequestedModelCapacity | null;
-}
-
-function NetworkModelCatalog({ snapshot, developerMode, theme, onNavigate, compact = false }: {
-  compact?: boolean;
-  snapshot: PublicSnapshot;
-  developerMode: boolean;
-  theme: "light" | "dark";
-  onNavigate: (view: PanelView) => void;
-}) {
-  const [selectedModelId, setSelectedModelId] = useState("");
-  const [page, setPage] = useState(0);
-  const closeSelectedModel = useCallback(() => setSelectedModelId(""), []);
-  const drawerTitleId = useId();
-  const [showAll, setShowAll] = useState(false);
-  const entries = useMemo<NetworkCatalogEntry[]>(() => {
-    const active = snapshot.models.map((model) => ({
-      id: model.id,
-      state: "active" as const,
-      replicas: model.replicas,
-      pipelines: model.pipelines,
-      request: snapshot.requestedModels.find((request) => request.id === model.id) ?? null,
-    }));
-    const activeIds = new Set(active.map((model) => model.id.toLowerCase()));
-    const queued = snapshot.requestedModels
-      .filter((request) => !activeIds.has(request.id.toLowerCase()))
-      .map((request) => ({
-        id: request.id,
-        state: "queued" as const,
-        replicas: 0,
-        pipelines: 0,
-        request,
-      }));
-    return [...active, ...queued];
-  }, [snapshot.models, snapshot.requestedModels]);
-  const selectedEntry = entries.find((entry) => entry.id === selectedModelId) ?? null;
-  const pageSize = TABLE_PAGE_SIZE;
-  const pageCount = Math.max(1, Math.ceil(entries.length / pageSize));
-  const visiblePage = Math.min(page, pageCount - 1);
-  const visibleEntries = entries.slice(visiblePage * pageSize, visiblePage * pageSize + pageSize);
-  useEffect(() => setPage(0), [entries]);
-
-  const activeEntries = entries.filter((entry) => entry.state === "active").sort((left, right) => left.id.localeCompare(right.id));
-  const compactEntries = showAll ? activeEntries : activeEntries.slice(0, 5);
-  return <>
-    {compact ? <UiCard className="overview-models">
-      <header><UiHeading as="h2">Models</UiHeading>{developerMode && <UiButton onClick={() => onNavigate("models")}>Manage models</UiButton>}</header>
-      {compactEntries.length > 0 ? <ul className="overview-model-list">{compactEntries.map((entry) => {
-        const telemetry = networkModelTelemetry(snapshot, entry.id);
-        const runtime = networkModelRuntimeLabel(telemetry.deployments);
-        const capability = runtime === "kokoro" ? "Speech" : runtime === "embedding" ? "Embeddings" : runtime === "decision" ? "Decisions" : runtime;
-        return <li key={entry.id}><UiButton className="overview-model-row" onClick={() => setSelectedModelId(entry.id)} aria-label={`View details for ${entry.id}`}>
-          <Boxes size={19} aria-hidden="true" /><span><strong>{entry.id}</strong><small>{capability}</small></span><span className="overview-model-nodes">{telemetry.peers.length} {telemetry.peers.length === 1 ? "node" : "nodes"}</span><ChevronRight size={16} aria-hidden="true" />
-        </UiButton></li>;
-      })}</ul> : <div className="overview-models-empty"><Boxes size={24} /><strong>No models available yet</strong><UiText>Add a device to bring a model online.</UiText></div>}
-      {activeEntries.length > 5 && <footer><UiButton onClick={() => setShowAll((current) => !current)} aria-expanded={showAll}>{showAll ? "Show less" : `Show all ${activeEntries.length} models`}</UiButton></footer>}
-    </UiCard> : <UiCard className="network-model-catalog">
-      <header className="network-model-catalog-head">
-        <div><span>MODEL & TOKEN CATALOG</span><UiHeading as="h2">Available intelligence</UiHeading><UiText>Inspect each model, its real token activity and the peers currently serving it.</UiText></div>
-        <div><b><i /> LIVE DATA</b>{developerMode && <UiButton type="button" onClick={() => onNavigate("models")}>Manage models</UiButton>}</div>
-      </header>
-      <UiText className="panel-table-scroll-hint">Swipe sideways to see all model details →</UiText>
-      <div className="network-model-table-wrap" role="region" aria-label="Scrollable model details" tabIndex={0}>
-        <UiTable className="network-model-table">
-          <UiTableHead><UiTableRow><UiTableHeader>Model</UiTableHeader><UiTableHeader>Status</UiTableHeader><UiTableHeader>Availability</UiTableHeader><UiTableHeader>Peer memory</UiTableHeader><UiTableHeader>Measured speed</UiTableHeader><UiTableHeader>Processed tokens</UiTableHeader><UiTableHeader><span className="sr-only">Details</span></UiTableHeader></UiTableRow></UiTableHead>
-          <UiTableBody>{visibleEntries.map((entry) => {
-            const telemetry = networkModelTelemetry(snapshot, entry.id);
-            return <UiTableRow key={entry.id} className={selectedModelId === entry.id ? "selected" : ""}>
-              <UiTableCell><UiButton type="button" className="network-model-name" onClick={() => setSelectedModelId(entry.id)}><i><Boxes /></i><span><strong>{entry.id}</strong><small>{networkModelRuntimeLabel(telemetry.deployments)}</small></span></UiButton></UiTableCell>
-              <UiTableCell><UiBadge className={`network-model-state ${entry.state}`}>{entry.state === "active" ? "Active" : modelRequestStatusLabel(entry.request?.status)}</UiBadge></UiTableCell>
-              <UiTableCell><strong>{`${telemetry.peers.length} node${telemetry.peers.length === 1 ? "" : "s"}`}</strong><small>{entry.replicas} replicas · {entry.pipelines} pipelines</small></UiTableCell>
-              <UiTableCell>{telemetry.peerMemoryMb > 0 ? formatMemory(telemetry.peerMemoryMb) : "Not reported"}</UiTableCell>
-              <UiTableCell>{telemetry.measuredThroughput > 0 ? `${formatCompactNumber(telemetry.measuredThroughput)} tok/s` : "Not measured"}</UiTableCell>
-              <UiTableCell>{telemetry.processedTokens > 0 ? formatCompactTokens(telemetry.processedTokens) : "No activity"}</UiTableCell>
-              <UiTableCell><UiButton type="button" className="network-model-open" onClick={() => setSelectedModelId(entry.id)} aria-label={`View details for ${entry.id}`}><ChevronRight /></UiButton></UiTableCell>
-            </UiTableRow>;
-          })}</UiTableBody>
-        </UiTable>
-        {entries.length === 0 && <div className="network-model-empty"><Boxes /><strong>No models are active yet</strong><span>Models and their token activity will appear here as soon as a node publishes one.</span>{developerMode && <UiButton type="button" onClick={() => onNavigate("models")}>Open model catalog</UiButton>}</div>}
-      </div>
-      {entries.length > pageSize && <TablePagination label="models" page={visiblePage} pageCount={pageCount} total={entries.length} onPageChange={setPage} />}
-    </UiCard>}
-    {selectedEntry && createPortal(
-      <NetworkModelDrawer entry={selectedEntry} snapshot={snapshot} theme={theme} titleId={drawerTitleId} onClose={closeSelectedModel} />,
-      document.body,
-    )}
-  </>;
-}
-
-function NetworkModelDrawer({ entry, snapshot, theme, titleId, onClose }: {
-  entry: NetworkCatalogEntry;
-  snapshot: PublicSnapshot;
-  theme: "light" | "dark";
-  titleId: string;
-  onClose: () => void;
-}) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const telemetry = networkModelTelemetry(snapshot, entry.id);
-  const execution = modelExecutionSummary(snapshot, entry.id);
-  const inputTokens = telemetry.jobs.reduce((total, job) => total + job.inputTokens, 0);
-  const outputTokens = telemetry.jobs.reduce((total, job) => total + job.outputTokens, 0);
-  const completedRequests = telemetry.jobs.filter((job) => job.status === "completed").length;
-  const [peerPage, setPeerPage] = useState(0);
-  const peerPageSize = TABLE_PAGE_SIZE;
-  const peerPageCount = Math.max(1, Math.ceil(telemetry.peers.length / peerPageSize));
-  const visiblePeerPage = Math.min(peerPage, peerPageCount - 1);
-  const visiblePeers = telemetry.peers.slice(visiblePeerPage * peerPageSize, visiblePeerPage * peerPageSize + peerPageSize);
-  useEffect(() => setPeerPage(0), [entry.id, telemetry.peers.length]);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.requestAnimationFrame(() => firstFocusable(dialog)?.focus() ?? dialog.focus());
-    const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
-      trapDialogTab(event, dialog);
-    };
-    window.addEventListener("keydown", keydown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", keydown);
-      previous?.focus();
-    };
-  }, [onClose]);
-  return <div className={`model-detail-backdrop ${theme === "light" ? "theme-light" : "theme-dark"}`} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-    <UiDialogPanel as="aside" ref={dialogRef} className="model-detail-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
-      <header className="model-detail-head">
-        <div className="model-detail-icon"><Boxes /></div>
-        <div><span>NETWORK MODEL</span><UiHeading as="h2" id={titleId}>{entry.id}</UiHeading><small>{networkModelRuntimeLabel(telemetry.deployments)}</small></div>
-        <UiButton type="button" onClick={onClose} aria-label="Close model details"><X /></UiButton>
-      </header>
-      <div className="model-detail-badges"><span className={entry.state}><i />{entry.state === "active" ? "Active now" : modelRequestStatusLabel(entry.request?.status)}</span><span className={`execution ${execution.deviceType}`}><Cpu />{executionShortLabel(execution)}</span></div>
-      <section className="model-detail-metrics" aria-label="Model telemetry">
-        <ModelDetailMetric icon={Network} label="Availability" value={`${telemetry.peers.length} node${telemetry.peers.length === 1 ? "" : "s"}`} />
-        <ModelDetailMetric icon={MemoryStick} label="Peer memory" value={telemetry.peerMemoryMb > 0 ? formatMemory(telemetry.peerMemoryMb) : "Not reported"} />
-        <ModelDetailMetric icon={Coins} label="Processed tokens" value={telemetry.processedTokens > 0 ? formatCompactTokens(telemetry.processedTokens) : "No activity"} />
-        <ModelDetailMetric icon={Gauge} label="Measured speed" value={telemetry.measuredThroughput > 0 ? `${formatCompactNumber(telemetry.measuredThroughput)} tok/s` : "Not measured"} />
-      </section>
-      <section className="model-detail-section">
-        <div className="model-detail-section-title"><Activity /><UiHeading as="h3">Token activity</UiHeading></div>
-        <div className="model-token-breakdown">
-          <div><span>Input tokens</span><strong>{formatCompactTokens(inputTokens)}</strong></div>
-          <div><span>Output tokens</span><strong>{formatCompactTokens(outputTokens)}</strong></div>
-          <div><span>Completed requests</span><strong>{completedRequests}</strong></div>
-        </div>
-      </section>
-      <section className="model-detail-section">
-        <div className="model-detail-section-title"><Code2 /><UiHeading as="h3">Runtime identity</UiHeading></div>
-        <div className="model-runtime-identity"><span><small>MODEL ID</small><code>{entry.id}</code></span><span><small>RUNTIME MODES</small><code>{networkModelRuntimeLabel(telemetry.deployments)}</code></span></div>
-      </section>
-      <section className="model-detail-section model-peer-section">
-        <div className="model-detail-section-title"><Network /><UiHeading as="h3">Active peers</UiHeading><span>{telemetry.peers.length}</span></div>
-        <div className="model-peer-table-wrap">
-          <UiTable className="model-peer-table">
-            <UiTableHead><UiTableRow><UiTableHeader>Node</UiTableHeader><UiTableHeader>Region</UiTableHeader><UiTableHeader>Device</UiTableHeader><UiTableHeader>Memory</UiTableHeader><UiTableHeader>Speed</UiTableHeader></UiTableRow></UiTableHead>
-            <UiTableBody>{visiblePeers.map(({ worker, deployments }) => {
-              const measured = deployments.filter(isMeasuredDeployment).reduce((total, deployment) => total + deployment.tokensPerSecond, 0);
-              return <UiTableRow key={worker.id}><UiTableCell><strong><i />{shortId(worker.id)}</strong></UiTableCell><UiTableCell>{worker.region}</UiTableCell><UiTableCell>{worker.gpus[0]?.model ?? worker.kind}</UiTableCell><UiTableCell>{formatMemory(worker.offeredVramMb)}</UiTableCell><UiTableCell>{measured > 0 ? `${formatCompactNumber(measured)} tok/s` : "Not measured"}</UiTableCell></UiTableRow>;
-            })}</UiTableBody>
-          </UiTable>
-          {telemetry.peers.length === 0 && <div className="model-peer-empty"><Server /><span>No active peer is advertising this model right now.</span></div>}
-        </div>
-        {telemetry.peers.length > peerPageSize && <TablePagination label="model peers" page={visiblePeerPage} pageCount={peerPageCount} total={telemetry.peers.length} onPageChange={setPeerPage} />}
-      </section>
-    </UiDialogPanel>
-  </div>;
-}
-
-function ModelDetailMetric({ icon: Icon, label, value }: { icon: typeof Network; label: string; value: string }) {
-  return <div><Icon /><span><small>{label}</small><strong>{value}</strong></span></div>;
-}
-
-function networkModelTelemetry(snapshot: PublicSnapshot, modelId: string) {
-  const normalizedModelId = modelId.toLowerCase();
-  const peers = snapshot.workers.flatMap((worker) => {
-    const deployments = worker.deployments.filter((deployment) => deployment.model.toLowerCase() === normalizedModelId);
-    return deployments.length > 0 && worker.connected ? [{ worker, deployments }] : [];
-  });
-  const deployments = peers.flatMap((peer) => peer.deployments);
-  const jobs = snapshot.jobs.filter((job) => job.model.toLowerCase() === normalizedModelId);
-  return {
-    peers,
-    deployments,
-    jobs,
-    peerMemoryMb: peers.reduce((total, peer) => total + peer.worker.offeredVramMb, 0),
-    measuredThroughput: deployments.filter(isMeasuredDeployment).reduce((total, deployment) => total + deployment.tokensPerSecond, 0),
-    processedTokens: jobs.reduce((total, job) => total + job.inputTokens + job.outputTokens, 0),
-  };
-}
-
-function networkModelRuntimeLabel(deployments: PublicDeployment[]): string {
-  const labels = [...new Set(deployments.map((deployment) => deployment.adapter ?? deployment.mode).filter(Boolean))];
-  return labels.length > 0 ? labels.join(" · ") : "Runtime not reported";
-}
-
-function modelRequestStatusLabel(status: RequestedModelCapacity["status"] | undefined): string {
-  if (!status) return "Queued";
-  const labels: Record<RequestedModelCapacity["status"], string> = {
-    profiling: "Profiling",
-    waiting_capacity: "Waiting for capacity",
-    ready: "Ready",
-    activating: "Activating",
-    active: "Active",
-    incompatible: "Incompatible",
-    failed: "Needs attention",
-  };
-  return labels[status];
-}
-
-const MESH_OVERVIEW_POSITIONS = [
-  { x: 10, y: 24 }, { x: 19, y: 70 }, { x: 31, y: 42 }, { x: 38, y: 82 },
-  { x: 62, y: 20 }, { x: 70, y: 58 }, { x: 82, y: 30 }, { x: 89, y: 73 },
-  { x: 59, y: 84 }, { x: 28, y: 14 }, { x: 75, y: 86 }, { x: 92, y: 48 },
-  { x: 8, y: 51 }, { x: 47, y: 16 },
-] as const;
-
-const MESH_AMBIENT_SPORES = [
-  { x: 15, y: 35 }, { x: 24, y: 84 }, { x: 36, y: 18 }, { x: 43, y: 67 },
-  { x: 57, y: 31 }, { x: 66, y: 76 }, { x: 78, y: 16 }, { x: 88, y: 58 },
-  { x: 94, y: 28 }, { x: 7, y: 77 },
-] as const;
-
-function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, publicLink, external, developerMode, onNavigate }: {
-  workers: PublicWorker[];
-  traces: NetworkExecutionTrace[];
-  registeredWorkers: number;
-  sharedVramMb: number;
-  publicLink: (path: string) => string;
-  external: boolean;
-  developerMode: boolean;
-  onNavigate: (view: PanelView) => void;
-}) {
-  const [zoom, setZoom] = useState(1);
-  const [selectedWorkerId, setSelectedWorkerId] = useState("");
-  const [fullscreen, setFullscreen] = useState(false);
-  const cardRef = useRef<HTMLElement>(null);
-  const visibleWorkers = workers.slice(0, MESH_OVERVIEW_POSITIONS.length);
-  const selectedWorker = visibleWorkers.find((worker) => worker.id === selectedWorkerId) ?? null;
-  const selectedWorkerIndex = selectedWorker ? visibleWorkers.findIndex((worker) => worker.id === selectedWorker.id) : -1;
-  const selectedWorkerPosition = selectedWorkerIndex >= 0 ? MESH_OVERVIEW_POSITIONS[selectedWorkerIndex] ?? { x: 50, y: 50 } : null;
-  const visibleOfferedVramMb = visibleWorkers.reduce((total, worker) => total + worker.offeredVramMb, 0);
-  const selectedSharePercent = selectedWorker && visibleOfferedVramMb > 0 ? selectedWorker.offeredVramMb / visibleOfferedVramMb * 100 : 0;
-  const positions = new Map<string, { x: number; y: number }>();
-  visibleWorkers.forEach((worker, index) => {
-    const position = MESH_OVERVIEW_POSITIONS[index] ?? { x: 50, y: 50 };
-    positions.set(worker.id, position);
-    if (worker.executionNodeId) positions.set(worker.executionNodeId, position);
-  });
-  const links = projectObservedTopology(visibleWorkers, traces).flatMap((link) => {
-    const source = positions.get(link.sourceNodeId);
-    const target = positions.get(link.destinationNodeId);
-    return source && target ? [{ link, source, target }] : [];
-  });
-  const physicalLinks = links.filter(({ link }) => link.evidenceClass === "physical").length;
-
-  useEffect(() => {
-    const updateFullscreen = () => setFullscreen(document.fullscreenElement === cardRef.current);
-    document.addEventListener("fullscreenchange", updateFullscreen);
-    return () => document.removeEventListener("fullscreenchange", updateFullscreen);
-  }, []);
-
-  function updatePointerGlow(event: React.PointerEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.style.setProperty("--mesh-pointer-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
-    event.currentTarget.style.setProperty("--mesh-pointer-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
-  }
-
-  async function toggleFullscreen() {
-    if (!cardRef.current) return;
-    if (document.fullscreenElement === cardRef.current) await document.exitFullscreen();
-    else await cardRef.current.requestFullscreen();
-  }
-
-  return (
-    <UiCard className={`network-canvas interactive-mesh${fullscreen ? " fullscreen" : ""}`} ref={cardRef}>
-      <div className="canvas-head mesh-canvas-head">
-        <div><span>LIVE TOPOLOGY</span><strong>Explore the network</strong></div>
-        <div className="mesh-head-status" aria-label={`${visibleWorkers.length} observed nodes and ${links.length} evidenced routes`}>
-          <b><i /> OBSERVED</b>
-          <span>{visibleWorkers.length} NODES</span>
-          <span>{links.length} ROUTES</span>
-        </div>
-        <div className="mesh-head-actions">
-          {developerMode && <UiButton className="canvas-link" onClick={() => onNavigate("nodes")}>Node details</UiButton>}
-          <UiButton className="mesh-fullscreen-button" onClick={() => void toggleFullscreen()}><Maximize2 />{fullscreen ? "Exit fullscreen" : "Fullscreen"}</UiButton>
-        </div>
-      </div>
-      <div
-        className="interactive-mesh-stage"
-        onPointerMove={updatePointerGlow}
-        onPointerLeave={(event) => {
-          event.currentTarget.style.setProperty("--mesh-pointer-x", "50%");
-          event.currentTarget.style.setProperty("--mesh-pointer-y", "45%");
-        }}
-      >
-        <div className="mesh-ambient mesh-ambient-one" />
-        <div className="mesh-ambient mesh-ambient-two" />
-        <div className="mesh-scene" style={{ "--mesh-zoom": zoom } as CSSProperties}>
-          <div className="mesh-grid" />
-          <div className="mesh-spores" aria-hidden="true">
-            {MESH_AMBIENT_SPORES.map((spore, index) => <i key={`${spore.x}-${spore.y}`} style={{ "--spore-x": `${spore.x}%`, "--spore-y": `${spore.y}%`, "--spore-delay": `${index * -0.83}s` } as CSSProperties} />)}
-          </div>
-          <svg className="mesh-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <filter id="mesh-packet-glow" x="-200%" y="-200%" width="500%" height="500%">
-                <feGaussianBlur stdDeviation=".8" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-            </defs>
-            {links.map(({ link, source, target }) => {
-              const path = `M ${source.x} ${source.y} L ${target.x} ${target.y}`;
-              return <g key={`${link.sourceNodeId}:${link.destinationNodeId}:${link.transport}`} className={`mesh-link-${link.evidenceClass}`}>
-                <path d={path} pathLength="1" />
-              </g>;
-            })}
-          </svg>
-          <div className="mesh-core" role="img" aria-label="mycellios coordinator">
-            <span><Network size={25} strokeWidth={1.6} aria-hidden="true" /></span>
-            <strong>Mycellios</strong>
-            <small>coordinator</small>
-            <i />
-          </div>
-          {visibleWorkers.map((worker, index) => {
-            const position = MESH_OVERVIEW_POSITIONS[index] ?? { x: 50, y: 50 };
-            const selected = selectedWorkerId === worker.id;
-            return (
-              <UiButton
-                className={`mesh-node ${worker.kind}${selected ? " selected" : ""}`}
-                style={{ "--node-x": `${position.x}%`, "--node-y": `${position.y}%`, "--node-delay": `${index * -0.41}s` } as CSSProperties}
-                key={worker.id}
-                onClick={() => setSelectedWorkerId(selected ? "" : worker.id)}
-                aria-pressed={selected}
-                aria-label={`${workerLabel(worker)}, ${worker.gpus[0]?.model ?? worker.kind}`}
-              >
-                <span><WorkerKindIcon worker={worker} /><i /></span>
-                <strong>{workerLabel(worker)}</strong>
-                <small>{worker.gpus[0]?.model ?? worker.kind}</small>
-              </UiButton>
-            );
-          })}
-        </div>
-        {visibleWorkers.length === 0 && <div className="network-empty interactive-empty"><Wifi size={28} /><strong>No nodes are connected right now</strong><span>Connected devices appear in the live topology.</span><UiLink href={publicLink("/browser/")} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>Connect this device <ArrowRight size={13} /></UiLink></div>}
-        <div className="mesh-stage-legend"><b><i /> OBSERVED</b><span>{physicalLinks} physical</span><span>{links.length - physicalLinks} declared/simulated</span>{links.length === 0 && <span>No route observed yet</span>}</div>
-        {selectedWorker && selectedWorkerPosition && <MeshNodePopover worker={selectedWorker} position={selectedWorkerPosition} sharePercent={selectedSharePercent} onClose={() => setSelectedWorkerId("")} />}
-        {visibleWorkers.length > 0 && <div className="mesh-zoom-controls" aria-label="Network zoom controls">
-          <UiButton onClick={() => setZoom((value) => Math.min(1.35, value + 0.12))} disabled={zoom >= 1.35} aria-label="Zoom in"><Plus /></UiButton>
-          <output>{Math.round(zoom * 100)}%</output>
-          <UiButton onClick={() => setZoom((value) => Math.max(0.76, value - 0.12))} disabled={zoom <= 0.76} aria-label="Zoom out"><Minus /></UiButton>
-        </div>}
-      </div>
-      <div className="network-summary mesh-network-summary">
-        <div><span>Nodes online</span><strong>{workers.length} / {registeredWorkers}</strong></div>
-        <div><span>Evidenced routes</span><strong>{links.length}</strong></div>
-        <div><span>Shared VRAM</span><strong>{formatMemory(sharedVramMb)}</strong></div>
-      </div>
-    </UiCard>
-  );
 }
 
 export function MeshNodePopover({ worker, position, sharePercent, onClose }: {

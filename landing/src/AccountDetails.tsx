@@ -1,5 +1,6 @@
-import { Button as UiButton, Heading as UiHeading, Text as UiText } from "./ui/primitives";
-import { CircleAlert, LoaderCircle, LogOut, UserRound } from "lucide-react";
+import { Button as UiButton, Heading as UiHeading, Link as UiLink } from "./ui/primitives";
+import { ArrowUpRight, CircleAlert, LoaderCircle, LogOut, UserRound } from "lucide-react";
+import { AGENT_ACCOUNT_URL } from "../../src/contracts/agent-account-links";
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { ApiAccount, ApiUsage } from "./api-access";
 import type { AuthSession, NetworkIdentity, OAuthProvider, PublicAuthConfig } from "./auth";
@@ -66,19 +67,22 @@ export function AccountDetails({ tab, titleId, session, identity, account, usage
   useEffect(() => setUsagePage(0), [usage.length]);
 
   if (tab === "account") return <>
-    <UiHeading as="h2" id={titleId}>Account</UiHeading>
-    <div className="account-identity-card"><UserRound /><span><strong>{identity?.email ?? session.user.email ?? identity?.id ?? session.user.id}</strong><small>{identity ? `${identity.role ?? "member"} · hosted network` : "Network role unverified"}</small></span></div>
-    {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>Your session is active, but network permissions could not be verified. Admin tools remain locked.</span><UiButton type="button" disabled={roleBusy} onClick={onRetryRole}>{roleBusy ? "Checking…" : "Retry"}</UiButton></div>}
-    <section className="account-link-identities">
-      <div><strong>Sign-in methods</strong><small>{canLinkGoogle || canLinkX ? "Link another available sign-in method to this account." : providers ? "No additional sign-in methods are available for this network." : "Other sign-in methods have not been verified."}</small></div>
-      {(canLinkGoogle || canLinkX) && <span>
+    <UiHeading as="h2" id={titleId}>Tu cuenta</UiHeading>
+    <div className="account-identity-card"><UserRound /><span><small>Sesión iniciada como</small><strong>{identity?.email ?? session.user.email ?? identity?.id ?? session.user.id}</strong></span></div>
+    {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>No se han podido comprobar los permisos de red. Las herramientas de administración siguen bloqueadas.</span><UiButton type="button" disabled={roleBusy} onClick={onRetryRole}>{roleBusy ? "Comprobando…" : "Reintentar"}</UiButton></div>}
+    <UiLink className="account-agent-link" href={AGENT_ACCOUNT_URL}>
+      <span><strong>Cuenta en Mycellios Agent</strong><small>Perfil, facturación, uso y claves de API.</small></span>
+      <ArrowUpRight size={16} aria-hidden="true" />
+    </UiLink>
+    {(canLinkGoogle || canLinkX) && <section className="account-link-identities">
+      <div><strong>Métodos de inicio de sesión</strong><small>Vincula otro método disponible a esta cuenta.</small></div>
+      <span>
         {canLinkGoogle && <UiButton type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("google")}>{linkBusy === "google" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">G</b>}Google</UiButton>}
         {canLinkX && <UiButton type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("twitter")}>{linkBusy === "twitter" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">𝕏</b>}X</UiButton>}
-      </span>}
-      {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
-    </section>
-    <div className="account-facts"><span><small>MEMBER SINCE</small><strong>{account ? new Date(account.created_at).toLocaleDateString() : "—"}</strong></span><span><small>API TOKEN BALANCE</small><strong>{account ? `${formatCompactTokens(account.token_balance)} tokens` : "—"}</strong></span></div>
-    <UiButton className="account-signout" onClick={onSignOut}><LogOut size={16} />Sign out</UiButton>
+      </span>
+    </section>}
+    {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
+    <UiButton className="account-signout" onClick={onSignOut}><LogOut size={16} />Cerrar sesión</UiButton>
   </>;
 
   if (tab === "billing") return <Suspense fallback={<div className="account-usage-empty" role="status">Loading plan…</div>}><BillingAccountPanel session={session} titleId={titleId} account={account} /></Suspense>;

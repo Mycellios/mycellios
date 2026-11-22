@@ -2,8 +2,7 @@ import { ArrowRight, CheckCircle2, CircleAlert, Eye, EyeOff, LoaderCircle, X } f
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { SPORE_WELCOME_REWARD } from "../../src/contracts/spore-rewards";
 import { AccountDetails, MetaMaskProviderIcon } from "./AccountDetails";
-import { ApiAccessPanel } from "./ApiAccessPanel";
-import { configuredApiUrl, loadApiUsage, type ApiAccount, type ApiUsage } from "./api-access";
+import { loadApiUsage, type ApiAccount, type ApiUsage } from "./api-access";
 import {
   EmailConfirmationRequired,
   linkOAuthIdentity,
@@ -37,7 +36,7 @@ function XProviderIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.77 7.74L23.2 22h-6.24l-4.89-6.39L6.49 22H3.37l7.24-8.28L2.96 2h6.4l4.42 5.84L18.9 2Zm-1.1 17.84h1.73L8.42 4.05H6.57L17.8 19.84Z" /></svg>;
 }
 
-type AccountTab = "account" | "billing" | "usage" | "api";
+type AccountTab = "account" | "billing" | "usage";
 
 export function AccountModal({
   ready = true,
@@ -50,7 +49,6 @@ export function AccountModal({
   onAuthenticated,
   onRetryRole,
   onSignOut,
-  onSignInAgain = onSignOut,
   initialTab = "account",
   onClose,
 }: {
@@ -64,7 +62,6 @@ export function AccountModal({
   onAuthenticated: (session: AuthSession, identity: NetworkIdentity | null) => void;
   onRetryRole: () => Promise<void>;
   onSignOut: () => void;
-  onSignInAgain?: () => void;
   initialTab?: AccountTab;
   onClose: () => void;
 }) {
@@ -244,22 +241,11 @@ export function AccountModal({
         <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />Loading account…</div>
       </> : session ? <>
         <div className="account-detail-tabs">
-          <UiButton className={accountTab === "account" ? "active" : ""} aria-pressed={accountTab === "account"} onClick={() => setAccountTab("account")}>Account</UiButton>
+          <UiButton className={accountTab === "account" ? "active" : ""} aria-pressed={accountTab === "account"} onClick={() => setAccountTab("account")}>Cuenta</UiButton>
           <UiButton className={accountTab === "billing" ? "active" : ""} aria-pressed={accountTab === "billing"} onClick={() => setAccountTab("billing")}>Plan</UiButton>
-          <UiButton className={accountTab === "usage" ? "active" : ""} aria-pressed={accountTab === "usage"} onClick={() => setAccountTab("usage")}>Usage</UiButton>
-          {(config.apiAccessEnabled || accountTab === "api") && <UiButton className={accountTab === "api" ? "active" : ""} aria-pressed={accountTab === "api"} onClick={() => setAccountTab("api")}>API keys</UiButton>}
+          <UiButton className={accountTab === "usage" ? "active" : ""} aria-pressed={accountTab === "usage"} onClick={() => setAccountTab("usage")}>Uso de la API</UiButton>
         </div>
-        {accountTab === "api" ? <>
-          <UiHeading as="h2" id={titleId}>API keys</UiHeading>
-          <ApiAccessPanel
-            embedded
-            enabled={config.apiAccessEnabled === true}
-            apiBaseUrl={configuredApiUrl(config.publicApiBaseUrl)}
-            accessToken={session.accessToken}
-            getValidSession={getValidSession}
-            onSignIn={onSignInAgain}
-          />
-        </> : <AccountDetails tab={accountTab} titleId={titleId} session={session} identity={identity} account={account} usage={usage} usageBusy={usageBusy} linkBusy={linkBusy} roleBusy={roleBusy} providers={config.providers} error={error} onLinkProvider={(provider) => void linkProvider(provider)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />}
+        <AccountDetails tab={accountTab} titleId={titleId} session={session} identity={identity} account={account} usage={usage} usageBusy={usageBusy} linkBusy={linkBusy} roleBusy={roleBusy} providers={config.providers} error={error} onLinkProvider={(provider) => void linkProvider(provider)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />
       </> : <>
         <UiHeading as="h2" id={titleId}>{!emailAvailable ? "Continue to Mycellios" : mode === "signin" ? "Welcome back" : "Create your account"}</UiHeading>
         {(!emailAvailable || mode === "signup") && <UiText>Create your account and get {SPORE_WELCOME_REWARD} trial Spore in Mycellios Agent. Trial Spore has no monetary value.</UiText>}

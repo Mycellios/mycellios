@@ -161,9 +161,14 @@ These rules apply to the complete repository.
 - Agent spacing, surface radii and motion belong to `agent-style.css`. Native
   disclosures animate their real height; preserve reduced-motion preferences and
   the sidebar's geometry transitions when adding control transitions.
-- Overview shows one network summary and active models. Keep setup, device tables,
-  topology, runtime telemetry and activity in closed detail groups; use
-  `landing/src/overview.css` and the production Overview stories for this layout.
+- Overview is a public statistics page (`landing/src/NetworkOverview.tsx`): a KPI
+  row (nodes online of registered, shared GPU memory, models in service, completed
+  tasks), hourly completed tasks for 24 h from `/public/v1/history` with the outcome
+  of the latest published tasks, then plain models and devices tables. Map data in
+  `overview-stats.ts`: human model names/types with the id as secondary text, status
+  from requestedModels, hardware class instead of IDs, never account data. Its only
+  action is a small link to Run; keep setup and topology on their own screens. Use
+  `landing/src/overview.css`, `overview-stats.test.ts` and the Overview stories.
 - Models readiness summaries consume the coordinator's requested-model status
   and canonical activation incident. Never infer readiness from GPU totals alone:
   bounded CPU placement can be preparing while GPU capacity is insufficient.
@@ -453,10 +458,16 @@ These rules apply to the complete repository.
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
   identities explicit. Healthchecks must not open AntSeed channels or run models.
-- Account → API keys (`/account?tab=api`) lives in `landing/src/AccountModal.tsx`
-  and uses the ordinary signed-in API key routes for any client. Keep full keys a one-time creation response, preserve
-  account rate limits and native owner qualification, and use server-side
-  revocation. Check `landing/src/panel-issue.test.tsx` and `tests/api-access.test.ts`.
+- API keys live in the Agent account (Settings → Account → API keys,
+  `/agent/app?settings=api-keys`). Agent API `mycelliosApiKeys` calls the coordinator's
+  unchanged `/v1/api-keys` with the user's OIDC token server-side, with bounded reads
+  and timeouts; the new secret is returned once to the caller and Agent's own
+  connection key is refused for revocation. The dashboard account dialog is minimal
+  (who is signed in, a link to the Agent account, sign out, plus the coordinator's
+  API plan and usage that Agent does not show yet); `/account?tab=api` redirects to
+  Agent. Check `mycellios-api-keys.test.ts`, `ApiKeysSettings.test.tsx`,
+  `landing/src/panel-issue.test.tsx`, `tests/landing-marketing-routes.test.ts` and
+  `tests/api-access.test.ts`.
 - Native requalification may refresh only explicitly approved worker/build/model/
   activation/node tuples. Keep the three-attempt daily cap and uncertain-request
   backoff; source drift requires operator approval, not a widened allowlist.

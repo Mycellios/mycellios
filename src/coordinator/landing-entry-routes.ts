@@ -1,3 +1,4 @@
+import { legacyAccountRedirect } from "../contracts/agent-account-links.js";
 import { MARKETING_GUIDE_PATHS } from "../contracts/marketing-guides.js";
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
@@ -81,6 +82,9 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
   for (const [path, documentName] of Object.entries(routeDocuments)) {
     const document = existsSync(resolve(assetsRoot, documentName)) ? documentName : "index.html";
     app.get(path, async (request, reply) => {
+      const queryIndex = request.url.indexOf("?");
+      const moved = legacyAccountRedirect(path, queryIndex === -1 ? "" : request.url.slice(queryIndex));
+      if (moved) return reply.redirect(moved, 302);
       if (["/account", "/admin", "/dashboard", "/spore", "/spore/rewards"].includes(path) || request.url.includes("view=")) reply.header("X-Robots-Tag", "noindex, nofollow, noarchive");
       return reply.sendFile(document);
     });
