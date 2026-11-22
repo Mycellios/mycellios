@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type {
   ModelBackupChoice,
@@ -28,7 +29,6 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-  Spinner,
 } from "@mycellios/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronsUpDown, GripVertical, MoreHorizontal, Plus } from "lucide-react";
@@ -542,7 +542,7 @@ export function ModelRoleSettings({
       </ol>
       {panel}
       {state.busy && !settings ? (
-        <Spinner className="mt-3" aria-label={t`Loading model catalog…`} />
+        <LoadingSkeleton className="mt-3" label={t`Loading model catalog…`} layout="settings" />
       ) : null}
       {state.error && !externalLoadError ? (
         <div role="alert" className="mt-2 text-sm text-destructive">

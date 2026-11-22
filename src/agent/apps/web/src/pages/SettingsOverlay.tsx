@@ -50,6 +50,7 @@ import {
 import type { ComponentType } from "react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { ApprovalRulesSettings } from "../components/ApprovalRulesSettings";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { useDeveloperMode } from "../lib/developer-mode";
 import { spaceQueries, useQueryUserId, writeSaved } from "../lib/query";
 import { SpaceRpcProvider } from "../lib/space-rpc";
@@ -123,7 +124,6 @@ export function SettingsOverlay({
   memoryConfig,
   onMemoryConfigChange,
   onClose,
-  onVoiceStatusMaybeChanged,
 }: {
   bots?: Bot[];
   onBotNotificationsChange?: (id: string, enabled: boolean) => Promise<void>;
@@ -164,7 +164,6 @@ export function SettingsOverlay({
   memoryConfig: SpaceMemoryConfig | null | undefined;
   onMemoryConfigChange: (config: SpaceMemoryConfig | null) => void;
   onClose: () => void;
-  onVoiceStatusMaybeChanged?: () => void | Promise<void>;
 }) {
   const { t, i18n } = useLingui();
   const [developerMode] = useDeveloperMode();
@@ -237,7 +236,7 @@ export function SettingsOverlay({
       <Button variant="outline" onClick={() => void otherBots.refetch()}>{t`Retry`}</Button>
     </div>
   ) : (
-    <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p>
+    <LoadingSkeleton />
   );
   async function updateNotification(id: string, enabled: boolean) {
     await onBotNotificationsChange?.(id, enabled);
@@ -319,10 +318,11 @@ export function SettingsOverlay({
     if (!nav) return;
     const measure = () => {
       const offset = Math.abs(nav.scrollLeft);
-      setNavOverflow({
-        previous: offset > 1,
-        next: nav.scrollWidth - nav.clientWidth - offset > 1,
-      });
+      const previous = offset > 1;
+      const next = nav.scrollWidth - nav.clientWidth - offset > 1;
+      setNavOverflow((current) => current.previous === previous && current.next === next
+        ? current
+        : { previous, next });
     };
     const revealSection = () => {
       if (nav.scrollWidth > nav.clientWidth) {
@@ -397,18 +397,12 @@ export function SettingsOverlay({
           ? t`Close voice settings`
           : t`Close user settings`;
 
-  async function refreshVoiceStatus() {
-    await onVoiceStatusMaybeChanged?.();
-  }
-
-  // Leaving is immediate, so the URL updates in the same tick; voice readiness refreshes behind it.
   function leaveSettings(next: () => void) {
     if (panelBusy) return;
     if (formState.dirty) {
       setLeaveAction(() => next);
       return;
     }
-    void refreshVoiceStatus();
     next();
   }
 

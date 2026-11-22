@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { SpaceMemoryConfig } from "@mycellios/contracts";
 import {
@@ -9,7 +10,6 @@ import {
   Field,
   FieldLabel,
   OptionSelect,
-  Spinner,
   Toggle,
 } from "@mycellios/ui-web";
 import { XIcon } from "lucide-react";
@@ -198,9 +198,7 @@ export function MemorySettingsOverlay({
           <SpaceMemorySection />
 
           {config === undefined ? (
-            <p className="text-[13px] text-muted-foreground">
-              <Spinner aria-label={t`Loading memory settings…`} />
-            </p>
+            <LoadingSkeleton label={t`Loading memory settings…`} layout="settings" />
           ) : config ? (
             <section className="rounded-xl border border-border px-4 py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

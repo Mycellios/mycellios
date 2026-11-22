@@ -319,11 +319,26 @@ describe("tab keyboard, mouse and menu", () => {
 
   it("closes with Delete, Backspace and a middle click, renames with F2 and double click, and moves with Alt+Shift+arrows", async () => {
     const { host, select } = await setup("keys");
-    await act(() => key(tabButton(host, "a"), { key: "ArrowRight", altKey: true, shiftKey: true }));
-    expect(readConversationTabs("keys").ids).toEqual(["b", "a", "c"]);
-    await act(() => key(tabButton(host, "a"), { key: "ArrowLeft", altKey: true, shiftKey: true }));
-    expect(readConversationTabs("keys").ids).toEqual(["a", "b", "c"]);
-    await act(() => key(tabButton(host, "b"), { key: "F2" }));
+    const pendingFrames: FrameRequestCallback[] = [];
+    const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => pendingFrames.push(callback));
+    try {
+      await act(() => {
+        const tab = tabButton(host, "a");
+        tab.focus();
+        key(tab, { key: "ArrowRight", altKey: true, shiftKey: true });
+      });
+      expect(readConversationTabs("keys").ids).toEqual(["b", "a", "c"]);
+      await act(() => {
+        const tab = tabButton(host, "a");
+        tab.focus();
+        key(tab, { key: "ArrowLeft", altKey: true, shiftKey: true });
+      });
+      expect(readConversationTabs("keys").ids).toEqual(["a", "b", "c"]);
+      await act(() => key(tabButton(host, "b"), { key: "F2" }));
+    } finally {
+      requestFrame.mockRestore();
+    }
+    await act(() => { for (const frame of pendingFrames) frame(performance.now()); });
     expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
     await act(() => key(host.querySelector("input")!, { key: "Escape" }));
     await act(() => tabButton(host, "c").dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));

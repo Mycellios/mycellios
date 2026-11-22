@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type {
   SettingsScope,
@@ -22,7 +23,6 @@ import {
   Input,
   NativeSelect,
   NativeSelectOption,
-  Spinner,
 } from "@mycellios/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
@@ -213,6 +213,11 @@ export function VoiceSettingsOverlay({
   const managesConnection = scope === "account" || !credential;
   const canConnect = selfHosted ? Boolean(baseUrl.trim()) : apiKey.trim().length >= 8;
 
+  function refreshConversationVoiceStatus() {
+    // Until the new read succeeds, the composer treats the connection as unavailable.
+    void queryClient.resetQueries({ queryKey: queries.voice.status.queryKey(), exact: true });
+  }
+
   async function connectKey() {
     if (!selected || !canConnect) return;
     setError(null);
@@ -235,6 +240,7 @@ export function VoiceSettingsOverlay({
           : {}),
       });
       setApiKey("");
+      refreshConversationVoiceStatus();
       await refresh(selected.id);
       setNotice(t`Connected ${selected.name}.`);
     } catch (err) {
@@ -251,6 +257,7 @@ export function VoiceSettingsOverlay({
     markPending("disconnect");
     try {
       await rpc.voice.disconnect({ provider: providerId });
+      refreshConversationVoiceStatus();
       setApiKey("");
       await refresh(providerId);
     } catch (err) {
@@ -268,6 +275,7 @@ export function VoiceSettingsOverlay({
     setError(null);
     try {
       await rpc.voice.setVoice({ scope, voiceId: nextVoiceId, provider: selected?.id });
+      refreshConversationVoiceStatus();
       await refresh(selected?.id);
     } catch (err) {
       setError(errorText(err, t`Could not save that voice`));
@@ -330,9 +338,7 @@ export function VoiceSettingsOverlay({
   const content = (
     <>
       {loading && !catalog.length ? (
-        <p className="text-sm text-muted-foreground">
-          <Spinner aria-label={t`Loading voice providers…`} />
-        </p>
+        <LoadingSkeleton label={t`Loading voice providers…`} layout="settings" />
       ) : null}
       {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
       {notice ? <p className="mb-4 text-sm text-success">{notice}</p> : null}
