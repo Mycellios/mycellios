@@ -52,7 +52,7 @@ import {
   upsertMessageById,
 } from "@mycellios/core";
 import { clientCorrelationHeaders, responseCorrelation } from "@mycellios/logging/monitoring";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { promptAiConsent } from "./ai-consent";
 import type { EndpointResult } from "./endpoint";
 import { defaultApiBase, normalizeApiBase } from "./endpoint";
@@ -75,8 +75,8 @@ import {
 import { clearUnsentSends } from "./thread-feedback";
 import { authResponseErrorText, errorText, sessionSaveErrorText } from "./user-error";
 
-const SPACE_KEY = "rakazo.space_id";
-const SPACE_ROLLBACK_KEY = "rakazo.space_rollback";
+const SPACE_KEY = "mycellios.space_id";
+const SPACE_ROLLBACK_KEY = "mycellios.space_rollback";
 const RPC_TIMEOUT_MS = 8_000;
 export const MAX_MOBILE_AUTH_RESPONSE_BYTES = 256 * 1024;
 export const MAX_MOBILE_RPC_RESPONSE_BYTES = 16 * 1024 * 1024;

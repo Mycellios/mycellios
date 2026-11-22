@@ -1,6 +1,6 @@
 import type { RemoteImagesPreference } from "@mycellios/core";
 import { normalizeRemoteImagesPreference, REMOTE_IMAGES_STORAGE_KEY } from "@mycellios/core";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 
 export type { RemoteImagesPreference };
 

@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { Platform } from "react-native";
 import { captureApiRequestContext, currentApiBase, rpc } from "./api";
 import { currentSessionGeneration } from "./session";
