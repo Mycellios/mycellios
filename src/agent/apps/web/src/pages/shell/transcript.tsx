@@ -116,6 +116,7 @@ export const Transcript = memo(function Transcript({
   onOpenImport,
   onMarkRead,
   onBranch,
+  onDeleteMessage,
   branchDisabled = false,
   renderBranchOrigin,
 }: {
@@ -179,6 +180,7 @@ export const Transcript = memo(function Transcript({
   onMarkRead?: () => void;
   /** "Branch in new conversation" on the last Mico message of each turn; absent where branching is not offered. */
   onBranch?: (message: ThreadMessage) => void;
+  onDeleteMessage?: (message: ThreadMessage) => void;
   /** A turn is running in this conversation, so branching waits. */
   branchDisabled?: boolean;
   /** The divider where a branch's copied history ends, with its live source. */
@@ -690,12 +692,16 @@ export const Transcript = memo(function Transcript({
           const joinsPrevious = joinMessageBubbles(before?.kind === "message" ? before.message : undefined, message, separatorIds.has(message.id) || message.id === unreadDividerId);
           const joinsNext = joinMessageBubbles(message, after?.kind === "message" ? after.message : undefined, Boolean(after?.kind === "message" && (separatorIds.has(after.message.id) || after.message.id === unreadDividerId)));
           const peerReceipt = isPeerReceiptBlocks(message.blocks);
+          const deleteMessage = message.role === "user" && message.runId && !peerReceipt &&
+            !message.blocks.some(block => block.kind === "task_brief" || block.kind === "channel_message")
+            ? onDeleteMessage : undefined;
           const messageReactions = reactionView.reactions.get(message.id);
           const wrapMessage = (content: ReactNode) =>
             compactMessages && !peerReceipt && !message.id.startsWith("progress:") &&
             message.blocks.some((block) => block.kind === "text" || block.kind === "file" || block.kind === "image" || block.kind === "image_generation" || block.kind === "ask")
               ? <MessageTouchActions message={message} onReply={onReply} onMarkUnread={onMarkUnread}
-                  markedUnread={message.id === markedUnreadMessageId} onReact={onReact} onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}>{content}</MessageTouchActions>
+                  markedUnread={message.id === markedUnreadMessageId} onReact={onReact} onDelete={deleteMessage}
+                  onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}>{content}</MessageTouchActions>
               : content;
           return (
             <Fragment key={message.id}>
@@ -784,6 +790,7 @@ export const Transcript = memo(function Transcript({
                       onMarkUnread={onMarkUnread}
                       onReact={onReact}
                       onBranch={branchableIds.has(message.id) ? onBranch : undefined}
+                      onDelete={deleteMessage}
                       branchDisabled={branchDisabled}
                     />)}
                     {lastRun?.completedAt && message.runId === lastRun.id &&

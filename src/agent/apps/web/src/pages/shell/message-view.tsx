@@ -81,6 +81,7 @@ export const MessageView = memo(function MessageView({
   onMarkUnread,
   markedUnread = false,
   onReact,
+  onDelete,
   onBranch,
   branchDisabled = false,
 }: {
@@ -127,6 +128,7 @@ export const MessageView = memo(function MessageView({
   onMarkUnread: (message: ThreadMessage) => void;
   markedUnread?: boolean;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
+  onDelete?: (message: ThreadMessage) => void;
   /** "Branch in new conversation", only on the last Mico message of a turn. */
   onBranch?: (message: ThreadMessage) => void;
   branchDisabled?: boolean;
@@ -215,6 +217,7 @@ export const MessageView = memo(function MessageView({
       onReact={onReact}
       onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}
       onBranch={onBranch}
+      onDelete={onDelete}
       branchDisabled={branchDisabled}
     />
   );

@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@mycellios/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
-import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Split, Users, X } from "lucide-react";
+import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Split, Trash2, Users, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { MessagePinsContext } from "../../components/PinnedMessages";
 import { SEND_TO_GROUP_MENU_LIMIT, SendToGroupContext } from "../../components/SendToGroup";
@@ -31,6 +31,7 @@ type MessageActions = {
   markedUnread?: boolean;
   onAddRoutine?: (name: string, prompt: string) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
+  onDelete?: (message: ThreadMessage) => void;
 };
 
 function copyMessage(message: ThreadMessage) {
@@ -39,7 +40,7 @@ function copyMessage(message: ThreadMessage) {
 }
 
 export function MessageTouchActions({
-  message, onReply, onMarkUnread, markedUnread, onReact, onAddRoutine, children,
+  message, onReply, onMarkUnread, markedUnread, onReact, onAddRoutine, onDelete, children,
 }: MessageActions & { children: ReactNode }) {
   const { t } = useLingui();
   const sendToGroup = useContext(SendToGroupContext);
@@ -119,6 +120,9 @@ export function MessageTouchActions({
           {canMarkMessageUnread(message) && !markedUnread ? (
             <SheetClose render={<Button variant="ghost" />} onClick={() => onMarkUnread(message)}><MessageSquareDot />{t`Mark as unread`}</SheetClose>
           ) : null}
+          {onDelete ? <SheetClose render={<Button variant="ghost" className="text-destructive" />} onClick={() => onDelete(message)}>
+            <Trash2 />{t`Delete`}
+          </SheetClose> : null}
         </div>
       </SheetContent>
     </Sheet>
@@ -133,6 +137,7 @@ export function MessageHoverActions({
   markedUnread = false,
   onReact,
   onAddRoutine,
+  onDelete,
   onBranch,
   branchDisabled = false,
 }: MessageActions & {
@@ -257,6 +262,9 @@ export function MessageHoverActions({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ) : null}
+            {onDelete ? <DropdownMenuItem variant="destructive" onClick={() => onDelete(message)}>
+              <Trash2 size={14} aria-hidden="true" /><Trans>Delete</Trans>
+            </DropdownMenuItem> : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

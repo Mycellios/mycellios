@@ -73,6 +73,8 @@ import {
 } from "@mycellios/core";
 import type { GroupAvatarMember } from "@mycellios/ui-web";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   BotAvatar,
   Button,
   DropdownMenu,
@@ -4292,6 +4294,20 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   selectConversationRef.current = openConversationInChat;
   /** Copies the turn that ends with this Mico message into a new conversation and opens it next to this tab. */
   const branching = useRef(false);
+  const [messageDelete, setMessageDelete] = useState<{ scope: string; taskId?: string; id: string } | null>(null);
+  const deletingMessage = messageDelete?.scope === conversationScope && messageDelete?.taskId === taskScope?.taskThreadId ? messageDelete : null;
+  function requestMessageDeletion(message: ThreadMessage) {
+    if (conversationScope) setMessageDelete({ scope: conversationScope, taskId: taskScope?.taskThreadId, id: message.id });
+  }
+  async function confirmMessageDeletion() {
+    setMessageDelete(null);
+    if (!active || !deletingMessage) return;
+    try {
+      await rpc.threads.deleteOwnMessage({ botId: active.id, taskThreadId: taskScope?.taskThreadId, messageId: deletingMessage.id });
+    } catch (cause) {
+      toast.error(errorText(cause, t`Could not delete the message. Try again.`));
+    }
+  }
   async function branchFromMessage(message: ThreadMessage) {
     if (!active || inGroup || activeProject || !conversationScope || branching.current) return;
     branching.current = true;
@@ -4971,6 +4987,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               }}
               onReact={reactToMessage}
               onBranch={branchingOffered ? onBranchMessage : undefined}
+              onDeleteMessage={active && !inGroup && !activeProject && !newConversation && !composerRunning ? requestMessageDeletion : undefined}
               branchDisabled={composerRunning}
               renderBranchOrigin={renderBranchOrigin}
               onJumpToMessage={jumpToReplyMessage}
@@ -5004,6 +5021,18 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               }}
             /></SendToGroupContext.Provider></MessagePinsContext.Provider></ResponseStyleContext.Provider>
           )}
+          <AlertDialog open={Boolean(deletingMessage)} onOpenChange={open => { if (!open) setMessageDelete(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle><Trans>Delete this message?</Trans></AlertDialogTitle>
+                <AlertDialogDescription><Trans>This permanently removes the message from the conversation.</Trans></AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel><Trans>Cancel</Trans></AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={() => void confirmMessageDeletion()}><Trans>Delete</Trans></AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         {active || activeGroup ? (
           // Let messages continue behind the composer's rounded top corners.
