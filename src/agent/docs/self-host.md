@@ -666,6 +666,9 @@ BOAT_API_KEY=             # when SANDBOX_PROVIDER=boat
 
 A saved `ask_user` answer starts a fresh Pi tool budget within the same task.
 Automatic plan starts and replays of approved actions keep the existing budget.
+Pi shares this budget across the parent and its subagents. Internal plan updates
+and tool discovery have a separate cap of eight calls or the configured limit,
+whichever is greater. This lets Pi close a verified plan after the last task call.
 
 `RAKAZO_LIVE_MODEL_CATALOG=off` disables provider and Codex live catalog probing; the default is on.
 
