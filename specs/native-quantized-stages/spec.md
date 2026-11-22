@@ -1,7 +1,7 @@
 # Native quantized stages
 
-Status: design and feasibility prototype (opened 2026-11-22). No runtime code
-has been merged for this spec.
+Status: phase 1 in progress (opened 2026-11-22). The pinned runtime and its
+batch-class self-test are merged (#451); stage execution is in review.
 
 ## Goal
 
@@ -120,17 +120,25 @@ can report it and restart the child.
 
 ### Stage packages
 
-The stage package identity and manifest of `native_gguf.py` stay. The GGUF
-inside a package must also load in llama.cpp:
+The sealed package format of `native_gguf.py` does not change. A node
+verifies the package as before, then derives a llama.cpp *view* from its
+verified bytes (`llama_cpp_view.py`), cached by package id:
 
 - blocks renumbered from zero and the block count rewritten;
-- `token_embd` and `output_norm` present in every package, because the loader
-  requires them. A middle stage does not need the real embedding matrix, so
-  its package should carry a one-token vocabulary. This is not prototyped.
-- a non-tail package carries one block more than its range, because the layer
-  input of block `k` is only produced when block `k` exists. The extra block
-  costs one block of compute and memory per stage. An upstream option to stop
-  the graph after a given block would remove it.
+- no tokenizer (`tokenizer.ggml.model = none`), with the vocabulary size the
+  stage needs: the real size for the head and the tail, one for a middle
+  stage. The tokenizer stays with the root, as today.
+- tensors the loader requires but the stage does not read: a unit
+  `output_norm` for non-tail stages, a one-row token embedding for middle
+  stages, and for a tail whose model has a separate output matrix, a token
+  embedding copied from that matrix (same shape and type);
+- a non-tail view carries a copy of its last block, because the layer input of
+  block `k` is only produced when block `k` exists. The copy costs one block of
+  compute and memory per stage. An upstream option to stop the graph after a
+  given block would remove it.
+
+With SmolLM2-1.7B (Q4_K_M), views of one, two and three stages produced the
+same greedy tokens as the original GGUF, on CPU and on Vulkan.
 
 ### Exact speculation
 
@@ -292,6 +300,14 @@ contributor work.
    answers with the same tokens as the complete GGUF on the copy and chat
    corpora, with and without speculation, and a node with a mismatched binary
    or a failing self-test publishes no profile.
+
+   Done so far: the pinned runtime and self-test (#451), the view, the
+   Torch-free executor and the stage runner, selected with
+   `--native-gguf-executor llama-cpp` on the server and stage processes. On
+   one host, a two-stage loopback route returned the same text with and
+   without speculation (64 of 64 answers, CPU and Vulkan). Still open: the
+   engine runtime challenge handler and engine-family selection, which replace
+   the flag.
 2. **Packages.** Tensor-range package builder with the fixed cut points and the
    middle-stage vocabulary, cache and eviction. Exit: two nodes build
    byte-identical packages for the same range.
