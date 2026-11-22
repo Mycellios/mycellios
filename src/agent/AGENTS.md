@@ -195,6 +195,11 @@
   Verify server-connections/dialogs, native directory/IPC and setup/preload tests.
 
 
+- Supermemory reads both container namespaces and writes new memories under the
+  Mycellios prefix. Purge both prefixes for the same explicit history generations
+  and leave durable memories untouched. Check the focused Supermemory adapter
+  tests. Preserve dual reads and purges in any rollback once new writes begin.
+
 - Local memory keeps existing Markdown documents/revisions. General notes are owned
   by user and Space; Mico notes span that Mico's conversations; task notes require
   the current main/task thread and use a tasks/<thread>/ path. Isolated scope excludes

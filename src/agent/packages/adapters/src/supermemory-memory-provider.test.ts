@@ -17,6 +17,8 @@ const context: AdapterContext = {
   signal: new AbortController().signal,
 };
 
+const previousNamespace = "rakazo";
+
 function provider() {
   return new SupermemoryMemoryProvider({
     baseUrl: "http://localhost:6767",
@@ -41,10 +43,13 @@ describe("SupermemoryMemoryProvider", () => {
       context,
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(
       fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).containerTag),
-    ).toEqual(["rakazo:workspace:workspace-1", "rakazo:bot-1"]);
+    ).toEqual([
+      "mycellios:workspace:workspace-1", "mycellios:bot-1",
+      `${previousNamespace}:workspace:workspace-1`, `${previousNamespace}:bot-1`,
+    ]);
   });
 
   it("adds the current history generation only after compaction", async () => {
@@ -69,7 +74,37 @@ describe("SupermemoryMemoryProvider", () => {
 
     expect(
       fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).containerTag),
-    ).toEqual(["rakazo:bot-1", "rakazo:bot-1:history:3"]);
+    ).toEqual([
+      "mycellios:bot-1", "mycellios:bot-1:history:3",
+      `${previousNamespace}:bot-1`, `${previousNamespace}:bot-1:history:3`,
+    ]);
+  });
+
+  it("recalls existing history and saves new history under the current namespace", async () => {
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      if (!body.q) return new Response("", { status: 200 });
+      const results = body.containerTag === [previousNamespace, "bot-1", "history", 3].join(":")
+        ? [{ memory: "Existing history", similarity: 0.9 }]
+        : [];
+      return Response.json({ results });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(provider().recall(
+      { query: "project", scope: "isolated", botId: "bot-1", historyGeneration: 3, limit: 5 },
+      context,
+    )).resolves.toEqual({ ok: true, value: [{ memory: "Existing history", score: 0.9 }] });
+
+    fetchMock.mockClear();
+    await expect(provider().save(
+      { content: "New history", scope: "shared", botId: "bot-1", source: { kind: "history", generation: 3 } },
+      context,
+    )).resolves.toEqual({ ok: true, value: undefined });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      containerTag: "mycellios:bot-1:history:3",
+    });
   });
 
   it("passes recall limits and cancellation through to the provider client", async () => {
@@ -109,7 +144,7 @@ describe("SupermemoryMemoryProvider", () => {
 
     expect(
       fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).containerTag),
-    ).toEqual(["rakazo:workspace:workspace-1", "rakazo:bot-1"]);
+    ).toEqual(["mycellios:workspace:workspace-1", "mycellios:bot-1"]);
   });
 
   it("purges only requested history generations", async () => {
@@ -119,8 +154,10 @@ describe("SupermemoryMemoryProvider", () => {
     await provider().purgeHistory({ botId: "bot-1", generations: [2, 3, 3] }, context);
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
-      "http://localhost:6767/v3/container-tags/rakazo%3Abot-1%3Ahistory%3A2",
-      "http://localhost:6767/v3/container-tags/rakazo%3Abot-1%3Ahistory%3A3",
+      "http://localhost:6767/v3/container-tags/mycellios%3Abot-1%3Ahistory%3A2",
+      "http://localhost:6767/v3/container-tags/mycellios%3Abot-1%3Ahistory%3A3",
+      `http://localhost:6767/v3/container-tags/${previousNamespace}%3Abot-1%3Ahistory%3A2`,
+      `http://localhost:6767/v3/container-tags/${previousNamespace}%3Abot-1%3Ahistory%3A3`,
     ]);
   });
 
@@ -131,8 +168,10 @@ describe("SupermemoryMemoryProvider", () => {
     ).resolves.toEqual({ ok: true, value: undefined });
   });
 
-  it("reports a purge the key is not allowed to make", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 403 })));
+  it("reports a purge failure even when the other namespace was cleared", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request) =>
+      new Response("{}", { status: String(url).includes(previousNamespace) ? 403 : 200 }),
+    ));
     await expect(
       provider().purgeHistory({ botId: "bot-1", generations: [4] }, context),
     ).resolves.toEqual({ ok: false, error: SUPERMEMORY_DELETE_FORBIDDEN_ERROR });
@@ -188,7 +227,7 @@ describe("Supermemory connection setup", () => {
       [
         "DELETE",
         expect.stringMatching(
-          /^https:\/\/api\.supermemory\.ai\/v3\/container-tags\/rakazo%3Adelete-probe%3A[0-9a-f-]{36}$/,
+          /^https:\/\/api\.supermemory\.ai\/v3\/container-tags\/mycellios%3Adelete-probe%3A[0-9a-f-]{36}$/,
         ),
       ],
     ]);
@@ -392,7 +431,7 @@ describe("Supermemory private host reuse", () => {
     await expect(
       memory.recall({ query: "project", scope: "shared", botId: "bot-1", limit: 5 }, context),
     ).resolves.toMatchObject({ ok: true });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(resolveHostname).toHaveBeenCalledOnce();
 
     resolveHostname.mockRejectedValue(new Error("dns blip"));
@@ -438,6 +477,6 @@ describe("Supermemory private host reuse", () => {
       memory.recall({ query: "project", scope: "isolated", botId: "bot-1", limit: 1 }, context),
     ).resolves.toMatchObject({ ok: true });
     expect(resolveHostname).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

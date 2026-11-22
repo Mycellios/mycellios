@@ -24,6 +24,9 @@ import {
   searchSupermemoryContainers,
 } from "./supermemory-client.js";
 
+const MEMORY_NAMESPACE = "mycellios";
+const LEGACY_MEMORY_NAMESPACE = "rakazo";
+
 export const SUPERMEMORY_PROVIDER_ID = "supermemory";
 export { SUPERMEMORY_CLOUD_BASE_URL };
 
@@ -92,7 +95,7 @@ export async function prepareSupermemoryConnection(
   // Clearing a conversation deletes its memory, which only owner and admin keys may do.
   // Deleting a fresh random tag checks that without touching anyone's data.
   const deletable = await deleteSupermemoryContainer(
-    `rakazo:delete-probe:${randomUUID()}`,
+    `${MEMORY_NAMESPACE}:delete-probe:${randomUUID()}`,
     connection,
   );
   if (!deletable.ok) throw new Error(deletable.error);
@@ -113,22 +116,26 @@ export function decodeLegacySupermemoryCredentials(
   return plaintext.trim() ? { apiKey: plaintext } : null;
 }
 
-function durableContainerTags(scope: DurableMemoryScope, botId: string, spaceId: string): string[] {
-  const isolated = `rakazo:${botId}`;
-  // This external namespace predates the Space rename. Keep it stable so
-  // existing durable memories remain recallable; the identifier is a Space ID.
-  return scope === "shared" ? [`rakazo:workspace:${spaceId}`, isolated] : [isolated];
+function durableContainerKeys(scope: DurableMemoryScope, botId: string, spaceId: string): string[] {
+  return scope === "shared" ? [`workspace:${spaceId}`, botId] : [botId];
 }
 
-function historyContainerTag(botId: string, generation: number): string {
-  return `rakazo:${botId}:history:${generation}`;
+function historyContainerKey(botId: string, generation: number): string {
+  return `${botId}:history:${generation}`;
+}
+
+function compatibleContainerTags(keys: string[]): string[] {
+  return [MEMORY_NAMESPACE, LEGACY_MEMORY_NAMESPACE].flatMap((namespace) =>
+    keys.map((key) => `${namespace}:${key}`),
+  );
 }
 
 function recallContainerTags(request: SemanticMemoryRecallRequest, spaceId: string): string[] {
-  const tags = durableContainerTags(request.scope, request.botId, spaceId);
-  return request.historyGeneration === undefined
-    ? tags
-    : [...tags, historyContainerTag(request.botId, request.historyGeneration)];
+  const keys = durableContainerKeys(request.scope, request.botId, spaceId);
+  if (request.historyGeneration !== undefined) {
+    keys.push(historyContainerKey(request.botId, request.historyGeneration));
+  }
+  return compatibleContainerTags(keys);
 }
 
 export class SupermemoryMemoryProvider implements SemanticMemoryProvider {
@@ -195,13 +202,13 @@ export class SupermemoryMemoryProvider implements SemanticMemoryProvider {
   ): Promise<SemanticMemoryResponse> {
     const blocked = await this.localBaseUrlBlock();
     if (blocked) return { ok: false, error: blocked };
-    const tags =
+    const keys =
       request.source.kind === "history"
-        ? [historyContainerTag(request.botId, request.source.generation)]
-        : durableContainerTags(request.scope, request.botId, context.spaceId);
+        ? [historyContainerKey(request.botId, request.source.generation)]
+        : durableContainerKeys(request.scope, request.botId, context.spaceId);
     const result = await saveSupermemoryMemoryToContainers(
       request.content,
-      tags,
+      keys.map((key) => `${MEMORY_NAMESPACE}:${key}`),
       this.connectionForRequest(),
       context.signal,
     );
@@ -214,16 +221,16 @@ export class SupermemoryMemoryProvider implements SemanticMemoryProvider {
   ): Promise<SemanticMemoryResponse> {
     const blocked = await this.localBaseUrlBlock();
     if (blocked) return { ok: false, error: blocked };
+    const keys = [...new Set(request.generations)].map((generation) =>
+      historyContainerKey(request.botId, generation),
+    );
+    const connection = this.connectionForRequest();
     const results = await Promise.all(
-      [...new Set(request.generations)].map((generation) =>
-        deleteSupermemoryContainer(
-          historyContainerTag(request.botId, generation),
-          this.connectionForRequest(),
-          context.signal,
-        ),
+      compatibleContainerTags(keys).map((tag) =>
+        deleteSupermemoryContainer(tag, connection, context.signal),
       ),
     );
-    const errors = results.filter((result) => !result.ok).map((result) => result.error);
+    const errors = [...new Set(results.filter((result) => !result.ok).map((result) => result.error))];
     return errors.length > 0
       ? { ok: false, error: errors.join("; ") }
       : { ok: true, value: undefined };
