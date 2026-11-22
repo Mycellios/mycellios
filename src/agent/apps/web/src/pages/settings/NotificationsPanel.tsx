@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { SoundSettings } from "./SoundSettings";
 import { useLingui } from "@lingui/react/macro";
 import { NOTIFICATION_PAUSE_MINUTES, NOTIFICATIONS_PAUSED_UNTIL_RESUMED, NOTIFICATIONS_PAUSED_UNTIL_RESUMED_MS, notificationPauseIsIndefinite, type Bot, type NotificationSettings } from "@mycellios/contracts";
@@ -139,7 +140,7 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
   const canTest = nativeStatus?.supported || permission === "granted" && (!android || androidStatus?.registered);
   return <div className="rk-general-settings space-y-6">
     <SettingsGroup title={<span className="flex flex-wrap items-center gap-2">{t`What to notify you about`}<span className="rounded-full bg-accent px-2 py-0.5 text-xs font-normal">{t`All my devices`}</span></span>}>
-      {!push ? <div className="px-4 py-3" role={loadError ? "alert" : "status"}>{loadError ? <>{t`Could not load account notification settings.`} <Button size="sm" variant="outline" onClick={() => setRetry(v => v + 1)}>{t`Retry`}</Button></> : t`Loading…`}</div> : <>
+      {!push ? (loadError ? <div className="px-4 py-3" role="alert">{t`Could not load account notification settings.`} <Button size="sm" variant="outline" onClick={() => setRetry(v => v + 1)}>{t`Retry`}</Button></div> : <LoadingSkeleton layout="settings" className="px-4 py-3" />) : <>
         <SettingsRow label={<span className="flex items-center gap-3"><Bell className="size-5" aria-hidden />Mycellios</span>}
           control={<LevelPicker label={t`Account notifications`} value={push.settings.level} disabled={busy !== null} onChange={level => void saveAccount({ level })} />} />
         {overrides.map(([botId, level]) => <SettingsRow key={botId}

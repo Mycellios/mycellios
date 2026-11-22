@@ -208,6 +208,13 @@
   deadline so a stalled connection reaches existing retry/error handling. Preserve
   caller cancellation and keep auth writes, paid requests and event streams outside
   that deadline. Qualify first language entry and returning-user Settings navigation.
+- While route or panel content first loads, reuse the kit's Skeleton through
+  LoadingSkeleton with the destination's layout. Retain populated content during
+  background reads and preserve errors, empty states and in-progress actions.
+  Desktop preloads the Settings overlay after the usable shell paints, then mounts
+  the resolved component directly. Preserve cold-open fallback and chunk recovery.
+  Cache system fonts for the renderer session and refresh conversation voice readiness
+  on successful Voice edits, independent of section navigation.
 
 - Desktop navigation keeps server connections in the narrow rail footer and the
   active workspace in the sidebar header. Keep server management out of the

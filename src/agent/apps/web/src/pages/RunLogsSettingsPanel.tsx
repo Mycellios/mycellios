@@ -159,15 +159,7 @@ export function RunLogsSettingsPanel() {
         </>
       ) : null}
       {logs.isPending ? (
-        <div role="status" aria-label={t`Loading logs`} className="space-y-5">
-          {[0, 1, 2].map((row) => (
-            <div
-              key={row}
-              aria-hidden="true"
-              className="h-12 w-full rounded-lg bg-muted motion-safe:animate-pulse"
-            />
-          ))}
-        </div>
+        <LoadingSkeleton label={t`Loading logs`} />
       ) : runs.length === 0 && !logs.isError && !activity ? (
         <p className="text-sm text-muted-foreground">
           <Trans>No executions yet. Activity will appear here after you send a message.</Trans>
@@ -355,3 +347,4 @@ function formatDate(value: string, locale: string): string {
     new Date(value),
   );
 }
+import { LoadingSkeleton } from "../components/LoadingSkeleton";

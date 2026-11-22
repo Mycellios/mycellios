@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import { TOKENS_PER_TRIAL_SPORE, type Bot, type Space, type UsageDashboard, type UsageDashboardTotals } from "@mycellios/contracts";
 import { useQuery } from "@tanstack/react-query";
@@ -371,7 +372,7 @@ export function UsageWorkspace({
           </p>
         ) : null}
         {loading ? (
-          <p className="rk-usage-loading" role="status">{t`Loading usage data…`}</p>
+          <LoadingSkeleton label={t`Loading usage data…`} layout="detail" className="rk-usage-loading" />
         ) : null}
         {report && totals ? (
           <>

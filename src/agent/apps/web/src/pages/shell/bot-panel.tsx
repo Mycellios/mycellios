@@ -39,6 +39,7 @@ import type { ReactNode } from "react";
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary";
 import { InstructionSettings } from "../../components/InstructionSettings";
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { botProfilePatch } from "../../lib/bot-profile-patch";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { lazyComponent } from "../../lib/preload-recovery";
@@ -745,12 +746,12 @@ export function BotSettings({
       {page === "memory" ? (
         <div className="space-y-5 [&>section]:mt-0">
           <ErrorBoundary fallback={<SectionLoadFailed />}>
-            <Suspense fallback={null}>
+            <Suspense fallback={<LoadingSkeleton layout="detail" rows={1} />}>
               <ScratchpadSection botId={bot.id} />
             </Suspense>
           </ErrorBoundary>
           <ErrorBoundary fallback={<SectionLoadFailed />}>
-            <Suspense fallback={null}>
+            <Suspense fallback={<LoadingSkeleton rows={2} />}>
               <KnowledgeSection botId={bot.id} threadId={threadId} />
             </Suspense>
           </ErrorBoundary>
@@ -758,7 +759,7 @@ export function BotSettings({
       ) : null}
       {page === "skills" ? (
         <ErrorBoundary fallback={<SectionLoadFailed />}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<LoadingSkeleton rows={2} />}>
             <KnowledgeSection botId={bot.id} skillsOnly />
           </Suspense>
         </ErrorBoundary>

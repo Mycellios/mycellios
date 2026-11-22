@@ -1,9 +1,10 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@mycellios/contracts";
-import { NativeSelect, NativeSelectOption, Spinner } from "@mycellios/ui-web";
+import { NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IntegrationSetup } from "../components/integrations/IntegrationSetup";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { rpc } from "../lib/rpc";
 
 export function IntegrationSetupPage() {
@@ -58,15 +59,9 @@ export function IntegrationSetupPage() {
             botId={botId || undefined}
             onDone={() => navigate(bots.length ? "/app" : "/onboarding")}
           />
-        ) : (
-          <p>
-            {error ? (
-              t`Could not load bots. Reload to try again.`
-            ) : (
-              <Spinner aria-label={t`Loading…`} />
-            )}
-          </p>
-        )}
+        ) : error ? (
+          <p role="alert">{t`Could not load bots. Reload to try again.`}</p>
+        ) : <LoadingSkeleton layout="settings" />}
       </div>
     </div>
   );
