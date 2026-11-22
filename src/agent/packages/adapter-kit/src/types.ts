@@ -753,7 +753,10 @@ export interface BackgroundJobPayloads {
   /** The bot's call rang out: mark it missed if nobody answered. */
   "call.expire": { threadId: string; callId: string };
   "plan.autostart": { runId: string };
-  "history.compact": { threadId: string };
+  "history.compact": {
+    threadId: string;
+    manual?: { generation: number; nextSeq: number; cursor: number | null };
+  };
   "memory.review": { threadId: string };
   /** Finish a conversation delete whose undo window has passed; a restored one is left alone. */
   "thread.delete": { threadId: string };

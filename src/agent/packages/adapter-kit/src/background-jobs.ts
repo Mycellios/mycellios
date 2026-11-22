@@ -23,7 +23,14 @@ const payloadSchemas = {
   "skill.teaching-expire": z.object({ skillId: z.string().min(1) }),
   "call.expire": z.object({ threadId: z.string().min(1), callId: z.string().min(1) }),
   "plan.autostart": z.object({ runId: z.string().min(1) }),
-  "history.compact": z.object({ threadId: z.string().min(1) }),
+  "history.compact": z.object({
+    threadId: z.string().min(1),
+    manual: z.object({
+      generation: z.number().int().nonnegative(),
+      nextSeq: z.number().int().nonnegative(),
+      cursor: z.number().int().nullable(),
+    }).optional(),
+  }),
   "memory.review": z.object({ threadId: z.string().min(1) }),
   "thread.delete": z.object({ threadId: z.string().min(1) }),
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
@@ -182,12 +189,12 @@ export function messagingDeliverJob(runId?: string, availableAt?: Date): Backgro
   };
 }
 
-export function historyCompactJob(threadId: string): BackgroundJob {
+export function historyCompactJob(threadId: string, manual?: BackgroundJobPayloads["history.compact"]["manual"]): BackgroundJob {
   return {
     name: "history.compact",
-    payload: { threadId },
+    payload: { threadId, ...(manual ? { manual } : {}) },
     replaceKey: historyCompactJobKey(threadId),
-    maxAttempts: HISTORY_COMPACT_MAX_ATTEMPTS,
+    maxAttempts: manual ? 1 : HISTORY_COMPACT_MAX_ATTEMPTS,
   };
 }
 

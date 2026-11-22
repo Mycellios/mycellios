@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { MicoTaskTabs } from "../../src/components/MicoTaskTabs";
 import { MicoWorkMenu } from "../../src/components/MicoWorkMenu";
 import { MicoStartedBanner } from "../../src/components/NewConversationIntro";
+import { NewChatControl } from "../../src/components/composer/NewChatControl";
 import { WorkflowWorkspace } from "../../src/pages/WorkflowWorkspace";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
 import { readComposerDraft, writeComposerDraft } from "../../src/lib/composer-draft";
@@ -43,7 +44,12 @@ let executions: WorkflowExecution[] = [];
 let revision = 0, paused = false, childState = "queued";
 const save = () => sessionStorage.setItem("mico-fixture-rows", JSON.stringify(rows));
 const patch = (id: string, change: Partial<Row>) => { const row = rows.find(item => item.threadId === id); if (row) Object.assign(row, change); save(); };
-const rpc = { tasks: {
+const rpc = { threads: {
+  compactContext: async (input: { botId: string; taskThreadId: string }) => {
+    if (input.botId !== "mico-fixture" || input.taskThreadId !== "task-two") throw new Error("Wrong conversation");
+    return { queued: true };
+  },
+}, tasks: {
   overview: async () => [],
   concurrency: async (input: { limit?: number }) => { limit = input.limit ?? limit; return { limit, effectiveLimit: limit }; },
   get: async () => ({ taskId: "parent", version: 1, paused: false, active: true, botId: "mico-fixture", runId: "run-fixture", bots: [{ id: "mico-fixture", name: "Existing Mico" }] }),
@@ -128,7 +134,11 @@ function Preview() {
       <textarea aria-label="Start a new conversation with Existing Mico" placeholder="Start a new conversation with Existing Mico" className="min-h-10 flex-1 resize-none bg-transparent outline-none"
         value={draft} onChange={event => { setDraft(event.target.value); writeComposerDraft(draftKey, event.target.value); }} />
       <Button type="submit" size="sm" disabled={!draft.trim()}>Send</Button>
-    </form> : <div className="rounded-xl border p-3 text-sm">Message to Mico</div>}
+    </form> : <div className="flex items-center gap-2 rounded-xl border p-3 text-sm">Message to Mico
+      {phoneMenu ? <SpaceRpcProvider spaceId="fixture" client={rpc} taskScope={{ botId: "mico-fixture", taskThreadId: "task-two" }}>
+        <NewChatControl botId="mico-fixture" name="Existing Mico" canCompact />
+      </SpaceRpcProvider> : null}
+    </div>}
     <div className="mt-2 flex gap-2">
       <Button size="sm" variant="outline" onClick={() => {
         rows.push({ threadId: `mico-started-${rows.length}`, title: "Compare energy offers", kind: "conversation", startedBy: "agent", state: "running", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });

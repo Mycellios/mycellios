@@ -4,7 +4,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 vi.mock("@lingui/react/macro", () => ({ Trans: ({ children }: {children: ReactNode}) => children, useLingui: () => ({ t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((text, part, i) => text + part + (values[i] ?? ""), "") }) }));
-const api = vi.hoisted(() => ({ newChat: vi.fn(), scope: vi.fn() }));
+const api = vi.hoisted(() => ({ newChat: vi.fn(), compactContext: vi.fn(), scope: vi.fn() }));
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ threads: api }), useBoundTaskThreadScope: api.scope }));
 import { NewChatControl } from "./NewChatControl";
 let root: Root, container: HTMLDivElement;
@@ -32,4 +32,16 @@ it("never resets the main chat from an independent task conversation", async () 
  api.scope.mockReturnValue({ taskThreadId: "kuma-task" });
  await act(async () => root.render(<NewChatControl botId="bot" name="Ada" onStarted={started}/>));
  expect(container.querySelector('button')).toBeNull(); expect(api.newChat).not.toHaveBeenCalled();
+});
+it("requires confirmation and compacts only the selected conversation", async () => {
+  api.scope.mockReturnValue({ botId: "bot", taskThreadId: "task-1" });
+  api.compactContext.mockResolvedValue({ queued: true });
+  await act(async () => root.render(<NewChatControl botId="bot" name="Ada" canCompact />));
+  await act(async () => button("Conversation options").click());
+  expect(button("Reset context…")).toBeUndefined();
+  await act(async () => button("Compact now…").click());
+  expect(api.compactContext).not.toHaveBeenCalled();
+  await act(async () => button("Compact now").click());
+  expect(api.compactContext).toHaveBeenCalledExactlyOnceWith({ botId: "bot", taskThreadId: "task-1" });
+  expect(api.newChat).not.toHaveBeenCalled();
 });

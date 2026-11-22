@@ -191,3 +191,4 @@ export * from "./android-fcm.js";
 export * from "./task-reminders.js";
 
 export { reconcileLocalMemoryReviews, scheduleLocalMemoryReview } from "./local-memory-review.js";
+export { idleCompactionThread, manualCompactionStart, MANUAL_COMPACTION_RECENT_MESSAGES } from "./history-compaction.js";

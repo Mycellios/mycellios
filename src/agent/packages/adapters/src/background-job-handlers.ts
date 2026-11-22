@@ -216,7 +216,7 @@ export function createBackgroundJobHandlers(deps: {
     "history.compact": asOwner(thread, async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.
       // Skip legacy backlog work after a policy change.
-      if (deps.executor.contextStrategy && deps.executor.contextStrategy !== "current") return;
+      if (!payload.manual && deps.executor.contextStrategy && deps.executor.contextStrategy !== "current") return;
       await compactHistory(
         {
           prisma: deps.prisma,
@@ -228,6 +228,7 @@ export function createBackgroundJobHandlers(deps: {
           ...(deps.executor.resolveModel ? { resolveModel: deps.executor.resolveModel } : {}),
         },
         payload.threadId,
+        ...(payload.manual ? [payload.manual] as const : []),
       );
     }),
   };

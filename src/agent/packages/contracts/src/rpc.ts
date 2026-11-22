@@ -780,6 +780,7 @@ export const appContract = {
       )
       .output(z.object({ ok: z.literal(true) })),
     newChat: oc.input(threadTarget.and(z.object({ clientNonce: z.string().min(1).max(128) }))).output(z.object({ ok: z.literal(true) })),
+    compactContext: oc.input(threadTarget).output(z.object({ queued: z.boolean() })),
     deleteOwnMessage: oc.input(threadTarget.safeExtend({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     clear: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
     answer: oc

@@ -61,6 +61,7 @@ export const Composer = memo(function Composer({
   activeName,
   activeColor,
   onNewChatStarted,
+  canCompactContext,
   running,
   busyMessages = running,
   busyMessageMode,
@@ -110,6 +111,7 @@ export const Composer = memo(function Composer({
   activeName?: string;
   activeColor?: string;
   onNewChatStarted?: () => void;
+  canCompactContext?: boolean;
   running: boolean;
   busyMessages?: boolean;
   busyMessageMode?: "queue" | "steer";
@@ -1009,7 +1011,7 @@ export const Composer = memo(function Composer({
           }`}
         >
           {sideQuestionBotId && !newConversation ? <NewChatControl key={draftKey} botId={sideQuestionBotId}
-            name={activeName ?? t`Mico`} color={activeColor} onStarted={onNewChatStarted}
+            name={activeName ?? t`Mico`} color={activeColor} onStarted={onNewChatStarted} canCompact={canCompactContext}
             disabled={Boolean(disabled || running || sending || onCall || voice.state || reviewedVoice.stage !== "closed")} /> : null}
           {desktopVoice ? <ComposerVoiceStrip voice={voice} compact /> : (
             <ComposerVoiceButton voice={voice} disabled={disabled || sending || onCall || reviewedVoice.stage !== "closed"} />
