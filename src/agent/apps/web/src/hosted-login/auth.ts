@@ -211,12 +211,39 @@ export function signIn(
   return authRequest(config, "/auth/v1/token?grant_type=password", { email, password });
 }
 
-export function signUp(
+export async function signUp(
   config: PublicAuthConfig,
   email: string,
   password: string,
 ): Promise<AuthSession> {
-  return authRequest(config, "/auth/v1/signup", { email, password });
+  const response = await fetch("/agent/api/invite/proof", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+    cache: "no-store",
+    redirect: "error",
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (response.status === 404) {
+    // The identity database decides whether signups without an invitation are allowed.
+    return authRequest(config, "/auth/v1/signup", { email, password });
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (
+    !response.ok ||
+    !payload ||
+    typeof payload !== "object" ||
+    !("proof" in payload) ||
+    typeof payload.proof !== "string" ||
+    !/^\d{10}\.[a-f0-9]{64}$/.test(payload.proof)
+  ) {
+    throw new AuthServiceError("Could not verify your invitation.", response.status);
+  }
+  return authRequest(config, "/auth/v1/signup", {
+    email,
+    password,
+    data: { mycellios_invite_proof: payload.proof },
+  });
 }
 
 export function signInWithOAuth(config: PublicAuthConfig, provider: OAuthProvider): void {
@@ -597,7 +624,7 @@ async function consumeOAuthRedirect(config: PublicAuthConfig): Promise<AuthSessi
 async function authRequest(
   config: PublicAuthConfig,
   path: string,
-  body: Record<string, string>,
+  body: Record<string, string | Record<string, string>>,
   expectedRefreshToken?: string,
 ): Promise<AuthSession> {
   assertAuthConfig(config);

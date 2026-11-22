@@ -58,7 +58,8 @@ export function planChecks(files, availableAgentTests) {
   const visual = f => /\.(md|png|svg|jpg|webp|css|po)$/.test(f);
   const root = files.some(f => !visual(f) && /^(src\/(?!agent\/)|landing\/|mobile\/|tests\/|scripts\/.*\.ts$|tsconfig|vite\.|vitest\.|package(?:-lock)?\.json$)/.test(f))
     || files.some(f => /^scripts\/.*\.test\.[cm]?js$/.test(f) && f !== 'scripts/ci-fast-delivery.test.mjs');
-  const agent = files.some(f => f.startsWith('src/agent/') && !visual(f));
+  const primaryAccountBeta = 'deploy/primary-account-beta.sql';
+  const agent = files.some(f => f === primaryAccountBeta || (f.startsWith('src/agent/') && !visual(f)));
   const agentShared = files.some(f => f.startsWith('src/agent/') && (!f.startsWith('src/agent/apps/') || f.startsWith('src/agent/apps/api/')));
   const agentWeb = agent && (agentShared || files.some(f => f.startsWith('src/agent/apps/web/')));
   const desktopDownloadBrowserTest = 'scripts/desktop-macos/download-page.test.mjs';
@@ -145,12 +146,12 @@ export function planChecks(files, availableAgentTests) {
       [/sidebar.fold|bot-folders|20261115130000_sidebar_folders/, 'verify-sidebar-folders-db.ts', 'folder migration, isolation and hierarchy'],
       [/message-pins|20261115160000_message_pins|20261122200000_message_pin_authors/, 'verify-message-pins-db.ts', 'message pin migrations, Mico pins and account/thread isolation'],
       [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],
-      [/signup-invite|20261122233000_signup_invite/, 'verify-signup-invite-db.ts', 'invitation link migration and concurrent signup places on isolated PostgreSQL'],
+      [/signup-invite|20261122233000_signup_invite|^deploy\/primary-account-beta\.sql$/, 'verify-signup-invite-db.ts', 'invitation link migration and concurrent signup places on isolated PostgreSQL'],
       [/thread-lifecycle|side-threads|thread-deletion|20261122120000_thread_lifecycle/, 'verify-thread-lifecycle-db.ts', 'conversation lifecycle migration, archive, delete and lock races on isolated PostgreSQL'],
       [/routine-thread|routine-run-markers|verify-routine-isolation|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
       [/conversation-surfaces/, 'verify-conversation-surfaces-db.ts', 'sidebar counts, mark all read and mirrored requests on isolated PostgreSQL'],
     ]) {
-      if (files.some(file => file.startsWith('src/agent/') && pattern.test(file)))
+      if (files.some(file => (file.startsWith('src/agent/') || file === primaryAccountBeta) && pattern.test(file)))
         add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);
     }
     if (files.some(file => file.startsWith('src/agent/') && /local-memory|packages\/memory\/src|20261115180000/.test(file)))

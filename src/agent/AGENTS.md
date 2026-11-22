@@ -1400,6 +1400,10 @@
   surrounding site. Offer both sign-in and primary-account registration there;
   switching forms must retain the pending OAuth authorization and its PKCE flow.
   Confirmation-required registrations are not authenticated sessions.
+  A hosted closed beta gates primary account creation in the identity database
+  as well as Agent workspace creation. Preserve the email-bound proof from the
+  invite cookie, the transactional primary quota and existing-account sign-in.
+  Qualify both gates with `scripts/verify-signup-invite-db.ts` before activation.
   Continue automatically only for deployment-
   configured client/callback pairs with openid/email/profile scopes. Unknown clients
   or broader scopes still require consent. Keep live client IDs outside Git and
