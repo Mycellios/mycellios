@@ -165,9 +165,21 @@ self-hosted installs until they have migrated.
   `src/agent/LICENSE`, plus `scripts/private-terms-baseline.json` itself, which
   stores no names.
 
-## Open questions
+## Proposed decisions
 
-- Minimum supported Desktop and mobile versions that allow removing legacy
-  headers, schemes and the bridge alias.
-- Whether the legacy Expo preview is retired or renamed (Phase 5).
-- Whether the production database is renamed or keeps its physical name (Phase 6).
+Proposed on 2026-11-22; each one is confirmed by the owner before the phase that
+depends on it starts.
+
+- Legacy removal gate (Phases 3 to 5). Accepting both spellings needs no minimum
+  version, so those changes ship first. A legacy header, scheme or bridge alias is
+  removed only when both hold: `MYCELLIOS_MIN_CLIENT_BUILD` (or its legacy name)
+  requires, for every platform, a build at or after the first release that sends
+  only the new spelling, and at least 60 days have passed since that release.
+  Desktop releases are versioned from 0.13.0; the gate names the first later
+  release that carries the change.
+- Legacy Expo preview (Phase 5): retire it. `apps/android` supersedes it; remove
+  its native modules and package after its last installed copies have been asked
+  to move, instead of renaming them for a final build.
+- Production database (Phase 6): keep the physical database name and expose only
+  the new name in configuration. Renaming needs a maintenance window for no user
+  benefit. Roles still move to new names, as Phase 6 describes.
