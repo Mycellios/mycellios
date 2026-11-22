@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AccountDetails } from "./AccountDetails";
+import { PanelI18nProvider } from "./i18n/panel-i18n";
 import { AccountModal, Tests, friendlyModelMutationError, panelIssueForErrors, panelViewFromLocation } from "./Panel";
 
 describe("Panel deep links", () => {
@@ -54,7 +55,7 @@ describe("Benchmark controls", () => {
 
 describe("AccountDetails", () => {
   it("shows the signed-in account without granting an unverified role", () => {
-    const markup = renderToStaticMarkup(<AccountDetails
+    const markup = renderToStaticMarkup(<PanelI18nProvider locale="es" persist={false}><AccountDetails
       titleId="account-title"
       session={{ accessToken: "access", refreshToken: "refresh", expiresAt: Date.now() + 60_000, user: { id: "user-1", email: "person@example.com" } }}
       identity={null}
@@ -62,7 +63,7 @@ describe("AccountDetails", () => {
       error={null}
       onRetryRole={() => undefined}
       onSignOut={() => undefined}
-    />);
+    /></PanelI18nProvider>);
     expect(markup).toContain("person@example.com");
     expect(markup).toContain("No se han podido comprobar los permisos de red.");
     expect(markup).toContain("Las herramientas de administración siguen bloqueadas.");
@@ -83,13 +84,17 @@ describe("AccountModal", () => {
   };
 
   it("keeps only the signed-in identity, the Agent account link and sign-out", () => {
-    const markup = renderToStaticMarkup(<AccountModal {...signedInProps} />);
+    const markup = renderToStaticMarkup(<PanelI18nProvider locale="es" persist={false}><AccountModal {...signedInProps} /></PanelI18nProvider>);
     expect(markup).toContain("owner@example.com");
     expect(markup).toContain("Cuenta en Mycellios Agent");
     expect(markup).toContain('href="https://www.mycellios.com/agent/app?settings=profile"');
     expect(markup).toContain("Cerrar sesión");
     for (const removed of ["Plan", "Uso de la API", "Stripe", "REQUESTS", "Create key", "Métodos de inicio de sesión"]) expect(markup).not.toContain(removed);
     expect(markup).not.toContain("account-detail-tabs");
+    const english = renderToStaticMarkup(<PanelI18nProvider locale="en" persist={false}><AccountModal {...signedInProps} /></PanelI18nProvider>);
+    expect(english).toContain("Mycellios Agent account");
+    expect(english).toContain("Sign out");
+    expect(english).not.toContain("Cerrar sesión");
   });
 
   it("asks a signed-out visitor to sign in", () => {

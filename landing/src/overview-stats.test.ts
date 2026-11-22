@@ -70,9 +70,9 @@ describe("overview statistics", () => {
   });
 
   it("describes devices by hardware class without exposing private fields", () => {
-    expect(snapshot.workers.map(deviceHardware)).toEqual(["NVIDIA GeForce RTX 2060", "CPU", "Capacidad nativa", "NVIDIA GeForce RTX 3090"]);
+    expect(snapshot.workers.map(deviceHardware)).toEqual(["NVIDIA GeForce RTX 2060", "CPU", null, "NVIDIA GeForce RTX 3090"]);
     const rows = deviceRows(snapshot.workers);
-    expect(rows.at(-1)).toMatchObject({ id: "d", status: "offline", online: false, kind: "Nodo" });
+    expect(rows.at(-1)).toMatchObject({ id: "d", status: "offline", online: false, kind: "node" });
     expect(Object.keys(rows[0]!).sort()).toEqual(["hardware", "id", "kind", "lastSeenAt", "online", "status", "version"]);
   });
 

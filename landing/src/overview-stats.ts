@@ -36,21 +36,6 @@ export interface StatsSnapshot {
  */
 export interface StatsHistorySample { capturedAt: string; completedJobs: number; failedJobs?: number | null }
 
-export const MODEL_KIND_LABELS: Record<ModelKind, string> = {
-  voice: "Voz",
-  transcription: "Transcripción",
-  embeddings: "Vectores",
-  chat: "Chat",
-  decisions: "Decisiones",
-};
-
-export const MODEL_STATE_LABELS: Record<ModelServiceState, string> = {
-  serving: "En servicio",
-  preparing: "Preparando",
-  no_capacity: "Sin capacidad",
-  unavailable: "No disponible",
-};
-
 const ADAPTER_KINDS: Record<string, ModelKind> = {
   kokoro: "voice",
   transcription: "transcription",
@@ -84,11 +69,13 @@ const FAMILY_NAMES: Record<string, string> = {
   gpu: "GPU",
   cpu: "CPU",
 };
-const LANGUAGE_NAMES: Record<string, string> = { es: "español", en: "inglés" };
+export type ModelLanguage = "es" | "en";
+const LANGUAGE_NAMES: Record<ModelLanguage, string> = { es: "español", en: "inglés" };
+const isModelLanguage = (value: string): value is ModelLanguage => value === "es" || value === "en";
 const DROPPED_PREFIXES = ["mycellios-", "agent-credit-lab-"];
 
 /** A readable name for a raw model id; the id itself stays available as secondary text. */
-export function modelDisplayName(id: string): string {
+export function modelDisplayName(id: string, languageName: (language: ModelLanguage) => string = (language) => LANGUAGE_NAMES[language]): string {
   let value = id.trim();
   for (const prefix of DROPPED_PREFIXES) if (value.toLowerCase().startsWith(prefix)) value = value.slice(prefix.length);
   const words: string[] = [];
@@ -97,7 +84,7 @@ export function modelDisplayName(id: string): string {
     const lower = token.toLowerCase();
     // Dates and short hashes identify a build, not the model a reader recognises.
     if (/^\d{8}$/.test(lower) || (/^[0-9a-f]{8}$/.test(lower) && /\d/.test(lower))) continue;
-    if (LANGUAGE_NAMES[lower]) { languages.push(LANGUAGE_NAMES[lower]); continue; }
+    if (isModelLanguage(lower)) { languages.push(languageName(lower)); continue; }
     if (/^\d+(\.\d+)?[bm]$/.test(lower)) { words.push(lower.toUpperCase()); continue; }
     words.push(FAMILY_NAMES[lower] ?? `${token.charAt(0).toUpperCase()}${token.slice(1)}`);
   }
@@ -178,37 +165,34 @@ function isPhysicalGpu(gpu: StatsGpu): boolean {
   return vendor !== "cpu" && vendor !== "mycellios";
 }
 
-export const WORKER_KIND_LABELS: Record<string, string> = {
-  node: "Nodo",
-  cell: "Celda nativa",
-  desktop: "Escritorio",
-  browser: "Navegador",
-};
-export const WORKER_STATUS_LABELS: Record<StatsWorker["status"], string> = {
-  online: "En línea",
-  suspect: "Inestable",
-  draining: "Retirándose",
-  offline: "Desconectado",
-};
+/** Worker kinds the panel names; other kinds are shown as reported. */
+export const WORKER_KINDS = ["node", "cell", "desktop", "browser"] as const;
+export type KnownWorkerKind = (typeof WORKER_KINDS)[number];
+export function isKnownWorkerKind(kind: string): kind is KnownWorkerKind {
+  return (WORKER_KINDS as readonly string[]).includes(kind);
+}
 
 export interface DeviceRow {
   id: string;
-  hardware: string;
+  /** The contributed card, "CPU", or null for native capacity without a physical GPU. */
+  hardware: string | null;
+  /** The reported worker kind; the panel names known kinds in its language. */
   kind: string;
-  version: string;
+  /** "v1.2.3", or null when the worker did not report a version. */
+  version: string | null;
   status: StatsWorker["status"];
   online: boolean;
   lastSeenAt: string;
 }
 
-/** The hardware a device contributes, named by its card or as a CPU. */
-export function deviceHardware(worker: StatsWorker): string {
+/** The hardware a device contributes: its card, a CPU, or null for native capacity. */
+export function deviceHardware(worker: StatsWorker): string | null {
   const gpus = worker.gpus.filter(isPhysicalGpu);
   if (gpus.length > 0) {
     const name = gpus[0]!.model.replace(/\((?:R|TM)\)/gi, "").replace(/\s+/g, " ").trim() || "GPU";
     return gpus.length > 1 ? `${name} +${gpus.length - 1}` : name;
   }
-  if (worker.gpus.some((gpu) => gpu.vendor.toLowerCase() === "mycellios")) return "Capacidad nativa";
+  if (worker.gpus.some((gpu) => gpu.vendor.toLowerCase() === "mycellios")) return null;
   return "CPU";
 }
 
@@ -216,8 +200,8 @@ export function deviceRows(workers: readonly StatsWorker[]): DeviceRow[] {
   return workers.map((worker) => ({
     id: worker.id,
     hardware: deviceHardware(worker),
-    kind: WORKER_KIND_LABELS[worker.kind] ?? worker.kind,
-    version: worker.agentVersion ? `v${worker.agentVersion}` : "Sin versión",
+    kind: worker.kind,
+    version: worker.agentVersion ? `v${worker.agentVersion}` : null,
     status: worker.connected ? worker.status : "offline",
     online: worker.connected && worker.status === "online",
     lastSeenAt: worker.lastSeenAt,

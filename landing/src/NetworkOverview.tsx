@@ -1,10 +1,9 @@
 import { ArrowRight, CircleAlert } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
-  MODEL_KIND_LABELS,
-  MODEL_STATE_LABELS,
-  WORKER_STATUS_LABELS,
   deviceRows,
+  isKnownWorkerKind,
+  modelDisplayName,
   hourlyTasks,
   modelRows,
   onlineGpuCapacity,
@@ -15,6 +14,7 @@ import {
   type StatsSnapshot,
 } from "./overview-stats";
 import { formatMemory, shortId } from "./panel-ui-utilities";
+import { usePanelI18n, type PanelLocale, type PanelTranslate } from "./i18n/panel-i18n";
 import {
   Badge as UiBadge,
   Button as UiButton,
@@ -33,8 +33,23 @@ export type OverviewSnapshot = StatsSnapshot & { capturedAt: string };
 type Evidence = "waiting" | "fresh" | "delayed" | "stale" | "degraded";
 
 const NEVER = new Date(0).toISOString();
-const numbers = new Intl.NumberFormat("es-ES");
-const hourFormat = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" });
+const intlLocale = (locale: PanelLocale) => locale === "es" ? "es-ES" : "en-US";
+const numberFormats = { es: new Intl.NumberFormat("es-ES"), en: new Intl.NumberFormat("en-US") };
+const hourFormats = {
+  es: new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }),
+  en: new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit" }),
+};
+type OverviewText = { t: PanelTranslate; locale: PanelLocale; number: (value: number) => string; hour: (value: number) => string };
+
+function overviewText(t: PanelTranslate, locale: PanelLocale): OverviewText {
+  return { t, locale, number: (value) => numberFormats[locale].format(value), hour: (value) => hourFormats[locale].format(value) };
+}
+
+/** Number and hour formatting plus messages in the panel's language. */
+function useOverviewText(): OverviewText {
+  const { t, locale } = usePanelI18n();
+  return overviewText(t, locale);
+}
 
 export async function loadDayHistory(): Promise<StatsHistorySample[]> {
   const response = await fetch("/public/v1/history?range=24h", { cache: "no-store", signal: AbortSignal.timeout(12_000) });
@@ -43,28 +58,28 @@ export async function loadDayHistory(): Promise<StatsHistorySample[]> {
   return Array.isArray(body.samples) ? body.samples : [];
 }
 
-function evidenceFor(capturedAt: string, connectionError: string | null, now: number): { state: Evidence; text: string } {
+function evidenceFor(capturedAt: string, connectionError: string | null, now: number, t: PanelTranslate, locale: PanelLocale): { state: Evidence; text: string } {
   const captured = Date.parse(capturedAt);
-  if (!Number.isFinite(captured) || capturedAt === NEVER) return { state: "waiting", text: "Esperando datos" };
-  if (connectionError) return { state: "degraded", text: `Sin conexión · datos de ${sinceText(captured, now)}` };
+  if (!Number.isFinite(captured) || capturedAt === NEVER) return { state: "waiting", text: t("overview.evidence.waiting") };
+  if (connectionError) return { state: "degraded", text: t("overview.evidence.degraded", { since: sinceText(captured, now, t, locale) }) };
   const age = now - captured;
-  if (age <= 10_000) return { state: "fresh", text: "Red en directo" };
-  return { state: age <= 30_000 ? "delayed" : "stale", text: `Datos de ${sinceText(captured, now)}` };
+  if (age <= 10_000) return { state: "fresh", text: t("overview.evidence.fresh") };
+  return { state: age <= 30_000 ? "delayed" : "stale", text: t("overview.evidence.old", { since: sinceText(captured, now, t, locale) }) };
 }
 
-/** "hace 3 min", "hace 2 días" or a date, in Spanish. */
-export function sinceText(timestamp: number, now = Date.now()): string {
-  if (!Number.isFinite(timestamp)) return "fecha desconocida";
+/** "3 min ago" / "hace 3 min", or a date beyond a month. */
+export function sinceText(timestamp: number, now: number, t: PanelTranslate, locale: PanelLocale): string {
+  if (!Number.isFinite(timestamp)) return t("overview.since.unknown");
   const seconds = Math.max(0, Math.floor((now - timestamp) / 1_000));
-  if (seconds < 10) return "ahora";
-  if (seconds < 60) return `hace ${seconds} s`;
+  if (seconds < 10) return t("overview.since.now");
+  if (seconds < 60) return t("overview.since.seconds", { count: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `hace ${minutes} min`;
+  if (minutes < 60) return t("overview.since.minutes", { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `hace ${hours} h`;
+  if (hours < 24) return t("overview.since.hours", { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `hace ${days} ${days === 1 ? "día" : "días"}`;
-  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(timestamp);
+  if (days < 30) return days === 1 ? t("overview.since.day") : t("overview.since.days", { count: days });
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" }).format(timestamp);
 }
 
 const STATE_TONES: Record<ModelServiceState, "success" | "warning" | "neutral" | "danger"> = {
@@ -82,8 +97,10 @@ export function Overview({ snapshot, connectionError, onAddDevice, loadHistory =
   /** Fixed clock for stories and tests; live pages use the current time. */
   now?: number;
 }) {
+  const text = useOverviewText();
+  const { t, locale, number } = text;
   const now = fixedNow ?? Date.now();
-  const evidence = evidenceFor(snapshot.capturedAt, connectionError, now);
+  const evidence = evidenceFor(snapshot.capturedAt, connectionError, now, t, locale);
   const [history, setHistory] = useState<StatsHistorySample[] | null>(null);
   const [historyError, setHistoryError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -110,32 +127,32 @@ export function Overview({ snapshot, connectionError, onAddDevice, loadHistory =
   return <section className="overview-page overview-stats" aria-labelledby="overview-stats-title">
     <header className="overview-heading">
       <div>
-        <UiHeading as="h1" id="overview-stats-title">Estadísticas de la red</UiHeading>
+        <UiHeading as="h1" id="overview-stats-title">{t("overview.title")}</UiHeading>
         <span className={`overview-status ${evidence.state}`} role="status"><i />{evidence.text}</span>
       </div>
-      <UiButton variant="ghost" className="overview-add-device" onClick={onAddDevice}>Añadir un dispositivo <ArrowRight size={15} aria-hidden="true" /></UiButton>
+      <UiButton variant="ghost" className="overview-add-device" onClick={onAddDevice}>{t("overview.addDevice")} <ArrowRight size={15} aria-hidden="true" /></UiButton>
     </header>
-    {evidence.state === "waiting" ? <UiCard className="overview-no-evidence"><CircleAlert aria-hidden="true" /><div><UiHeading as="h2">Esperando al coordinador</UiHeading><UiText>Las estadísticas aparecerán cuando llegue la primera lectura de la red.</UiText></div></UiCard> : <>
-      <dl className="overview-kpis" aria-label="Resumen de la red">
+    {evidence.state === "waiting" ? <UiCard className="overview-no-evidence"><CircleAlert aria-hidden="true" /><div><UiHeading as="h2">{t("overview.waiting.title")}</UiHeading><UiText>{t("overview.waiting.copy")}</UiText></div></UiCard> : <>
+      <dl className="overview-kpis" aria-label={t("overview.kpis")}>
         <div>
-          <dt>Nodos en línea</dt>
-          <dd className="overview-kpi-value">{numbers.format(snapshot.summary.online)} <small>de {numbers.format(snapshot.summary.registered)}</small></dd>
-          <dd className="overview-kpi-hint">Equipos conectados ahora, de todos los registrados.</dd>
+          <dt>{t("overview.kpi.online")}</dt>
+          <dd className="overview-kpi-value">{number(snapshot.summary.online)} <small>{t("overview.kpi.onlineOf", { count: number(snapshot.summary.registered) })}</small></dd>
+          <dd className="overview-kpi-hint">{t("overview.kpi.onlineHint")}</dd>
         </div>
         <div>
-          <dt>Memoria de GPU compartida</dt>
-          <dd className="overview-kpi-value">{gpu.gpus > 0 ? formatMemory(gpu.sharedMb) : "Ninguna"}</dd>
-          <dd className="overview-kpi-hint">{gpu.gpus > 0 ? `${gpu.gpus} ${gpu.gpus === 1 ? "tarjeta gráfica" : "tarjetas gráficas"} en equipos en línea.` : "Ningún equipo en línea aporta tarjeta gráfica."}</dd>
+          <dt>{t("overview.kpi.gpu")}</dt>
+          <dd className="overview-kpi-value">{gpu.gpus > 0 ? formatMemory(gpu.sharedMb) : t("overview.kpi.gpuNone")}</dd>
+          <dd className="overview-kpi-hint">{gpu.gpus === 0 ? t("overview.kpi.gpuEmpty") : gpu.gpus === 1 ? t("overview.kpi.gpuOne") : t("overview.kpi.gpuMany", { count: number(gpu.gpus) })}</dd>
         </div>
         <div>
-          <dt>Modelos en servicio</dt>
-          <dd className="overview-kpi-value">{numbers.format(serving)}</dd>
-          <dd className="overview-kpi-hint">{preparing > 0 ? `${preparing} más en preparación.` : "Listos para recibir tareas."}</dd>
+          <dt>{t("overview.kpi.models")}</dt>
+          <dd className="overview-kpi-value">{number(serving)}</dd>
+          <dd className="overview-kpi-hint">{preparing > 0 ? t("overview.kpi.modelsPreparing", { count: number(preparing) }) : t("overview.kpi.modelsReady")}</dd>
         </div>
         <div>
-          <dt>Tareas completadas</dt>
-          <dd className="overview-kpi-value">{numbers.format(snapshot.summary.completedJobs)}</dd>
-          <dd className="overview-kpi-hint">{completedHint(activity)}</dd>
+          <dt>{t("overview.kpi.completed")}</dt>
+          <dd className="overview-kpi-value">{number(snapshot.summary.completedJobs)}</dd>
+          <dd className="overview-kpi-hint">{completedHint(activity, text)}</dd>
         </div>
       </dl>
       <ActivityCard activity={activity} error={historyError} onRetry={() => setAttempt((value) => value + 1)} />
@@ -145,28 +162,28 @@ export function Overview({ snapshot, connectionError, onAddDevice, loadHistory =
   </section>;
 }
 
-function completedHint(activity: HourlyActivity | null): string {
-  if (!activity || activity.coverageStart === null) return "Total desde que empezó la red.";
-  const amount = numbers.format(activity.completed);
+function completedHint(activity: HourlyActivity | null, { t, number, hour }: OverviewText): string {
+  if (!activity || activity.coverageStart === null) return t("overview.kpi.completedTotal");
+  const count = number(activity.completed);
   return activity.fullDay
-    ? `${amount} en las últimas 24 horas.`
-    : `${amount} desde las ${hourFormat.format(activity.coverageStart)}.`;
+    ? t("overview.kpi.completedDay", { count })
+    : t("overview.kpi.completedSince", { count, time: hour(activity.coverageStart) });
 }
 
 function ActivityCard({ activity, error, onRetry }: { activity: HourlyActivity | null; error: boolean; onRetry: () => void }) {
+  const { t } = usePanelI18n();
   return <UiCard className="overview-card overview-activity">
     <header>
-      <UiHeading as="h2">Actividad de las últimas 24 horas</UiHeading>
-      <UiText>Tareas completadas y fallidas por hora.</UiText>
+      <UiHeading as="h2">{t("overview.activity.title")}</UiHeading>
+      <UiText>{t("overview.activity.copy")}</UiText>
     </header>
     {activity ? <HourlyChart activity={activity} />
-      : error ? <div className="overview-card-state" role="alert"><UiText>No se ha podido cargar la actividad.</UiText><UiButton variant="secondary" size="sm" onClick={onRetry}>Reintentar</UiButton></div>
-      : <div className="overview-card-state" role="status"><UiText>Cargando actividad…</UiText></div>}
+      : error ? <div className="overview-card-state" role="alert"><UiText>{t("overview.activity.error")}</UiText><UiButton variant="secondary" size="sm" onClick={onRetry}>{t("overview.activity.retry")}</UiButton></div>
+      : <div className="overview-card-state" role="status"><UiText>{t("overview.activity.loading")}</UiText></div>}
   </UiCard>;
 }
 
 const CHART = { width: 720, height: 168, top: 12, bottom: 136, left: 4, right: 716 };
-const NO_DATA = "sin datos";
 
 function barPath(x: number, width: number, top: number, bottom: number): string {
   const height = bottom - top;
@@ -175,39 +192,39 @@ function barPath(x: number, width: number, top: number, bottom: number): string 
   return `M${x} ${bottom}V${top + radius}Q${x} ${top} ${x + radius} ${top}H${x + width - radius}Q${x + width} ${top} ${x + width} ${top + radius}V${bottom}Z`;
 }
 
-function failedText(value: number | null): string {
-  return value === null ? `fallidas: ${NO_DATA}` : `${numbers.format(value)} fallidas`;
+function failedText(value: number | null, { t, number }: OverviewText): string {
+  return value === null ? t("overview.chart.failedUnknown") : t("overview.chart.failedCount", { count: number(value) });
 }
 
 /** Plain-language summary of the chart, also used as its accessible name. */
-export function activitySummary(activity: HourlyActivity): string {
-  const hourLabel = (start: number) => hourFormat.format(start);
-  const busiest = activity.hours.reduce((best, hour) => hour.completed > best.completed ? hour : best, activity.hours[0]!);
+export function activitySummary(activity: HourlyActivity, { t, number, hour }: OverviewText): string {
+  const busiest = activity.hours.reduce((best, entry) => entry.completed > best.completed ? entry : best, activity.hours[0]!);
   const completed = activity.completed > 0
-    ? `${numbers.format(activity.completed)} tareas completadas en las últimas 24 horas. La hora con más actividad empezó a las ${hourLabel(busiest.start)}, con ${numbers.format(busiest.completed)} tareas.`
-    : "No se han completado tareas en las últimas 24 horas.";
+    ? t("overview.chart.summary", { count: number(activity.completed), time: hour(busiest.start), busiest: number(busiest.completed) })
+    : t("overview.chart.empty");
   const failed = activity.failedCoverageStart === null
-    ? "Todavía no hay datos de tareas fallidas por hora."
+    ? t("overview.chart.failedNone")
     : activity.failedFullDay
-      ? `${numbers.format(activity.failed)} tareas fallidas en las últimas 24 horas.`
-      : `${numbers.format(activity.failed)} tareas fallidas desde las ${hourLabel(activity.failedCoverageStart)}; antes, sin datos.`;
+      ? t("overview.chart.failedDay", { count: number(activity.failed) })
+      : t("overview.chart.failedSince", { count: number(activity.failed), time: hour(activity.failedCoverageStart) });
   return `${completed} ${failed}`;
 }
 
 export function HourlyChart({ activity }: { activity: HourlyActivity }) {
+  const text = useOverviewText();
+  const { t, number, hour: hourLabel } = text;
   const [hovered, setHovered] = useState<number | null>(null);
   const tableId = useId();
   const maximum = Math.max(1, ...activity.hours.map((hour) => Math.max(hour.completed, hour.failed ?? 0)));
   const slot = (CHART.right - CHART.left) / activity.hours.length;
   const barWidth = Math.max(2, (slot - 6) / 2);
   const y = (value: number) => CHART.bottom - (value / maximum) * (CHART.bottom - CHART.top);
-  const hourLabel = (start: number) => hourFormat.format(start);
-  const summary = activitySummary(activity);
+  const summary = activitySummary(activity, text);
   const tooltip = hovered === null ? null : activity.hours[hovered]!;
   const leave = useCallback(() => setHovered(null), []);
   const failedLegend = activity.failedCoverageStart === null
-    ? NO_DATA
-    : activity.failedFullDay ? numbers.format(activity.failed) : `${numbers.format(activity.failed)} desde las ${hourLabel(activity.failedCoverageStart)}`;
+    ? t("overview.chart.noData")
+    : activity.failedFullDay ? number(activity.failed) : t("overview.chart.legendSince", { count: number(activity.failed), time: hourLabel(activity.failedCoverageStart) });
   return <figure className="overview-chart">
     <div className="overview-chart-plot" onMouseLeave={leave}>
       <svg viewBox={`0 0 ${CHART.width} ${CHART.height}`} role="img" aria-label={summary} aria-describedby={tableId} preserveAspectRatio="none">
@@ -220,86 +237,88 @@ export function HourlyChart({ activity }: { activity: HourlyActivity }) {
             <path className={`overview-chart-bar${active}`} d={barPath(x, barWidth, y(hour.completed), CHART.bottom)} />
             {hour.failed !== null && <path className={`overview-chart-bar failed${active}`} d={barPath(x + barWidth + 2, barWidth, y(hour.failed), CHART.bottom)} />}
             <rect className="overview-chart-hit" x={CHART.left + index * slot} y={0} width={slot} height={CHART.bottom} onMouseEnter={() => setHovered(index)}>
-              <title>{`${hourLabel(hour.start)}: ${numbers.format(hour.completed)} completadas, ${failedText(hour.failed)}`}</title>
+              <title>{t("overview.chart.barDetail", { time: hourLabel(hour.start), completed: number(hour.completed), failed: failedText(hour.failed, text) })}</title>
             </rect>
           </g>;
         })}
       </svg>
-      <span className="overview-chart-max" aria-hidden="true">{numbers.format(maximum)}</span>
-      {tooltip && <span className="overview-chart-tooltip" aria-hidden="true" style={{ left: `${((hovered! + 0.5) / activity.hours.length) * 100}%` }}><strong>{numbers.format(tooltip.completed)}</strong> completadas · {tooltip.failed === null ? `fallidas: ${NO_DATA}` : <><strong>{numbers.format(tooltip.failed)}</strong> fallidas</>} · {hourLabel(tooltip.start)}</span>}
+      <span className="overview-chart-max" aria-hidden="true">{number(maximum)}</span>
+      {tooltip && <span className="overview-chart-tooltip" aria-hidden="true" style={{ left: `${((hovered! + 0.5) / activity.hours.length) * 100}%` }}><strong>{number(tooltip.completed)}</strong> {t("overview.chart.completedWord")} · {tooltip.failed === null ? t("overview.chart.failedUnknown") : <><strong>{number(tooltip.failed)}</strong> {t("overview.chart.failedWord")}</>} · {hourLabel(tooltip.start)}</span>}
     </div>
     <div className="overview-chart-axis" aria-hidden="true">
       {activity.hours.filter((_, index) => index % 6 === 0).map((hour) => <span key={hour.start}>{hourLabel(hour.start)}</span>)}
-      <span>Ahora</span>
+      <span>{t("overview.chart.now")}</span>
     </div>
     <ul className="overview-chart-legend" aria-hidden="true">
-      <li><i className="overview-legend-completed" />Completadas <strong>{numbers.format(activity.completed)}</strong></li>
-      <li><i className="overview-legend-failed" />Fallidas <strong>{failedLegend}</strong></li>
+      <li><i className="overview-legend-completed" />{t("overview.chart.legendCompleted")} <strong>{number(activity.completed)}</strong></li>
+      <li><i className="overview-legend-failed" />{t("overview.chart.legendFailed")} <strong>{failedLegend}</strong></li>
     </ul>
     <figcaption className="sr-only">{summary}</figcaption>
     <UiTable id={tableId} className="sr-only">
-      <UiTableHead><UiTableRow><UiTableHeader>Hora</UiTableHeader><UiTableHeader>Tareas completadas</UiTableHeader><UiTableHeader>Tareas fallidas</UiTableHeader></UiTableRow></UiTableHead>
-      <UiTableBody>{activity.hours.map((hour) => <UiTableRow key={hour.start}><UiTableCell>{hourLabel(hour.start)}</UiTableCell><UiTableCell>{numbers.format(hour.completed)}</UiTableCell><UiTableCell>{hour.failed === null ? NO_DATA : numbers.format(hour.failed)}</UiTableCell></UiTableRow>)}</UiTableBody>
+      <UiTableHead><UiTableRow><UiTableHeader>{t("overview.chart.hour")}</UiTableHeader><UiTableHeader>{t("overview.chart.completed")}</UiTableHeader><UiTableHeader>{t("overview.chart.failed")}</UiTableHeader></UiTableRow></UiTableHead>
+      <UiTableBody>{activity.hours.map((hour) => <UiTableRow key={hour.start}><UiTableCell>{hourLabel(hour.start)}</UiTableCell><UiTableCell>{number(hour.completed)}</UiTableCell><UiTableCell>{hour.failed === null ? t("overview.chart.noData") : number(hour.failed)}</UiTableCell></UiTableRow>)}</UiTableBody>
     </UiTable>
   </figure>;
 }
 
 function ModelsCard({ models }: { models: ReturnType<typeof modelRows> }) {
+  const { t, number } = useOverviewText();
   const [showAll, setShowAll] = useState(false);
   const inService = models.filter((model) => model.state === "serving");
   const others = models.length - inService.length;
   const visible = showAll || inService.length === 0 ? models : inService;
   return <UiCard className="overview-card overview-models-card">
     <header>
-      <UiHeading as="h2">Modelos</UiHeading>
-      <UiText>Qué puede hacer la red ahora y cuántos equipos lo sirven.</UiText>
+      <UiHeading as="h2">{t("overview.models.title")}</UiHeading>
+      <UiText>{t("overview.models.copy")}</UiText>
     </header>
-    {models.length === 0 ? <UiText className="overview-card-state">Todavía no hay modelos. Añade un dispositivo para poner uno en servicio.</UiText> : <>
-      <div className="overview-table-scroll" role="region" aria-label="Tabla de modelos" tabIndex={0}>
+    {models.length === 0 ? <UiText className="overview-card-state">{t("overview.models.empty")}</UiText> : <>
+      <div className="overview-table-scroll" role="region" aria-label={t("overview.models.table")} tabIndex={0}>
         <UiTable className="overview-table">
-          <UiTableHead><UiTableRow><UiTableHeader>Modelo</UiTableHeader><UiTableHeader>Tipo</UiTableHeader><UiTableHeader>Nodos</UiTableHeader><UiTableHeader>Estado</UiTableHeader><UiTableHeader>Tareas recientes</UiTableHeader></UiTableRow></UiTableHead>
+          <UiTableHead><UiTableRow><UiTableHeader>{t("overview.models.model")}</UiTableHeader><UiTableHeader>{t("overview.models.kind")}</UiTableHeader><UiTableHeader>{t("overview.models.nodes")}</UiTableHeader><UiTableHeader>{t("overview.models.state")}</UiTableHeader><UiTableHeader>{t("overview.models.recent")}</UiTableHeader></UiTableRow></UiTableHead>
           <UiTableBody>{visible.map((model) => <UiTableRow key={model.id}>
-            <UiTableCell><span className="overview-cell-name"><strong>{model.name}</strong><small>{model.id}</small></span></UiTableCell>
-            <UiTableCell>{MODEL_KIND_LABELS[model.kind]}</UiTableCell>
-            <UiTableCell className="overview-number" data-label="Nodos">{numbers.format(model.nodes)}</UiTableCell>
-            <UiTableCell><UiBadge tone={STATE_TONES[model.state]}>{MODEL_STATE_LABELS[model.state]}</UiBadge></UiTableCell>
-            <UiTableCell className="overview-number" data-label="Tareas recientes">{numbers.format(model.recentTasks)}</UiTableCell>
+            <UiTableCell><span className="overview-cell-name"><strong>{modelDisplayName(model.id, (language) => t(`overview.language.${language}`))}</strong><small>{model.id}</small></span></UiTableCell>
+            <UiTableCell>{t(`overview.kind.${model.kind}`)}</UiTableCell>
+            <UiTableCell className="overview-number" data-label={t("overview.models.nodes")}>{number(model.nodes)}</UiTableCell>
+            <UiTableCell><UiBadge tone={STATE_TONES[model.state]}>{t(`overview.state.${model.state}`)}</UiBadge></UiTableCell>
+            <UiTableCell className="overview-number" data-label={t("overview.models.recent")}>{number(model.recentTasks)}</UiTableCell>
           </UiTableRow>)}</UiTableBody>
         </UiTable>
       </div>
       <footer>
-        <UiText as="small">«Tareas recientes» cuenta las últimas 100 tareas de la red.</UiText>
-        {others > 0 && inService.length > 0 && <UiButton variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Mostrar solo los modelos en servicio" : `Mostrar ${others} ${others === 1 ? "modelo" : "modelos"} sin servicio`}</UiButton>}
+        <UiText as="small">{t("overview.models.recentNote")}</UiText>
+        {others > 0 && inService.length > 0 && <UiButton variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? t("overview.models.showServing") : others === 1 ? t("overview.models.showOthersOne") : t("overview.models.showOthersMany", { count: number(others) })}</UiButton>}
       </footer>
     </>}
   </UiCard>;
 }
 
 function DevicesCard({ devices, now }: { devices: DeviceRow[]; now: number }) {
+  const { t, locale, number } = useOverviewText();
   const [showAll, setShowAll] = useState(false);
   const online = devices.filter((device) => device.online);
   const offline = devices.length - online.length;
   const visible = showAll || online.length === 0 ? devices : online;
   return <UiCard className="overview-card overview-devices-card">
     <header>
-      <UiHeading as="h2">Dispositivos</UiHeading>
-      <UiText>Equipos que aportan cómputo a la red.</UiText>
+      <UiHeading as="h2">{t("overview.devices.title")}</UiHeading>
+      <UiText>{t("overview.devices.copy")}</UiText>
     </header>
-    {devices.length === 0 ? <UiText className="overview-card-state">Todavía no hay dispositivos registrados.</UiText> : <>
-      <div className="overview-table-scroll" role="region" aria-label="Tabla de dispositivos" tabIndex={0}>
+    {devices.length === 0 ? <UiText className="overview-card-state">{t("overview.devices.empty")}</UiText> : <>
+      <div className="overview-table-scroll" role="region" aria-label={t("overview.devices.table")} tabIndex={0}>
         <UiTable className="overview-table">
-          <UiTableHead><UiTableRow><UiTableHeader>Equipo</UiTableHeader><UiTableHeader>Tipo</UiTableHeader><UiTableHeader>Versión</UiTableHeader><UiTableHeader>Estado</UiTableHeader><UiTableHeader>Última señal</UiTableHeader></UiTableRow></UiTableHead>
+          <UiTableHead><UiTableRow><UiTableHeader>{t("overview.devices.device")}</UiTableHeader><UiTableHeader>{t("overview.devices.kind")}</UiTableHeader><UiTableHeader>{t("overview.devices.version")}</UiTableHeader><UiTableHeader>{t("overview.devices.state")}</UiTableHeader><UiTableHeader>{t("overview.devices.lastSeen")}</UiTableHeader></UiTableRow></UiTableHead>
           <UiTableBody>{visible.map((device) => <UiTableRow key={device.id}>
-            <UiTableCell><span className="overview-cell-name"><strong>{device.hardware}</strong><small title={device.id}>{shortId(device.id)}</small></span></UiTableCell>
-            <UiTableCell>{device.kind}</UiTableCell>
-            <UiTableCell data-label="Versión">{device.version}</UiTableCell>
-            <UiTableCell><UiBadge tone={device.online ? "success" : device.status === "offline" ? "neutral" : "warning"}>{WORKER_STATUS_LABELS[device.status]}</UiBadge></UiTableCell>
-            <UiTableCell data-label="Última señal">{sinceText(Date.parse(device.lastSeenAt), now)}</UiTableCell>
+            <UiTableCell><span className="overview-cell-name"><strong>{device.hardware ?? t("overview.devices.native")}</strong><small title={device.id}>{shortId(device.id)}</small></span></UiTableCell>
+            <UiTableCell>{isKnownWorkerKind(device.kind) ? t(`overview.workerKind.${device.kind}`) : device.kind}</UiTableCell>
+            <UiTableCell data-label={t("overview.devices.version")}>{device.version ?? t("overview.devices.noVersion")}</UiTableCell>
+            <UiTableCell><UiBadge tone={device.online ? "success" : device.status === "offline" ? "neutral" : "warning"}>{t(`overview.workerStatus.${device.status}`)}</UiBadge></UiTableCell>
+            <UiTableCell data-label={t("overview.devices.lastSeen")}>{sinceText(Date.parse(device.lastSeenAt), now, t, locale)}</UiTableCell>
           </UiTableRow>)}</UiTableBody>
         </UiTable>
       </div>
       {offline > 0 && online.length > 0 && <footer>
-        <UiButton variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? "Mostrar solo los equipos en línea" : `Mostrar ${offline} ${offline === 1 ? "equipo desconectado" : "equipos desconectados"}`}</UiButton>
+        <UiButton variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? t("overview.devices.showOnline") : offline === 1 ? t("overview.devices.showOfflineOne") : t("overview.devices.showOfflineMany", { count: number(offline) })}</UiButton>
       </footer>}
     </>}
   </UiCard>;

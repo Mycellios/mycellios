@@ -1,6 +1,7 @@
 import { Button as UiButton, DialogPanel as UiDialogPanel, Link as UiLink } from "./ui/primitives";
 import { Check, ChevronDown, ChevronRight, Copy, Download, Globe2, Network, Share2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { usePanelI18n } from "./i18n/panel-i18n";
 
 export function EarnQuickMenu({
   earnUrl,
@@ -15,6 +16,7 @@ export function EarnQuickMenu({
   external: boolean;
   onOpenEarn: () => void;
 }) {
+  const { t } = usePanelI18n();
   const [open, setOpen] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const menuId = useId();
@@ -58,33 +60,33 @@ export function EarnQuickMenu({
       <UiButton
         type="button"
         className="panel-join-trigger"
-        aria-label="Earn"
+        aria-label={t("shell.earn")}
         aria-haspopup="dialog"
         aria-controls={menuId}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
         <Share2 size={15} />
-        <span>Earn</span>
+        <span>{t("shell.earn")}</span>
         <ChevronDown className="panel-join-chevron" size={13} />
       </UiButton>
       {open && (
-        <UiDialogPanel className="panel-join-popover" id={menuId} role="dialog" aria-label="Earn by contributing">
-          <strong className="panel-join-heading">Contribute</strong>
+        <UiDialogPanel className="panel-join-popover" id={menuId} role="dialog" aria-label={t("shell.earn.dialog")}>
+          <strong className="panel-join-heading">{t("shell.earn.heading")}</strong>
           <div className="panel-join-options">
             <UiLink href={browserUrl} {...externalProps} onClick={() => setOpen(false)}>
-              <Globe2 size={17} /><span>In your browser</span><ChevronRight size={14} />
+              <Globe2 size={17} /><span>{t("shell.earn.browser")}</span><ChevronRight size={14} />
             </UiLink>
             <UiLink href={downloadsUrl} {...externalProps} onClick={() => setOpen(false)}>
-              <Download size={17} /><span>On your computer</span><ChevronRight size={14} />
+              <Download size={17} /><span>{t("shell.earn.computer")}</span><ChevronRight size={14} />
             </UiLink>
             <UiButton type="button" onClick={() => { setOpen(false); onOpenEarn(); }}>
-              <Network size={17} /><span>All options</span><ChevronRight size={14} />
+              <Network size={17} /><span>{t("shell.earn.all")}</span><ChevronRight size={14} />
             </UiButton>
           </div>
           <UiButton type="button" className={`panel-join-copy ${copyState}`} onClick={() => void copyEarnLink()} aria-live="polite">
             {copyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
-            {copyState === "copied" ? "Link copied" : copyState === "error" ? "Try copying again" : "Copy invite link"}
+            {t(copyState === "copied" ? "shell.earn.copied" : copyState === "error" ? "shell.earn.copyFailed" : "shell.earn.copy")}
           </UiButton>
         </UiDialogPanel>
       )}

@@ -16,6 +16,8 @@ import {
   type PublicAuthConfig,
 } from "./auth";
 import { errorText } from "./panel-ui-utilities";
+import { usePanelI18n } from "./i18n/panel-i18n";
+import { KNOWN_ACCOUNT_ERRORS } from "./i18n/messages/account";
 import { Button as UiButton, DialogPanel as UiDialogPanel, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Text as UiText } from "./ui/primitives";
 
 const brandIcon = "/assets/brand/favicon.png";
@@ -54,6 +56,8 @@ export function AccountModal({
   onSignOut: () => void;
   onClose: () => void;
 }) {
+  const { t } = usePanelI18n();
+  const shownError = (message: string) => Object.hasOwn(KNOWN_ACCOUNT_ERRORS, message) ? t(KNOWN_ACCOUNT_ERRORS[message]!) : message;
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -190,36 +194,36 @@ export function AccountModal({
 
   return <div className="modal-backdrop account-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
     <UiDialogPanel ref={dialogRef} className="account-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
-      <UiButton type="button" className="account-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></UiButton>
+      <UiButton type="button" className="account-modal-close" aria-label={t("account.close")} onClick={onClose}><X size={18} /></UiButton>
       <div className="account-modal-brand"><img src={brandIcon} alt="" /></div>
       {!ready && !session ? <>
-        <UiHeading as="h2" id={titleId}>Checking your account</UiHeading>
-        <UiText>Restoring your session and sign-in options…</UiText>
-        <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />Loading account…</div>
+        <UiHeading as="h2" id={titleId}>{t("account.checking.title")}</UiHeading>
+        <UiText>{t("account.checking.detail")}</UiText>
+        <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />{t("account.checking.loading")}</div>
       </> : session ? <>
-        <AccountDetails titleId={titleId} session={session} identity={identity} roleBusy={roleBusy} error={error} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />
+        <AccountDetails titleId={titleId} session={session} identity={identity} roleBusy={roleBusy} error={error && shownError(error)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />
       </> : <>
-        <UiHeading as="h2" id={titleId}>{!emailAvailable ? "Continue to Mycellios" : mode === "signin" ? "Welcome back" : "Create your account"}</UiHeading>
-        {(!emailAvailable || mode === "signup") && <UiText>Create your account and get {SPORE_WELCOME_REWARD} trial Spore in Mycellios Agent. Trial Spore has no monetary value.</UiText>}
-        {!emailAvailable && <UiText>Email sign-in is unavailable on this network. Choose a provider below.</UiText>}
-        {emailAvailable && <div className="account-mode-tabs"><UiButton className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setNotice(null); setError(null); }}>Sign in</UiButton><UiButton className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setNotice(null); setError(null); }}>Create account</UiButton></div>}
+        <UiHeading as="h2" id={titleId}>{t(!emailAvailable ? "account.title.continue" : mode === "signin" ? "account.title.welcomeBack" : "account.title.create")}</UiHeading>
+        {(!emailAvailable || mode === "signup") && <UiText>{t("account.welcomeReward", { reward: SPORE_WELCOME_REWARD })}</UiText>}
+        {!emailAvailable && <UiText>{t("account.emailUnavailable")}</UiText>}
+        {emailAvailable && <div className="account-mode-tabs"><UiButton className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setNotice(null); setError(null); }}>{t("account.mode.signIn")}</UiButton><UiButton className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setNotice(null); setError(null); }}>{t("account.mode.create")}</UiButton></div>}
         {emailAvailable && <UiForm onSubmit={(event) => void submit(event)}>
-          <UiFieldLabel>Email<UiInput type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></UiFieldLabel>
-          <UiFieldLabel>Password<span className="account-password-field"><UiInput type={passwordVisible ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><UiButton type="button" aria-label={passwordVisible ? "Hide password" : "Show password"} aria-pressed={passwordVisible} title={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible((visible) => !visible)}>{passwordVisible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</UiButton></span></UiFieldLabel>
-          {notice && <div className="account-auth-success" role="status"><CheckCircle2 size={16} />{notice}</div>}
-          {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
-          <UiButton className="account-submit" disabled={busy}>{busy ? <LoaderCircle className="spin" /> : null}<span>{busy ? "Connecting…" : mode === "signin" ? "Sign in securely" : "Create account"}</span>{!busy && <ArrowRight aria-hidden="true" />}</UiButton>
+          <UiFieldLabel>{t("account.email")}<UiInput type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></UiFieldLabel>
+          <UiFieldLabel>{t("account.password")}<span className="account-password-field"><UiInput type={passwordVisible ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><UiButton type="button" aria-label={t(passwordVisible ? "account.password.hide" : "account.password.show")} aria-pressed={passwordVisible} title={t(passwordVisible ? "account.password.hide" : "account.password.show")} onClick={() => setPasswordVisible((visible) => !visible)}>{passwordVisible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</UiButton></span></UiFieldLabel>
+          {notice && <div className="account-auth-success" role="status"><CheckCircle2 size={16} />{shownError(notice)}</div>}
+          {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{shownError(error)}</div>}
+          <UiButton className="account-submit" disabled={busy}>{busy ? <LoaderCircle className="spin" /> : null}<span>{t(busy ? "account.submit.busy" : mode === "signin" ? "account.submit.signIn" : "account.submit.create")}</span>{!busy && <ArrowRight aria-hidden="true" />}</UiButton>
         </UiForm>}
-        {!emailAvailable && error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
-        {otherSignInAvailable && <><div className="account-provider-divider"><i />{emailAvailable ? "or continue with" : "Continue with"}<i /></div>
-        <div className="account-provider-orbs" aria-label="Other sign-in options">
-          {googleAvailable && <UiButton type="button" className="account-provider-google" aria-label="Continue with Google" title="Continue with Google" disabled={providerBusy !== null || busy} onClick={continueWithGoogle}>
+        {!emailAvailable && error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{shownError(error)}</div>}
+        {otherSignInAvailable && <><div className="account-provider-divider"><i />{t(emailAvailable ? "account.providers.orContinue" : "account.providers.continue")}<i /></div>
+        <div className="account-provider-orbs" aria-label={t("account.providers.label")}>
+          {googleAvailable && <UiButton type="button" className="account-provider-google" aria-label={t("account.providers.google")} title={t("account.providers.google")} disabled={providerBusy !== null || busy} onClick={continueWithGoogle}>
             {providerBusy === "google" ? <LoaderCircle className="spin" /> : <GoogleProviderIcon />}
           </UiButton>}
-          {xAvailable && <UiButton type="button" className="account-provider-x" aria-label="Continue with X" title="Continue with X" disabled={providerBusy !== null || busy} onClick={continueWithX}>
+          {xAvailable && <UiButton type="button" className="account-provider-x" aria-label={t("account.providers.x")} title={t("account.providers.x")} disabled={providerBusy !== null || busy} onClick={continueWithX}>
             {providerBusy === "x" ? <LoaderCircle className="spin" /> : <XProviderIcon />}
           </UiButton>}
-          {walletAvailable && <UiButton type="button" className="account-provider-wallet" aria-label="Continue with MetaMask" title="Continue with MetaMask" disabled={providerBusy !== null || busy} onClick={() => void continueWithMetaMask()}>
+          {walletAvailable && <UiButton type="button" className="account-provider-wallet" aria-label={t("account.providers.metamask")} title={t("account.providers.metamask")} disabled={providerBusy !== null || busy} onClick={() => void continueWithMetaMask()}>
             {providerBusy === "metamask" ? <LoaderCircle className="spin" /> : <MetaMaskProviderIcon />}
           </UiButton>}
         </div></>}

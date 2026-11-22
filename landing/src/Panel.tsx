@@ -1,4 +1,6 @@
 import { AccountModal } from "./AccountModal";
+import { PanelI18nProvider, usePanelI18n, type PanelLocale } from "./i18n/panel-i18n";
+import type { PanelMessageKey } from "./i18n/messages";
 import { Overview } from "./NetworkOverview";
 import { AgentNavigationLink, Sidebar, SidebarFooter } from "./ui/Sidebar";
 import { Badge as UiBadge, DialogPanel as UiDialogPanel, Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
@@ -270,17 +272,17 @@ const EMPTY: PublicSnapshot = {
   recentNetworkTraces: [],
 };
 
-const sharedNavItems: Array<{ id: PanelView; label: string; icon: typeof Network }> = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "history", label: "History", icon: History },
-  { id: "nodes", label: "Nodes", icon: Server },
-  { id: "jobs", label: "Tasks", icon: Activity },
-  { id: "tests", label: "Tests", icon: Gauge },
-  { id: "logs", label: "Logs", icon: ScrollText },
-  { id: "models", label: "Models", icon: Boxes },
-  { id: "contribute", label: "Run", icon: Zap },
-  { id: "downloads", label: "Downloads", icon: Download },
-  { id: "admin", label: "Admin", icon: ShieldCheck },
+const sharedNavItems: Array<{ id: PanelView; label: PanelMessageKey; icon: typeof Network }> = [
+  { id: "overview", label: "shell.nav.overview", icon: LayoutDashboard },
+  { id: "history", label: "shell.nav.history", icon: History },
+  { id: "nodes", label: "shell.nav.nodes", icon: Server },
+  { id: "jobs", label: "shell.nav.jobs", icon: Activity },
+  { id: "tests", label: "shell.nav.tests", icon: Gauge },
+  { id: "logs", label: "shell.nav.logs", icon: ScrollText },
+  { id: "models", label: "shell.nav.models", icon: Boxes },
+  { id: "contribute", label: "shell.nav.contribute", icon: Zap },
+  { id: "downloads", label: "shell.nav.downloads", icon: Download },
+  { id: "admin", label: "shell.nav.admin", icon: ShieldCheck },
 ];
 
 const simplePanelViews = new Set<PanelView>(["overview", "history", "contribute", "downloads"]);
@@ -336,7 +338,12 @@ export function panelIssueForErrors(
   return null;
 }
 
-function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
+function Panel(props: PanelProps = {}) {
+  return <PanelI18nProvider><PanelScreen {...props} /></PanelI18nProvider>;
+}
+
+function PanelScreen({ mobileEntry = false, accountEntry = false }: PanelProps) {
+  const { t, locale, setLocale } = usePanelI18n();
   const localBrowser = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(window.location.hostname);
   const localProductionProxy = localBrowser && window.location.port === "4174";
   const dashboardEntry = !mobileEntry && window.location.pathname === "/dashboard";
@@ -346,7 +353,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [issue, setIssue] = useState<PanelIssue | null>(null);
   const coordinatorError = issue?.source === "coordinator" ? issue.message : null;
-  const coordinatorStatus = coordinatorError ? "Unavailable" : loading ? "Connecting" : "Connected";
+  const coordinatorStatus = t(coordinatorError ? "shell.status.unavailable" : loading ? "shell.status.connecting" : "shell.status.connected");
   const error = issue?.message ?? null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -790,32 +797,32 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
       <div
         className={`public-panel theme-${theme} panel-mode-${panelMode}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
       >
-      <UiLink className="panel-skip-link" href="#panel-main-content" inert={authOpen}>Skip to main content</UiLink>
+      <UiLink className="panel-skip-link" href="#panel-main-content" inert={authOpen}>{t("shell.skipToContent")}</UiLink>
       <Sidebar collapsed={sidebarCollapsed} open={menuOpen} inert={authOpen} onToggle={toggleSidebar} onClose={closeNavigation} closeButtonRef={sidebarCloseButtonRef} homeHref={publicLink("/")} logoSrc={brandIcon}>
         <nav id="panel-sidebar-links">
-          {panelMode === "developer" && <span className="panel-nav-label">DEVELOPER TOOLS</span>}
-          {navItems.map(({ id, label, icon: Icon }) => (
+          {panelMode === "developer" && <span className="panel-nav-label">{t("shell.nav.developerTools")}</span>}
+          {navItems.map(({ id, label: labelKey, icon: Icon }) => { const label = t(labelKey); return (
             <UiButton key={id} className={view === id ? "active" : ""} title={label} aria-label={label} aria-current={view === id ? "page" : undefined} onClick={() => navigate(id)}>
               <Icon size={18} /><span>{label}</span>{id === "nodes" && <b>{snapshot.summary.connected}</b>}
             </UiButton>
-          ))}<AgentNavigationLink />
+          ); })}<AgentNavigationLink />
         </nav>
         {advancedAccess && <UiButton
           type="button"
           className={`panel-mode-toggle ${panelMode === "developer" ? "active" : ""}`}
           aria-pressed={panelMode === "developer"}
-          title={panelMode === "developer" ? "Switch to the simple panel" : "Show developer tools"}
+          title={t(panelMode === "developer" ? "shell.developerMode.hideTitle" : "shell.developerMode.showTitle")}
           onClick={() => changePanelMode(panelMode === "developer" ? "simple" : "developer")}
         >
           <Code2 size={18} />
-          <span><strong>Developer mode</strong><small>{panelMode === "developer" ? "Advanced tools visible" : "Simple panel active"}</small></span>
+          <span><strong>{t("shell.developerMode")}</strong><small>{t(panelMode === "developer" ? "shell.developerMode.on" : "shell.developerMode.off")}</small></span>
           <i aria-hidden="true" />
         </UiButton>}
         <SidebarFooter
-          accountLabel={(networkIdentity?.email ?? authSession?.user.email)?.split("@")[0] ?? (authSession ? "Account" : "Sign in")}
-          accountTitle={authSession ? `Open account for ${networkIdentity?.email ?? authSession.user.email ?? "Mycellios user"}` : "Sign in to Mycellios"}
+          accountLabel={(networkIdentity?.email ?? authSession?.user.email)?.split("@")[0] ?? t(authSession ? "shell.account.fallbackName" : "shell.account.signIn")}
+          accountTitle={authSession ? t("shell.account.openFor", { email: networkIdentity?.email ?? authSession.user.email ?? t("shell.account.fallbackUser") }) : t("shell.account.signInTitle")}
           onAccount={() => { setMenuOpen(false); setAuthOpen(true); }}
-          theme={theme} onTheme={toggleTheme} status={coordinatorStatus}
+          theme={theme} onTheme={toggleTheme} locale={locale} onLocale={setLocale} status={coordinatorStatus}
           degraded={Boolean(coordinatorError) || loading} version={snapshot.version}
           earnMenu={<EarnQuickMenu
               earnUrl={`${window.location.origin}/earn`}
@@ -826,19 +833,19 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
             />}
         />
       </Sidebar>
-      {menuOpen && !authOpen && <UiButton className="panel-menu-backdrop" aria-label="Close navigation overlay" onClick={closeNavigation} />}
+      {menuOpen && !authOpen && <UiButton className="panel-menu-backdrop" aria-label={t("shell.closeNavigationOverlay")} onClick={closeNavigation} />}
 
       <div className="panel-main" inert={authOpen}>
         <UiButton
           ref={menuButtonRef}
           className="panel-menu-button"
-          aria-label={menuOpen ? "Close navigation" : "Show navigation labels"}
+          aria-label={t(menuOpen ? "shell.closeNavigation" : "shell.showNavigationLabels")}
           aria-controls="panel-navigation"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((current) => !current)}
         ><Menu /></UiButton>
 
-        {issue && <div className="panel-error" role="alert" aria-live="assertive" title={issue.message}><CircleAlert size={17} /> {issue.source === "coordinator" ? "Coordinator unavailable." : "This node could not join the network."} Retrying automatically.</div>}
+        {issue && <div className="panel-error" role="alert" aria-live="assertive" title={issue.message}><CircleAlert size={17} /> {t(issue.source === "coordinator" ? "shell.issue.coordinator" : "shell.issue.runtime")} {t("shell.issue.retrying")}</div>}
         <main id="panel-main-content" ref={mainContentRef} className="panel-content" tabIndex={-1}>
           <div className="panel-content-scale">
             {loading && snapshot.capturedAt === EMPTY.capturedAt ? <PanelLoading /> : (
@@ -856,7 +863,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
               />}
               {view === "tests" && advancedAccess && <Tests canRunLocally={localBrowser && !localProductionProxy} />}
               {view === "logs" && advancedAccess && <SystemLogs snapshot={snapshot} connectionError={coordinatorError} />}
-              {view === "contribute" && <Suspense fallback={<div className="panel-loading" role="status" aria-live="polite"><LoaderCircle className="spin" /><strong>Loading contribution tools</strong><span>Preparing the browser and node options…</span></div>}>
+              {view === "contribute" && <Suspense fallback={<div className="panel-loading" role="status" aria-live="polite"><LoaderCircle className="spin" /><strong>{t("shell.contributeLoading.title")}</strong><span>{t("shell.contributeLoading.detail")}</span></div>}>
                 <Contribute
                   accessToken={authSession?.accessToken ?? null}
                   authConfig={authConfig}
@@ -873,7 +880,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
                   }}
                 />
               </Suspense>}
-              {view === "downloads" && <DownloadsPage title={<PageTitle eyebrow="CLIENTS" title="Downloads" copy="Native packages are listed here only when their release files are available." />} publicLink={publicLink} external={false} />}
+              {view === "downloads" && <DownloadsPage title={<PageTitle eyebrow={t("shell.downloads.eyebrow")} title={t("shell.downloads.title")} copy={t("shell.downloads.copy")} />} publicLink={publicLink} external={false} />}
               {view === "admin" && advancedAccess && <AssistantAdmin
                 apiOrigin=""
                 adminToken={modelAdminToken}
@@ -1393,14 +1400,10 @@ export function LiveNetworkTelemetry({ snapshot, evidence = overviewSnapshotEvid
   );
 }
 
-const historyRangeLabels: Record<NetworkHistoryRange, string> = {
-  "24h": "24 hours",
-  "7d": "7 days",
-  "30d": "30 days",
-  "90d": "90 days",
-};
+const historyRanges: readonly NetworkHistoryRange[] = ["24h", "7d", "30d", "90d"];
 
 export function NetworkHistory({ endpoint, compact = true }: { endpoint: string; compact?: boolean }) {
+  const { t } = usePanelI18n();
   const [range, setRange] = useState<NetworkHistoryRange>("24h");
   const [history, setHistory] = useState<NetworkTelemetryHistory | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1430,96 +1433,97 @@ export function NetworkHistory({ endpoint, compact = true }: { endpoint: string;
   }, [load]);
 
   return <section className="network-history-page minimal-screen">
-    <PageTitle title="Network history" />
+    <PageTitle title={t("history.title")} />
     <div className="network-history-toolbar">
-      <div className="network-history-ranges" role="group" aria-label="History range">
-        {(Object.keys(historyRangeLabels) as NetworkHistoryRange[]).map((value) => (
+      <div className="network-history-ranges" role="group" aria-label={t("history.range.label")}>
+        {historyRanges.map((value) => (
           <UiButton
             type="button"
             className={range === value ? "active" : ""}
             aria-pressed={range === value}
             onClick={() => setRange(value)}
             key={value}
-          >{historyRangeLabels[value]}</UiButton>
+          >{t(`history.range.${value}`)}</UiButton>
         ))}
       </div>
-      <span>{history?.samples.length ? `${history.samples.length} samples` : ""}</span>
+      <span>{history?.samples.length ? t("history.samples", { count: history.samples.length }) : ""}</span>
     </div>
-    {loadError && <div className="network-history-error" role="alert"><CircleAlert size={17} /><span><strong>Could not load history</strong>{loadError}</span><UiButton type="button" onClick={() => void load()}>Retry</UiButton></div>}
-    {loading && !history ? <div className="network-history-loading"><LoaderCircle className="spin" /><span>Loading saved samples…</span></div> : history && <NetworkHistoryReport history={history} compact={compact} />}
+    {loadError && <div className="network-history-error" role="alert"><CircleAlert size={17} /><span><strong>{t("history.error.title")}</strong>{loadError}</span><UiButton type="button" onClick={() => void load()}>{t("history.retry")}</UiButton></div>}
+    {loading && !history ? <div className="network-history-loading"><LoaderCircle className="spin" /><span>{t("history.loading")}</span></div> : history && <NetworkHistoryReport history={history} compact={compact} />}
   </section>;
 }
 
 export function NetworkHistoryReport({ history, compact = true }: { history: NetworkTelemetryHistory; compact?: boolean }) {
+  const { t, locale } = usePanelI18n();
   const latest = history.samples.at(-1);
   const first = history.samples[0];
   if (!latest) {
-    return <Empty icon={History} title="No samples yet" copy="The coordinator will save the first reading automatically and add another every ten minutes." />;
+    return <Empty icon={History} title={t("history.empty.title")} copy={t("history.empty.copy")} />;
   }
   return <>
-    {!compact && <div className="network-history-summary" aria-label="Latest sample">
+    {!compact && <div className="network-history-summary" aria-label={t("history.latest")}>
       <HistorySummaryCard
         icon={MemoryStick}
-        label="Active VRAM"
+        label={t("history.card.vram")}
         value={formatMemory(latest.offeredVramMb)}
-        detail={`${formatMemory(latest.freeVramMb)} free now`}
+        detail={t("history.card.vramDetail", { free: formatMemory(latest.freeVramMb) })}
         delta={historyDelta(latest.offeredVramMb, first?.offeredVramMb)}
         tone="blue"
       />
       <HistorySummaryCard
         icon={Server}
-        label="Connected nodes"
+        label={t("history.card.nodes")}
         value={String(latest.connectedNodes)}
-        detail={`${latest.onlineNodes} online · ${latest.browserNodes} browser`}
+        detail={t("history.card.nodesDetail", { online: latest.onlineNodes, browser: latest.browserNodes })}
         delta={historyDelta(latest.connectedNodes, first?.connectedNodes)}
         tone="green"
       />
       {!compact && <HistorySummaryCard
         icon={Boxes}
-        label="Active models"
+        label={t("history.card.models")}
         value={String(latest.activeModels)}
-        detail={`${latest.modelReplicas} replicas · ${latest.modelPipelines} pipelines`}
+        detail={t("history.card.modelsDetail", { replicas: latest.modelReplicas, pipelines: latest.modelPipelines })}
         delta={historyDelta(latest.activeModels, first?.activeModels)}
         tone="purple"
       />}
       {!compact && <HistorySummaryCard
         icon={Activity}
-        label="Jobs in flight"
+        label={t("history.card.jobs")}
         value={String(latest.inflightJobs)}
-        detail={`${latest.runningJobs} running`}
+        detail={t("history.card.jobsDetail", { running: latest.runningJobs })}
         delta={historyDelta(latest.inflightJobs, first?.inflightJobs)}
         tone="orange"
       />}
     </div>}
-    <div className="network-history-meta"><span>Updated {formatHistoryDate(latest.capturedAt)}</span></div>
+    <div className="network-history-meta"><span>{t("history.updated", { date: formatHistoryDate(latest.capturedAt, locale) })}</span></div>
     <div className="network-history-charts">
       <NetworkHistoryChart
-        title="Network capacity"
-        eyebrow="ACTIVE VRAM"
+        title={t("history.chart.capacity")}
+        eyebrow={t("history.chart.capacityEyebrow")}
         samples={history.samples}
         unit=""
         valueFormatter={formatMemory}
         series={[
-          { key: "offeredVramMb", label: "Active total", tone: "blue" },
-          { key: "freeVramMb", label: "Free", tone: "green" },
+          { key: "offeredVramMb", label: t("history.chart.activeTotal"), tone: "blue" },
+          { key: "freeVramMb", label: t("history.chart.free"), tone: "green" },
         ]}
       />
       <NetworkHistoryChart
-        title="Node availability"
-        eyebrow="PEERS"
+        title={t("history.chart.availability")}
+        eyebrow={t("history.chart.availabilityEyebrow")}
         samples={history.samples}
-        unit="nodes"
+        unit={t("history.unit.nodes")}
         valueFormatter={(value) => String(Math.round(value))}
         series={[
-          { key: "connectedNodes", label: "Connected", tone: "blue" },
-          { key: "onlineNodes", label: "Online", tone: "green" },
-          { key: "browserNodes", label: "Browser", tone: "purple" },
+          { key: "connectedNodes", label: t("history.chart.connected"), tone: "blue" },
+          { key: "onlineNodes", label: t("history.chart.online"), tone: "green" },
+          { key: "browserNodes", label: t("history.chart.browser"), tone: "purple" },
         ]}
       />
       {!compact && <DetailedHistoryCharts history={history} />}
     </div>
     {compact ? (
-      <PanelDisclosure icon={Activity} eyebrow="ON DEMAND" title="More charts & saved readings">
+      <PanelDisclosure icon={Activity} eyebrow={t("history.more.eyebrow")} title={t("history.more.title")}>
         <div className="network-history-charts network-history-charts-detail"><DetailedHistoryCharts history={history} /></div>
         <NetworkHistoryTable samples={history.samples} />
       </PanelDisclosure>
@@ -1528,28 +1532,29 @@ export function NetworkHistoryReport({ history, compact = true }: { history: Net
 }
 
 function DetailedHistoryCharts({ history }: { history: NetworkTelemetryHistory }) {
+  const { t } = usePanelI18n();
   return <>
     <NetworkHistoryChart
-      title="Available models"
-      eyebrow="MODEL FABRIC"
+      title={t("history.chart.models")}
+      eyebrow={t("history.chart.modelsEyebrow")}
       samples={history.samples}
-      unit="models"
+      unit={t("history.unit.models")}
       valueFormatter={(value) => String(Math.round(value))}
       series={[
-        { key: "activeModels", label: "Models", tone: "purple" },
-        { key: "modelReplicas", label: "Replicas", tone: "blue" },
-        { key: "modelPipelines", label: "Pipelines", tone: "green" },
+        { key: "activeModels", label: t("history.chart.modelsSeries"), tone: "purple" },
+        { key: "modelReplicas", label: t("history.chart.replicas"), tone: "blue" },
+        { key: "modelPipelines", label: t("history.chart.pipelines"), tone: "green" },
       ]}
     />
     <NetworkHistoryChart
-      title="Inference load"
-      eyebrow="ACTIVITY"
+      title={t("history.chart.load")}
+      eyebrow={t("history.chart.loadEyebrow")}
       samples={history.samples}
-      unit="jobs"
+      unit={t("history.unit.jobs")}
       valueFormatter={(value) => String(Math.round(value))}
       series={[
-        { key: "inflightJobs", label: "In flight", tone: "orange" },
-        { key: "runningJobs", label: "Running", tone: "green" },
+        { key: "inflightJobs", label: t("history.chart.inFlight"), tone: "orange" },
+        { key: "runningJobs", label: t("history.chart.running"), tone: "green" },
       ]}
     />
   </>;
@@ -1588,6 +1593,7 @@ function NetworkHistoryChart({
   unit: string;
   valueFormatter: (value: number) => string;
 }) {
+  const { t, locale } = usePanelI18n();
   const points = downsampleNetworkHistory(samples, 720);
   const width = 760;
   const height = 250;
@@ -1606,7 +1612,7 @@ function NetworkHistoryChart({
   const labelEvery = Math.max(1, Math.ceil(points.length / 3));
   return <UiCard className="network-history-chart">
     <header><div><UiHeading as="h2">{title}</UiHeading></div><div className="network-history-legend">{series.map((item) => <span className={item.tone} key={item.key}><i />{item.label}</span>)}</div></header>
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${title}. ${samples.length} real samples.`}>
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t("history.chart.ariaLabel", { title, count: samples.length })}>
       {[0, 0.5, 1].map((ratio) => <g key={ratio}>
         <line className="history-grid-line" x1={left} y1={top + ratio * (height - top - bottom)} x2={width - right} y2={top + ratio * (height - top - bottom)} />
         <text x={left - 8} y={top + ratio * (height - top - bottom) + 4} textAnchor="end">{valueFormatter(ceiling * (1 - ratio))}</text>
@@ -1617,7 +1623,7 @@ function NetworkHistoryChart({
       </g>)}
       {points.map((sample, index) => {
         if (index % labelEvery !== 0 && index !== points.length - 1) return null;
-        return <text className={`history-x-label${index === 0 || index === points.length - 1 ? " history-edge-label" : ""}`} x={x(index)} y={height - 13} textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"} key={sample.capturedAt}>{formatHistoryChartTime(sample.capturedAt)}</text>;
+        return <text className={`history-x-label${index === 0 || index === points.length - 1 ? " history-edge-label" : ""}`} x={x(index)} y={height - 13} textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"} key={sample.capturedAt}>{formatHistoryChartTime(sample.capturedAt, locale)}</text>;
       })}
     </svg>
     <footer>{series.map((item) => <strong key={item.key}>{item.label} {valueFormatter(points.at(-1)?.[item.key] ?? 0)} {unit && <small>{unit}</small>}</strong>)}</footer>
@@ -1639,14 +1645,16 @@ function HistorySummaryCard({
   delta: number;
   tone: "blue" | "green" | "purple" | "orange";
 }) {
+  const { t } = usePanelI18n();
   return <UiCard className={`network-history-summary-card ${tone}`}>
     <Icon />
     <span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span>
-    <b className={delta > 0 ? "positive" : delta < 0 ? "negative" : "neutral"}>{delta > 0 ? "+" : ""}{delta} since start</b>
+    <b className={delta > 0 ? "positive" : delta < 0 ? "negative" : "neutral"}>{t("history.card.delta", { delta: `${delta > 0 ? "+" : ""}${delta}` })}</b>
   </UiCard>;
 }
 
 function NetworkHistoryTable({ samples }: { samples: NetworkTelemetrySample[] }) {
+  const { t, locale } = usePanelI18n();
   const [page, setPage] = useState(0);
   const allRows = samples.slice(-24).reverse();
   const pageSize = TABLE_PAGE_SIZE;
@@ -1655,13 +1663,13 @@ function NetworkHistoryTable({ samples }: { samples: NetworkTelemetrySample[] })
   const visible = allRows.slice(visiblePage * pageSize, visiblePage * pageSize + pageSize);
   useEffect(() => setPage(0), [samples]);
   return <UiCard className="network-history-table-card">
-    <header><div><span>EXACT SAMPLES</span><UiHeading as="h2">Latest saved readings</UiHeading></div><small>Showing {allRows.length} most recent</small></header>
-    <UiText className="panel-table-scroll-hint">Swipe sideways to see every reading →</UiText>
-    <div className="network-history-table-scroll" role="region" aria-label="Scrollable history readings" tabIndex={0}>
+    <header><div><span>{t("history.table.eyebrow")}</span><UiHeading as="h2">{t("history.table.title")}</UiHeading></div><small>{t("history.table.count", { count: allRows.length })}</small></header>
+    <UiText className="panel-table-scroll-hint">{t("history.table.scrollHint")}</UiText>
+    <div className="network-history-table-scroll" role="region" aria-label={t("history.table.region")} tabIndex={0}>
       <UiTable>
-        <UiTableHead><UiTableRow><UiTableHeader>Timestamp</UiTableHeader><UiTableHeader>Active VRAM</UiTableHeader><UiTableHeader>Free VRAM</UiTableHeader><UiTableHeader>Nodes</UiTableHeader><UiTableHeader>Online</UiTableHeader><UiTableHeader>Models</UiTableHeader><UiTableHeader>Inflight</UiTableHeader><UiTableHeader>Completed</UiTableHeader></UiTableRow></UiTableHead>
+        <UiTableHead><UiTableRow><UiTableHeader>{t("history.table.timestamp")}</UiTableHeader><UiTableHeader>{t("history.table.activeVram")}</UiTableHeader><UiTableHeader>{t("history.table.freeVram")}</UiTableHeader><UiTableHeader>{t("history.table.nodes")}</UiTableHeader><UiTableHeader>{t("history.table.online")}</UiTableHeader><UiTableHeader>{t("history.table.models")}</UiTableHeader><UiTableHeader>{t("history.table.inflight")}</UiTableHeader><UiTableHeader>{t("history.table.completed")}</UiTableHeader></UiTableRow></UiTableHead>
         <UiTableBody>{visible.map((sample) => <UiTableRow key={sample.capturedAt}>
-          <UiTableCell><strong>{formatHistoryDate(sample.capturedAt)}</strong></UiTableCell>
+          <UiTableCell><strong>{formatHistoryDate(sample.capturedAt, locale)}</strong></UiTableCell>
           <UiTableCell>{formatMemory(sample.offeredVramMb)}</UiTableCell>
           <UiTableCell>{formatMemory(sample.freeVramMb)}</UiTableCell>
           <UiTableCell>{sample.connectedNodes}</UiTableCell>
@@ -1672,7 +1680,7 @@ function NetworkHistoryTable({ samples }: { samples: NetworkTelemetrySample[] })
         </UiTableRow>)}</UiTableBody>
       </UiTable>
     </div>
-    {allRows.length > pageSize && <TablePagination label="history samples" page={visiblePage} pageCount={pageCount} total={allRows.length} onPageChange={setPage} />}
+    {allRows.length > pageSize && <TablePagination label={t("history.table.pagination")} page={visiblePage} pageCount={pageCount} total={allRows.length} onPageChange={setPage} />}
   </UiCard>;
 }
 
@@ -1693,22 +1701,12 @@ function historyDelta(current: number, initial: number | undefined): number {
   return initial === undefined ? 0 : Math.round(current - initial);
 }
 
-function formatHistoryDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+function formatHistoryDate(value: string, locale: PanelLocale = "en"): string {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-US", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-function formatHistoryChartTime(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value)).replace(",", "");
+function formatHistoryChartTime(value: string, locale: PanelLocale = "en"): string {
+  return formatHistoryDate(value, locale).replace(",", "");
 }
 
 export interface OverviewSnapshotEvidence {

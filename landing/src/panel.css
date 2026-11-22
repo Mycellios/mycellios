@@ -16324,3 +16324,17 @@ body:has(.public-panel-viewport) {
 @media (prefers-reduced-motion: reduce) {
   .public-panel .panel-sidebar *, .public-panel .panel-sidebar-footer.compact-footer { transition: none !important; }
 }
+
+/* The optional language switch sits between the theme and Earn controls. */
+.public-panel .panel-language-toggle span { font: 700 11px var(--panel-font-mono); letter-spacing: .04em; }
+@media (min-width: 921px) {
+  .public-panel .compact-footer:has(.panel-language-toggle) .panel-sidebar-account { width: calc(100% - 126px); }
+  .public-panel .compact-footer:has(.panel-language-toggle) .panel-sidebar-meta { right: 113px; }
+  .public-panel .compact-footer .panel-sidebar-actions:has(.panel-language-toggle) { width: 104px; }
+  .public-panel .compact-footer .panel-language-toggle { left: 36px; }
+  .public-panel.sidebar-collapsed .panel-sidebar-footer.compact-footer:has(.panel-language-toggle) { height: 186px; min-height: 186px; flex-basis: 186px; }
+  .public-panel.sidebar-collapsed .compact-footer:has(.panel-language-toggle) .panel-sidebar-account { width: 100%; bottom: 136px; }
+  .public-panel.sidebar-collapsed .compact-footer:has(.panel-language-toggle) .panel-sidebar-meta { right: 24px; bottom: 123px; }
+  .public-panel.sidebar-collapsed .compact-footer .panel-sidebar-actions:has(.panel-language-toggle) { width: 32px; height: 108px; }
+  .public-panel.sidebar-collapsed .compact-footer .panel-language-toggle { left: 0; top: 36px; }
+}

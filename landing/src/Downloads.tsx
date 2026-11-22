@@ -4,6 +4,7 @@ import { ArrowRight, Download, Laptop, Globe2 } from "lucide-react";
 import type { PublicDownloadAvailability } from "../../src/contracts/public-downloads.js";
 import { fetchPublicDownloadAvailability, PUBLIC_DOWNLOAD_OPTIONS } from "./public-downloads";
 import { DesktopDownloads } from "./DesktopDownloads";
+import { usePanelI18n } from "./i18n/panel-i18n";
 
 export function downloadAvailabilityNotice(
   availability: PublicDownloadAvailability | null,
@@ -48,6 +49,7 @@ export function DownloadsPage({
   external: boolean;
   loadAvailability?: typeof fetchPublicDownloadAvailability;
 }) {
+  const { t } = usePanelI18n();
   const [availability, setAvailability] = useState<PublicDownloadAvailability | null>(null);
   useEffect(() => {
     let active = true;
@@ -72,21 +74,21 @@ export function DownloadsPage({
   return <section className="connect-studio minimal-screen">
     {title}
     <div className="connect-studio-workspace">
-      <div className="connect-route-picker" aria-label="Contribution method">
-        <UiButton type="button" className={route === "native" ? "selected" : ""} aria-pressed={route === "native"} onClick={() => setRoute("native")}><Laptop size={21} /><span><strong>On your computer</strong></span><ArrowRight size={17} /></UiButton>
-        <UiButton type="button" className={route === "browser" ? "selected" : ""} aria-pressed={route === "browser"} onClick={() => setRoute("browser")}><Globe2 size={21} /><span><strong>In your browser</strong></span><ArrowRight size={17} /></UiButton>
+      <div className="connect-route-picker" aria-label={t("downloads.method")}>
+        <UiButton type="button" className={route === "native" ? "selected" : ""} aria-pressed={route === "native"} onClick={() => setRoute("native")}><Laptop size={21} /><span><strong>{t("downloads.native")}</strong></span><ArrowRight size={17} /></UiButton>
+        <UiButton type="button" className={route === "browser" ? "selected" : ""} aria-pressed={route === "browser"} onClick={() => setRoute("browser")}><Globe2 size={21} /><span><strong>{t("downloads.browser")}</strong></span><ArrowRight size={17} /></UiButton>
       </div>
       <div className="connect-route-content">
-      {route === "browser" ? <UiCard className="connect-browser-route"><UiHeading as="h2">Browser worker</UiHeading><UiText>Keep the tab open while contributing.</UiText><UiLink className="connect-primary-action" href={publicLink("/browser/")} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>Open browser worker <ArrowRight size={17} /></UiLink></UiCard> : <>
-      <div className="connect-platforms" aria-label="Operating system">{PUBLIC_DOWNLOAD_OPTIONS.map((option) => <UiButton type="button" key={option.id} aria-pressed={selectedPlatform === option.id} className={selectedPlatform === option.id ? "selected" : ""} onClick={() => setSelectedPlatform(option.id)}>{option.label}</UiButton>)}</div>
+      {route === "browser" ? <UiCard className="connect-browser-route"><UiHeading as="h2">{t("downloads.browser.title")}</UiHeading><UiText>{t("downloads.browser.copy")}</UiText><UiLink className="connect-primary-action" href={publicLink("/browser/")} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>{t("downloads.browser.open")} <ArrowRight size={17} /></UiLink></UiCard> : <>
+      <div className="connect-platforms" aria-label={t("downloads.system")}>{PUBLIC_DOWNLOAD_OPTIONS.map((option) => <UiButton type="button" key={option.id} aria-pressed={selectedPlatform === option.id} className={selectedPlatform === option.id ? "selected" : ""} onClick={() => setSelectedPlatform(option.id)}>{option.label}</UiButton>)}</div>
       <div className="download-grid">{PUBLIC_DOWNLOAD_OPTIONS.filter((option) => option.id === selectedPlatform).map((option) => {
       const pkg = availability?.packages.find((item) => item.id === option.id);
       const available = pkg?.available === true;
       return <UiCard className={`download-card${available ? " ready" : " unavailable"}`} key={option.id}>
         <UiHeading as="h2">{option.detail}</UiHeading>
         {pkg && !available
-          ? <UiButton className="download-card-action" variant="primary" disabled title="No release is published for this platform yet.">Download <Download /></UiButton>
-          : <UiLink className="download-card-action" href={publicLink(pkg?.path ?? option.path)} download={pkg?.fileName ?? true}>Download <Download /></UiLink>}
+          ? <UiButton className="download-card-action" variant="primary" disabled title={t("downloads.unpublished")}>{t("downloads.download")} <Download /></UiButton>
+          : <UiLink className="download-card-action" href={publicLink(pkg?.path ?? option.path)} download={pkg?.fileName ?? true}>{t("downloads.download")} <Download /></UiLink>}
       </UiCard>;
     })}</div>
       </>}
