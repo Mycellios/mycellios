@@ -95,6 +95,7 @@ it("integrates authenticated RPC, bounded owned context, independent runtime and
   const f = fixture();
   await expect(f.client().threads.sideQuestionAvailable({ botId: "bot" })).resolves.toEqual({
     available: true,
+    extendedHistory: true,
   });
   await expect(
     f
@@ -130,6 +131,27 @@ it("integrates authenticated RPC, bounded owned context, independent runtime and
   });
   expect(f.usage).toHaveBeenCalledOnce();
   expect(f.writes).not.toHaveBeenCalled();
+});
+
+it("accepts 20 recent exchanges with longer answers and keeps the model token cap", async () => {
+  const f = fixture();
+  const earlier = Array.from({ length: 20 }, (_, index) => ({
+    question: `Earlier question ${index}`,
+    answer: index === 19 ? "x".repeat(32_000) : `Earlier answer ${index}`,
+  }));
+  const input = { botId: "bot", question: "What did we discuss?", earlier, extendedHistory: true as const };
+  await expect(f.client().threads.sideQuestion(input)).resolves.toEqual({
+    answer: "The login page.",
+  });
+  const [request] = f.run.mock.calls[0]!;
+  expect(request.prompt).toContain("Earlier question 0");
+  expect(request.prompt).toContain(earlier[19]!.answer);
+  expect(request.model.maxTokens).toBe(2048);
+  await expect(f.client().threads.sideQuestion({
+    ...input,
+    earlier: [...earlier, earlier[0]!],
+  })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  expect(f.run).toHaveBeenCalledOnce();
 });
 
 it("refuses anonymous, foreign bot/Space and invalid questions before invoking a model", async () => {

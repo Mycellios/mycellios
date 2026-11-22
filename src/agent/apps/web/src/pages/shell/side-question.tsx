@@ -19,7 +19,8 @@ export function SideQuestion({ rpc, botId, taskThreadId, name, color, active: vi
   enterToSend?: boolean; onBrowser?: () => void; onFiles?: () => void; onSettings?: () => void; onVoice?: () => void;
 }) {
   const { t, i18n } = useLingui();
-  const [available, setAvailable] = useState<boolean | null>(null);
+  const [capability, setCapability] = useState<{ available: boolean; extendedHistory?: true } | null>(null);
+  const available = capability?.available;
   const [checkError, setCheckError] = useState(false), [check, setCheck] = useState(0);
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Exchange[]>([]);
@@ -54,8 +55,8 @@ export function SideQuestion({ rpc, botId, taskThreadId, name, color, active: vi
     const controller = new AbortController();
     setCheckError(false);
     rpc.threads.sideQuestionAvailable({ botId, taskThreadId }, { signal: controller.signal })
-      .then(result => { if (!controller.signal.aborted) setAvailable(result.available); })
-      .catch(() => { if (!controller.signal.aborted) { setAvailable(null); setCheckError(true); } });
+      .then(result => { if (!controller.signal.aborted) setCapability(result); })
+      .catch(() => { if (!controller.signal.aborted) { setCapability(null); setCheckError(true); } });
     return () => controller.abort();
   }, [rpc, botId, taskThreadId, visible, check]);
   async function send() {
@@ -63,10 +64,20 @@ export function SideQuestion({ rpc, botId, taskThreadId, name, color, active: vi
     if (active.current || !text || !available) return;
     const controller = new AbortController(), id = ++nextId.current;
     active.current = controller; setBusy(true); setError(null); setQuestion("");
-    const earlier = turns.filter(turn => turn.answer !== null).slice(-8).map(turn => ({ question: turn.question.slice(0, 8000), answer: turn.answer!.slice(0, 16000) }));
+    const extendedHistory = capability?.extendedHistory === true;
+    const earlier = turns.filter(turn => turn.answer !== null)
+      .slice(extendedHistory ? -20 : -8)
+      .map(turn => ({
+        question: turn.question.slice(0, 8000),
+        answer: turn.answer!.slice(0, extendedHistory ? 32_000 : 16_000),
+      }));
     setTurns(previous => [...previous, { id, question: text, askedAt: new Date().toISOString(), answer: null, answeredAt: null }]);
     try {
-      const result = await rpc.threads.sideQuestion({ botId, taskThreadId, question: text, earlier, responseLocale: i18n.locale }, { signal: controller.signal });
+      const result = await rpc.threads.sideQuestion({
+        botId, taskThreadId, question: text, earlier,
+        ...(extendedHistory ? { extendedHistory: true as const } : {}),
+        responseLocale: i18n.locale,
+      }, { signal: controller.signal });
       if (alive.current && !controller.signal.aborted) setTurns(previous => previous.map(turn => turn.id === id ? { ...turn, answer: result.answer, answeredAt: new Date().toISOString() } : turn));
     } catch (err) {
       if (alive.current && !controller.signal.aborted) {
