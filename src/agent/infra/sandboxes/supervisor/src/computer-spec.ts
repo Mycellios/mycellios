@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import path from "node:path";
+import { readEnv } from "@mycellios/core/legacy-env";
 import { MAX_DESKTOP_DISPLAY, screenPorts } from "@mycellios/core/node/desktop-runtime";
 import type Docker from "dockerode";
 
@@ -10,8 +11,8 @@ import type Docker from "dockerode";
  * (`:latest`) name. An image that already carries a tag or digest is used as is.
  */
 export function resolveComputerImage(
-  image = process.env.RAKAZO_COMPUTER_IMAGE,
-  tag = process.env.RAKAZO_COMPUTER_IMAGE_TAG,
+  image = readEnv("COMPUTER_IMAGE"),
+  tag = readEnv("COMPUTER_IMAGE_TAG"),
 ): string {
   const name = image?.trim();
   if (!name) return "rakazo/computer:local";

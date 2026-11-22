@@ -1,5 +1,6 @@
 import type { MessageBlock } from "@mycellios/contracts";
 import { isToolActivityBlock, isUserProgressClientNonce, USER_PROGRESS_CLIENT_NONCE_PREFIX } from "@mycellios/core";
+import { readEnv } from "@mycellios/core/legacy-env";
 
 /**
  * Keep mid-turn progress beats short; prefer a few high-signal updates. Mid-turn
@@ -40,7 +41,7 @@ export function midTurnProgressBudgetAllows(publishedCount: number, turnAgeMs: n
  * else USER_PROGRESS_MESSAGE_MAX_LENGTH.
  */
 export function messageUserMaxLength(): number {
-  const value = process.env.RAKAZO_MESSAGE_USER_MAX_CHARS?.trim();
+  const value = readEnv("MESSAGE_USER_MAX_CHARS")?.trim();
   if (!value || !/^\d+$/.test(value)) return USER_PROGRESS_MESSAGE_MAX_LENGTH;
   const raw = Number(value);
   return Number.isSafeInteger(raw) && raw >= 1 ? raw : USER_PROGRESS_MESSAGE_MAX_LENGTH;

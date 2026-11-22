@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { config } from "dotenv";
+import { readEnv } from "../legacy-env.js";
 
 export function loadRootEnv(options: { allowInTests?: boolean } = {}) {
   // The project preview supplies its isolated environment, never a checkout's credentials.
-  if (process.env.RAKAZO_PROJECT_LOCAL === "1") return;
+  if (readEnv("PROJECT_LOCAL") === "1") return;
   // Test runners and verification CLIs supply their own isolated environment.
   // Loading a developer's credentials here also changes otherwise offline tests.
   if (process.env.NODE_ENV === "test" && !options.allowInTests) return;

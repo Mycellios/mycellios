@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { normalizeOpenAiCompatibleBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
+import { readEnv } from "@mycellios/core/legacy-env";
 import { MYCELLIOS_API_HOSTS } from "./mycellios-api.js";
 import { isCloudMetadataAddress, isLinkLocalAddress, isPrivateAddress } from "./network-address.js";
 
@@ -10,7 +11,7 @@ const BUILT_IN_PUBLIC_MODEL_HOSTS = new Set(["ollama.com", ...MYCELLIOS_API_HOST
 const METADATA_HOSTS = new Set(["metadata.google.internal", "metadata.goog"]);
 
 export function openAiCompatAllowPublicHosts(): boolean {
-  return process.env.RAKAZO_OPENAI_COMPAT_ALLOW_PUBLIC === "1";
+  return readEnv("OPENAI_COMPAT_ALLOW_PUBLIC") === "1";
 }
 
 function normalizeHostname(hostname: string): string {
@@ -32,7 +33,7 @@ export function isPrivateOpenAiCompatibleHostname(hostname: string): boolean {
   if (METADATA_HOSTS.has(normalized)) return false;
   const ipKind = isIP(normalized);
   if (ipKind === 4 || ipKind === 6) return isPrivateAddress(normalized);
-  return (process.env.RAKAZO_OPENAI_COMPAT_PRIVATE_HOSTS ?? "")
+  return (readEnv("OPENAI_COMPAT_PRIVATE_HOSTS") ?? "")
     .split(",")
     .some((entry) => entry.trim() !== "" && normalizeHostname(entry.trim()) === normalized);
 }
