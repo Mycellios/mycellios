@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-22
+
+### Changed
+
+- Micos you create in Desktop now work on your computer by default, each in its own folder.
+  Micos created on the web or mobile keep their own private workspace on the server. You can
+  still change where a Mico works in its settings.
+- When a Mico set to This PC gets a new message while the PC is offline, the chat now says that
+  the message runs on the server, without the PC's files.
+- New Micos that work on This PC keep their files in a folder you can find, named after the Mico,
+  under Mycellios/Micos in your home folder. Mico settings show where it is and open it. Micos that
+  already work on this PC keep their files where they are.
+
+### Fixed
+
+- The This PC setting now says what really happens when the PC is offline: a new message runs
+  on the server, without the PC's files, and work already running on the PC stops.
+- A Mico with its own server computer no longer fails with "Computer limit reached" when another
+  Mico in the same space left its computer running. An idle computer is put to sleep, with its
+  files saved, so the new one can start. Computers that are working keep running.
+
 ## [0.9.1] - 2026-11-21
 
 ### Fixed
