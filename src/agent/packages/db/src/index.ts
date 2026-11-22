@@ -37,6 +37,7 @@ export * from "./history-retrieval.js";
 export * from "./memory-config.js";
 export * from "./messages.js";
 export * from "./message-pins.js";
+export * from "./message-queue.js";
 export * from "./messaging.js";
 export * from "./model-credentials.js";
 export * from "./model-credits.js";

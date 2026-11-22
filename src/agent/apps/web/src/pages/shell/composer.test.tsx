@@ -11,7 +11,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./queued-messages", () => ({ QueuedMessages: () => null }));
+vi.mock("./queue-panel", () => ({ QueuePanel: () => null }));
 
 vi.mock("@lingui/react/macro", () => {
   const t = (parts: TemplateStringsArray, ...values: unknown[]) =>

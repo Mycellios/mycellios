@@ -89,6 +89,11 @@ export function projectMessages(
       });
       continue;
     }
+    if (event.type === "thread.message.deleted") {
+      const index = messages.findIndex((message) => message.id === payload.messageId);
+      if (index >= 0) messages.splice(index, 1);
+      continue;
+    }
     if (event.type === "thread.cloud_agent") {
       const block = cloudAgentBlockFromPayload(payload);
       for (const message of messages) {
@@ -378,13 +383,21 @@ export function reduceLiveMessageBlocks(
 
   if (update.type === "progress" && update.payload?.activity === true) {
     const activityText = String(update.payload.text ?? "");
+    // A turn that waits for its own background work keeps a timed status line.
+    const waiting = update.payload.waiting === "background" ? ("background" as const) : undefined;
+    const since = waiting && typeof update.payload.since === "string" ? update.payload.since : undefined;
     const flushed = replyTail
       ? flushHeldTools(segments, replyTail.text, heldTools(replyTail), true)
       : segments;
-    if (!activityText) return flushed;
+    if (!activityText && !waiting) return flushed;
     return [
       ...flushed,
-      { kind: "progress", text: activityText, activity: true as const },
+      {
+        kind: "progress",
+        text: activityText,
+        activity: true as const,
+        ...(waiting ? { waiting, ...(since ? { since } : {}) } : {}),
+      },
     ];
   }
 

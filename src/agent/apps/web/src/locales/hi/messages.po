@@ -7060,3 +7060,207 @@ msgstr "प्रतीक्षा रद्द करें"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "किसी इवेंट की प्रतीक्षा"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "अभी एक रूटीन चल रहा है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "Mico यहाँ अपने ही काम पर लगा है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "मौजूदा बारी आपके जवाब की प्रतीक्षा कर रही है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "अभी यहाँ कुछ नहीं चल रहा है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "यह संदेश पहले ही शुरू हो चुका है या हटा दिया गया।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "यह संदेश कहीं और संपादित किया जा रहा है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "यह संपादन कहीं और बंद कर दिया गया।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "इस बीच कतार बदल गई। उसे ताज़ा कर दिया गया है; फिर से कोशिश करें।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "कतार के संदेश में टेक्स्ट या फ़ाइल होनी चाहिए।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "केवल वही संदेश नई बातचीत में जा सकता है जो आपने सिर्फ़ इस Mico को भेजा हो।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "नहीं जोड़ा गया: {reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "कतार अपडेट नहीं हो सकी। फिर से कोशिश करें।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "कतार का संदेश सहेजा गया।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "कतार का संदेश डिलीट किया गया।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "{total} में से स्थान {position} पर ले जाया गया।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "नई बातचीत में ले जाया गया: {title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "कंप्यूटर या सर्वर के फिर से शुरू होने की प्रतीक्षा है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "रुका हुआ: पिछली बारी उपयोग या क्रेडिट की सीमा तक पहुँच गई। तैयार हों तो एक संदेश अभी भेजें।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "रुका हुआ: पिछली बारी को साइन-इन या सही कुंजी चाहिए। उसे ठीक करें, फिर एक संदेश अभी भेजें।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "किसी संदेश के संपादन तक रुका हुआ है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "ये मौजूदा बारी के बाद एक-एक करके भेजे जाते हैं।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "भेजे जाने की प्रतीक्षा में संदेश"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "कतार का संदेश {total} में से {position}: {preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "कतार का संदेश संपादित करें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "कहीं और संपादित हो रहा है"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "संपादन जारी"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "इसे अभी चल रही बारी में जोड़ें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "मौजूदा बारी में जोड़ा गया।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "मौजूदा बारी रोकें और यह संदेश अगला भेजें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "यह संदेश अभी भेजा जा रहा है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "नई बातचीत में ले जाएँ"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "इस संदेश के लिए और कार्रवाइयाँ"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "आपका संपादित टेक्स्ट"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "भेजे जाने की प्रतीक्षा में"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "जब तक आप सहेजते या रद्द नहीं करते, कतार रुकी रहती है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "नहीं जोड़ा गया"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "अभी जोड़ें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "अभी भेजें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "इसके बजाय यहाँ संपादित करें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "फ़ोकस किए गए संदेश को कतार में खिसकाने के लिए ऊपर और नीचे तीर कुंजियाँ दबाएँ।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "कतार का संदेश डिलीट करें?"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "इसे कहीं और संपादित किया जा रहा है। डिलीट करने से वह संपादन भी हट जाएगा।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "रखें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "संपादन सहेजा नहीं गया"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "सहेजने से पहले संदेश शुरू हो गया, हटा दिया गया या कहीं और संपादित हुआ। आपका टेक्स्ट नीचे रखा गया है।"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "इसे संदेश बॉक्स में डालें"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, one {खाली जगह की प्रतीक्षा: इस Mico की # बातचीत चल रही है।} other {खाली जगह की प्रतीक्षा: इस Mico की # बातचीत चल रही हैं।}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, one {# फ़ाइल} other {# फ़ाइलें}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "पृष्ठभूमि के काम की प्रतीक्षा…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "यह रनटाइम एक समय में एक ही काम चलाता है, मुख्य चैट समेत।"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "अतिरिक्त काम अपनी बारी का इंतज़ार करते हैं। मुख्य चैट की अपनी जगह है और वह कभी उनके पीछे इंतज़ार नहीं करती।"

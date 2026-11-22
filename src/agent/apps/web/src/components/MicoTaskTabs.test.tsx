@@ -323,6 +323,9 @@ describe("tab keyboard, mouse and menu", () => {
     expect(readConversationTabs("keys").ids).toEqual(["b", "a", "c"]);
     await act(() => key(tabButton(host, "a"), { key: "ArrowLeft", altKey: true, shiftKey: true }));
     expect(readConversationTabs("keys").ids).toEqual(["a", "b", "c"]);
+    // A move gives focus back to the moved tab on the next frame. Let it land first, or it can
+    // take focus from a rename field opened below and close that rename.
+    await act(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
     await act(() => key(tabButton(host, "b"), { key: "F2" }));
     expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
     await act(() => key(host.querySelector("input")!, { key: "Escape" }));

@@ -7059,3 +7059,207 @@ msgstr "בטל את ההמתנה"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "ממתין לאירוע"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "שגרה פועלת עכשיו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "ה-Mico עובד כאן על משימה משלו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "התור הנוכחי ממתין לתשובה שלך."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "שום דבר לא פועל כאן עכשיו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "ההודעה הזו כבר התחילה או הוסרה."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "ההודעה הזו נערכת כרגע במקום אחר."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "העריכה הזו נסגרה במקום אחר."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "התור השתנה בינתיים. הוא רוענן; נסו שוב."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "הודעה בתור צריכה טקסט או קובץ."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "רק הודעה ששלחתם ל-Mico הזה בלבד יכולה לעבור לשיחה חדשה."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "לא הועבר: {reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "לא ניתן היה לעדכן את התור. נסו שוב."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "ההודעה בתור נשמרה."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "ההודעה בתור נמחקה."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "הועבר למקום {position} מתוך {total}."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "הועבר לשיחה חדשה: {title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "ממתין בזמן שהמחשב או השרת מופעלים מחדש."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "מושהה: התור האחרון הגיע למגבלת שימוש או קרדיטים. שלחו הודעה עכשיו כשתהיו מוכנים."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "מושהה: התור האחרון צריך התחברות או מפתח תקין. תקנו זאת ואז שלחו הודעה עכשיו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "מושהה בזמן שהודעה נערכת."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "הן נשלחות אחת אחת, אחרי התור הנוכחי."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "הודעות שממתינות לשליחה"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "הודעה בתור {position} מתוך {total}: {preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "עריכת הודעה בתור"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "נערכת במקום אחר"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "בעריכה"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "הוספה לתור שפועל עכשיו"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "נוסף לתור הנוכחי."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "עצירת התור הנוכחי ושליחת ההודעה הזו כבאה בתור"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "ההודעה הזו נשלחת עכשיו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "העברה לשיחה חדשה"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "פעולות נוספות להודעה זו"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "הטקסט הערוך שלך"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "ממתינות לשליחה"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "התור ממתין עד שתשמרו או תבטלו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "לא הועבר"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "להעביר עכשיו"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "לשלוח עכשיו"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "לערוך כאן במקום זאת"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "השתמשו בחיצים למעלה ולמטה כדי להזיז בתור את ההודעה שבפוקוס."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "למחוק את ההודעה מהתור?"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "היא נערכת במקום אחר. מחיקה תבטל גם את העריכה הזו."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "להשאיר"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "העריכה לא נשמרה"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "ההודעה התחילה, הוסרה או נערכה במקום אחר לפני ששמרתם. הטקסט שלכם נשמר למטה."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "להכניס לתיבת ההודעה"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, one {ממתין למקום פנוי: שיחה אחת של ה-Mico הזה פועלת.} other {ממתין למקום פנוי: # שיחות של ה-Mico הזה פועלות.}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, one {קובץ אחד} other {# קבצים}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "ממתין לעבודה ברקע…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "סביבת ההרצה הזו מריצה משימה אחת בכל פעם, כולל הצ'אט הראשי."
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "משימות נוספות ממתינות לתורן. לצ'אט הראשי יש מקום משלו והוא אף פעם לא ממתין מאחוריהן."

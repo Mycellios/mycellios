@@ -60,6 +60,7 @@ import {
 import type { ModelBackupOutcome } from "@mycellios/core";
 import {
   abortableDelay,
+  framedSteeringText,
   MISSING_TOOL_FINAL_RESPONSE_ERROR,
   MODEL_OUTPUT_CUT_ERROR,
   MODEL_OUTPUT_LIMIT_ERROR,
@@ -121,7 +122,8 @@ import {
 } from "./runtime-tool-catalog.js";
 import { SCHEDULE_TOOL_NAMES } from "./schedule-tools.js";
 import type { FinishedShellCommand } from "./shell-command-stream.js";
-import { deliverFinishedShells } from "./shell-command-stream.js";
+import { BACKGROUND_WAIT_PROGRESS, deliverFinishedShells } from "./shell-command-stream.js";
+import { watchSteeringDuringTool } from "./steering-delivery.js";
 import {
   isThinkingSignatureMismatch,
   withoutThinkingBlocks,
@@ -718,6 +720,7 @@ export class PiAgentRuntime implements AgentRuntime {
               host.pendingShells,
               turn,
               turnSignal,
+              () => queue.push(BACKGROUND_WAIT_PROGRESS),
             );
             await continuity.flush();
             if (continuityFailure) return { action: "end" as const };
@@ -744,9 +747,12 @@ export class PiAgentRuntime implements AgentRuntime {
             for (const item of steering) representedHistoryIds.add(item.messageId);
             for (const item of steering) {
               const images = toPiImages(item.images);
+              // The model reads the person's words behind a short framing note; the chat keeps
+              // only their words.
+              const text = framedSteeringText(item.text);
               agent.steer({
                 role: "user",
-                content: images.length ? [{ type: "text", text: item.text }, ...images] : item.text,
+                content: images.length ? [{ type: "text", text }, ...images] : text,
                 timestamp: Date.now(),
               });
             }
@@ -2085,6 +2091,11 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
                 };
               }
               if (host.request.executeTool) {
+                // A message the person sends meanwhile moves a running shell to the background,
+                // so the turn reaches its next step and takes the message there.
+                const watch = host.depth === 0
+                  ? watchSteeringDuringTool(host.request, host.signal)
+                  : { signal: undefined, stop: () => undefined };
                 const result = await host.request.executeTool(
                   tool.name,
                   args,
@@ -2094,8 +2105,9 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
                     onShellStillRunning: (completion) => {
                       host.pendingShells.push(completion);
                     },
+                    ...(watch.signal ? { yieldSignal: watch.signal } : {}),
                   },
-                );
+                ).finally(watch.stop);
                 if (isAgentToolExecutionResult(result)) {
                   if (isToolPauseResult(result)) host.pausePending = true;
                   return boundAgentToolResult(result);

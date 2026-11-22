@@ -7059,3 +7059,207 @@ msgstr "Beklemeyi iptal et"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Bir olay bekleniyor"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "Şu anda bir rutin çalışıyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "Mico burada kendi görevi üzerinde çalışıyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "Geçerli tur yanıtınızı bekliyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "Şu anda burada çalışan bir şey yok."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "Bu mesaj zaten başladı ya da kaldırıldı."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "Bu mesaj başka bir yerde düzenleniyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "Bu düzenleme başka bir yerde kapatıldı."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "Bu arada kuyruk değişti. Yenilendi; tekrar deneyin."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "Kuyruktaki bir mesajın metni ya da dosyası olmalı."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "Yalnızca sadece bu Mico'ya gönderdiğiniz bir mesaj yeni bir sohbete taşınabilir."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "Yönlendirilmedi: {reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "Kuyruk güncellenemedi. Tekrar deneyin."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "Kuyruktaki mesaj kaydedildi."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "Kuyruktaki mesaj silindi."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "{total} içinde {position}. sıraya taşındı."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "Yeni bir sohbete taşındı: {title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "Bilgisayar ya da sunucu yeniden başlarken bekleniyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "Duraklatıldı: son tur bir kullanım ya da kredi sınırına ulaştı. Hazır olduğunuzda birini şimdi gönderin."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "Duraklatıldı: son tur için oturum açma ya da çalışan bir anahtar gerekiyor. Düzeltin, sonra birini şimdi gönderin."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "Bir mesaj düzenlenirken duraklatıldı."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "Geçerli turdan sonra teker teker gönderilirler."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "Gönderilmeyi bekleyen mesajlar"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "Kuyruktaki mesaj {position}/{total}: {preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "Kuyruktaki mesajı düzenle"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "Başka bir yerde düzenleniyor"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "Düzenleniyor"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "Şu anda süren tura ekle"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "Geçerli tura eklendi."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "Geçerli turu durdur ve bu mesajı sıradaki olarak gönder"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "Bu mesaj şimdi gönderiliyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "Yeni bir sohbete taşı"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "Bu mesaj için diğer işlemler"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "Düzenlediğiniz metin"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "Gönderilmeyi bekliyor"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "Kaydedene ya da iptal edene kadar kuyruk bekler."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "Yönlendirilmedi"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "Şimdi yönlendir"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "Şimdi gönder"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "Bunun yerine burada düzenle"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "Odaktaki mesajı kuyrukta taşımak için yukarı ve aşağı ok tuşlarını kullanın."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "Kuyruktaki mesaj silinsin mi?"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "Başka bir yerde düzenleniyor. Silmek o düzenlemeyi de atar."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "Tut"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "Düzenleme kaydedilmedi"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "Siz kaydetmeden önce mesaj başladı, kaldırıldı ya da başka bir yerde düzenlendi. Metniniz aşağıda duruyor."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "Mesaj kutusuna koy"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, one {Boş yer bekleniyor: bu Mico'nun # sohbeti sürüyor.} other {Boş yer bekleniyor: bu Mico'nun # sohbeti sürüyor.}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, one {# dosya} other {# dosya}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "Arka plandaki iş bekleniyor…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "Bu çalışma ortamı, ana sohbet dahil, aynı anda tek bir görev yürütür."
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "Fazla görevler sıralarını bekler. Ana sohbetin kendi yeri vardır ve asla onların arkasında beklemez."
