@@ -77,17 +77,22 @@ export async function bootstrapUserSpace(
       if (!isUniqueViolation(error)) throw error;
     });
   const policy = signupPolicyFromEnv(env);
-  await prisma.deploymentSettings.upsert({
-    where: { id: "default" },
-    create: {
-      id: "default",
-      ownerUserId: null,
-      signupsEnabled: policy.enabled,
-      signupAllowlist: policy.allowlist.join(","),
-      signupPolicyInitialized: true,
-    },
-    update: {},
-  });
+  // The first signups on a fresh deployment can race to create this row; the winner's is kept.
+  await prisma.deploymentSettings
+    .upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        ownerUserId: null,
+        signupsEnabled: policy.enabled,
+        signupAllowlist: policy.allowlist.join(","),
+        signupPolicyInitialized: true,
+      },
+      update: {},
+    })
+    .catch((error: unknown) => {
+      if (!isUniqueViolation(error)) throw error;
+    });
   const hasMemory = await prisma.memoryDocument.findFirst({
     where: { spaceId: orgId, userId: user.id, scope: "user", path: "MEMORY.md" },
   });
