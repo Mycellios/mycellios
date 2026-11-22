@@ -271,7 +271,9 @@ These rules apply to the complete repository.
   src/agent/CHANGELOG.md; never bump it by hand (docs/DEVELOPMENT.md#desktop-release-notes).
   Android's versionCode is derived by
   `installer-version.mjs`. Native receipts, immutable assets and current-main
-  comparison precede publication. `deploy/installers/publisher.py` promotes the
+  comparison precede publication: main must still contain the qualified revision
+  and carry the same Desktop version (later commits ship with the next version),
+  so busy main branches cannot starve a release. `deploy/installers/publisher.py` promotes the
   verified public release with the original host-side Android signer, a shared
   promotion lock, a recoverable pointer journal and real public download probes.
   Keep publisher staging on the mounted data volume; the legacy state path may
