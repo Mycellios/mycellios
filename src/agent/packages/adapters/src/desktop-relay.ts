@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import type { AdapterContext } from "@mycellios/adapter-kit";
 import { getLogger } from "@mycellios/logging";
 import { desktopLegacyFailureCode } from "@mycellios/contracts";
+import { DesktopUnreachableError } from "./computer-errors.js";
 import type { DesktopExecutorBinding, DesktopExecutorOwner, DesktopExecutorPoll } from "../../../../contracts/desktop-executor.js";
 import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, type HostComputerRequest } from "./host-computer-protocol.js";
 
@@ -350,25 +351,41 @@ export function desktopRelayTransport(url: string, secret: string) {
     return fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-desktop-time": timestamp, "x-desktop-signature": signDesktopRelay(secret, timestamp, body) }, body, signal: context.signal, redirect: "error" });
   };
 }
+/**
+ * Ask the relay whether this Mico's PC is available: its JSON answer, or null when it
+ * refused the probe (404 when the relay or the Mico is unavailable, or a rejected
+ * request). A timeout, a lost connection or a busy relay (a failed lookup answers 409,
+ * then 429 and 5xx) is no answer at all: it throws DesktopUnreachableError, never
+ * "offline". The caller's own cancellation stays a cancellation.
+ */
+async function probeDesktopRelay(url: string, secret: string, context: AdapterContext, extra: { agentExecution?: 1 } = {}): Promise<unknown> {
+  const body = JSON.stringify({ probe: context.botId, ...extra, scope: { userId: context.userId, spaceId: context.spaceId }, nonce: randomUUID() });
+  const timestamp = String(Date.now());
+  let response: Response;
+  let state: unknown = null;
+  try {
+    response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-desktop-time": timestamp, "x-desktop-signature": signDesktopRelay(secret, timestamp, body) }, body, signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]), redirect: "error" });
+    if (response.ok) state = await response.json();
+    else await response.body?.cancel();
+  } catch (error) {
+    if (context.signal.aborted) throw error;
+    throw new DesktopUnreachableError({ cause: error });
+  }
+  if (response.status === 409 || response.status === 429 || response.status >= 500) throw new DesktopUnreachableError();
+  return state;
+}
 export function desktopRelayAvailable(url: string, secret: string) {
   return async (context?: AdapterContext) => {
     if (!context?.botId) return false;
-    const body = JSON.stringify({ probe: context.botId, scope: { userId: context.userId, spaceId: context.spaceId }, nonce: randomUUID() });
-    const timestamp = String(Date.now());
-    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-desktop-time": timestamp, "x-desktop-signature": signDesktopRelay(secret, timestamp, body) }, body, signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]), redirect: "error" });
-    if (!response.ok) return false;
-    const state = await response.json() as {available?: boolean};
-    return state.available === true;
+    const state = await probeDesktopRelay(url, secret, context) as { available?: boolean } | null;
+    return state?.available === true;
   };
 }
 export function desktopAgentSelection(url: string, secret: string) {
   return async (context: AdapterContext): Promise<{ available: boolean; preferred: boolean }> => {
     if (!context.botId) throw Error("Desktop execution requires an owned Mico");
-    const body = JSON.stringify({ probe: context.botId, agentExecution: 1, scope: { userId: context.userId, spaceId: context.spaceId }, nonce: randomUUID() });
-    const timestamp = String(Date.now());
-    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-desktop-time": timestamp, "x-desktop-signature": signDesktopRelay(secret, timestamp, body) }, body, signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]), redirect: "error" });
-    if (!response.ok) { await response.body?.cancel(); throw Error("Desktop execution admission could not be checked"); }
-    const state = await response.json() as { available?: unknown; preferred?: unknown; agentExecution?: unknown };
+    const state = await probeDesktopRelay(url, secret, context, { agentExecution: 1 }) as { available?: unknown; preferred?: unknown; agentExecution?: unknown } | null;
+    if (!state) throw Error("Desktop execution admission could not be checked");
     if (state.agentExecution !== 1 || typeof state.available !== "boolean" || typeof state.preferred !== "boolean") throw Error("Desktop execution protocol unavailable");
     return { available: state.available, preferred: state.preferred };
   };

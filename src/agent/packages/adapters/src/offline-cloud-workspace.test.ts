@@ -2,6 +2,9 @@ import type { SandboxProvider } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { appendEventInTransaction, createThreadMessageInTransaction } from "@mycellios/db";
+import { DesktopUnreachableError } from "./computer-errors.js";
+import { desktopRelayAvailable, desktopRelayKey } from "./desktop-relay.js";
+import { HostAwareSandbox } from "./host-aware-sandbox.js";
 import { OFFLINE_CLOUD_NOTICE, selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
 
 vi.mock("@mycellios/db", async (importOriginal) => ({
@@ -91,5 +94,49 @@ describe("offline cloud workspaces", () => {
     await expect(selectOfflineCloudWorkspace(prisma, sandbox, { ...run, checkpoint: "local" }, desktop, lease))
       .resolves.toBeUndefined();
     expect(database.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("retries instead of moving to a server workspace when the PC check gets no answer", async () => {
+    const { database, prisma, sandbox, provisionKind } = fixture();
+    const unanswered = new DesktopUnreachableError({ cause: new TypeError("fetch failed") });
+    provisionKind.mockRejectedValueOnce(unanswered);
+    await expect(selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease)).rejects.toBe(unanswered);
+    expect(database.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("treats its own check timeout as no answer, never as an offline PC", async () => {
+    const { database, prisma, sandbox, provisionKind } = fixture();
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    const clock = vi.spyOn(AbortSignal, "timeout").mockReturnValueOnce(AbortSignal.abort(timeout));
+    provisionKind.mockImplementationOnce(async ({ signal }: { signal: AbortSignal }) => {
+      throw signal.reason;
+    });
+    const failure = await selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease)
+      .catch((error: unknown) => error);
+    clock.mockRestore();
+    expect(failure).toBeInstanceOf(DesktopUnreachableError);
+    expect((failure as Error).cause).toBe(timeout);
+    expect(database.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("through the real relay check, retries a timeout and moves only on the relay's answer", async () => {
+    const { database, prisma } = fixture();
+    const kind = (id: string) => ({ describe: () => ({ id }) }) as unknown as SandboxProvider;
+    const sandbox = new HostAwareSandbox(kind("docker"), kind("desktop"),
+      desktopRelayAvailable("http://relay.invalid/internal", desktopRelayKey("fixture")));
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    const relayFetch = vi.fn().mockRejectedValueOnce(timeout)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ available: false }), { status: 404 }));
+    vi.stubGlobal("fetch", relayFetch);
+    try {
+      await expect(selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease))
+        .rejects.toBeInstanceOf(DesktopUnreachableError);
+      expect(database.$transaction).not.toHaveBeenCalled();
+      await expect(selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease))
+        .resolves.toMatchObject({ id: "cloud" });
+      expect(relayFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

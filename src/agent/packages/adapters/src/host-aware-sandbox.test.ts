@@ -5,6 +5,7 @@ import type { ComputerRef, SandboxProvider } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "@mycellios/db";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ComputerBrowserProvider } from "./computer-browser.js";
+import { DesktopUnreachableError } from "./computer-errors.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { DockerSandboxProvider } from "./docker-sandbox.js";
 import { FakeSandboxProvider } from "./fake-sandbox.js";
@@ -212,6 +213,23 @@ describe("host-aware sandbox", () => {
     const computer = await sandbox.provision({ botId: "iso", homePath: "/tmp/iso" }, ctx);
     expect(computer.kind).toBe("fake");
     await sandbox.destroy(computer, ctx);
+  });
+  it("keeps server work going when the PC check gets no answer, but holds PC work", async () => {
+    const isolated = new FakeSandboxProvider();
+    const unanswered = async (): Promise<boolean> => {
+      throw new DesktopUnreachableError();
+    };
+    const sandbox = new HostAwareSandbox(isolated, new DesktopSandboxProvider(), unanswered);
+    const computer = await sandbox.provision({ botId: "server", homePath: "/tmp/server" }, ctx);
+    expect(computer.kind).toBe("fake");
+    await expect(sandbox.isRunning(computer, ctx)).resolves.toBe(false);
+    await sandbox.destroy(computer, ctx);
+    await expect(
+      sandbox.provision({ botId: "pc", homePath: "", providerKind: "desktop" }, ctx),
+    ).rejects.toBeInstanceOf(DesktopUnreachableError);
+    await expect(
+      sandbox.isRunning({ id: "pc", kind: "desktop" } as ComputerRef, ctx),
+    ).rejects.toBeInstanceOf(DesktopUnreachableError);
   });
   it("never replaces a disconnected local project with a cloud computer", async () => {
     const isolated = new FakeSandboxProvider();

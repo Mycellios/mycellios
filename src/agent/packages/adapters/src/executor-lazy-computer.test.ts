@@ -5,6 +5,7 @@ import type { MessageBlock } from "@mycellios/contracts";
 import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
+import { DesktopUnreachableError } from "./computer-errors.js";
 import { createRunExecutor } from "./executor.js";
 
 const sink = createTestSink();
@@ -46,8 +47,13 @@ async function runRoutine(
     missingComputer?: boolean;
     preflightClaimLost?: boolean;
     desktopDispatched?: boolean;
+    /** Where a Desktop availability check gets no answer. */
+    desktopUnanswered?: "offline-check" | "turn-start" | "after-tools";
   } = {},
 ) {
+  const unanswered = () => new DesktopUnreachableError({
+    cause: new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+  });
   const attachment: Extract<MessageBlock, { kind: "file" | "image" }> = {
     kind: options.attachments ?? "file",
     artifactId: "artifact-1",
@@ -76,6 +82,7 @@ async function runRoutine(
     context?: { onDesktopRunDispatched?: () => void },
   ) {
     if (options.desktopDispatched) context?.onDesktopRunDispatched?.();
+    if (options.desktopUnanswered === "turn-start") throw unanswered();
     if (options.steering && !options.steeringAfterFirst) {
       steeringInputs.push(...((await request.claimSteering?.([])) ?? []));
     }
@@ -97,6 +104,7 @@ async function runRoutine(
       }
     } else if (options.parallel) await Promise.all(toolCalls.map(execute));
     else for (const [index, call] of toolCalls.entries()) await execute(call, index);
+    if (options.desktopUnanswered === "after-tools") throw unanswered();
     if (options.takeover) {
       yield { type: "takeover" as const, reason: "Sign in to the inbox." };
       return;
@@ -225,6 +233,9 @@ async function runRoutine(
   };
   const sandbox = {
     describe: () => ({ id: "e2b", capabilities: { graphical: false } }),
+    ...(options.desktopUnanswered === "offline-check"
+      ? { provisionKind: vi.fn(async () => { throw unanswered(); }) }
+      : {}),
     environment: options.native
       ? vi.fn(async () => {
           if (options.nativeUnavailable) throw new Error("native app is closed");
@@ -648,6 +659,70 @@ describe("run computer provisioning", () => {
         where: expect.objectContaining({ NOT: { status: "setup_failed", error: null } }),
       }),
     );
+  });
+
+  const DESKTOP_UNANSWERED = "Your PC did not answer in time. Check that Mycellios Desktop is open and online, then try again.";
+  const continueJobs = (enqueue: { mock: { calls: unknown[][] } }) =>
+    enqueue.mock.calls.filter(([job]) => (job as { name: string }).name === "run.continue");
+
+  it("retries a message whose offline-workspace check timed out, without moving it to a server", async () => {
+    const { finalizeRun, runtimeRun, prisma, enqueue, run, sandbox } = await runRoutine([], {
+      native: true, desktopUnanswered: "offline-check",
+    });
+    expect((sandbox as { provisionKind?: unknown }).provisionKind).toHaveBeenCalledOnce();
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(finalizeRun).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(run).toMatchObject({ status: "queued", error: "Run setup failed; retrying" });
+    expect(prisma.attempt.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "setup_failed", error: "Run setup failed; retrying" }),
+    }));
+    expect(continueJobs(enqueue)).toEqual([[expect.objectContaining({
+      payload: { runId: run.id }, availableAt: expect.any(Date),
+    })]]);
+  });
+
+  it("ends an offline-workspace check that never answers with a plain sentence at the setup limit", async () => {
+    const { finalizeRun, runtimeRun, enqueue } = await runRoutine([], {
+      native: true, desktopUnanswered: "offline-check", priorSetupFailures: 7,
+    });
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(finalizeRun).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ outcome: "failed", error: DESKTOP_UNANSWERED }),
+    );
+    expect(continueJobs(enqueue)).toEqual([]);
+  });
+
+  it("retries a turn whose Desktop check timed out before anything reached the PC", async () => {
+    const onRunStarted = vi.fn();
+    const { finalizeRun, prisma, enqueue, run } = await runRoutine([], {
+      desktopUnanswered: "turn-start", onRunStarted,
+    });
+    expect(finalizeRun).not.toHaveBeenCalled();
+    expect(run.status).toBe("queued");
+    expect(prisma.attempt.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "setup_failed", error: "Run setup failed; retrying" }),
+    }));
+    expect(continueJobs(enqueue)).toHaveLength(1);
+  });
+
+  it("ends a turn whose Desktop check never answers with a plain sentence at the setup limit", async () => {
+    const { finalizeRun, enqueue } = await runRoutine([], {
+      desktopUnanswered: "turn-start", onRunStarted: vi.fn(), priorSetupFailures: 7,
+    });
+    expect(finalizeRun).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ outcome: "failed", error: DESKTOP_UNANSWERED }),
+    );
+    expect(continueJobs(enqueue)).toEqual([]);
+  });
+
+  it.each([
+    ["reached the PC", { desktopDispatched: true, desktopUnanswered: "turn-start" }, []],
+    ["ran a tool", { desktopUnanswered: "after-tools" }, [{ name: "list_files", args: { path: "" } }]],
+  ] as const)("never replays a turn that %s when a later Desktop check gets no answer", async (_, options, calls) => {
+    const { finalizeRun, enqueue } = await runRoutine([...calls], { ...options, onRunStarted: vi.fn() });
+    expect(finalizeRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ outcome: "failed" }));
+    expect(continueJobs(enqueue)).toEqual([]);
   });
 
   it.each([undefined, "abort", "recover"] as const)(
