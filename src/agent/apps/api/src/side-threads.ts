@@ -60,6 +60,7 @@ export function sideThreadRow(row: SideThreadListRow): SideThread {
     updatedAt: row.updatedAt.toISOString(),
     unread: Boolean(row.unread),
     openWaits: row.openWaits ?? 0,
+    ...(row.startedBy === "branch" ? { branchedFromThreadId: row.branchedFromThreadId ?? null } : {}),
   };
 }
 

@@ -1,6 +1,7 @@
 import { parseThreadTitle, runFailureError } from "@mycellios/core";
 import { ORPCError } from "@orpc/server";
 import { createRepos, listSideThreadRequests, listSideThreads } from "@mycellios/db";
+import { branchConversation, branchErrorToRpc } from "../conversation-branch.js";
 import { archiveSideThread, deleteSideThread, restoreSideThread, sideThreadRow } from "../side-threads.js";
 import { resolveThreadTarget } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
@@ -138,6 +139,15 @@ export function developmentRoutes(ctx: RouterContext) {
         if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
         const { deleteAfter } = await deleteSideThread(deps, context.actor, target);
         return { ok: true as const, deleteAfter: deleteAfter.toISOString() };
+      }),
+      branch: authed.development.branch.handler(async ({ context, input }) => {
+        // Owner, Space and Mico are checked again inside, under the source's lock.
+        await createRepos(deps.prisma).getBot(context.actor, input.botId);
+        try {
+          return await branchConversation(deps, context.actor, input);
+        } catch (error) {
+          throw branchErrorToRpc(error);
+        }
       }),
     },
   };
