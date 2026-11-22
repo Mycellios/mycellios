@@ -62,6 +62,22 @@ class ReplicaTests(unittest.TestCase):
         replica.reconcile()
         self.assertEqual(replica.state, "ready")
 
+    def test_vectors_that_are_not_unit_length_never_reach_the_caller(self):
+        # A faulted GPU backend once returned all-zero rows with status 200.
+        for bad in ([0.0] * service.DIMENSIONS, [float("nan")] + [0.0] * (service.DIMENSIONS - 1),
+                    [2.0] + [0.0] * (service.DIMENSIONS - 1), [1.0] * 3):
+            embedder = FakeEmbedder()
+            embedder.embed = lambda texts, before_batch=None, bad=bad: ([bad for _ in texts], 1)
+            replica = service.Replica({**CONFIG, "device": "cpu"}, load=lambda embedder=embedder: embedder)
+            replica.reconcile()
+            with self.assertRaises(service.ServiceError) as raised:
+                replica.embed(["x"])
+            self.assertEqual((raised.exception.status, raised.exception.code), (500, "invalid_model_output"))
+
+    def test_unit_vectors_pass_the_norm_check(self):
+        third = 1 / 3 ** 0.5
+        self.assertTrue(service.is_unit_vector([third] * 3 + [0.0] * (service.DIMENSIONS - 3)))
+
 
 class CancellationTests(unittest.TestCase):
     def test_abandoned_request_stops_between_micro_batches(self):
