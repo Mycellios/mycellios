@@ -199,3 +199,57 @@ export function buildEngineRuntimeActivationPlans(
   }
   return plans;
 }
+
+export type EngineRuntimeActivationPlanRecord =
+  | { readonly status: "recorded"; readonly plans: number }
+  | { readonly status: "skipped"; readonly reason: string };
+
+/**
+ * Store the engine runtime challenges for a committed activation.
+ *
+ * The scheduler only challenges workers whose plan is stored for a committed
+ * route, and profiles expire after a day, so without this record no profile is
+ * ever issued or renewed. The route is already serving when this runs: when
+ * its evidence cannot be bound to the certified target, the model's plans are
+ * cleared and the reason returned, but the activation itself is not failed.
+ */
+export async function recordEngineRuntimeActivationPlans(input: {
+  authority: unknown;
+  modelId: string;
+  routeReservationId: string | null;
+  result: AutoDistributionRunResult;
+  workers: readonly StoredWorker[];
+  store: {
+    replaceEngineRuntimeActivationPlans(
+      modelId: string,
+      activationId: string,
+      values: readonly unknown[],
+    ): Promise<unknown>;
+    removeEngineRuntimeActivationPlans(modelId: string): Promise<unknown>;
+  };
+  now?: number;
+}): Promise<EngineRuntimeActivationPlanRecord> {
+  if (input.routeReservationId === null) {
+    // Challenges are tied to a committed route reservation.
+    (await input.store.removeEngineRuntimeActivationPlans(input.modelId));
+    return { status: "skipped", reason: "engine_activation_route_reservation_is_missing" };
+  }
+  const activationId = input.result.launch.launchId;
+  let plans: EngineRuntimeActivationPlan[];
+  try {
+    plans = buildEngineRuntimeActivationPlans(
+      input.authority,
+      input.modelId,
+      activationId,
+      input.routeReservationId,
+      input.result,
+      input.workers,
+      input.now,
+    );
+  } catch (error) {
+    (await input.store.removeEngineRuntimeActivationPlans(input.modelId));
+    return { status: "skipped", reason: error instanceof Error ? error.message : String(error) };
+  }
+  (await input.store.replaceEngineRuntimeActivationPlans(input.modelId, activationId, plans));
+  return { status: "recorded", plans: plans.length };
+}

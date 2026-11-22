@@ -245,7 +245,15 @@ What remains before selection is automatic, in order:
    package identity instead of Qwen3 shape fields.
 2. Both worker kinds wire the probe, and nodes report Vulkan availability.
 3. The coordinator builds activation plans after each automatic distribution,
-   which is the missing link for every engine family.
+   which is the missing link for every engine family. Done: after a route
+   commits, `recordEngineRuntimeActivationPlans` stores one challenge per stage
+   member, or clears the model's plans and logs the reason. A serving route is
+   never failed by it. This makes renewal work. It does not solve the first
+   profile: with an authority configured, planning admits only nodes that
+   already hold a profile, so a network without profiles never activates and
+   never gets plans. The bootstrap needs a decision: plan the first route from
+   runtime performance profiles (and relax the engine-bound link evidence for
+   it), or issue the first challenge from a planned but not yet launched route.
 4. The Python launcher and the launch agent accept `--native-gguf-executor
    llama-cpp` only when it is bound to the sealed engine authority. The stage
    artifact preparer supplies the pinned build directory and the view cache.

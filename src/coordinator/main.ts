@@ -17,7 +17,7 @@ import { createCoordinator } from "./server.js";
 import { readNativeRuntimeBuildMetadata } from "../core/native-build-identity.js";
 import { configureCoordinatorModelProfileRuntime } from "./model-profile-runtime.js";
 import {
-  buildEngineRuntimeActivationPlans,
+  recordEngineRuntimeActivationPlans,
   engineActivationAuthoritySchema,
 } from "./engine-activation-authority.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
@@ -193,6 +193,15 @@ const runtime = await createCoordinator(config, {
               } catch (error) {
                 (await store.removeEngineRuntimeActivationPlans(modelId));
                 throw error;
+              }
+              if (engineActivationAuthority) {
+                const record = await recordEngineRuntimeActivationPlans({
+                  authority: engineActivationAuthority, modelId, routeReservationId: reservationId,
+                  result, workers: await store.listWorkers(), store,
+                });
+                if (record.status === "skipped") {
+                  console.warn(JSON.stringify({ event: "engine_runtime_activation_plans_skipped", modelId, reason: record.reason }));
+                }
               }
               return;
             }
