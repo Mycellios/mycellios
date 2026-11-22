@@ -10,8 +10,16 @@ import {
   MIN_PASSWORD_LENGTH,
   signupPolicyFromEnv,
 } from "@mycellios/core";
-import type { PrismaClient, SecurityEventType } from "@mycellios/db";
-import { bootstrapUserSpace, personalOrganizationIds, recordSecurityEvent } from "@mycellios/db";
+import type { PrismaClient, SecurityEventType, SignupInvite } from "@mycellios/db";
+import {
+  bootstrapUserSpace,
+  claimSignupInvite,
+  personalOrganizationIds,
+  recordSecurityEvent,
+  signupInviteCodeFromCookie,
+  signupInviteCodeMatches,
+  signupInviteHasRoom,
+} from "@mycellios/db";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -54,6 +62,8 @@ export interface AuthEnv {
   webOrigin: string;
   signupsEnabled: string | undefined;
   signupAllowlist: string | undefined;
+  /** When set, a new account also needs this invitation's cookie and one of its free places. */
+  signupInvite?: SignupInvite;
   extraOrigins?: string[];
   /** SHA-256 signing certificate fingerprints of Android apps allowed to use this server's passkeys. */
   androidAppCertFingerprints?: string[];
@@ -155,6 +165,14 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
   // Better Auth's own token key, so every stored token shares one cipher and key.
   let authContext: Promise<{ secretConfig: TokenKey }> | undefined;
   const tokenKey = async () => (await authContext!).secretConfig;
+  const invite = env.signupInvite;
+  const inviteCode = (headers: Headers | undefined) =>
+    signupInviteCodeFromCookie(headers?.get("cookie"));
+  /** Early refusal before an account row exists. The session hook below claims the place. */
+  const inviteAdmits = async (headers: Headers | undefined) =>
+    !invite ||
+    (signupInviteCodeMatches(inviteCode(headers), invite) &&
+      (await signupInviteHasRoom(prisma, invite)));
   const auth = betterAuth({
     appName: productBrand.name,
     logger: env.logger,
@@ -244,6 +262,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
             return { error: "EMAIL_NOT_ALLOWED" };
           if (!env.oidc?.allowSignupBypass && policy.allowlist.length > 0 && !verified)
             return { error: "EMAIL_VERIFICATION_REQUIRED" };
+          if (!(await inviteAdmits(ctx.headers))) return { error: "REGISTRATION_CLOSED" };
           return;
         }
         if (source.action === "sign-in" && user.id) {
@@ -372,7 +391,11 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
             .toLowerCase();
           if (!(await ctx.context.internalAdapter.findUserByEmail(email))) {
             const admission = signupPolicyFromEnv(env);
-            if (!admission.enabled || !emailAllowed(email, admission.allowlist)) {
+            if (
+              !admission.enabled ||
+              !emailAllowed(email, admission.allowlist) ||
+              !(await inviteAdmits(ctx.headers))
+            ) {
               if (ctx.path === SEND_SIGN_IN_CODE_PATH) return ctx.json({ success: true });
               throw new APIError("BAD_REQUEST", { code: "INVALID_OTP", message: "Invalid OTP" });
             }
@@ -395,6 +418,12 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
             throw new APIError("BAD_REQUEST", {
               code: "EMAIL_NOT_ALLOWED",
               message: "Email is not allowed to register",
+            });
+          }
+          if (!(await inviteAdmits(ctx.headers))) {
+            throw new APIError("BAD_REQUEST", {
+              code: "REGISTRATION_CLOSED",
+              message: "Registration is closed",
             });
           }
           if (policy.allowlist.length > 0 && !env.email) {
@@ -511,6 +540,20 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
               if (
                 !policy.enabled ||
                 (!bypassAllowlist && !emailAllowed(user.email, policy.allowlist))
+              ) {
+                throw new APIError("FORBIDDEN", {
+                  code: "REGISTRATION_CLOSED",
+                  message: "Registration is closed",
+                });
+              }
+              // The authoritative check: places are counted under a lock, so concurrent
+              // signups that all passed the early checks still admit at most the limit.
+              if (
+                invite &&
+                !(
+                  signupInviteCodeMatches(inviteCode(ctx?.headers), invite) &&
+                  (await claimSignupInvite(prisma, invite, user.id))
+                )
               ) {
                 throw new APIError("FORBIDDEN", {
                   code: "REGISTRATION_CLOSED",

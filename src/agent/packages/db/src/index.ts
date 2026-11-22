@@ -12,6 +12,7 @@ export * from "./board.js";
 export * from "./board-live.js";
 export * from "./web-presence.js";
 export * from "./bootstrap-user.js";
+export * from "./signup-invite.js";
 export * from "./bot-instructions.js";
 export * from "./bot-update.js";
 export * from "./cancel-runs.js";

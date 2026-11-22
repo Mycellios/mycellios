@@ -328,6 +328,22 @@ describe("OIDC environment", () => {
     for (const value of ["0", "86399", "7776001", "NaN", "1.5"])
       expect(() => loadEnv({ ...base, AUTH_SESSION_DURATION_SECONDS: value })).toThrow(/one and ninety days/);
   });
+  it("reads an invitation link only with a strong code and a bounded limit", () => {
+    const code = "beta-invite-code-0123456789abcdef";
+    expect(loadEnv(base).signupInvite).toBeUndefined();
+    expect(
+      loadEnv({ ...base, SIGNUP_INVITE_CODE: code, SIGNUP_INVITE_LIMIT: "10" }).signupInvite,
+    ).toEqual({ code, limit: 10 });
+    for (const value of ["short", "has space in it 0123456789abc", "x".repeat(129)])
+      expect(() =>
+        loadEnv({ ...base, SIGNUP_INVITE_CODE: value, SIGNUP_INVITE_LIMIT: "10" }),
+      ).toThrow(/SIGNUP_INVITE_CODE/);
+    expect(() => loadEnv({ ...base, SIGNUP_INVITE_LIMIT: "10" })).toThrow(/SIGNUP_INVITE_CODE/);
+    for (const value of [undefined, "0", "-1", "1.5", "NaN", "100001"])
+      expect(() =>
+        loadEnv({ ...base, SIGNUP_INVITE_CODE: code, SIGNUP_INVITE_LIMIT: value }),
+      ).toThrow(/SIGNUP_INVITE_LIMIT/);
+  });
   it("reads an optional Desktop minimum version and refuses malformed values", () => {
     expect(loadEnv(base).desktopMinimumVersion).toBeUndefined();
     expect(

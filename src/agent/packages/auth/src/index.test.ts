@@ -287,3 +287,54 @@ describe("bearer sessions", () => {
     expect(JSON.stringify(lookups)).toContain(token);
   });
 });
+
+describe("closed-beta invitation", () => {
+  const code = "beta-invite-code-0123456789abcdef";
+
+  function inviteAuth(taken: number) {
+    const userCreate = vi.fn().mockRejectedValue(new Error("no account may be created"));
+    const prisma = {
+      signupInviteRedemption: { count: vi.fn().mockResolvedValue(taken) },
+      user: { findFirst: vi.fn().mockResolvedValue(null), create: userCreate },
+    };
+    const auth = createAuth(prisma as never, {
+      secret: "offline-auth-secret-at-least-32-characters",
+      baseURL: "https://api.example.test",
+      webOrigin: "https://app.example.test",
+      signupsEnabled: "true",
+      signupAllowlist: "",
+      signupInvite: { code, limit: 10 },
+    });
+    return { auth, userCreate };
+  }
+
+  async function signUp(auth: ReturnType<typeof createAuth>, cookie?: string) {
+    return auth.handler(
+      new Request("https://api.example.test/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://app.example.test",
+          ...(cookie ? { cookie } : {}),
+        },
+        body: JSON.stringify({
+          email: "beta@example.test",
+          password: "test-password-123",
+          name: "Beta",
+        }),
+      }),
+    );
+  }
+
+  it.each([
+    ["without the invitation cookie", 0, undefined],
+    ["with another code", 0, `mycellios_signup_invite=${code}x`],
+    ["once every place is taken", 10, `mycellios_signup_invite=${code}`],
+  ])("refuses email signup %s before creating an account", async (_label, taken, cookie) => {
+    const { auth, userCreate } = inviteAuth(taken);
+    const response = await signUp(auth, cookie);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "REGISTRATION_CLOSED" });
+    expect(userCreate).not.toHaveBeenCalled();
+  });
+});

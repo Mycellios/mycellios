@@ -71,6 +71,8 @@ export interface AppEnv {
   clientIpHeader: string;
   signupsEnabled: string | undefined;
   signupAllowlist: string | undefined;
+  /** SIGNUP_INVITE_CODE/SIGNUP_INVITE_LIMIT: new accounts need this invitation link. */
+  signupInvite?: { code: string; limit: number };
   encryptionKey: string;
   /** CONTENT_ENCRYPTION: whether new content is encrypted at rest. */
   contentEncryption: boolean;
@@ -272,6 +274,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     clientIpHeader: optional(source.CLIENT_IP_HEADER)?.toLowerCase() ?? "x-forwarded-for",
     signupsEnabled: source.SIGNUPS_ENABLED,
     signupAllowlist: source.SIGNUP_ALLOWLIST,
+    signupInvite: signupInviteFromEnv(source),
     encryptionKey: resolveEncryptionKey(source),
     contentEncryption: resolveContentEncryption(source),
     dataDir: source.DATA_DIR ?? "./data",
@@ -373,6 +376,19 @@ function browserMonitoringFromEnv(source: NodeJS.ProcessEnv): AppEnv["browserMon
     release: optional(source.SENTRY_RELEASE) ?? (sha === "unknown" ? undefined : sha),
     pseudonymSecret: monitoringPseudonymSecret(source),
   };
+}
+
+/** An unguessable link code and a bounded number of places; both required together. */
+function signupInviteFromEnv(source: NodeJS.ProcessEnv): AppEnv["signupInvite"] {
+  const code = optional(source.SIGNUP_INVITE_CODE);
+  const rawLimit = optional(source.SIGNUP_INVITE_LIMIT);
+  if (!code && !rawLimit) return undefined;
+  if (!code || !/^[A-Za-z0-9_-]{24,128}$/.test(code))
+    throw new Error("SIGNUP_INVITE_CODE must be 24 to 128 letters, digits, '-' or '_'");
+  const limit = Number(rawLimit);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100_000)
+    throw new Error("SIGNUP_INVITE_LIMIT must be a whole number from 1 to 100000");
+  return { code, limit };
 }
 
 function optional(value: string | undefined): string | undefined {
