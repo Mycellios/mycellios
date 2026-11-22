@@ -1,7 +1,7 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 
 /** Collapsed inbox sections for the last account that changed them here. */
-export const COLLAPSED_SECTIONS_KEY = "rakazo.collapsed-sections";
+export const COLLAPSED_SECTIONS_KEY = "mycellios.collapsed-sections";
 
 export type CollapsedSections = { userId?: string; keys: ReadonlySet<string> };
 

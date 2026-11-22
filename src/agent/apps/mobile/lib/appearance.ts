@@ -1,5 +1,4 @@
 import {
-  LEGACY_UI_APPEARANCE_STORAGE_KEY,
   type AppearancePreference,
   normalizeAppearancePreference,
   type ResolvedAppearance,
@@ -7,7 +6,7 @@ import {
   tokensForAppearance,
   UI_APPEARANCE_STORAGE_KEY,
 } from "@mycellios/ui-tokens";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { Appearance, type ColorSchemeName } from "react-native";
 
 export type { AppearancePreference, ResolvedAppearance };
@@ -26,9 +25,7 @@ export function getCachedAppearancePreference(): AppearancePreference {
 
 export async function loadAppearancePreference(): Promise<AppearancePreference> {
   try {
-    const stored =
-      (await SecureStore.getItemAsync(UI_APPEARANCE_STORAGE_KEY)) ??
-      (await SecureStore.getItemAsync(LEGACY_UI_APPEARANCE_STORAGE_KEY));
+    const stored = await SecureStore.getItemAsync(UI_APPEARANCE_STORAGE_KEY);
     memoryPreference = normalizeAppearancePreference(stored);
   } catch {
     memoryPreference = memoryPreference ?? "system";
