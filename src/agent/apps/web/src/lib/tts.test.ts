@@ -28,7 +28,7 @@ describe("Speaker", () => {
     const fetcher = vi.fn(async () => Response.json({ error: "Insufficient credits" }, { status: 402 }));
     const localSpeak = vi.fn();
     vi.stubGlobal("fetch", fetcher);
-    vi.stubGlobal("window", { rakazoDesktop: { localVoice: { speak: localSpeak } } });
+    vi.stubGlobal("window", { mycelliosDesktop: { localVoice: { speak: localSpeak } } });
     const speaker = new Speaker();
     await expect(speaker.speak("Hola, esta es una prueba. ".repeat(45), {
       networkLanguage: "es",
@@ -54,7 +54,7 @@ describe("Speaker", () => {
       },
     );
     vi.stubGlobal("window", {
-      rakazoDesktop: { localVoice: { status: vi.fn(() => { throw new Error("Explicit device preview must not use Supertonic"); }) } },
+      mycelliosDesktop: { localVoice: { status: vi.fn(() => { throw new Error("Explicit device preview must not use Supertonic"); }) } },
       speechSynthesis: {
         getVoices: () => [{ localService: true, lang: "es-ES" }],
         speak: (value: SpeechSynthesisUtterance) => {
@@ -265,7 +265,7 @@ describe("Speaker", () => {
 describe("local speech routing", () => {
  it("does not send text to a provider when the local model is not ready", async () => {
    const fetchMock=vi.fn(); vi.stubGlobal("fetch",fetchMock);
-   const speak=vi.fn(); vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:false}),speak,stop:vi.fn(async()=>{})}}});
+   const speak=vi.fn(); vi.stubGlobal("window",{mycelliosDesktop:{localVoice:{status:async()=>({ready:false}),speak,stop:vi.fn(async()=>{})}}});
    const speaker=new Speaker(); const error=await speaker.speak("Hola");
    expect(error).toContain("Supertonic"); expect(fetchMock).not.toHaveBeenCalled(); expect(speak).not.toHaveBeenCalled();
  });
@@ -273,7 +273,7 @@ describe("local speech routing", () => {
    let finish!: (v:unknown)=>void;
    const speak=vi.fn(()=>new Promise(resolve=>{finish=resolve;})),stop=vi.fn(async()=>{}),fetchMock=vi.fn();
    vi.stubGlobal("fetch",fetchMock); vi.stubGlobal("navigator",{language:"es-ES"});
-   vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:true}),speak,stop}}});
+   vi.stubGlobal("window",{mycelliosDesktop:{localVoice:{status:async()=>({ready:true}),speak,stop}}});
    const speaker=new Speaker(); const pending=speaker.speak("Hola");
    await vi.waitFor(()=>expect(speak).toHaveBeenCalled()); speaker.stop(); finish({samples:new Float32Array([0]),sampleRate:24000}); await pending;
    expect(stop).toHaveBeenCalledOnce(); expect(fetchMock).not.toHaveBeenCalled(); expect(speaker.state.status).toBe("idle");
@@ -283,7 +283,7 @@ describe("local speech routing", () => {
 it("renders local PCM audio with the selected speed without calling a speech provider", async () => {
  const fetchMock=vi.fn(),speak=vi.fn(async()=>({samples:new Float32Array([0,0.1,0]),sampleRate:24000}));
  vi.stubGlobal("fetch",fetchMock);vi.stubGlobal("navigator",{language:"es-ES"});
- vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:false,models:{asr:{ready:false},tts:{ready:true}}}),speak,stop:vi.fn(async()=>{})}}});
+ vi.stubGlobal("window",{mycelliosDesktop:{localVoice:{status:async()=>({ready:false,models:{asr:{ready:false},tts:{ready:true}}}),speak,stop:vi.fn(async()=>{})}}});
  const close=vi.fn(async()=>{}),copy=vi.fn();
  vi.stubGlobal("AudioContext",class {
   destination={};resume=async()=>{};close=close;

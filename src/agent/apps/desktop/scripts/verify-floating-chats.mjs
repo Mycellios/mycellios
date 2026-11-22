@@ -47,11 +47,11 @@ async function qualify() { try {
  const win = chats.liveWindows()[0];
  assert.equal(win.webContents.getURL(),url.replace('/main','/fixture-mico'));
  assert.equal(win.webContents.session,main.webContents.session);
- const bridge=await win.webContents.executeJavaScript('({keys:Object.keys(window.rakazoDesktop).sort(),space:window.rakazoDesktop.chatWindow.spaceId,cookie:document.cookie})');
+ const bridge=await win.webContents.executeJavaScript('({keys:Object.keys(window.mycelliosDesktop).sort(),space:window.mycelliosDesktop.chatWindow.spaceId,cookie:document.cookie})');
  assert.deepEqual(bridge.keys,['chatWindow','nativeWindowFrame','platform']);
  assert.equal(bridge.space,'fixture-space');
  assert.equal(bridge.cookie,'fixture_session=synthetic-only');
- await win.webContents.executeJavaScript('window.rakazoDesktop.chatWindow.returnToMain()');
+ await win.webContents.executeJavaScript('window.mycelliosDesktop.chatWindow.returnToMain()');
  phase('checking account changes and close');
  assert.equal(returned,true);
  await chats.open({scope,botId:'fixture-mico'});

@@ -25,10 +25,10 @@ const render=(scope="chat-a")=>root.render(<ReviewWorkspaceProvider scope={scope
 beforeEach(async()=>{
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
   host=document.createElement("div");document.body.append(host);root=createRoot(host);
-  window.rakazoDesktop={preview:{command:vi.fn(async()=>{}),show:vi.fn(async()=>{}),layout:vi.fn(async()=>{}),close:vi.fn(async()=>{}),onChanged:()=>()=>{}}} as any;
+  window.mycelliosDesktop={preview:{command:vi.fn(async()=>{}),show:vi.fn(async()=>{}),layout:vi.fn(async()=>{}),close:vi.fn(async()=>{}),onChanged:()=>()=>{}}} as any;
   await act(async()=>render());
 });
-afterEach(async()=>{await act(async()=>root.unmount());host.remove();delete window.rakazoDesktop;vi.unstubAllGlobals();});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();delete window.mycelliosDesktop;vi.unstubAllGlobals();});
 it("adds the selected element, capture and user's comment to this chat's draft without submitting work",async()=>{
   await act(async()=>review!.add({id:"page",url:"http://localhost:3000/",name:"Local project",mimeType:"text/uri-list"}));
   expect(host.querySelector('[data-testid="native-page"]')).toBeTruthy();
@@ -57,7 +57,7 @@ it("adds the selected element, capture and user's comment to this chat's draft w
   await act(async()=>retry.click());
   await act(async()=>review!.consumeDraft(review!.draft!.id,true));
   expect(host.querySelector("textarea")!.value).toBe("");
-  expect(window.rakazoDesktop!.preview!.command).not.toHaveBeenCalled();
+  expect(window.mycelliosDesktop!.preview!.command).not.toHaveBeenCalled();
   await act(async()=>render("chat-b"));
   expect(review!.draft).toBeNull();expect(review!.documents).toHaveLength(0);
 });
@@ -81,5 +81,5 @@ it("opens and navigates a URL tab independently of local-computer permissions",a
   const back=host.querySelector<HTMLButtonElement>('button[aria-label="Back"]')!;
   expect(back.disabled).toBe(false);
   await act(async()=>back.click());
-  expect(window.rakazoDesktop!.preview!.command).toHaveBeenCalledWith({id:review!.documents[0]!.id,action:"back"});
+  expect(window.mycelliosDesktop!.preview!.command).toHaveBeenCalledWith({id:review!.documents[0]!.id,action:"back"});
 });

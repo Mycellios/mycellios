@@ -1,5 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
-contextBridge.exposeInMainWorld('rakazoDesktop', {
+const desktopBridge = {
   platform: process.platform, nativeWindowFrame: process.platform !== 'darwin',
   development: {
     isDevelopment: true,
@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld('rakazoDesktop', {
     toggleMaximize: () => ipcRenderer.invoke('desktop.window.toggleMaximize'),
     state: () => ipcRenderer.invoke('desktop.window.state'),
   },
-});
+};
+
+contextBridge.exposeInMainWorld("mycelliosDesktop", desktopBridge);
+contextBridge.exposeInMainWorld("rakazoDesktop", desktopBridge);

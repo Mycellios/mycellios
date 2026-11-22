@@ -15,7 +15,7 @@ import { AppBehaviorPanel, ConversationExtras, ExternalLinksPreference, DevicePr
 import {setGeneralPreferences} from "../../lib/general-preferences";
 let unmount: () => Promise<void>;
 beforeEach(() => { localStorage.clear(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); });
-afterEach(async () => { await unmount?.(); delete window.rakazoDesktop; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(async () => { await unmount?.(); delete window.mycelliosDesktop; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function render(node: ReactNode) {
   const div = document.createElement("div"); document.body.append(div); const root = createRoot(div);
   unmount = async () => { await act(async () => root.unmount()); div.remove(); };
@@ -47,7 +47,7 @@ it("shows native capabilities on web as unavailable while keeping session restor
 });
 it("saves quick reconnection through the native bridge",async()=>{
   const update=vi.fn(async patch=>({...initial,...patch}));
-  Object.defineProperty(window,"rakazoDesktop",{configurable:true,value:{settings:{state:async()=>initial,update}}});
+  Object.defineProperty(window,"mycelliosDesktop",{configurable:true,value:{settings:{state:async()=>initial,update}}});
   const div=await render(<AppBehaviorPanel />);await act(async()=>toggle(div,"Quick server reconnection").click());
   expect(update).toHaveBeenCalledWith({keepRemoteSessions:true});
   expect(toggle(div,"Quick server reconnection").getAttribute("aria-checked")).toBe("true");
@@ -63,7 +63,7 @@ it("shows the external link destination on web without offering unavailable nati
 it("saves the native browser destination and restores the previously saved choice",async()=>{
   let saved={...initial,externalLinkTarget:"app" as const};
   const update=vi.fn(async patch=>{saved={...saved,...patch};return saved;});
-  Object.defineProperty(window,"rakazoDesktop",{configurable:true,value:{settings:{state:async()=>saved,update}}});
+  Object.defineProperty(window,"mycelliosDesktop",{configurable:true,value:{settings:{state:async()=>saved,update}}});
   const div=await render(<ExternalLinksPreference />);
   const select=div.querySelector<HTMLSelectElement>('[data-testid="external-link-target"]')!;
   expect(select.value).toBe("app");expect(select.disabled).toBe(false);
@@ -73,7 +73,7 @@ it("saves the native browser destination and restores the previously saved choic
 });
 
 it("does not display a changed native destination when saving fails",async()=>{
-  Object.defineProperty(window,"rakazoDesktop",{configurable:true,value:{settings:{state:async()=>initial,update:async()=>{throw Error("disk");}}}});
+  Object.defineProperty(window,"mycelliosDesktop",{configurable:true,value:{settings:{state:async()=>initial,update:async()=>{throw Error("disk");}}}});
   const div=await render(<ExternalLinksPreference />);
   const select=div.querySelector<HTMLSelectElement>('[data-testid="external-link-target"]')!;
   await act(async()=>{select.value="app";select.dispatchEvent(new Event("change",{bubbles:true}));});
@@ -81,7 +81,7 @@ it("does not display a changed native destination when saving fails",async()=>{
 });
 it("hides unavailable startup controls and enables the battery choice only after a confirmed native save", async () => {
   const update = vi.fn(async patch => ({ ...initial, ...patch }));
-  Object.defineProperty(window, "rakazoDesktop", { configurable: true, value: { settings: { state: async () => initial, update } } });
+  Object.defineProperty(window, "mycelliosDesktop", { configurable: true, value: { settings: { state: async () => initial, update } } });
   const div = await render(<AppBehaviorPanel />);
   expect(div.textContent).not.toContain("Open Mycellios at login");
   expect(toggle(div, "Also on battery").disabled).toBe(true);
@@ -92,7 +92,7 @@ it("hides unavailable startup controls and enables the battery choice only after
 it("blocks navigation while pending and preserves the old native state on failure", async () => {
   let fail: (error: Error) => void = () => {};
   const update = vi.fn(() => new Promise<DesktopBehaviorSettings>((_resolve, reject) => { fail = reject; }));
-  Object.defineProperty(window, "rakazoDesktop", { configurable: true, value: { settings: { state: async () => initial, update } } });
+  Object.defineProperty(window, "mycelliosDesktop", { configurable: true, value: { settings: { state: async () => initial, update } } });
   const busy = vi.fn(); const div = await render(<AppBehaviorPanel onBusyChange={busy} />);
   await act(async () => toggle(div, "Keep the computer awake").click());
   expect(busy).toHaveBeenLastCalledWith(true); expect(toggle(div, "Keep the computer awake").disabled).toBe(true);

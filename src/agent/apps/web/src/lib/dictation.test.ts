@@ -814,7 +814,7 @@ describe("dictation engine choice", () => {
   it("treats Electron as having no usable Web Speech", () => {
     vi.stubGlobal("window", {
       webkitSpeechRecognition: class {},
-      rakazoDesktop: { platform: "darwin" },
+      mycelliosDesktop: { platform: "darwin" },
     });
     expect(webSpeechAvailable()).toBe(false);
   });
@@ -1243,7 +1243,7 @@ describe("Dictation web speech", () => {
     }
     vi.stubGlobal("window", {
       webkitSpeechRecognition: FakeRecognition,
-      rakazoDesktop: { platform: "darwin" },
+      mycelliosDesktop: { platform: "darwin" },
     });
     const fetchMock = vi.fn(async () => Response.json({ text: "from fish" }));
     stubRecorderFallback(fetchMock);
@@ -1751,7 +1751,7 @@ it("interrupts spoken output but does not capture or upload when the selected lo
   const getUserMedia = vi.fn(), fetcher = vi.fn();
   vi.stubGlobal("localStorage", { getItem: (key: string) => key === "mycellios.general.v1" ? JSON.stringify({ dictationEngine: "local" }) : null });
   vi.stubGlobal("navigator", { language: "en", mediaDevices: { getUserMedia } });
-  vi.stubGlobal("window", { rakazoDesktop: { localVoice: { status: async () => ({ ready: false }) } } });
+  vi.stubGlobal("window", { mycelliosDesktop: { localVoice: { status: async () => ({ ready: false }) } } });
   vi.stubGlobal("fetch", fetcher);
   const capture = new Dictation(); await capture.listen({ mode: "hold", transcribe: true, onFinal: () => {} });
   expect(stopSpeech).toHaveBeenCalledOnce();

@@ -570,7 +570,7 @@ it("offers client updates in web without requesting server deployment authority"
 });
 
 it("shows Updates in the desktop app", async () => {
-  vi.stubGlobal("rakazoDesktop", { update: {} });
+  vi.stubGlobal("mycelliosDesktop", { update: {} });
   const { container, cleanup } = await render({});
   try {
     expect(updatesNav(container)).not.toBeNull();

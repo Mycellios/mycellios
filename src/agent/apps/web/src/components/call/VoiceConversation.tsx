@@ -1,3 +1,4 @@
+import { desktopBridge } from "../../lib/desktop";
 import { getGeneralPreferences, useGeneralPreferences } from "../../lib/general-preferences";
 import type { LocalVoiceStatus } from "@mycellios/contracts";
 import { useLingui } from "@lingui/react/macro";
@@ -35,7 +36,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
   const preparing = useRef(false);
   const preparationTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const seen = useRef(new Set<string>());
-  const native = window.rakazoDesktop?.localVoice;
+  const native = desktopBridge()?.localVoice;
   const preferences = useGeneralPreferences();
   const networkDictation = Boolean(accountId && preferences.networkTranscriptionAccount === accountId);
   const canCapture = Boolean(networkDictation || transcribe || isAndroidHost() || webSpeechAvailable());

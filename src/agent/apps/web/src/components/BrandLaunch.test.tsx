@@ -24,7 +24,7 @@ describe("brand launch drag region", () => {
   afterEach(() => {
     root.unmount();
     container.remove();
-    delete window.rakazoDesktop;
+    delete window.mycelliosDesktop;
   });
 
   async function render() {
@@ -38,11 +38,11 @@ describe("brand launch drag region", () => {
   }
 
   it("keeps the welcome bar draggable only while macOS hides the title bar", async () => {
-    window.rakazoDesktop = { platform: "darwin" } as Window["rakazoDesktop"];
+    window.mycelliosDesktop = { platform: "darwin" } as Window["mycelliosDesktop"];
     expect((await render())?.className).toBe("brand-launch-bar app-drag");
     root.unmount();
     container.remove();
-    window.rakazoDesktop = { platform: "win32" } as Window["rakazoDesktop"];
+    window.mycelliosDesktop = { platform: "win32" } as Window["mycelliosDesktop"];
     expect((await render())?.className).toBe("brand-launch-bar");
   });
 });

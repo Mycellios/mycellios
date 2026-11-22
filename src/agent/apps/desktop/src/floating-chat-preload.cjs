@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const spaceId = process.argv.find(value => value.startsWith("--mycellios-chat-space="))?.split("=")[1];
 if (!spaceId || !/^[a-zA-Z0-9_-]{1,160}$/.test(spaceId)) throw new Error("Missing floating chat Space");
 
-contextBridge.exposeInMainWorld("rakazoDesktop", {
+const desktopBridge = {
   platform: process.platform,
   nativeWindowFrame: true,
   chatWindow: {
@@ -20,4 +20,7 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
       return () => ipcRenderer.off("desktop.update.prepare", handler);
     },
   },
-});
+};
+
+contextBridge.exposeInMainWorld("mycelliosDesktop", desktopBridge);
+contextBridge.exposeInMainWorld("rakazoDesktop", desktopBridge);

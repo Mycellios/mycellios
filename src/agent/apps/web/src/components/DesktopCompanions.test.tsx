@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
-import type { Bot, RakazoDesktop } from "@mycellios/contracts";
+import type { Bot, MycelliosDesktop } from "@mycellios/contracts";
 const fixture = vi.hoisted(() => ({ avatar: vi.fn(), navigate: vi.fn(), get: vi.fn(), answer: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ rpc: { threads: { get: fixture.get, answer: fixture.answer } } }));
 vi.mock("../lib/companion-avatar", () => ({ companionAvatar: fixture.avatar }));
@@ -12,7 +12,7 @@ import { DesktopCompanions } from "./DesktopCompanions";
 it("revokes the old account before avatar loading and rejects a late snapshot from that account", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const publish = vi.fn(async (_snapshot: unknown) => undefined);
-  window.rakazoDesktop = { companions: { publish, onSelect: () => () => {} } } as unknown as RakazoDesktop;
+  window.mycelliosDesktop = { companions: { publish, onSelect: () => () => {} } } as unknown as MycelliosDesktop;
   let oldAvatar!: (image: undefined) => void;
   fixture.avatar.mockImplementationOnce(() => new Promise(resolve => { oldAvatar = resolve; })).mockResolvedValue(undefined);
   const div = document.createElement("div"); document.body.append(div); const root = createRoot(div);
@@ -27,7 +27,7 @@ it("revokes the old account before avatar loading and rejects a late snapshot fr
     await act(async () => oldAvatar(undefined));
     expect(publish.mock.calls.every(([snapshot]) => (snapshot as any).scope === newScope)).toBe(true);
   } finally {
-    await act(async () => root.unmount()); div.remove(); delete window.rakazoDesktop; vi.unstubAllGlobals();
+    await act(async () => root.unmount()); div.remove(); delete window.mycelliosDesktop; vi.unstubAllGlobals();
   }
 });
 
@@ -38,8 +38,8 @@ it("re-reads the owned pending question before submitting and ignores a stale ac
   fixture.get.mockResolvedValue(snapshot); fixture.answer.mockResolvedValue({ ok: true }); fixture.avatar.mockResolvedValue(undefined);
   let question!: (request: any) => Promise<void>;
   const questionResult = vi.fn(async () => undefined);
-  window.rakazoDesktop = { companions: { publish: vi.fn(async () => {}), state: vi.fn(async () => ({ island: { shown: false } })),
-    onQuestion: (fn: (request: any) => void) => { question = fn as typeof question; return () => {}; }, questionResult, onSelect: () => () => {} } } as unknown as RakazoDesktop;
+  window.mycelliosDesktop = { companions: { publish: vi.fn(async () => {}), state: vi.fn(async () => ({ island: { shown: false } })),
+    onQuestion: (fn: (request: any) => void) => { question = fn as typeof question; return () => {}; }, questionResult, onSelect: () => () => {} } } as unknown as MycelliosDesktop;
   const bot = { id: "mico", spaceId: "space", name: "Mico", color: "#3f9f78", status: "waiting_input", preview: "", unread: false } as Bot;
   const div = document.createElement("div"); const root = createRoot(div);
   try {
@@ -55,5 +55,5 @@ it("re-reads the owned pending question before submitting and ignores a stale ac
     fixture.get.mockResolvedValue({ ...snapshot, run: { id: "run", status: "queued" } });
     await act(async () => question(request));
     expect(fixture.answer).not.toHaveBeenCalled(); expect(questionResult).toHaveBeenCalledWith({ scope, nonce: "nonce", outcome: "stale" });
-  } finally { await act(async () => root.unmount()); delete window.rakazoDesktop; vi.unstubAllGlobals(); }
+  } finally { await act(async () => root.unmount()); delete window.mycelliosDesktop; vi.unstubAllGlobals(); }
 });

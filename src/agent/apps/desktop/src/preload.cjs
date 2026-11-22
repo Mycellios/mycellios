@@ -7,7 +7,7 @@ try {
     developmentIdentity={branch:value.branch,hue:value.hue};
 }catch{}
 
-contextBridge.exposeInMainWorld("rakazoDesktop", {
+const desktopBridge = {
   development: {isDevelopment: Boolean(developmentIdentity), identity:developmentIdentity, open: botId => ipcRenderer.invoke("desktop.development.open",botId), status: () => ipcRenderer.invoke("desktop.development.status"), stop: () => ipcRenderer.invoke("desktop.development.stop")},
   videoEdit: { request: input => ipcRenderer.invoke("desktop.apps.video-edit", input) },
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
@@ -160,4 +160,7 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
       return () => ipcRenderer.off("desktop.oauth.callback", handler);
     },
   },
-});
+};
+
+contextBridge.exposeInMainWorld("mycelliosDesktop", desktopBridge);
+contextBridge.exposeInMainWorld("rakazoDesktop", desktopBridge);

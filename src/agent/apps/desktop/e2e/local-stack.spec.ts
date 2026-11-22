@@ -484,7 +484,7 @@ test("the desktop never exposes server administration or account impersonation",
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
   const main = await nextWindow;
   await expect(main.getByText(APP_MARKER)).toBeVisible();
-  expect(await main.evaluate(() => "localSettings" in window.rakazoDesktop!)).toBe(false);
+  expect(await main.evaluate(() => "localSettings" in window.mycelliosDesktop!)).toBe(false);
   expect(
     await app.evaluate(({ Menu }) =>
       Boolean(Menu.getApplicationMenu()?.getMenuItemById("local-server-settings")),

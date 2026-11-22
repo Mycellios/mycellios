@@ -219,10 +219,10 @@ try {
   for (let index = 0; index < threads.length; index++) {
     stage(`prepare-task-${index}`);
     await page.goto(`${base}/app/${bot.id}?task=${threads[index]!.id}`, { waitUntil: "commit" });
-    await page.waitForFunction(() => Boolean((window as any).rakazoDesktop?.computer), undefined, { timeout: 120000 });
+    await page.waitForFunction(() => Boolean(((window as any).mycelliosDesktop ?? (window as any).rakazoDesktop)?.computer), undefined, { timeout: 120000 });
     await page.waitForFunction(() => document.body.innerText.includes("Developer lab"), undefined, { timeout: 120000 });
     await page.evaluate(async ({ botId, threadId }) => {
-      const desktop = (window as any).rakazoDesktop;
+      const desktop = ((window as any).mycelliosDesktop ?? (window as any).rakazoDesktop);
       if (!(await desktop.computer.requestAccess())) throw Error("Native qualification consent unavailable");
       await desktop.computer.connect(botId);
       await desktop.computer.prepareTask({ botId, taskThreadId: threadId });

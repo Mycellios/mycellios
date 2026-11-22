@@ -34,9 +34,12 @@ try{
  }
  assert.ok(page,'No first-party application window');
  assert.match(await page.locator('body').innerText(),/Sign in|Iniciar sesi.n|Continue with Mycellios|Continuar con Mycellios|Choose your language|Elige tu idioma/);
- const bridge=await page.evaluate(()=>({platform:window.rakazoDesktop?.platform,apps:typeof window.rakazoDesktop?.appsStudio?.request,prepare:typeof window.rakazoDesktop?.update?.onPrepare}));
+ const bridge=await page.evaluate(()=>{
+  const native = window.mycelliosDesktop ?? window.rakazoDesktop;
+  return {platform:native?.platform,apps:typeof native?.appsStudio?.request,prepare:typeof native?.update?.onPrepare};
+ });
  assert.deepEqual(bridge,{platform:'win32',apps:'function',prepare:'function'});
- const denial=await page.evaluate(async()=>{try{await window.rakazoDesktop.appsStudio.request({action:'list'});return '';}catch(e){return String(e);}});
+ const denial=await page.evaluate(async()=>{try{await (window.mycelliosDesktop ?? window.rakazoDesktop).appsStudio.request({action:'list'});return '';}catch(e){return String(e);}});
  assert.match(denial,/Apps necesita el acceso ya autorizado/);
  const smoke={passed:true,version:identity.version,revision:identity.revision,isolatedProfile:true,bridge,installerSha256:installer.sha256,installation,expedited,
    accountLoginSubmitted:false,realVideoGeneration:false};

@@ -74,7 +74,7 @@ Phone WhatsApp ⇄ WhatsApp servers ⇄ Desktop main (Baileys socket, encrypted 
   WhatsApp outbox instead of the generic messaging outbox.
 - **RPC** `whatsapp.links.*` / `whatsapp.senders.*` (`packages/contracts/src/whatsapp-link.ts`)
   back the settings page. Linking itself happens only inside Desktop (IPC
-  `window.rakazoDesktop.whatsapp`), because the session must stay on the PC.
+  `window.mycelliosDesktop.whatsapp`), because the session must stay on the PC.
 
 ## Not in this first version
 

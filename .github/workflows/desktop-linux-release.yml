@@ -94,7 +94,7 @@ jobs:
             await expect.poll(() => app.windows().some(page => page.url().startsWith('data:text/html')), { timeout: 60000 }).toBe(true);
             const page = app.windows().find(window => window.url().startsWith('data:text/html'));
             await expect(page.getByText('Mycellios Linux proof')).toBeVisible();
-            assert.equal(await page.evaluate(() => window.rakazoDesktop?.platform), 'linux');
+            assert.equal(await page.evaluate(() => (window.mycelliosDesktop ?? window.rakazoDesktop)?.platform), 'linux');
             assert.equal(await app.evaluate(({ app }) => app.isPackaged), true);
             console.log('Packaged renderer and native bridge verified');
           } finally {
