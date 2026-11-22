@@ -256,3 +256,22 @@ it("searches the readable fallback when a mention name is opaque", () => {
     }),
   ).toEqual([{ kind: "bot", id: "bot-1", name: "Bot", subtitle: "Bot", color: undefined }]);
 });
+
+describe("conversation mentions", () => {
+  it("offers the Mico's conversations by name and sends them as thread targets", () => {
+    const options = buildComposerMentionOptions({
+      query: "pl",
+      bots: [{ id: "bot-1", name: "Planner" }],
+      groups: [],
+      routines: [],
+      connectors: [],
+      threads: [{ id: "thread-1", name: "Plan the trip", botId: "bot-1" }, { id: "thread-2", name: "Budget", botId: "bot-1" }],
+    });
+    expect(options.map((option) => [option.kind, option.id])).toEqual([["bot", "bot-1"], ["thread", "thread-1"]]);
+    expect(options[1]).toMatchObject({ name: "Plan the trip", botId: "bot-1", subtitle: "Conversation" });
+    const plan = resolveComposerSendPlan({ text: "Use @Plan the trip", mentions: [options[1]!], hasAttachments: false });
+    expect(plan.mentionPayload).toEqual([{ kind: "thread", id: "thread-1" }]);
+    // The name stays in the text so the model reads which conversation is meant.
+    expect(plan.trimmed).toBe("Use @Plan the trip");
+  });
+});

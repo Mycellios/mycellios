@@ -198,6 +198,8 @@ const structuredMentionTarget = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("group"), id: Id }),
   z.object({ kind: z.literal("routine"), id: Id }),
   z.object({ kind: z.literal("connector"), id: Id }),
+  /** One of the same Mico's conversations; the message links to it. */
+  z.object({ kind: z.literal("thread"), id: Id }),
 ]);
 
 const threadSendInput = threadTarget

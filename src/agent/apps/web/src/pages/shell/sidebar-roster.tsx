@@ -425,6 +425,8 @@ export function SidebarRoster({
                         sidebarChatOrder !== "manual" ||
                         item.kind !== "bot" ||
                         !event.altKey ||
+                        // Alt+Shift+arrows move between a Mico's conversations.
+                        event.shiftKey ||
                         (event.key !== "ArrowUp" && event.key !== "ArrowDown")
                       )
                         return;

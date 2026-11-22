@@ -6450,3 +6450,99 @@ msgstr "הסתרת העדכון מאת {name}"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "מאת {author}"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "סגירת שאר הכרטיסיות"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "סגירת הכרטיסיות הבאות"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "יש לעצור את השיחה לפני שמוחקים אותה."
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "למחוק את השיחה הזו?"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "„{title}”, ההודעות שלה והקבצים שנוצרו רק בה יימחקו לצמיתות. הצ׳אט הראשי יישאר כפי שהוא."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "לא ניתן להעביר את השיחה לארכיון. יש לנסות שוב."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "לא ניתן לשחזר את השיחה. יש לנסות שוב."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} נמחקה"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "לא ניתן למחוק את השיחה. יש לנסות שוב."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "לא ניתן לבטל את המחיקה."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "פעולות עבור {title}"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "שחזור ופתיחה"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "שחזור השיחה"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "שיחות, תשובות חדשות"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "שיחה חדשה עם {name}"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "ההודעה הראשונה שלך פותחת אותה. הצ׳אט הראשי עם {name} יישאר כפי שהוא."
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "השיחה הזו נפתחה על ידי {name}"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "השיחה הזו נעצרה בגלל שגיאה"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "לא צוינה סיבה. אפשר לשלוח הודעה כדי לנסות שוב."
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "התחלת שיחה חדשה עם {micoName}"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "הודעה ל־{micoName} בשיחה הזו"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "לא ניתן להתחיל את השיחה. יש לנסות שוב."
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "לא ניתן לאשר את ההודעה הראשונה. יש לבדוק את השיחה החדשה ולשלוח אותה שוב אם היא חסרה."
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "פתיחת השיחה {name}"

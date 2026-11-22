@@ -2938,6 +2938,67 @@ describe("sendThreadMessage", () => {
     });
   });
 
+  it("links only the same person's conversations of this Mico and names them for the model", async () => {
+    let messageSeq = 0;
+    let eventSeq = 0;
+    const tx = {
+      secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      thread: {
+        update: vi.fn(async ({ data }: { data: { nextMessageSeq?: unknown } }) =>
+          data.nextMessageSeq ? { nextMessageSeq: ++messageSeq } : { nextEventSeq: ++eventSeq },
+        ),
+        findMany: vi.fn().mockResolvedValue([{ id: "plan", title: "Plan the trip" }]),
+      },
+      message: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        create: vi.fn(async ({ data }: { data: { blocks: unknown } }) => ({
+          id: "msg-1", threadId: "thread-1", seq: 1, role: "user", blocks: data.blocks,
+          botId: null, runId: null, clientNonce: "nonce-1", createdAt: new Date(),
+        })),
+      },
+      run: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findUnique: vi.fn().mockResolvedValue({ status: "queued", startedAt: null }),
+        create: vi.fn().mockResolvedValue({ id: "run-1", taskId: "task-1", status: "queued" }),
+      },
+      task: { create: vi.fn().mockResolvedValue({ id: "task-1" }) },
+      event: { create: vi.fn().mockResolvedValue({ id: "event-1", seq: 3, createdAt: new Date() }) },
+      steeringMessage: { create: vi.fn() },
+    };
+    const prisma = {
+      message: { findUnique: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await sendThreadMessage(
+      {
+        prisma,
+        events: { notify: vi.fn().mockResolvedValue(undefined) } as never,
+        jobs: { enqueue: vi.fn().mockResolvedValue(undefined) } as never,
+      },
+      { spaceId: "workspace-1", userId: "user-1" } as Actor,
+      { kind: "bot", botId: "bot-1", threadId: "thread-1" } as ThreadTarget,
+      { text: "Use @Plan the trip", clientNonce: "nonce-1", mentions: [{ kind: "thread", id: "plan" }, { kind: "thread", id: "someone-else" }] },
+    );
+
+    expect(tx.thread.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["plan", "someone-else"] }, spaceId: "workspace-1", userId: "user-1", taskBotId: "bot-1", deleteAfter: null },
+      select: { id: true, title: true },
+    });
+    expect(tx.message.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        blocks: [
+          { kind: "text", text: "Use @Plan the trip" },
+          { kind: "thread_link", botId: "bot-1", threadId: "plan", title: "Plan the trip" },
+        ],
+      }),
+    });
+    expect(tx.task.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ prompt: expect.stringContaining("The person points at these conversations of yours: “Plan the trip”.") }),
+    });
+  });
+
   it("puts the message seq on the live event so the sender can match its echo", async () => {
     let messageSeq = 0;
     let eventSeq = 0;

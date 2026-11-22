@@ -112,6 +112,13 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("context_reset") }),
   z.object({ kind: z.literal("text"), text: z.string() }),
   z.object({
+    /** A user message points at another conversation of the same Mico; the title is the one it had then. */
+    kind: z.literal("thread_link"),
+    botId: Id,
+    threadId: Id,
+    title: z.string().max(240),
+  }),
+  z.object({
     kind: z.literal("card"),
     lines: z.array(z.object({ k: z.string(), v: z.string() })),
   }),

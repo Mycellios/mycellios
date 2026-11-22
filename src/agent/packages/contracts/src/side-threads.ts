@@ -34,5 +34,7 @@ export const SideThreadSchema = z.object({
   startedBy: SideThreadStartedBySchema.nullable().optional(),
   createdAt: IsoDate.optional(),
   updatedAt: IsoDate.optional(),
+  /** A reply the person has not read yet. */
+  unread: z.boolean().optional(),
 });
 export type SideThread = z.infer<typeof SideThreadSchema>;

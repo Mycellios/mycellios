@@ -2,7 +2,7 @@ import { formatCron } from "./cron.js";
 import { displayName } from "./display-name.js";
 import { hasMentionToken } from "./group-mentions.js";
 
-export const COMPOSER_MENTION_KINDS = ["bot", "group", "routine", "connector", "everyone"] as const;
+export const COMPOSER_MENTION_KINDS = ["bot", "group", "routine", "connector", "everyone", "thread"] as const;
 
 export type ComposerMentionKind = (typeof COMPOSER_MENTION_KINDS)[number];
 
@@ -13,7 +13,7 @@ export type ComposerMention = {
   name: string;
   subtitle?: string;
   color?: string;
-  /** Owning bot for routine chips (test-run lands on that bot). */
+  /** Owning bot for routine chips (test-run lands on that bot) and conversation chips. */
   botId?: string;
   /** Connected connection row id when kind is connector + connected. */
   connectionId?: string;
@@ -29,6 +29,8 @@ export type MentionPickerRoutine = {
   botId: string;
   botName?: string;
 };
+/** One of the current Mico's own conversations, offered so a message can point at it. */
+export type MentionPickerThread = { id: string; name: string; botId: string };
 export type MentionPickerConnector = {
   id: string;
   name: string;
@@ -89,11 +91,10 @@ export function partitionComposerMentions(mentions: readonly ComposerMention[]) 
 }
 
 /** Payload entries for `threads/send` mentions (legacy bare bot ids still accepted). */
-export function toThreadMentionPayload(
-  mentions: readonly ComposerMention[],
-): Array<string | { kind: "bot" | "group" | "routine" | "connector"; id: string }> {
-  const payload: Array<string | { kind: "bot" | "group" | "routine" | "connector"; id: string }> =
-    [];
+export type ThreadMentionTarget = string | { kind: "bot" | "group" | "routine" | "connector" | "thread"; id: string };
+
+export function toThreadMentionPayload(mentions: readonly ComposerMention[]): ThreadMentionTarget[] {
+  const payload: ThreadMentionTarget[] = [];
   for (const mention of mentions) {
     if (mention.kind === "everyone") continue;
     if (mention.kind === "bot") {
@@ -106,6 +107,10 @@ export function toThreadMentionPayload(
     }
     if (mention.kind === "routine") {
       payload.push({ kind: "routine", id: mention.id });
+      continue;
+    }
+    if (mention.kind === "thread") {
+      payload.push({ kind: "thread", id: mention.id });
       continue;
     }
     if (mention.kind === "connector") {
@@ -151,6 +156,8 @@ export function buildComposerMentionOptions(input: {
   groups: readonly MentionPickerGroup[];
   routines: readonly MentionPickerRoutine[];
   connectors: readonly MentionPickerConnector[];
+  /** The current Mico's conversations; absent where a message cannot point at one. */
+  threads?: readonly MentionPickerThread[];
   currentGroupId?: string | null;
   includeEveryone?: boolean;
   /** When omitted, return every match (catalog build). When set, apply after query filter. */
@@ -223,6 +230,12 @@ export function buildComposerMentionOptions(input: {
       authStatus: connector.authStatus,
       subtitle: connector.authStatus === "connected" ? "Connected" : "Needs auth",
     });
+  }
+
+  for (const thread of input.threads ?? []) {
+    const name = displayName(thread.name, "Conversation");
+    if (!matches(name)) continue;
+    options.push({ kind: "thread", id: thread.id, name, botId: thread.botId, subtitle: "Conversation" });
   }
 
   if (input.limit == null) return options;

@@ -6450,3 +6450,99 @@ msgstr "隐藏来自 {name} 的更新"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "来自 {author}"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "关闭其他标签页"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "关闭右侧标签页"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "请先停止此对话，再将其删除。"
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "删除此对话？"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "“{title}”及其消息和仅在其中创建的文件将被永久删除。主聊天保持不变。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "无法归档对话。请重试。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "无法恢复对话。请重试。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "已删除 {title}"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "无法删除对话。请重试。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "无法撤销删除。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "{title} 的操作"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "恢复并打开"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "恢复对话"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "对话，有新回复"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "与 {name} 的新对话"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "发送第一条消息即可开始。与 {name} 的主聊天保持不变。"
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "{name} 打开了此对话"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "此对话因错误而停止"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "未给出原因。发送一条消息即可重试。"
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "与 {micoName} 开始新对话"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "在此对话中给 {micoName} 发消息"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "无法开始对话。请重试。"
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "无法确认第一条消息。请查看新对话，如果消息不在其中，请重新发送。"
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "打开对话 {name}"

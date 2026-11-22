@@ -6450,3 +6450,99 @@ msgstr "{name}의 업데이트 숨기기"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "{author}에게서"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "다른 탭 닫기"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "오른쪽 탭 닫기"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "삭제하기 전에 이 대화를 중지하세요."
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "이 대화를 삭제할까요?"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "“{title}”과(와) 그 메시지, 그곳에서만 만든 파일이 영구적으로 삭제됩니다. 메인 채팅은 그대로 유지됩니다."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "대화를 보관하지 못했습니다. 다시 시도해 주세요."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "대화를 복원하지 못했습니다. 다시 시도해 주세요."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} 삭제됨"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "대화를 삭제하지 못했습니다. 다시 시도해 주세요."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "삭제를 취소하지 못했습니다."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "{title} 작업"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "복원하고 열기"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "대화 복원"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "대화, 새 답장"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "{name}와(과) 새 대화"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "첫 메시지를 보내면 대화가 시작됩니다. {name}와(과)의 메인 채팅은 그대로 유지됩니다."
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "{name}이(가) 이 대화를 열었습니다"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "이 대화가 오류로 중지되었습니다"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "이유가 제공되지 않았습니다. 다시 시도하려면 메시지를 보내세요."
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "{micoName}와(과) 새 대화 시작하기"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "이 대화에서 {micoName}에게 메시지 보내기"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "대화를 시작하지 못했습니다. 다시 시도해 주세요."
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "첫 메시지를 확인하지 못했습니다. 새 대화를 확인하고 메시지가 없으면 다시 보내세요."
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "대화 {name} 열기"

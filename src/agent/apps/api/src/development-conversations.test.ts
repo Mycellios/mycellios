@@ -128,7 +128,9 @@ it("lists each side thread's kind, archive, live state, outcome and who opened i
 it("renames only a conversation owned by this account, Space and Mico, as a title of the person's", async () => {
   const f=fixture({});
   await expect(f.rename({context:{actor},input:{botId:"mico",taskThreadId:"task-thread",title:"  Mi título "}})).resolves.toEqual({threadId:"task-thread",title:"Mi título"});
-  expect(f.prisma.thread.updateMany).toHaveBeenCalledWith({where:{id:"task-thread",userId:"owner",spaceId:"space",taskBotId:"mico",projectKey:"mico:mico",taskKey:{startsWith:"mico-task:mico:"},deleteAfter:null},data:{title:"Mi título",titleSource:"user"}});
+  // The person's own conversations and the ones their Mico opened for them; never routine or delegated threads.
+  expect(f.prisma.thread.updateMany).toHaveBeenCalledWith({where:{id:"task-thread",userId:"owner",spaceId:"space",taskBotId:"mico",deleteAfter:null,
+    OR:[{projectKey:"mico:mico",taskKey:{startsWith:"mico-task:mico:"}},{startedBy:"agent"}]},data:{title:"Mi título",titleSource:"user"}});
   f.prisma.thread.updateMany.mockResolvedValue({count:0});
   await expect(f.rename({context:{actor},input:{botId:"mico",taskThreadId:"foreign",title:"No"}})).rejects.toThrow();
 });

@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import type { ComposerMention, SlashActionId } from "@mycellios/core";
 import { BotAvatar } from "@mycellios/ui-web";
-import { Clock, Puzzle, X } from "lucide-react";
+import { Clock, MessageCircle, Puzzle, X } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { FALLBACK_BOT_COLOR } from "./chat-shared";
 
@@ -17,6 +17,9 @@ export function slashActionLabel(id: SlashActionId) {
 }
 
 export function MentionOptionIcon({ mention }: { mention: ComposerMention }) {
+  if (mention.kind === "thread") {
+    return <MessageCircle size={16} strokeWidth={1.7} className="mt-0.5 shrink-0 text-muted-foreground" />;
+  }
   if (mention.kind === "routine") {
     return <Clock size={16} strokeWidth={1.7} className="mt-0.5 shrink-0 text-muted-foreground" />;
   }
@@ -41,6 +44,9 @@ export function MentionOptionIcon({ mention }: { mention: ComposerMention }) {
 }
 
 export function MentionChipIcon({ mention }: { mention: ComposerMention }) {
+  if (mention.kind === "thread") {
+    return <MessageCircle size={13} strokeWidth={1.7} className="shrink-0 text-muted-foreground/70" />;
+  }
   if (mention.kind === "routine") {
     return <Clock size={13} strokeWidth={1.7} className="shrink-0 text-muted-foreground/70" />;
   }

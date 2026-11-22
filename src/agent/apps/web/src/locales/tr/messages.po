@@ -6450,3 +6450,99 @@ msgstr "{name} tarafından gelen güncellemeyi gizle"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "{author} tarafından"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "Diğer sekmeleri kapat"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "Sağdaki sekmeleri kapat"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "Silmeden önce bu sohbeti durdurun."
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "Bu sohbet silinsin mi?"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "“{title}”, mesajları ve yalnızca orada oluşturulan dosyalar kalıcı olarak silinir. Ana sohbet olduğu gibi kalır."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "Sohbet arşivlenemedi. Tekrar deneyin."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "Sohbet geri yüklenemedi. Tekrar deneyin."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} silindi"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "Sohbet silinemedi. Tekrar deneyin."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "Silme işlemi geri alınamadı."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "{title} için işlemler"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "Geri yükle ve aç"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "Sohbeti geri yükle"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "Sohbetler, yeni yanıtlar"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "{name} ile yeni sohbet"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "İlk mesajınız sohbeti başlatır. {name} ile ana sohbet olduğu gibi kalır."
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "Bu sohbeti {name} açtı"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "Bu sohbet bir hatayla durdu"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "Bir neden belirtilmedi. Tekrar denemek için bir mesaj gönderin."
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "{micoName} ile yeni bir sohbet başlatın"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "Bu sohbette {micoName} için mesaj yazın"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "Sohbet başlatılamadı. Tekrar deneyin."
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "İlk mesaj doğrulanamadı. Yeni sohbeti kontrol edin ve mesaj yoksa yeniden gönderin."
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "{name} sohbetini aç"

@@ -24,6 +24,7 @@ import {
   ToolSteps,
 } from "../../components/ToolActivityDisclosure";
 import { SkillDraftCard } from "../../components/teach/SkillDraftCard";
+import { ThreadLinkChip } from "../../components/ThreadLinkChip";
 import type { ArtifactTarget } from "../../lib/artifact-open";
 import { messageProviderLabel } from "../../lib/messaging";
 import { PlanDisclosure } from "../../components/PlanDisclosure";
@@ -576,6 +577,13 @@ export const MessageView = memo(function MessageView({
                   mimeType={block.mimeType}
                   size={block.size}
                 />
+              </div>
+            );
+          }
+          if (block.kind === "thread_link") {
+            return (
+              <div key={i} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                <ThreadLinkChip botId={block.botId} threadId={block.threadId} title={block.title} />
               </div>
             );
           }

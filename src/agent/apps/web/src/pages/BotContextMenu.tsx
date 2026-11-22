@@ -18,6 +18,7 @@ import {
   Eraser,
   Folder,
   FolderPlus,
+  MessageCirclePlus,
   Pencil,
   Pin,
   Trash2,
@@ -39,6 +40,7 @@ export function BotContextMenu({
   onClear,
   onArchive,
   onDelete,
+  onNewConversation,
 }: {
   bot: ChatMenuTarget;
   onClose: () => void;
@@ -53,6 +55,8 @@ export function BotContextMenu({
   onClear: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  /** Opens a draft conversation with this Mico; groups have none. */
+  onNewConversation?: () => void;
 }) {
   const { t } = useLingui();
 
@@ -61,6 +65,15 @@ export function BotContextMenu({
       aria-label={t`Actions for ${bot.name}`}
       className="max-h-[min(420px,calc(100vh-16px))] w-[264px] overflow-y-auto"
     >
+      {onNewConversation ? (
+        <>
+          <ContextMenuItem onClick={onNewConversation}>
+            <MessageCirclePlus />
+            {t`New conversation`}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+        </>
+      ) : null}
       <ContextMenuItem onClick={onTogglePinned}>
         <Pin />
         {bot.pinned ? t`Unpin` : t`Pin`}

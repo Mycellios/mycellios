@@ -6451,3 +6451,99 @@ msgstr "{name} से अपडेट छिपाएँ"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "{author} से"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "बाकी टैब बंद करें"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "दाईं ओर के टैब बंद करें"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "हटाने से पहले यह बातचीत रोकें।"
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "यह बातचीत हटाएँ?"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "“{title}”, उसके संदेश और सिर्फ़ वहीं बनी फ़ाइलें हमेशा के लिए हटा दी जाएँगी। मुख्य चैट जैसी है वैसी ही रहेगी।"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "बातचीत संग्रहित नहीं हो सकी। फिर से कोशिश करें।"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "बातचीत बहाल नहीं हो सकी। फिर से कोशिश करें।"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} हटाई गई"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "बातचीत हटाई नहीं जा सकी। फिर से कोशिश करें।"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "हटाना पूर्ववत नहीं हो सका।"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "{title} के लिए कार्रवाइयाँ"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "बहाल करें और खोलें"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "बातचीत बहाल करें"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "बातचीत, नए जवाब"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "{name} के साथ नई बातचीत"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "आपका पहला संदेश इसे शुरू करता है। {name} के साथ मुख्य चैट जैसी है वैसी ही रहेगी।"
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "{name} ने यह बातचीत शुरू की"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "यह बातचीत एक त्रुटि के साथ रुक गई"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "कोई कारण नहीं बताया गया। फिर से कोशिश करने के लिए संदेश भेजें।"
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "{micoName} के साथ नई बातचीत शुरू करें"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "इस बातचीत में {micoName} को संदेश भेजें"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "बातचीत शुरू नहीं हो सकी। फिर से कोशिश करें।"
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "पहले संदेश की पुष्टि नहीं हो सकी। नई बातचीत देखें और अगर संदेश न दिखे तो उसे फिर से भेजें।"
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "बातचीत {name} खोलें"

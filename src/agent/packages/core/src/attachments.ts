@@ -132,6 +132,7 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       if (block.kind === "text") return block.text;
       if (block.kind === "chart") return `[chart: ${block.name}]`;
       if (block.kind === "image") return `[image: ${block.name}]`;
+      if (block.kind === "thread_link") return `[conversation: ${block.title || "untitled"}]`;
       // A finished card is followed by its image block; only an unfinished one needs words.
       if (block.kind === "image_generation") {
         if (block.status === "completed" || block.status === "generating") return "";

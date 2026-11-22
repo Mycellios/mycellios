@@ -91,12 +91,17 @@ export function developmentRoutes(ctx: RouterContext) {
         const parsed = parseThreadTitle(input.title);
         if (!parsed.ok) throw new ORPCError("BAD_REQUEST", { message: parsed.error });
         await createRepos(deps.prisma).getBot(actor, input.botId);
-        // A title the person sets is theirs: automatic titles never replace it.
+        // A title the person sets is theirs: automatic titles never replace it. Their own
+        // conversations and the ones their Mico started for them take a title; routine,
+        // workflow and delegated threads keep the name the server gives them.
         const result = await deps.prisma.thread.updateMany({
           where: {
             id: input.taskThreadId, userId: actor.userId, spaceId: actor.spaceId,
-            taskBotId: input.botId, projectKey: `mico:${input.botId}`,
-            taskKey: { startsWith: `mico-task:${input.botId}:` }, deleteAfter: null,
+            taskBotId: input.botId, deleteAfter: null,
+            OR: [
+              { projectKey: `mico:${input.botId}`, taskKey: { startsWith: `mico-task:${input.botId}:` } },
+              { startedBy: "agent" },
+            ],
           },
           data: { title: parsed.title, titleSource: "user" },
         });

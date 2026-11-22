@@ -6451,3 +6451,99 @@ msgstr "{name}からの更新を隠す"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "{author}から"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "他のタブを閉じる"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "右側のタブを閉じる"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "削除する前にこの会話を停止してください。"
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "この会話を削除しますか？"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "「{title}」とそのメッセージ、そこだけで作成されたファイルは完全に削除されます。メインチャットは変わりません。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "会話をアーカイブできませんでした。もう一度お試しください。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "会話を復元できませんでした。もう一度お試しください。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} を削除しました"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "会話を削除できませんでした。もう一度お試しください。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "削除を取り消せませんでした。"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "{title} の操作"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "復元して開く"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "会話を復元"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "会話、新しい返信あり"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "{name} との新しい会話"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "最初のメッセージで会話が始まります。{name} とのメインチャットは変わりません。"
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "{name} がこの会話を開きました"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "この会話はエラーで停止しました"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "理由は示されませんでした。もう一度試すにはメッセージを送信してください。"
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "{micoName} と新しい会話を始める"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "この会話で {micoName} にメッセージ"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "会話を開始できませんでした。もう一度お試しください。"
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "最初のメッセージを確認できませんでした。新しい会話を確認し、見当たらない場合はもう一度送信してください。"
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "会話「{name}」を開く"

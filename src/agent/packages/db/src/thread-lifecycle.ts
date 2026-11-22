@@ -45,6 +45,7 @@ const UNFINISHED_DELEGATION = Prisma.join(["queued", "running", "waiting", "wait
 export interface LockedSideThread {
   id: string;
   taskBotId: string | null;
+  startedBy?: string | null;
   botId: string | null;
   projectKey: string | null;
   taskKey: string | null;
@@ -62,7 +63,7 @@ export async function lockSideThread(
   input: { botId: string; threadId: string },
 ): Promise<LockedSideThread> {
   const [row] = await tx.$queryRaw<LockedSideThread[]>`
-    SELECT id, "taskBotId", "botId", "projectKey", "taskKey", "archivedAt", "deleteAfter"
+    SELECT id, "taskBotId", "botId", "projectKey", "taskKey", "startedBy", "archivedAt", "deleteAfter"
     FROM threads
     WHERE id = ${input.threadId} AND "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}
     FOR UPDATE`;
@@ -128,7 +129,7 @@ export async function restoreSideThreadInTransaction(
 }
 
 /**
- * Hides a conversation the person started and schedules its removal after the undo window.
+ * Hides a conversation the person or their Mico started and schedules its removal after the undo window.
  * Refused while any of its runs or delegated work is unfinished. Repeating it keeps the
  * first deadline.
  */
@@ -139,7 +140,7 @@ export async function markSideThreadDeletedInTransaction(
   now = new Date(),
 ): Promise<{ deleteAfter: Date }> {
   const thread = await lockSideThread(tx, scope, input);
-  if (taskThreadKind(thread) !== "conversation")
+  if (taskThreadKind(thread) !== "conversation" && thread.startedBy !== "agent")
     throw new ThreadLifecycleError(
       "not_deletable",
       "Only conversations you started can be deleted.",
@@ -215,6 +216,7 @@ export interface SideThreadListRow {
   createdAt: Date;
   updatedAt: Date;
   activeStatuses: string[] | null;
+  unread?: boolean | null;
 }
 
 /**
@@ -230,7 +232,7 @@ export function listSideThreads(
   const project = input.projectKey ? Prisma.sql`AND t."projectKey" = ${input.projectKey}` : Prisma.empty;
   return prisma.$queryRaw<SideThreadListRow[]>`
     SELECT t.id, t."projectKey", t."taskKey", t."taskBotId", t.title, t."titleSource", t."startedBy",
-      t.outcome, t."lastError", t."archivedAt", t."deleteAfter", t."createdAt",
+      t.outcome, t."lastError", t."archivedAt", t."deleteAfter", t."createdAt", t.unread,
       GREATEST(t."createdAt", COALESCE(m."createdAt", t."createdAt"), COALESCE(t."archivedAt", t."createdAt")) AS "updatedAt",
       a.statuses AS "activeStatuses"
     FROM threads t

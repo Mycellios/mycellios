@@ -55,6 +55,8 @@ import { useTaskCosts } from "./use-task-costs";
 import type { PendingThreadSend } from "../../lib/pending-thread-sends";
 
 const NO_PENDING_SENDS: readonly PendingThreadSend[] = [];
+/** How close to the top a scroll starts loading older messages. */
+const TRANSCRIPT_AUTOLOAD_TOP_PX = 240;
 
 export function bubbleFrameWidth(role: ThreadMessage["role"]) {
   return role === "user"
@@ -64,6 +66,8 @@ export function bubbleFrameWidth(role: ThreadMessage["role"]) {
 
 export const Transcript = memo(function Transcript({
   headerTabs = false,
+  banner = null,
+  footer = null,
   conversationBot,
   scrollRef,
   scrollRequest,
@@ -108,6 +112,10 @@ export const Transcript = memo(function Transcript({
   onOpenImport,
 }: {
   headerTabs?: boolean;
+  /** Above the messages, e.g. who opened this conversation. */
+  banner?: ReactNode;
+  /** After the messages, e.g. how this conversation's last turn failed. */
+  footer?: ReactNode;
   conversationBot?: { id: string; color: string };
   scrollRef: RefObject<HTMLDivElement | null>;
   scrollRequest: { messageId: string; nonce: number } | null;
@@ -458,6 +466,9 @@ export const Transcript = memo(function Transcript({
     }
   }, [atEnd]);
 
+  // Scrolling near the top loads older messages by itself; the loader keeps the reading
+  // position. A failure stops it until the button is used again.
+  const autoLoadOlder = useRef(true);
   const loadOlder = useCallback(() => {
     const wasFollowing = following.current;
     // Prepend must not race the end-follow observer.
@@ -506,6 +517,12 @@ export const Transcript = memo(function Transcript({
             event.currentTarget.scrollTop,
           );
           lastScrollTop.current = event.currentTarget.scrollTop;
+          if (!scrolledDown && olderCursor != null && !loadingOlder && autoLoadOlder.current &&
+              !jumpScrolling.current && event.currentTarget.scrollTop < TRANSCRIPT_AUTOLOAD_TOP_PX &&
+              event.currentTarget.scrollHeight > event.currentTarget.clientHeight) {
+            const pending = loadOlder();
+            if (pending) pending.catch(() => { autoLoadOlder.current = false; });
+          }
           const nearEnd = transcriptIsNearEnd(event.currentTarget);
           if (atEnd !== nearEnd) setAtEnd(nearEnd);
           // A jump scroll owns the viewport until its animation settles; its
@@ -533,7 +550,7 @@ export const Transcript = memo(function Transcript({
             variant="ghost"
             size="sm"
             disabled={loadingOlder}
-            onClick={() => void loadOlder()}
+            onClick={() => { autoLoadOlder.current = true; void loadOlder()?.catch(() => undefined); }}
             aria-label={t`Load earlier messages`}
             className="self-center text-muted-foreground"
           >
@@ -541,6 +558,7 @@ export const Transcript = memo(function Transcript({
             {t`Load earlier messages`}
           </Button>
         ) : null}
+        {banner}
         {reactionView.visibleMessages.length === 0 && !pendingMessages.length && !running && olderCursor == null ? (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-4 py-12 text-center">
             <TranscriptEmptyAvatar bot={conversationBot} />
@@ -775,6 +793,7 @@ export const Transcript = memo(function Transcript({
             {t`Working in another conversation…`}
           </p>
         ) : null}
+        {footer}
         </div>
       </div>
       {quoteDraft ? (
