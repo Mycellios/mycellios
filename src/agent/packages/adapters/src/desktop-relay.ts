@@ -5,7 +5,9 @@ import { desktopLegacyFailureCode } from "@mycellios/contracts";
 import type { DesktopExecutorBinding, DesktopExecutorOwner, DesktopExecutorPoll } from "../../../../contracts/desktop-executor.js";
 import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, type HostComputerRequest } from "./host-computer-protocol.js";
 
-const LEASE_MS = 45_000;
+// Presence outlasts a stalled API: relay requests can wait 20-40 s for a busy
+// database, and Desktop keeps running work through stalls up to 85 s.
+const LEASE_MS = 90_000;
 const MAX_OPERATIONS = 8;
 const MAX_WAITING_OPERATIONS = 32;
 const MAX_BOT_OPERATIONS = 8;

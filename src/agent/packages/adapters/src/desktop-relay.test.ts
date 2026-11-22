@@ -55,7 +55,7 @@ describe("outbound Desktop relay", () => {
     const response = broker.dispatch({ method: "environment", botId: "bot" }, context());
     expect(() => broker.bind(owner, { ...binding, deviceId: "other" })).toThrow();
     expect(broker.poll(owner, "device").operations).toHaveLength(1);
-    now = 46_000;
+    now = 91_000;
     expect(broker.available(owner, "bot")).toBe(false);
     expect(await response.text()).toContain("disconnected");
     expect(() => broker.dispatch({ method: "environment", botId: "bot" }, context())).toThrow();
