@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@mycellios/adapter-kit";
+import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent, AgentToolExecutionObserver } from "@mycellios/adapter-kit";
 import { DESKTOP_OWNER_UNRESOLVED_ERROR, isUncertainDesktopRun } from "@mycellios/core";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { DesktopUnreachableError } from "./computer-errors.js";
@@ -297,6 +297,68 @@ it("keeps actual provider credentials and producer-side billing in cloud while P
     expect(calls).toEqual(["reserve", "provider", "settle", "usage"]);
   } finally { provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve())); }
 });
+
+it("runs a Pi tool call on Desktop while the server can take a person's message into the turn", async () => {
+  let requests = 0;
+  const provider = createServer((req, res) => {
+    requests += 1; req.resume();
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    const chunk = (delta: object, finish: string | null, usage?: object) => res.write(`data: ${JSON.stringify({ id: `request-${requests}`, object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta, finish_reason: finish }], ...(usage ? { usage } : {}) })}\n\n`);
+    if (requests === 1) {
+      chunk({ role: "assistant", content: null, tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "shell", arguments: JSON.stringify({ command: "echo hello" }) } }] }, null);
+      chunk({}, "tool_calls", { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 });
+    } else {
+      chunk({ role: "assistant", content: "Done." }, null);
+      chunk({}, "stop", { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 });
+    }
+    res.end("data: [DONE]\n\n");
+  });
+  await new Promise<void>(resolve => provider.listen(0, "127.0.0.1", resolve));
+  const address = provider.address(); if (!address || typeof address === "string") throw Error("fixture");
+  const host = await startHostComputerServer({ root: tmpdir(), token: "c".repeat(64), hostname: "127.0.0.1", agentRuntime: new PiAgentRuntime() }); hosts.push(host); host.setEnabled(true);
+  const runtime = new DesktopAgentRuntime({ fallback: { describe, abort: vi.fn(), run: vi.fn() }, select: async () => ({ available: true, preferred: true }), transport: (input, ctx) =>
+    fetch(`http://127.0.0.1:${host.port}/computer`, { method: "POST", headers: { authorization: `Bearer ${"c".repeat(64)}` }, body: JSON.stringify(input), signal: ctx.signal }) });
+  const calls: Array<{ name: string; args: unknown; observer: AgentToolExecutionObserver | undefined }> = [];
+  const input = request();
+  input.model = { provider: "openai-compatible", id: "fixture", apiKey: "cloud-only-provider-key", baseUrl: `http://127.0.0.1:${address.port}/v1`, allowPrivateEndpoint: true, maxTokens: 128, contextWindow: 8192 };
+  input.allowSilentEmpty = true;
+  input.tools = [{ name: "shell", description: "Run a command", inputSchema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } }];
+  input.steeringPending = async () => false;
+  input.executeTool = async (name, args, _id, _route, observer) => { calls.push({ name, args, observer }); return { code: 0, stdout: "hello\n", stderr: "" }; };
+  try {
+    const events: AgentRuntimeEvent[] = []; for await (const event of runtime.run(input, context)) events.push(event);
+    expect(calls).toMatchObject([{ name: "shell", args: { command: "echo hello" } }]);
+    expect(calls[0]!.observer?.yieldSignal).toBeInstanceOf(AbortSignal);
+    expect(calls[0]!.observer?.onShellStillRunning).toBeTypeOf("function");
+    expect(events.filter(e => e.type === "text").map(e => e.type === "text" ? e.text : "").join("")).toBe("Done.");
+  } finally { provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve())); }
+});
+
+it("watches for steering on the server for main-turn Desktop tools only", async () => {
+  let desktopSteering: unknown = "not run";
+  const engine: AgentRuntime = { describe, abort: vi.fn(), async *run(input) {
+    desktopSteering = input.steeringPending;
+    await input.executeTool!("shell", {}, JSON.stringify(["pi-tool", "helper-call", "call-1"]));
+    await input.executeTool!("shell", {}, JSON.stringify(["pi-tool", "main", "call-2"]));
+    yield { type: "done" };
+  } };
+  const host = await startHostComputerServer({ root: tmpdir(), token: "d".repeat(64), hostname: "127.0.0.1", agentRuntime: engine }); hosts.push(host); host.setEnabled(true);
+  const runtime = new DesktopAgentRuntime({ fallback: { describe, abort: vi.fn(), run: vi.fn() }, select: async () => ({ available: true, preferred: true }), transport: (input, ctx) =>
+    fetch(`http://127.0.0.1:${host.port}/computer`, { method: "POST", headers: { authorization: `Bearer ${"d".repeat(64)}` }, body: JSON.stringify(input), signal: ctx.signal }) });
+  const yields: Record<string, boolean> = {};
+  const input = request();
+  input.steeringPending = async () => true;
+  input.executeTool = async (_name, _args, id, _route, observer) => {
+    const yieldSignal = observer?.yieldSignal;
+    yields[id] = Boolean(yieldSignal);
+    // The waiting message moves the main-turn command to the background.
+    if (yieldSignal) await new Promise(resolve => yieldSignal.addEventListener("abort", resolve, { once: true }));
+    return { code: 0, stdout: "", stderr: "" };
+  };
+  for await (const _ of runtime.run(input, context)) { /* drain */ }
+  expect(desktopSteering).toBeUndefined();
+  expect(yields).toEqual({ [JSON.stringify(["pi-tool", "helper-call", "call-1"])]: false, [JSON.stringify(["pi-tool", "main", "call-2"])]: true });
+}, 15_000);
 
 it("redelivers a completed tool result when its acknowledgement is lost", async () => {
   const token = "e".repeat(64);

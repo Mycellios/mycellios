@@ -733,6 +733,9 @@
   starts. Keep legacy initial-run receipts; reconnection alone grants no segment.
   Keep the native session open for outstanding callback replies after the engine
   ends. Report completion only after the complete stream and acknowledgements.
+  The bridge carries plain data, bytes and callbacks only (no AbortSignal or class
+  instance). The server owns the steering watch for Desktop tools: never send
+  steeringPending across it. Verify with the Pi tool-call test in desktop-agent-runtime.
   Disconnects must not silently substitute a cloud run for an admitted local run.
   Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
   Preserve local project and checkpoint bindings; a tool result payload alone
