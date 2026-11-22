@@ -4,6 +4,7 @@ import { Download, History, LayoutDashboard, Zap } from "lucide-react";
 import { EarnQuickMenu } from "../EarnQuickMenu";
 import { AgentNavigationLink, Sidebar, SidebarFooter } from "./Sidebar";
 import { Button, Heading, Text } from "./primitives";
+import { usePanelI18n } from "../i18n/panel-i18n";
 
 const meta = { title: "Kit/Sidebar", component: Sidebar, args: { collapsed: false, onToggle: () => {}, onClose: () => {}, homeHref: "#home", logoSrc: "/assets/brand/favicon.png", children: null }, parameters: { layout: "fullscreen", ownsThemeRoot: true }, tags: ["autodocs"] } satisfies Meta<typeof Sidebar>;
 export default meta;
@@ -13,17 +14,17 @@ function SidebarExample({ initiallyCollapsed = false, signedIn = false, initialT
   const [collapsed, setCollapsed] = useState(initiallyCollapsed);
   const [theme, setTheme] = useState<"light" | "dark">(initialTheme);
   useEffect(() => setTheme(initialTheme), [initialTheme]);
-  const [view, setView] = useState("Overview");
+  const { t, locale, setLocale } = usePanelI18n();
+  const [view, setView] = useState<"overview" | "history" | "contribute" | "downloads">("overview");
   return <div className={`public-panel theme-${theme}${collapsed ? " sidebar-collapsed" : ""}`}>
     <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(value => !value)} onClose={() => {}} homeHref="#home" logoSrc="/assets/brand/favicon.png">
-      <nav id="panel-sidebar-links">{[["Overview", LayoutDashboard], ["History", History], ["Run", Zap], ["Downloads", Download]].map(([label, Icon]) => {
-        const Glyph = Icon as typeof Download;
-        const name = label as string;
-        return <Button key={name} variant="navigation" className={view === name ? "active" : ""} aria-label={name} title={name} aria-current={view === name ? "page" : undefined} onClick={() => setView(name)}><Glyph size={18} /><span>{name}</span></Button>;
+      <nav id="panel-sidebar-links">{([["overview", LayoutDashboard], ["history", History], ["contribute", Zap], ["downloads", Download]] as const).map(([id, Glyph]) => {
+        const name = t(`shell.nav.${id}`);
+        return <Button key={id} variant="navigation" className={view === id ? "active" : ""} aria-label={name} title={name} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}><Glyph size={18} /><span>{name}</span></Button>;
       })}<AgentNavigationLink /></nav>
-      <SidebarFooter accountLabel={signedIn ? "Alex" : "Sign in"} accountTitle={signedIn ? "Open account" : "Sign in to Mycellios"} onAccount={() => {}} theme={theme} onTheme={() => setTheme(value => value === "light" ? "dark" : "light")} status="Connected" degraded={false} version="0.2.77" earnMenu={<EarnQuickMenu earnUrl="#earn" browserUrl="#browser" downloadsUrl="#downloads" external={false} onOpenEarn={() => {}} />} />
+      <SidebarFooter accountLabel={signedIn ? "Alex" : t("shell.account.signIn")} accountTitle={signedIn ? t("shell.account.openFor", { email: "alex@example.com" }) : t("shell.account.signInTitle")} onAccount={() => {}} theme={theme} onTheme={() => setTheme(value => value === "light" ? "dark" : "light")} locale={locale} onLocale={setLocale} status={t("shell.status.connected")} degraded={false} version="0.2.77" earnMenu={<EarnQuickMenu earnUrl="#earn" browserUrl="#browser" downloadsUrl="#downloads" external={false} onOpenEarn={() => {}} />} />
     </Sidebar>
-    <div className="panel-main" style={{ padding: 40 }}><Heading as="h1">{view}</Heading><Text>Toggle the sidebar to inspect alignment and motion. The navigation and footer are the production components.</Text></div>
+    <div className="panel-main" style={{ padding: 40 }}><Heading as="h1">{t(`shell.nav.${view}`)}</Heading><Text>Toggle the sidebar to inspect alignment and motion. The navigation and footer are the production components.</Text></div>
   </div>;
 }
 export const Expanded: Story = { render: (_args, context) => <SidebarExample initialTheme={context.globals.theme === "dark" ? "dark" : "light"} /> };

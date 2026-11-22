@@ -230,6 +230,17 @@ These rules apply to the complete repository.
   `?landing=saved` and the earlier complete page with `?landing=previous` (and
   optional `&hero=dark`). Only the earlier page preloads the WebGL mushroom
   renderer. Keep reference-specific styles within `mycellios-reference`.
+- The dashboard panel (`/dashboard` and its screens, account dialog included) is
+  bilingual through the typed catalogs in `landing/src/i18n/messages` (one module
+  per area, `es` and `en`) and `usePanelI18n`; it does not use Agent's Lingui. Only
+  the Panel mounts `PanelI18nProvider`: `es*` browsers get Spanish, others English,
+  the sidebar switch persists `mycellios.panel-locale` (try/catch) and `<html lang>`
+  follows it. Components outside the provider (marketing, standalone downloads)
+  keep English text, so public pages and SEO are unchanged. Add every new panel
+  string to both catalogs; `panel-i18n.test.tsx` fails on a missing key or
+  placeholder. Storybook's toolbar switches the panel language. Operator developer
+  tools, upstream error messages and the shared browser worker's measured status
+  details may stay as reported.
 - Other panel screens use `landing/src/panel-minimal.css`, the shared SummaryStrip
   and single-title PanelDisclosure. Keep secondary tables/filters behind disclosures
   and preserve visible actionable errors, authorization and payment safeguards.

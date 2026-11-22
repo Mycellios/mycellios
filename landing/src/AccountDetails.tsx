@@ -2,6 +2,7 @@ import { Button as UiButton, Heading as UiHeading, Link as UiLink } from "./ui/p
 import { ArrowUpRight, CircleAlert, LogOut, UserRound } from "lucide-react";
 import { AGENT_ACCOUNT_URL } from "../../src/contracts/agent-account-links";
 import type { AuthSession, NetworkIdentity } from "./auth";
+import { usePanelI18n } from "./i18n/panel-i18n";
 
 export function MetaMaskProviderIcon() {
   return <svg viewBox="0 0 35 34" aria-hidden="true">
@@ -42,15 +43,16 @@ export function AccountDetails({ titleId, session, identity, roleBusy, error, on
   onRetryRole: () => void;
   onSignOut: () => void;
 }) {
+  const { t } = usePanelI18n();
   return <>
-    <UiHeading as="h2" id={titleId}>Tu cuenta</UiHeading>
-    <div className="account-identity-card"><UserRound /><span><small>Sesión iniciada como</small><strong>{identity?.email ?? session.user.email ?? identity?.id ?? session.user.id}</strong></span></div>
-    {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>No se han podido comprobar los permisos de red. Las herramientas de administración siguen bloqueadas.</span><UiButton type="button" disabled={roleBusy} onClick={onRetryRole}>{roleBusy ? "Comprobando…" : "Reintentar"}</UiButton></div>}
+    <UiHeading as="h2" id={titleId}>{t("account.signedIn.title")}</UiHeading>
+    <div className="account-identity-card"><UserRound /><span><small>{t("account.signedIn.as")}</small><strong>{identity?.email ?? session.user.email ?? identity?.id ?? session.user.id}</strong></span></div>
+    {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>{t("account.role.warning")}</span><UiButton type="button" disabled={roleBusy} onClick={onRetryRole}>{t(roleBusy ? "account.role.checking" : "account.role.retry")}</UiButton></div>}
     <UiLink className="account-agent-link" href={AGENT_ACCOUNT_URL}>
-      <span><strong>Cuenta en Mycellios Agent</strong><small>Perfil, suscripción y uso de la API, y claves de API.</small></span>
+      <span><strong>{t("account.agent.title")}</strong><small>{t("account.agent.detail")}</small></span>
       <ArrowUpRight size={16} aria-hidden="true" />
     </UiLink>
     {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
-    <UiButton className="account-signout" onClick={onSignOut}><LogOut size={16} />Cerrar sesión</UiButton>
+    <UiButton className="account-signout" onClick={onSignOut}><LogOut size={16} />{t("account.signOut")}</UiButton>
   </>;
 }

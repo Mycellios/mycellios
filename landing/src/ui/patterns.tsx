@@ -2,13 +2,16 @@ import { Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, Disclos
 import { useRef, useState } from "react";
 import type * as React from "react";
 import { Activity, Check, ChevronDown, Cpu, LoaderCircle, Radio } from "lucide-react";
+import { usePanelI18n } from "../i18n/panel-i18n";
 
 interface AppSelectOption {
   value: string;
   label: string;
 }
 
-export function AppSelect({ ariaLabel, value, options, onChange, placeholder = "Select an option" }: { ariaLabel: string; value: string; options: AppSelectOption[]; onChange: (value: string) => void; placeholder?: string }) {
+export function AppSelect({ ariaLabel, value, options, onChange, placeholder: requestedPlaceholder }: { ariaLabel: string; value: string; options: AppSelectOption[]; onChange: (value: string) => void; placeholder?: string }) {
+  const { t } = usePanelI18n();
+  const placeholder = requestedPlaceholder ?? t("shell.select.placeholder");
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
@@ -78,10 +81,14 @@ export function Stat({ icon: Icon, label, value, detail, tone = "blue" }: { icon
 export function CapacityMetric({ icon: Icon, label, value, detail }: { icon: typeof Cpu; label: string; value: string; detail: string }) { return <div className="global-capacity-metric"><i><Icon /></i><span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span></div>; }
 export function Metric({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div>; }
 export function Empty({ icon: Icon, title, copy }: { icon: typeof Activity; title: string; copy: string }) { return <div className="panel-empty"><Icon /><strong>{title}</strong><UiText>{copy}</UiText></div>; }
-export function PanelLoading() { return <div className="panel-loading" role="status" aria-live="polite" aria-atomic="true"><LoaderCircle className="spin" /><strong>Connecting to mycellios</strong><span>Loading the configured network snapshot…</span></div>; }
+export function PanelLoading() {
+  const { t } = usePanelI18n();
+  return <div className="panel-loading" role="status" aria-live="polite" aria-atomic="true"><LoaderCircle className="spin" /><strong>{t("shell.loading.title")}</strong><span>{t("shell.loading.detail")}</span></div>;
+}
 
-export function SummaryStrip({ items, label = "Summary" }: { items: Array<{ label: string; value: React.ReactNode }>; label?: string }) {
-  return <dl className="ui-summary-strip" aria-label={label} style={{ "--summary-columns": Math.min(4, items.length) } as React.CSSProperties}>
+export function SummaryStrip({ items, label }: { items: Array<{ label: string; value: React.ReactNode }>; label?: string }) {
+  const { t } = usePanelI18n();
+  return <dl className="ui-summary-strip" aria-label={label ?? t("shell.summary")} style={{ "--summary-columns": Math.min(4, items.length) } as React.CSSProperties}>
     {items.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}
   </dl>;
 }

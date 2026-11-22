@@ -38,6 +38,9 @@ import {
 } from "./api-access";
 import type { AuthSession, PublicAuthConfig } from "./auth";
 import { verifyTotpStepUp } from "./auth";
+import { panelTranslator, usePanelI18n, type PanelLocale, type PanelTranslate } from "./i18n/panel-i18n";
+
+const english = panelTranslator("en");
 
 interface ContributeProps {
   accessToken: string | null;
@@ -56,6 +59,7 @@ interface ContributeProps {
 }
 
 export function Contribute(props: ContributeProps) {
+  const { t } = usePanelI18n();
   const [worker, setWorker] = useState<MobileWorkerSnapshot>(() =>
     getMobileWorkerSnapshot(),
   );
@@ -67,7 +71,7 @@ export function Contribute(props: ContributeProps) {
   const nodeLoadInFlight = useRef(false);
   const nodeLoadBlocked = useRef(false);
   const startButtonRef = useRef<HTMLButtonElement>(null);
-  const errorPresentation = error ? contributionErrorPresentation(error) : null;
+  const errorPresentation = error ? contributionErrorPresentation(error, t) : null;
 
   useEffect(() => {
     initializeMobileWorker();
@@ -141,7 +145,7 @@ export function Contribute(props: ContributeProps) {
     >
       <div className="panel-page-title">
         <div>
-          <UiHeading as="h1">Your devices</UiHeading>
+          <UiHeading as="h1">{t("contribute.title")}</UiHeading>
         </div>
       </div>
       {errorPresentation && (
@@ -188,17 +192,18 @@ function BrowserContribution({
   worker: MobileWorkerSnapshot;
   startButtonRef: React.RefObject<HTMLButtonElement | null>;
 }) {
+  const { t } = usePanelI18n();
   const connected = worker.running && worker.connection === "online";
   return (
     <UiCard className="contribute-browser-card">
       <header>
         <div className="contribute-browser-icon"><MonitorSmartphone /></div>
         <div>
-          <UiHeading as="h2">This browser</UiHeading>
-          <UiText>{worker.statusText}</UiText>
+          <UiHeading as="h2">{t("contribute.browser.title")}</UiHeading>
+          <UiText>{translateWorkerStatus(worker.statusText, t)}</UiText>
         </div>
         <UiBadge className={`state-badge ${connected ? "online" : "paused"}`}>
-          {connected ? "Connected" : worker.starting || worker.running ? "Connecting" : "Paused"}
+          {t(connected ? "contribute.browser.connected" : worker.starting || worker.running ? "contribute.browser.connecting" : "contribute.browser.paused")}
         </UiBadge>
         <UiButton
           ref={startButtonRef}
@@ -207,34 +212,34 @@ function BrowserContribution({
           onClick={() => void toggleMobileWorker()}
         >
           {worker.starting ? <Radio className="spin" /> : <Power />}
-          {worker.running ? "Pause contribution" : "Start contributing"}
+          {t(worker.running ? "contribute.browser.pause" : "contribute.browser.start")}
         </UiButton>
       </header>
 
 
       <div className="contribute-power-row">
-        <span>Power</span>
-        <div className="contribute-levels" role="group" aria-label="Browser power level">
+        <span>{t("contribute.browser.power")}</span>
+        <div className="contribute-levels" role="group" aria-label={t("contribute.browser.powerGroup")}>
           {(["low", "balanced", "maximum"] as MobileWorkerLevel[]).map((level, index) => (
             <UiButton
               key={level}
               className={worker.level === level ? "active" : ""}
               disabled={worker.running || worker.starting}
               onClick={() => setMobileWorkerLevel(level)}
-              aria-label={`${level} browser power`}
+              aria-label={t("contribute.browser.levelLabel", { level: t(`contribute.browser.level.${level}`) })}
             >
               <span className="contribute-level-icon" aria-hidden="true">
                 {Array.from({ length: index + 1 }, (_, ray) => <Zap key={ray} />)}
               </span>
-              <span>{level}</span>
+              <span>{t(`contribute.browser.level.${level}`)}</span>
             </UiButton>
           ))}
         </div>
       </div>
-      <PanelDisclosure icon={Cpu} title="Device details">
-        <div className="contribute-browser-facts" aria-label="Browser worker details">
-          <span><Cpu /><small>Engine</small><strong>{worker.backend === "webgpu" ? "WebGPU" : "CPU"}</strong></span>
-          <span><Activity /><small>Work</small><strong>{worker.verifiedTasks > 0 ? `${worker.verifiedTasks} verified` : "No tasks yet"}</strong></span>
+      <PanelDisclosure icon={Cpu} title={t("contribute.browser.details")}>
+        <div className="contribute-browser-facts" aria-label={t("contribute.browser.facts")}>
+          <span><Cpu /><small>{t("contribute.browser.engine")}</small><strong>{worker.backend === "webgpu" ? "WebGPU" : "CPU"}</strong></span>
+          <span><Activity /><small>{t("contribute.browser.work")}</small><strong>{worker.verifiedTasks > 0 ? t("contribute.browser.verified", { count: worker.verifiedTasks }) : t("contribute.browser.noTasks")}</strong></span>
         </div>
       </PanelDisclosure>
     </UiCard>
@@ -250,6 +255,7 @@ function NativeNodeSetup(
     onError(value: string | null): void;
   },
 ) {
+  const { t } = usePanelI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const installer = detectInstaller();
   const nativeRuntime = desktopRuntimeBridge();
@@ -262,7 +268,7 @@ function NativeNodeSetup(
     props.onError(null);
     try {
       if (nativeRuntime && (await nativeRuntime.status()).enrolled) {
-        props.onNotice("A runtime identity already exists on this computer. Manage the existing node below.");
+        props.onNotice(t("contribute.native.notice.existing"));
         await props.onRefresh();
         return;
       }
@@ -273,7 +279,7 @@ function NativeNodeSetup(
       );
       if (nativeRuntime) {
         await nativeRuntime.enroll(bundle);
-        props.onNotice("Runtime paired. Connecting this computer to your account…");
+        props.onNotice(t("contribute.native.notice.paired"));
         await props.onRefresh();
         return;
       }
@@ -286,9 +292,7 @@ function NativeNodeSetup(
       anchor.download = `mycellios-pair-${bundle.enrollmentId.slice(0, 8)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
-      props.onNotice(
-        "Pairing bundle created and confirmed. Open it only with the native installer; it expires and can be redeemed once.",
-      );
+      props.onNotice(t("contribute.native.notice.bundle"));
     } catch (cause) {
       props.onError(errorText(cause));
     } finally {
@@ -300,10 +304,10 @@ function NativeNodeSetup(
       props.onSignIn();
       return;
     }
-    const transferId = window.prompt("Paste the ownership transfer ID.")?.trim();
-    const transferToken = window.prompt("Paste the one-time ownership transfer token.")?.trim();
-    const nodeId = window.prompt("Type the complete node ID you are accepting.")?.trim();
-    const code = window.prompt("Enter the six-digit authenticator code to accept ownership.")?.trim();
+    const transferId = window.prompt(t("contribute.native.prompt.transferId"))?.trim();
+    const transferToken = window.prompt(t("contribute.native.prompt.transferToken"))?.trim();
+    const nodeId = window.prompt(t("contribute.native.prompt.acceptNodeId"))?.trim();
+    const code = window.prompt(t("contribute.native.prompt.acceptCode"))?.trim();
     if (!transferId || !transferToken || !nodeId || !code) return;
     setBusy("accept-transfer");
     props.onError(null);
@@ -313,7 +317,7 @@ function NativeNodeSetup(
       await acceptNodeOwnershipTransfer(elevated.accessToken, {
         transferId, transferToken, nodeId, confirmation: nodeId,
       });
-      props.onNotice(`Ownership accepted for ${nodeId.slice(0, 12)}. The node will reconnect under its new generation.`);
+      props.onNotice(t("contribute.native.notice.accepted", { node: nodeId.slice(0, 12) }));
       await props.onRefresh();
     } catch (cause) {
       props.onError(errorText(cause));
@@ -325,47 +329,47 @@ function NativeNodeSetup(
     <UiDisclosure className="contribute-native-disclosure" open={nativeRuntime ? true : undefined}>
       <UiDisclosureSummary>
         <span className="contribute-native-summary-icon"><Server /></span>
-        <span><strong>Desktop devices</strong></span>
-        <b className={props.nodes.length > 0 ? "" : "empty"} aria-label={`${props.nodes.length} paired nodes`}>{props.nodes.length || ""}</b>
+        <span><strong>{t("contribute.native.title")}</strong></span>
+        <b className={props.nodes.length > 0 ? "" : "empty"} aria-label={t("contribute.native.pairedCount", { count: props.nodes.length })}>{props.nodes.length || ""}</b>
         <ChevronDown />
       </UiDisclosureSummary>
       <div className="contribute-detail-grid">
       <UiCard className="contribute-settings-card">
         <div className="contribute-card-head">
           <div>
-            <UiHeading as="h2">Setup</UiHeading>
+            <UiHeading as="h2">{t("contribute.native.setup")}</UiHeading>
           </div>
           <Server />
         </div>
         <UiText>
-          {nativeRuntime ? "Enable contribution from this computer using your Mycellios account." : "Install the service, then use a one-time pairing bundle."}
+          {t(nativeRuntime ? "contribute.native.setup.bridge" : "contribute.native.setup.install")}
         </UiText>
         <div className="page-actions">
           {!nativeRuntime && <UiLink href="/downloads" variant="primary">
             <Download />
-            Download for {installer.label}
+            {t("contribute.native.download", { platform: installer.label })}
           </UiLink>}
           {props.accessToken ? <>
             <UiButton type="button" disabled={busy !== null} onClick={() => void createBundle()}>
               <ShieldCheck />
-              {busy === "pair" ? (nativeRuntime ? "Setting up…" : "Creating…") : (nativeRuntime ? "Enable contribution" : "Create pairing bundle")}
+              {t(busy === "pair" ? (nativeRuntime ? "contribute.native.settingUp" : "contribute.native.creating") : (nativeRuntime ? "contribute.native.enable" : "contribute.native.createBundle"))}
             </UiButton>
             <UiButton type="button" disabled={busy !== null} onClick={() => void acceptTransfer()}>
               <ShieldCheck />
-              Accept ownership transfer
+              {t("contribute.native.acceptTransfer")}
             </UiButton>
           </> : (
-            <UiButton type="button" onClick={props.onSignIn}><ShieldCheck />Sign in to pair a node</UiButton>
+            <UiButton type="button" onClick={props.onSignIn}><ShieldCheck />{t("contribute.native.signIn")}</UiButton>
           )}
         </div>
       </UiCard>
       <UiCard className="contribute-activity-card">
         <div className="contribute-card-head">
           <div>
-            <UiHeading as="h2">Paired devices</UiHeading>
+            <UiHeading as="h2">{t("contribute.native.paired")}</UiHeading>
           </div>
           <UiButton
-            aria-label="Refresh nodes"
+            aria-label={t("contribute.native.refresh")}
             disabled={props.loading}
             onClick={() => void props.onRefresh()}
           >
@@ -374,9 +378,7 @@ function NativeNodeSetup(
         </div>
         {props.nodes.length === 0 ? (
           <UiText>
-            {props.accessToken
-              ? "No native node is paired with this account yet."
-              : "Sign in to see your native nodes."}
+            {t(props.accessToken ? "contribute.native.empty" : "contribute.native.signedOut")}
           </UiText>
         ) : (
           props.nodes.map((node) => (
@@ -414,6 +416,7 @@ function OwnedNodeCard({
   busy: string | null;
   setBusy(value: string | null): void;
 }) {
+  const { t, locale } = usePanelI18n();
   const [limits, setLimits] = useState(
     () =>
       node.observed?.limits ??
@@ -454,7 +457,7 @@ function OwnedNodeCard({
         type,
         payload,
       } as Pick<NodeCommand, "type" | "payload">);
-      onNotice(`${type} queued for ${node.nodeId.slice(0, 8)}.`);
+      onNotice(t("contribute.node.queued", { command: type, node: node.nodeId.slice(0, 8) }));
       await onRefresh();
     } catch (cause) {
       onError(errorText(cause));
@@ -464,15 +467,11 @@ function OwnedNodeCard({
   };
   const revoke = async () => {
     if (!authSession) return;
-    const code = window.prompt(
-      "Enter the six-digit authenticator code to revoke this node.",
-    );
+    const code = window.prompt(t("contribute.node.prompt.revokeCode"));
     if (!code) return;
-    const confirmation = window.prompt(
-      `Type the complete node ID ${node.nodeId} to confirm permanent credential revocation.`,
-    );
+    const confirmation = window.prompt(t("contribute.node.prompt.revokeConfirm", { node: node.nodeId }));
     if (confirmation !== node.nodeId) {
-      onError("Revocation cancelled: node identity did not match.");
+      onError(t("contribute.node.revokeMismatch"));
       return;
     }
     setBusy(`${node.nodeId}:revoke`);
@@ -485,7 +484,7 @@ function OwnedNodeCard({
         "owner_requested",
         confirmation,
       );
-      onNotice("Node credential revoked and active sessions disconnected.");
+      onNotice(t("contribute.node.revoked"));
       await onRefresh();
     } catch (cause) {
       onError(errorText(cause));
@@ -495,24 +494,18 @@ function OwnedNodeCard({
   };
   const uninstall = async () => {
     if (!authSession) return;
-    const retentionChoice = window.prompt(
-      "Choose exactly KEEP-DATA to remove only the service and application, or DELETE-ALL to also erase cache, logs, configuration and device identity.",
-    );
+    const retentionChoice = window.prompt(t("contribute.node.prompt.retention"));
     const retain = uninstallRetentionChoice(retentionChoice);
     if (!retain) {
-      onError("Uninstall cancelled: choose KEEP-DATA or DELETE-ALL exactly.");
+      onError(t("contribute.node.retentionInvalid"));
       return;
     }
-    const code = window.prompt(
-      "Enter the six-digit authenticator code to uninstall this node.",
-    );
+    const code = window.prompt(t("contribute.node.prompt.uninstallCode"));
     if (!code) return;
     if (
-      window.prompt(
-        `Type the complete node ID ${node.nodeId} to confirm ${retentionChoice === "KEEP-DATA" ? "service removal while retaining cache, logs, configuration and identity" : "permanent removal of the service and all node data"}.`,
-      ) !== node.nodeId
+      window.prompt(t(retentionChoice === "KEEP-DATA" ? "contribute.node.prompt.uninstallKeep" : "contribute.node.prompt.uninstallDelete", { node: node.nodeId })) !== node.nodeId
     ) {
-      onError("Uninstall cancelled: node identity did not match.");
+      onError(t("contribute.node.uninstallMismatch"));
       return;
     }
     try {
@@ -532,11 +525,11 @@ function OwnedNodeCard({
   };
   const transferOwnership = async () => {
     if (!authSession) return;
-    const targetAccountId = window.prompt("Enter the destination account ID. The destination account must accept separately.")?.trim();
-    const code = window.prompt("Enter the six-digit authenticator code to authorize ownership transfer.")?.trim();
-    const confirmation = window.prompt(`Type the complete node ID ${node.nodeId} to create a one-time transfer bundle.`)?.trim();
+    const targetAccountId = window.prompt(t("contribute.node.prompt.transferTarget"))?.trim();
+    const code = window.prompt(t("contribute.node.prompt.transferCode"))?.trim();
+    const confirmation = window.prompt(t("contribute.node.prompt.transferConfirm", { node: node.nodeId }))?.trim();
     if (!targetAccountId || !code || confirmation !== node.nodeId) {
-      if (confirmation && confirmation !== node.nodeId) onError("Transfer cancelled: node identity did not match.");
+      if (confirmation && confirmation !== node.nodeId) onError(t("contribute.node.transferMismatch"));
       return;
     }
     setBusy(`${node.nodeId}:transfer`);
@@ -552,7 +545,7 @@ function OwnedNodeCard({
       anchor.download = `mycellios-transfer-${node.nodeId.slice(0, 8)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
-      onNotice("One-time ownership transfer bundle created. Share it only with the destination account; it expires in 15 minutes.");
+      onNotice(t("contribute.node.transferCreated"));
     } catch (cause) {
       onError(errorText(cause));
     } finally {
@@ -566,15 +559,14 @@ function OwnedNodeCard({
     startMinuteUtc: 0,
     endMinuteUtc: 1_440,
   };
-  const presentation = nodePresentation(node);
+  const presentation = nodePresentation(node, t, locale);
   return (
     <div className="owned-node-card">
       <header>
         <div>
           <strong>{node.nodeId.slice(0, 12)}</strong>
           <small>
-            generation {node.generation} ·{" "}
-            {node.connected ? "connected" : "offline"}
+            {t("contribute.node.generation", { generation: node.generation, state: t(node.connected ? "contribute.node.connected" : "contribute.node.offline") })}
           </small>
         </div>
         <UiBadge className={`state-badge ${presentation.tone}`}>
@@ -588,25 +580,25 @@ function OwnedNodeCard({
           disabled={disabled}
           onClick={() => void run("pause", { version: 1 })}
         >
-          Pause
+          {t("contribute.node.pause")}
         </UiButton>
         <UiButton
           disabled={disabled}
           onClick={() => void run("resume", { version: 1 })}
         >
-          Resume
+          {t("contribute.node.resume")}
         </UiButton>
         <UiButton
           disabled={disabled}
           onClick={() => void run("drain", { version: 1, deadlineMs: 300_000 })}
         >
-          Drain
+          {t("contribute.node.drain")}
         </UiButton>
         <UiButton
           disabled={disabled}
           onClick={() => void run("update", { version: 1, channel: "stable" })}
         >
-          Update
+          {t("contribute.node.update")}
         </UiButton>
         <UiButton
           disabled={disabled}
@@ -617,13 +609,13 @@ function OwnedNodeCard({
             })
           }
         >
-          Rollback
+          {t("contribute.node.rollback")}
         </UiButton>
         <UiButton disabled={disabled} onClick={() => void revoke()}>
-          Revoke
+          {t("contribute.node.revoke")}
         </UiButton>
         <UiButton disabled={disabled} onClick={() => void transferOwnership()}>
-          Transfer ownership
+          {t("contribute.node.transfer")}
         </UiButton>
         <UiButton
           disabled={
@@ -631,15 +623,15 @@ function OwnedNodeCard({
           }
           onClick={() => void uninstall()}
         >
-          Uninstall all
+          {t("contribute.node.uninstall")}
         </UiButton>
       </div>
       <UiDisclosure>
         <UiDisclosureSummary>
           <span>
-            Resource limits
+            {t("contribute.limits.title")}
             <small>
-              {limits.maxCpuPercent}% CPU · {limits.maxRamMiB} MiB RAM
+              {t("contribute.limits.summary", { cpu: limits.maxCpuPercent, ram: limits.maxRamMiB })}
             </small>
           </span>
           <ChevronDown />
@@ -647,16 +639,16 @@ function OwnedNodeCard({
         <div className="node-limit-grid">
           {(
             [
-              ["maxConcurrency", "Concurrent jobs"],
-              ["maxCpuPercent", "CPU %"],
-              ["maxRamMiB", "RAM MiB"],
-              ["maxVramMiB", "VRAM MiB"],
-              ["maxDiskMiB", "Disk MiB"],
-              ["maxTemperatureC", "Temperature °C"],
+              "maxConcurrency",
+              "maxCpuPercent",
+              "maxRamMiB",
+              "maxVramMiB",
+              "maxDiskMiB",
+              "maxTemperatureC",
             ] as const
-          ).map(([key, label]) => (
+          ).map((key) => (
             <UiFieldLabel key={key}>
-              <span>{label}</span>
+              <span>{t(`contribute.limits.${key}`)}</span>
               <UiInput
                 type="number"
                 min={key === "maxVramMiB" ? 0 : 1}
@@ -675,31 +667,27 @@ function OwnedNodeCard({
           disabled={disabled}
           onClick={() => void run("set-limits", { version: 1, ...limits })}
         >
-          Apply limits and restart safely
+          {t("contribute.limits.apply")}
         </UiButton>
       </UiDisclosure>
       <UiDisclosure>
         <UiDisclosureSummary>
           <span>
-            Schedule and allowed models
+            {t("contribute.policy.title")}
             <small>
-              {policyWindow.days.length} days ·{" "}
-              {policy.modelAllowlist.length || "any certified"} models
+              {t("contribute.policy.summary", { days: policyWindow.days.length, models: policy.modelAllowlist.length || t("contribute.policy.anyCertified") })}
             </small>
           </span>
           <ChevronDown />
         </UiDisclosureSummary>
-        <UiText>
-          Times are UTC. An empty model list permits any coordinator-certified
-          model.
-        </UiText>
+        <UiText>{t("contribute.policy.note")}</UiText>
         <div
           className="node-schedule-days"
           role="group"
-          aria-label="Contribution days UTC"
+          aria-label={t("contribute.policy.days")}
         >
-          {DAY_LABELS.map((label, day) => (
-            <UiFieldLabel key={label}>
+          {WEEK_DAYS.map((day) => (
+            <UiFieldLabel key={day}>
               <UiInput
                 type="checkbox"
                 checked={policyWindow.days.includes(day)}
@@ -717,13 +705,13 @@ function OwnedNodeCard({
                   }))
                 }
               />
-              {label}
+              {t(`contribute.policy.day.${day}`)}
             </UiFieldLabel>
           ))}
         </div>
         <div className="node-limit-grid">
           <UiFieldLabel>
-            <span>Start UTC</span>
+            <span>{t("contribute.policy.start")}</span>
             <UiInput
               type="time"
               value={minuteToTime(policyWindow.startMinuteUtc)}
@@ -741,7 +729,7 @@ function OwnedNodeCard({
             />
           </UiFieldLabel>
           <UiFieldLabel>
-            <span>End UTC</span>
+            <span>{t("contribute.policy.end")}</span>
             <UiInput
               type="time"
               value={minuteToTime(
@@ -764,7 +752,7 @@ function OwnedNodeCard({
           </UiFieldLabel>
         </div>
         <UiFieldLabel>
-          <span>Exact model IDs, one per line</span>
+          <span>{t("contribute.policy.models")}</span>
           <UiTextarea
             rows={4}
             value={models}
@@ -791,12 +779,12 @@ function OwnedNodeCard({
             })
           }
         >
-          Apply policy and restart safely
+          {t("contribute.policy.apply")}
         </UiButton>
       </UiDisclosure>
       {node.commands[0] && (
         <small>
-          Latest: {node.commands[0].type} · {node.commands[0].state}
+          {t("contribute.node.latest", { command: node.commands[0].type, state: node.commands[0].state })}
         </small>
       )}
     </div>
@@ -804,6 +792,7 @@ function OwnedNodeCard({
 }
 
 function NodeDiagnostics({ node }: { node: OwnedNode }) {
+  const { t, locale } = usePanelI18n();
   const observed = node.observed;
   const diagnostics = observed?.diagnostics;
   if (!observed)
@@ -811,8 +800,8 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
       <div className="node-diagnostics-empty">
         <Radio className="spin" />
         <span>
-          <strong>Waiting for telemetry</strong>
-          <small>The signed node snapshot has not arrived yet.</small>
+          <strong>{t("contribute.diagnostics.waiting")}</strong>
+          <small>{t("contribute.diagnostics.waitingDetail")}</small>
         </span>
       </div>
     );
@@ -827,11 +816,9 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
         <span>
           <Activity />
           <span>
-            <strong>Runtime and diagnostics</strong>
+            <strong>{t("contribute.diagnostics.title")}</strong>
             <small>
-              {observed.build.version} ·{" "}
-              {observed.runtime.backend ?? "runtime pending"} ·{" "}
-              {diagnostics?.capacity.acceleratorCount ?? 0} accelerator(s)
+              {t("contribute.diagnostics.summary", { version: observed.build.version, backend: observed.runtime.backend ?? t("contribute.diagnostics.runtimePending"), count: diagnostics?.capacity.acceleratorCount ?? 0 })}
             </small>
           </span>
         </span>
@@ -839,35 +826,35 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
       </UiDisclosureSummary>
       <div className="node-diagnostics-grid">
         <span>
-          <small>Build</small>
+          <small>{t("contribute.diagnostics.build")}</small>
           <strong>{observed.build.version}</strong>
           <em>{observed.build.sourceRevision}</em>
         </span>
         <span>
-          <small>Runtime</small>
-          <strong>{observed.runtime.ready ? "Ready" : "Starting"}</strong>
+          <small>{t("contribute.diagnostics.runtime")}</small>
+          <strong>{t(observed.runtime.ready ? "contribute.diagnostics.ready" : "contribute.diagnostics.starting")}</strong>
           <em>{observed.runtime.abi}</em>
         </span>
         <span>
-          <small>Accelerator</small>
-          <strong>{accelerator?.name ?? "Not reported"}</strong>
+          <small>{t("contribute.diagnostics.accelerator")}</small>
+          <strong>{accelerator?.name ?? t("contribute.diagnostics.notReported")}</strong>
           <em>
             {accelerator
-              ? `${accelerator.offeredMemoryMiB} / ${accelerator.totalMemoryMiB} MiB offered`
-              : "Capacity pending"}
+              ? t("contribute.diagnostics.offered", { offered: accelerator.offeredMemoryMiB, total: accelerator.totalMemoryMiB })
+              : t("contribute.diagnostics.capacityPending")}
           </em>
         </span>
         <span>
-          <small>Resources</small>
+          <small>{t("contribute.diagnostics.resources")}</small>
           <strong>
             {resources
-              ? `${resources.cpuPercent.toFixed(0)}% CPU · ${resources.ramMiB} MiB`
-              : "Probe pending"}
+              ? t("contribute.diagnostics.resourceUse", { cpu: resources.cpuPercent.toFixed(0), ram: resources.ramMiB })
+              : t("contribute.diagnostics.probePending")}
           </strong>
           <em>
             {resources
-              ? `${resources.diskMiB} MiB disk${resources.temperatureC === null ? "" : ` · ${resources.temperatureC.toFixed(0)} °C`}`
-              : "No measurement yet"}
+              ? `${t("contribute.diagnostics.disk", { disk: resources.diskMiB })}${resources.temperatureC === null ? "" : ` · ${resources.temperatureC.toFixed(0)} °C`}`
+              : t("contribute.diagnostics.noMeasurement")}
           </em>
         </span>
       </div>
@@ -877,7 +864,7 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
           <span>
             <strong>{diagnostics.incident.code}</strong>
             <small>
-              {new Date(diagnostics.incident.occurredAt).toLocaleString()}
+              {new Date(diagnostics.incident.occurredAt).toLocaleString(intlLocale(locale))}
             </small>
           </span>
         </div>
@@ -886,47 +873,45 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
   );
 }
 
+const intlLocale = (locale: PanelLocale) => locale === "es" ? "es-ES" : "en-US";
+
 export function nodePresentation(
   node: Pick<OwnedNode, "connected" | "status" | "observed">,
+  t: PanelTranslate = english,
+  locale: PanelLocale = "en",
 ) {
   if (node.status === "revoked")
     return {
-      label: "Revoked",
+      label: t("contribute.state.revoked"),
       tone: "error",
-      summary: "Credentials revoked. This node can no longer reconnect.",
+      summary: t("contribute.state.revokedSummary"),
     };
   if (!node.observed)
     return {
-      label: node.connected ? "Pairing" : "Waiting",
+      label: t(node.connected ? "contribute.state.pairing" : "contribute.state.waiting"),
       tone: "paused",
-      summary: "Waiting for a signed node snapshot.",
+      summary: t("contribute.state.waitingSummary"),
     };
   if (!node.connected && node.observed.state !== "failed")
     return {
-      label: "Reconnecting",
+      label: t("contribute.state.reconnecting"),
       tone: "paused",
-      summary: `Build ${node.observed.build.version} · last observed ${node.observed.state}.`,
+      summary: t("contribute.state.reconnectingSummary", { version: node.observed.build.version, state: t(`contribute.state.${node.observed.state}`) }),
     };
-  const labels: Record<typeof node.observed.state, string> = {
-    loading: "Loading",
-    pairing: "Pairing",
-    canary: "Canary",
-    ready: "Ready",
-    reconnecting: "Reconnecting",
-    degraded: "Degraded",
-    failed: "Failed",
-    revoked: "Revoked",
-  };
   const state = node.observed.state;
   return {
-    label: labels[state],
+    label: t(`contribute.state.${state}`),
     tone:
       state === "ready"
         ? "online"
         : state === "failed" || state === "revoked"
           ? "error"
           : "paused",
-    summary: `Build ${node.observed.build.version} · ${node.observed.runtime.backend ?? "runtime pending"} · observed ${new Date(node.observed.observedAt).toLocaleString()}.`,
+    summary: t("contribute.state.summary", {
+      version: node.observed.build.version,
+      backend: node.observed.runtime.backend ?? t("contribute.diagnostics.runtimePending"),
+      date: new Date(node.observed.observedAt).toLocaleString(intlLocale(locale)),
+    }),
   };
 }
 
@@ -941,22 +926,50 @@ export interface ContributionErrorPresentation {
   requiresAuth: boolean;
 }
 
-export function contributionErrorPresentation(message: string): ContributionErrorPresentation {
-  const normalized = message.toLowerCase();
+export function contributionErrorPresentation(message: string, t: PanelTranslate = english): ContributionErrorPresentation {
   if (isInvalidSessionError(message)) {
     return {
-      title: "Your contribution session has expired",
-      detail: "This browser's network credential is no longer valid. Sign in again to reconnect your contribution.",
-      action: "Sign in",
+      title: t("contribute.error.expired.title"),
+      detail: t("contribute.error.expired.detail"),
+      action: t("contribute.error.signIn"),
       requiresAuth: true,
     };
   }
   return {
-    title: "Could not update contribution",
-    detail: message || "The coordinator could not confirm this browser's status.",
-    action: "Retry",
+    title: t("contribute.error.title"),
+    detail: message || t("contribute.error.detail"),
+    action: t("contribute.error.retry"),
     requiresAuth: false,
   };
+}
+
+const WORKER_STATUS_KEYS = {
+  "Press the button and keep this screen open.": "contribute.status.idle",
+  "Updating automatically…": "contribute.status.updating",
+  "Paused because mycellios is not visible.": "contribute.status.hidden",
+  "Preparing this device. No work is active until the network connects.": "contribute.status.preparing",
+  "Preparing the compute engine after returning to mycellios…": "contribute.status.returning",
+  "Compute is ready; waiting for coordinator confirmation…": "contribute.status.awaitingCoordinator",
+  "Connection lost; retrying automatically…": "contribute.status.reconnecting",
+  "Device validated and waiting for real inference work.": "contribute.status.validated",
+  "CPU check passed. Waiting for a compatible model layer.": "contribute.status.cpuPassed",
+  "Connected. Running the one-time network admission check…": "contribute.status.admission",
+  "Complete-model response verified by the coordinator.": "contribute.status.modelVerified",
+  "Expert output matched the coordinator's independent reference.": "contribute.status.expertMatched",
+  "Result sent; waiting for coordinator verification…": "contribute.status.resultSent",
+  "Downloading and verifying a real model expert…": "contribute.status.downloadingExpert",
+  "Expert activation returned; awaiting network verification…": "contribute.status.expertReturned",
+} as const satisfies Record<string, Parameters<PanelTranslate>[0]>;
+
+/**
+ * The shared browser worker reports its status in English. Known messages are shown
+ * in the panel's language; measured details and runtime errors stay as reported.
+ */
+export function translateWorkerStatus(text: string, t: PanelTranslate): string {
+  if (Object.hasOwn(WORKER_STATUS_KEYS, text)) return t(WORKER_STATUS_KEYS[text as keyof typeof WORKER_STATUS_KEYS]);
+  const measuring = /^Measuring the (GPU|CPU) with a real task…$/.exec(text);
+  if (measuring) return t("contribute.status.measuring", { engine: measuring[1]! });
+  return text;
 }
 
 function isInvalidSessionError(error: unknown): boolean {
@@ -968,7 +981,7 @@ function isInvalidSessionError(error: unknown): boolean {
     || normalized.includes("session is invalid or expired");
 }
 
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 function timeToMinute(value: string) {
   const [hours = "0", minutes = "0"] = value.split(":");
   return Number(hours) * 60 + Number(minutes);
