@@ -1,5 +1,5 @@
 import {publishRuntimeComponents} from './publish-runtime-components.mjs';
-import {publishInstallerAssets} from './release-publication.mjs';
+import {assertMainStillAdmits,publishInstallerAssets} from './release-publication.mjs';
 import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -59,13 +59,17 @@ const manifest={schema:'mycellios-installer-release/1',version,revision,tree,wor
 await fs.writeFile(path.join(out,'installer-release.json'),JSON.stringify(manifest,null,2));
 const m=path.join(out,'installer-release.json');artifacts.push({fileName:'installer-release.json',sha256:await digest(m),bytes:(await fs.stat(m)).size});
 await fs.writeFile(path.join(out,'SHA256SUMS-all.txt'),artifacts.map(a=>`${a.sha256}  ${a.fileName}`).join('\n')+'\n');
-// Never publish an earlier checkout over concurrent main changes.
-git('fetch','origin','main:refs/remotes/origin/main','--no-tags');if(git('rev-parse','origin/main')!==revision)throw Error('Main advanced during native qualification');
+// Never publish over a newer Desktop version or a revision main no longer contains.
+const checkMain=()=>{git('fetch','origin','main:refs/remotes/origin/main','--no-tags');const main=git('rev-parse','origin/main');
+ let mainContainsRevision=true;try{execFileSync('git',['merge-base','--is-ancestor',revision,main],{stdio:'ignore'});}catch{mainContainsRevision=false;}
+ const mainVersion=JSON.parse(git('show',`${main}:src/agent/apps/desktop/package.json`)).version;
+ assertMainStillAdmits({revision,version,main,mainContainsRevision,mainVersion});};
+checkMain();
 const api=async resource=>{const r=await fetch('https://api.github.com/repos/Mycellios/mycellios/'+resource,{redirect:'error',signal:AbortSignal.timeout(15000),headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json'}});if(r.status===404)return null;if(!r.ok)throw Error('Release API unavailable');return r.json();};
 await publishRuntimeComponents({input,revision,gh,api});
 await fs.writeFile(path.join(out,'notes.md'),`One qualified source revision for Windows, Linux, Fedora and both Mac architectures: ${revision}.\n\nAndroid build input is signed automatically on the original signing host before it is linked by Mycellios. The download page never links an unsigned APK. Platform runner checks passed; physical device installs are separate. Updates remain owner-approved.\n`);
 const sums=path.join(out,'SHA256SUMS-all.txt');
 const complete=[...artifacts,{fileName:'SHA256SUMS-all.txt',sha256:await digest(sums),bytes:(await fs.stat(sums)).size}];
 await publishInstallerAssets({out,tag,revision,artifacts:complete,notesFile:path.join(out,'notes.md'),gh,api,
- assertCurrentMain:()=>{git('fetch','origin','main:refs/remotes/origin/main','--no-tags');if(git('rev-parse','origin/main')!==revision)throw Error('Main advanced before final publication; draft retained');}});
+ assertCurrentMain:checkMain});
 console.log(JSON.stringify({published:true,tag,revision,platforms:platforms.map(p=>p.id),androidSigning:'original-host-required'}));

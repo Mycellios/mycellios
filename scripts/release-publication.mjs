@@ -53,6 +53,18 @@ function missingAssets(release,artifacts){
 }
 
 /** Qualified local assets only; no builders, credentials, or model calls here. */
+/**
+ * A qualified revision may still publish after main moves on, as long as main
+ * contains it and still carries the same Desktop version: the newer commits ship
+ * with the next version. A newer version on main, or a revision that main no
+ * longer contains, keeps the draft unpublished.
+ */
+export function assertMainStillAdmits({revision,version,main,mainContainsRevision,mainVersion}){
+ if(main===revision)return;
+ if(!mainContainsRevision)throw Error('Main no longer contains the qualified revision; draft retained');
+ if(mainVersion!==version)throw Error('Main advanced to another Desktop version; draft retained');
+}
+
 export async function publishInstallerAssets({out,tag,revision,artifacts,notesFile,gh,api,assertCurrentMain}){
  allowedTag('desktop',tag);
  if(!/^[a-f0-9]{40}$/.test(revision)||!Array.isArray(artifacts)||!artifacts.length||typeof assertCurrentMain!=='function')

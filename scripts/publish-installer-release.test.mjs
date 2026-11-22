@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
-import {publishInstallerAssets,resolveFirstPartyRelease} from './release-publication.mjs';
+import {assertMainStillAdmits,publishInstallerAssets,resolveFirstPartyRelease} from './release-publication.mjs';
 
 const revision='a'.repeat(40),tag='desktop-v0.3.56-windows-preview';
 async function fixture(run){
@@ -117,3 +117,11 @@ test('rejects unsafe or duplicate local asset names before contacting GitHub',()
  await assert.rejects(publish({artifacts:[artifacts[0],artifacts[0]]}),/Invalid qualified/);
  assert.deepEqual(state.reads,[]);assert.equal(state.creates,0);
 }));
+
+test('a qualified revision publishes after main advances only while main keeps its Desktop version',()=>{
+ const base={revision,version:'0.10.0',mainContainsRevision:true,mainVersion:'0.10.0'};
+ assert.doesNotThrow(()=>assertMainStillAdmits({...base,main:revision}));
+ assert.doesNotThrow(()=>assertMainStillAdmits({...base,main:'b'.repeat(40)}));
+ assert.throws(()=>assertMainStillAdmits({...base,main:'b'.repeat(40),mainVersion:'0.10.1'}),/another Desktop version; draft retained/);
+ assert.throws(()=>assertMainStillAdmits({...base,main:'b'.repeat(40),mainContainsRevision:false}),/no longer contains the qualified revision/);
+});
