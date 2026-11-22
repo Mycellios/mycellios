@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   engineRuntimeChallengeSchema,
@@ -9,7 +10,7 @@ import { engineRuntimeExactnessSchema } from "../src/contracts/engine-runtime-pr
 import { probeLlamaCppEngineRuntimeProfile } from "../src/worker/llama-cpp-engine-probe.js";
 
 const BUILD = "llama.cpp-b12613-win-vulkan-x64";
-const CACHE = join("C:", "mycellios", "cache");
+const CACHE = resolve(tmpdir(), "mycellios-probe-cache");
 
 function request(backend: "vulkan" | "cpu" = "vulkan") {
   return {
