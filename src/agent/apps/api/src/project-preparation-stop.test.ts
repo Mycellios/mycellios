@@ -11,6 +11,7 @@ it.each([false, true])("Stop preserves unrelated work and steering (legacy task 
   const steering = [{ runId: "setup" }, { runId: "chat" }, { runId: null }];
   const tx = {
     $queryRaw: vi.fn(),
+    botMessageRecipient: { findMany: vi.fn(async () => []) },
     externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     message: { findMany: vi.fn(async () => []) },
     run: {

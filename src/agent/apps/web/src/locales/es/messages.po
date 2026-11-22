@@ -14502,6 +14502,106 @@ msgstr "Cancelar la espera"
 msgid "Waiting for an event"
 msgstr "Esperando un evento"
 
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Esperando respuestas"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{done} de {total} respuestas recibidas"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "en {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} lo atiende a continuación"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} está trabajando en ello"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} te necesita"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} respondió"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} no pudo terminar"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} se detuvo"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "Detener a {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Ocultar esta lista"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "No se pudo actualizar la lista. Vuelve a intentarlo."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} está deteniendo su tarea"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "La tarea de {name} está detenida"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Reasignar…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} espera otro trabajo"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} está trabajando en una tarea delegada"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "Aviso enviado a {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Novedad de {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Propósito"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "¿Para qué es este grupo?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Líder"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Recibe los mensajes que no nombran a ningún miembro y los pasa cuando otro miembro encaja mejor."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Enviar al grupo"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "Enviar a {groupName}"
+
 #: src/pages/shell/queue-panel.tsx
 msgid "A routine is running now."
 msgstr "Ahora se está ejecutando una rutina."

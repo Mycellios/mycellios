@@ -621,6 +621,26 @@
   db events/messages, message-view and peer-exchange-groups tests and
   `node --import tsx scripts/verify-agent-tasks-db.ts`; fakes do not qualify a live model.
 
+- Micos messaging each other and groups follow specs/mico-team-messaging/spec.md (the
+  reference product is a behavior reference only). message_bot reaches 1-32 owned Micos,
+  shares at most 10 workspace files as owner/Space artifacts, and takes reply_to_message_id
+  and expects_reply; every recipient still gets its own bot_message turn, never a steer.
+  Requests open bot_message_requests/recipients (ids and states only). Answers to a
+  multi-recipient request are held and released as one turn under the request row lock,
+  naming who did not answer; stopThreadRuns and the job reconciler settle stopped
+  recipients, and a request nobody answered starts no turn. "Waiting for replies"
+  (tasks.awaitingReplies) reuses the person's Stop and the revisioned work controls
+  (Continue = resume). list_agents is read-only; interrupt_agent stops only turns working on
+  the caller's own messages, through the durable Stop, and refuses the rest. Groups keep a
+  purpose and a person-chosen leadBotId (additive `20261123090000` migration); routing is
+  deterministic (mentions, @everyone, an opening name, else the lead) with no model routing
+  call; a member's history hides other members' replies to the same message; "continue"
+  resumes the stopped work of the newest request; send_to_group returns answers to the
+  sender's main chat; history tools stay available and the 24-task limit is unchanged.
+  Verify adapters/core bot-messages, group-mentions, message-visibility, thread-target,
+  AwaitingReplies, CollaborationMarker, GroupPanel and SendToGroup tests and
+  `node --import tsx scripts/verify-mico-requests-db.ts`.
+
 - "Branch in new conversation" (specs/conversation-branching/spec.md; behavior reference only)
   sits in the More menu of the last Mico message of each finished turn, main chat or side
   conversation, on desktop/web only (not phones, groups, projects or floating chats); disabled

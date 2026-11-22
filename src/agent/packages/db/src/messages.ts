@@ -4,13 +4,18 @@ import type { Prisma, PrismaClient } from "./client.js";
 import { ThreadLifecycleError } from "./thread-lifecycle.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
-/** Group turns use channel inputs and their own outputs, never private thread history. */
+/**
+ * Group turns use channel inputs and their own outputs, never private thread history.
+ * `hiddenRunIds` leaves out other members' replies to the request this turn answers, so a
+ * member forms its own answer before it sees theirs.
+ */
 export function loadRunHistoryMessages(
   prisma: PrismaClient,
   run: { id: string; threadId: string },
   limit: number,
   channelId?: string,
   contextStartSeq = 0,
+  hiddenRunIds: readonly string[] = [],
 ) {
   return prisma.message.findMany({
     where: {
@@ -20,7 +25,10 @@ export function loadRunHistoryMessages(
       // only with the turn that answers them.
       NOT: { steeringMessages: { some: { originTrigger: { in: ["queued_user", "agent_task"] }, claimedAt: null, OR: [{ runId: null }, { runId: { not: run.id } }] } } },
       // A routine run marker only links the main chat to the routine conversation.
-      AND: [{ NOT: { role: "system", blocks: { array_contains: [{ kind: "routine_run" }] } } }],
+      AND: [
+        { NOT: { role: "system", blocks: { array_contains: [{ kind: "routine_run" }] } } },
+        ...(hiddenRunIds.length ? [{ NOT: { role: "bot", runId: { in: [...hiddenRunIds] } } }] : []),
+      ],
       ...(channelId
         ? {
             OR: [
@@ -168,4 +176,21 @@ export async function assertRunIsCancelled(
   if (run?.status !== "cancelled") {
     throw new RunHistoryWriteError();
   }
+}
+
+/**
+ * Other members' turns that answer the same group message as this turn. Their replies stay out
+ * of this turn's history, so each member answers from its own view; later turns see them.
+ */
+export async function samePromptPeerRunIds(
+  prisma: PrismaClient,
+  run: { threadId: string; botId: string; sourceMessageId?: string | null },
+): Promise<string[]> {
+  if (!run.sourceMessageId) return [];
+  const rows = await prisma.run.findMany({
+    where: { threadId: run.threadId, sourceMessageId: run.sourceMessageId, botId: { not: run.botId } },
+    select: { id: true },
+    take: 50,
+  });
+  return rows.map((row) => row.id);
 }

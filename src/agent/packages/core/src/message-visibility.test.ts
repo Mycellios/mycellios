@@ -117,7 +117,7 @@ describe("user-visible messages", () => {
     ];
 
     // Results, statuses, and the helper asking back about the delegated work all wake the bot to
-    // speak to the user. An FYI never threads back, but it is not new work either.
+    // speak to the user.
     const unthreaded = (intent: "fyi" | "request" | "question") =>
       resultFor(intent).map((item) => ({ ...item, replyToMessageId: undefined }));
     for (const messages of [
@@ -125,7 +125,6 @@ describe("user-visible messages", () => {
       resultFor("status"),
       resultFor("question"),
       resultFor("request"),
-      unthreaded("fyi"),
     ]) {
       const transcript = foldPeerReplies(messages, { includePeerReceipts: true });
       // Threaded back to "Messaged Coder", the marker merges into that receipt; an FYI keeps it.
@@ -147,8 +146,9 @@ describe("user-visible messages", () => {
     const merged = foldPeerReplies(resultFor("result"), { includePeerReceipts: true });
     expect(jumpTargetId(merged, "received")).toBe("sent");
     expect(jumpTargetId(merged, "relay")).toBe("relay");
-    // New work from another bot: the reply goes back to that bot, so it folds.
-    for (const intent of ["request", "question"] as const) {
+    // New work from another bot: the reply goes back to that bot, so it folds. An update a
+    // teammate sent unasked folds its quiet reply under the "Update from" marker too.
+    for (const intent of ["request", "question", "fyi"] as const) {
       expect(
         foldPeerReplies(unthreaded(intent), { includePeerReceipts: true })
           .folded.get("received")

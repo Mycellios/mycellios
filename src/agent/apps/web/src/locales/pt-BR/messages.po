@@ -7060,6 +7060,114 @@ msgstr "Cancelar a espera"
 msgid "Waiting for an event"
 msgstr "Aguardando um evento"
 
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Aguardando respostas"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{done} de {total} respostas recebidas"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "em {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} pega isso em seguida"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} está trabalhando nisso"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} precisa de você"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} respondeu"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} não conseguiu terminar"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} foi interrompido"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "Parar {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Ocultar esta lista"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "Não foi possível atualizar a lista. Tente novamente."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} está parando a tarefa"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "A tarefa de {name} está parada"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Reatribuir…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} aguarda outro trabalho"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} está trabalhando em uma tarefa delegada"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Cancelar tarefa"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "Reatribuir tarefa"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "Aviso enviado a {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Atualização de {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Propósito"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "Para que serve este grupo?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Líder"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Recebe as mensagens que não citam nenhum membro e as repassa quando outro membro é mais adequado."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Enviar para o grupo"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "Enviar para {groupName}"
+
 #: src/pages/shell/queue-panel.tsx
 msgid "A routine is running now."
 msgstr "Uma rotina está em execução agora."

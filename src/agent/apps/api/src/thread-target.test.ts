@@ -3788,6 +3788,7 @@ describe("stopThreadRuns", () => {
     const transaction = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
+      botMessageRecipient: { findMany: vi.fn(async () => []) },
       thread: {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
       },
@@ -3930,6 +3931,7 @@ describe("stopThreadRuns", () => {
     const transaction = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
+      botMessageRecipient: { findMany: vi.fn(async () => []) },
       thread: {
         update: vi.fn().mockResolvedValue({ nextEventSeq: 5 }),
       },
@@ -4041,6 +4043,7 @@ describe("stopThreadRuns", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
+      botMessageRecipient: { findMany: vi.fn(async () => []) },
       thread: {
         update: vi.fn(async () => ({ nextEventSeq: ++nextEventSeq })),
       },
@@ -4147,6 +4150,7 @@ describe("stopThreadRuns", () => {
     const transaction = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn(),
+      botMessageRecipient: { findMany: vi.fn(async () => []) },
       thread: { update: vi.fn() },
       run: {
         updateManyAndReturn: vi.fn().mockResolvedValue([]),

@@ -66,6 +66,7 @@ import {
 import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, NotificationKind, RunStatus } from "@mycellios/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
+  BOT_MESSAGE_MAX_FILES,
   BotSecretName,
   botSecretSubmissionSchema,
   CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE,
@@ -170,6 +171,7 @@ import {
   isTooManyDatabaseConnections,
   listApprovalRules,
   loadRunHistoryMessages,
+  samePromptPeerRunIds,
   loadRunTurnCheckpoint,
   parseComputerMode,
   RUN_TURN_CHECKPOINT_KIND,
@@ -345,6 +347,8 @@ import {
   updateFleetGroup,
 } from "./fleet-tools.js";
 import { handoffToGroupBot, loadBotGroupDirectory, loadGroupContext } from "./group-handoff.js";
+import { sendToGroup, settleGroupRequestRun } from "./group-requests.js";
+import { interruptAgent, listAgents } from "./team-awareness.js";
 import {
   COMPACTION_BATCH_SIZE,
   formatCompactedSummary,
@@ -623,6 +627,7 @@ function eventWaitForModel(wait: EventWaitView, currentThreadId: string) {
 
 const READ_ONLY_AGENT_TOOLS = new Set([
   "app_read",
+  "list_agents",
   "list_waits",
   "pc_windows",
   "pc_snapshot",
@@ -4067,7 +4072,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             where: { id: run.botId },
             include: { computer: true },
           }),
-          loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId, thread.contextStartSeq),
+          // A group member answers the person's message from its own view: other members'
+          // replies to that same message stay out of its history until it has answered.
+          (thread.groupId ? samePromptPeerRunIds(deps.prisma, run) : Promise.resolve([])).then((hiddenRunIds) =>
+            loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId, thread.contextStartSeq, hiddenRunIds),
+          ),
           run.trigger === "bot_message"
             ? loadBotMessageContext(deps.prisma, run.sourceMessageId)
             : Promise.resolve(undefined),
@@ -8383,12 +8392,59 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish(await executeWorkflowTool(deps.prisma, run, name, args, effectKey));
           }
           if (name === "message_bot") {
+            const paths = Array.isArray(args.paths)
+              ? args.paths.map((value) => String(value ?? "").trim()).filter(Boolean)
+              : [];
+            if (paths.length > BOT_MESSAGE_MAX_FILES)
+              return finish({ error: `share at most ${BOT_MESSAGE_MAX_FILES} files per message` });
+            // Shared files travel as owner/Space artifacts, the same path attach_file uses; each
+            // recipient's turn copies them into its own workspace.
+            const attachments: Array<Extract<MessageBlock, { kind: "file" | "image" }>> = [];
+            if (paths.length) {
+              if (!deps.artifacts) return finish({ error: "artifact storage unavailable" });
+              if (!computerAvailable) return finish({ error: "sharing files needs your computer" });
+              for (const filePath of paths) {
+                let bytes: Uint8Array;
+                try {
+                  bytes = await deps.sandbox.readFile(
+                    await getRunComputer("tool", name),
+                    resolveBotWorkspacePath(computerMode, bot.id, filePath),
+                    context,
+                    { maxBytes: deps.maxUploadSizeBytes ?? ATTACHMENT_MAX_BYTES },
+                  );
+                } catch {
+                  return finish({ error: `file not found or unreadable: ${filePath}` });
+                }
+                if (!inferAttachmentMimeType(filePath))
+                  return finish({ error: `unsupported file type: ${filePath}` });
+                try {
+                  const shared = await attachWorkspaceFileToThread(
+                    { prisma: deps.prisma, artifacts: deps.artifacts, maxUploadSizeBytes: deps.maxUploadSizeBytes },
+                    {
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      botId: bot.id,
+                      runId: run.id,
+                      filePath,
+                      bytes,
+                      operationId: `${executionId}:share:${attachments.length}`,
+                    },
+                  );
+                  attachments.push(shared.block);
+                } catch (error) {
+                  return finish({
+                    error: `${filePath}: ${error instanceof Error ? error.message : "could not share file"}`,
+                  });
+                }
+              }
+            }
             const sent = await messageBot(
               deps,
               { ...run, sourceMessageId: run.sourceMessageId },
               { id: bot.id, name: bot.name },
               {
                 bot_id: args.bot_id ? String(args.bot_id) : undefined,
+                bot_ids: Array.isArray(args.bot_ids) ? args.bot_ids.map((value) => String(value)) : undefined,
                 confirm_name: args.confirm_name ? String(args.confirm_name) : undefined,
                 message: redactSecrets(String(args.message ?? ""), runSecrets),
                 intent: args.intent as
@@ -8398,6 +8454,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   | "status"
                   | "fyi"
                   | undefined,
+                expects_reply: typeof args.expects_reply === "boolean" ? args.expects_reply : undefined,
+                reply_to_message_id: args.reply_to_message_id ? String(args.reply_to_message_id) : undefined,
+                attachments,
                 deliveryKey: effectKey,
               },
             );
@@ -8406,8 +8465,42 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ok: true,
               botId: sent.botId,
               name: sent.name,
+              ...("recipients" in sent && sent.recipients ? { recipients: sent.recipients } : {}),
+              ...("files" in sent && sent.files ? { files: sent.files } : {}),
               note: sent.note,
             });
+          }
+          if (name === "list_agents") {
+            return finish(await listAgents(deps, { spaceId: run.spaceId, userId: run.userId, botId: bot.id }));
+          }
+          if (name === "interrupt_agent") {
+            return finish(
+              await interruptAgent(
+                deps,
+                { spaceId: run.spaceId, userId: run.userId, botId: bot.id, name: bot.name },
+                {
+                  bot_id: args.bot_id ? String(args.bot_id) : undefined,
+                  confirm_name: args.confirm_name ? String(args.confirm_name) : undefined,
+                  reason: redactSecrets(String(args.reason ?? ""), runSecrets),
+                },
+              ),
+            );
+          }
+          if (name === "send_to_group") {
+            if (thread.groupId) return finish({ error: "you are in a group; use handoff_to_bot here" });
+            return finish(
+              await sendToGroup(
+                deps,
+                { ...run, sourceMessageId: run.sourceMessageId },
+                { id: bot.id, name: bot.name },
+                {
+                  group_id: String(args.group_id ?? ""),
+                  message: redactSecrets(String(args.message ?? ""), runSecrets),
+                  bot_ids: Array.isArray(args.bot_ids) ? args.bot_ids.map((value) => String(value)) : undefined,
+                  deliveryKey: effectKey,
+                },
+              ),
+            );
           }
           if (name === "connect_agent") {
             const result = await connectAgent(
@@ -10112,13 +10205,19 @@ async function notifyFailedRoutineRun(
 /**
  * After a turn ends: start the report it queued in the Mico's main chat (the row is durable,
  * so the reconciler repairs a lost enqueue), and once a report turn ends, answer a teammate
- * whose request opened that task when none of its tasks is still working.
+ * whose request opened that task when none of its tasks is still working. A group member's
+ * turn for a send_to_group request hands its answer to the Mico that asked.
  */
 async function afterAgentTaskTurn(
   deps: ExecutorDeps,
-  run: { trigger: string; clientNonce?: string | null; spaceId: string; userId: string },
+  run: { id: string; trigger: string; clientNonce?: string | null; spaceId: string; userId: string },
   finalized: { taskReport?: { runId: string } | null },
 ) {
+  if (run.trigger === "follow_up") {
+    await settleGroupRequestRun(deps, run.id).catch((error) =>
+      getLogger().error("group request answer", error),
+    );
+  }
   if (finalized.taskReport) {
     await deps.jobs
       .enqueue(runContinueJob(finalized.taskReport.runId))
@@ -10416,6 +10515,8 @@ export function selectBuiltinToolsForRun(options: {
         ![
           "message_user",
           "message_bot",
+          "send_to_group",
+          "interrupt_agent",
           "handoff_to_bot",
           "message_agent",
           "generate_image",

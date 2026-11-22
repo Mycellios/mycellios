@@ -7060,6 +7060,114 @@ msgstr "取消等待"
 msgid "Waiting for an event"
 msgstr "正在等待事件"
 
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "等待回复"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "已收到 {done}/{total} 条回复"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "在 {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} 接下来会处理"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} 正在处理"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} 需要你"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} 已回复"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} 未能完成"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} 已被停止"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "停止 {name}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "隐藏此列表"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "无法更新列表。请重试。"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} 正在停止任务"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "{name} 的任务已停止"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "重新分配…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} 在等待其他工作"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} 正在处理委派的任务"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "取消任务"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "重新分配任务"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "已告知 {peer}"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "来自 {peer} 的更新"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "用途"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "这个群组用来做什么？"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "负责人"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "接收未点名任何成员的消息，并在其他成员更合适时转交。"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "发送到群组"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "发送到 {groupName}"
+
 #: src/pages/shell/queue-panel.tsx
 msgid "A routine is running now."
 msgstr "现在正在运行一个例程。"

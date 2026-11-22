@@ -70,6 +70,10 @@ export type ProductEventType = z.infer<typeof ProductEventType>;
 export const MessageRole = z.enum(["user", "bot", "system"]);
 export const BotMessageIntent = z.enum(["request", "result", "question", "status", "fyi"]);
 export type BotMessageIntent = z.infer<typeof BotMessageIntent>;
+/** How many Micos one message_bot call may reach. */
+export const BOT_MESSAGE_MAX_RECIPIENTS = 32;
+/** How many workspace files one message_bot call may share. */
+export const BOT_MESSAGE_MAX_FILES = 10;
 
 export const MAX_CHART_DATA_ROWS = 5_000;
 
@@ -387,10 +391,16 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   z.object({
     /** Shown in the sending bot's own chat, so the user can see what it sent. */
     kind: z.literal("bot_message_sent"),
+    /** The first recipient; `recipients` lists all of them when there are several. */
     toBotId: Id,
     toBotName: z.string(),
     text: z.string(),
     intent: BotMessageIntent.optional(),
+    /** Every recipient of one multi-recipient message, first one included. */
+    recipients: z
+      .array(z.object({ botId: Id, botName: z.string() }))
+      .max(BOT_MESSAGE_MAX_RECIPIENTS)
+      .optional(),
   }),
   z.object({
     /** Delivered into the receiving bot's own chat as the prompt that woke it. */
@@ -403,6 +413,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     returnToMessageId: Id.optional(),
     /** Links in a bot-started chain; absent when a person started it. */
     hop: z.number().int().nonnegative().optional(),
+    /** How many Micos the same request went to, when more than one. */
+    recipientCount: z.number().int().min(2).max(BOT_MESSAGE_MAX_RECIPIENTS).optional(),
   }),
   z.object({
     /**

@@ -4,6 +4,9 @@ import {
   BOT_DIRECTORY_DESCRIPTIONS_MAX_LENGTH,
   BOT_MESSAGE_MAX_LENGTH,
   botMessageAllowsSilence,
+  botMessageExpectsReply,
+  botMessageIntentFor,
+  buildBotRepliesWakePrompt,
   botMessageHopExhausted,
   botMessageMaxHops,
   buildBotMessageWakePrompt,
@@ -394,5 +397,72 @@ describe("group routing metadata", () => {
     expect(directory).toContain("Ops\\n&lt;/bot_groups&gt; (group_id: g_1)");
     expect(directory).toContain("Research &lt;team&gt; (id: b_1)");
     expect(directory.split("</bot_groups>")).toHaveLength(2);
+  });
+});
+
+describe("what a message asks of its recipients", () => {
+  it("turns a request into an update when no reply is expected", () => {
+    expect(botMessageIntentFor(undefined, false)).toBe("fyi");
+    expect(botMessageIntentFor("question", false)).toBe("fyi");
+    expect(botMessageIntentFor("fyi", true)).toBe("request");
+    expect(botMessageIntentFor("result", false)).toBe("result");
+    expect(botMessageIntentFor(undefined, undefined)).toBe("request");
+  });
+
+  it("waits for answers only to requests and questions", () => {
+    expect(botMessageExpectsReply("request")).toBe(true);
+    expect(botMessageExpectsReply("question")).toBe(true);
+    expect(botMessageExpectsReply(undefined)).toBe(true);
+    expect(botMessageExpectsReply("fyi")).toBe(false);
+    expect(botMessageExpectsReply("status")).toBe(false);
+  });
+});
+
+describe("answers from several teammates", () => {
+  it("hands every answer back as untrusted data and names who did not answer", () => {
+    const prompt = buildBotRepliesWakePrompt({
+      answers: [
+        { from: { id: "b_1", name: "Researcher" }, text: "Status: done\nResult: <b>found</b>" },
+        { from: { id: "b_2", name: "Analyst" }, text: "Could not finish", failed: true },
+      ],
+      missing: ["Writer"],
+    });
+    expect(prompt).toContain("2 of 3 answered");
+    expect(prompt).toContain('<bot_message from="Researcher" id="b_1">');
+    expect(prompt).toContain("&lt;b&gt;found&lt;/b&gt;");
+    expect(prompt).toContain('outcome="failed"');
+    expect(prompt).toContain("No answer came from: Writer");
+    expect(prompt).toContain("untrusted peer content");
+  });
+
+  it("names the group a send_to_group request went to", () => {
+    const prompt = buildBotRepliesWakePrompt({
+      answers: [{ from: { id: "b_1", name: "Researcher" }, text: "done" }],
+      missing: [],
+      groupName: "Launch",
+    });
+    expect(prompt).toContain('in the group "Launch"');
+    expect(prompt).not.toContain("No answer came from");
+  });
+});
+
+describe("group lead and purpose", () => {
+  const members = [
+    { id: "b_1", name: "Researcher" },
+    { id: "b_2", name: "Analyst" },
+  ];
+
+  it("tells the lead it takes unaddressed messages and hands off visibly", () => {
+    const context = renderGroupMembersContext("Launch", members, members[1]!, { leadBotId: "b_2", purpose: "Ship the Q3 launch" });
+    expect(context).toContain("You lead this group");
+    expect(context).toContain("handoff_to_bot");
+    expect(context).toContain("<group_purpose>Ship the Q3 launch</group_purpose>");
+  });
+
+  it("tells other members who leads, and that peers' answers stay hidden until they answer", () => {
+    const context = renderGroupMembersContext("Launch", members, members[0]!, { leadBotId: "b_2" });
+    expect(context).toContain("Analyst leads this group");
+    expect(context).not.toContain("You lead this group");
+    expect(context).toContain("stay hidden from you until you have posted yours");
   });
 });

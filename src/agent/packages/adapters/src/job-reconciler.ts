@@ -7,6 +7,7 @@ import { reconcileComputerRuns } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
+import { reconcileBotRequestRecipients } from "./group-requests.js";
 import { reconcileCallRequests } from "./call-request.js";
 import { reconcilePlanAutoStarts } from "./plan-autostart.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
@@ -360,6 +361,11 @@ export function createJobReconciler(
               });
             }
           }),
+        );
+        // Requests to several Micos (or a group) must not wait on a recipient whose turn ended
+        // outside the answer and stop paths.
+        await reconcileBotRequestRecipients({ prisma: deps.prisma, jobs: deps.jobs, events }, { limit: batchSize }).catch(
+          (error) => getLogger().error("bot request recipient reconciliation", error),
         );
       }
 

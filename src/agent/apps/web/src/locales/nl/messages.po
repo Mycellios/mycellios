@@ -7061,6 +7061,114 @@ msgstr "Wachten annuleren"
 msgid "Waiting for an event"
 msgstr "Wacht op een gebeurtenis"
 
+#: src/components/AwaitingReplies.tsx
+msgid "Waiting for replies"
+msgstr "Wachten op antwoorden"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{done} of {total} replies in"
+msgstr "{done} van {total} antwoorden binnen"
+
+#: src/components/AwaitingReplies.tsx
+msgid "in {group}"
+msgstr "in {group}"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} picks it up next"
+msgstr "{name} pakt het hierna op"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on it"
+msgstr "{name} werkt eraan"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} needs you"
+msgstr "{name} heeft je nodig"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} replied"
+msgstr "{name} heeft geantwoord"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} could not finish"
+msgstr "{name} kon het niet afmaken"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} was stopped"
+msgstr "{name} is gestopt"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Stop {name}"
+msgstr "{name} stoppen"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Hide this list"
+msgstr "Deze lijst verbergen"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The list could not be updated. Try again."
+msgstr "De lijst kon niet worden bijgewerkt. Probeer het opnieuw."
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is stopping its task"
+msgstr "{name} stopt de taak"
+
+#: src/components/AwaitingReplies.tsx
+msgid "The task for {name} is stopped"
+msgstr "De taak voor {name} is gestopt"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign…"
+msgstr "Opnieuw toewijzen…"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} waits on other work"
+msgstr "{name} wacht op ander werk"
+
+#: src/components/AwaitingReplies.tsx
+msgid "{name} is working on a delegated task"
+msgstr "{name} werkt aan een gedelegeerde taak"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Cancel task"
+msgstr "Taak annuleren"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Reassign task"
+msgstr "Taak opnieuw toewijzen"
+
+#: src/pages/shell/message-view.tsx
+msgid "Informed {peer}"
+msgstr "{peer} geïnformeerd"
+
+#: src/pages/shell/message-view.tsx
+msgid "Update from {peer}"
+msgstr "Update van {peer}"
+
+#: src/pages/GroupPanel.tsx
+msgid "Purpose"
+msgstr "Doel"
+
+#: src/pages/GroupPanel.tsx
+msgid "What is this group for?"
+msgstr "Waarvoor is deze groep?"
+
+#: src/pages/GroupPanel.tsx
+msgid "Lead"
+msgstr "Leider"
+
+#: src/pages/GroupPanel.tsx
+msgid "Takes the messages that name no member, and hands them on when another member fits better."
+msgstr "Krijgt de berichten die geen lid noemen en geeft ze door als een ander lid beter past."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to group"
+msgstr "Naar groep sturen"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Send to {groupName}"
+msgstr "Naar {groupName} sturen"
+
 #: src/pages/shell/queue-panel.tsx
 msgid "A routine is running now."
 msgstr "Er draait nu een routine."

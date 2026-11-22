@@ -716,9 +716,12 @@ export function botsRoutes(ctx: RouterContext) {
       duplicate: authed.groups.duplicate.handler(async ({ context, input }) => {
         const source = await groupRepos.getGroup(context.actor, input.groupId);
         try {
+          const botIds = source.members.map((member) => member.bot.id);
           return await groupRepos.createGroup(context.actor, {
             name: duplicateBotName(source.name),
-            botIds: source.members.map((member) => member.bot.id),
+            botIds,
+            ...(source.purpose ? { purpose: source.purpose } : {}),
+            ...(source.leadBotId && botIds.includes(source.leadBotId) ? { leadBotId: source.leadBotId } : {}),
           });
         } catch (error) {
           throw mapSpaceLifecycleError(error);

@@ -10,7 +10,7 @@ import type { RouterContext } from "./routes/context.js";
 beforeEach(() => { fixtures.allowed = true; fixtures.read.mockReset().mockResolvedValue(null); fixtures.access.mockClear(); });
 function route() {
   const procedure = { handler: (handler: unknown) => handler };
-  const authed = { engines: { codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, get: procedure, control: procedure } };
+  const authed = { engines: { codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
   const routes = localCapabilityRoutes({ authed, deps: { dataDir: "host" } } as unknown as RouterContext);
   return routes.engines.codexQuota as unknown as (input: { context: { actor: { userId: string; spaceId: string } } }) => Promise<unknown>;
 }

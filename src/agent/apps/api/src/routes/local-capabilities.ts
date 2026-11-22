@@ -5,7 +5,11 @@ import {
 } from "@mycellios/adapters";
 import { createTaskControls } from "../task-controls.js";
 import { createAcpRegistry } from "../acp-registry.js";
-import { closeEventWait, controlWorkTree, listEventWaits, workStatus, IsolationError } from "@mycellios/db";
+import {
+  awaitingRepliesForThread, awaitingReplyRun, closeEventWait, controlWorkTree, hideAwaitingReplies, listEventWaits,
+  workStatus, IsolationError,
+} from "@mycellios/db";
+import { resolveThreadTarget, stopThreadRuns } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
 
 export function localCapabilityRoutes({ authed, deps }: RouterContext) {
@@ -89,6 +93,29 @@ export function localCapabilityRoutes({ authed, deps }: RouterContext) {
         if (!thread) throw new IsolationError();
         const waits = await listEventWaits(deps.prisma, { spaceId: actor.spaceId, userId: actor.userId, botId: input.botId }, { threadIds: [thread.id] });
         return waits.map(({ closedAt: _closedAt, closedBy: _closedBy, thread: _thread, ...wait }) => wait);
+      }),
+      awaitingReplies: authed.tasks.awaitingReplies.handler(async ({ context, input }) => {
+        const { spaceId, userId } = context.actor;
+        // Answers always land in the Mico's main chat, so the list belongs there.
+        const bot = await deps.prisma.bot.findFirst({ where: { id: input.botId, spaceId, userId, archivedAt: null },
+          select: { thread: { select: { id: true } } } });
+        if (!bot?.thread) throw new IsolationError();
+        return awaitingRepliesForThread(deps.prisma, { spaceId, userId, botId: input.botId, threadId: bot.thread.id });
+      }),
+      stopAwaitingReply: authed.tasks.stopAwaitingReply.handler(async ({ context, input }) => {
+        const pending = await awaitingReplyRun(deps.prisma, context.actor, input);
+        // Already answered, failed or stopped: nothing is left to stop.
+        if (!pending) return { ok: true as const };
+        // The person's own Stop on that turn: same cancellation, teardown and settlement.
+        const target = await resolveThreadTarget(deps.prisma, context.actor,
+          pending.groupId ? { groupId: pending.groupId } : { botId: input.botId });
+        if (target.threadId !== pending.threadId) throw new IsolationError();
+        await stopThreadRuns(deps, context.actor, target, [pending.runId]);
+        return { ok: true as const };
+      }),
+      hideAwaitingReplies: authed.tasks.hideAwaitingReplies.handler(async ({ context, input }) => {
+        await hideAwaitingReplies(deps.prisma, context.actor, input.requestIds);
+        return { ok: true as const };
       }),
       cancelWait: authed.tasks.cancelWait.handler(async ({ context, input }) => {
         const { spaceId, userId } = context.actor;
