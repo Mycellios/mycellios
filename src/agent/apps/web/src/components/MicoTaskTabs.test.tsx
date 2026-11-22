@@ -13,6 +13,7 @@ vi.mock("@mycellios/ui-web", async (original) => ({ ...await original<typeof imp
 import { fitConversationTabs, MainTabMenu, MicoTaskTabs } from "./MicoTaskTabs";
 import { queryClient } from "../lib/query";
 import { NEW_CONVERSATION_TAB, readConversationTabs, updateConversationTabs } from "../lib/thread-tabs";
+import { openBranchTab } from "../lib/conversation-branch";
 
 const roots: ReturnType<typeof createRoot>[] = [];
 beforeEach(() => { localStorage.clear(); queryClient.clear(); toast.mockClear(); toast.error.mockClear(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); });
@@ -151,6 +152,39 @@ describe("Mico task navigation", () => {
     expect(tabButton(host, "mine").getAttribute("aria-current")).toBe("page");
     expect(select).not.toHaveBeenCalled();
     expect(document.activeElement).not.toBe(tabButton(host, "task"));
+  });
+
+  it("shows a branch right after the tab it came from, titled at once, as the person's own conversation", async () => {
+    const { host, root } = mount();
+    const select = vi.fn();
+    const rows: Array<Record<string, unknown>> = [
+      { threadId: "a", title: "Trip budget", kind: "conversation", startedBy: "user" },
+      { threadId: "b", title: "Notes", kind: "conversation", startedBy: "user" },
+    ];
+    let release: () => void = () => undefined;
+    const list = vi.fn(async () => rows.map(row => ({ ...row })));
+    const rpc = { development: { list } } as unknown as RpcClient;
+    updateConversationTabs("branches", state => ({ ...state, ids: ["a", "b"] }));
+    queryClient.setQueryData(["conversation-tabs", "branches", "width"], 1200);
+    await act(() => root.render(<MicoTaskTabs botId="mico" scope="branches" taskThreadId="a" rpc={rpc} onSelect={select} />));
+    // The server answered with the new branch; until the list is read again its tab already has its title.
+    list.mockImplementationOnce(() => new Promise(resolve => { release = () => resolve(rows.map(row => ({ ...row }))); }));
+    await act(async () => openBranchTab("branches", "a", { threadId: "a2", title: "Trip budget #2" }));
+    await act(() => root.render(<MicoTaskTabs botId="mico" scope="branches" taskThreadId="a2" rpc={rpc} onSelect={select} />));
+    expect(readConversationTabs("branches").ids).toEqual(["a", "a2", "b"]);
+    expect(tabButton(host, "a2").textContent).toBe("Trip budget #2");
+    expect(tabButton(host, "a2").getAttribute("aria-current")).toBe("page");
+    rows.splice(1, 0, { threadId: "a2", title: "Trip budget #2", kind: "conversation", startedBy: "branch", titleSource: "auto", branchedFromThreadId: "a" });
+    await act(async () => release());
+    await flush();
+    expect(Array.from(host.querySelectorAll("[data-thread-tab]")).map(tab => tab.getAttribute("data-thread-tab"))).toEqual(["a", "a2", "b"]);
+    await act(() => button("Conversations", host).click());
+    const row = Array.from(picker().querySelectorAll("button")).find(item => item.textContent?.startsWith("Trip budget #2"))!;
+    expect(row.querySelector("[data-thread-kind]")).toBeNull();
+    expect(picker().querySelectorAll('button[aria-label="Rename conversation"]').length).toBe(3);
+    expect(select).not.toHaveBeenCalled();
+    await act(() => button("Conversations", host).click());
+    await flush();
   });
 
   it("closes the view of a conversation archived elsewhere and brings its tab back on restore", async () => {

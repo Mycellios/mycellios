@@ -107,7 +107,7 @@ try {
   assert.equal(target.threadId, first.threadId);
   assert.equal("projectSessionId" in target, false);
   checks.push("real starts retain nonce identity and create independent normal Mico task conversations");
-  const development = Object.fromEntries(["open", "rename", "list", "requests", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove"].map(name => [name, handler]));
+  const development = Object.fromEntries(["open", "rename", "list", "requests", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove", "branch"].map(name => [name, handler]));
   const dev = developmentRoutes({ deps, authed: { development } } as never).development as unknown as Record<string, (v: unknown) => Promise<any>>;
   const tabs = await runAsTenant(actor, () => dev.list!({ context: { actor }, input: { botId: bot.id } }));
   assert.equal(tabs.length, 2);

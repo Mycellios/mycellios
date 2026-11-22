@@ -146,6 +146,7 @@ function replyBlockText(block: MessageBlock): string {
   switch (block.kind) {
     case "context_reset":
     case "thread_link":
+    case "branch_origin":
       return "";
     case "text":
     case "ask":

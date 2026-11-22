@@ -7060,3 +7060,27 @@ msgstr "प्रतीक्षा रद्द करें"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "किसी इवेंट की प्रतीक्षा"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "नई बातचीत में शाखा बनाएँ"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "इस बातचीत की शाखा बनाने के लिए मौजूदा बारी खत्म होने तक रुकें।"
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "बातचीत की शाखा नहीं बन सकी। फिर से कोशिश करें।"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "एक हटाई गई बातचीत से शाखा"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "{name} से शाखा"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "जहाँ से यह शाखा शुरू हुई, वहाँ खोलें"

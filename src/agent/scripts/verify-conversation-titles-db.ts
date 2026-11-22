@@ -36,7 +36,7 @@ try {
   await system.spaceMember.create({data:{id:"space-member",userId:"owner",organizationId:"org",spaceId:"space",role:"owner",createdAt:new Date()}});
   await system.bot.create({data:{id:"mico",spaceId:"space",userId:"owner",name:"Synthetic Mico",color:"#10B981",thread:{create:{spaceId:"space",userId:"owner"}}}});
   const handler={handler:(fn:unknown)=>fn};
-  const authed={development:Object.fromEntries(["open","rename","list","requests","status","projects","saveProject","projectTask","primaryRun","archive","restore","remove"].map(key=>[key,handler]))};
+  const authed={development:Object.fromEntries(["open","rename","list","requests","status","projects","saveProject","projectTask","primaryRun","archive","restore","remove","branch"].map(key=>[key,handler]))};
   const routes=developmentRoutes({deps:{prisma},authed} as never).development;
   const invoke=<T>(fn:unknown,input:unknown,identity=actor) => runAsTenant(identity,()=> (fn as (value:unknown)=>Promise<T>)({context:{actor:identity},input}));
   const opened=await invoke<{threadId:string}>(routes.open,{botId:"mico",projectKey:"mico:mico",taskKey:"mico-task:mico:proof"});
