@@ -72,7 +72,7 @@ Use this for development, Docker sandboxes on the host, or Electron.
 ```text
 Set up Mycellios locally and leave it running in a usable state.
 
-Repository: https://github.com/elie222/rakazo.git
+Repository: https://github.com/Mycellios/mycellios.git (Agent workspace: src/agent)
 
 Work like a careful onboarding engineer: perform the setup yourself, explain only decisions or blockers, and verify the product through the UI rather than stopping after dependency installation.
 

@@ -100,11 +100,6 @@ jobs:
           BOAT_API_KEY: ${{ inputs.sandbox_provider == 'boat' && secrets.BOAT_API_KEY || '' }}
           SHARD: ${{ matrix.shard }}
         run: pnpm test:e2e -- --sandbox="$SANDBOX_TEST_PROVIDER" --shard="$SHARD/4"
-      # Homepage screenshots only: no copy or layout assertions.
-      # Runs after product e2e so shared apps/web/test-results is not wiped by the product run.
-      - name: Capture marketing homepage screenshots
-        if: matrix.shard == 1 && always() && (steps.playwright_tests.outcome == 'success' || steps.playwright_tests.outcome == 'failure')
-        run: pnpm --filter @mycellios/www e2e
       - name: Upload shard results
         if: always()
         uses: actions/upload-artifact@v4

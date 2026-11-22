@@ -380,7 +380,7 @@ There are no new migrations. A verified database backup and prior containers are
 retained for rollback. No live model latency or installed Desktop acceptance is
 claimed by this delivery.
 
-The review compared [Rakazo conversation synchronization](https://github.com/elie222/rakazo/tree/v0.9.0/apps/web/src/pages/shell)
+The review compared the upstream conversation synchronization (v0.9.0)
 and the reference app's conversation UI.
 The implementation uses existing Mycellios components without a new dependency,
 copied reference app implementation or an artificial typewriter backlog. See
@@ -407,7 +407,7 @@ launch/discovery/call failures, model-visible outputs and credential-bearing
 schemas. They do not qualify a live provider login or installed Desktop update.
 Remote typing, integration and publication need their own exact-revision evidence;
 full suites remain paused. These independently implemented changes were selected
-after reviewing [Rakazo 0.9.0](https://github.com/elie222/rakazo/releases/tag/v0.9.0)
+after reviewing upstream 0.9.0
 and the reference app (0.67.1).
 Existing ZIP import already accepts missing Unix file types while rejecting links
 and devices; no reference app implementation was copied.

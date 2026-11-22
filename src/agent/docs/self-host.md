@@ -1,6 +1,6 @@
 # Self-hosting Mycellios
 
-The signed-in product is a long-running API, a Graphile Worker, Postgres, and a computer provider (Docker supervisor, E2B, Daytona, CreateOS, or Boat). It is not a static site. The marketing site in `apps/www` can be hosted separately.
+The signed-in product is a long-running API, a Graphile Worker, Postgres, and a computer provider (Docker supervisor, E2B, Daytona, CreateOS, or Boat). It is not a static site.
 
 ## Local (source checkout)
 
@@ -478,7 +478,7 @@ repairs. Investigate `Model credit hold requires review` logs using the shared c
 missing provider evidence into a zero-cost settlement.
 
 OpenRouter inference requests include the normal Mycellios user ID in `user`, `HTTP-Referer`
-(`https://rakazo.com`), and `X-OpenRouter-Title` (`Rakazo`). These values are sent only to OpenRouter's
+(`https://www.mycellios.com`), and `X-OpenRouter-Title` (`Mycellios`). These values are sent only to OpenRouter's
 HTTPS inference endpoints, never to compatible custom hosts. Recovery uses the existing configured
 deployment credential; no Redis or external accounting service is required.
 
@@ -1977,7 +1977,6 @@ backups. Homes stay on that volume unless they are kept in
 Use the same HTTPS origin for the web app, `/api`, and `/rpc`. Preserve the authenticated screen
 proxy routes. Choose a [computer provider](#choosing-a-computer-provider) appropriate to the
 service's trust boundary. `SIGNUPS_ENABLED` and `SIGNUP_ALLOWLIST` apply from the environment on every API start.
-The optional marketing site in `apps/www` can be hosted separately.
 
 ## Image and video generation
 
