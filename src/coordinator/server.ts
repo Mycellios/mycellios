@@ -27,6 +27,13 @@ import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
 import { flatMapAsync, mapAsync } from "../core/async-collections.js";
 import { InferenceRouteRecovery } from "./inference-route-recovery.js";
 import { networkInventory } from "../contracts/network-inventory.js";
+import {
+  NETWORK_TELEMETRY_INTERVAL_MS,
+  NETWORK_TELEMETRY_RETENTION_DAYS,
+  networkHistoryRanges,
+  networkHistoryResponse,
+  networkTelemetrySample,
+} from "./network-history.js";
 import websocket from "@fastify/websocket";
 import staticFiles from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
@@ -115,7 +122,6 @@ import { PhysicalContributionEvidenceAuthority } from "../economy/physical-contr
 import { sha256CanonicalEvidence } from "../core/json.js";
 import {
   MeshStore,
-  type StoredNetworkTelemetrySample,
   type StoredRequestedModel,
   type StoredWorker,
 } from "../storage/store.js";
@@ -295,8 +301,7 @@ function safeSporeQuote(quote: SporeConversionQuote) {
   };
 }
 
-export const NETWORK_TELEMETRY_INTERVAL_MS = 10 * 60_000;
-export const NETWORK_TELEMETRY_RETENTION_DAYS = 90;
+export { NETWORK_TELEMETRY_INTERVAL_MS, NETWORK_TELEMETRY_RETENTION_DAYS };
 
 const SIGNED_WORKER_ADMISSION_PATHS = new Set([
   "/internal/v1/nodes/enrollments/redeem",
@@ -307,13 +312,6 @@ const SIGNED_WORKER_ADMISSION_PATHS = new Set([
 ]);
 const WORKER_CONNECT_PATH = "/internal/v1/workers/connect";
 const WORKER_NODE_CONTROL_PATH = /^\/internal\/v1\/nodes\/([^/]+)\/(?:commands(?:\/results)?|snapshot|replicas)$/;
-
-const networkHistoryRanges = {
-  "24h": 24,
-  "7d": 7 * 24,
-  "30d": 30 * 24,
-  "90d": NETWORK_TELEMETRY_RETENTION_DAYS * 24,
-} as const;
 
 export interface CoordinatorRuntime {
   app: FastifyInstance;
@@ -2415,7 +2413,11 @@ export async function createCoordinator(
     }, runtimeVersion, coordinatorBuildIdentity));
     const capturedAt = Math.floor(now / NETWORK_TELEMETRY_INTERVAL_MS)
       * NETWORK_TELEMETRY_INTERVAL_MS;
-    (await store.recordNetworkTelemetrySample(networkTelemetrySample(snapshot, capturedAt)));
+    (await store.recordNetworkTelemetrySample(networkTelemetrySample(
+      snapshot,
+      capturedAt,
+      (await store.countFailedJobs()),
+    )));
     (await store.pruneNetworkTelemetrySamples(
       now - NETWORK_TELEMETRY_RETENTION_DAYS * 24 * 60 * 60_000,
     ));
@@ -4250,16 +4252,7 @@ export async function createCoordinator(
     const now = Date.now();
     (await captureNetworkTelemetry(now));
     const since = now - networkHistoryRanges[range] * 60 * 60_000;
-    return {
-      capturedAt: new Date(now).toISOString(),
-      intervalMinutes: NETWORK_TELEMETRY_INTERVAL_MS / 60_000,
-      retentionDays: NETWORK_TELEMETRY_RETENTION_DAYS,
-      range,
-      samples: (await store.listNetworkTelemetrySamples(since)).map((sample) => ({
-        ...sample,
-        capturedAt: new Date(sample.capturedAt).toISOString(),
-      })),
-    };
+    return networkHistoryResponse((await store.listNetworkTelemetrySamples(since)), now, range);
   });
 
   app.post("/local/v1/benchmarks/run", async (request, reply) => {
@@ -5792,42 +5785,6 @@ function panelSnapshotForView(
     jobs: snapshot.jobs.slice(0, 30),
   };
   return snapshot;
-}
-
-function networkTelemetrySample(
-  snapshot: Awaited<ReturnType<typeof publicSnapshot>>,
-  capturedAt: number,
-): StoredNetworkTelemetrySample {
-  const onlineWorkers = networkInventory(snapshot.workers).online;
-  const offeredVramMb = onlineWorkers.reduce(
-    (total, worker) => total + worker.offeredVramMb,
-    0,
-  );
-  const freeVramMb = onlineWorkers.reduce(
-    (total, worker) => total
-      + worker.gpus.reduce((gpuTotal, gpu) => gpuTotal + gpu.freeOfferedVramMb, 0),
-    0,
-  );
-  const inflightJobs = snapshot.jobs.filter(
-    (job) => ["queued", "leasing", "running", "streaming"].includes(job.status),
-  );
-  return {
-    capturedAt,
-    registeredNodes: snapshot.summary.registered,
-    connectedNodes: snapshot.summary.connected,
-    onlineNodes: snapshot.summary.online,
-    browserNodes: snapshot.summary.mobile,
-    activeModels: snapshot.models.length,
-    modelReplicas: snapshot.models.reduce((total, model) => total + model.replicas, 0),
-    modelPipelines: snapshot.models.reduce((total, model) => total + model.pipelines, 0),
-    offeredVramMb,
-    freeVramMb: Math.min(offeredVramMb, freeVramMb),
-    inflightJobs: inflightJobs.length,
-    runningJobs: inflightJobs.filter(
-      (job) => job.status === "running" || job.status === "streaming",
-    ).length,
-    completedJobs: snapshot.summary.completedJobs,
-  };
 }
 
 function mobileDashboardWorker(worker: MobileWorkerSnapshot) {

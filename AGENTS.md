@@ -163,8 +163,11 @@ These rules apply to the complete repository.
   the sidebar's geometry transitions when adding control transitions.
 - Overview is a public statistics page (`landing/src/NetworkOverview.tsx`): a KPI
   row (nodes online of registered, shared GPU memory, models in service, completed
-  tasks), hourly completed tasks for 24 h from `/public/v1/history` with the outcome
-  of the latest published tasks, then plain models and devices tables. Map data in
+  tasks), hourly completed and failed tasks for 24 h from `/public/v1/history`, then
+  plain models and devices tables. History `failedJobs` is a cumulative count of
+  `failed` and deadline-`expired` jobs (client cancellations excluded); null marks
+  samples recorded before it was measured and the chart shows those hours as
+  "sin datos", never zero. Map data in
   `overview-stats.ts`: human model names/types with the id as secondary text, status
   from requestedModels, hardware class instead of IDs, never account data. Its only
   action is a small link to Run; keep setup and topology on their own screens. Use
