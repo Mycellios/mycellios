@@ -121,6 +121,7 @@ export const BotSchema = z.object({
   threadId: Id,
   preview: z.string(),
   status: z.string(),
+  waitingTaskThreadId: Id.optional(),
   runErrorId: Id.nullable().default(null),
   /** Replies in the main chat the person has not read yet, at most 100. Older servers omit it. */
   unreadCount: z.number().int().nonnegative().optional(),
@@ -286,6 +287,7 @@ export const SpaceBotSchema = BotSchema.pick({
   parentBotId: true,
   preview: true,
   status: true,
+  waitingTaskThreadId: true,
   runErrorId: true,
   unreadCount: true,
   conversations: true,

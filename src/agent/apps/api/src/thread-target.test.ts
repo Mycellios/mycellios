@@ -674,7 +674,7 @@ describe("threadSnapshot", () => {
 
       const snapshot = await threadSnapshot({ prisma }, target);
 
-      expect(tx.$queryRaw).toHaveBeenCalledOnce();
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
       if (trigger === "bot_message") {
         expect(snapshot.run).toMatchObject({ id: run.id, status: "running" });
         expect(snapshot.activeRuns).toEqual([expect.objectContaining({ id: run.id })]);
@@ -711,6 +711,7 @@ describe("threadSnapshot", () => {
         }),
       ]);
       expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: "RepeatableRead",
         timeout: 15_000,
         maxWait: 5_000,
       });
@@ -1041,6 +1042,7 @@ describe("threadSnapshot", () => {
     );
     expect(snapshot.activeRuns).toEqual([]);
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
       timeout: 15_000,
       maxWait: 5_000,
     });

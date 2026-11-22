@@ -6,7 +6,7 @@ import { type NeedsYouEntry, needsYouEntries, needsYouPath } from "../../lib/nee
 
 type RosterRow = {
   kind: "bot" | "group";
-  chat: { id: string; spaceId: string; name: string; color?: string; status?: string; conversations?: { waiting: number } | null };
+  chat: { id: string; spaceId: string; name: string; color?: string; status?: string; waitingTaskThreadId?: string; conversations?: { waiting: number } | null };
 };
 
 /**
@@ -23,7 +23,7 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
   const entries = useMemo(() => needsYouEntries([{
     bots: groups.flatMap(group => group.bots.flatMap(row => row.kind === "bot" ? [{
       id: row.chat.id, spaceId: row.chat.spaceId, name: row.chat.name, color: row.chat.color ?? "",
-      status: row.chat.status ?? "idle", conversations: row.chat.conversations,
+      status: row.chat.status ?? "idle", waitingTaskThreadId: row.chat.waitingTaskThreadId, conversations: row.chat.conversations,
     }] : [])),
   }]), [groups]);
   if (!entries.length) return null;
