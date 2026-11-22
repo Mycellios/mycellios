@@ -732,11 +732,11 @@ export class MeshStore {
     return row ? this.mapJob(row) : null;
   }
 
-  async setJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): Promise<void> {
+  async setJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): Promise<number | null> {
     const first = route.stages[0];
     if (!first) throw new Error("Cannot assign an empty route");
-    (await this.database.transaction(async () => {
-      (await this.database.raw
+    return this.database.transaction(async () => {
+      const result = await this.database.raw
         .prepare(
           `UPDATE jobs
            SET status = 'leasing', worker_id = ?, deployment_id = ?, lease_id = ?,
@@ -750,16 +750,17 @@ export class MeshStore {
           first.modelDigest,
           Date.now(),
           jobId,
-        ));
-      (await this.queueJob(jobId));
-    }));
+        );
+      const row = await this.queueJob(jobId);
+      return result.changes === 1 && row ? Number(row.deadline_at) : null;
+    });
   }
 
-  async promoteJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): Promise<void> {
+  async promoteJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): Promise<number | null> {
     const first = route.stages[0];
     if (!first) throw new Error("Cannot promote an empty route");
-    (await this.database.transaction(async () => {
-      const result = (await this.database.raw
+    return this.database.transaction(async () => {
+      const result = await this.database.raw
         .prepare(
           `UPDATE jobs
            SET status = 'leasing', worker_id = ?, deployment_id = ?, lease_id = ?,
@@ -773,10 +774,11 @@ export class MeshStore {
           first.modelDigest,
           Date.now(),
           jobId,
-        ));
+        );
       if (result.changes !== 1) throw new Error("job_route_promotion_conflict");
-      (await this.queueJob(jobId));
-    }));
+      const row = await this.queueJob(jobId);
+      return row ? Number(row.deadline_at) : null;
+    });
   }
 
   async setJobStatus(jobId: string, status: JobStatus, failureCode?: string): Promise<void> {
@@ -1510,7 +1512,7 @@ export class MeshStore {
     }));
   }
 
-  private async queueJob(jobId: string): Promise<void> {
+  private async queueJob(jobId: string): Promise<JobRow | undefined> {
     const row = (await this.database.raw.prepare("SELECT * FROM jobs WHERE id = ?").get(jobId)) as
       | JobRow
       | undefined;
@@ -1532,6 +1534,7 @@ export class MeshStore {
       created_at: Number(row.created_at),
       updated_at: Number(row.updated_at),
     }));
+    return row;
   }
 
   private async queueRequestedModel(modelId: string): Promise<void> {
