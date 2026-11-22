@@ -1,4 +1,5 @@
 import {
+  engineRuntimeExactnessMatches,
   engineRuntimeProfileSchema,
   type EngineRuntimeProfile,
 } from "../contracts/engine-runtime-profile.js";
@@ -40,8 +41,11 @@ export async function publishCoordinatorEngineRuntimeProfile(
     || performance.sessionId !== profile.sessionId
     || performance.workerId !== profile.workerId
     || performance.nodeId !== profile.nodeId
-    || performance.profile.backend !== profile.backend
     || !activationPlan
+    // llama.cpp runs its own backends (cpu, vulkan) beside the Torch runtime
+    // that the performance evidence measured; its exactness names the backend.
+    || (activationPlan.request.probeKind !== "llama-cpp-gguf-v1"
+      && performance.profile.backend !== profile.backend)
   ) {
     throw new Error("engine_runtime_profile_evidence_binding_is_invalid");
   }
@@ -72,7 +76,8 @@ function requestMatchesProfile(
     && profile.capacity.maxKvTokens >= request.contextTokens
     && profile.capacity.maxLayerCount >= request.expectedLayerEnd - request.expectedLayerStart
     && profile.capacity.kvBytesPerToken === request.expectedKvBytesPerToken
-    && request.requiredRoles.every((role) => profile.features.roles.includes(role));
+    && request.requiredRoles.every((role) => profile.features.roles.includes(role))
+    && engineRuntimeExactnessMatches(request, profile);
 }
 
 function sameProfileSlot(left: EngineRuntimeProfile, right: EngineRuntimeProfile): boolean {

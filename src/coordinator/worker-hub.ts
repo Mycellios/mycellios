@@ -52,8 +52,7 @@ import {
 } from "../contracts/evidence-challenge.js";
 import {
   ENGINE_RUNTIME_PROFILE_DEFAULT_MAXIMUM_AGE_MS,
-  engineRuntimeMeasurementSchema,
-  sealEngineRuntimeProfile,
+  engineRuntimeExactnessMatches, engineRuntimeMeasurementSchema, sealEngineRuntimeProfile,
 } from "../contracts/engine-runtime-profile.js";
 import { canonicalEvidenceJson, sha256Text } from "../core/json.js";
 import {
@@ -1533,7 +1532,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         (candidate) => candidate.workerId === challenge.workerId
           && candidate.modelId === challenge.modelId
           && canonicalEvidenceJson(candidate.request) === canonicalEvidenceJson({
-            probeKind: challenge.probeKind,
+            probeKind: challenge.probeKind, ...(challenge.gguf ? { gguf: challenge.gguf } : {}),
             descriptorDigest: challenge.descriptorDigest,
             certificationId: challenge.certificationId,
             artifactManifestDigest: challenge.artifactManifestDigest,
@@ -1586,6 +1585,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         )
         || Date.parse(measurement.measuredAt) < Date.parse(challenge.issuedAt) - 5_000
         || Date.parse(measurement.measuredAt) > now + 5_000
+        || !engineRuntimeExactnessMatches(challenge, measurement)
       ) {
         throw new Error("engine_runtime_measurement_does_not_match_challenge");
       }
@@ -1613,6 +1613,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         capacity: measurement.capacity,
         costs: measurement.costs,
         features: measurement.features,
+        ...(measurement.exactness ? { exactness: measurement.exactness } : {}),
         evidence: {
           deploymentCanaryEvidenceId: activationPlan.evidence.canaryEvidenceId,
           runtimePerformanceEvidenceId: performance.evidenceId,
