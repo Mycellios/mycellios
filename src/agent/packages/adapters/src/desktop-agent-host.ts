@@ -32,6 +32,13 @@ export class DesktopAgentHost {
         !Array.isArray(request.tools) || !request.model || typeof request.model.provider !== "string" || typeof request.model.id !== "string") {
       rpc.close(); throw Error("Invalid Desktop agent request");
     }
+    // Only the shell continuation crosses back: the server owns the steering yield signal,
+    // and any other observer field (such as an AbortSignal) cannot be encoded on the bridge.
+    const execute = request.executeTool;
+    if (execute) {
+      request.executeTool = (name, args, executionId, route, observer) => execute(name, args, executionId, route,
+        observer?.onShellStillRunning ? { onShellStillRunning: observer.onShellStillRunning } : undefined);
+    }
     // onCheckpoint's capture is synchronous. Serialize it at the producer, preserving the exact
     // per-call transcript, then reconstruct that cheap capture on the durable worker.
     if (request.onCheckpoint) {

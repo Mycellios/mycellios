@@ -4,7 +4,7 @@ import { ModelAccountError, ModelOutputError, TransientModelError } from "@mycel
 
 /** Ephemeral callbacks only. No executable code, paths, stack traces or credentials are logged. */
 export type AgentWire = null | boolean | number | string | {
-  kind: "undefined" | "bytes" | "error" | "function" | "promise" | "array" | "object";
+  kind: "undefined" | "bytes" | "date" | "error" | "function" | "promise" | "array" | "object";
   value?: unknown;
 };
 export type AgentRpcMessage =
@@ -12,6 +12,18 @@ export type AgentRpcMessage =
   | { kind: "result"; id: string; value: AgentWire; failed: boolean };
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9-]{36}$/.test(value);
 const LIMIT = 4096;
+const NAME = /^[A-Za-z_$][\w$]{0,63}$/;
+
+/** Names the value's type and key path only, never the value itself. */
+function unsupportedValue(value: unknown, path: string): Error {
+  const type = typeof value === "object" && value
+    ? (Object.getPrototypeOf(value) as { constructor?: { name?: unknown } } | null)?.constructor?.name
+    : typeof value;
+  const name = typeof type === "string" && NAME.test(type) ? type : "object";
+  return Error(`Unsupported Desktop runtime value (${name} at ${path ? path.slice(0, 240) : "root"})`);
+}
+/** Model-chosen keys stay out of messages unless they are plain identifiers. */
+const keyPath = (path: string, key: string) => NAME.test(key) ? `${path}.${key}` : `${path}[?]`;
 
 export class DesktopAgentRpc {
   private targets = new Map<string, (...args: unknown[]) => unknown>();
@@ -23,7 +35,7 @@ export class DesktopAgentRpc {
 
   encode(value: unknown): AgentWire {
     let count = 0;
-    const visit = (v: unknown, depth: number): AgentWire => {
+    const visit = (v: unknown, depth: number, path: string): AgentWire => {
       if (++count > 100_000 || depth > 48) throw Error("Desktop runtime value exceeds its bound");
       if (v === undefined) return { kind: "undefined" };
       if (v === null || typeof v === "string" || typeof v === "boolean") return v;
@@ -37,13 +49,18 @@ export class DesktopAgentRpc {
         return { kind: typeof v === "function" ? "function" : "promise", value: id };
       }
       if (v instanceof Uint8Array) return { kind: "bytes", value: Buffer.from(v).toString("base64") };
+      // Dates travel as ISO instants; invalid dates and other class instances are refused.
+      if (v instanceof Date) {
+        if (!Number.isFinite(v.getTime())) throw unsupportedValue(v, path);
+        return { kind: "date", value: v.toISOString() };
+      }
       if (v instanceof Error) return { kind: "error", value: [v.name, v.message] };
-      if (Array.isArray(v)) return { kind: "array", value: v.map(x => visit(x, depth + 1)) };
+      if (Array.isArray(v)) return { kind: "array", value: v.map((x, i) => visit(x, depth + 1, `${path}[${i}]`)) };
       if (typeof v === "object" && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null))
-        return { kind: "object", value: Object.entries(v).map(([k, x]) => [k, visit(typeof x === "function" ? x.bind(v) : x, depth + 1)]) };
-      throw Error("Unsupported Desktop runtime value");
+        return { kind: "object", value: Object.entries(v).map(([k, x]) => [k, visit(typeof x === "function" ? x.bind(v) : x, depth + 1, keyPath(path, k))]) };
+      throw unsupportedValue(v, path);
     };
-    return visit(value, 0);
+    return visit(value, 0, "");
   }
 
   decode(value: unknown): unknown {
@@ -58,6 +75,12 @@ export class DesktopAgentRpc {
         case "bytes":
           if (typeof item.value !== "string" || item.value.length > 12 * 1024 * 1024 || !/^[A-Za-z0-9+/]*={0,2}$/.test(item.value)) break;
           return new Uint8Array(Buffer.from(item.value, "base64"));
+        case "date": {
+          if (typeof item.value !== "string" || item.value.length > 40) break;
+          const date = new Date(item.value);
+          if (!Number.isFinite(date.getTime())) break;
+          return date;
+        }
         case "error": {
           if (!Array.isArray(item.value) || item.value.length !== 2 || item.value.some(x => typeof x !== "string")) break;
           const [name, message] = item.value as [string, string];
