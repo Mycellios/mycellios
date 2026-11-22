@@ -22,8 +22,11 @@ const speculationPython = new Set(['python/distributed_runtime/speculation.py',
   'python/distributed_runtime/macro_wave_adapter.py', 'python/tests/test_macro_wave_adapter.py',
   'python/distributed_runtime/draft_model.py', 'python/tests/test_draft_model.py',
   'python/distributed_runtime/engine.py', 'python/tests/test_engine.py']);
+// The pinned llama.cpp stage runtime: pure tests need numpy from the same lock;
+// its physical test is skipped on CI because no binary or model is present.
+const llamaCppPython = new Set(['python/distributed_runtime/llama_cpp_runtime.py', 'python/tests/test_llama_cpp_runtime.py']);
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f));
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -69,12 +72,15 @@ export function planChecks(files, availableAgentTests) {
     add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...[...transcriptionPython].filter(f => existsSync(f))], 'native transcription Python syntax');
   }
   if (root || agent) add('.', 'npm', ['install', '--global', 'npm@10.9.8', '--no-audit', '--no-fund'], 'pinned npm toolchain');
-  if (files.some(f => speculationPython.has(f))) {
+  const speculationChanged = files.some(f => speculationPython.has(f));
+  const llamaCppChanged = files.some(f => llamaCppPython.has(f));
+  if (speculationChanged || llamaCppChanged) {
     const venv = '.ci/speculation-venv';
     add('.', 'python3', ['-c', 'import sys; assert sys.version_info[:2] == (3, 12), sys.version'], 'speculation runtime interpreter is CPython 3.12');
     add('.', 'python3', ['-m', 'venv', venv], 'speculation runtime virtual environment');
     add('.', `${venv}/bin/python`, ['-m', 'pip', 'install', '--require-hashes', '--only-binary=:all:', '--no-deps', '-r', 'scripts/wheel-locks/linux-x64-cp312.txt'], 'hash-locked CPU runtime wheels');
-    for (const test of speculationTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `speculation runtime ${test} (CPU, no model or GPU)`);
+    if (speculationChanged) for (const test of speculationTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `speculation runtime ${test} (CPU, no model or GPU)`);
+    if (llamaCppChanged) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_llama_cpp_runtime.py'], 'pinned llama.cpp stage runtime (no binary, model or GPU)');
   }
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);

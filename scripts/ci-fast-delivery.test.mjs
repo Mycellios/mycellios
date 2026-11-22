@@ -36,6 +36,18 @@ test('speculation changes run locked CPU engine and server tests without admitti
   assert.ok(readFileSync('.github/workflows/ci.yml', 'utf8').includes('python-version: "3.12"'));
 });
 
+test('llama.cpp stage runtime changes run its locked tests without the speculation suites', () => {
+  const files = ['python/distributed_runtime/llama_cpp_runtime.py', 'python/tests/test_llama_cpp_runtime.py'];
+  const plan = planChecks(files);
+  assert.ok(plan.some(c => c.args.includes('--require-hashes') && c.args.includes('scripts/wheel-locks/linux-x64-cp312.txt')));
+  assert.ok(plan.some(c => c.cwd === 'python' && c.args.includes('test_llama_cpp_runtime.py')));
+  assert.ok(!plan.some(c => c.args.includes('test_engine.py')));
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  const both = planChecks([...files, 'python/distributed_runtime/speculation.py']);
+  assert.equal(both.filter(c => c.args.includes('--require-hashes')).length, 1);
+  assert.ok(both.some(c => c.args.includes('test_engine.py')) && both.some(c => c.args.includes('test_llama_cpp_runtime.py')));
+});
+
 test('installer publishing changes execute real signing, catalog and recovery boundaries', () => {
  const files=['deploy/installers/publisher.py','deploy/installers/test_publisher.py'];
  const plan=planChecks(files);
