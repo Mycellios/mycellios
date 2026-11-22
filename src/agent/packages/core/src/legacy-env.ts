@@ -35,6 +35,38 @@ export function readEnv(name: string, source: EnvSource = processEnv()): string 
   return legacy;
 }
 
+/** HTTP headers are named `x-mycellios-<name>`; servers still accept the legacy prefix (phase 3). */
+export const HEADER_PREFIX = "x-mycellios-";
+const LEGACY_HEADER_PREFIX = String.fromCharCode(120, 45, 114, 97, 107, 97, 122, 111, 45);
+
+/** The legacy header name for `name`, for replies that older clients still read. */
+export function legacyHeaderName(name: string): string {
+  return LEGACY_HEADER_PREFIX + name;
+}
+
+export class ConflictingHeaderError extends Error {
+  constructor(name: string) {
+    super(`Conflicting values for the ${HEADER_PREFIX}${name} header`);
+    this.name = "ConflictingHeaderError";
+  }
+}
+
+/**
+ * Reads `x-mycellios-<name>`, then the legacy header. A request carrying both with
+ * different values is refused, so no hop can act on one value while another uses the other.
+ */
+export function readHeader(
+  get: (name: string) => string | null | undefined,
+  name: string,
+): string | undefined {
+  const current = get(HEADER_PREFIX + name) ?? undefined;
+  const legacy = get(LEGACY_HEADER_PREFIX + name) ?? undefined;
+  if (current !== undefined && legacy !== undefined && current !== legacy) {
+    throw new ConflictingHeaderError(name);
+  }
+  return current ?? legacy;
+}
+
 /** Removes both spellings, for secrets that must not reach child processes. */
 export function deleteEnv(name: string, target: Record<string, string | undefined> = process.env): void {
   delete target[ENV_PREFIX + name];

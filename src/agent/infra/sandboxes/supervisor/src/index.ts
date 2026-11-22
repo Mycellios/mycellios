@@ -12,12 +12,13 @@ import {
   resolveSupervisorToken,
   uploadSizeFromEnv,
 } from "@mycellios/core";
+import { readHeader } from "@mycellios/core/legacy-env";
 import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { getLogger, SERVICE_NAMES } from "@mycellios/logging";
 import { createRootLogger } from "@mycellios/logging/axiom";
 import { requestLogging } from "@mycellios/logging/hono";
 import Docker from "dockerode";
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import type { ComputerEgressMode } from "./computer-spec.js";
@@ -97,6 +98,9 @@ import {
   withKeyedLock,
   workspaceTarget,
 } from "./supervisor-logic.js";
+
+/** Reads `x-mycellios-<name>`, or the legacy header older API workers still send. */
+const requestHeader = (c: Context, name: string) => readHeader((header) => c.req.header(header), name);
 
 loadRootEnv();
 
@@ -207,7 +211,7 @@ app.post("/computers", async (c) => {
     })
     .parse(await c.req.json());
   try {
-    assertRequestIdentity(c.req.header("x-rakazo-bot-id"), c.req.header("x-rakazo-space-id"), {
+    assertRequestIdentity(requestHeader(c, "bot-id"), requestHeader(c, "space-id"), {
       botId: body.botId,
       spaceId: body.spaceId,
     });
@@ -378,8 +382,8 @@ app.get("/computers/:id", async (c) => {
   try {
     const { info } = await managedContainer(
       id,
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
     );
     return c.json({
       id,
@@ -408,13 +412,13 @@ app.post("/computers/:id/exec", async (c) => {
   try {
     const managed = await managedContainer(
       id,
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
     );
     // Docker would fail the exec inside the stream; answer up front so the caller can boot it.
     if (!managed.info.State.Running) return c.json({ error: "computer is not running" }, 409);
     container = managed.container;
-    const screenId = c.req.header("x-rakazo-screen-id") || c.req.header("x-rakazo-bot-id") || id;
+    const screenId = requestHeader(c, "screen-id") || requestHeader(c, "bot-id") || id;
     const screenIndex = computerScreens.get(id)?.get(screenId)?.index ?? 0;
     layout = screenPorts(screenIndex);
   } catch (error) {
@@ -541,10 +545,10 @@ app.post("/computers/:id/browser", async (c) => {
   try {
     const { container, layout } = await managedScreen(
       c.req.param("id"),
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
-      c.req.header("x-rakazo-screen-id"),
-      c.req.header("x-rakazo-screen-lease-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
+      requestHeader(c, "screen-id"),
+      requestHeader(c, "screen-lease-id"),
     );
     const result = await runContainerCommand(
       container,
@@ -604,10 +608,10 @@ app.post("/computers/:id/observe", async (c) => {
   try {
     const { container, info, layout, browserProfile } = await managedScreen(
       c.req.param("id"),
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
-      c.req.header("x-rakazo-screen-id"),
-      c.req.header("x-rakazo-screen-lease-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
+      requestHeader(c, "screen-id"),
+      requestHeader(c, "screen-lease-id"),
     );
     const control = computerControlEndpoint(info);
     const observation = await preferComputerControl(
@@ -645,10 +649,10 @@ app.post("/computers/:id/actions", async (c) => {
   try {
     const { container, info, layout, browserProfile } = await managedScreen(
       c.req.param("id"),
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
-      c.req.header("x-rakazo-screen-id"),
-      c.req.header("x-rakazo-screen-lease-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
+      requestHeader(c, "screen-id"),
+      requestHeader(c, "screen-lease-id"),
     );
     const control = computerControlEndpoint(info);
     const attempt = await attemptComputerControl(
@@ -689,8 +693,8 @@ app.get("/computers/:id/files", async (c) => {
   try {
     const { container } = await managedContainer(
       c.req.param("id"),
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
     );
     const relative = normalizeWorkspaceRelative(c.req.query("path") ?? "");
     const target = workspaceTarget(relative);
@@ -752,8 +756,8 @@ app.post("/computers/:id/files", async (c) => {
   try {
     const { container } = await managedContainer(
       c.req.param("id"),
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
     );
     const target = workspaceTarget(normalizeWorkspaceRelative(body.path));
     await writeContainerFile(
@@ -774,10 +778,10 @@ app.get("/computers/:id/screen", async (c) => {
   try {
     const { container, info, layout, viewToken } = await managedScreen(
       id,
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
-      c.req.header("x-rakazo-screen-id"),
-      c.req.header("x-rakazo-screen-lease-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
+      requestHeader(c, "screen-id"),
+      requestHeader(c, "screen-lease-id"),
       false,
     );
     const screenUrl = await publishedScreenUrl(container, info, layout.viewPort);
@@ -803,10 +807,10 @@ app.post("/computers/:id/screen-mode", async (c) => {
     .parse(await c.req.json());
   try {
     const id = c.req.param("id");
-    const botId = c.req.header("x-rakazo-bot-id");
-    const spaceId = c.req.header("x-rakazo-space-id");
-    const screenId = c.req.header("x-rakazo-screen-id");
-    const screenLeaseId = c.req.header("x-rakazo-screen-lease-id");
+    const botId = requestHeader(c, "bot-id");
+    const spaceId = requestHeader(c, "space-id");
+    const screenId = requestHeader(c, "screen-id");
+    const screenLeaseId = requestHeader(c, "screen-lease-id");
     const { container, info } = await managedContainer(id, botId, spaceId);
     const { layout, viewToken } = await withComputerScreenLock(id, async () => {
       const screen = await ensureManagedScreen(
@@ -860,11 +864,11 @@ app.post("/computers/:id/terminal", async (c) => {
     .parse(await c.req.json());
   try {
     const id = c.req.param("id");
-    const botId = c.req.header("x-rakazo-bot-id");
+    const botId = requestHeader(c, "bot-id");
     const { container, info } = await managedContainer(
       id,
       botId,
-      c.req.header("x-rakazo-space-id"),
+      requestHeader(c, "space-id"),
     );
     const cwd = workspaceTarget(normalizeWorkspaceRelative(body.cwd));
     const terminalToken = randomUUID();
@@ -873,8 +877,8 @@ app.post("/computers/:id/terminal", async (c) => {
         id,
         container,
         botId,
-        c.req.header("x-rakazo-screen-id"),
-        c.req.header("x-rakazo-screen-lease-id"),
+        requestHeader(c, "screen-id"),
+        requestHeader(c, "screen-lease-id"),
         false,
       );
       const result = await runContainerCommand(
@@ -924,10 +928,10 @@ app.post("/computers/:id/input", async (c) => {
   try {
     const { container, layout } = await managedScreen(
       id,
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
-      c.req.header("x-rakazo-screen-id"),
-      c.req.header("x-rakazo-screen-lease-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
+      requestHeader(c, "screen-id"),
+      requestHeader(c, "screen-lease-id"),
     );
     const result = await runContainerCommand(container, [
       "env",
@@ -951,14 +955,14 @@ app.delete("/computers/:id/screen", async (c) => {
     const id = c.req.param("id");
     const { container } = await managedContainer(
       id,
-      c.req.header("x-rakazo-bot-id"),
-      c.req.header("x-rakazo-space-id"),
+      requestHeader(c, "bot-id"),
+      requestHeader(c, "space-id"),
     );
     containerFound = true;
-    const screenId = c.req.header("x-rakazo-screen-id") || c.req.header("x-rakazo-bot-id") || id;
-    const cancelRunWork = c.req.header("x-rakazo-cancel-run-work") === "1";
-    const keepScreenWarm = c.req.header("x-rakazo-preserve-screen") === "1" && !cancelRunWork;
-    const screenLeaseId = c.req.header("x-rakazo-screen-lease-id");
+    const screenId = requestHeader(c, "screen-id") || requestHeader(c, "bot-id") || id;
+    const cancelRunWork = requestHeader(c, "cancel-run-work") === "1";
+    const keepScreenWarm = requestHeader(c, "preserve-screen") === "1" && !cancelRunWork;
+    const screenLeaseId = requestHeader(c, "screen-lease-id");
     await withComputerScreenLock(id, async () => {
       const info = await container.inspect();
       const assigned = currentComputerScreens(
@@ -1037,9 +1041,9 @@ app.delete("/computers/:id/screen", async (c) => {
 
 app.post("/computers/:id/stop", async (c) => {
   const id = c.req.param("id");
-  const botId = c.req.header("x-rakazo-bot-id");
+  const botId = requestHeader(c, "bot-id");
   try {
-    const { container } = await managedContainer(id, botId, c.req.header("x-rakazo-space-id"));
+    const { container } = await managedContainer(id, botId, requestHeader(c, "space-id"));
     await withComputerScreenLock(id, async () => {
       const info = await container.inspect();
       if (info.State.Running) {
@@ -1077,11 +1081,11 @@ app.post("/computers/:id/stop", async (c) => {
 
 app.delete("/computers/:id", async (c) => {
   const id = c.req.param("id");
-  const botId = c.req.header("x-rakazo-bot-id");
+  const botId = requestHeader(c, "bot-id");
   try {
     if (!botId) throw new Error("missing computer identity");
     return await withBotLifecycleLock(botId, async () => {
-      const { container } = await managedContainer(id, botId, c.req.header("x-rakazo-space-id"));
+      const { container } = await managedContainer(id, botId, requestHeader(c, "space-id"));
       await withComputerScreenLock(id, async () => {
         await container.remove({ force: true }).catch(() => undefined);
         clearComputerScreenRegistry(computerScreens, computerScreenBoots, id);

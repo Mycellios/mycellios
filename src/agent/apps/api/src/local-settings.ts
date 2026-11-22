@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
-import { LOCAL_COMPUTER_HOST_PATH, LOCAL_SETTINGS_TOKEN_HEADER } from "@mycellios/contracts";
+import { LOCAL_COMPUTER_HOST_PATH } from "@mycellios/contracts";
+import { readHeader } from "@mycellios/core/legacy-env";
 import type { PrismaClient } from "@mycellios/db";
 import { runAsSystem } from "@mycellios/db";
 import type { Hono } from "hono";
@@ -31,7 +32,7 @@ export function mountLocalComputerHost(
   // Only the native main process holds this token. Public sessions never authorize this route.
   app.post(LOCAL_COMPUTER_HOST_PATH, async (c) => {
     c.header("cache-control", "no-store");
-    if (!validLocalSettingsToken(deps.token, c.req.header(LOCAL_SETTINGS_TOKEN_HEADER))) {
+    if (!validLocalSettingsToken(deps.token, readHeader((name) => c.req.header(name), "local-settings-token"))) {
       return c.json({ error: "Local settings are unavailable" }, 401);
     }
     if (

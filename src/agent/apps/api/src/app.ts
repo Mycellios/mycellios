@@ -97,6 +97,7 @@ import { createAuth, isBlockedAuthPath, loopbackTwinOrigins } from "@mycellios/a
 import type { Actor, AuthCapabilities } from "@mycellios/contracts";
 import { productAppUrl, SERVER_BUILD_HEADER } from "@mycellios/contracts";
 import { signupPolicyFromEnv } from "@mycellios/core";
+import { HEADER_PREFIX, readHeader } from "@mycellios/core/legacy-env";
 import type { Pool, PrismaClient } from "@mycellios/db";
 import {
   createBoardEvents,
@@ -771,7 +772,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         return isTrustedOrigin(origin, env) ? origin : "";
       },
       credentials: true,
-      exposeHeaders: [SERVER_BUILD_HEADER],
+      exposeHeaders: [SERVER_BUILD_HEADER, `${HEADER_PREFIX}build`],
     }),
   );
   // Session and account replies must never be stored by a client or an HTTP cache.
@@ -866,7 +867,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       ? await demoAgent?.session(request) : await auth.api.getSession({ headers: request.headers });
     if (!session?.user) return null;
     const actor = await actorFromMembership(
-      requireMembership(prisma, session.user.id, request.headers.get("x-rakazo-space-id")),
+      requireMembership(prisma, session.user.id, readHeader((name) => request.headers.get(name), "space-id") ?? null),
     );
     return actor && { actor, sessionId: session.session.id };
   };
