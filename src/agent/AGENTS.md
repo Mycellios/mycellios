@@ -44,6 +44,10 @@
   Build with scripts/build-android-release.sh and verify scoped web/Java tests, APK
   signature, source seal, manual update continuity and physical Quick Tap separately.
 
+- Expo mobile registers both app-link schemes and routes notifications from either.
+  iOS screenshot flows exercise the Mycellios scheme. Keep old callback URLs
+  working while deployed servers and supported builds still use them.
+
 - Native Expo sign-in may share the configured HTTPS OIDC issuer origin with Agent.
   Its authorization proxy accepts only the configured issuer authorize path, client,
   callback, S256 challenge and live server-issued state/nonce. Preserve the upstream
@@ -101,6 +105,10 @@
   or native runtimes. Keep scripts, ephemeral setup/retrieval/compaction and
   one-shot internal generations outside that loop. Retain persisted continuation
   counts, Stop, approvals and ordinary Credit admission on every model call.
+  With Pi's optional tool-call limit, a committed `ask_user` answer gives that
+  checkpoint one fresh budget while retaining the plan and prior tool results.
+  Automatic plan starts, approval replays and retries keep the existing budget.
+  Verify the handoff with the Pi checkpoint and tool-dispatch tests.
 - `await_event` parks a private Mico request as a `waiting_event` child of the
   existing Task tree. It waits for an owned run, the next owned routine result,
   or a bounded future time; external events use the existing routine ingress.

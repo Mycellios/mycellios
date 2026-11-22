@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mycellios Agent",
     "slug": "mycellios-agent",
-    "scheme": "rakazo",
+    "scheme": ["mycellios", "rakazo"],
     "version": "1.0.9",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
