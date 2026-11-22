@@ -36,6 +36,7 @@ import {
 } from "../contracts/build-identity.js";
 import { validateExecutorIsolationPolicy } from "./process-environment.js";
 import { validateDenseRpcStage } from "./dense-stage-arguments.js";
+import { validateNativeGgufExecutorArguments } from "./native-gguf-source.js";
 
 const START_SCHEMA = "gdlp-launch-agent-start/1";
 const STOP_SCHEMA = "gdlp-launch-agent-stop/1";
@@ -1069,27 +1070,9 @@ function validatePythonLaunchProcess(value: unknown, nodeId: string): asserts va
     throw new Error("python_launch_process_kind_is_invalid");
   }
   const processKind = value.kind as PythonLaunchProcess["kind"];
-  const common = [
-    "kind",
-    "launchIndex",
-    "processId",
-    "routeId",
-    "phases",
-    "logicalPlanIds",
-    "stageId",
-    "stageIndex",
-    "layerStart",
-    "layerEnd",
-    "totalLayers",
-    "codec",
-    "sealedWaveTokens",
-    "maxPrefillChunkTokens",
-    "anchor",
-    "members",
-    "macroWave",
-    "isolation",
-    "command",
-  ];
+  const common = ["kind", "launchIndex", "processId", "routeId", "phases", "logicalPlanIds", "stageId",
+    "stageIndex", "layerStart", "layerEnd", "totalLayers", "codec", "sealedWaveTokens",
+    "maxPrefillChunkTokens", "anchor", "members", "macroWave", "isolation", "command"];
   const variant =
     value.kind === "cell-member"
       ? [
@@ -1149,6 +1132,8 @@ function validatePythonLaunchProcess(value: unknown, nodeId: string): asserts va
   validateMembers(value.members);
   validateMacroWaveStage(value.macroWave);
   validateCommand(value.command, processKind);
+  // llama.cpp host flags only beside the llama.cpp executor and a sealed native package.
+  validateNativeGgufExecutorArguments((value.command as { args: unknown[] }).args, value.nativeGguf != null);
   if (value.kind === "root-engine") validateRootEngineCommand(value.command);
   if (value.kind === "remote-stage") {
     validateSpeculativeTreeCommand(value.command, "remote_stage");

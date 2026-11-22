@@ -12,9 +12,12 @@ from distributed_runtime.native_gguf_remote import (
     TensorManifestError,
     build_remote_native_gguf_stage,
     build_tensor_manifest,
+    fetch_tensor_manifest,
     file_range_fetcher,
     http_range_fetcher,
     load_tensor_manifest,
+    prepare_remote_native_gguf_stage,
+    remote_stage_result,
 )
 from tests.test_llama_cpp_stage import _Fixture
 
@@ -123,6 +126,43 @@ class RemoteStageTests(unittest.TestCase):
     def test_http_fetcher_requires_https(self) -> None:
         with self.assertRaisesRegex(ValueError, "HTTPS"):
             http_range_fetcher("http://example.invalid/model.gguf")
+        with self.assertRaisesRegex(ValueError, "HTTPS"):
+            fetch_tensor_manifest("http://example.invalid/manifest.json", expected_manifest_id="0" * 64)
+
+    def _prepare(self, name: str, **overrides):
+        options = dict(layer_start=1, layer_end=2, model_source="hf://fixture/model", model_revision="a" * 40, reuse_verified=True)
+        options.update(overrides)
+        return prepare_remote_native_gguf_stage(self.fetch, self.manifest, self.root / name, **options)
+
+    def test_prepare_reuses_a_verified_package_without_fetching(self) -> None:
+        first = self._prepare("cached")
+        self.calls.clear()
+        again = self._prepare("cached")
+        self.assertEqual(again.package_id, first.package_id)
+        self.assertEqual(self.calls, [])
+
+    def test_prepare_rebuilds_a_damaged_or_foreign_cache(self) -> None:
+        first = self._prepare("cached")
+        weights = first.root / "native-stage.gguf"
+        weights.write_bytes(weights.read_bytes()[:-1] + b"\x00")
+        self.calls.clear()
+        rebuilt = self._prepare("cached")
+        self.assertEqual(rebuilt.package_id, first.package_id)
+        self.assertNotEqual(self.calls, [])
+        self.calls.clear()
+        other = self._prepare("cached", model_revision="b" * 40)
+        self.assertNotEqual(other.package_id, first.package_id)
+        self.assertEqual(other.model_revision, "b" * 40)
+        self.assertNotEqual(self.calls, [])
+
+    def test_stage_result_names_the_model_identity(self) -> None:
+        package = self._prepare("result")
+        result = remote_stage_result(package)
+        local = self.fixture.package(1, 2)
+        self.assertEqual(result["packageId"], local.package_id)
+        self.assertEqual(result["modelIdentity"], local.artifact_identity)
+        self.assertEqual((result["layerStart"], result["layerEnd"], result["totalLayers"]), (1, 2, 3))
+        self.assertEqual(result["weightsSizeBytes"], (package.root / "native-stage.gguf").stat().st_size)
 
 
 if __name__ == "__main__":

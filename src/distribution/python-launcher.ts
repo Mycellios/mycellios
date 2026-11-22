@@ -5,6 +5,7 @@ import { isRecord } from "./python-value-guards.js";
 import { normalizeTcpWritePolicy, tcpWriteArguments, type TcpWriteOptions } from "./tcp-write-arguments.js";
 import { normalizeRouteProbes, routeProbeArguments, type ProbeOptions } from "./route-probe-arguments.js";
 import { appendStagePackageIdentity, normalizeStagePackageBindings } from "./stage-package-bindings.js";
+import { nativeGgufSourceArguments, normalizeNativeGgufSource, type PythonNativeGgufSourceConfiguration } from "./native-gguf-source.js";
 import type { DenseStagePolicy } from "../contracts/dense-stage.js";
 import { createHash } from "node:crypto";
 import {
@@ -242,6 +243,8 @@ export interface PythonLaunchCompilerOptions extends ProbeOptions, TcpWriteOptio
    * complete model coordinates as well as the exact physical stage range.
    */
   nativeGgufStages?: Record<string, PythonNativeGgufStageInput>;
+  /** Pinned GGUF every node builds its own stage package from; see native-gguf-source.ts. */
+  nativeGgufSource?: PythonNativeGgufSourceConfiguration;
   /**
    * Host-local bindings for every RAM-backed MoE stage. The compiler requires
    * complete coverage and seals them to the stage budgets before execution.
@@ -451,6 +454,7 @@ export interface PythonLaunchConfiguration extends ProbeOptions, TcpWriteOptions
   recovery: PythonRecoveryConfiguration | null;
   /** Sorted by stageId and sealed into route/process/launch identities. */
   nativeGgufStages: Record<string, PythonNativeGgufStageConfiguration>;
+  nativeGgufSource?: PythonNativeGgufSourceConfiguration;
   /** Sorted, host-local bindings for the certified physical RAM-backed runner. */
   ramBackedMoeStages: Record<string, PythonRamBackedMoeStageConfiguration>;
   /** Sorted, complete bindings for the native paged-KV runner. */
@@ -779,6 +783,7 @@ function buildDescription(
     configuration.ramBackedMoeStages,
     configuration.pagedKvStages,
     configuration.recovery,
+    configuration.nativeGgufSource,
   );
   const planIds: [string, string] = [prefill.planId, decode.planId];
   const boundaries = [0, ...stages.map((stage) => stage.layerEnd)];
@@ -1177,6 +1182,7 @@ function renderRemoteStageArguments(
   } else {
     appendModelArguments(args, configuration.runtimeModel);
     appendStagePackageIdentity(args, configuration.stagePackageIdentities, launch.anchor.memberId);
+    args.push(...nativeGgufSourceArguments(configuration.nativeGgufSource));
   }
   if (pagedKv) appendPagedKvArguments(args, pagedKv);
   args.push(
@@ -1376,6 +1382,7 @@ function renderRootEngineArguments(
   } else {
     appendModelArguments(args, configuration.runtimeModel);
     if (!launch.nativeGguf) appendStagePackageIdentity(args, configuration.stagePackageIdentities, launch.anchor.memberId);
+    args.push(...nativeGgufSourceArguments(configuration.nativeGgufSource));
     if (launch.nativeGguf) {
       args.push(
         "--stage-package-identity",
@@ -1728,7 +1735,7 @@ function normalizeConfiguration(
       "maxRetainedSessionTokens",
       "retainedSessionTtlSeconds",
       "recovery",
-      "nativeGgufStages",
+      "nativeGgufStages", "nativeGgufSource",
       "ramBackedMoeStages",
       "pagedKvStages",
       "executorIsolation",
@@ -1822,11 +1829,10 @@ function normalizeConfiguration(
     manifest,
     value.pagedKvStages,
   );
-  validateExclusiveStageBindings(
-    nativeGgufStages,
-    ramBackedMoeStages,
-    pagedKvStages,
-  );
+  validateExclusiveStageBindings(nativeGgufStages, ramBackedMoeStages, pagedKvStages);
+  const nativeGgufSource = normalizeNativeGgufSource(manifest, value.nativeGgufSource, { runtimeModel,
+    hasStageBindings: [nativeGgufStages, ramBackedMoeStages, pagedKvStages].some((bindings) => Object.keys(bindings).length > 0),
+    hasStagePackageIdentities: value.stagePackageIdentities !== undefined });
   const prefillInflightChunks = boundedInteger(
     value.prefillInflightChunks ??
       Math.min(64, manifest.plans.prefill.stages.length),
@@ -2072,7 +2078,7 @@ function normalizeConfiguration(
     maxRetainedSessionTokens,
     retainedSessionTtlSeconds,
     recovery,
-    nativeGgufStages,
+    nativeGgufStages, ...(nativeGgufSource ? { nativeGgufSource } : {}),
     ramBackedMoeStages,
     pagedKvStages,
     executorIsolation,
@@ -2233,16 +2239,7 @@ function normalizeNativeGgufStages(
     }
     assertExactKeys(
       input,
-      [
-        "packagePath",
-        "packageId",
-        "modelIdentity",
-        "modelSource",
-        "modelRevision",
-        "layerStart",
-        "layerEnd",
-        "totalLayers",
-      ],
+      ["packagePath", "packageId", "modelIdentity", "modelSource", "modelRevision", "layerStart", "layerEnd", "totalLayers"],
       [],
       `python_native_gguf_stage_configuration_keys_are_invalid:${stageId}`,
     );
@@ -2902,13 +2899,14 @@ function routeIdentity(
   ramBackedMoeStages: Record<string, PythonRamBackedMoeStageConfiguration>,
   pagedKvStages: Record<string, PythonPagedKvStageConfiguration>,
   recovery: PythonRecoveryConfiguration | null,
+  nativeGgufSource?: PythonNativeGgufSourceConfiguration,
 ): string {
   return `route-${digest(
     canonicalJson({
       pipelineId,
       settings,
       codec,
-      nativeGgufStages,
+      nativeGgufStages, ...(nativeGgufSource ? { nativeGgufSource } : {}),
       ramBackedMoeStages,
       pagedKvStages,
       recovery,

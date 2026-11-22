@@ -46,10 +46,12 @@ from .native_gguf import (
     build_native_gguf_stage,
     parse_gguf,
     parse_gguf_header,
+    verify_native_gguf_stage,
 )
 
 TENSOR_MANIFEST_SCHEMA = "gdlp-gguf-tensor-manifest/1"
 MAX_HEADER_BYTES = 256 * 1024 * 1024
+MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 _FETCH_CHUNK = 8 * 1024 * 1024
 
 RangeFetcher = Callable[[int, int], bytes]
@@ -254,6 +256,74 @@ def build_remote_native_gguf_stage(
         shutil.rmtree(work, ignore_errors=True)
 
 
+def prepare_remote_native_gguf_stage(
+    fetch: RangeFetcher,
+    manifest: TensorManifest,
+    destination: str | os.PathLike[str],
+    *,
+    layer_start: int,
+    layer_end: int,
+    model_source: str,
+    model_revision: str | None,
+    reuse_verified: bool = False,
+) -> NativeGgufStagePackage:
+    """Build a stage package, or reuse a verified one built from the same manifest.
+
+    A cached package is reused only when it verifies and names the manifest's
+    artifact, config, model coordinates and range. Anything else at the
+    destination is discarded and rebuilt, so a damaged cache never runs.
+    """
+
+    target = Path(destination).expanduser().resolve()
+    if reuse_verified and target.exists():
+        config_sha256 = _sha256(str(manifest.document["configText"]).encode("utf-8"))
+        try:
+            cached = verify_native_gguf_stage(target, expected_layer_start=layer_start, expected_layer_end=layer_end)
+        except (NativeGgufError, OSError, ValueError):
+            cached = None
+        if cached is not None and (
+            cached.source_gguf_sha256 == manifest.source_sha256
+            and cached.config_sha256 == config_sha256
+            and cached.model_source == model_source
+            and cached.model_revision == model_revision
+        ):
+            return cached
+        shutil.rmtree(target)
+    return build_remote_native_gguf_stage(
+        fetch, manifest, target,
+        layer_start=layer_start, layer_end=layer_end,
+        model_source=model_source, model_revision=model_revision,
+    )
+
+
+def fetch_tensor_manifest(
+    url: str,
+    *,
+    expected_manifest_id: str,
+    timeout_seconds: float = 60.0,
+    max_bytes: int = MAX_MANIFEST_BYTES,
+) -> TensorManifest:
+    """Download a tensor manifest over HTTPS and accept only the pinned identity."""
+
+    if not url.startswith("https://"):
+        raise ValueError("tensor manifest URLs must use HTTPS")
+    request = urllib.request.Request(url, headers={"User-Agent": "mycellios-node"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            if response.status != 200:
+                raise TensorManifestError(f"tensor manifest request returned HTTP {response.status}")
+            data = response.read(max_bytes + 1)
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+        raise TensorManifestError(f"tensor manifest request failed: {error}") from error
+    if len(data) > max_bytes:
+        raise TensorManifestError("tensor manifest is too large")
+    try:
+        document = json.loads(data.decode("utf-8"))
+    except ValueError as error:
+        raise TensorManifestError("tensor manifest is not JSON") from error
+    return load_tensor_manifest(document, expected_manifest_id=expected_manifest_id)
+
+
 def http_range_fetcher(url: str, *, timeout_seconds: float = 60.0, attempts: int = 3) -> RangeFetcher:
     """Fetch byte ranges over HTTPS, accepting only an exact 206 response."""
 
@@ -328,13 +398,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_command.add_argument("--output", required=True)
     fetch_command = commands.add_parser("fetch-stage", help="build one stage package from a remote GGUF")
     fetch_command.add_argument("--url", required=True)
-    fetch_command.add_argument("--manifest", required=True)
+    manifest_source = fetch_command.add_mutually_exclusive_group(required=True)
+    manifest_source.add_argument("--manifest", help="local tensor manifest file")
+    manifest_source.add_argument("--manifest-url", help="HTTPS URL of the tensor manifest")
     fetch_command.add_argument("--manifest-id", required=True)
     fetch_command.add_argument("--destination", required=True)
     fetch_command.add_argument("--layer-start", type=int, required=True)
     fetch_command.add_argument("--layer-end", type=int, required=True)
     fetch_command.add_argument("--model-source", required=True)
     fetch_command.add_argument("--model-revision")
+    fetch_command.add_argument("--reuse-verified", action="store_true", help="keep a verified package already at the destination")
     args = parser.parse_args(argv)
     if args.command == "manifest":
         manifest = build_tensor_manifest(args.source, args.config)
@@ -344,11 +417,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         os.replace(temporary, output)
         print(json.dumps({"manifestId": manifest["manifestId"], "tensors": len(manifest["tensors"])}))
         return 0
-    manifest = load_tensor_manifest(
-        json.loads(Path(args.manifest).read_text(encoding="utf-8")),
-        expected_manifest_id=args.manifest_id,
-    )
-    package = build_remote_native_gguf_stage(
+    if args.manifest_url is not None:
+        manifest = fetch_tensor_manifest(args.manifest_url, expected_manifest_id=args.manifest_id)
+    else:
+        manifest = load_tensor_manifest(
+            json.loads(Path(args.manifest).read_text(encoding="utf-8")),
+            expected_manifest_id=args.manifest_id,
+        )
+    package = prepare_remote_native_gguf_stage(
         http_range_fetcher(args.url),
         manifest,
         args.destination,
@@ -356,9 +432,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         layer_end=args.layer_end,
         model_source=args.model_source,
         model_revision=args.model_revision,
+        reuse_verified=args.reuse_verified,
     )
-    print(json.dumps({"packageId": package.package_id, "packageIdentity": package.package_identity}))
+    print(json.dumps(remote_stage_result(package)))
     return 0
+
+
+def remote_stage_result(package: NativeGgufStagePackage) -> dict[str, Any]:
+    """The JSON line the node's stage preparer reads after ``fetch-stage``."""
+
+    return {
+        "destination": str(package.root),
+        "packageId": package.package_id,
+        "packageIdentity": package.package_identity,
+        "modelIdentity": package.artifact_identity,
+        "layerStart": package.layer_start,
+        "layerEnd": package.layer_end,
+        "totalLayers": package.total_layers,
+        "weightsSizeBytes": (package.root / "native-stage.gguf").stat().st_size,
+    }
 
 
 if __name__ == "__main__":
