@@ -444,7 +444,10 @@
   there only when it has no files. Never send, steer or stop the main task from
   the aside pane. Respect the current contextStartSeq and send-key preference.
   Side-question generations are ephemeral: meter usage, but do not write a chat
-  message or a Pi session transcript. Verify scoped pane/composer/API tests.
+  message or a Pi session transcript. Clients send up to 20 recent exchanges when
+  the capability probe advertises extended history, and up to eight otherwise.
+  The server retains its context budget and model output token cap. Verify scoped
+  pane/composer/API tests.
 
 - Pinned messages are personal per account/Space/exact thread, or pinned for that
   person by their own Mico with pin_message in its own main chat or side conversation
