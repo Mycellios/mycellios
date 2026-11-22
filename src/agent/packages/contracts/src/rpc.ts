@@ -504,6 +504,8 @@ export const appContract = {
     create: oc.input(CreateBotInput).output(BotSchema),
     /** Profile setup never queues a model turn; an old server fails before creation. */
     createProfile: oc.input(CreateBotInput.extend({ expectedUserId: z.string().min(1).max(256) })).output(BotSchema),
+    /** Opening a Mico's untouched chat queues its one welcome turn; later calls do nothing. */
+    welcome: oc.input(botId).output(z.object({ queued: z.boolean() })),
     importPreview: oc.input(AgentImportPreviewInput).output(AgentImportPlanSchema),
     importCreate: oc.input(AgentImportCreateInput).output(BotSchema),
     importInfo: oc.input(botId).output(AgentImportInfoSchema.nullable()),

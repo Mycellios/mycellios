@@ -4892,7 +4892,14 @@ describe("bot intro run", () => {
   const bot = { id: "bot-1", threadId: "thread-1" } as unknown as Bot;
 
   function introDeps(
-    options: { agentRuntime?: string; hasCredential?: boolean; existingRun?: boolean; imported?: boolean } = {},
+    options: {
+      agentRuntime?: string;
+      hasCredential?: boolean;
+      existingRun?: boolean;
+      imported?: boolean;
+      conversation?: boolean;
+      parentName?: string;
+    } = {},
   ) {
     let calls = 0;
     const create = vi.fn(({ data }: { data: object }) => {
@@ -4904,6 +4911,7 @@ describe("bot intro run", () => {
       $queryRaw: vi.fn().mockResolvedValue([]),
       task: { create },
       agentImport: { findFirst: vi.fn().mockResolvedValue(options.imported ? { id: "import-1" } : null) },
+      message: { findFirst: vi.fn().mockResolvedValue(options.conversation ? { id: "message-1" } : null) },
       run: {
         create,
         findFirst: vi.fn().mockResolvedValue(options.existingRun ? { id: "run-0" } : null),
@@ -4922,6 +4930,9 @@ describe("bot intro run", () => {
         user: { findUnique: vi.fn().mockResolvedValue({ name: "Ada Lovelace" }) },
         space: {
           findUnique: vi.fn().mockResolvedValue({ name: "Personal", isDefault: true }),
+        },
+        bot: {
+          findFirst: vi.fn().mockResolvedValue(options.parentName ? { name: options.parentName } : null),
         },
       },
       jobs: { enqueue },
@@ -5032,19 +5043,47 @@ describe("bot intro run", () => {
     expect(prompt(["ask_user", "update_bot"])).not.toContain("update_bot");
   });
 
-  it("asks the first Mico for a short greeting instead of a focus card", async () => {
+  it("welcomes the first Mico with the same question as any other", async () => {
     const { create, deps } = introDeps();
-    await enqueueBotIntroRun(deps, actor, { ...bot, spawnKey: "onboarding:first" });
+    await expect(enqueueBotIntroRun(deps, actor, { ...bot, spawnKey: "onboarding:first" })).resolves.toBe(true);
     const [taskCall] = create.mock.calls as Array<[{ data: { prompt?: string } }]>;
-    expect(taskCall?.[0].data.prompt).toContain("Greet the user briefly");
-    expect(taskCall?.[0].data.prompt).not.toContain("ask_user");
+    expect(taskCall?.[0].data.prompt).toBe(
+      botIntroPrompt({ userName: "Ada Lovelace", spaceName: null, disabledBuiltinTools: [] }),
+    );
   });
 
-  it("keeps an imported first Mico inert when creation reuses its key", async () => {
+  it("keeps an imported Mico inert when creation reuses its key", async () => {
     const { create, enqueue, deps } = introDeps({ imported: true });
-    await enqueueBotIntroRun(deps, actor, { ...bot, spawnKey: "onboarding:first" });
+    await expect(enqueueBotIntroRun(deps, actor, { ...bot, spawnKey: "onboarding:first" })).resolves.toBe(false);
     expect(create).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("leaves a chat that already has a conversation as it is", async () => {
+    const { create, enqueue, deps } = introDeps({ conversation: true });
+    await expect(enqueueBotIntroRun(deps, actor, bot)).resolves.toBe(false);
+    expect(create).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("names the teammate that created a Mico in its welcome", async () => {
+    const { create, deps } = introDeps({ parentName: "Chief" });
+    await enqueueBotIntroRun(deps, actor, { ...bot, parentBotId: "parent-1" } as Bot);
+    const [taskCall] = create.mock.calls as Array<[{ data: { prompt?: string } }]>;
+    expect(taskCall?.[0].data.prompt).toBe(
+      botIntroPrompt({ userName: "Ada Lovelace", spaceName: null, disabledBuiltinTools: [], createdBy: "Chief" }),
+    );
+    expect(deps.prisma.bot.findFirst).toHaveBeenCalledWith({
+      where: { id: "parent-1", spaceId: "space-1", userId: "user-1" },
+      select: { name: true },
+    });
+  });
+
+  it("asks where to start with three first tasks, in a single question card", () => {
+    const prompt = botIntroPrompt({ userName: "Ada", spaceName: null, disabledBuiltinTools: [] });
+    expect(prompt).toContain("one ask_user call");
+    expect(prompt).toContain("three short first tasks");
+    expect(prompt).toContain("If they skip it");
   });
 });
 

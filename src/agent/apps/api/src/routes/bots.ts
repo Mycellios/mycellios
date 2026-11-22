@@ -23,7 +23,7 @@ import {
   validateBotModelChange,
 } from "@mycellios/adapters";
 import type { Actor, Bot, BotSecretMetadata, CreateBotInput } from "@mycellios/contracts";
-import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@mycellios/contracts";
+import { BotSecretAuth } from "@mycellios/contracts";
 import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName, SidebarFolderError } from "@mycellios/core";
 import { Prisma } from "@mycellios/db";
 import {
@@ -129,85 +129,101 @@ function botSecretMetadataDto(row: {
   };
 }
 
-/** The creation intro's hidden prompt. It names only the tools this bot still has. */
+/**
+ * The welcome turn's hidden prompt. The reply is one question card that says who the Mico is
+ * and offers three first tasks for its role, so a new chat never starts empty. It names only
+ * the tools this bot still has.
+ */
 export function botIntroPrompt(input: {
   responseLocale?: string;
   userName: string;
   spaceName: string | null;
   disabledBuiltinTools: readonly string[];
-  firstMico?: boolean;
+  /** The teammate that created this Mico, when another Mico made it. */
+  createdBy?: string | null;
 }): string {
-  if (input.firstMico) {
-    return [
-      responseLanguageInstruction(input.responseLocale),
-      "Greet the user briefly. If your profile describes a role, say in one sentence what you can help with.",
-      "Do not ask onboarding questions, use tools, or change your profile.",
-    ].filter(Boolean).join("\n");
-  }
   const canAsk = !input.disabledBuiltinTools.includes("ask_user");
   const canUpdate = !input.disabledBuiltinTools.includes("update_bot");
-  const options =
-    "two to four short options that fit your name, anything your title, description or instructions already say, and what you know about them, never a stock list";
+  const tasks =
+    "three short first tasks that fit your role, each written the way they would ask for it, with a one-line description";
+  const context = [
+    input.createdBy
+      ? `Your teammate ${input.createdBy} just created you${input.userName ? ` for ${input.userName}` : ""}.`
+      : `You were just created${input.userName ? ` by ${input.userName}` : ""}.`,
+    input.spaceName ? `Their team space is called "${input.spaceName}".` : undefined,
+    "The user does not see this message. Your profile is your role.",
+  ];
   return [
-    responseLanguageInstruction(input.responseLocale),
-    [
-      "You were just created.",
-      input.userName ? `${input.userName} made you.` : undefined,
-      input.spaceName ? `Their team space is called "${input.spaceName}".` : undefined,
-    ]
-      .filter(Boolean)
-      .join(" "),
-    // Text streamed before ask_user is not kept once the run pauses, so the greeting
+    responseLanguageInstruction(input.responseLocale) ??
+      "Write in the language of your profile; if it has none, write in English.",
+    context.filter(Boolean).join(" "),
+    // Text streamed before ask_user is not kept once the run pauses, so the welcome
     // goes in the question itself.
     canAsk
-      ? `Call ask_user right away, with no text before it. Its question greets them by first name in a few words and asks what they want you for, with ${options}. They can also type their own answer.`
-      : `Greet them by first name in a few words and ask in one sentence what they want you for, suggesting ${options}.`,
-    "If your profile already makes that clear, say in one line what you will do instead of asking.",
+      ? [
+          "Welcome them with one ask_user call, made right away with no text before it: the question is the welcome.",
+          "- question: one or two warm sentences that greet them by first name, say who you are and how you can help, then ask briefly where to start. No feature lists or setup questions.",
+          `- options: ${tasks}. Single choice; they can also type their own answer.`,
+          "If your profile does not say what you are for yet, ask what they want you for instead, with three short example roles as the options.",
+        ].join("\n")
+      : `Welcome them in one or two warm sentences that say who you are, suggest ${tasks}, and ask where to start.`,
+    "When they answer, do what they chose or wrote. If they skip it, reply with one short, friendly sentence saying they can message you whenever they are ready, without mentioning the question.",
     canUpdate
-      ? "Once you know what you are for, use update_bot to set your title to a short role and your description to one line. Leave them unset if the answer is too vague, and keep your name and look."
+      ? "If your profile had no role and their answer gives you one, use update_bot to set your title to a short role and your description to one line. Keep your name and look."
       : undefined,
-    "Then get started, asking one follow-up only if you cannot start without it.",
+    "Before they answer, do not call other tools, start work or mention these instructions.",
   ]
     .filter(Boolean)
     .join("\n");
 }
 
 /**
- * Queue one hidden-prompt turn (like a routine or skill test
- * run) that greets the user and asks. The executor limits the "created"
- * trigger to that question and the bot's own profile (see executor.ts), and
- * answering resumes the run as the user's turn.
+ * Queue one hidden-prompt turn (like a routine or skill test run) that welcomes the user with a
+ * question. The executor limits the "created" trigger to that question and the bot's own profile
+ * (see executor.ts), and answering resumes the run as the user's turn. A Mico gets at most one,
+ * and none after any earlier run, conversation message or import, so a used or imported Mico
+ * stays as it is.
  */
-export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bot, responseLocale?: string): Promise<void> {
+export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bot, responseLocale?: string): Promise<boolean> {
   const threadId = bot.threadId;
-  if (!threadId) return;
+  if (!threadId) return false;
   // Scripted is the deterministic test/eval runtime, not a real deployment: an
   // extra automatic run there competes with whatever response a test or eval
   // harness queued next, for a bot it doesn't otherwise get to opt out of.
-  if (deps.env.agentRuntime === "scripted") return;
+  if (deps.env.agentRuntime === "scripted") return false;
   const hasNativeEngine = bot.agentEngine && bot.agentEngine !== "pi";
-  if (!hasNativeEngine && !(bot.modelProvider && bot.modelId) && (await modelSetup(deps, actor)).needsModel) return;
-  const firstMico = bot.spawnKey === FIRST_MICO_SPAWN_KEY;
-  const [user, space] = await Promise.all([
+  if (!hasNativeEngine && !(bot.modelProvider && bot.modelId) && (await modelSetup(deps, actor)).needsModel) return false;
+  const [user, space, parent] = await Promise.all([
     deps.prisma.user.findUnique({ where: { id: actor.userId }, select: { name: true } }),
     deps.prisma.space.findUnique({
       where: { id: actor.spaceId },
       select: { name: true, isDefault: true },
     }),
+    bot.parentBotId
+      ? deps.prisma.bot.findFirst({
+          where: { id: bot.parentBotId, spaceId: actor.spaceId, userId: actor.userId },
+          select: { name: true },
+        })
+      : null,
   ]);
   const prompt = botIntroPrompt({
     responseLocale,
     userName: displayName(user?.name, ""),
     spaceName: space && !space.isDefault ? space.name.trim() || null : null,
     disabledBuiltinTools: bot.disabledBuiltinTools ?? [],
-    firstMico,
+    createdBy: parent?.name.trim() || null,
   });
   const run = await deps.prisma.$transaction(async (tx) => {
     // An idempotent create (spawnKey) returns the bot it already made; it gets one intro.
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
     if (await tx.run.findFirst({ where: { botId: bot.id }, select: { id: true } })) return null;
-    // An import racing a first-Mico create may own the same idempotency key.
-    if (firstMico && await tx.agentImport.findFirst({ where: { botId: bot.id }, select: { id: true } })) return null;
+    // A chat someone already used, or one already asking, keeps its history as it is.
+    if (await tx.message.findFirst({
+      where: { threadId, role: { in: ["user", "bot"] } },
+      select: { id: true },
+    })) return null;
+    // An imported agent starts inert, also when an import races a first-Mico create for its key.
+    if (await tx.agentImport.findFirst({ where: { botId: bot.id }, select: { id: true } })) return null;
     const task = await tx.task.create({
       data: {
         spaceId: actor.spaceId,
@@ -231,7 +247,9 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
       select: { id: true },
     });
   });
-  if (run) await deps.jobs.enqueue(runContinueJob(run.id));
+  if (!run) return false;
+  await deps.jobs.enqueue(runContinueJob(run.id));
+  return true;
 }
 
 async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: string) {
@@ -307,6 +325,12 @@ export function botsRoutes(ctx: RouterContext) {
         const { expectedUserId, ...profile } = input;
         if (expectedUserId !== context.actor.userId) throw new ORPCError("FORBIDDEN");
         return createMico(context, profile, false);
+      }),
+      welcome: authed.bots.welcome.handler(async ({ context, input }) => {
+        const bot = (await repos.listBots(context.actor)).find((candidate) => candidate.id === input.botId);
+        if (!bot) throw new IsolationError();
+        const locale = context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined;
+        return { queued: await enqueueBotIntroRun(deps, context.actor, bot, locale) };
       }),
       importPreview: authed.bots.importPreview.handler(async ({ context, input }) =>
         previewAgentImport(agentImportServices as AgentImportServices, context.actor, input),

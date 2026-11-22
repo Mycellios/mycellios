@@ -175,6 +175,8 @@ describe("spawned bot creation", () => {
         parentBotId: "parent-1",
       }),
     );
+    // The chat starts empty so opening it queues the welcome, not a provenance notice.
+    expect(createBot.mock.calls[0]?.[1]).not.toHaveProperty("initialMessage");
     expect(result).toEqual({
       ok: true,
       botId: "child-2",
