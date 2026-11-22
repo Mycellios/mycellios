@@ -1,7 +1,7 @@
 /** Per-thread composer draft persistence (survives tab reloads and discards). */
 import { hasUnsavedEditorWork } from "./unsaved-editor-work";
 
-export const COMPOSER_DRAFT_STORAGE_PREFIX = "rakazo.composerDraft.";
+export const COMPOSER_DRAFT_STORAGE_PREFIX = "mycellios.composerDraft.";
 
 type ComposerDraftSubmission = { text: string };
 const pendingSubmissions = new Map<string, ComposerDraftSubmission>();

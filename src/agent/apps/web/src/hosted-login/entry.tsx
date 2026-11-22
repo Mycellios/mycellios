@@ -1,3 +1,5 @@
+// First: copies storage saved under the legacy key names before any module reads it.
+import "../lib/legacy-storage";
 import { createRoot } from "react-dom/client";
 import { OAuthConsent } from "./OAuthConsent";
 import { applyHostedChrome } from "./hosted-chrome";

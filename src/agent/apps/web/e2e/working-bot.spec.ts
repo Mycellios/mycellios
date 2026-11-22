@@ -76,7 +76,7 @@ test("delegated work stays working and stoppable with a newer queued run", async
         ],
       }),
     );
-    await page.evaluate(() => localStorage.setItem("rakazo.responseStreaming", "on"));
+    await page.evaluate(() => localStorage.setItem("mycellios.responseStreaming", "on"));
     await prisma.$transaction((tx) =>
       appendEventInTransaction(tx, {
         ...scope,

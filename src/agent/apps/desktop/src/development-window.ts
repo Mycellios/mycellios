@@ -143,7 +143,7 @@ export function installDevelopmentWindow(
     const uiPreferences: { locale?: string; appearance?: string; spaceId?: string } = {};
     try {
       const values = await stable.webContents.executeJavaScript(
-        '({locale:localStorage.getItem("rakazo.uiLocale"),appearance:localStorage.getItem("rakazo.uiAppearance"),spaceId:localStorage.getItem("rakazo:space-id")})',
+        '({locale:localStorage.getItem("mycellios.uiLocale"),appearance:localStorage.getItem("mycellios.uiAppearance"),spaceId:localStorage.getItem("mycellios:space-id")})',
       );
       if (/^(en|de|ko|tr|hi|pt-BR|zh-CN|es|ru|fr|he|nl|ja)$/.test(values?.locale))
         uiPreferences.locale = values.locale;
@@ -176,7 +176,7 @@ export function installDevelopmentWindow(
           `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:${port}; img-src 'self' https: data: blob:; font-src 'self' data:; worker-src 'self' blob:; frame-src 'self' https: http://127.0.0.1:*; object-src 'none'; base-uri 'self'`,
         );
         if (request.method !== "HEAD" && headers.get("content-type")?.includes("text/html")) {
-          const seed = `<script>(()=>{const p=${JSON.stringify(uiPreferences)};for(const [key,value] of [["rakazo.uiLocale",p.locale],["rakazo.uiAppearance",p.appearance]])if(value&&!localStorage.getItem(key))localStorage.setItem(key,value);if(p.spaceId)localStorage.setItem("rakazo:space-id",p.spaceId);else localStorage.removeItem("rakazo:space-id")})()</script>`;
+          const seed = `<script>(()=>{const p=${JSON.stringify(uiPreferences)};for(const [key,value] of [["mycellios.uiLocale",p.locale],["mycellios.uiAppearance",p.appearance]])if(value&&!localStorage.getItem(key))localStorage.setItem(key,value);if(p.spaceId)localStorage.setItem("mycellios:space-id",p.spaceId);else localStorage.removeItem("mycellios:space-id")})()</script>`;
           return new Response((await response.text()).replace("<head>", "<head>" + seed), {
             status: response.status,
             headers,

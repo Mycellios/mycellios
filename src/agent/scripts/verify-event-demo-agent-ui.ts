@@ -73,7 +73,7 @@ try {
   const page = await context.newPage();
   page.on("pageerror", e => errors.push(e.message));
   page.on("response", r => { if (r.url().includes("/rpc/") && r.status() >= 400) rpcFailures.push({ path: new URL(r.url()).pathname, status: r.status() }); });
-  await context.addInitScript(() => { localStorage.setItem("rakazo.uiLocale", "en"); localStorage.setItem("mycellios.uiLocaleConfirmed", "en"); });
+  await context.addInitScript(() => { localStorage.setItem("mycellios.uiLocale", "en"); localStorage.setItem("mycellios.uiLocaleConfirmed", "en"); });
   let presenceReads = 0;
   const guest = randomUUID(), endsAt = Date.now() + 3600_000;
   // Only the native admission authority is a fixture here; Agent auth/RPC/database/UI are real.

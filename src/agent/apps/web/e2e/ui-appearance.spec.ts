@@ -449,7 +449,7 @@ test("sidebar list fades above the credits foot and keeps the last row reachable
   const lastRow = list.getByRole("button", { name: /^Demo chat 19/ }).first();
   await expect(lastRow).toHaveCount(1);
   for (const theme of ["light", "dark"]) {
-    await page.evaluate((theme) => localStorage.setItem("rakazo.uiAppearance", theme), theme);
+    await page.evaluate((theme) => localStorage.setItem("mycellios.uiAppearance", theme), theme);
     await page.reload();
     await expect(lastRow).toHaveCount(1);
     await expect(foot).toBeVisible();

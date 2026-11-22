@@ -9,7 +9,7 @@ async function waitForStoredPanel(page: Page, panel: string | null) {
       return page.evaluate((expected) => {
         for (let i = 0; i < localStorage.length; i += 1) {
           const key = localStorage.key(i);
-          if (!key?.includes("rakazo:right-panel-state:")) continue;
+          if (!key?.includes("mycellios:right-panel-state:")) continue;
           try {
             const value = JSON.parse(localStorage.getItem(key) ?? "null") as { panel?: unknown };
             if (value && "panel" in value && value.panel === expected) return true;

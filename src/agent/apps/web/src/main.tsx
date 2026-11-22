@@ -1,3 +1,5 @@
+// First: copies storage saved under the legacy key names before any module reads it.
+import "./lib/legacy-storage";
 import { installFocusInput } from "./lib/focus-input";
 import { syncNativeLogo } from "./lib/logo-preference";
 import { installActionSounds } from "./lib/reply-sound";

@@ -44,6 +44,8 @@ class PinnedLlamaCppBuild:
     build: str
     target: str
     archive_sha256: str
+    archive_url: str
+    archive_size: int
     libraries: Mapping[str, str]
     library_name: str
     ggml_name: str
@@ -58,6 +60,8 @@ PINNED_BUILDS: Mapping[str, PinnedLlamaCppBuild] = {
         build="b12613",
         target="win-vulkan-x64",
         archive_sha256="56f1fca056efc933a39226fa767328a0082ebd42ec3c4d2e0193a37ac44abdee",
+        archive_url="https://github.com/ggml-org/llama.cpp/releases/download/b12613/llama-b12613-bin-win-vulkan-x64.zip",
+        archive_size=38_845_965,
         library_name="llama.dll",
         ggml_name="ggml.dll",
         libraries={

@@ -199,7 +199,7 @@ describe("Dictation recorder fallback", () => {
   });
 
   it("keeps transcription in the space where recording started", async () => {
-    const store = new Map<string, string>([["rakazo:space-id", "space-support"]]);
+    const store = new Map<string, string>([["mycellios:space-id", "space-support"]]);
     const localStorage = {
       getItem: (key: string) => store.get(key) ?? null,
       setItem: (key: string, value: string) => {
@@ -242,7 +242,7 @@ describe("Dictation recorder fallback", () => {
     const onFinal = vi.fn();
     const dictation = new Dictation();
     await dictation.listen({ mode: "hold", transcribe: true, onFinal });
-    store.set("rakazo:space-id", "space-other");
+    store.set("mycellios:space-id", "space-other");
     dictation.submitHold();
     await vi.waitFor(() => expect(onFinal).toHaveBeenCalledWith("hello"));
 
@@ -352,7 +352,7 @@ describe("Dictation recorder fallback", () => {
 
   it("tells the provider which language the caller speaks", async () => {
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) => (key === "rakazo.uiLocale" ? "es" : null),
+      getItem: (key: string) => (key === "mycellios.uiLocale" ? "es" : null),
     });
     const track = { stop: vi.fn() };
     vi.stubGlobal("navigator", {
@@ -879,7 +879,7 @@ describe("Dictation web speech", () => {
 
   it("listens in the language the app is set to", async () => {
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) => (key === "rakazo.uiLocale" ? "nl" : null),
+      getItem: (key: string) => (key === "mycellios.uiLocale" ? "nl" : null),
       setItem: () => undefined,
       removeItem: () => undefined,
       clear: () => undefined,
@@ -1739,7 +1739,7 @@ describe("transcriptionLanguage", () => {
   });
   it("hints the provider with the language the caller picked", () => {
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) => (key === "rakazo.uiLocale" ? "es" : null),
+      getItem: (key: string) => (key === "mycellios.uiLocale" ? "es" : null),
     });
     vi.stubGlobal("navigator", { language: "es-ES" });
     expect(transcriptionLanguage()).toBe("es");

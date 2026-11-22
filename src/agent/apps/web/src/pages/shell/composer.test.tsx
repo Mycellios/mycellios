@@ -726,7 +726,7 @@ describe("Composer", () => {
     const draftKey = "bot:draft-restore-test";
     const first = renderComposer(onSend, { draftKey });
     type(first, "unsent thought");
-    expect(window.localStorage.getItem(`rakazo.composerDraft.${draftKey}`)).toBe("unsent thought");
+    expect(window.localStorage.getItem(`mycellios.composerDraft.${draftKey}`)).toBe("unsent thought");
     act(() => root?.unmount());
     container?.remove();
     const second = renderComposer(onSend, { draftKey });
@@ -769,7 +769,7 @@ it.each([true, false])(
     type(textarea, "pending text");
     pressEnter(textarea);
     expect(textarea.value).toBe("");
-    expect(localStorage.getItem(`rakazo.composerDraft.${draftKey}`)).toBe("pending text");
+    expect(localStorage.getItem(`mycellios.composerDraft.${draftKey}`)).toBe("pending text");
     act(() => root?.unmount());
     container?.remove();
     await act(async () => finishSend(accepted));
@@ -793,7 +793,7 @@ it.each([true, false])(
     type(textarea, "newer text");
     await act(async () => finishSend(accepted));
     expect(textarea.value).toBe("newer text");
-    expect(localStorage.getItem("rakazo.composerDraft.bot:bot-1")).toBe("newer text");
+    expect(localStorage.getItem("mycellios.composerDraft.bot:bot-1")).toBe("newer text");
   },
 );
 
@@ -817,7 +817,7 @@ it.each([true, false])(
     expect(returned.value).toBe("submitted text");
     await act(async () => finishSend(accepted));
     expect(returned.value).toBe(accepted ? "" : "submitted text");
-    expect(localStorage.getItem(`rakazo.composerDraft.${draftKey}`)).toBe(
+    expect(localStorage.getItem(`mycellios.composerDraft.${draftKey}`)).toBe(
       accepted ? null : "submitted text",
     );
   },
@@ -842,7 +842,7 @@ it("preserves edits made after returning, even when the text matches the submiss
   type(returned, "submitted text");
   await act(async () => finishSend(true));
   expect(returned.value).toBe("submitted text");
-  expect(localStorage.getItem(`rakazo.composerDraft.${draftKey}`)).toBe("submitted text");
+  expect(localStorage.getItem(`mycellios.composerDraft.${draftKey}`)).toBe("submitted text");
 });
 
 it("clears accepted saved text when only an attachment was picked during the send", async () => {
@@ -858,7 +858,7 @@ it("clears accepted saved text when only an attachment was picked during the sen
   pickAttachment();
   await act(async () => finishSend(true));
   expect(textarea.value).toBe("");
-  expect(localStorage.getItem("rakazo.composerDraft.bot:bot-1")).toBeNull();
+  expect(localStorage.getItem("mycellios.composerDraft.bot:bot-1")).toBeNull();
 });
 
 it.each([false, true])("offers dictation independently of calls while running=%s", (running) => {

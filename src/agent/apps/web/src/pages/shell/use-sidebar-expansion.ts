@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 function collapsedSidebarSectionsStorageKey(userId: string | null | undefined, mobile: boolean): string | null {
   if (!userId) return null;
-  return `rakazo:collapsed-sidebar-sections:${mobile ? "mobile:" : ""}${userId}`;
+  return `mycellios:collapsed-sidebar-sections:${mobile ? "mobile:" : ""}${userId}`;
 }
 
 function readCollapsedIdSet(storageKey: string | null): Set<string> {

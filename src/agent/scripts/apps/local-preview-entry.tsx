@@ -14,7 +14,7 @@ let opened = false;
 let scope = "";
 function render() {
   const owner = document.documentElement.getAttribute("data-preview-owner");
-  const space = localStorage.getItem("rakazo:space-id");
+  const space = localStorage.getItem("mycellios:space-id");
   const next = `${owner}:${space}`;
   const allowed = Boolean(
     window.rakazoDesktop?.appsStudio && /\/app(?:\/|$)/.test(location.pathname),
@@ -55,7 +55,7 @@ function ensureMenu() {
 }
 const observer = new MutationObserver(() => {
   ensureMenu();
-  const next = `${document.documentElement.getAttribute("data-preview-owner")}:${localStorage.getItem("rakazo:space-id")}`;
+  const next = `${document.documentElement.getAttribute("data-preview-owner")}:${localStorage.getItem("mycellios:space-id")}`;
   if (scope !== next || (opened && !/\/app(?:\/|$)/.test(location.pathname))) render();
 });
 observer.observe(document.documentElement, {
