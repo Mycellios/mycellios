@@ -105,6 +105,7 @@ import { signupPolicyFromEnv } from "@mycellios/core";
 import { HEADER_PREFIX, readHeader } from "@mycellios/core/legacy-env";
 import type { Pool, PrismaClient } from "@mycellios/db";
 import {
+  assertDatabaseSchemaCurrent,
   createBoardEvents,
   createWebPresence,
   createDb,
@@ -277,6 +278,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     trustedProxies: env.trustedProxies.length > 0 ? env.trustedProxies : defaultTrustedProxies(),
     header: env.clientIpHeader,
   });
+  // Before anything listens: a release whose migrations were not applied must
+  // fail its health check and roll back instead of answering with 500s.
+  if (created.pool) await assertDatabaseSchemaCurrent(prisma);
   const rowSecurity = rowSecurityWarning(await describeRowSecurity(prisma));
   if (rowSecurity) logger.warn(rowSecurity);
   const realtime =
