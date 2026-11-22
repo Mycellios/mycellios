@@ -1309,7 +1309,7 @@ describe("run notification preference", () => {
       },
       select: {
         bot: { select: { notifyOnFinish: true } },
-        thread: { select: { groupId: true, taskBotId: true } },
+        thread: { select: { groupId: true, taskBotId: true, taskKey: true } },
       },
     });
 

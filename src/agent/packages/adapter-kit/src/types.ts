@@ -2,6 +2,7 @@ import type {
   AgentQuestion,
   CacheCapabilities as ConnectionCacheCapabilities,
   ConnectionCatalogItem,
+  NotificationKind,
   SandboxKind,
 } from "@mycellios/contracts";
 
@@ -812,7 +813,7 @@ export interface ArtifactPut {
 export interface NotificationMessage {
   /** Explicit scheduled follow-up, independent of model execution. */
   taskReminder?: { id: string; at: string };
-  kind: "completion" | "failure" | "help" | "takeover";
+  kind: NotificationKind;
   title: string;
   body: string;
   botId: string;
@@ -821,8 +822,21 @@ export interface NotificationMessage {
   groupId?: string;
   /** Explicit private conversation; never infer this from a legacy threadId. */
   taskThreadId?: string;
+  /** A Mico's own task conversation that is not a routine's: the task-replies switch applies. */
+  taskConversation?: boolean;
+  /** The waiting event a question or takeover notice is about, so other devices can close it. */
+  requestId?: string;
   /** Unread chats to show on the app icon, when the sender knows them. */
   badge?: number;
+}
+
+/** A question or takeover notice whose request was answered or ended; other devices close it. */
+export interface NotificationDismissal {
+  userId: string;
+  spaceId: string;
+  botId: string;
+  threadId: string;
+  requestId: string;
 }
 
 /** A product-authored transactional email, independent of its delivery vendor. */

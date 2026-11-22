@@ -131,6 +131,7 @@ import { PasskeyOffer } from "../components/PasskeyOffer";
 import { setLiveThreadConnection } from "../lib/live-thread-connection";
 import { notificationPreferences } from "../lib/notification-preferences";
 import { createReplySoundGate, playReplySound, unlockReplySound } from "../lib/reply-sound";
+import { createGroupNoticeGate, createTeammateRunTracker, groupWorkStillRunning } from "../lib/notification-gates";
 import { ReleaseNotes } from "../components/ReleaseNotes";
 import { SidebarFooter } from "../components/SidebarFooter";
 import { ServerConnectionDialogs } from "../components/ServerConnectionDialogs";
@@ -163,7 +164,9 @@ import {
 } from "../lib/bots-sidebar-density-pref";
 import { readBotsSidebarCollapsed, writeBotsSidebarCollapsed } from "../lib/bots-sidebar-pref";
 import {
+  closeRequestNotification,
   deliverBrowserNotification as deliverNativeBrowserNotification,
+  isRunResumeOrEnd,
   hasFocusedNotificationTab,
   requestBrowserNotificationPermission,
   requiresNotificationAttention,
@@ -380,7 +383,12 @@ type PendingBrowserNotification = {
   botName: string;
   groupId?: string;
   taskId?: string;
+  /** From a Mico's own task conversation that is not a routine's (the task-replies switch). */
+  taskConversation?: boolean;
 };
+
+/** How a live event may alert: quiet keeps the reply-sound bookkeeping but never alerts. */
+type BrowserNoticeOptions = { quiet?: boolean; taskConversation?: boolean };
 
 const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
 /** Bound Settings leave so a hung voice status refresh cannot block dismissal. */
@@ -1272,15 +1280,17 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       pending.event,
       pending.groupId ? pending.botName : currentBot?.name || pending.botName,
       {
-        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() && accountNotificationAllowed(userId, pending.botId, pending.event) && Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
+        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() &&
+          accountNotificationAllowed(userId, pending.botId, pending.event, Date.now(), { taskConversation: pending.taskConversation }) &&
+          Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
           (!preferences.attentionOnly || requiresNotificationAttention(pending.event)),
         preview: preferences.preview && (accountNotificationSettings(userId)?.previews ?? false),
         pageVisible: true,
         windowFocused: hasFocusedNotificationTab(userId),
         permission: Notification.permission,
         notifiedEventIds: notifiedBrowserEvents.current,
-        show: (title, body, tag) =>
-          showSystemNotification(title, body, `mycellios:${userId}:${tag}`, route, preferences.sound, () => navigate(route)),
+        show: (title, body, tag, requestRunId) =>
+          showSystemNotification(title, body, `mycellios:${userId}:${tag}`, route, preferences.sound, () => navigate(route), requestRunId),
       },
     );
     return result !== "pending";
@@ -1302,12 +1312,21 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       enabled: boolean,
       notificationGroupId?: string,
       notificationTaskId?: string,
+      options: BrowserNoticeOptions = {},
     ) => {
       const botId = event.botId;
       if (!userId) return;
+      // A question or takeover this tab alerted for was answered: close that alert here too.
+      if (event.runId && event.threadId === subscribedThreadId && isRunResumeOrEnd(event) &&
+        notifiedBrowserEvents.current.has(`run-attention:${event.runId}`)) {
+        void closeRequestNotification(`mycellios:${userId}:${event.threadId}`, event.runId);
+      }
       const completedReply = streamReady && replySoundGate(event, subscribedThreadId, initialCursor);
+      // Teammate-started completions and held group replies stay silent; unread still counts.
+      if (options.quiet) return;
       const preferences = notificationPreferences(userId);
-      if (!preferences.enabled || preferences.mutedUntil > Date.now() || !accountNotificationAllowed(userId, botId, event)) return;
+      if (!preferences.enabled || preferences.mutedUntil > Date.now() ||
+        !accountNotificationAllowed(userId, botId, event, Date.now(), { taskConversation: options.taskConversation })) return;
       if (typeof botId !== "string" && !notificationGroupId) return;
       if (
         enabled && preferences.sound && !preferences.attentionOnly &&
@@ -1332,6 +1351,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         botName,
         groupId: notificationGroupId,
         taskId: notificationTaskId,
+        taskConversation: options.taskConversation,
       } satisfies PendingBrowserNotification;
       if (typeof Notification === "undefined" || Notification.permission === "denied") return;
       if (Notification.permission === "default") {
@@ -1369,12 +1389,26 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           client.runs.list({ filter: "recent" }, options),
         ]);
         if (stop.signal.aborted || hasFocusedNotificationTab(userId)) return;
-        for (const run of [...activeRuns.runs, ...(recentRuns?.runs ?? [])].reverse()) {
+        // A group alerts once per request: only its newest finished turn, once no member works.
+        const workingGroups = new Set(activeRuns.runs.filter((run) => run.groupId &&
+          (run.status === "queued" || run.status === "leased" || run.status === "running")).map((run) => run.groupId));
+        const runs = [...activeRuns.runs, ...(recentRuns?.runs ?? [])].reverse();
+        const lastGroupRun = new Map<string, { runId: string; at: number }>();
+        for (const run of runs) {
+          const at = Date.parse(run.updatedAt);
+          const last = run.groupId && run.status === "completed" ? lastGroupRun.get(run.groupId) : undefined;
+          if (run.groupId && run.status === "completed" && (!last || at >= last.at)) lastGroupRun.set(run.groupId, { runId: run.runId, at });
+        }
+        for (const run of runs) {
           const time = Date.parse(run.updatedAt);
           if (!run.notificationsEnabled || run.threadId === snapshotRef.current?.threadId ||
             !Number.isFinite(time) || time < Math.max(after, before - 5 * 60_000)) continue;
           // The activity list has no routine-level notification preference or quiet-result flag.
           if (run.trigger === "routine" && (run.status === "completed" || run.status === "failed")) continue;
+          // A turn another Mico started finishes quietly; its failures and questions still alert.
+          if ((run.trigger === "bot_message" || run.trigger === "delegated_task") && run.status === "completed") continue;
+          if (run.groupId && run.status === "completed" &&
+            (workingGroups.has(run.groupId) || lastGroupRun.get(run.groupId)?.runId !== run.runId)) continue;
           const type = run.status === "waiting_input" ? "run.waiting_input"
             : run.status === "waiting_takeover" ? "computer.takeover.requested"
             : run.status === "completed" ? "run.completed"
@@ -1388,6 +1422,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             botName: run.groupName ?? run.botName,
             groupId: run.groupId ?? undefined,
             taskId: !run.groupId && bot && bot.threadId !== run.threadId ? run.threadId : undefined,
+            taskConversation: !run.groupId && Boolean(bot && bot.threadId !== run.threadId) && run.trigger !== "routine",
           });
         }
         after = Math.max(after, before);
@@ -1855,6 +1890,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     if (cachedThread && snapshotRef.current?.botId !== active.id) commitSnapshot(cachedThread);
     const sidebarRefresh = createRefreshCoalescer(() => refreshBots());
     const snapshotRefresh = createRefreshCoalescer(() => refreshThread(active.id));
+    const teammateRuns = createTeammateRunTracker();
+    const routineRuns = new Set<string>();
     const abort = new AbortController();
     setLiveThreadConnection("live");
     void runThreadSubscription({
@@ -1895,6 +1932,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       onEvent: (event, initial) => {
         if (isRunTerminalEvent(event) && event.seq > initial.cursor) window.dispatchEvent(new Event("mycellios:wallet-changed"));
         const currentBot = botsRef.current.find((bot) => bot.id === active.id);
+        teammateRuns.seed(activeThreadRuns(snapshotRef.current));
+        teammateRuns.observe(event);
+        if (event.type === "run.started" && event.runId && event.payload.trigger === "routine") routineRuns.add(event.runId);
         notifyBrowserForEvent(
           event,
           initial.threadId,
@@ -1904,6 +1944,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           currentBot?.notifyOnFinish ?? false,
           undefined,
           taskScope?.taskThreadId,
+          {
+            quiet: teammateRuns.quiet(event),
+            taskConversation: Boolean(taskScope?.taskThreadId) && !(event.runId && routineRuns.has(event.runId)),
+          },
         );
         if (event.type === "thread.cleared") {
           expandedHistoryThread.current = null;
@@ -2004,6 +2048,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     if (cachedThread && snapshotRef.current?.groupId !== groupId) commitSnapshot(cachedThread);
     const sidebarRefresh = createRefreshCoalescer(() => refreshBots());
     const snapshotRefresh = createRefreshCoalescer(() => refreshGroupThread(groupId));
+    const groupNotices = createGroupNoticeGate<ProductEvent>();
     const abort = new AbortController();
     setLiveThreadConnection("live");
     void runThreadSubscription({
@@ -2032,6 +2077,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       },
       onEvent: (event, initial) => {
         if (isRunTerminalEvent(event) && event.seq > initial.cursor) window.dispatchEvent(new Event("mycellios:wallet-changed"));
+        // Replies wait for the group's last working turn, then the latest one alerts once.
+        const gate = groupNotices(event, groupWorkStillRunning(activeThreadRuns(snapshotRef.current), event.runId));
         notifyBrowserForEvent(
           event,
           initial.threadId,
@@ -2040,7 +2087,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           activeGroup.name,
           true,
           groupId,
+          undefined,
+          { quiet: gate.hold },
         );
+        if (gate.release) {
+          notifyBrowserForEvent(gate.release, initial.threadId, initial.cursor, true, activeGroup.name, true, groupId);
+        }
         if (event.type === "thread.message.created" && event.payload.role === "bot") {
           readVisibleGroups.current.delete(groupId);
           markVisibleGroupRead();

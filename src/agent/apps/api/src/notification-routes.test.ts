@@ -121,8 +121,11 @@ describe("notification account RPC", () => {
   });
   it("applies preference changes only to the signed-in account", async () => {
     const f = fixture(),
-      settings = { level: "off" as const, previews: false, mutedUntil: null, bots: {} };
+      settings = { level: "off" as const, previews: false, mutedUntil: null, bots: {}, taskReplies: false };
     await f.client.notifications.saveSettings(settings);
     expect(f.webPush.saveSettings).toHaveBeenCalledWith("owner", settings);
+    // An older client without the task-replies field keeps today's behavior.
+    await f.client.notifications.saveSettings({ level: "all", previews: false, mutedUntil: null, bots: {} } as never);
+    expect(f.webPush.saveSettings).toHaveBeenLastCalledWith("owner", expect.objectContaining({ taskReplies: true }));
   });
 });

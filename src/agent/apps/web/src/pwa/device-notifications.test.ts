@@ -42,3 +42,30 @@ it("persists device preferences across worker restarts and clears them on sign-o
   await dispatch("push", { data: { json: () => ({ ...payload(), id: "next" }) } });
   expect(shown).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalled();
 });
+it("keeps an indefinite device pause in force", () => {
+  expect(devicePushNotification(payload(), "https://mycellios.test/", "en", { mutedUntil: Date.parse("9999-12-31T23:59:59.999Z") })).toBeNull();
+});
+it("closes only the answered request's notice when another device answers it", async () => {
+  const listeners = new Map<string, (event: any) => void>();
+  const answered = { data: { noticeId: "event-ask" }, close: vi.fn() };
+  const newer = { data: { noticeId: "event-done" }, close: vi.fn() };
+  const shown = vi.fn(async () => {});
+  const getNotifications = vi.fn(async () => [answered, newer]);
+  const rows = new Map<string, Response>();
+  const scope = { registration: { scope: "https://mycellios.test/", showNotification: shown, getNotifications },
+    navigator: { language: "en" }, location: { origin: "https://mycellios.test" },
+    addEventListener: (name: string, fn: any) => listeners.set(name, fn),
+    caches: { open: async () => ({ match: async (key: string) => rows.get(key)?.clone(), put: async (key: string, value: Response) => { rows.set(key, value.clone()); },
+      delete: async (key: string) => rows.delete(key), keys: async () => [...rows.keys()] }) } };
+  const dispatch = async (name: string, input: object) => { let work: Promise<void> = Promise.resolve(); listeners.get(name)!({ ...input, waitUntil: (promise: Promise<void>) => { work = promise; } }); await work; };
+  installPushWorker(scope as unknown as ServiceWorkerGlobalScope);
+  await dispatch("message", { data: { type: "mycellios:push-binding", accountId: "owner" }, source: { url: "https://mycellios.test/app" }, ports: [] });
+  // Binding a new account clears older notices; only the close below matters here.
+  answered.close.mockClear(); newer.close.mockClear();
+  const close = { version: 2, type: "dismiss", id: "dismiss:event-ask", accountId: "owner", notice: "event-ask", threadId: "thread", expiresAt: Date.now() + 60_000 };
+  await dispatch("push", { data: { json: () => ({ ...close, accountId: "someone-else" }) } });
+  expect(answered.close).not.toHaveBeenCalled();
+  await dispatch("push", { data: { json: () => close } });
+  expect(getNotifications).toHaveBeenLastCalledWith({ tag: "mycellios:thread" });
+  expect(answered.close).toHaveBeenCalledOnce(); expect(newer.close).not.toHaveBeenCalled(); expect(shown).not.toHaveBeenCalled();
+});

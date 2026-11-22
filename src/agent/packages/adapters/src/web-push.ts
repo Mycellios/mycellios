@@ -2,15 +2,19 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   AdapterContext,
   JobPublisher,
+  NotificationDismissal,
   NotificationMessage,
   NotificationProvider,
 } from "@mycellios/adapter-kit";
 import {
   NotificationSettingsSchema,
   notificationAllowed,
+  isTaskConversation,
+  notificationBaseKind,
+  validNotificationPause,
   WebPushSubscriptionSchema,
 } from "@mycellios/contracts";
-import type { NotificationSettings, WebPushSubscription } from "@mycellios/contracts";
+import type { NotificationKind, NotificationSettings, WebPushSubscription } from "@mycellios/contracts";
 import { micoAvatarShape, parseBotAvatarValue } from "@mycellios/contracts";
 import { currentMicoAvatarValue } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
@@ -58,6 +62,18 @@ export function validatePushEndpoint(value: string): string {
   return url.href;
 }
 
+/** Fixed copy for hidden previews: no Mico, group or conversation name and no message text. */
+const HIDDEN_PREVIEW_BODY: Record<NotificationKind, string> = {
+  completion: "Your Mico has finished. Open the chat to see the result.",
+  failure: "Your Mico needs attention. Open the chat for details.",
+  help: "Your Mico needs your answer.",
+  takeover: "Your Mico needs you to continue.",
+  not_started: "A message or routine could not start. Open the chat for details.",
+  helper_failed: "A helper or teammate could not finish its part. Open the chat for details.",
+  usage_limit: "Your Mico stopped at a usage limit. Open the chat for details.",
+  sign_in: "Your Mico needs you to sign in to its provider again or reconnect it.",
+};
+
 export function privateNotification(message: NotificationMessage, previews: boolean) {
   // Even opt-in previews must not reveal common credentials or arbitrarily long content.
   const clean = (text: string, limit: number) =>
@@ -68,15 +84,13 @@ export function privateNotification(message: NotificationMessage, previews: bool
       .slice(0, limit);
   return {
     title: previews ? clean(message.title, 80) : "Mycellios",
-    body: previews
-      ? clean(message.body, 200)
-      : {
-          completion: "Your Mico has finished. Open the chat to see the result.",
-          failure: "Your Mico needs attention. Open the chat for details.",
-          help: "Your Mico needs your answer.",
-          takeover: "Your Mico needs you to continue.",
-        }[message.kind],
+    body: previews ? clean(message.body, 200) : HIDDEN_PREVIEW_BODY[message.kind],
   };
+}
+
+/** Apple requires every Web Push to show a notice, so a silent close is never sent there. */
+export function silentPushAllowed(endpoint: string): boolean {
+  return !new URL(endpoint).hostname.toLowerCase().endsWith(".push.apple.com");
 }
 
 type Device = {
@@ -93,7 +107,8 @@ type Delivery = {
   spaceId: string;
   botId: string;
   runId: string;
-  kind: NotificationMessage["kind"];
+  /** A notice kind, or "dismiss" for a request answered elsewhere. */
+  kind: NotificationKind | "dismiss";
   eventId: string;
   attempts: number;
   expiresAt: Date;
@@ -111,11 +126,15 @@ const send: Sender = (subscription, payload, config) =>
     timeout: 10_000,
   });
 const system = <T>(fn: () => Promise<T>) => runAsSystem("account-owned Web Push delivery", fn);
+const REQUEST_KINDS = new Set<NotificationKind>(["help", "takeover"]);
+/** Kinds whose run ended failed; the later ones only refine why. */
+const FAILED_RUN_KINDS = new Set<NotificationKind>(["failure", "not_started", "usage_limit", "sign_in"]);
 
 /** Durable registrations and outbox; queue payloads contain IDs, never endpoints or chat text. */
 export class WebPushService {
   private readonly encryption: EncryptedSecretStore;
   private timer?: ReturnType<typeof setInterval>;
+  private nativeDismiss?: (request: NotificationDismissal) => Promise<void>;
   constructor(
     private readonly db: PrismaClient,
     encryptionKey: string,
@@ -124,6 +143,11 @@ export class WebPushService {
     private readonly sender: Sender = send,
   ) {
     this.encryption = new EncryptedSecretStore(encryptionKey);
+  }
+
+  /** Native channels close their copy of an answered request through this hook. */
+  useNativeDismiss(dismiss: (request: NotificationDismissal) => Promise<void>) {
+    this.nativeDismiss = dismiss;
   }
 
   async settings(userId: string): Promise<NotificationSettings> {
@@ -147,8 +171,8 @@ export class WebPushService {
   async saveSettings(userId: string, input: NotificationSettings) {
     const settings = NotificationSettingsSchema.parse(input);
     if (Object.keys(settings.bots).length > 200) throw new Error("Too many Mico overrides");
-    if (settings.mutedUntil && Date.parse(settings.mutedUntil) > Date.now() + 7 * 86400_000) {
-      throw new Error("Notification pause must be within seven days");
+    if (!validNotificationPause(settings.mutedUntil)) {
+      throw new Error("Notification pause must be within seven days or until turned back on");
     }
     return system(async () => {
       for (const botId of Object.keys(settings.bots)) {
@@ -244,12 +268,15 @@ export class WebPushService {
       ON CONFLICT ("userId", "sessionId", "clientId") DO UPDATE SET "focusedUntil" = EXCLUDED."focusedUntil"`);
   }
 
-  /** Existing executor notices cover completed/failed runs, questions, approvals and takeovers. */
+  /**
+   * Executor notices: completed and failed runs (with refined failure kinds), helpers or
+   * teammates that failed, questions, approvals and takeovers.
+   */
   async enqueue(message: NotificationMessage, context: AdapterContext) {
     const runId = message.taskReminder ? `task-reminder:${message.taskReminder.id}` : context.runId;
     if (!this.config || !runId || (message.taskReminder && (!Number.isFinite(Date.parse(message.taskReminder.at)) || Date.parse(message.taskReminder.at)>Date.now()))) return 0;
     const settings = await this.settings(context.userId);
-    if (!notificationAllowed(settings, message.botId, message.kind)) return 0;
+    if (!notificationAllowed(settings, message.botId, message.kind, Date.now(), { taskConversation: message.taskConversation })) return 0;
     return system(async () => {
       const reminder = message.taskReminder ? await this.db.inboxTask.findFirst({
         where:{id:message.taskReminder.id,userId:context.userId,spaceId:context.spaceId,botId:message.botId,threadId:message.threadId,
@@ -293,7 +320,7 @@ export class WebPushService {
           id: eventKey,
           accountId: context.userId,
           ...privateNotification({ ...message, title: message.taskReminder ? message.title : name }, settings.previews),
-          kind: message.kind,
+          ...transportKind(message.kind),
           preview: settings.previews,
           avatar: legacyArt ? art.id : undefined,
           avatarArt: art && !legacyArt ? art.id : undefined,
@@ -315,6 +342,72 @@ export class WebPushService {
       return devices.length;
     });
   }
+
+  /** The waiting event a question or takeover notice is about; none for other kinds. */
+  async requestEvent(message: NotificationMessage, context: AdapterContext) {
+    if (message.taskReminder || !context.runId || !REQUEST_KINDS.has(message.kind)) return undefined;
+    const runId = context.runId;
+    return system(async () => (await this.notificationEvent(runId, message.kind))?.id);
+  }
+  /** Remember a request notice that reached a channel, so its answer can close it elsewhere. */
+  async recordRequest(message: NotificationMessage, context: AdapterContext) {
+    if (message.taskReminder || !context.runId || !message.requestId || !REQUEST_KINDS.has(message.kind)) return;
+    await system(() => this.db.$executeRaw`INSERT INTO notification_requests
+      (id, "userId", "spaceId", "botId", "threadId", "runId", "eventId", kind)
+      VALUES (${randomUUID()}, ${context.userId}, ${context.spaceId}, ${message.botId}, ${message.threadId}, ${context.runId}, ${message.requestId}, ${message.kind})
+      ON CONFLICT ("runId", "eventId") DO NOTHING`);
+  }
+
+  /**
+   * Requests whose run no longer waits on them were answered, retired or stopped. Each one is
+   * claimed once across processes, then closed on the devices that showed it.
+   */
+  async resolveRequests() {
+    return system(async () => {
+      await this.db.$executeRaw`DELETE FROM notification_requests WHERE "createdAt" < now() - interval '2 days'`;
+      const resolved = await this.db.$queryRaw<
+        Array<NotificationDismissal & { runId: string }>
+      >`UPDATE notification_requests q SET "resolvedAt" = now()
+        WHERE q.id IN (
+          SELECT o.id FROM notification_requests o LEFT JOIN runs r ON r.id = o."runId"
+          WHERE o."resolvedAt" IS NULL AND o."createdAt" > now() - interval '1 day'
+            AND (r.id IS NULL OR r.status <> CASE WHEN o.kind = 'takeover' THEN 'waiting_takeover' ELSE 'waiting_input' END)
+          ORDER BY o."createdAt" LIMIT 100 FOR UPDATE OF o SKIP LOCKED)
+        RETURNING q."userId", q."spaceId", q."botId", q."threadId", q."runId", q."eventId" AS "requestId"`;
+      for (const request of resolved) {
+        await this.queueDismissals(request).catch(() => getLogger().warn("Web Push dismissal unavailable"));
+        await this.nativeDismiss?.(request).catch(() => getLogger().warn("Native notification dismissal unavailable"));
+      }
+      return resolved.length;
+    });
+  }
+  /** Only devices whose push service accepted the request notice receive a close message. */
+  private async queueDismissals(request: NotificationDismissal & { runId: string }) {
+    if (!this.config) return;
+    const devices = await this.db.$queryRaw<Array<{ deviceId: string }>>`SELECT DISTINCT d."deviceId"
+      FROM web_push_deliveries d JOIN web_push_devices v ON v.id = d."deviceId"
+      WHERE d."eventKey" = ${request.requestId} AND d."sentAt" IS NOT NULL AND v."userId" = ${request.userId}`;
+    const expiresAt = Date.now() + 300_000;
+    for (const { deviceId } of devices) {
+      const id = randomUUID();
+      const payload = {
+        version: 2,
+        type: "dismiss",
+        id: `dismiss:${request.requestId}`,
+        accountId: request.userId,
+        notice: request.requestId,
+        threadId: request.threadId,
+        expiresAt,
+      };
+      const ciphertext = await this.seal(JSON.stringify(payload), id, request.userId);
+      await this.db.$executeRaw`INSERT INTO web_push_deliveries
+        (id, "deviceId", "eventKey", ciphertext, "spaceId", "botId", "runId", kind, "eventId", "dueAt", "expiresAt")
+        VALUES (${id}, ${deviceId}, ${`dismiss:${request.requestId}`}, ${ciphertext}, ${request.spaceId}, ${request.botId}, ${request.runId}, 'dismiss', ${request.requestId}, now(), ${new Date(expiresAt).toISOString()}::timestamptz)
+        ON CONFLICT ("deviceId", "eventKey") DO NOTHING`;
+    }
+    if (devices.length) await this.drain();
+  }
+
   /** Repair the commit/enqueue gap and expired worker leases without replaying tools. */
   async drain() {
     if (!this.config) return;
@@ -341,9 +434,11 @@ export class WebPushService {
     });
   }
   start() {
-    if (!this.config || this.timer) return;
-    const tick = () =>
+    if ((!this.config && !this.nativeDismiss) || this.timer) return;
+    const tick = () => {
       void this.drain().catch(() => getLogger().warn("Web Push outbox unavailable"));
+      void this.resolveRequests().catch(() => getLogger().warn("Notification request sweep unavailable"));
+    };
     tick();
     this.timer = setInterval(tick, 30_000);
     this.timer.unref?.();
@@ -387,12 +482,14 @@ export class WebPushService {
       const finish = () =>
         this.db
           .$executeRaw`UPDATE web_push_deliveries SET "finishedAt" = now(), "leaseUntil" = NULL WHERE id = ${id}`;
-      if (!device || !(await this.validDelivery(row, device))) {
+      const dismissal = row.kind === "dismiss";
+      if (!device || !(await (dismissal ? this.liveSession(device) : this.validDelivery(row, device)))) {
         await finish();
         return;
       }
       // Active clients suppress all devices, not just the one displaying the conversation.
-      if (await this.anyFocused(device.userId)) {
+      // Closing an answered request is not a new alert, so it is never held.
+      if (!dismissal && (await this.anyFocused(device.userId))) {
         await this.db
           .$executeRaw`UPDATE web_push_deliveries SET "leaseUntil" = NULL, attempts = attempts - 1,
           "dueAt" = now() + interval '15 seconds' WHERE id = ${id}`;
@@ -404,18 +501,28 @@ export class WebPushService {
         );
         validatePushEndpoint(subscription.endpoint);
         const saved = JSON.parse(await this.encryption.load(row.ciphertext, `webpush:${row.id}`));
-        const currentSettings = await this.settings(device.userId);
-        const payload = JSON.stringify({
-          ...saved,
-          ...privateNotification({ ...saved, kind: row.kind }, currentSettings.previews),
-          kind: row.kind,
-          preview: currentSettings.previews && saved.preview !== false,
-          avatar: currentSettings.previews && saved.preview === true ? saved.avatar : undefined,
-          avatarArt: currentSettings.previews && saved.preview === true ? saved.avatarArt : undefined,
-        });
+        let payload: string;
+        if (row.kind === "dismiss") {
+          if (!silentPushAllowed(subscription.endpoint)) {
+            await finish();
+            return;
+          }
+          payload = JSON.stringify(saved);
+        } else {
+          const currentSettings = await this.settings(device.userId);
+          payload = JSON.stringify({
+            ...saved,
+            ...privateNotification({ ...saved, kind: row.kind }, currentSettings.previews),
+            ...transportKind(row.kind),
+            preview: currentSettings.previews && saved.preview !== false,
+            avatar: currentSettings.previews && saved.preview === true ? saved.avatar : undefined,
+            avatarArt: currentSettings.previews && saved.preview === true ? saved.avatarArt : undefined,
+          });
+        }
         // Standard encrypted Web Push. Provider errors are never logged with endpoint/payload.
         await this.sender(subscription, payload, this.config!);
-        await finish();
+        await this.db
+          .$executeRaw`UPDATE web_push_deliveries SET "finishedAt" = now(), "sentAt" = now(), "leaseUntil" = NULL WHERE id = ${id}`;
       } catch (error) {
         const status =
           typeof error === "object" && error !== null && "statusCode" in error
@@ -432,14 +539,16 @@ export class WebPushService {
       }
     });
   }
-  private async validDelivery(row: Delivery, device: Device) {
-    const session = await this.db.session.findFirst({
+  private async liveSession(device: Device) {
+    return Boolean(await this.db.session.findFirst({
       where: { id: device.sessionId, userId: device.userId, expiresAt: { gt: new Date() } },
       select: { id: true },
-    });
-    if (!session || !notificationAllowed(await this.settings(device.userId), row.botId, row.kind))
-      return false;
+    }));
+  }
+  private async validDelivery(row: Delivery, device: Device) {
+    if (row.kind === "dismiss" || !(await this.liveSession(device))) return false;
     if(row.runId.startsWith("task-reminder:")) {
+      if (!notificationAllowed(await this.settings(device.userId), row.botId, row.kind)) return false;
       return Boolean(await this.db.inboxTask.findFirst({where:{
         id:row.runId.slice("task-reminder:".length),userId:device.userId,spaceId:row.spaceId,botId:row.botId,
         thread:{archivedAt:null,deleteAfter:null},remindAt:new Date(row.eventId),bot:{archivedAt:null},
@@ -451,7 +560,7 @@ export class WebPushService {
       select: {
         status: true,
         updatedAt: true,
-        thread: { select: { unread: true, groupId: true } },
+        thread: { select: { unread: true, groupId: true, taskBotId: true, taskKey: true } },
         bot: { select: { notifyOnFinish: true, archivedAt: true } },
         space: {
           select: { memberships: { where: { userId: device.userId }, select: { userId: true } } },
@@ -460,6 +569,9 @@ export class WebPushService {
     });
     if (
       !run ||
+      !notificationAllowed(await this.settings(device.userId), row.botId, row.kind, Date.now(), {
+        taskConversation: isTaskConversation(run.thread, row.botId),
+      }) ||
       !run.space.memberships.length ||
       run.bot.archivedAt ||
       (!run.bot.notifyOnFinish && !run.thread.groupId) ||
@@ -472,11 +584,18 @@ export class WebPushService {
         (await this.notificationEvent(row.runId, row.kind))?.id === row.eventId
       );
     }
-    return row.kind === "completion" ? run.status === "completed" : run.status === "failed";
+    // A helper can fail while its turn keeps working; its card is the unread message.
+    if (row.kind === "helper_failed") return true;
+    return row.kind === "completion" ? run.status === "completed" : FAILED_RUN_KINDS.has(row.kind) && run.status === "failed";
   }
-  private notificationEvent(runId: string, kind: NotificationMessage["kind"]) {
-    const type = { help: "run.waiting_input", takeover: "computer.takeover.requested", completion: "run.completed", failure: "run.failed" }[kind];
-    return this.db.event.findFirst({ where: { runId, type }, orderBy: { seq: "desc" }, select: { id: true, createdAt: true } });
+  private notificationEvent(runId: string, kind: NotificationKind) {
+    const types =
+      kind === "help" ? ["run.waiting_input"]
+      : kind === "takeover" ? ["computer.takeover.requested"]
+      : kind === "completion" ? ["run.completed"]
+      : kind === "helper_failed" ? ["thread.subagent", "run.failed"]
+      : ["run.failed"];
+    return this.db.event.findFirst({ where: { runId, type: { in: types } }, orderBy: { seq: "desc" }, select: { id: true, createdAt: true } });
   }
   private async seal(value: string, id: string, userId: string) {
     return (
@@ -495,17 +614,24 @@ export class WebPushService {
   }
 }
 
+/** Older installed workers accept only the original four kinds; the refinement rides beside them. */
+function transportKind(kind: NotificationKind) {
+  const base = notificationBaseKind(kind);
+  return { kind: base, detail: base === kind ? undefined : kind };
+}
+
 /** Shared policy, while retaining native delivery acceptance and receipt semantics. */
 export function notificationChannels(
   native: NotificationProvider,
   web: WebPushService,
 ): NotificationProvider {
+  if (native.dismiss) web.useNativeDismiss((request) => native.dismiss!(request));
   const legacy = async (
     message: NotificationMessage,
     context: AdapterContext,
   ): Promise<"delivered" | "undeliverable"> => {
     const settings = await web.settings(context.userId);
-    if (!notificationAllowed(settings, message.botId, message.kind)) return "undeliverable";
+    if (!notificationAllowed(settings, message.botId, message.kind, Date.now(), { taskConversation: message.taskConversation })) return "undeliverable";
     const safeMessage = { ...message, ...privateNotification(message, settings.previews) };
     if (native.deliver) return native.deliver(safeMessage, context);
     await native.send(safeMessage, context);
@@ -515,14 +641,23 @@ export function notificationChannels(
     message: NotificationMessage,
     context: AdapterContext,
   ): Promise<"delivered" | "undeliverable"> => {
+    // A request notice names its waiting event so an answer on any device can close it.
+    const requestId = REQUEST_KINDS.has(message.kind)
+      ? await web.requestEvent(message, context).catch(() => undefined)
+      : undefined;
+    const notice = requestId ? { ...message, requestId } : message;
     const outcomes = await Promise.allSettled([
-      legacy(message, context),
-      web.enqueue(message, context),
+      legacy(notice, context),
+      web.enqueue(notice, context),
     ]);
     const accepted =
       (outcomes[0]?.status === "fulfilled" && outcomes[0].value === "delivered") ||
       (outcomes[1]?.status === "fulfilled" && Number(outcomes[1].value) > 0);
-    if (accepted) return "delivered";
+    if (accepted) {
+      if (requestId)
+        await web.recordRequest(notice, context).catch(() => getLogger().warn("Notification request record unavailable"));
+      return "delivered";
+    }
     if (outcomes.some((result) => result.status === "rejected"))
       throw new Error("Notification channels unavailable");
     return "undeliverable";
@@ -535,6 +670,9 @@ export function notificationChannels(
     },
     async send(message, context) {
       await deliver(message, context);
+    },
+    async dismiss(request) {
+      await native.dismiss?.(request);
     },
   };
 }

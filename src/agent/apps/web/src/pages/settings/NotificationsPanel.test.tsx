@@ -104,3 +104,21 @@ it("requires native registration even when Android system permission is already 
   await act(async () => button("Enable notifications").click());
   expect(api.androidRequest).toHaveBeenCalledWith("enable", { accountId: "owner" });
 });
+it("saves the task-replies switch for all devices and pauses for a chosen length or until resumed", async () => {
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="notification-task-replies"]')!.click());
+  expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ taskReplies: false, level: "all" }));
+  const account = host.querySelector<HTMLSelectElement>('select[aria-label="Pause on all devices"]')!;
+  expect([...account.options].map(option => option.textContent)).toEqual(["Pause for…", "For 15 minutes", "For 1 hour", "For 3 hours", "For 8 hours", "For 24 hours", "Until I turn it back on"]);
+  await act(async () => { account.value = "always"; account.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ mutedUntil: "9999-12-31T23:59:59.999Z" }));
+  expect(host.textContent).toContain("Until you turn them back on.");
+  await act(async () => button("Resume notifications").click());
+  expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ mutedUntil: null }));
+  const device = host.querySelector<HTMLSelectElement>('select[aria-label="Pause on this device"]')!;
+  const before = Date.now();
+  await act(async () => { device.value = "180"; device.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(notificationPreferences("owner").mutedUntil).toBeGreaterThanOrEqual(before + 180 * 60_000);
+  expect(notificationPreferences("owner").mutedUntil).toBeLessThan(before + 181 * 60_000);
+  expect(host.textContent).toContain("Paused on this device");
+});

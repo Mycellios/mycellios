@@ -14407,3 +14407,23 @@ msgstr "No se pudieron marcar todos los chats como leídos. Inténtalo de nuevo.
 #: src/pages/Shell.tsx
 msgid "Could not mark the chats as read. Try again."
 msgstr "No se pudieron marcar los chats como leídos. Inténtalo de nuevo."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause for…"
+msgstr "Pausar durante…"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until you turn them back on."
+msgstr "Hasta que las vuelvas a activar."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until {time}."
+msgstr "Hasta {time}."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Replies in task conversations"
+msgstr "Respuestas en conversaciones de tarea"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+msgstr "Avisa cuando un Mico termina o falla en una de sus conversaciones de tarea. Las preguntas y aprobaciones siempre avisan; las rutinas siguen su propio ajuste."

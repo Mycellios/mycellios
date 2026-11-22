@@ -29,10 +29,11 @@ try {
   const sql = database.getPgClient(); await sql.connect();
   try {
     // These empty tables belong only to this newly created fixture database.
-    await sql.query("DROP TABLE web_push_deliveries, web_push_devices, web_push_presence, web_push_settings, mobile_push_devices, push_tokens");
+    await sql.query("DROP TABLE notification_requests, web_push_deliveries, web_push_devices, web_push_presence, web_push_settings, mobile_push_devices, push_tokens");
     await sql.query(await readFile("packages/db/prisma/migrations/20261023120000_push_tokens/migration.sql", "utf8"));
     await sql.query(await readFile("packages/db/prisma/migrations/20261112110000_mobile_push_devices/migration.sql", "utf8"));
     await sql.query(await readFile("packages/db/prisma/migrations/20261108010000_web_push/migration.sql", "utf8"));
+    await sql.query(await readFile("packages/db/prisma/migrations/20261122230000_notification_requests/migration.sql", "utf8"));
     await sql.query(`CREATE ROLE push_device_test LOGIN PASSWORD '${password}' NOSUPERUSER NOBYPASSRLS; ALTER ROLE push_device_test SET timezone='Europe/Paris'; GRANT USAGE ON SCHEMA public TO push_device_test; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO push_device_test`);
   } finally { await sql.end(); }
   const runtimeUrl = `postgresql://push_device_test:${password}@127.0.0.1:${port}/postgres`;
@@ -55,6 +56,18 @@ try {
     assert.equal(await service.hasRecipient(owner), false);
     await assert.rejects(service.register(owner, next, client, { endpoint: "https://fcm.googleapis.com/fcm/send/fixture", keys: { p256dh: pair.publicKey, auth: Buffer.alloc(16).toString("base64url") } }));
     console.log("Web Push registration, presence and session replacement verified with non-UTC PostgreSQL timezone.");
+    // An answered request is claimed once through the system policy, even by competing services.
+    const second = new WebPushService(db.prisma, "synthetic-notification-encryption", { enqueue: async () => undefined } as never,
+      { ...pair, subject: "mailto:fixture@example.invalid" });
+    const closed: string[] = [];
+    for (const item of [service, second]) item.useNativeDismiss(async request => { closed.push(request.requestId); });
+    const request = { kind: "help" as const, title: "Fixture", body: "Fixture", botId: "fixture-bot", threadId: "fixture-thread", requestId: "fixture-event" };
+    await service.recordRequest(request, { userId: owner, spaceId: "fixture-space", runId: "missing-run", operationId: "fixture", traceId: "fixture", signal: new AbortController().signal });
+    const claims = await Promise.all([service.resolveRequests(), second.resolveRequests()]);
+    assert.equal(claims[0] + claims[1], 1);
+    assert.deepEqual(closed, ["fixture-event"]);
+    assert.equal(await service.resolveRequests(), 0);
+    console.log("Answered notification requests resolve once under RLS with the additive registry migration.");
   } finally { await db.pool.end(); }
   const result = await run(process.execPath, [path.resolve("node_modules/vitest/vitest.mjs"), "run", "packages/adapters/src/push-token-store.postgres.test.ts"],
     { windowsHide: true, env: { ...process.env, VERIFY_DATABASE: "1", DATABASE_URL: runtimeUrl }, maxBuffer: 2 * 1024 * 1024 }).catch(error => { process.stdout.write(error.stdout ?? ""); process.stderr.write(error.stderr ?? ""); process.exitCode = 1; return null; });

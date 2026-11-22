@@ -52,6 +52,8 @@ suite("Web Push on isolated PostgreSQL", () => {
       CREATE TABLE IF NOT EXISTS space_members (id text PRIMARY KEY, "spaceId" text, "organizationId" text, "userId" text);
       CREATE TABLE IF NOT EXISTS threads (id text PRIMARY KEY, unread boolean);
       ALTER TABLE threads ADD COLUMN IF NOT EXISTS "groupId" text;
+      ALTER TABLE threads ADD COLUMN IF NOT EXISTS "taskBotId" text;
+      ALTER TABLE threads ADD COLUMN IF NOT EXISTS "taskKey" text;
       CREATE TABLE IF NOT EXISTS events (id text PRIMARY KEY, "runId" text, type text, seq integer);
       ALTER TABLE events ADD COLUMN IF NOT EXISTS "createdAt" timestamptz NOT NULL DEFAULT now();
       CREATE TABLE IF NOT EXISTS runs (id text PRIMARY KEY, "userId" text, "spaceId" text, "botId" text, "threadId" text, status text, "updatedAt" timestamptz);
@@ -61,18 +63,25 @@ suite("Web Push on isolated PostgreSQL", () => {
       "utf8",
     );
     await db.pool.query(
-      "DROP TABLE IF EXISTS web_push_deliveries, web_push_devices, web_push_settings, web_push_presence CASCADE",
+      "DROP TABLE IF EXISTS notification_requests, web_push_deliveries, web_push_devices, web_push_settings, web_push_presence CASCADE",
     );
     await db.pool.query(migration);
+    // The additive follow-up: sent receipts and the request registry for cross-device closes.
+    await db.pool.query(
+      await fs.readFile(
+        new URL("../../db/prisma/migrations/20261122230000_notification_requests/migration.sql", import.meta.url),
+        "utf8",
+      ),
+    );
   });
   beforeEach(async () => {
-    await db.pool.query(`TRUNCATE web_push_deliveries, web_push_devices, web_push_settings, web_push_presence, "user", "session", bots, spaces, space_members, threads, events, runs CASCADE;
+    await db.pool.query(`TRUNCATE notification_requests, web_push_deliveries, web_push_devices, web_push_settings, web_push_presence, "user", "session", bots, spaces, space_members, threads, events, runs CASCADE;
       INSERT INTO "user" VALUES ('alice'), ('bob');
       INSERT INTO "session" VALUES ('session-a','alice',now()+interval '1 hour'),('session-b','bob',now()+interval '1 hour');
       INSERT INTO bots (id, "userId", name, "notifyOnFinish", "archivedAt") VALUES ('bot','alice','Mico',true,null), ('foreign','bob','Other',true,null);
       INSERT INTO spaces VALUES ('space','org');
       INSERT INTO space_members VALUES ('member','space','org','alice');
-      INSERT INTO threads VALUES ('thread',true,null);
+      INSERT INTO threads (id, unread, "groupId") VALUES ('thread',true,null);
       INSERT INTO events (id,"runId",type,seq) VALUES ('event-ask','run','run.waiting_input',1);
       INSERT INTO runs VALUES ('run','alice','space','bot','thread','waiting_input',now());`);
     sender.mockReset();
@@ -152,6 +161,7 @@ suite("Web Push on isolated PostgreSQL", () => {
         previews: false,
         mutedUntil: null,
         bots: { foreign: "off" },
+        taskReplies: true,
       }),
     ).rejects.toThrow();
     const settings = {
@@ -159,6 +169,7 @@ suite("Web Push on isolated PostgreSQL", () => {
       previews: false,
       mutedUntil: null,
       bots: { bot: "all" as const },
+      taskReplies: false,
     };
     await service.saveSettings("alice", settings);
     expect(await service.settings("alice")).toEqual(settings);
@@ -222,6 +233,7 @@ suite("Web Push on isolated PostgreSQL", () => {
           previews: false,
           mutedUntil: null,
           bots: {},
+          taskReplies: true,
         });
       await service.deliver(row!.id);
       expect(sender).not.toHaveBeenCalled();
@@ -243,7 +255,7 @@ suite("Web Push on isolated PostgreSQL", () => {
   });
   it("keeps new avatar artwork out of the field used by older installed workers", async () => {
     await db.pool.query("UPDATE bots SET color=$1 WHERE id='bot'", [micoAvatarValue(1012, "#7D859A")]);
-    await service.saveSettings("alice", { level: "all", previews: true, mutedUntil: null, bots: {} });
+    await service.saveSettings("alice", { level: "all", previews: true, mutedUntil: null, bots: {}, taskReplies: true });
     await register();
     await service.enqueue(message, context);
     await due();
@@ -260,6 +272,7 @@ suite("Web Push on isolated PostgreSQL", () => {
       previews: true,
       mutedUntil: null,
       bots: {},
+      taskReplies: true,
     });
     await register();
     await service.enqueue(message, context);
@@ -270,6 +283,7 @@ suite("Web Push on isolated PostgreSQL", () => {
       previews: false,
       mutedUntil: null,
       bots: {},
+      taskReplies: true,
     });
     await service.deliver(row!.id);
     const payload = JSON.parse(sender.mock.calls[0]![1] as string);
@@ -295,6 +309,73 @@ suite("Web Push on isolated PostgreSQL", () => {
     await register(); await service.enqueue(message, context); await due(); const [row] = await pending();
     await service.presence("alice", "session-a", randomUUID(), true);
     await service.deliver(row!.id); expect(sender).not.toHaveBeenCalled();
+  });
+  it("sends a refined failure under a kind older installed workers accept", async () => {
+    await db.pool.query("UPDATE runs SET status='failed'; INSERT INTO events (id,\"runId\",type,seq) VALUES ('event-failed','run','run.failed',2)");
+    await register();
+    await service.enqueue({ ...message, kind: "usage_limit", body: "Provider quota exhausted" }, context);
+    await due();
+    const [row] = await pending();
+    await service.deliver(row!.id);
+    const payload = JSON.parse(sender.mock.calls[0]![1] as string);
+    expect(payload).toMatchObject({ kind: "failure", detail: "usage_limit", title: "Mycellios" });
+    expect(JSON.stringify(payload)).not.toContain("quota exhausted");
+  });
+  it("honors the task-replies switch for a Mico's own task conversation but not its routine one", async () => {
+    await db.pool.query("UPDATE runs SET status='completed'; UPDATE threads SET \"taskBotId\"='bot'; INSERT INTO events (id,\"runId\",type,seq) VALUES ('event-done','run','run.completed',2)");
+    await register();
+    const completion = { ...message, kind: "completion" as const, taskConversation: true };
+    await service.enqueue(completion, context);
+    await service.saveSettings("alice", { level: "all", previews: false, mutedUntil: null, bots: {}, taskReplies: false });
+    expect(await service.enqueue(completion, context)).toBe(0);
+    await due();
+    const [queued] = await pending();
+    await service.deliver(queued!.id);
+    expect(sender).not.toHaveBeenCalled();
+    // A routine's own conversation follows the routine, not the task-replies switch.
+    await db.pool.query("UPDATE threads SET \"taskKey\"='routine:r1'; UPDATE web_push_deliveries SET \"finishedAt\"=NULL, \"leaseUntil\"=NULL, attempts=0");
+    await due();
+    await service.deliver(queued!.id);
+    expect(sender).toHaveBeenCalledOnce();
+  });
+  it("closes an answered question on devices that showed it, even while another device is focused", async () => {
+    await register();
+    await service.register("alice", "session-a", randomUUID(), subscription("held"));
+    await service.enqueue(message, context);
+    await due();
+    const rows = await pending();
+    // Only the first device's push service accepted the notice.
+    await service.deliver(rows[0]!.id);
+    await db.pool.query("UPDATE web_push_deliveries SET \"finishedAt\"=now() WHERE id=$1", [rows[1]!.id]);
+    await service.recordRequest({ ...message, requestId: "event-ask" }, context);
+    expect(await service.resolveRequests()).toBe(0);
+    await db.pool.query("UPDATE runs SET status='queued'");
+    expect(await service.resolveRequests()).toBe(1);
+    expect(await service.resolveRequests()).toBe(0);
+    const dismissals = (await pending()).filter((row) => !rows.some((item) => item.id === row.id));
+    expect(dismissals).toHaveLength(1);
+    await service.presence("alice", "session-a", randomUUID(), true);
+    sender.mockClear();
+    await service.deliver(dismissals[0]!.id);
+    expect(sender).toHaveBeenCalledOnce();
+    expect(JSON.parse(sender.mock.calls[0]![1] as string)).toEqual({
+      version: 2, type: "dismiss", id: "dismiss:event-ask", accountId: "alice", notice: "event-ask", threadId: "thread",
+      expiresAt: expect.any(Number),
+    });
+  });
+  it("never sends a silent close to Apple, which requires a visible notice per push", async () => {
+    await service.register("alice", "session-a", clientId, { ...subscription(), endpoint: "https://web.push.apple.com/device" });
+    await service.enqueue(message, context);
+    await due();
+    const [row] = await pending();
+    await service.deliver(row!.id);
+    await service.recordRequest({ ...message, requestId: "event-ask" }, context);
+    await db.pool.query("UPDATE runs SET status='cancelled'");
+    await service.resolveRequests();
+    const dismissal = (await pending()).find((item) => item.id !== row!.id);
+    sender.mockClear();
+    await service.deliver(dismissal!.id);
+    expect(sender).not.toHaveBeenCalled();
   });
   it("RLS denies unscoped account registrations even with direct SQL", async () => {
     await register();

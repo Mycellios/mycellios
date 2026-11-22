@@ -896,6 +896,16 @@
   later icons in avatarArt so installed workers with the original allowlist
   still deliver the notice with the generic mushroom. When
   previews are off it displays a generic mascot and hides conversation identity.
+  Refined failure kinds (not_started, helper_failed, usage_limit, sign_in from
+  runErrorNotice) travel as `detail` beside a base kind old workers accept. Turns
+  another Mico started (bot_message, delegated_task) finish without notice or cue;
+  their requests and failures still alert. A group notifies once, from the last
+  member turn, while unread (groupWorkEndedWithUnread). The account taskReplies
+  switch only silences finishes/failures of non-routine task conversations. An
+  indefinite pause stores NOTIFICATIONS_PAUSED_UNTIL_RESUMED. notification_requests
+  records request notices; one sweep claim queues the version-2 close only to
+  devices with sentAt, never Apple endpoints, plus a normal-priority Android close
+  for the matching request. Closes skip the presence hold; other pushes keep it.
   Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
   Mobile boot/resume only refreshes prior opt-ins; request OS consent from settings.
