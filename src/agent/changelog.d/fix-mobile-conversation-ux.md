@@ -10,3 +10,6 @@
 
 - Typing in the message field on phones no longer lags: the draft is saved in the background
   instead of on every keystroke, and the field measures its height once per frame.
+- Conversations open faster on phones: the next conversations are prepared before you pick
+  them, even when only the current tab fits. A slow background read no longer holds up the
+  others.
