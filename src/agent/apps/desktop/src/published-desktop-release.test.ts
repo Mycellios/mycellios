@@ -71,7 +71,8 @@ describe("published Desktop packages", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
   it("bounds release metadata before parsing", async () => {
-    await expect(publishedWindowsRelease("0.3.15", vi.fn<typeof fetch>(async () => new Response(" ".repeat(512_001))))).rejects.toThrow(/limit/);
+    const oversizedList = " ".repeat(2 * 1024 * 1024 + 1);
+    await expect(publishedWindowsRelease("0.3.15", vi.fn<typeof fetch>(async () => new Response(oversizedList)))).rejects.toThrow(/limit/);
   });
 });
 
