@@ -250,9 +250,103 @@ Rollback at any step:
 
 Vectors from both paths are interchangeable, so nothing has to be re-embedded.
 
+## Phone replicas (Android)
+
+Status: phone-side safety pieces merged, disabled. No phone advertises or
+serves this model.
+
+### How phones contribute today
+
+The Android app (`src/agent/apps/android`) is a WebView host. Phones contribute
+through the browser worker (`src/mobile/runtime.ts`, `MobileComputeHub`,
+`/mobile/v1`): matrix checks, browser expert stages and the GPT-2 text pilot on
+WASM/WebGPU. That path is not a native worker. It cannot hold the native
+qualification this model requires, and its registration schema is strict, so a
+new capability needs a coordinator change that this work does not make.
+
+### Runtime and quality
+
+ONNX Runtime cannot read the pinned safetensors, so a phone uses the ONNX export
+`onnx-community/Qwen3-Embedding-0.6B-ONNX` at revision
+`c25a394dd583836952667c12f008335071b3f43d`. Its `tokenizer.json` is byte-equal
+to the pinned one. Measured on 2026-11-22 with ONNX Runtime 1.22.0 CPU on an x86
+laptop (Zen 5, 4 threads), using the pinned tokenizer, left padding, last-token
+pooling and the query instruction:
+
+| Export | Canary cosine | Document cosine vs fp16 (min) | Tokens/s | Peak memory |
+|---|---|---|---|---|
+| `model_fp16.onnx` (fp16 weights) | 0.9999988 | — | 34 | 2.7 GB resident, 3.7 GB committed |
+| `model_int8.onnx` (dynamic int8) | 0.905 | 0.848 | 98 | not measured |
+| `model_q4.onnx` (4-bit weights) | 0.943 | 0.923 | 35 | not measured |
+
+- Quantization fails the canary gate (≥ 0.9995) by a wide margin, so the int8
+  and q4 exports must never be offered. Only the fp16 export is pinned
+  (`MEMORY_EMBEDDING_PHONE_FILES`, 1.21 GB).
+- The fp16 pass was measured on x86, where ONNX Runtime upcasts to fp32. Arm CPUs
+  can run fp16 arithmetic natively, and DirectML fp16 already drifted to 0.987,
+  so an Arm result is unknown until it is measured on a phone.
+- Throughput and memory on a phone are **not measured**. Scaling the x86 figure
+  to phone cores suggests roughly 10-20 tokens/s and more than 2 GB of RAM, which
+  is below the 100 tokens/s bar used for CPU backups above and heavy for a
+  background app. No ONNX Runtime dependency ships in the APK until a phone
+  measurement justifies it.
+
+### What the Android host contains
+
+Package `com.mycellios.android.embedding`, not wired into the app:
+
+- `MemoryEmbeddingPins`: a copy of the contract. `tests/memory-embedding-phone.test.ts`
+  fails if it drifts. `PHONE_EXECUTION_ADMITTED` is `false`, matching the empty
+  `MEMORY_EMBEDDING_PHONE_EXECUTIONS`.
+- `EmbeddingSafetyGate`: work is allowed only when every condition holds, and
+  each check fails closed:
+  - the owner opted in (off by default);
+  - a phone execution is admitted;
+  - the phone is charging and at least 50 % full;
+  - the battery is below 36.0 °C to start, and work stops at 38.0 °C;
+  - the Android thermal status is at most light;
+  - power saving is off;
+  - the network is validated and unmetered.
+  The phone advertises the model only when this gate, a hash-verified artifact
+  and an on-device canary (≥ 0.9995) all pass.
+- `MemoryEmbeddingRunner`:
+  - applies the query instruction;
+  - splits work into sub-batches of 2,048 padded tokens, using the replica's
+    planning rule, and rechecks the gate before each one;
+  - rejects a wrong count or dimension, non-finite values and near-zero vectors;
+  - returns L2-normalized vectors.
+  Request text stays in memory and errors carry fixed codes only.
+- `PinnedArtifactStore`:
+  - downloads only the pinned files from the pinned revision into no-backup
+    app storage;
+  - installs a file only after its exact size and sha256 match;
+  - resumes partial downloads and stops between 1 MiB chunks when the gate
+    closes;
+  - caps the artifact at 1.4 GiB and keeps 2 GiB of free space;
+  - re-hashes every file before a load;
+  - evicts other identities, artifacts idle for 14 days, and everything when
+    the owner opts out.
+- `AndroidMemoryEmbedding`: reads battery, thermal, power and network state,
+  keeps the opt-in and fetches files over HTTPS. The manifest gains
+  `ACCESS_NETWORK_STATE`.
+- JVM tests cover the gate, artifact identity and hashes, downloads and
+  eviction, sub-batch stopping, output validation and the canary.
+
+### To enable phones
+
+1. Measure the fp16 export on physical Arm phones: canary and document cosine
+   against CPU fp32, tokens/s, peak memory and battery temperature while
+   charging.
+2. If it passes, add the measured pair to `MEMORY_EMBEDDING_PHONE_EXECUTIONS`
+   and set `PHONE_EXECUTION_ADMITTED`, then ship the runtime dependency.
+3. Add coordinator admission for phone workers, with native-equivalent
+   qualification bound to the phone session and build, and an owner opt-in
+   control in the app.
+
 ## Follow-ups
 
 - Physically qualify the native replica (see "Migration and rollback").
+- Measure the phone path on a physical Android phone (see "Phone replicas").
 - Add more CPU backups once nodes have spare RAM (the MSI GE60 has about
   3 GB free while it runs its 4B stage).
 
