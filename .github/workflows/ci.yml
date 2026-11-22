@@ -46,6 +46,14 @@ jobs:
           path: .ci/proportional-receipt.json
           if-no-files-found: error
           retention-days: 14
+      - name: Preserve mobile conversation screenshots
+        if: always() && hashFiles('.ci/mobile-conversation-menu/*.png') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobile-conversation-menu-${{ github.sha }}
+          path: .ci/mobile-conversation-menu/*.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Preserve the Desktop downloads page build
         if: success() && hashFiles('build/desktop-downloads/web/desktop-downloads.html') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

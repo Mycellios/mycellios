@@ -18,7 +18,7 @@ const server = await createServer({ root, configFile: path.join(root, "vite.conf
   server: { host: "127.0.0.1", port: 0, strictPort: false },
   plugins: [{ name: "private-task-acceptance", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
-      const fixture = req.url === "/__task_acceptance" ? "mico-task-preview" : req.url === "/__surfaces_acceptance" ? "conversation-surfaces-preview"
+      const fixture = req.url?.split("?")[0] === "/__task_acceptance" ? "mico-task-preview" : req.url === "/__surfaces_acceptance" ? "conversation-surfaces-preview"
         : req.url === "/__branch_acceptance" ? "conversation-branch-preview" : null;
       if (!fixture) return next();
       const html = await server.transformIndexHtml(req.url, `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/${fixture}.tsx"></script></body></html>`);
@@ -26,6 +26,38 @@ const server = await createServer({ root, configFile: path.join(root, "vite.conf
     });
   } }],
 });
+async function verifyMobileMenu(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  try {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto(`${url}?phone-menu`);
+    const trigger = page.getByRole("button", { name: "Conversations, new replies" });
+    await trigger.tap();
+    const picker = page.locator('[data-slot="popover-content"]');
+    const unread = picker.getByRole("group", { name: "Unread · 1" });
+    const pending = unread.locator('[data-mobile-conversation="task-two"]');
+    await pending.getByRole("img", { name: "New reply" }).waitFor();
+    await picker.getByText("Waiting for you: 1", { exact: true }).waitFor();
+    await picker.getByRole("group", { name: "Read", exact: true }).getByText("Review API").waitFor();
+    await picker.getByRole("group", { name: "Archived", exact: true }).getByText("Old budget").waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: path.join(output, "mobile-conversation-menu.png"), animations: "disabled" });
+    await pending.getByRole("button", { name: /^Actions for/ }).tap();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).tap();
+    const dialog = page.getByRole("alertdialog");
+    await dialog.waitFor();
+    await page.screenshot({ path: path.join(output, "mobile-conversation-delete.png"), animations: "disabled" });
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).tap();
+    await dialog.waitFor({ state: "hidden" });
+    if (!(await picker.isVisible())) await trigger.tap();
+    await pending.getByText("A task with a deliberately long project and functionality name").waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+}
+
 let browser;
 try {
   await server.listen();
@@ -34,6 +66,13 @@ try {
   browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
     ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
     : existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }) });
+  if (process.argv.includes("--mobile-menu-only")) {
+    await verifyMobileMenu(browser, url);
+    console.log("Mobile conversation menu passed with synthetic RPCs.");
+  } else await verifyConversationSurfaces(browser, url);
+} finally { await browser?.close(); await server.close(); }
+
+async function verifyConversationSurfaces(browser, url) {
   const page = await browser.newPage();
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   await page.goto(url);
@@ -217,7 +256,7 @@ try {
 
   // Conversation surfaces: the side panel's Conversations pane, a conversation beside the chat,
   // requests mirrored into the main chat, the sidebar's Mico rows, Needs you and Mark all as read.
-  await page.goto(`http://127.0.0.1:${address.port}/__surfaces_acceptance`);
+  await page.goto(new URL("/__surfaces_acceptance", url).href);
   const pane = () => page.getByTestId("conversations-pane");
   await pane().waitFor({ timeout: 90_000 });
   const opened = () => page.getByTestId("opened").textContent();
@@ -331,7 +370,7 @@ try {
   // Branching: the action on the last Mico reply of each finished turn, waiting while a turn runs,
   // the new tab right after its source, and the divider that links back.
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto(`http://127.0.0.1:${address.port}/__branch_acceptance`);
+  await page.goto(new URL("/__branch_acceptance", url).href);
   const thread = () => page.getByTestId("fixture-transcript");
   await thread().waitFor({ timeout: 90_000 });
   const conversation = () => page.getByTestId("active-conversation").textContent();
@@ -414,4 +453,4 @@ try {
     "a side branch opens right after its source as \"{title} #2\" and its divider names the source",
     "the divider says when the source was deleted", "no browser errors"] };
   await writeFile(path.join(output, "result.json"), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
-} finally { await browser?.close(); await server.close(); }
+}

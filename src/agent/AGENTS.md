@@ -477,6 +477,10 @@
 
 - Mico task conversations use MicoTaskTabs: one Mico keeps independent named
   conversations behind the compact + action and the Conversations picker.
+  The phone menu groups conversations by unread, read and archived state, counts
+  open conversations waiting for the person, and gives owned rows a touch menu
+  with the same actions and a delete confirmation. Verify the mobile fixture in
+  `scripts/verify-mico-tasks-ui.mjs --mobile-menu-only`.
   Size the visible tab subset to the measured available width, always keeping
   the active conversation readable. Overflow stays in the picker; never close
   or delete history to make it fit. Keep New conversation first in that picker.
