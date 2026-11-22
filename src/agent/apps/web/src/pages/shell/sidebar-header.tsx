@@ -2,7 +2,7 @@ import { ServerConnections } from "../../components/ServerConnections";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Space } from "@mycellios/contracts";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
-import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { desktopHidesTitleBar } from "../../lib/desktop";
@@ -52,6 +52,7 @@ export function SidebarHeader({
   onSpaceSettings,
   history,
   mobileMenu,
+  onOpenNavigation,
 }: {
   mini?: boolean;
   search?: ReactNode;
@@ -80,6 +81,7 @@ export function SidebarHeader({
   onSchedule?: () => void;
   onUsage?: () => void;
   mobileMenu?: ReactNode;
+  onOpenNavigation?: () => void;
 }) {
   const { t } = useLingui();
   const hiddenTitleBar = desktopHidesTitleBar();
@@ -142,7 +144,7 @@ export function SidebarHeader({
         ? "flex shrink-0 flex-wrap items-center gap-2 px-5 pt-3 pb-1"
         : `${hiddenTitleBar ? "app-drag" : ""} rk-sidebar-topbar shrink-0 items-center gap-1 ${mini ? "flex flex-col px-1 py-2" : "grid grid-cols-[minmax(0,1fr)_auto] px-2"}`}
     >
-      {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><PanelLeftClose size={22} /></Button> : null}
+      {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={onOpenNavigation ? t`Workspace navigation` : t`Close navigation`} onClick={onOpenNavigation ?? (() => setMobileSidebarOpen(false))}><PanelLeftOpen size={22} /></Button> : null}
       {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "flex min-w-0 items-center"}>
         {mobile ? <div className="mt-2 flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-tight">Mycellios</h1></div> : null}
         <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
@@ -227,6 +229,7 @@ export function SidebarHeader({
         </IconTooltip>
         {mini || mobile || !search ? createMenu : null}
         {mobileMenu}
+        {mobile && onOpenNavigation ? <Button variant="ghost" size="icon" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><X aria-hidden /></Button> : null}
       </div>
     </div>
     {search && !mini && !mobile ? <div data-testid="sidebar-search-row" className="mx-2.5 my-2.5 flex shrink-0 items-center gap-1.5">{search}{createMenu}</div> : null}

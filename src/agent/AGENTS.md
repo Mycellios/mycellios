@@ -594,8 +594,9 @@
   and open-tab state across the scoped remount without a whole-page loading frame.
   A seeded tab switch reads the destination's history directly without duplicating it
   through bootstrap. While the first read is pending, show loading in the chat pane.
-  Preload a bounded number of visible tabs and pending asks in the scoped memory
-  cache. Roster replies target the owned task thread and scroll to its loaded card.
+  Preload at most two tab/picker destinations independently in the scoped memory
+  cache, including when only the active tab fits on mobile; pointer/focus intent
+  may warm another destination. Pending asks are preloaded without marking them read. Roster replies target the owned task thread and scroll to its loaded card.
   Read messages, active runs, and the event cursor in one Repeatable Read snapshot
   without taking a thread row lock. Verify the navigation and lock regressions in
   conversation-tab-history.spec.ts and working-bot.postgres.test.ts.
@@ -2237,7 +2238,16 @@
   `node --import tsx scripts/verify-sidebar-folders-db.ts` in its isolated database.
 
 - Keep Tasks, the model selector and a single header tools panel toggle on the
-  right of the conversation header. Put secondary actions inside the full-height resizable side panel;
+  right of the conversation header. Mobile roster navigation opens the shared
+  WorkspaceRail actions in a modal side sheet, retaining a visible strip of the
+  roster. Preserve Base UI focus/dismissal, RTL and reduced motion. Navigation
+  motion never delays cached messages or subscriptions. On coarse mobile pointers,
+  focus-input keeps text focus tied to a field/label tap, controls in the same
+  fieldset/form, or keyboard navigation; taps elsewhere dismiss it without clearing
+  drafts or preventing the action. Composer drafts persist in a short batched write
+  and flush on hide, send and conversation change. Verify focus-input, composer,
+  MicoTaskTabs and mobile-navigation-motion browser cases.
+  Put secondary actions inside the full-height resizable side panel;
   mobile Browser return focus targets the same tools trigger.
   Load selected-model metadata before opening its picker; saved Mycellios model
   IDs must already show a readable name and the Mycellios logo during discovery.

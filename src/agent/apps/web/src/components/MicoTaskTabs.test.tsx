@@ -35,6 +35,43 @@ const tabButton = (host: ParentNode, id: string) => host.querySelector<HTMLButto
 const flush = () => act(() => new Promise(resolve => setTimeout(resolve, 0)));
 
 describe("Mico task navigation", () => {
+  it("preloads two picker destinations even when only the active tab fits", async () => {
+    const host = document.createElement("div"); document.body.append(host);
+    const root = createRoot(host); roots.push(root);
+    const tabs = ["active", "first", "second", "third"].map(threadId => ({ threadId, title: threadId }));
+    const rpc = { development: { list: vi.fn().mockResolvedValue(tabs) } } as unknown as RpcClient;
+    // Leave the first read pending: the second must start independently.
+    const warm = vi.fn(() => new Promise<unknown>(() => {}));
+    const select = vi.fn();
+    await act(() => root.render(<MicoTaskTabs botId="mico" scope="narrow" taskThreadId="active"
+      rpc={rpc} onSelect={select} onWarm={warm} />));
+    expect(host.querySelector('button[title="active"]')).not.toBeNull();
+    expect(host.querySelector('button[title="first"]')).toBeNull();
+    expect(warm.mock.calls).toEqual([["mico", "first"], ["mico", "second"]]);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("warms the mobile picker and starts an untouched destination on pointer down without delaying selection", async () => {
+    const host = document.createElement("div"); document.body.append(host);
+    const root = createRoot(host); roots.push(root);
+    const tabs = ["active", "first", "second", "third"].map(threadId => ({ threadId, title: threadId }));
+    const rpc = { development: { list: vi.fn().mockResolvedValue(tabs) } } as unknown as RpcClient;
+    const warm = vi.fn().mockRejectedValue(new Error("offline"));
+    const select = vi.fn();
+    await act(() => root.render(<MicoTaskTabs botId="mico" scope="menu" taskThreadId="active"
+      rpc={rpc} onSelect={select} onWarm={warm} inMenu />));
+    expect(warm).not.toHaveBeenCalled();
+    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Conversations"]')!.click());
+    expect(warm).toHaveBeenCalledWith("mico", "first");
+    expect(warm).toHaveBeenCalledWith("mico", "second");
+    const third = [...document.querySelectorAll("button")].find(button => button.textContent === "third")!;
+    await act(() => third.dispatchEvent(new Event("pointerdown", { bubbles: true })));
+    expect(warm).toHaveBeenLastCalledWith("mico", "third");
+    expect(select).not.toHaveBeenCalled();
+    await act(() => third.click());
+    expect(select).toHaveBeenCalledWith("third");
+  });
+
   it("opens a draft tab with + and creates nothing until the first message", async () => {
     const { host, root } = mount();
     const select = vi.fn(), open = vi.fn();

@@ -7,6 +7,25 @@ type ComposerDraftSubmission = { text: string };
 const pendingSubmissions = new Map<string, ComposerDraftSubmission>();
 const failedDraftWrites = new Map<string, string>();
 const acceptedListeners = new Map<string, Set<(text: string) => void>>();
+const queuedDraftWrites = new Map<string, string>();
+let draftWriteTimer: ReturnType<typeof setTimeout> | undefined;
+let lifecycleInstalled = false;
+
+/** Keep keystrokes in memory immediately; batch synchronous storage off the input event. */
+export function scheduleComposerDraft(threadKey: string, draft: string): void {
+  if (!threadKey) return;
+  pendingSubmissions.delete(threadKey);
+  queuedDraftWrites.set(threadKey, draft);
+  if (!lifecycleInstalled && typeof window !== "undefined") {
+    lifecycleInstalled = true;
+    window.addEventListener("pagehide", flushComposerDrafts);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") flushComposerDrafts();
+    });
+  }
+  // A fixed window also persists during continuous typing, not just after a pause.
+  draftWriteTimer ??= setTimeout(() => { draftWriteTimer = undefined; flushComposerDrafts(); }, 150);
+}
 
 export function beginComposerDraftSubmission(
   threadKey: string,
@@ -42,7 +61,7 @@ export function setComposerUnsavedWork(pending: boolean): void {
 
 /** A send waiting for its answer, or attachments that only exist in memory. */
 export function composerHoldsUnsavedWork(): boolean {
-  return pendingSubmissions.size > 0 || unsavedWork || failedDraftWrites.size > 0 || hasUnsavedEditorWork();
+  return pendingSubmissions.size > 0 || unsavedWork || queuedDraftWrites.size > 0 || failedDraftWrites.size > 0 || hasUnsavedEditorWork();
 }
 
 /** Unsaved composer work, or saved text in any composer that has not been sent. */
@@ -95,6 +114,8 @@ export function readComposerDraft(
   threadKey: string,
   storage: DraftStorage | null = getLocalStorage(),
 ): string {
+  if (queuedDraftWrites.has(threadKey)) return queuedDraftWrites.get(threadKey)!;
+  if (failedDraftWrites.has(threadKey)) return failedDraftWrites.get(threadKey)!;
   if (!storage || !threadKey) return "";
   try {
     return storage.getItem(composerDraftStorageKey(threadKey)) ?? "";
@@ -109,6 +130,7 @@ export function writeComposerDraft(
   storage: DraftStorage | null = getLocalStorage(),
 ): void {
   pendingSubmissions.delete(threadKey);
+  queuedDraftWrites.delete(threadKey);
   if (!threadKey) return;
   if (!storage) { failedDraftWrites.set(threadKey, draft); return; }
   try {
@@ -123,6 +145,11 @@ export function writeComposerDraft(
 
 /** Retry only failed persistence; never settle or resend an in-flight submission. */
 export function flushComposerDrafts(): boolean {
+  if (draftWriteTimer !== undefined) { clearTimeout(draftWriteTimer); draftWriteTimer = undefined; }
+  for (const [key, value] of queuedDraftWrites) {
+    queuedDraftWrites.delete(key);
+    failedDraftWrites.set(key, value);
+  }
   const storage = getLocalStorage();
   if (!storage) return false;
   for (const [key, value] of failedDraftWrites) {

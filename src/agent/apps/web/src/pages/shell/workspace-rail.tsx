@@ -23,7 +23,7 @@ import {
   Waypoints,
   Workflow,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { MycelliosWordmark } from "../../components/MycelliosBrand";
 import { desktopBridge, desktopHidesTitleBar, windowChromeKind } from "../../lib/desktop";
@@ -42,6 +42,10 @@ import { routinesAvailable } from "../../lib/routines-availability";
 import { workflowsAvailable } from "../../lib/workflows-availability";
 
 type WorkspaceRailProps = {
+  mobile?: boolean;
+  header?: ReactNode;
+  footer?: ReactNode;
+  onNavigate?: () => void;
   scope: string;
   activity: boolean;
   library?: boolean;
@@ -174,6 +178,25 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       return next;
     });
   };
+  if (props.mobile) {
+    const go = (action: () => void) => () => { props.onNavigate?.(); action(); };
+    return <nav className="rk-mobile-workspace-menu" aria-label={t`Workspace navigation`}>
+      {props.header}
+      <div className="rk-mobile-workspace-links">
+        <Button variant="ghost" aria-current={!props.activity && !pages.some(page => page.current) && !props.apps ? "page" : undefined} onClick={go(props.onChats)}><Bot aria-hidden /><span>{t`Micos`}</span></Button>
+        {pages.map(({ id, label, icon: Icon, action, current, unavailable }) =>
+          <Button key={id} variant="ghost" disabled={unavailable} aria-current={current ? "page" : undefined} onClick={go(action)}>
+            <Icon aria-hidden /><span>{label}</span>
+            {unavailable ? <span className="ms-auto text-xs text-muted-foreground">{t`Coming soon`}</span> : null}
+          </Button>)}
+        {props.onApps ? <Button variant="ghost" disabled={!storeAvailable} onClick={go(props.onApps)}><Store aria-hidden /><span>Hifa Store</span>
+          {!storeAvailable ? <span className="ms-auto text-xs text-muted-foreground">{t`Coming soon`}</span> : null}</Button> : null}
+        <div className="my-3 border-t border-border" />
+        <Button variant="ghost" onClick={go(props.onSettings)}><Settings aria-hidden />{t`Settings`}</Button>
+      </div>
+      <div className="mt-auto shrink-0 pt-4">{props.footer}</div>
+    </nav>;
+  }
   return (
     <nav
       data-testid="workspace-rail"
