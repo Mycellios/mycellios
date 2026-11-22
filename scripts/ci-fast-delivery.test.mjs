@@ -105,6 +105,9 @@ test('mobile notification migration runs actual isolated database qualification'
   assert.ok(planChecks(['src/agent/packages/db/src/message-queue.ts']).some(c => c.args.includes('scripts/verify-message-queue-db.ts')));
   assert.ok(planChecks(['src/agent/packages/db/src/mico-concurrency.ts']).some(c => c.args.includes('scripts/verify-message-queue-db.ts')));
   assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-message-queue-db.ts')));
+  for (const file of ['src/agent/packages/db/src/conversation-branch.ts', 'src/agent/apps/api/src/conversation-branch.ts', 'src/agent/scripts/verify-conversation-branch-db.ts', 'src/agent/packages/db/src/thread-lifecycle.ts'])
+    assert.ok(planChecks([file]).some(c => c.args.includes('scripts/verify-conversation-branch-db.ts')), file);
+  assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-conversation-branch-db.ts')));
 });
 test('Agent test files share the existing two-worker budget without serializing discovery', () => {
   const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx', 'src/agent/apps/web/src/pages/shell/composer.test.tsx']);

@@ -27,7 +27,13 @@ import { WhatsAppLinkSchema, WhatsAppSenderAddInput, WhatsAppSenderSchema } from
 import * as z from "zod";
 import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
-import { SideThreadRequestSchema, SideThreadSchema, SideThreadTargetSchema } from "./side-threads.js";
+import {
+  BranchConversationInputSchema,
+  BranchConversationOutputSchema,
+  SideThreadRequestSchema,
+  SideThreadSchema,
+  SideThreadTargetSchema,
+} from "./side-threads.js";
 import { CancelOpenWaitResultSchema, OpenWaitSchema } from "./event-waits.js";
 import {
   MESSAGE_QUEUE_EDIT_MAX_LENGTH,
@@ -597,6 +603,8 @@ export const appContract = {
     restore: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),restored:z.enum(["delete","archive","none"])})),
     /** Hides the conversation and removes it after `deleteAfter` unless it is restored first. */
     remove: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),deleteAfter:IsoDate})),
+    /** Copies a finished turn into a new conversation of the same Mico; refused while the source works. */
+    branch: oc.input(BranchConversationInputSchema).output(BranchConversationOutputSchema),
   },
   threads: {
     pinned: oc.input(threadTarget).output(z.object({threadId:Id,pins:z.array(MessagePinSchema)})),

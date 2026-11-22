@@ -7264,3 +7264,27 @@ msgstr "このランタイムはメインチャットを含め、一度に 1 つ
 #: src/components/MicoWorkMenu.tsx
 msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
 msgstr "それ以上のタスクは順番を待ちます。メインチャットには専用の枠があり、その後ろで待つことはありません。"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "新しい会話に分岐"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "この会話を分岐するには、現在のターンが終わるまでお待ちください。"
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "会話を分岐できませんでした。もう一度お試しください。"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "削除された会話から分岐"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "{name} から分岐"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "この分岐の元の場所を開く"

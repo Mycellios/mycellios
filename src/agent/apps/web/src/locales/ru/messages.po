@@ -7264,3 +7264,27 @@ msgstr "Эта среда выполняет одну задачу за раз, 
 #: src/components/MicoWorkMenu.tsx
 msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
 msgstr "Лишние задачи ждут своей очереди. У основного чата своё место, и он никогда не ждёт за ними."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "Ответвить в новый диалог"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Дождитесь окончания текущего хода, чтобы ответвить этот диалог."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "Не удалось ответвить диалог. Попробуйте ещё раз."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Ответвлено от удалённого диалога"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Ответвлено от: {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Открыть место, откуда началось ответвление"

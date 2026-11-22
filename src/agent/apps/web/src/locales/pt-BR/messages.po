@@ -7263,3 +7263,27 @@ msgstr "Este runtime executa uma tarefa por vez, incluindo o chat principal."
 #: src/components/MicoWorkMenu.tsx
 msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
 msgstr "Tarefas extras aguardam a vez. O chat principal tem seu próprio espaço e nunca espera atrás delas."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "Ramificar em uma nova conversa"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Aguarde o fim do turno atual para ramificar esta conversa."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "Não foi possível ramificar a conversa. Tente novamente."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Ramificada de uma conversa excluída"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Ramificada de {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Abrir onde esta ramificação começou"

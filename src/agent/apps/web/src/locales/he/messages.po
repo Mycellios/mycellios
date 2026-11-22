@@ -7263,3 +7263,27 @@ msgstr "סביבת ההרצה הזו מריצה משימה אחת בכל פעם,
 #: src/components/MicoWorkMenu.tsx
 msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
 msgstr "משימות נוספות ממתינות לתורן. לצ'אט הראשי יש מקום משלו והוא אף פעם לא ממתין מאחוריהן."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "פיצול לשיחה חדשה"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "יש להמתין לסיום התור הנוכחי כדי לפצל את השיחה הזו."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "לא ניתן לפצל את השיחה. יש לנסות שוב."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "פוצלה משיחה שנמחקה"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "פוצלה מתוך {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "פתיחת המקום שבו התחיל הפיצול"

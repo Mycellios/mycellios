@@ -7263,3 +7263,27 @@ msgstr "이 런타임은 메인 채팅을 포함해 한 번에 하나의 작업�
 #: src/components/MicoWorkMenu.tsx
 msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
 msgstr "추가 작업은 차례를 기다립니다. 메인 채팅은 별도 자리가 있어 그 뒤에서 기다리지 않습니다."
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "새 대화로 분기"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "이 대화를 분기하려면 현재 차례가 끝날 때까지 기다려 주세요."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "대화를 분기하지 못했습니다. 다시 시도해 주세요."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "삭제된 대화에서 분기됨"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "{name}에서 분기됨"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "이 분기가 시작된 곳 열기"

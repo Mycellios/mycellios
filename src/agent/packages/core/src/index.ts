@@ -102,6 +102,7 @@ export * from "./work-resources.js";
 export * from "./thread-lifecycle.js";
 export * from "./agent-tasks.js";
 export * from "./event-waits.js";
+export * from "./conversation-branch.js";
 export * from "./routine-runs.js";
 export * from "./history-access.js";
 export * from "./agent-provider-selection.js";

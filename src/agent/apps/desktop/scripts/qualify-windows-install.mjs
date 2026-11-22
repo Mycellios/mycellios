@@ -47,11 +47,19 @@ async function measure(installation,label){
  proofs.push({label,...timing,draftsPreserved:5,taskMarkersPreserved:5});
 }
 try{
+ console.log('Preparing the isolated preservation fixture');
  await preservation('seed','', 'before');
  await fs.writeFile(path.join(profile,'fixture-tasks.json'),JSON.stringify(Array.from({length:5},(_,i)=>({id:'fixture-'+i,status:'queued',assignmentVersion:1}))));
  const legacy=path.join(root,'legacy.exe');
- execFileSync('curl.exe',['--fail','--location','--retry','2','--output',legacy,'https://www.mycellios.com/downloads/desktop/releases/0.3.18/Mycellios-Desktop-0.3.18-windows-x64-pilot.exe'],{stdio:'pipe'});
+ console.log('Downloading the immutable Desktop 0.3.18 upgrade fixture');
+ execFileSync('curl.exe',[
+  '--fail','--silent','--show-error','--location','--connect-timeout','15',
+  '--speed-limit','1024','--speed-time','45','--max-time','180',
+  '--retry','2','--retry-max-time','240','--output',legacy,
+  'https://github.com/Mycellios/mycellios/releases/download/desktop-v0.3.18-windows-preview/Mycellios-Desktop-0.3.18-windows-x64-pilot.exe',
+ ],{stdio:'pipe',timeout:300000});
  assert.equal((await hashes(legacy)).sha256,'7fef0fcca53bcb24e883058826d9aff95b31450ecfd21a7a0aeb9fa88e432797');
+ console.log('Extracting the verified legacy installer');
  const extracted=path.join(root,'legacy-payload'),installation=path.join(root,'legacy/mycellios-desktop');
  execFileSync(zip,['e','-y','-o'+extracted,legacy,'$PLUGINSDIR/app-64.7z','$R0/Uninstall Mycellios Desktop.exe'],{stdio:'pipe'});
  execFileSync(zip,['x','-y','-o'+installation,path.join(extracted,'app-64.7z')],{stdio:'pipe'});
@@ -83,6 +91,7 @@ try{
  reg('add','HKCU\\'+keys[0],'/v','KeepShortcuts','/t','REG_SZ','/d','true','/f');
  reg('add','HKCU\\'+keys[1],'/v','UninstallString','/t','REG_SZ','/d','"'+path.join(installation,'Uninstall Mycellios Desktop.exe')+'" /currentuser','/f');
  reg('add','HKCU\\'+keys[1],'/v','DisplayVersion','/t','REG_SZ','/d','0.3.18','/f');
+ console.log('Qualifying upgrade and preservation');
  await measure(installation,'legacy-to-compact');
  const snapshots=await fs.readdir(path.join(path.dirname(installation),'mycellios-desktop-upgrade-backups'));
  assert.equal(snapshots.length,1);
@@ -92,6 +101,7 @@ try{
  await fs.rm(extracted,{recursive:true,force:true});
  await fs.rm(path.join(path.dirname(installation),'mycellios-desktop-upgrade-backups'),{recursive:true,force:true});
  for(const key of keys)reg('delete','HKCU\\'+key,'/f');
+ console.log('Qualifying fresh installation');
  await measure(path.join(root,'fresh/mycellios-desktop'),'fresh');
  const archives=await preservation('archives',path.join(installation,'resources'),'archive-tools');
  const proof={passed:proofs.every(p=>p.elapsedMs<60000),version:identity.version,revision:identity.revision,installerSha256:digest.sha256,measurements:proofs,legacyUninstallFailureRestored:true,archives,scope:'hosted-windows-runner',physicalOwnerPc:false};
