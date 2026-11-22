@@ -527,6 +527,8 @@
   Before task navigation, prime the destination's account/Space-scoped shell metadata
   and only its own cached transcript. Keep immutable RPC/draft isolation, tab titles
   and open-tab state across the scoped remount without a whole-page loading frame.
+  A seeded tab switch reads the destination's history directly without duplicating it
+  through bootstrap. While the first read is pending, show loading in the chat pane.
   Verify MicoTaskTabs, query cache isolation, auto-read,
   development-conversations, side-threads, thread-deletion, core thread-lifecycle,
   DB messages and history-retrieval(.postgres) tests plus

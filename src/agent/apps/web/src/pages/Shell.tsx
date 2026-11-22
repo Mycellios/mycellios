@@ -392,14 +392,15 @@ type PendingBrowserNotification = {
 type BrowserNoticeOptions = { quiet?: boolean; taskConversation?: boolean };
 
 const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
+const CONVERSATION_HISTORY_TIMEOUT_MS = 15_000;
 /** Bound Settings leave so a hung voice status refresh cannot block dismissal. */
 const VOICE_STATUS_REFRESH_TIMEOUT_MS = 10_000;
 const NO_AGENT_SKILLS: AgentSkillCatalogEntry[] = [];
 const NO_PROVIDERS: string[] = [];
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
-function threadSnapshotSignal(parent: AbortSignal): AbortSignal {
-  return anySignal([parent, AbortSignal.timeout(THREAD_SNAPSHOT_TIMEOUT_MS)]);
+function threadSnapshotSignal(parent: AbortSignal, timeout = THREAD_SNAPSHOT_TIMEOUT_MS): AbortSignal {
+  return anySignal([parent, AbortSignal.timeout(timeout)]);
 }
 
 function voiceStatusRefreshTimeout(): Promise<never> {
@@ -441,8 +442,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const { t, i18n } = useLingui();
   const reviewWorkspace = useReviewWorkspace();
   const { botId, groupId } = useParams();
-  const firstMicoEngine = NativeBotEngineSchema.safeParse(useLocation().state?.firstMicoEngine).data;
-  const manualMicoSetup = useLocation().state?.manualMicoSetup === true;
+  const locationState = useLocation().state;
+  const firstMicoEngine = NativeBotEngineSchema.safeParse(locationState?.firstMicoEngine).data;
+  const manualMicoSetup = locationState?.manualMicoSetup === true;
   const [shellSpaceId] = useState(() => initialSpaceId ?? selectedSpaceId());
   const rpc = useSpaceRpc();
   const responseStyle = useSavedResponseStyle(rpc);
@@ -472,6 +474,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const lastChat = queryClient.getQueryData(lastChatKey(userId ?? null, shellSpaceId));
     return { seed: cached, startChat: botId || groupId || !getGeneralPreferences().restoreLastWorkspace ? undefined : lastChatOf(cached, lastChat) };
   });
+  const [conversationSwitch] = useState(() => locationState?.conversationSwitch === true);
+  const loadingConversation = Boolean(taskScope || conversationSwitch);
+  const [threadLoadFailed, setThreadLoadFailed] = useState(false);
+  const [threadLoadAttempt, setThreadLoadAttempt] = useState(0);
   const routerNavigate = useNavigate();
   const navigateRef = useRef(routerNavigate);
   navigateRef.current = routerNavigate;
@@ -1526,6 +1532,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const snap = await rpc.threads.get({ botId: id }, signal ? { signal } : undefined);
     markOnce("rk:renderer:thread-response");
     if (
+      signal?.aborted ||
       activeBotId.current !== id ||
       epoch !== historyEpoch.current ||
       request !== threadRefreshEpoch.current
@@ -1539,6 +1546,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       expandedHistoryThread.current === snap.threadId,
     );
     commitSnapshot(reconciled.snapshot);
+    if (taskScope) setTaskThreadLoaded(true);
     commitComputer(reconciled.computer);
     cacheComputerFor(id, { computer: reconciled.computer });
     void Promise.all([
@@ -1692,8 +1700,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   useEffect(() => {
     let cancelled = false;
     const appliedAtStart = botsRefreshApplied.current;
-    void (taskScope ? rpc.bootstrap({ botId: taskScope.botId }) : takeInitialBootstrap(botId ?? startChat?.botId))
-      .then((bootstrap) => {
+    // Tab navigation primes the sidebar and account metadata. The dedicated history
+    // request owns the snapshot, so bootstrap would only fetch it a second time.
+    const bootstrapRequest = seed && conversationSwitch
+      ? undefined
+      : taskScope
+        ? rpc.bootstrap({ botId: taskScope.botId })
+        : takeInitialBootstrap(botId ?? startChat?.botId);
+    void bootstrapRequest
+      ?.then((bootstrap) => {
         // Kept for the space it belongs to, so switching back to it can paint at once.
         saveSeed(bootstrap);
         if (cancelled) return;
@@ -1894,6 +1909,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const teammateRuns = createTeammateRunTracker();
     const routineRuns = new Set<string>();
     const abort = new AbortController();
+    // Full history has a longer read budget than the lightweight cursor probe.
+    const historySignal = () => threadSnapshotSignal(abort.signal,
+      loadingConversation ? CONVERSATION_HISTORY_TIMEOUT_MS : THREAD_SNAPSHOT_TIMEOUT_MS);
+    setThreadLoadFailed(false);
     setLiveThreadConnection("live");
     void runThreadSubscription({
       signal: abort.signal,
@@ -1905,15 +1924,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         const initial = await (primed?.botId === active.id
           ? primed
           : pendingJump
-            ? rpc.threads.get({ botId: active.id }, { signal: threadSnapshotSignal(abort.signal) })
-            : refreshThread(active.id, threadSnapshotSignal(abort.signal)));
+            ? rpc.threads.get({ botId: active.id }, { signal: historySignal() })
+            : refreshThread(active.id, historySignal()));
         // The task's own snapshot came through this client, which now accepts its read.
         if (taskScope && !abort.signal.aborted) setTaskThreadLoaded(true);
         return initial;
       },
       loadHead: () =>
         rpc.threads.head({ botId: active.id }, { signal: threadSnapshotSignal(abort.signal) }),
-      refresh: () => refreshThread(active.id, threadSnapshotSignal(abort.signal)),
+      refresh: () => refreshThread(active.id, historySignal()),
       currentSnapshot: () => snapshotRef.current,
       subscribe: (cursor, signal) =>
         rpc.threads.subscribe({ botId: active.id, cursor }, { signal }),
@@ -1986,6 +2005,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           void refreshComputerScreen(active.id).catch(() => undefined);
         }
       },
+    }).then(() => {
+      if (!abort.signal.aborted && loadingConversation) setThreadLoadFailed(true);
     });
     return () => {
       setLiveThreadConnection("live");
@@ -1995,7 +2016,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       const left = snapshotRef.current;
       if (left?.botId === active.id && !left.groupId) queryClient.setQueryData(threadKey, left);
     };
-  }, [active?.id, markBotReadIfVisible, notifyBrowserForEvent]);
+  }, [active?.id, markBotReadIfVisible, notifyBrowserForEvent, threadLoadAttempt]);
 
   useEffect(() => {
     if (!groupId || !activeGroup) return;
@@ -4225,7 +4246,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     next.delete("draft");
     if (threadId) next.set("task", threadId); else next.delete("task");
     if (draft) next.set("draft", "1");
-    navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() });
+    navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() },
+      { state: { conversationSwitch: !draft } });
   }
   /** Opens a conversation, the draft or the main chat in the chat itself, keeping its tab. */
   function openConversationInChat(target?: string) {
@@ -4793,6 +4815,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             </div>
           ) : newConversation && active && !inGroup ? (
             <NewConversationIntro bot={active} />
+          ) : !activeSnapshot && active && loadingConversation ? (
+            threadLoadFailed ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3">
+                <p role="status"><Trans>Could not load this chat.</Trans></p>
+                <Button variant="ghost" onClick={() => setThreadLoadAttempt(attempt => attempt + 1)}>
+                  <Trans>Try again</Trans>
+                </Button>
+              </div>
+            ) : <PageLoading className="grid flex-1 place-items-center" />
           ) : (
             <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><Transcript
               headerTabs={false}

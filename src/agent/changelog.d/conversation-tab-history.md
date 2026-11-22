@@ -1,0 +1,1 @@
+- Conversation tabs reopen with their cached messages, and loading a conversation for the first time avoids a duplicate history request and premature retries.
