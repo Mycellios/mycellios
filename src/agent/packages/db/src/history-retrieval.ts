@@ -243,11 +243,40 @@ export async function searchHistory(
   });
 }
 
+/**
+ * The newest page of a conversation in scope (default 10, at most 20 messages, oldest first);
+ * nextCursor reads the page before it. Same fence as every other history read.
+ */
+export async function readHistoryPage(
+  prisma: PrismaClient,
+  scope: HistoryScope,
+  input: Pick<HistoryReadInput, "before" | "limit">,
+) {
+  const limit = pageSize(input.limit);
+  if (input.before !== undefined && (!Number.isInteger(input.before) || input.before < 0))
+    throw new Error("Invalid history cursor");
+  const rows = await messageRows(
+    prisma,
+    Prisma.sql`
+    SELECT ${columns} FROM messages m JOIN threads t ON t.id = m."threadId"
+    WHERE ${visible(scope)}
+      ${input.before !== undefined ? Prisma.sql`AND m.seq < ${input.before}` : Prisma.empty}
+    ORDER BY m.seq DESC LIMIT ${limit + 1}
+  `,
+  );
+  const page = rows.slice(0, limit).sort((a, b) => a.seq - b.seq);
+  return bounded({
+    untrusted: true as const,
+    messages: page.map((row) => reference(row, "", 2000)),
+    nextCursor: rows.length > limit ? page[0]!.seq : null,
+  });
+}
+
 /** Anchor authorization and neighbor authorization use the same predicate. */
 export async function readHistory(
   prisma: PrismaClient,
   scope: HistoryScope,
-  input: HistoryReadInput,
+  input: Omit<HistoryReadInput, "messageId"> & { messageId: string },
 ) {
   const limit = Math.min(pageSize(input.limit), 5);
   const direction = input.direction ?? "around";

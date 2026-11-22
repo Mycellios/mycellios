@@ -1,15 +1,20 @@
 import { runContinueJob } from "@mycellios/adapter-kit";
 import type { BotMessageIntent, MessageBlock } from "@mycellios/contracts";
 import {
+  ACTIVE_RUN_STATUSES,
   BOT_MESSAGE_MAX_LENGTH,
   botMessageContext,
   botMessageHopExhausted,
   buildBotMessageWakePrompt,
   clampBotMessage,
+  interruptedTaskReply,
   nextBotMessageHop,
   resolveBotAddress,
+  taskAnswerText,
+  taskReportNoncePrefix,
 } from "@mycellios/core";
 import {
+  agentTasksStartedByRun,
   appendEventInTransaction,
   createThreadMessageInTransaction,
   type PrismaClient,
@@ -348,6 +353,12 @@ export async function returnBotMessageOutcome(
     await markBotOutcomeReturned(deps.prisma, run.id);
     return true;
   }
+  // A turn that opened tasks answers its teammate once they have reported, never with an
+  // interim status. Until then this stays unreturned, so the reconciler keeps checking.
+  if ((await agentTasksStartedByRun(deps.prisma, run.id)).length) {
+    const state = await settleAgentTaskTeammateReply(deps, run.id);
+    return state === "delivered" || state === "none";
+  }
   const sent = await deps.prisma.message.findMany({
     where: { threadId: run.threadId, runId: run.id },
     select: { blocks: true },
@@ -384,6 +395,116 @@ export async function returnBotMessageOutcome(
   );
   if (outcome.ok) await markBotOutcomeReturned(deps.prisma, run.id);
   return outcome.ok;
+}
+
+export type TeammateReplyState = "none" | "deferred" | "delivered" | "failed";
+
+/**
+ * A teammate asked this Mico for something and the turn that answered opened tasks
+ * (start_task). The reply waits until none of those tasks or their reports is still working,
+ * then carries the Mico's answer to the last report; when no report answered (a task closed,
+ * deleted or lost first) it carries what the tasks left, marked as interrupted. One reply per
+ * request run, under the same delivery key as an ordinary returned outcome.
+ */
+export async function settleAgentTaskTeammateReply(
+  deps: Pick<ExecutorDeps, "prisma" | "events" | "jobs">,
+  requestRunId: string,
+): Promise<TeammateReplyState> {
+  const request = await deps.prisma.run.findUnique({
+    where: { id: requestRunId },
+    select: {
+      id: true,
+      spaceId: true,
+      threadId: true,
+      botId: true,
+      userId: true,
+      sourceMessageId: true,
+      status: true,
+      trigger: true,
+      createdAt: true,
+      botOutcomeReturnedAt: true,
+      bot: { select: { name: true } },
+    },
+  });
+  if (request?.trigger !== "bot_message" || request.botOutcomeReturnedAt) return "none";
+  if (!["completed", "failed", "cancelled"].includes(request.status)) return "deferred";
+  const context = await loadBotMessageContext(deps.prisma, request.sourceMessageId);
+  const intent = context?.intent ?? "request";
+  if (!context || (intent !== "request" && intent !== "question")) return "none";
+  const taskIds = await agentTasksStartedByRun(deps.prisma, request.id);
+  if (!taskIds.length) return "none";
+  const scope = { spaceId: request.spaceId, userId: request.userId };
+  const reportsOf = taskIds.map((taskId) => ({
+    threadId: request.threadId,
+    trigger: "task_report",
+    clientNonce: { startsWith: taskReportNoncePrefix(taskId) },
+  }));
+  const pending = await deps.prisma.run.findFirst({
+    where: {
+      ...scope,
+      status: { in: [...ACTIVE_RUN_STATUSES] },
+      OR: [{ threadId: { in: taskIds } }, ...reportsOf],
+    },
+    select: { id: true },
+  });
+  if (pending) return "deferred";
+  const lastReport = await deps.prisma.run.findFirst({
+    where: { ...scope, createdAt: { gte: request.createdAt }, OR: reportsOf },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, status: true },
+  });
+  const answerOf = async (where: { threadId: string; runId?: string }) => {
+    const messages = await deps.prisma.message.findMany({
+      where: { ...where, role: "bot", thread: scope },
+      select: { blocks: true },
+      orderBy: { seq: "desc" },
+      take: where.runId ? 20 : 5,
+    });
+    for (const message of messages) {
+      const text = taskAnswerText(Array.isArray(message.blocks) ? (message.blocks as MessageBlock[]) : []);
+      if (text) return text;
+    }
+    return "";
+  };
+  let text =
+    lastReport?.status === "completed"
+      ? await answerOf({ threadId: request.threadId, runId: lastReport.id })
+      : "";
+  const replyIntent = text ? ("result" as const) : ("status" as const);
+  if (!text) {
+    const parts: string[] = [];
+    for (const threadId of taskIds) parts.push(await answerOf({ threadId }));
+    text = interruptedTaskReply(parts);
+  }
+  const sent = await messageBot(
+    deps,
+    request,
+    { id: request.botId, name: request.bot.name },
+    {
+      bot_id: context.fromBotId,
+      message: clampBotMessage(text),
+      intent: replyIntent,
+      deliveryKey: `auto-outcome:${request.id}`,
+    },
+    { allowTerminalSource: true, forceUnread: replyIntent === "status" },
+  );
+  if (!sent.ok) return "failed";
+  await markBotOutcomeReturned(deps.prisma, request.id);
+  return "delivered";
+}
+
+/** After a report turn ends: answer the teammate whose request opened that task, if all are done. */
+export async function settleTaskReportTeammate(
+  deps: Pick<ExecutorDeps, "prisma" | "events" | "jobs">,
+  reportRun: { clientNonce: string | null; spaceId: string; userId: string },
+): Promise<TeammateReplyState> {
+  const threadId = reportRun.clientNonce?.match(/^task-report:([^:]+):/)?.[1];
+  if (!threadId) return "none";
+  const thread = await deps.prisma.thread.findFirst({
+    where: { id: threadId, spaceId: reportRun.spaceId, userId: reportRun.userId, startedBy: "agent" },
+    select: { startedByRunId: true },
+  });
+  return thread?.startedByRunId ? settleAgentTaskTeammateReply(deps, thread.startedByRunId) : "none";
 }
 
 async function markBotOutcomeReturned(prisma: PrismaClient, runId: string) {

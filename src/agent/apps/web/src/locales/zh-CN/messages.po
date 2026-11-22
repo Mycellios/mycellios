@@ -6438,3 +6438,15 @@ msgstr "委派"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "其他"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "显示来自 {name} 的更新"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "隐藏来自 {name} 的更新"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "来自 {author}"

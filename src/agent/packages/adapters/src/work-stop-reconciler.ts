@@ -4,11 +4,15 @@ import type { PrismaClient, ThreadEvents } from "@mycellios/db";
 import { cancelComputerRunWorkArgv } from "./computer-idle.js";
 import { projectLeaseOwner } from "./project-execution.js";
 
-/** Durable teardown outbox; only explicit user tree controls put work in this queue. */
+/**
+ * Durable teardown outbox; explicit user tree controls and a Mico's own close_task put work
+ * in this queue. `taskIds` narrows a pass to the Tasks one control just stopped.
+ */
 export async function reconcileWorkStops(deps: {
   prisma: PrismaClient; sandbox: SandboxProvider; jobs?: Pick<JobPublisher,"cancel">; events?: ThreadEvents;
-}, scope?: {spaceId:string;userId:string}) {
-  const tasks=await deps.prisma.task.findMany({where:{...scope,workStopPending:true},orderBy:{delegationCheckedAt:{sort:'asc',nulls:'first'}},take:25});
+}, scope?: {spaceId:string;userId:string;taskIds?:string[]}) {
+  const {taskIds,...owner}=scope??{};
+  const tasks=await deps.prisma.task.findMany({where:{...owner,...(taskIds?{id:{in:taskIds}}:{}),workStopPending:true},orderBy:{delegationCheckedAt:{sort:'asc',nulls:'first'}},take:25});
   const failures:string[]=[];
   for(const task of tasks){
     try {

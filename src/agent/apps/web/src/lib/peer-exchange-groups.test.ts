@@ -29,3 +29,15 @@ it("folds runs of two or more consecutive Mico messages and names the other Mico
 it("leaves a single Mico message as it is", () => {
   expect(peerExchanges([reply("a"), sent("b", "DevOps"), reply("c")]).size).toBe(0);
 });
+
+it("never folds a task report into a run of Mico messages", () => {
+  const report: ThreadItem<ThreadMessage> = {
+    kind: "message",
+    message: {
+      id: "r", threadId: "t", seq: 1, role: "user", createdAt: at,
+      blocks: [{ kind: "task_report", fromBotId: "mico", fromBotName: "Mico", taskId: "task", title: "Forum", outcome: "completed", text: "Drafted" }],
+    },
+  };
+  const groups = peerExchanges([sent("a", "DevOps"), report, received("b", "DevOps")]);
+  expect(groups.size).toBe(0);
+});

@@ -38,6 +38,7 @@ import {
   isOwnedWorkflowThread,
   lockOwnedGroup,
   primaryActiveRun,
+  queueTaskReportInTransaction,
   recordThreadTurnOutcome,
   retireWaitingQuestionInTransaction,
   touchGroupUpdatedAt,
@@ -1307,12 +1308,14 @@ export async function stopThreadRuns(
     prisma: PrismaClient;
     sandbox: SandboxProvider;
     events: ThreadEvents;
+    /** Starts the report a stopped Mico-opened task sends; the reconciler repairs a miss. */
+    jobs?: Pick<JobPublisher, "enqueue">;
   },
   actor: Actor,
   target: ThreadTarget,
   only?: string[] | { runId: string; trigger: "project_prepare" },
 ) {
-  const { runIds, computers, leases, eventSeq } = await deps.prisma.$transaction(async (tx) => {
+  const { runIds, computers, leases, eventSeq, taskReport } = await deps.prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
@@ -1327,6 +1330,11 @@ export async function stopThreadRuns(
     await clearEndedRunState(tx, ids);
     // A stopped turn reads as stopped on its conversation until the next turn.
     await recordThreadTurnOutcome(tx, { threadId: target.threadId, runIds: ids, outcome: "interrupted" });
+    // A task the Mico opened tells its main chat that the person stopped it.
+    const taskReport =
+      target.kind === "bot" && ids.length
+        ? await queueTaskReportInTransaction(tx, { threadId: target.threadId, runIds: ids, outcome: "stopped" })
+        : null;
     await tx.steeringMessage.deleteMany({
       where: {
         botId: { in: target.kind === "bot" ? [target.botId] : target.memberBotIds },
@@ -1388,12 +1396,20 @@ export async function stopThreadRuns(
         },
       });
     }
-    return { runIds: ids, computers, leases, eventSeq };
+    return { runIds: ids, computers, leases, eventSeq, taskReport };
   });
   if (eventSeq !== null) {
     // The events are durable; subscribers refetch from their persisted cursor.
     await deps.events.notify(target.threadId, eventSeq).catch((error) => {
       getLogger().error("thread stop realtime notification", error);
+    });
+  }
+  if (taskReport) {
+    await deps.events.notify(taskReport.threadId, taskReport.seq).catch((error) => {
+      getLogger().error("task report realtime notification", error);
+    });
+    await deps.jobs?.enqueue(runContinueJob(taskReport.runId)).catch((error) => {
+      getLogger().error("task report enqueue", error);
     });
   }
   // Keep the DB lease until after teardown so a replacement run cannot claim the

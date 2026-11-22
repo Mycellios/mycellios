@@ -36,6 +36,10 @@ const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set([
   "bot_message",
   "delegated_task",
   "task_return",
+  // A conversation the Mico opened itself works on its brief; a person's message waits for
+  // the turn to end. A task report turn relays that result to the main chat the same way.
+  "agent_task",
+  "task_report",
 ]);
 
 /**

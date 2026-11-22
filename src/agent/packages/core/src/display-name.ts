@@ -63,6 +63,8 @@ export function displayMessageBlock(
     case "bot_message_sent":
       return named({ ...block, toBotName: displayName(block.toBotName, labels.bot) });
     case "bot_message_received":
+    case "task_brief":
+    case "task_report":
       return named({ ...block, fromBotName: displayName(block.fromBotName, labels.bot) });
     case "subagent":
       return named({ ...block, name: displayName(block.name, labels.subagent) });

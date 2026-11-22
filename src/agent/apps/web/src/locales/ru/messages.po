@@ -6439,3 +6439,15 @@ msgstr "Делегировано"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "Другое"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "Показать обновление от {name}"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "Скрыть обновление от {name}"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "От {author}"

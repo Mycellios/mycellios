@@ -3,7 +3,9 @@ import { dockerAdaptiveSearchCommand } from "./docker-search-budget.js";
 import { eventDemoSessionActive } from "@mycellios/db";
 import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@mycellios/core/native-project-instructions";
-import { micoBehaviorInstructions } from "./mico-behavior.js";
+import { agentTaskInstructions, micoBehaviorInstructions } from "./mico-behavior.js";
+import { AGENT_TASK_TOOL_NAMES, agentTaskToolsAllowed, isAgentTaskToolName, runAgentTaskTool } from "./agent-tasks.js";
+import { AGENT_TASK_NOT_AVAILABLE_ERROR, AGENT_TASK_SURFACE_ERROR, AGENT_TASK_WAIT_REFUSAL } from "@mycellios/core";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
 import { planCardTool } from "./plan-card.js";
 import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, readMicoDefaults } from "@mycellios/contracts";
@@ -59,7 +61,7 @@ import {
   SandboxRateLimitError,
   TransientModelError,
 } from "@mycellios/adapter-kit";
-import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@mycellios/contracts";
+import type { ComputerCommand, ComputerMode, HistoryReadInput, HistorySearchInput, MessageBlock, ModelRoleChoice, RunStatus } from "@mycellios/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
   BotSecretName,
@@ -242,7 +244,7 @@ import { reviewWithBackups } from "./auto-review-backups.js";
 import { createAutoReviewProvider } from "./auto-review-factory.js";
 import { PARTIAL_REPLY_NOTE } from "./automated-messages.js";
 import { attachedImageArtifactIds, resolveUpdateBotAvatar } from "./bot-avatar.js";
-import { loadBotMessageContext, messageBot, returnBotMessageOutcome } from "./bot-messages.js";
+import { loadBotMessageContext, messageBot, returnBotMessageOutcome, settleTaskReportTeammate } from "./bot-messages.js";
 import {
   allowPrivateHttpSecretOrigins,
   botSecretToolView,
@@ -319,7 +321,7 @@ import {
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { nativeWorkProjectSession } from "@mycellios/core";
 import { projectExecutionLeaseKey, PROJECT_SHARED_SCREEN_TOOLS } from "./project-execution.js";
-import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait } from "@mycellios/db";
+import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait, isOwnedAgentTask, readHistoryPage } from "@mycellios/db";
 import type { NativeCommandReceipt } from "./native-command-journal.js";
 import { connectApp } from "./connect-app.js";
 import { connectedContext, selectRunConnections } from "./connection-context.js";
@@ -4584,6 +4586,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const workflowToolsAllowed = ownerStartedRun && !thread.groupId && /\b(workflows?|flujos?)\b/i.test(task.prompt);
         if (!workflowToolsAllowed) for (const name of WORKFLOW_TOOL_NAMES) disabledBuiltinTools.add(name);
         if (thread.taskBotId) disabledBuiltinTools.add("call_user");
+        // Tasks belong to the Mico's own main chat and routine conversations only.
+        const agentTasksAllowed = await agentTaskToolsAllowed(deps.prisma, run, thread, {
+          messagingChannelRun,
+          backgroundRun: isBackgroundRunTrigger(run.trigger),
+        });
+        if (!agentTasksAllowed) for (const name of AGENT_TASK_TOOL_NAMES) disabledBuiltinTools.add(name);
+        // A conversation the Mico opened finishes with a report; it never parks on a wait.
+        const agentStartedThread = thread.taskBotId === bot.id && thread.startedBy === "agent";
+        if (agentStartedThread) disabledBuiltinTools.add("await_event");
         if (isolatedProjectRun) {
           for (const name of [...PROJECT_SHARED_SCREEN_TOOLS, ...PAGE_BROWSER_TOOL_NAMES]) disabledBuiltinTools.add(name);
         }
@@ -4787,6 +4798,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
           : undefined;
+        const agentTaskInstruction = agentTaskInstructions({
+          offersStartTask: tools.some((tool) => tool.name === "start_task"),
+          sideConversation: thread.taskBotId === bot.id,
+        });
         const approvedEffects = await deps.prisma.externalEffect.findMany({
           where: { runId, status: "approved" },
           orderBy: APPROVED_EFFECT_REPLAY_ORDER,
@@ -5133,6 +5148,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === "propose_instructions_update" && approvalPausePending)
             return pauseForApproval();
           if (disabledBuiltinTools.has(name)) {
+            // Task tools and waits off here because of where this turn runs, not a bot setting.
+            const ownerDisabled = disabledBuiltinToolSet(bot.disabledBuiltinTools).has(name);
+            if (!ownerDisabled && isAgentTaskToolName(name) && !agentTasksAllowed)
+              return { error: AGENT_TASK_SURFACE_ERROR };
+            if (!ownerDisabled && name === "await_event" && agentStartedThread)
+              return { error: AGENT_TASK_WAIT_REFUSAL };
             return { error: "This tool is disabled for this bot." };
           }
           if (privateLane && COMPUTER_REQUIRED_TOOL_NAMES.has(name)) {
@@ -7496,18 +7517,34 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
           }
           if (name === "search_history" || name === "read_history") {
+            const parsed =
+              name === "search_history"
+                ? HistorySearchInputSchema.parse(args)
+                : HistoryReadInputSchema.parse(args);
+            // A conversation this Mico opened, read from its main chat or a routine thread
+            // under the same owner/Space/Mico fence. Anything else is not available.
+            const taskId = parsed.taskId && parsed.taskId !== run.threadId ? parsed.taskId : undefined;
+            if (
+              taskId &&
+              (!agentTasksAllowed ||
+                !(await isOwnedAgentTask(deps.prisma, { spaceId: run.spaceId, userId: run.userId, botId: bot.id }, taskId)))
+            ) {
+              return finish({ untrusted: true, error: AGENT_TASK_NOT_AVAILABLE_ERROR });
+            }
             const scope = {
               spaceId: run.spaceId,
               userId: run.userId,
-              threadId: run.threadId,
+              threadId: taskId ?? run.threadId,
               botId: run.botId,
-              channelId,
-              searchBeforeSeq: historySearchBeforeSeq,
+              ...(taskId ? {} : { channelId, searchBeforeSeq: historySearchBeforeSeq }),
             };
+            const readInput = name === "read_history" ? (parsed as HistoryReadInput) : undefined;
             const response =
               name === "search_history"
-                ? await searchHistory(deps.prisma, scope, HistorySearchInputSchema.parse(args))
-                : await readHistory(deps.prisma, scope, HistoryReadInputSchema.parse(args));
+                ? await searchHistory(deps.prisma, scope, parsed as HistorySearchInput)
+                : readInput?.messageId
+                  ? await readHistory(deps.prisma, scope, { ...readInput, messageId: readInput.messageId })
+                  : await readHistoryPage(deps.prisma, scope, readInput ?? {});
             const redacted = redactConnectorPayload(response, runSecrets);
             // Redaction can expand short synthetic credentials; never let Pi clip the JSON.
             if (Buffer.byteLength(JSON.stringify(redacted), "utf8") > 11_000) {
@@ -8178,7 +8215,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : { ok: true },
             );
           }
+          if (isAgentTaskToolName(name)) {
+            if (!agentTasksAllowed) return finish({ error: AGENT_TASK_SURFACE_ERROR });
+            return finish(await runAgentTaskTool(
+              deps,
+              { ...run, leaseOwner: workerId, leaseFence: fence },
+              { id: bot.id, name: bot.name },
+              name,
+              {
+                ...args,
+                ...(typeof args.brief === "string" ? { brief: redactSecrets(args.brief, runSecrets) } : {}),
+                ...(typeof args.text === "string" ? { text: redactSecrets(args.text, runSecrets) } : {}),
+                ...(typeof args.title === "string" ? { title: redactSecrets(args.title, runSecrets) } : {}),
+              },
+              effectKey,
+            ));
+          }
           if (name === "await_event") {
+            if (agentStartedThread) return finish({ error: AGENT_TASK_WAIT_REFUSAL });
             if (messagingChannelRun || thread.groupId) return finish({error:"Event waits are available only in the owner's private Mico conversations"});
             if(pendingCommands.size)return finish({error:"Inspect command_status before parking a request with a running or uncertain command"});
             const wait = await openEventWait(deps.prisma, { ...run, leaseOwner: workerId, leaseFence: fence }, {
@@ -8715,6 +8769,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   computerInstruction,
                   pageBrowserAllowed,
                   taskCatalogInstruction,
+                  agentTaskInstruction,
                   workspaceInstruction,
                   agentEnvironmentInstruction,
                   botDirectory,
@@ -9439,6 +9494,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               .enqueue(runContinueJob(completed.continuationRunId))
               .catch((error) => getLogger().error("steering continuation enqueue", error));
           }
+          await afterAgentTaskTurn(deps, run, completed);
           if (botMessageOutcome) {
             // Prefer the final reply. If the turn only posted mid-turn progress, return that
             // text explicitly as status. Delivery uses a stable auto-outcome key; mark
@@ -9566,6 +9622,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               .enqueue(runContinueJob(failed.continuationRunId))
               .catch((error) => getLogger().error("steering continuation enqueue", error));
           }
+          await afterAgentTaskTurn(deps, run, failed);
           if (run.trigger === "bot_message") {
             await returnBotMessageOutcome(
               deps,
@@ -9817,6 +9874,27 @@ async function notifyFailedRoutineRun(
   );
 }
 
+/**
+ * After a turn ends: start the report it queued in the Mico's main chat (the row is durable,
+ * so the reconciler repairs a lost enqueue), and once a report turn ends, answer a teammate
+ * whose request opened that task when none of its tasks is still working.
+ */
+async function afterAgentTaskTurn(
+  deps: ExecutorDeps,
+  run: { trigger: string; clientNonce?: string | null; spaceId: string; userId: string },
+  finalized: { taskReport?: { runId: string } | null },
+) {
+  if (finalized.taskReport) {
+    await deps.jobs
+      .enqueue(runContinueJob(finalized.taskReport.runId))
+      .catch((error) => getLogger().error("task report enqueue", error));
+  }
+  if (run.trigger === "task_report") {
+    await settleTaskReportTeammate(deps, { clientNonce: run.clientNonce ?? null, spaceId: run.spaceId, userId: run.userId })
+      .catch((error) => getLogger().error("task report teammate reply", error));
+  }
+}
+
 /** Fails a run that never reached the model and tells the people waiting on it. */
 async function failRunBeforeTurn(
   deps: ExecutorDeps,
@@ -9830,6 +9908,7 @@ async function failRunBeforeTurn(
     trigger: string;
     routineId?: string | null;
     sourceMessageId?: string | null;
+    clientNonce?: string | null;
   },
   botName: string,
   lease: { attemptId: string; workerId: string; fence: number },
@@ -9853,6 +9932,7 @@ async function failRunBeforeTurn(
       .enqueue(runContinueJob(failed.continuationRunId))
       .catch((error) => getLogger().error("steering continuation enqueue", error));
   }
+  await afterAgentTaskTurn(deps, run, failed);
   if (run.trigger === "bot_message") {
     await returnBotMessageOutcome(
       deps,
@@ -10437,6 +10517,8 @@ export function userTurnInstructions(parts: {
   computerInstruction: string;
   pageBrowserAllowed: boolean;
   taskCatalogInstruction?: string;
+  /** When to open tasks (main chat, routine) or the side-conversation rules. */
+  agentTaskInstruction?: string;
   workspaceInstruction: string;
   agentEnvironmentInstruction: string | undefined;
   botDirectory: string | undefined;
@@ -10457,6 +10539,7 @@ export function userTurnInstructions(parts: {
       : undefined,
     toolUsageLine(parts),
     parts.taskCatalogInstruction,
+    parts.agentTaskInstruction,
     parts.workspaceInstruction,
     parts.agentEnvironmentInstruction,
     "A bot and a subagent are different. Never use both for the same request.",
@@ -10521,8 +10604,12 @@ export function threadContextForRun<T extends { id?: string; role: string }>(
   messagingChannelRun: boolean,
   sourceMessageId?: string | null,
 ) {
-  // The current reaction is supplied with its target in the prompt, once.
-  if (trigger === "reaction" && sourceMessageId) {
+  // The current reaction is supplied with its target in the prompt, once. A task brief,
+  // a follow-up from the main chat and a task report also arrive framed in the prompt.
+  if (
+    (trigger === "reaction" || trigger === "agent_task" || trigger === "task_report") &&
+    sourceMessageId
+  ) {
     context = {
       ...context,
       messages: context.messages.filter((message) => message.id !== sourceMessageId),
@@ -10588,7 +10675,8 @@ export function runIdentityInstruction(
 }
 
 export function runSendsFinishNotification(trigger: string): boolean {
-  return trigger !== "created" && !isBackgroundRunTrigger(trigger);
+  // A conversation the Mico opened reports to the main chat; that report turn notifies.
+  return trigger !== "created" && trigger !== "agent_task" && !isBackgroundRunTrigger(trigger);
 }
 
 /** Open the model only while this worker still owns the running lease. */

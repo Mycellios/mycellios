@@ -15,6 +15,7 @@ import {
   ImageGenerationCard,
 } from "../../components/ImageGenerationCard";
 import { SubagentCard } from "../../components/SubagentCard";
+import { TaskReportCard } from "../../components/TaskReportCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
   StandaloneToolActivity,
@@ -323,10 +324,14 @@ export const MessageView = memo(function MessageView({
       </>
     );
   }
+  // Task briefs and reports come from the Mico, not the person, so they stay on its side.
+  const fromPerson =
+    message.role === "user" &&
+    !blocks.some((block) => block.kind === "task_report" || block.kind === "task_brief");
   return (
     <>
       {messageContext}
-      <div className={cn("relative flex flex-col gap-2", message.role === "user" && "items-end")}>
+      <div className={cn("relative flex flex-col gap-2", fromPerson && "items-end")}>
         {blocks.map((block, i) => {
           if (block.kind === "steps" && shouldRenderToolCard(block, showToolActivity)) {
             return (
@@ -380,6 +385,33 @@ export const MessageView = memo(function MessageView({
                     : undefined
                 }
               />
+            );
+          }
+          if (block.kind === "task_report") {
+            return (
+              <TaskReportCard
+                key={i}
+                block={block}
+                color={peerBot(block.fromBotId)?.color ?? FALLBACK_BOT_COLOR}
+              />
+            );
+          }
+          if (block.kind === "task_brief") {
+            // What the Mico wrote into a conversation it opened: the brief or a follow-up.
+            const author = block.fromBotName;
+            return (
+              <div key={i} data-testid="task-brief" className="flex max-w-full flex-col items-start gap-1 self-start">
+                <span dir="auto" className="ps-1 text-[13px] text-muted-foreground">
+                  {t`From ${author}`}
+                </span>
+                <div
+                  className="rk-message-bubble max-w-full rounded-[20px] px-3.5 py-2.5 text-body1 text-foreground"
+                  dir="auto"
+                  data-quote-message-id={quoteMessageId}
+                >
+                  <CollapsibleMessageText text={block.text} showFull={showFullText} />
+                </div>
+              </div>
             );
           }
           if (block.kind === "channel_message") {
@@ -521,7 +553,7 @@ export const MessageView = memo(function MessageView({
             return (
               <div
                 key={i}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex ${fromPerson ? "justify-end" : "justify-start"}`}
               >
                 <ArtifactImage
                   target={artifactTarget}

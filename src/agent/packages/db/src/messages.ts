@@ -16,7 +16,9 @@ export function loadRunHistoryMessages(
     where: {
       threadId: run.threadId,
       ...(contextStartSeq > 0 ? { seq: { gte: contextStartSeq } } : {}),
-      NOT: { steeringMessages: { some: { originTrigger: "queued_user", claimedAt: null, OR: [{ runId: null }, { runId: { not: run.id } }] } } },
+      // Queued messages (the person's, or a follow-up from the Mico's main chat) join history
+      // only with the turn that answers them.
+      NOT: { steeringMessages: { some: { originTrigger: { in: ["queued_user", "agent_task"] }, claimedAt: null, OR: [{ runId: null }, { runId: { not: run.id } }] } } },
       ...(channelId
         ? {
             OR: [

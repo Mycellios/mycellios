@@ -6438,3 +6438,15 @@ msgstr "Devredildi"
 #: src/components/MicoTaskTabs.tsx
 msgid "Other"
 msgstr "Diğer"
+
+#: src/components/TaskReportCard.tsx
+msgid "Show the update from {name}"
+msgstr "{name} tarafından gelen güncellemeyi göster"
+
+#: src/components/TaskReportCard.tsx
+msgid "Hide the update from {name}"
+msgstr "{name} tarafından gelen güncellemeyi gizle"
+
+#: src/pages/shell/message-view.tsx
+msgid "From {author}"
+msgstr "{author} tarafından"

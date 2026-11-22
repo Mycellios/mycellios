@@ -439,7 +439,8 @@
   only for ordinary conversations. A task tab marks its own thread read once that
   task's snapshot has loaded (never on hover) and never clears the main chat's dot.
   search_history/read_history read the run's own thread, including a Mico's side
-  thread, under the same owner/Space/unarchived-Mico fence; results stay untrusted.
+  thread, or by taskId (main chat or routine thread) a conversation the Mico opened,
+  under the same owner/Space/unarchived-Mico fence; results stay untrusted.
   The + opens an untitled conversation directly. Its first committed user message
   supplies the title in the same transaction, without a model request: its first
   non-empty line (else the first file name), at most 120 characters ending in "…",
@@ -478,6 +479,24 @@
   Reset context is a confirmed secondary action for the main chat only; never
   expose that endpoint from an independent task or label it New conversation.
   Verify the task navigation and NewChatControl regression tests.
+
+- A Mico opens its own side conversations with start_task/message_task/close_task
+  (specs/mico-side-tasks/spec.md; the reference product is a behavior reference only).
+  Offer and accept them only in its own main chat and owned routine threads, refuse them
+  elsewhere with an explanation, and refuse await_event in agent-started threads. At most 8
+  unfinished agent-started conversations per Mico, counted under a per-Mico advisory lock:
+  no queueing, no automatic archive. The tool effect key names the thread, so retries replay.
+  Turns run as agent_task through claimMicoRun (concurrency unchanged); message_task queues an
+  agent_task steering row that is never claimed mid-turn. close_task stops through the
+  work-stop outbox, archives within 15 s and sends no report. finalizeRun, stopThreadRuns and
+  expireStuckRun queue one task_report message and run in the main chat in the same
+  transaction (nonce task-report:<thread>:<run>; no report for silent, person-started without
+  a waiting teammate, delegation-parked or deleting turns). Report turns are ordinary paid
+  turns: normal Credit admission and observers, tainted from the start. A bot_message turn
+  that opened tasks replies to its teammate only once they settle (auto-outcome key; the
+  reconciler retries). Verify core/adapters agent-tasks, executor-agent-tasks, bot-messages,
+  db events/messages, message-view and peer-exchange-groups tests and
+  `node --import tsx scripts/verify-agent-tasks-db.ts`; fakes do not qualify a live model.
 
 - New chat is distinct from Clear: retain messages with a context_reset divider,
   advance Thread.contextStartSeq, invalidate local summaries/checkpoints and rotate
