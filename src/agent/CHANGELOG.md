@@ -6,6 +6,87 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-22
+
+### Added
+
+- A Mico can look through all of its conversations: in its main chat or a side
+  conversation, search_history without a query lists the main chat and the side
+  conversations (archived ones too) with their state and latest request and reply,
+  and a search covers this conversation, the main chat and the newest side
+  conversations, naming the conversation of each match. read_history reads any of
+  them by its taskId.
+- A Mico can pin a message in its own conversation for you, for example a final
+  draft. Its pins show "Pinned by" with its name, count toward the 100 pins of a
+  conversation, and you can unpin them.
+- The pinned messages list can show the pins of all of a Mico's conversations.
+  Opening one from another conversation opens that conversation, restoring it if
+  it was archived, and jumps to the message.
+- Each chat has a "Search messages" box that jumps between matches with Previous
+  and Next.
+- Sidebar search also finds messages in a Mico's side conversations and opens the
+  right conversation, and its results can be narrowed to Messages, Micos, Groups,
+  Files or Routines.
+- A Conversations pane in the chat's side panel lists a Mico's open conversations and the draft
+  with their state and time, and shows how many are waiting for you. A conversation opens in the
+  chat or beside it, where you can read it, answer its questions and write to it.
+- Questions, approvals and takeovers from a Mico's conversations also appear in its main chat.
+  Answering a question or an approval there answers it in the conversation; once answered
+  anywhere, it disappears everywhere.
+- A Mico in the sidebar can be expanded to show the conversations that need a look and the most
+  recent ones. Resting the pointer on a Mico shows its conversations.
+- The sidebar shows how many replies are unread in a Mico's main chat, and a separate mark when
+  only its conversations have new replies.
+- A "Needs you" group at the top of the sidebar lists the Micos waiting for an answer, a review or
+  a takeover, only while something waits.
+- A view menu next to the sidebar search filters chats (Micos, groups, unread, working, folders),
+  sorts them by recent activity on request and marks everything as read. The default order does
+  not change.
+- In a long chat, a banner says how many messages are new, with Jump and Mark as read.
+- Notifications say why work stopped: a message or routine that could not start,
+  a helper or teammate that failed, a usage or credit limit, and a provider that
+  needs you to sign in again. With previews off they still show only fixed text,
+  never the Mico's name or the reply.
+- Answering a question, approval or takeover on one device closes its
+  notification on your other devices that get background web notifications or
+  use the Android app. iPhone and iPad keep theirs until opened, because Apple
+  requires every push to show an alert.
+- Settings > Notifications has a "Replies in task conversations" switch for all
+  your devices. It is on by default; turned off, a Mico's own task conversations
+  stop alerting when they finish or fail, while questions, approvals and routines
+  still alert.
+- Both pause controls offer 15 minutes, 1, 3, 8 or 24 hours, or until you turn
+  notifications back on.
+
+### Changed
+
+- Mark as Read on a Mico in the sidebar also reads its conversations. Mark as Unread makes its
+  newest reply unread again.
+- A reply to another Mico's message or delegated task no longer plays a sound or
+  sends a notification. It still counts as unread, and its questions, approvals
+  and failures still alert.
+- A group notifies once per request, when its last member finishes with unread
+  replies, instead of once for every member.
+
+### Fixed
+
+- Muting the current server "Until I turn it back on" is saved instead of being
+  rejected as longer than seven days.
+- A Windows update that was interrupted while installing no longer leaves Mycellios
+  Desktop unusable. The next installation restores the previous version first and
+  then continues. Before, every later installation stopped at once.
+- Keep the faster GitHub download available when recent Desktop releases include many assets.
+
+### Self-host upgrade notes
+
+- Apply the additive migration `20261122200000_message_pin_authors` before starting
+  this version. It adds a nullable `pinnedByBotId` column and two indexes to
+  `message_pins`; existing pins stay your own pins.
+- Apply the additive migration `20261122230000_notification_requests` before
+  starting this version. It adds a nullable `sentAt` column to
+  `web_push_deliveries` and a system-only `notification_requests` table; older
+  services keep delivering notifications without them.
+
 ## [0.13.0] - 2026-11-22
 
 ### Added
