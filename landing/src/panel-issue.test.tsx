@@ -124,6 +124,40 @@ describe("AccountDetails", () => {
 });
 
 describe("AccountModal", () => {
+  const apiTabProps = {
+    initialTab: "api" as const,
+    config: { enabled: true, apiAccessEnabled: true, publicApiBaseUrl: "https://api.example/v1" },
+    session: { accessToken: "session", refreshToken: "refresh", expiresAt: 1, user: { id: "owner", email: "owner@example.com" } },
+    identity: null,
+    account: null,
+    onConfigLoaded: () => undefined,
+    getValidSession: async () => null,
+    onAuthenticated: () => undefined,
+    onRetryRole: async () => undefined,
+    onSignOut: () => undefined,
+    onClose: () => undefined,
+  };
+
+  it("shows the shared API endpoint and key management to the signed-in account", () => {
+    const markup = renderToStaticMarkup(<AccountModal {...apiTabProps} />);
+    expect(markup).toContain("https://api.example/v1");
+    expect(markup).toContain("Create key");
+    expect(markup).toContain("The full key is shown only once.");
+    expect(markup).toContain("Copy URL");
+  });
+
+  it("requires a session on the API deep link", () => {
+    const markup = renderToStaticMarkup(<AccountModal {...apiTabProps} session={null} />);
+    expect(markup).toContain("Sign in securely");
+    expect(markup).not.toContain("Create key");
+  });
+
+  it("offers no key operations when the coordinator disables API access", () => {
+    const markup = renderToStaticMarkup(<AccountModal {...apiTabProps} config={{ ...apiTabProps.config, apiAccessEnabled: false }} />);
+    expect(markup).toContain("API key management is unavailable");
+    expect(markup).not.toContain("Create key");
+  });
+
   it("waits for session restoration before presenting sign-in controls", () => {
     const markup = renderToStaticMarkup(<AccountModal
       ready={false}

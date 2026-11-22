@@ -1,6 +1,6 @@
 # Tasks
 
-- [x] Update `.jarvis-dev.json` to avoid UI/coordinator port collisions.
+- [x] Update the local runner configuration to avoid UI/coordinator port collisions.
   Verify: run the configured command with `PORT=4175 HOST=127.0.0.1`.
 
 - [x] Confirm the landing UI is reachable on the assigned UI port.

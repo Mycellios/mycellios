@@ -447,7 +447,7 @@ Mico names and instructions stay: they are the content the user chose.
      exists but none can settle, the request fails before dispatch with
      `502 settlement_evidence_unavailable`, the status clients already got
      after the wasted run, so the Speakr bridge still falls back at once.
-     Unfunded and operator traffic, such as Jarvis memory backfill, is
+     Unfunded and operator traffic, such as the operator's memory backfill, is
      unchanged.
   2. Done: the coordinator ignores `privacy` on public requests at admission
      (`parseChatRequest`); it still accepts the field so existing clients keep

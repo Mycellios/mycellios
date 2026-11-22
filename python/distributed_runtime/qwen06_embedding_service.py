@@ -1,4 +1,4 @@
-"""Private Qwen3-Embedding-0.6B replica for operator memory (Jarvis).
+"""Private Qwen3-Embedding-0.6B replica for operator memory.
 
 One node serves `POST /v1/embeddings` on its NetBird address with a bearer
 token. A GPU replica loads the model only while the coordinator holds a
