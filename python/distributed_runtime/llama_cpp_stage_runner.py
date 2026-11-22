@@ -34,7 +34,9 @@ from .model import StageModelSpec
 from .native_gguf import NativeGgufError, verify_native_gguf_stage
 
 DEFAULT_BUILD = "llama.cpp-b12613-win-vulkan-x64"
-EXACT_WINDOW_TOKENS = 32
+# Verification waves are at most MAX_DRAFT_TOKENS + 1 = 17 positions. Longer
+# inputs are prompt prefill, which speculative and plain decoding run alike.
+EXACT_WINDOW_TOKENS = 17
 SELF_TEST_POSITIONS = 17
 
 
