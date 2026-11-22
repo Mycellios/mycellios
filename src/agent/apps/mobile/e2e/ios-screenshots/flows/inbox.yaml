@@ -1,10 +1,10 @@
-appId: com.rakazo.app
+appId: com.mycellios.agent
 name: Inbox
 ---
 - runFlow:
     file: ../subflows/sign-in.yaml
     env:
-      RAKAZO_ACTIVE_EMAIL: ${RAKAZO_SCREENSHOT_EMAIL}
+      MYCELLIOS_ACTIVE_EMAIL: ${MYCELLIOS_SCREENSHOT_EMAIL}
 - extendedWaitUntil:
     visible: ".*Researcher.*"
     timeout: 20000

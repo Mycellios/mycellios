@@ -50,7 +50,8 @@
   out of unprivileged previews. Check preload, desktop, RPC and PWA tests.
 
 - Expo mobile registers both app-link schemes and routes notifications from either.
-  iOS screenshot flows exercise the Mycellios scheme. Keep old callback URLs
+  Native Android Expo notifications and Maestro flows use Mycellios links and
+  the current Expo app ID. Keep old callback URLs
   working while deployed servers and supported builds still use them.
 
 - Native Expo sign-in may share the configured HTTPS OIDC issuer origin with Agent.

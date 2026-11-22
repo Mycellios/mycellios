@@ -100,7 +100,7 @@ class RakazoCallService : Service() {
 
   private fun openApp(): PendingIntent {
     val intent = packageManager.getLaunchIntentForPackage(packageName)
-      ?: Intent(Intent.ACTION_VIEW, android.net.Uri.parse("rakazo://"))
+      ?: Intent(Intent.ACTION_VIEW, android.net.Uri.parse("mycellios://")).setPackage(packageName)
     intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
     return PendingIntent.getActivity(
       this,
