@@ -22,7 +22,7 @@ import type { WorkerHub } from "../src/coordinator/worker-hub.js";
 import { Scheduler } from "../src/scheduler/scheduler.js";
 import { MeshDatabase } from "../src/storage/database.js";
 import { MeshStore, type StoredWorker } from "../src/storage/store.js";
-import { addWorker } from "./helpers.js";
+import { addWorker, ownNode } from "./helpers.js";
 
 /** Same value as EXPECTED_IDENTITY in python/tests/test_qwen06_embedding_service.py. */
 const PINNED_IDENTITY = "sha256:7ced807793a552878c586b4fc420c5f9edef134abe30e4202b9f2022487cdd55";
@@ -292,9 +292,12 @@ describe("memory embedding routing", () => {
         model: MEMORY_EMBEDDING_MODEL, modelDigest: MEMORY_EMBEDDING_DIGEST, activationId: `act-${id}`, buildSourceId: SOURCE,
         observedAt: Date.now() - 60_000 } as never } : {}) }];
     await store.updateWorkerHeartbeat(worker.id, capabilities, "online");
+    await ownNode(database, worker, OWNER);
     return (await store.getWorker(worker.id))!;
   }
   const request = chat({ schema: MEMORY_EMBEDDING_SCHEMA, input: ["memoria"] });
+  const OWNER = "account-operator";
+  const owned = { ownerAccountId: OWNER };
   const offers = (hub: Hub) => hub.sent.filter((message) => message.type === "lease.offer").map((message) => message.workerId);
 
   it("sends memory vectors only to qualified replicas; the pinned qualification probe still reaches an unqualified one", async () => {
@@ -303,7 +306,7 @@ describe("memory embedding routing", () => {
     hub.connected.add(pending.id);
     const service = await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000);
     try {
-      await expect(service.submit(request)).rejects.toThrow(expect.objectContaining({ code: "native_qualification_unavailable", statusCode: 503 }));
+      await expect(service.submit(request, undefined, undefined, undefined, owned)).rejects.toThrow(expect.objectContaining({ code: "native_qualification_unavailable", statusCode: 503 }));
       expect(offers(hub)).toEqual([]);
       const probe = await service.submit({ ...request, workload_class: "benchmark",
         privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: [pending.identityId!] } });
@@ -313,7 +316,7 @@ describe("memory embedding routing", () => {
       hub.sent.length = 0;
       const qualified = await replica("qualified", true);
       hub.connected.add(qualified.id);
-      const served = await service.submit(request);
+      const served = await service.submit(request, undefined, undefined, undefined, owned);
       expect(offers(hub)).toEqual([qualified.id]);
       await service.cancel(served.jobId);
     } finally {
@@ -323,7 +326,7 @@ describe("memory embedding routing", () => {
 
   it("keeps no_capacity when no memory replica is connected", async () => {
     const service = await MeshService.create(store, new Scheduler(store), new Hub() as unknown as WorkerHub, 30_000);
-    await expect(service.submit(request)).rejects.toThrow(expect.objectContaining({ code: "no_capacity", statusCode: 503 }));
+    await expect(service.submit(request, undefined, undefined, undefined, owned)).rejects.toThrow(expect.objectContaining({ code: "no_capacity", statusCode: 503 }));
     await service.drainEvents();
   });
 });

@@ -16,7 +16,8 @@ import { MeasuredServiceRates } from "../src/scheduler/measured-service-rates.js
 import { Scheduler } from "../src/scheduler/scheduler.js";
 import { MeshDatabase } from "../src/storage/database.js";
 import { MeshStore, type StoredWorker } from "../src/storage/store.js";
-import { addWorker } from "./helpers.js";
+import { addWorker, ownNode } from "./helpers.js";
+const OWNER = "account-operator";
 
 type Execution = NonNullable<ModelDeployment["execution"]>;
 const execution = (node: string, backend: string, precision: string): Execution => {
@@ -130,12 +131,19 @@ describe("split memory embedding requests", () => {
         model: MEMORY_EMBEDDING_MODEL, modelDigest: MEMORY_EMBEDDING_DIGEST, activationId: `act-${id}`, buildSourceId: SOURCE,
         observedAt: Date.now() - 60_000 } as never }];
     await store.updateWorkerHeartbeat(worker.id, capabilities, "online");
+    await ownNode(database, worker, OWNER);
     hub.connected.add(worker.id);
     return (await store.getWorker(worker.id))!;
   }
   const request = (texts: string[], extra: Partial<ChatCompletionRequest> = {}): ChatCompletionRequest => ({ model: MEMORY_EMBEDDING_MODEL,
     max_tokens: 1, stream: false, messages: [{ role: "user", content: JSON.stringify({ schema: MEMORY_EMBEDDING_SCHEMA, input: texts }) }], ...extra });
-  const start = async () => (service = await MeshService.create(store, new Scheduler(store, { serviceBand: 0 }), hub as unknown as WorkerHub, 300_000));
+  const start = async () => {
+    service = await MeshService.create(store, new Scheduler(store, { serviceBand: 0 }), hub as unknown as WorkerHub, 300_000);
+    // Memory embeddings run only on the caller's own nodes; these replicas belong to OWNER.
+    const submit = service.submit.bind(service);
+    service.submit = (request, session, key, revision, options = {}) => submit(request, session, key, revision, { ownerAccountId: OWNER, ...options });
+    return service;
+  };
   const offers = () => hub.sent.filter((message) => message.type === "lease.offer") as Array<Sent & { payload: JobPayload }>;
   const textsOf = (offer: { payload: JobPayload }) => (JSON.parse(offer.payload.request.messages[0]!.content) as { input: string[] }).input;
 

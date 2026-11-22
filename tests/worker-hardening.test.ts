@@ -51,6 +51,44 @@ describe("worker boundary hardening", () => {
     } });
   });
 
+  it("advertises a node-managed replica beside the executor and routes only its leases to the replica adapter", async () => {
+    const replicaDeployment = { ...capabilities().deployments[0]!, deploymentId: "dep-replica", model: "replica-model", modelDigest: "sha256:replica", adapter: "embedding" as const };
+    let ready = false;
+    const generated: string[] = [];
+    const replicaAdapter: InferenceAdapter = {
+      kind: "embedding", probe: async () => ({ kind: "embedding", models: ["replica-model"], streaming: true, embeddings: true, reranking: false }),
+      warm: async () => undefined, cancel: async () => undefined, metrics: async () => ({ ready: true, activeJobs: 0, loadedModels: [] }),
+      async *generate(request) { generated.push(request.jobId); yield { index: 0, text: "vectors", metrics: { inputTokens: 3, outputTokens: 0 } }; },
+    };
+    const agent = new WorkerAgent({ ...baseConfig(), adapter: { kind: "mycellios-native", model: "mycellios-native-control" } }, {
+      coordinatorUrl: "http://127.0.0.1:8080",
+      advertiseDeployment: false,
+      nativeReplica: {
+        deployments: () => (ready ? [replicaDeployment] : []),
+        adapterFor: (model, digest) => (ready && model === "replica-model" && digest === "sha256:replica" ? replicaAdapter : null),
+        cancel: async () => undefined,
+      },
+    });
+    const harness = agent as unknown as AgentHarness;
+    const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    harness.registeredWorkerId = "worker-node";
+    harness.capabilities = { ...capabilities(), deployments: [] };
+    harness.socket = { readyState: 1, send: (value) => sent.push(JSON.parse(value)) };
+    harness.adapter = { ...harness.adapter, metrics: async () => ({ ready: false, activeJobs: 0, loadedModels: [] }),
+      generate: async function* () { throw new Error("the executor adapter must never serve replica leases"); } };
+    const lease = payload({ modelDigest: "sha256:replica", request: { model: "replica-model", messages: [{ role: "user", content: "x" }], max_tokens: 1 } });
+    await harness.execute(lease);
+    expect(sent.at(-1)).toMatchObject({ type: "lease.reject", payload: { reason: "model_digest_mismatch" } });
+    ready = true;
+    await harness.sendHeartbeat();
+    // The executor adapter is not ready, yet the node is not drained and the replica keeps its slot.
+    expect(sent.at(-1)).toMatchObject({ payload: { heartbeat: { draining: false, deployments: [{ deploymentId: "dep-replica", freeSlots: 1 }] } } });
+    sent.length = 0;
+    await harness.execute({ ...lease, jobId: "job-replica" });
+    expect(generated).toEqual(["job-replica"]);
+    expect(sent.map((message) => message.type)).toEqual(expect.arrayContaining(["lease.accept", "task.token", "task.complete"]));
+  });
+
   it("advertises no free slot for a model the owner's policy excludes, before any content is offered", async () => {
     const agent = new WorkerAgent(baseConfig(), {
       coordinatorUrl: "http://127.0.0.1:8080",

@@ -454,6 +454,17 @@ These rules apply to the complete repository.
 - Native requalification may refresh only explicitly approved worker/build/model/
   activation/node tuples. Keep the three-attempt daily cap and uncertain-request
   backoff; source drift requires operator approval, not a widened allowlist.
+  The only model-bound exception is the memory embedding policy: pinned model and
+  artifact literals, one owner account, explicit build sources and measured
+  device/precision pairs; worker, activation and node come from the snapshot.
+  Check tests/native-qualification-watch.test.ts.
+- `mycellios-qwen3-embedding-0.6b` carries private memory: place it only on nodes
+  actively owned by the requesting account (`memory-embedding-owner-scope.ts`),
+  in planning, dispatch rechecks, retries and split pieces; refuse callers without
+  an account. Never widen this through request fields. Paired nodes start the
+  replica only on their own owner's approved demand (`node-replica-demand.ts`),
+  inside owner limits, and yield to distributed stages. Check
+  tests/memory-embedding-owner-scope.test.ts and memory-embedding-node-replica.
 
 - Shared-GPU native replicas follow `specs/on-demand-replica-placement/spec.md`:
   with `MYCELLIOS_NATIVE_REPLICA_PLACEMENT_CONFIG` (or `native-replica-placement.json`

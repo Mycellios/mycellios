@@ -134,6 +134,8 @@ export interface WorkerAgentOptions {
   }) => Promise<void>;
   /** Register the physical node without claiming that a model runtime exists. */
   advertiseDeployment?: boolean;
+  /** Optional node-managed native replica advertised beside the executor (native-replica-slot.ts). */
+  nativeReplica?: import("./native-replica-slot.js").NativeReplicaSlot | undefined;
   /** Deterministic hardware source for embedded agents and tests. */
   hardwareProbe?: () => Promise<HardwareProbe>;
   /** Adapter chosen by the verified runtime selector, independent of OS ordering. */
@@ -1015,7 +1017,7 @@ export class WorkerAgent {
       ],
       limits: this.config.limits,
       deployments: this.options.advertiseDeployment === false
-        ? []
+        ? (this.options.nativeReplica?.deployments() ?? [])
         : [{
           deploymentId,
           model,
@@ -1420,7 +1422,7 @@ export class WorkerAgent {
       case "task.cancel": {
         const { jobId } = message.payload;
         this.activeJobs.get(jobId)?.abort(new Error("Cancelled by coordinator"));
-        await this.adapter.cancel(jobId);
+        await Promise.allSettled([this.adapter.cancel(jobId), this.options.nativeReplica?.cancel(jobId)]);
         break;
       }
       case "evidence.challenge":
@@ -2289,7 +2291,8 @@ export class WorkerAgent {
       this.sendMessage("lease.reject", { jobId: payload.jobId, leaseId: payload.leaseId, reason: policyRejection });
       return;
     }
-    const deploymentMatches = this.capabilities?.deployments.some(
+    const adapter = this.options.nativeReplica?.adapterFor(payload.request.model, payload.modelDigest) ?? this.adapter;
+    const deploymentMatches = (this.options.nativeReplica ? this.options.nativeReplica.deployments() : this.capabilities?.deployments)?.some(
       (deployment) =>
         deployment.model === payload.request.model &&
         deployment.modelDigest === payload.modelDigest,
@@ -2310,7 +2313,7 @@ export class WorkerAgent {
       });
       return;
     }
-    if (this.activeJobs.size >= this.config.limits.maxConcurrency) {
+    if (this.activeJobs.size >= (adapter === this.adapter ? this.config.limits.maxConcurrency : 1)) {
       this.sendMessage("lease.reject", {
         jobId: payload.jobId,
         leaseId: payload.leaseId,
@@ -2341,10 +2344,10 @@ export class WorkerAgent {
     let output = "";
     let outputBytes = 0;
     let backendMetrics: AdapterChunk["metrics"] | undefined;
-    const outputByteLimit = this.adapter.kind === "transcription" ? MAX_TRANSCRIPTION_RESULT_BYTES : this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "embedding" ? (this.config.adapter.model === MEMORY_EMBEDDING_MODEL ? MAX_MEMORY_EMBEDDING_RESPONSE_BYTES : MAX_EMBEDDING_RESPONSE_BYTES) : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
+    const outputByteLimit = adapter.kind === "transcription" ? MAX_TRANSCRIPTION_RESULT_BYTES : adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : adapter.kind === "embedding" ? (payload.request.model === MEMORY_EMBEDDING_MODEL ? MAX_MEMORY_EMBEDDING_RESPONSE_BYTES : MAX_EMBEDDING_RESPONSE_BYTES) : adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
       : Math.min(MAX_OUTPUT_BYTES, (payload.request.max_tokens ?? 256) * 32);
     try {
-      for await (const chunk of this.adapter.generate(
+      for await (const chunk of adapter.generate(
         { jobId: payload.jobId, request: payload.request, lease: { id: payload.leaseId, deadline: payload.deadlineAt } },
         controller.signal,
       )) {
@@ -2420,7 +2423,7 @@ export class WorkerAgent {
         leaseId: payload.leaseId,
         text: output,
         finishReason:
-          this.adapter.kind !== "kokoro" && this.adapter.kind !== "transcription" && this.adapter.kind !== "embedding" && this.adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
+          adapter.kind !== "kokoro" && adapter.kind !== "transcription" && adapter.kind !== "embedding" && adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
             ? "length"
             : "stop",
         metrics,
@@ -2461,7 +2464,7 @@ export class WorkerAgent {
   private async abortActiveJobs(reason: string): Promise<void> {
     const jobs = [...this.activeJobs.entries()];
     for (const [, controller] of jobs) controller.abort(new Error(reason));
-    await Promise.allSettled(jobs.map(([jobId]) => this.adapter.cancel(jobId)));
+    await Promise.allSettled(jobs.flatMap(([jobId]) => [this.adapter.cancel(jobId), this.options.nativeReplica?.cancel(jobId)]));
   }
   private rejectServerMessage(socket: WebSocket, error: unknown): void {
     this.logger.warn(`Rejected invalid coordinator message: ${errorText(error)}`);
@@ -2476,6 +2479,7 @@ export class WorkerAgent {
     this.capabilities = {
       ...this.capabilities,
       hostMemory: observeHostMemory(this.options.offeredHostMemoryBytes?.()),
+      ...(this.options.nativeReplica ? { deployments: this.options.nativeReplica.deployments() } : {}),
     };
     const [observedMetrics, liveHardware] = await Promise.all([
       this.heartbeatMetrics.read(() => this.adapter.metrics()),
@@ -2508,7 +2512,7 @@ export class WorkerAgent {
     }
     const advertised = this.policyAdvertisedCapabilities(this.capabilities);
     const heartbeat: WorkerHeartbeat = {
-      draining: !this.acceptsNewWork() || (this.capabilities.deployments.length > 0 && !metrics.ready),
+      draining: !this.acceptsNewWork() || (this.options.advertiseDeployment !== false && this.capabilities.deployments.length > 0 && !metrics.ready),
       pausedReason: !this.contributionEnabled
         ? "Contribution paused"
         : this.updateDraining
@@ -2524,7 +2528,7 @@ export class WorkerAgent {
       })),
       deployments: advertised.deployments.map((deployment) => ({
         deploymentId: deployment.deploymentId,
-        freeSlots: metrics.ready ? deployment.freeSlots : 0,
+        freeSlots: metrics.ready || this.options.advertiseDeployment === false ? deployment.freeSlots : 0,
       })),
       network: {
         coordinatorRttMs: this.capabilities.network.coordinatorRttMs,

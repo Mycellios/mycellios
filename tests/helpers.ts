@@ -77,3 +77,18 @@ export async function addWorker(
   (await store.updateWorkerHeartbeat(worker.id, registration.capabilities, "online"));
   return (await store.getWorker(worker.id))!;
 }
+
+/** Records active node ownership for a worker's device or cell identity (owner-scoped models). */
+export async function ownNode(
+  database: import("../src/storage/database.js").MeshDatabase,
+  worker: Pick<StoredWorker, "identityKind" | "identityId">,
+  accountId: string,
+  status: "active" | "revoked" = "active",
+): Promise<void> {
+  if (!worker.identityKind || !worker.identityId) throw new Error("ownNode requires an identity");
+  const now = Date.now();
+  await database.raw.prepare(
+    `INSERT INTO node_ownership(identity_kind, identity_id, account_id, credential_fingerprint,
+     status, generation, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).run(worker.identityKind, worker.identityId, accountId, `sha256:${worker.identityId}`, status, now, now);
+}

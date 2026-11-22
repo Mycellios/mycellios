@@ -35,6 +35,8 @@ export const NATIVE_PYTHON_ENTRY_MODULES = Object.freeze([
   "distributed_runtime.activation_integrity",
   "distributed_runtime.stage_artifact_cache",
   "distributed_runtime.installed_stage_canary",
+  // Node-managed operator memory embedding replica (specs/memory-embedding-qwen06).
+  "distributed_runtime.qwen06_embedding_service",
 ]);
 
 /**
@@ -93,6 +95,7 @@ export const NATIVE_PYTHON_PRODUCT_FILES = Object.freeze([
   "distributed_runtime/prefill.py",
   "distributed_runtime/profile.py",
   "distributed_runtime/protocol.py",
+  "distributed_runtime/qwen06_embedding_service.py",
   "distributed_runtime/ram_backed_moe_runtime.py",
   "distributed_runtime/ram_backed_moe_stage.py",
   "distributed_runtime/ram_expert_cache.py",

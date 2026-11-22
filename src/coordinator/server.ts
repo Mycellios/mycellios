@@ -51,6 +51,8 @@ import {
 import { dirname, join, resolve, sep } from "node:path";
 import { z, ZodError } from "zod";
 import { registerNativeReplicaQualifications } from "./native-replica-qualification.js";
+import { activeNodeOwnerAccountId } from "./memory-embedding-owner-scope.js";
+import { registerNodeReplicaRoutes } from "./node-replica-demand.js";
 import {
   StableBenchmarkActivationTracker,
   type BenchmarkActivation,
@@ -304,7 +306,7 @@ const SIGNED_WORKER_ADMISSION_PATHS = new Set([
   "/internal/v1/workers/register",
 ]);
 const WORKER_CONNECT_PATH = "/internal/v1/workers/connect";
-const WORKER_NODE_CONTROL_PATH = /^\/internal\/v1\/nodes\/([^/]+)\/(?:commands(?:\/results)?|snapshot)$/;
+const WORKER_NODE_CONTROL_PATH = /^\/internal\/v1\/nodes\/([^/]+)\/(?:commands(?:\/results)?|snapshot|replicas)$/;
 
 const networkHistoryRanges = {
   "24h": 24,
@@ -1610,6 +1612,7 @@ export async function createCoordinator(
   };
   registerNativeReplicaQualifications(app, { adminToken: config.modelAdminToken, networkToken: config.networkToken,
     hub, store, service, attachReceipt: attachExecutionReceipt });
+  registerNodeReplicaRoutes(app, { database, service, sessionPrincipal: (request) => workerSessionPrincipals.get(request) });
   const studioInference: StudioInference = options.studioInference ?? (async (request) => {
     const chat: ChatCompletionRequest = {
       model: request.model,
@@ -4572,7 +4575,7 @@ export async function createCoordinator(
 
   app.get("/internal/v1/workers", async () => ({
     data: [
-      ...(await store.listWorkers()).filter((worker) => storedWorkerIsVisible(worker, hub)).map((worker) => ({
+      ...await Promise.all((await store.listWorkers()).filter((worker) => storedWorkerIsVisible(worker, hub)).map(async (worker) => ({
       id: worker.id,
       status: worker.status,
       connected: hub.isConnected(worker.id),
@@ -4580,10 +4583,8 @@ export async function createCoordinator(
       region: worker.capabilities.region,
       agentVersion: worker.capabilities.agentVersion,
       buildIdentity: worker.capabilities.buildIdentity,
-      offeredVramMb: worker.capabilities.gpus.reduce(
-        (sum, gpu) => sum + gpu.offeredVramMb,
-        0,
-      ),
+      offeredVramMb: worker.capabilities.gpus.reduce((sum, gpu) => sum + gpu.offeredVramMb, 0),
+      ownerAccountId: await activeNodeOwnerAccountId(store, worker), // qualification watch: owner-bound memory embeddings
       gpus: worker.capabilities.gpus,
       deployments: worker.capabilities.deployments,
       executionNodeId: worker.capabilities.distributedExecutor?.nodeId,
@@ -4595,11 +4596,8 @@ export async function createCoordinator(
       jobsCompleted: worker.jobsCompleted,
       lastSeenAt: new Date(worker.lastSeenAt).toISOString(),
       kind: storedWorkerKind(worker),
-      })),
-      ...mobileHub.listWorkers().map((worker) => ({
-        ...mobileDashboardWorker(worker),
-        kind: "browser" as const,
-      })),
+      }))),
+      ...mobileHub.listWorkers().map((worker) => ({ ...mobileDashboardWorker(worker), kind: "browser" as const })),
     ],
   }));
 
@@ -4757,7 +4755,7 @@ export async function createCoordinator(
     }
     let handle: Awaited<ReturnType<MeshService["submit"]>>;
     try {
-      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey, undefined, { requireSettlementEvidence: funded, splitMemoryEmbedding: !parsed.stream }));
+      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey, undefined, { requireSettlementEvidence: funded, splitMemoryEmbedding: !parsed.stream, ownerAccountId: principal.kind === "system" ? null : principal.userId }));
     } catch (error) {
       if (usage) (await apiAccess.failUsage(usage.id, "submission_failed"));
       throw error;
