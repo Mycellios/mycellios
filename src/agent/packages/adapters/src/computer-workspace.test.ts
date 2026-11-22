@@ -77,7 +77,7 @@ describe("provider-neutral computer workspace", () => {
   });
 
   it("leaves deleted bots' folders and browser profiles out of a Team Computer checkpoint", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-workspace-store-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-workspace-store-"));
     roots.push(root);
     const home = new LocalAgentHomeStore(root);
     const provider = new FakeSandboxProvider();
@@ -134,7 +134,7 @@ describe("provider-neutral computer workspace", () => {
   });
 
   it("restores a checkpoint into a replacement provider machine", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-workspace-store-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-workspace-store-"));
     roots.push(root);
     const home = new LocalAgentHomeStore(root);
     const firstProvider = new FakeSandboxProvider();
@@ -244,7 +244,7 @@ describe("Team bot folder cleanup", () => {
   }
 
   it("removes only folders of bots deleted from this space when a Team Computer wakes", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-wake-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-wake-"));
     roots.push(workspace);
     await seedFile(workspace, "bots/deleted-bot/private.txt", "gone");
     await seedFile(workspace, "bots/deleted-bot-2/notes.txt", "keep");
@@ -274,7 +274,7 @@ describe("Team bot folder cleanup", () => {
   });
 
   it("removes deleted bots' browser profiles when a Team Computer wakes", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-wake-profile-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-wake-profile-"));
     roots.push(workspace);
     const deletedProfile = `.browser-profiles/${teamBrowserProfileName("deleted-bot")}`;
     const liveProfile = `.browser-profiles/${teamBrowserProfileName("live-bot")}`;
@@ -296,7 +296,7 @@ describe("Team bot folder cleanup", () => {
   });
 
   it("unlinks a deleted bot's symlink that the provider's file listing does not show", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-wake-link-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-wake-link-"));
     roots.push(workspace);
     await seedFile(workspace, "shared/plan.txt", "keep");
     await mkdir(path.join(workspace, "bots"));
@@ -318,7 +318,7 @@ describe("Team bot folder cleanup", () => {
   });
 
   it("keeps removing deleted bots' folders after one entry is refused", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-wake-refused-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-wake-refused-"));
     roots.push(workspace);
     await seedFile(workspace, "bots/deleted-a", "not a folder");
     await seedFile(workspace, "bots/deleted-b/private.txt", "gone");
@@ -338,7 +338,7 @@ describe("Team bot folder cleanup", () => {
   });
 
   it("does not look up deletions when the Team Computer has no bot folders", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-wake-empty-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-wake-empty-"));
     roots.push(workspace);
     await mkdir(path.join(workspace, "bots"));
     await mkdir(path.join(workspace, ".browser-profiles"));
@@ -355,7 +355,7 @@ describe("Team bot folder cleanup", () => {
   });
 
   it("reaches the oldest leftover however long the deletion history is", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-wake-history-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-wake-history-"));
     roots.push(workspace);
     await seedFile(workspace, "bots/oldest-bot/private.txt", "gone");
     await seedFile(workspace, "bots/live-bot/notes.txt", "keep");
@@ -409,7 +409,7 @@ describe("Team bot folder cleanup", () => {
     ["bots", "."],
     ["shared", "plan"],
   ])("refuses to remove %s/%s", async (parent, name) => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "rakazo-team-escape-"));
+    const workspace = await mkdtemp(path.join(tmpdir(), "mycellios-team-escape-"));
     roots.push(workspace);
     await seedFile(workspace, "shared/plan/notes.txt", "keep");
     await mkdir(path.join(workspace, "bots"));

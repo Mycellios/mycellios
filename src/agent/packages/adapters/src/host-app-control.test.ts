@@ -14,7 +14,7 @@ let client: HostComputerSandbox;
 let computer: ComputerRef;
 
 beforeEach(async () => {
-  root = await realpath(await mkdtemp(path.join(tmpdir(), "rakazo-app-control-")));
+  root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-app-control-")));
   server = await startHostComputerServer({
     root,
     token,

@@ -1060,7 +1060,7 @@ function injectShell(code, precache, buildId) {
   }
   return injected;
 }
-function rakazoPwa(buildId, base = "/") {
+function mycelliosPwa(buildId, base = "/") {
   const manifest = () => JSON.stringify(webManifest(base), null, 2);
   return [
     {
@@ -1741,7 +1741,7 @@ var vite_config_default = defineConfig(({ command, mode }) => {
       babel({ plugins: [["@lingui/babel-plugin-lingui-macro", { descriptorFields: "message" }]] }),
       lingui(),
       tailwindcss(),
-      rakazoPwa(buildId, deploymentBase),
+      mycelliosPwa(buildId, deploymentBase),
       {
         // Production only: the dev server injects inline scripts for React Refresh.
         name: "rakazo-content-security-policy",

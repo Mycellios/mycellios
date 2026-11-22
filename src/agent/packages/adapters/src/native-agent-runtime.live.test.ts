@@ -13,7 +13,7 @@ const selected = new Set((process.env.VERIFY_NATIVE_ENGINES ?? "").split(","));
 for (const engine of ["codex", "claude", "acp"] as const) {
   (selected.has(engine) ? describe : describe.skip)(`authenticated ${engine} integration`, () => {
     it("executes the app-owned tool and completes two scoped turns", async () => {
-      const root = await mkdtemp(join(tmpdir(), "rakazo-native-live-"));
+      const root = await mkdtemp(join(tmpdir(), "mycellios-native-live-"));
       const safeRoot = resolve(root);
       if (
         !safeRoot.startsWith(resolve(tmpdir()) + sep) ||

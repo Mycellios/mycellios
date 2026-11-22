@@ -65,7 +65,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
-  userData = await mkdtemp(path.join(tmpdir(), "rakazo-desktop-e2e-"));
+  userData = await mkdtemp(path.join(tmpdir(), "mycellios-desktop-e2e-"));
 });
 
 test.afterEach(async () => {

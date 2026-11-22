@@ -39,7 +39,7 @@ import {
   rewrittenNovncHeaders,
   shouldInjectNovncStorageShim,
 } from "./src/novnc-html.js";
-import { rakazoPwa } from "./src/pwa/plugin.js";
+import { mycelliosPwa } from "./src/pwa/plugin.js";
 import { workspaceViteAliases } from "../desktop/scripts/workspace-aliases.mjs";
 import type { ScreenTargetFailure } from "./src/screen-proxy.js";
 import { eventDemoProxyCookie } from "./src/event-demo-proxy.js";
@@ -553,7 +553,7 @@ export default defineConfig(async ({ command, mode }) => {
       babel({ plugins: [["@lingui/babel-plugin-lingui-macro", { descriptorFields: "message" }]] }),
       lingui(),
       tailwindcss(),
-      rakazoPwa(buildId, deploymentBase),
+      mycelliosPwa(buildId, deploymentBase),
       {
         // Production only: the dev server injects inline scripts for React Refresh.
         name: "rakazo-content-security-policy",

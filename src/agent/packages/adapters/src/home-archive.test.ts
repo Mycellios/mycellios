@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 async function tempDir() {
-  const dir = await mkdtemp(path.join(tmpdir(), "rakazo-home-archive-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "mycellios-home-archive-"));
   dirs.push(dir);
   return dir;
 }

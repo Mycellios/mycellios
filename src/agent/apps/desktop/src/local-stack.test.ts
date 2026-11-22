@@ -96,7 +96,7 @@ describe("renderStackEnv", () => {
 describe("ensureStackEnv", () => {
   let dir: string;
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "rakazo-stack-env-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mycellios-stack-env-"));
   });
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
@@ -138,7 +138,7 @@ describe("ensureStackEnv", () => {
 describe("stack identity", () => {
   let dir: string;
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "rakazo-stack-token-"));
+    dir = await mkdtemp(path.join(tmpdir(), "mycellios-stack-token-"));
   });
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
@@ -312,7 +312,7 @@ describe("LocalStackController", () => {
   let phases: string[];
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), "rakazo-stack-"));
+    root = await mkdtemp(path.join(tmpdir(), "mycellios-stack-"));
     calls = [];
     phases = [];
   });

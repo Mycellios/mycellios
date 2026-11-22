@@ -19,7 +19,7 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 async function setup() {
-  const root = await mkdtemp(join(tmpdir(), "rakazo-local-stack-"));
+  const root = await mkdtemp(join(tmpdir(), "mycellios-local-stack-"));
   const children: Child[] = [];
   let config: Record<string, unknown> | undefined;
   const controller = new LocalNativeStackController({

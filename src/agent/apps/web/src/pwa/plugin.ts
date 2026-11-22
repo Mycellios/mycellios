@@ -112,7 +112,7 @@ export function injectShell(code: string, precache: readonly string[], buildId: 
 }
 
 /** Installable PWA shell: the web manifest and the service worker. */
-export function rakazoPwa(buildId: string, base = "/"): Plugin[] {
+export function mycelliosPwa(buildId: string, base = "/"): Plugin[] {
   const manifest = () => JSON.stringify(webManifest(base), null, 2);
   let workerCode: string | undefined;
   return [

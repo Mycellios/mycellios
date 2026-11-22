@@ -8,7 +8,7 @@ const signal = new AbortController().signal;
 describe("native workspace directory cleanup", () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), "rakazo-cleanup-"));
+    root = await mkdtemp(path.join(tmpdir(), "mycellios-cleanup-"));
   });
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });

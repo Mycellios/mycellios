@@ -745,7 +745,7 @@ describe("Railway computers", () => {
   });
 
   it("satisfies the shared workspace contract through the Railway SDK", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "rakazo-railway-contract-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "mycellios-railway-contract-"));
     const localPath = (filePath: string) => filePath.replace("/home/rakazo", directory);
     sandbox.files.write.mockImplementation(
       async (filePath: string, content: Uint8Array, options?: { mode: number }) => {
@@ -929,7 +929,7 @@ describe("Railway computers", () => {
   });
 
   it("exports regular binary files without following links or reading FIFOs", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "rakazo-railway-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "mycellios-railway-"));
     const stopBrowsers = vi.spyOn(LinuxDesktop.prototype, "stopBrowsers").mockResolvedValue();
     try {
       await mkdir(path.join(directory, "bin"));

@@ -46,7 +46,7 @@ describe("native host computer transport", () => {
   let url: string;
   let computer: ComputerRef;
   beforeEach(async () => {
-    root = await realpath(await mkdtemp(path.join(tmpdir(), "rakazo-host-test-")));
+    root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-host-test-")));
     server = await startHostComputerServer({ root, token, hostname: "127.0.0.1" });
     url = `http://127.0.0.1:${server.port}`;
     client = new HostComputerSandbox(url, token);

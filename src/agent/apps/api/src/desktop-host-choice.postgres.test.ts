@@ -13,7 +13,7 @@ it.skipIf(!databaseUrl).each([
   { sandboxProvider: "docker", nativeToken: false, expected: false },
   { sandboxProvider: "fake", nativeToken: true, expected: false },
 ])("exposes native host choice only on a managed Docker instance (%j)", async (fixture) => {
-  const dataDir = await mkdtemp(join(tmpdir(), "rakazo-host-choice-"));
+  const dataDir = await mkdtemp(join(tmpdir(), "mycellios-host-choice-"));
   const handles = await createApp({
     databaseUrl: databaseUrl!,
     dataDir,
