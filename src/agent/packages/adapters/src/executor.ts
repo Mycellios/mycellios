@@ -10,7 +10,7 @@ import { isPersonRequestedRoutineRun, missedRoutineOccurrences, ROUTINE_FAILURE_
 import { type HistoryAccess, runHistoryTool, runPinMessageTool } from "./history-tools.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
 import { planCardTool } from "./plan-card.js";
-import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, readMicoDefaults } from "@mycellios/contracts";
+import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, isTaskConversation, readMicoDefaults } from "@mycellios/contracts";
 import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
@@ -63,7 +63,7 @@ import {
   SandboxRateLimitError,
   TransientModelError,
 } from "@mycellios/adapter-kit";
-import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@mycellios/contracts";
+import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, NotificationKind, RunStatus } from "@mycellios/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
   BotSecretName,
@@ -123,6 +123,7 @@ import {
   planActionGate,
   promptInvokesSkill,
   redactSecrets,
+  runErrorNotice,
   renderBotDirectory,
   resolveActionApprovalForTools,
   siteAlwaysAllowed,
@@ -9383,6 +9384,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     peerMessage?.repliesToRequest === true,
                   ),
                 );
+                if (
+                  event.status === "failed" &&
+                  runSendsFinishNotification(run.trigger) &&
+                  !runAbortController?.signal.aborted
+                ) {
+                  // A stopped turn ends its helpers too; only a helper that failed on its own alerts.
+                  await notifyRun(deps, run, helperFailedNotice(bot.name, event.name, bot.id, thread.id));
+                }
               }
             } else if (event.type === "usage" && !event.accounted) {
               await recordUsage(deps.prisma, event, {
@@ -9589,8 +9598,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               threadId: thread.id,
             });
           } else if (
-            runSendsFinishNotification(run.trigger) &&
-            notifyBody &&
+            runSendsCompletionNotification(run.trigger) &&
+            // A silent last turn in a group still ends the group's work for the request.
+            (notifyBody || (thread.groupId && run.trigger !== "routine")) &&
             !completed.continuationRunId
           ) {
             await notifyRun(deps, run, {
@@ -9725,9 +9735,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             !failed.continuationRunId && (await scheduleRoutineRetry(deps, run, error));
           if (runSendsFinishNotification(run.trigger) && !failed.continuationRunId && !retrying) {
             await notifyRun(deps, run, {
-              kind: "failure",
-              title: `${displayName(bot.name, "Bot")} failed`,
-              body: message,
+              ...failureNotice(bot.name, message, { trigger: run.trigger }),
               botId: bot.id,
               threadId: thread.id,
             });
@@ -9754,6 +9762,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             bot?.name ?? "",
             { attemptId: attempt.id, workerId, fence },
             desktopSetupInterruptedMessage(setupMessage),
+            "failure",
           );
           return;
         }
@@ -9855,7 +9864,12 @@ async function runNotice(
   prisma: PrismaClient,
   run: { spaceId: string; userId: string; botId: string; threadId: string },
   routineId?: string | null,
-): Promise<{ enabled: boolean; groupId: string | null; taskThreadId?: string }> {
+): Promise<{
+  enabled: boolean;
+  groupId: string | null;
+  taskThreadId?: string;
+  taskConversation?: boolean;
+}> {
   // A routine carries its own notify setting, which decides on its failures.
   const routine = routineId
     ? await prisma.routine.findUnique({ where: { id: routineId }, select: { notify: true } })
@@ -9869,7 +9883,7 @@ async function runNotice(
     },
     select: {
       bot: { select: { notifyOnFinish: true } },
-      thread: { select: { groupId: true, taskBotId: true } },
+      thread: { select: { groupId: true, taskBotId: true, taskKey: true } },
     },
   });
   if (!source) return { enabled: false, groupId: null };
@@ -9877,7 +9891,75 @@ async function runNotice(
     enabled: routine ? routine.notify : Boolean(source.thread.groupId || source.bot.notifyOnFinish),
     groupId: source.thread.groupId,
     ...(!source.thread.groupId && source.thread.taskBotId === run.botId ? { taskThreadId: run.threadId } : {}),
+    // The account's task-replies switch covers these; a routine's own conversation is exempt.
+    ...(isTaskConversation(source.thread, run.botId) ? { taskConversation: true } : {}),
   };
+}
+
+/**
+ * A group's work for a request ends when no member turn is running or due and this turn's end
+ * is the latest one in the group. Only that last turn notifies, and only while the group has
+ * unread messages.
+ */
+export async function groupWorkEndedWithUnread(
+  prisma: Pick<PrismaClient, "run" | "event" | "thread">,
+  run: { id: string; threadId: string },
+  now = new Date(),
+): Promise<boolean> {
+  const busy = await prisma.run.count({
+    where: {
+      threadId: run.threadId,
+      id: { not: run.id },
+      OR: [
+        { status: { in: ["leased", "running"] } },
+        { status: "queued", OR: [{ wakeAt: null }, { wakeAt: { lte: now } }] },
+      ],
+    },
+  });
+  if (busy > 0) return false;
+  const ended = await prisma.event.findFirst({
+    where: { runId: run.id, type: { in: ["run.completed", "run.failed"] } },
+    orderBy: { seq: "desc" },
+    select: { seq: true },
+  });
+  if (!ended) return false;
+  const later = await prisma.event.count({
+    where: {
+      threadId: run.threadId,
+      seq: { gt: ended.seq },
+      runId: { not: run.id },
+      type: { in: ["run.completed", "run.failed"] },
+    },
+  });
+  if (later > 0) return false;
+  const thread = await prisma.thread.findUnique({ where: { id: run.threadId }, select: { unread: true } });
+  return thread?.unread === true;
+}
+
+type FailureNoticeKind = Extract<NotificationKind, "failure" | "not_started" | "helper_failed" | "usage_limit" | "sign_in">;
+
+/**
+ * The notice for a run that ended failed. A sign-in or usage limit says what the person must do;
+ * a teammate's delegated turn reads as a failed helper; the rest keep the caller's kind.
+ */
+export function failureNotice(
+  botName: string,
+  error: string | null | undefined,
+  options: { trigger?: string; kind?: "failure" | "not_started" } = {},
+): { kind: FailureNoticeKind; title: string; body: string } {
+  const name = displayName(botName, "Bot");
+  const cause = runErrorNotice(error);
+  const kind: FailureNoticeKind =
+    cause !== "failure" ? cause
+    : options.kind === "not_started" ? "not_started"
+    : options.trigger === "bot_message" || options.trigger === "delegated_task" ? "helper_failed"
+    : "failure";
+  const title =
+    kind === "not_started" ? `${name} could not start`
+    : kind === "usage_limit" ? `${name} reached a usage limit`
+    : kind === "sign_in" ? `${name} needs you to reconnect its provider`
+    : `${name} failed`;
+  return { kind, title, body: error ?? "" };
 }
 
 function routineNextRunIsNear(nextRunAt: Date | null, retryAt: number): boolean {
@@ -9943,9 +10025,7 @@ async function notifyFailedRoutineRun(
     deps,
     failed,
     {
-      kind: "failure",
-      title: `${displayName(bot.name, "Bot")} failed`,
-      body: failed.error ?? "",
+      ...failureNotice(bot.name, failed.error, { trigger: failed.trigger }),
       botId: failed.botId,
       threadId: failed.threadId,
     },
@@ -9992,6 +10072,8 @@ async function failRunBeforeTurn(
   botName: string,
   lease: { attemptId: string; workerId: string; fence: number },
   message: string,
+  /** A turn that reached the PC before failing was interrupted rather than unable to start. */
+  noticeKind: "not_started" | "failure" = "not_started",
 ): Promise<boolean> {
   const failed = await deps.events.finalizeRun({
     spaceId: run.spaceId,
@@ -10024,9 +10106,7 @@ async function failRunBeforeTurn(
   }
   if (!failed.continuationRunId) {
     await notifyRun(deps, run, {
-      kind: "failure",
-      title: `${displayName(botName, "Bot")} failed`,
-      body: message,
+      ...failureNotice(botName, message, { trigger: run.trigger, kind: noticeKind }),
       botId: run.botId,
       threadId: run.threadId,
     });
@@ -10053,13 +10133,25 @@ async function notifyRun(
     (isBackgroundRunTrigger(run.trigger) && message.kind !== "help" && message.kind !== "takeover")
   )
     return;
-  const routineId = message.kind === "failure" ? run.routineId : null;
+  const failure = message.kind !== "completion" && message.kind !== "help" && message.kind !== "takeover";
+  const routineId = failure ? run.routineId : null;
   const notice = await runNotice(deps.prisma, run, routineId).catch((error) => {
     if (options.retryOnFailure) throw error;
     getLogger().error("notification preference lookup", error);
     return null;
   });
   if (!notice?.enabled) return;
+  if (message.kind === "completion" && notice.groupId) {
+    // A group notifies once per request: when its last member turn ends with unread replies.
+    const ended = run.id
+      ? await groupWorkEndedWithUnread(deps.prisma, { id: run.id, threadId: run.threadId }).catch((error) => {
+          getLogger().error("group notification check", error);
+          return false;
+        })
+      : false;
+    if (!ended) return;
+    if (!message.body.trim()) message = { ...message, body: "New replies in the group." };
+  }
   // The icon shows what the inbox shows: unread chats across the user's Spaces. Without a
   // count the push leaves the badge as it is.
   const badge = await countUnreadInboxChats(deps.prisma, {
@@ -10075,6 +10167,7 @@ async function notifyRun(
         ...message,
         ...(notice.groupId ? { groupId: notice.groupId } : {}),
         ...(notice.taskThreadId ? { taskThreadId: notice.taskThreadId } : {}),
+        ...(notice.taskConversation ? { taskConversation: true } : {}),
         ...(badge === undefined ? {} : { badge }),
       },
       {
@@ -10775,6 +10868,14 @@ export function runSendsFinishNotification(trigger: string): boolean {
   return trigger !== "created" && trigger !== "agent_task" && !isBackgroundRunTrigger(trigger);
 }
 
+/**
+ * A turn another Mico started (a message or a delegated task) stays quiet when it completes:
+ * its reply can still be unread, but questions, approvals and failures are what alert.
+ */
+export function runSendsCompletionNotification(trigger: string): boolean {
+  return runSendsFinishNotification(trigger) && trigger !== "bot_message" && trigger !== "delegated_task";
+}
+
 /** Open the model only while this worker still owns the running lease. */
 export function mayOpenModelStream(
   run: { status: string; leaseOwner: string | null; leaseFence: number | null } | null,
@@ -10919,6 +11020,18 @@ export function completionMessageSegments(
   }
   if (options?.allowSilentEmpty || options?.skipEmptyFallback) return [];
   return [{ kind: "text", text: fallback }];
+}
+
+/** A helper inside a turn failed. Its error and result stay on the card, never in the notice. */
+export function helperFailedNotice(botName: string, helperName: string, botId: string, threadId: string): NotificationMessage {
+  const helper = displayName(helperName, "A helper");
+  return {
+    kind: "helper_failed",
+    title: `${displayName(botName, "Bot")}: ${helper} failed`,
+    body: `${helper} could not finish its part.`,
+    botId,
+    threadId,
+  };
 }
 
 /** User-facing text for completion notifications; empty when only tool/step activity remains. */

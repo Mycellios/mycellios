@@ -16,6 +16,20 @@ public final class NotificationPolicy {
     String path=group!=null?"/agent/app/g/"+group:"/agent/app/"+data.get("botId");
     return "https://www.mycellios.com"+path+"?noticeSpace="+data.get("spaceId")+(group==null && task!=null?"&task="+task:"");
   }
+  /** A close for a request answered on another device: the thread whose notice to close, or null. */
+  public static String dismissal(Map<String,String> data,String owner,long now) {
+    if(!"dismiss".equals(data.get("type")) || owner==null || owner.isEmpty() || !owner.equals(data.get("accountId")) || !"1".equals(data.get("version")))return null;
+    if(data.get("deliveryId")==null || !data.get("deliveryId").matches("[a-f0-9]{64}"))return null;
+    try { long expires=Long.parseLong(data.get("expiresAt")); if(expires<=now || expires>now+360000)return null; } catch(Exception e){return null;}
+    return id(data.get("threadId")) && id(data.get("requestId"))?data.get("threadId"):null;
+  }
+  /** Saved pause end: a far-future value from "until turned back on" stays; others last at most seven days. */
+  public static long pauseUntil(long requested,long now) {
+    if(requested>=PAUSED_UNTIL_RESUMED)return Long.MAX_VALUE;
+    return Math.min(now+7*86400000L,Math.max(0,requested));
+  }
+  /** 9999-12-31T23:59:59.999Z, the value the app stores for a pause without an end. */
+  public static final long PAUSED_UNTIL_RESUMED=253402300799999L;
   public static boolean clickTarget(String value) {
     if(value==null || value.length()>800 || !NavigationPolicy.trustedOrigin(value))return false;
     try {

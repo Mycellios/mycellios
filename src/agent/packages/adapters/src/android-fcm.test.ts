@@ -77,3 +77,22 @@ it("retries non-JSON temporary gateway failures without treating them as expired
   await sender.send("device", message, context);
   expect(ids[2]).not.toBe(ids[0]);
 });
+
+it("tags a request notice and closes it later with a normal-priority data message", async () => {
+  const sent: Array<{ data: Record<string, string>; android: { priority: string } }> = [];
+  const request = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).includes("oauth2")) return Response.json({ access_token: "secret", expires_in: 3600 });
+    sent.push(JSON.parse(String(init?.body)).message);
+    return Response.json({ name: "ok" });
+  });
+  const sender = new AndroidFcm(config, request as typeof fetch);
+  await sender.send("device", { ...message, kind: "help", requestId: "event-1" }, context);
+  await sender.dismiss("device", { userId: "owner", spaceId: "space", botId: "bot", threadId: "thread", requestId: "event-1" });
+  expect(sent[0]!.data).toMatchObject({ kind: "help", requestId: "event-1" });
+  expect(sent[0]!.android.priority).toBe("high");
+  expect(sent[1]!.data).toMatchObject({ version: "1", type: "dismiss", accountId: "owner", threadId: "thread", requestId: "event-1" });
+  // No title, body or chat target: an older host cannot turn a close into an alert.
+  expect(sent[1]!.data).not.toHaveProperty("title");
+  expect(sent[1]!.data).not.toHaveProperty("botId");
+  expect(sent[1]!.android.priority).toBe("normal");
+});

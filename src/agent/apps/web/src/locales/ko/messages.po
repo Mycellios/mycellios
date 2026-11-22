@@ -6919,3 +6919,47 @@ msgstr "모든 채팅을 읽음으로 표시하지 못했습니다. 다시 시�
 #: src/pages/Shell.tsx
 msgid "Could not mark the chats as read. Try again."
 msgstr "채팅을 읽음으로 표시하지 못했습니다. 다시 시도하세요."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause for…"
+msgstr "일시 중지 기간…"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until you turn them back on."
+msgstr "다시 켤 때까지."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until {time}."
+msgstr "{time}까지."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Replies in task conversations"
+msgstr "작업 대화의 답장"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+msgstr "Mico가 자신의 작업 대화에서 작업을 마치거나 실패하면 알립니다. 질문과 승인 요청은 항상 알리며, 루틴은 자체 설정을 따릅니다."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 15 minutes"
+msgstr "15분 동안"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 1 hour"
+msgstr "1시간 동안"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 3 hours"
+msgstr "3시간 동안"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 8 hours"
+msgstr "8시간 동안"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 24 hours"
+msgstr "24시간 동안"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until I turn it back on"
+msgstr "다시 켤 때까지"

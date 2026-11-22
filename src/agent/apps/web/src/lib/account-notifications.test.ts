@@ -2,7 +2,7 @@ import { afterEach, expect, it } from "vitest";
 import { accountNotificationAllowed, forgetNotificationSettings, rememberNotificationSettings } from "./account-notifications";
 afterEach(() => { forgetNotificationSettings("a"); forgetNotificationSettings("b"); });
 it("applies account filters to live replies, failures and requests with the same policy as push", () => {
-  rememberNotificationSettings("a", { level: "needs_me", previews: false, mutedUntil: null, bots: { quiet: "off", loud: "all" } });
+  rememberNotificationSettings("a", { level: "needs_me", previews: false, mutedUntil: null, bots: { quiet: "off", loud: "all" }, taskReplies: true });
   expect(accountNotificationAllowed("a", "normal", { type: "thread.message.created", payload: { role: "bot" } })).toBe(false);
   expect(accountNotificationAllowed("a", "loud", { type: "run.completed", payload: {} })).toBe(true);
   expect(accountNotificationAllowed("a", "quiet", { type: "thread.ask", payload: {} })).toBe(false);
@@ -11,10 +11,18 @@ it("applies account filters to live replies, failures and requests with the same
   expect(accountNotificationAllowed("a", "normal", { type: "thread.message.created", payload: { blocks: [{ kind: "subagent", status: "failed" }] } })).toBe(true);
 });
 it("never bypasses master off or pause and never reuses another account's settings", () => {
-  rememberNotificationSettings("a", { level: "off", previews: true, mutedUntil: null, bots: { loud: "all" } });
+  rememberNotificationSettings("a", { level: "off", previews: true, mutedUntil: null, bots: { loud: "all" }, taskReplies: true });
   expect(accountNotificationAllowed("a", "loud", { type: "thread.ask", payload: {} })).toBe(false);
   expect(accountNotificationAllowed("b", "loud", { type: "thread.ask", payload: {} })).toBe(false);
-  rememberNotificationSettings("a", { level: "all", previews: true, mutedUntil: new Date(2000).toISOString(), bots: {} });
+  rememberNotificationSettings("a", { level: "all", previews: true, mutedUntil: new Date(2000).toISOString(), bots: {}, taskReplies: true });
   expect(accountNotificationAllowed("a", "loud", { type: "thread.ask", payload: {} }, 1000)).toBe(false);
   expect(accountNotificationAllowed("a", "loud", { type: "thread.ask", payload: {} }, 2000)).toBe(true);
+});
+it("keeps task-conversation replies quiet when the switch is off, but still alerts for requests", () => {
+  rememberNotificationSettings("a", { level: "all", previews: false, mutedUntil: null, bots: {}, taskReplies: false });
+  const task = { taskConversation: true };
+  expect(accountNotificationAllowed("a", "mico", { type: "thread.message.created", payload: { role: "bot" } }, Date.now(), task)).toBe(false);
+  expect(accountNotificationAllowed("a", "mico", { type: "run.failed", payload: {} }, Date.now(), task)).toBe(false);
+  expect(accountNotificationAllowed("a", "mico", { type: "thread.ask", payload: {} }, Date.now(), task)).toBe(true);
+  expect(accountNotificationAllowed("a", "mico", { type: "thread.message.created", payload: { role: "bot" } })).toBe(true);
 });

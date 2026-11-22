@@ -1,6 +1,6 @@
 import { SoundSettings } from "./SoundSettings";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, NotificationSettings } from "@mycellios/contracts";
+import { NOTIFICATION_PAUSE_MINUTES, NOTIFICATIONS_PAUSED_UNTIL_RESUMED, NOTIFICATIONS_PAUSED_UNTIL_RESUMED_MS, notificationPauseIsIndefinite, type Bot, type NotificationSettings } from "@mycellios/contracts";
 import { BotAvatar, Button, Label, Switch, OptionSelect } from "@mycellios/ui-web";
 import { Bell, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
@@ -24,6 +24,26 @@ function LevelPicker({ label, value, disabled, onChange }: { label: string; valu
         onClick={() => { if (item.value !== value) onChange(item.value); }}>{item.label}</Button>)}
   </div>;
 }
+/** Offers each pause length, or a resume button with when the current pause ends. */
+function PauseControl({ label, until, now, disabled, onPause, onResume }: { label: string; until: number; now: number; disabled: boolean;
+  onPause: (minutes: number | null) => void; onResume: () => void }) {
+  const { t } = useLingui();
+  if (until > now) return <Button variant="outline" size="sm" disabled={disabled} onClick={onResume}>{t`Resume notifications`}</Button>;
+  const lengths: Record<string, string> = { "15": t`For 15 minutes`, "60": t`For 1 hour`, "180": t`For 3 hours`, "480": t`For 8 hours`, "1440": t`For 24 hours` };
+  return <OptionSelect aria-label={label} value="" className="w-48 max-w-full" disabled={disabled}
+    options={[{ value: "", label: t`Pause for…` }, ...NOTIFICATION_PAUSE_MINUTES.map(minutes => minutes === null
+      ? { value: "always", label: t`Until I turn it back on` }
+      : { value: String(minutes), label: lengths[String(minutes)] ?? String(minutes) })]}
+    onValueChange={choice => { if (choice) onPause(choice === "always" ? null : Number(choice)); }} />;
+}
+function usePauseUntilText() {
+  const { t } = useLingui();
+  return (until: number) => {
+    if (notificationPauseIsIndefinite(until)) return t`Until you turn them back on.`;
+    const time = new Date(until).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+    return t`Until ${time}.`;
+  };
+}
 type NotificationPanelProps = { scope: string; bots?: Bot[]; onUpdate?: (id: string, enabled: boolean) => Promise<void>; onBusyChange?: (value: boolean) => void };
 export function NotificationsPanel(props: NotificationPanelProps) { return <NotificationControls key={props.scope} {...props} />; }
 function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: NotificationPanelProps) {
@@ -39,7 +59,9 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
   const generation = useRef(0);
   const [now, setNow] = useState(Date.now);
   const localPaused = value.mutedUntil > now;
-  const accountPaused = Boolean(push?.settings.mutedUntil && Date.parse(push.settings.mutedUntil) > now);
+  const accountPausedUntil = push?.settings.mutedUntil ? Date.parse(push.settings.mutedUntil) : 0;
+  const accountPaused = accountPausedUntil > now;
+  const pauseUntilText = usePauseUntilText();
   const native = desktopBridge()?.notifications;
   const [nativeStatus, setNativeStatus] = useState<{ supported: boolean; settingsAvailable: boolean }>();
   const android = isAndroidHost();
@@ -81,7 +103,8 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
   useEffect(() => { onBusyChange?.(busy !== null); }, [busy, onBusyChange]);
   useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   useEffect(() => {
-    const expires = [value.mutedUntil, push?.settings.mutedUntil ? Date.parse(push.settings.mutedUntil) : 0].filter(at => at > Date.now());
+    const expires = [value.mutedUntil, push?.settings.mutedUntil ? Date.parse(push.settings.mutedUntil) : 0]
+      .filter(at => at > Date.now() && !notificationPauseIsIndefinite(at));
     if (!expires.length) return;
     const timer = window.setTimeout(() => setNow(Date.now()), Math.min(Math.min(...expires) - Date.now() + 1, 3_600_001));
     return () => window.clearTimeout(timer);
@@ -127,8 +150,14 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
           control={<OptionSelect aria-label={t`Choose for a Mico`} value="" className="w-48 max-w-full" disabled={busy !== null}
             options={[{ value: "", label: t`Choose a Mico` }, ...available.map(bot => ({ value: bot.id, label: bot.name }))]}
             onValueChange={botId => { if (botId) changeMico(botId, push.settings.level); }} />} />}
+        <SettingsRow label={<Label htmlFor={`${id}-task-replies`}>{t`Replies in task conversations`}</Label>}
+          description={t`Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting.`}
+          control={<Switch id={`${id}-task-replies`} data-testid="notification-task-replies" checked={push.settings.taskReplies !== false} disabled={busy !== null} onCheckedChange={taskReplies => void saveAccount({ taskReplies })} />} />
         <SettingsRow label={accountPaused ? t`Notifications paused on all devices` : t`Pause on all devices`}
-          control={<Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void saveAccount({ mutedUntil: accountPaused ? null : new Date(Date.now() + 3_600_000).toISOString() })}>{accountPaused ? t`Resume notifications` : t`Pause for 1 hour`}</Button>} />
+          description={accountPaused ? pauseUntilText(accountPausedUntil) : undefined}
+          control={<PauseControl label={t`Pause on all devices`} until={accountPausedUntil} now={now} disabled={busy !== null}
+            onResume={() => void saveAccount({ mutedUntil: null })}
+            onPause={minutes => { setNow(Date.now()); void saveAccount({ mutedUntil: minutes === null ? NOTIFICATIONS_PAUSED_UNTIL_RESUMED : new Date(Date.now() + minutes * 60_000).toISOString() }); }} />} />
         <SettingsRow label={<Label htmlFor={`${id}-push-preview`}>{t`Show push previews`}</Label>}
           description={t`Message content in background alerts on your devices. This device can hide it too.`}
           control={<Switch id={`${id}-push-preview`} checked={push.settings.previews} disabled={busy !== null} onCheckedChange={previews => void saveAccount({ previews })} />} />
@@ -171,7 +200,10 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
       <SettingsRow label={<Label htmlFor={`${id}-sound`}>{t`Notification sound`}</Label>}
         control={<Switch id={`${id}-sound`} checked={value.sound} disabled={!value.enabled || busy !== null} onCheckedChange={sound => save({ sound })} />} />
       <SettingsRow label={localPaused ? t`Paused on this device` : t`Pause on this device`}
-        control={<Button variant="outline" size="sm" disabled={!value.enabled} onClick={() => { setNow(Date.now()); save({ mutedUntil: localPaused ? 0 : Date.now() + 3_600_000 }); }}>{localPaused ? t`Resume notifications` : t`Pause for 1 hour`}</Button>} />
+        description={localPaused ? pauseUntilText(value.mutedUntil) : undefined}
+        control={<PauseControl label={t`Pause on this device`} until={value.mutedUntil} now={now} disabled={!value.enabled}
+          onResume={() => { setNow(Date.now()); save({ mutedUntil: 0 }); }}
+          onPause={minutes => { setNow(Date.now()); save({ mutedUntil: minutes === null ? NOTIFICATIONS_PAUSED_UNTIL_RESUMED_MS : Date.now() + minutes * 60_000 }); }} />} />
       {value.attentionOnly && <SettingsRow label={t`Legacy device filter: only when needed`} description={t`Use the account filter above to keep the same behavior on all devices.`}
         control={<Button size="sm" variant="outline" onClick={() => save({ attentionOnly: false })}>{t`Use account setting`}</Button>} />}
     </SettingsGroup>

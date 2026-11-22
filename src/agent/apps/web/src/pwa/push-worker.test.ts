@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { MICO_AVATAR_SHAPES } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
-import { parsePushPayload, pushChatUrl, pushNotification } from "./push-worker.js";
+import { parseDismissPayload, parsePushPayload, pushChatUrl, pushNotification } from "./push-worker.js";
 import { notificationTarget } from "./notification-target.js";
 
 const origin = "https://www.mycellios.com";
@@ -59,5 +59,28 @@ describe("Web Push navigation", () => {
       title: "Jarvis", options: { body: "Draft ready", icon: scope + "mycellios/notification-micos/sprout.png" },
     });
     expect(parsePushPayload({ ...preview, avatar: "https://external.test/track" }, now)).toBeNull();
+  });
+});
+
+describe("refined and answered notices", () => {
+  it("shows a refined failure's own copy and keeps an unknown refinement on the base copy", () => {
+    const failed = parsePushPayload({ ...payload, title: "Private name", body: "Quota text", kind: "failure", detail: "usage_limit", preview: false }, now)!;
+    expect(pushNotification(failed, scope, "es-ES")).toMatchObject({ title: "Límite de uso alcanzado", options: { body: expect.not.stringContaining("Quota") } });
+    expect(pushNotification({ ...failed, detail: "sign_in" }, scope, "en-US").title).toBe("Provider sign-in needed");
+    const later = parsePushPayload({ ...payload, kind: "failure", detail: "something_new", preview: false }, now)!;
+    expect(later).not.toBeNull();
+    expect(pushNotification(later, scope, "en-US").title).toBe("Task interrupted");
+  });
+  it("tags each notice with its id so an answer elsewhere closes exactly that one", () => {
+    const parsed = parsePushPayload({ ...payload, kind: "help" }, now)!;
+    expect(pushNotification(parsed, scope, "en-US").options.data).toMatchObject({ noticeId: "event-1" });
+  });
+  it("accepts only bounded close messages and never treats them as notices", () => {
+    const close = { version: 2, type: "dismiss", id: "dismiss:event-1", accountId: "owner", notice: "event-1", threadId: "thread", expiresAt: now + 1000 };
+    expect(parseDismissPayload(close, now)).toEqual(close);
+    expect(parsePushPayload(close, now)).toBeNull();
+    expect(parseDismissPayload({ ...close, threadId: "../x" }, now)).toBeNull();
+    expect(parseDismissPayload({ ...close, expiresAt: now + 1_000_000 }, now)).toBeNull();
+    expect(parseDismissPayload(payload, now)).toBeNull();
   });
 });

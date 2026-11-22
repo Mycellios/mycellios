@@ -6920,3 +6920,47 @@ msgstr "すべてのチャットを既読にできませんでした。もう一
 #: src/pages/Shell.tsx
 msgid "Could not mark the chats as read. Try again."
 msgstr "チャットを既読にできませんでした。もう一度お試しください。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause for…"
+msgstr "一時停止の期間…"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until you turn them back on."
+msgstr "再びオンにするまで。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until {time}."
+msgstr "{time}まで。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Replies in task conversations"
+msgstr "タスクの会話での返信"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+msgstr "Mico が自身のタスクの会話で完了または失敗したときに通知します。質問と承認は常に通知され、ルーティンはそれぞれの設定に従います。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 15 minutes"
+msgstr "15分間"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 1 hour"
+msgstr "1時間"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 3 hours"
+msgstr "3時間"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 8 hours"
+msgstr "8時間"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 24 hours"
+msgstr "24時間"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until I turn it back on"
+msgstr "再びオンにするまで"

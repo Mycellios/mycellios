@@ -55,6 +55,9 @@ export function hasFocusedNotificationTab(scope: string): boolean {
   }
 }
 
+/** Page-level alerts by tag, so an answered request can close the one this tab showed. */
+const pageNotices = new Map<string, Notification>();
+
 export async function showSystemNotification(
   title: string,
   body: string,
@@ -62,6 +65,8 @@ export async function showSystemNotification(
   route: string,
   sound: boolean,
   onOpen?: () => void,
+  /** The run whose question or takeover this alert is about. */
+  requestRunId?: string,
 ): Promise<void> {
   const url = appPath(route);
   const native = desktopBridge()?.notifications;
@@ -74,7 +79,7 @@ export async function showSystemNotification(
     tag,
     icon: appPath("/mycellios/app-icon-v2-192.png"),
     silent: !sound,
-    data: { url },
+    data: requestRunId ? { url, requestRunId } : { url },
   };
   const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
   if (registration?.active) {
@@ -82,12 +87,35 @@ export async function showSystemNotification(
     return;
   }
   const notification = new Notification(title, options);
+  pageNotices.set(tag, notification);
+  if (pageNotices.size > 50) pageNotices.delete(pageNotices.keys().next().value!);
   notification.addEventListener("click", () => {
     window.focus();
     notification.close();
     if (onOpen) onOpen();
     else window.location.assign(url);
   });
+}
+
+/** The run went on or ended, so a question or takeover it asked is no longer waiting. */
+export function isRunResumeOrEnd(event: Pick<ProductEvent, "type">): boolean {
+  return event.type === "run.started" || event.type === "run.completed" ||
+    event.type === "run.failed" || event.type === "run.cancelled";
+}
+
+/** Close this device's alert for a request once it was answered here or elsewhere. */
+export async function closeRequestNotification(tag: string, runId: string): Promise<void> {
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    for (const notice of (await registration?.getNotifications({ tag })) ?? []) {
+      if (notice.data?.requestRunId === runId) notice.close();
+    }
+  } catch { /* A missing worker leaves only page-level alerts. */ }
+  const page = pageNotices.get(tag);
+  if (page?.data?.requestRunId === runId) {
+    page.close();
+    pageNotices.delete(tag);
+  }
 }
 
 export function requestBrowserNotificationPermission(
@@ -227,7 +255,7 @@ export function deliverBrowserNotification(
     windowFocused: boolean;
     permission: BrowserNotificationPermission;
     notifiedEventIds: Set<string>;
-    show: (title: string, body: string, tag: string) => void | Promise<void>;
+    show: (title: string, body: string, tag: string, requestRunId?: string) => void | Promise<void>;
     preview?: boolean;
   },
 ): "delivered" | "pending" | "discarded" {
@@ -245,7 +273,10 @@ export function deliverBrowserNotification(
     ? { title: "Mycellios", body: i18n._("New activity in Mycellios.") }
     : browserNotificationMessage(event, botName);
   try {
-    const shown = context.show(message.title, message.body, event.threadId);
+    const requestRunId = requiresNotificationAttention(event) && event.runId ? event.runId : undefined;
+    const shown = requestRunId
+      ? context.show(message.title, message.body, event.threadId, requestRunId)
+      : context.show(message.title, message.body, event.threadId);
     context.notifiedEventIds.add(event.id);
     context.notifiedEventIds.add(notificationKey(event));
     if (shown) void shown.catch(() => {

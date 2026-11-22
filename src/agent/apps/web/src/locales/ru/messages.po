@@ -6920,3 +6920,47 @@ msgstr "Не удалось отметить все чаты как прочит
 #: src/pages/Shell.tsx
 msgid "Could not mark the chats as read. Try again."
 msgstr "Не удалось отметить чаты как прочитанные. Попробуйте ещё раз."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause for…"
+msgstr "Приостановить на…"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until you turn them back on."
+msgstr "Пока вы не включите их снова."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until {time}."
+msgstr "До {time}."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Replies in task conversations"
+msgstr "Ответы в беседах по задачам"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+msgstr "Уведомлять, когда Mico завершает работу или сталкивается с ошибкой в одной из своих бесед по задачам. Вопросы и запросы на одобрение уведомляют всегда; рутины следуют своим настройкам."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 15 minutes"
+msgstr "На 15 минут"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 1 hour"
+msgstr "На 1 час"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 3 hours"
+msgstr "На 3 часа"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 8 hours"
+msgstr "На 8 часов"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 24 hours"
+msgstr "На 24 часа"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until I turn it back on"
+msgstr "Пока я не включу снова"

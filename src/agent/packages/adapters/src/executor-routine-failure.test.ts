@@ -261,7 +261,8 @@ describe("routine failure notifications", () => {
     });
 
     expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "failure", title: "Assistant failed" }),
+      // A rejected key asks the person to reconnect the provider rather than reporting a plain failure.
+      expect.objectContaining({ kind: "sign_in", title: "Assistant needs you to reconnect its provider" }),
       expect.anything(),
     );
   });
@@ -269,7 +270,7 @@ describe("routine failure notifications", () => {
   it("puts the unread chats across the user's Spaces on the app icon", async () => {
     const { send, prisma } = await failRun({ error: new Error("Invalid API key"), unreadChats: 3 });
     expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "failure", badge: 3 }),
+      expect.objectContaining({ kind: "sign_in", badge: 3 }),
       expect.anything(),
     );
     expect(countUnreadInboxChats).toHaveBeenCalledWith(prisma, {
@@ -326,7 +327,7 @@ describe("retrying a routine run after a transient model failure", () => {
 
       expect(retries).toEqual([]);
       expect(send).toHaveBeenCalledWith(
-        expect.objectContaining({ kind: "failure" }),
+        expect.objectContaining({ kind: scenario.error.message === "Invalid API key" ? "sign_in" : "failure" }),
         expect.anything(),
       );
     },

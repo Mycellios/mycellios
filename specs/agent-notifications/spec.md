@@ -23,3 +23,32 @@ PostgreSQL; test navigation and malformed payloads in the web worker. To qualify
 the release, opt in on a physical phone, close the installed PWA, finish a turn
 from another client and tap the system notification. Confirm it opens the exact
 conversation without signing into a different account. Check a private task too.
+
+## What notifies
+
+A notice says what happened: a finished or failed turn, a question, an approval
+or takeover, a message or routine run that could not start, a helper or
+teammate that failed, a usage or credit limit, or a provider sign-in that is
+needed. Mycellios stops at a usage limit instead of waiting for it to reset, so
+that notice reports the stop. Hidden previews use fixed text for each kind and
+never name the Mico, group or conversation. Older installed workers receive the
+refined kinds as a failure with the same privacy.
+
+Turns started by another Mico finish quietly: no notice and no sound, while the
+reply still counts as unread. Their questions, approvals and failures still
+alert. A group notifies once per request, when its last member turn ends and the
+group has unread replies. Mico-started task reports notify through the main
+chat's normal completion. Private task conversations keep notifying; the
+account's "Replies in task conversations" switch (on by default) can silence
+their finishes and failures, but never their questions or approvals, and
+routines follow their own setting. Both pauses offer 15 minutes to 24 hours or
+until notifications are turned back on.
+
+When a question, approval or takeover is answered, retired or stopped, the
+server closes its notice on the other devices that showed it: installed web
+apps through a silent close message and the Android host through a data-only
+message. Apple endpoints are skipped because every push there must show an
+alert. A focused session still holds every new notice; closes are not held.
+Verify the request registry, sweep and closes on disposable PostgreSQL and in
+the worker tests. Physical qualification answers a question on one phone and
+checks that the other device's notice disappears.

@@ -39,13 +39,13 @@ public final class NativePush {
     prefs(c).edit().putLong("epoch",epoch).remove("owner").commit(); return epoch;
   }
   public static synchronized void clear(Context c){
-    prefs(c).edit().putLong("epoch",prefs(c).getLong("epoch",0)+1).remove("owner").remove("receipts").commit();
+    prefs(c).edit().putLong("epoch",prefs(c).getLong("epoch",0)+1).remove("owner").remove("receipts").remove("requests").commit();
     c.getSystemService(NotificationManager.class).cancelAll();
     WorkManager.getInstance(c).cancelUniqueWork("mycellios-push-registration");
     if(configured()) { FirebaseMessaging.getInstance().setAutoInitEnabled(false); FirebaseMessaging.getInstance().deleteToken(); }
   }
   public static synchronized void preferences(Context c,JSONObject value){
-    long until=Math.min(System.currentTimeMillis()+7*86400000L,Math.max(0,value.optLong("mutedUntil",0)));
+    long until=NotificationPolicy.pauseUntil(value.optLong("mutedUntil",0),System.currentTimeMillis());
     prefs(c).edit().putBoolean("preview",value.optBoolean("preview",false)).putBoolean("sound",value.optBoolean("sound",true))
       .putBoolean("attention",value.optBoolean("attentionOnly",false)).putLong("mutedUntil",until).commit();
   }
@@ -82,6 +82,7 @@ public final class NativePush {
   }
   public static long epoch(Context c){return prefs(c).getLong("epoch",0);}
   public static synchronized void receive(Context c,Map<String,String> data,boolean test){
+    if("dismiss".equals(data.get("type"))){dismiss(c,data);return;}
     String url=NotificationPolicy.target(data,owner(c),System.currentTimeMillis());
     if(url==null || !allowed(c) || (!test && foreground))return;
     android.content.SharedPreferences prefs=prefs(c);
@@ -100,7 +101,29 @@ public final class NativePush {
         .setContentTitle(preview?NotificationPolicy.text(data.get("title"),100):"Mycellios").setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body))
         .setContentIntent(click).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE).setSilent(!prefs.getBoolean("sound",true)).build();
       c.getSystemService(NotificationManager.class).notify(id,notification);
+      rememberRequest(c,data.get("threadId"),test?null:data.get("requestId"));
       JSONArray next=new JSONArray();for(int i=Math.max(0,receipts.length()-99);i<receipts.length();i++)next.put(receipts.get(i));next.put(data.get("deliveryId"));prefs.edit().putString("receipts",next.toString()).commit();
+    } catch(Exception ignored){ /* Payload and credentials must not enter Android logs. */ }
+  }
+  /** Which request each thread's notice shows, so only that notice closes when it is answered. */
+  private static void rememberRequest(Context c,String thread,String request){
+    try {
+      JSONObject requests=new JSONObject(prefs(c).getString("requests","{}"));
+      requests.remove(thread);
+      if(request!=null && request.matches("[a-zA-Z0-9_-]{1,160}"))requests.put(thread,request);
+      while(requests.length()>100){java.util.Iterator<String> keys=requests.keys();if(!keys.hasNext())break;requests.remove(keys.next());}
+      prefs(c).edit().putString("requests",requests.toString()).commit();
+    } catch(Exception ignored){ /* Only notice bookkeeping; never logged. */ }
+  }
+  private static void dismiss(Context c,Map<String,String> data){
+    String thread=NotificationPolicy.dismissal(data,owner(c),System.currentTimeMillis());
+    if(thread==null)return;
+    try {
+      JSONObject requests=new JSONObject(prefs(c).getString("requests","{}"));
+      if(!data.get("requestId").equals(requests.optString(thread,null)))return;
+      c.getSystemService(NotificationManager.class).cancel(thread.hashCode());
+      requests.remove(thread);
+      prefs(c).edit().putString("requests",requests.toString()).commit();
     } catch(Exception ignored){ /* Payload and credentials must not enter Android logs. */ }
   }
   public static void test(Context c) throws Exception {

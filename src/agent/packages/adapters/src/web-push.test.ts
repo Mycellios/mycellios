@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  NOTIFICATION_KINDS,
+  NOTIFICATIONS_PAUSED_UNTIL_RESUMED,
   NotificationSettingsSchema,
   notificationAllowed,
+  validNotificationPause,
   WebPushSubscriptionSchema,
 } from "@mycellios/contracts";
 import {
   notificationChannels,
   privateNotification,
+  silentPushAllowed,
   validatePushEndpoint,
   webPushConfig,
 } from "./web-push.js";
@@ -28,7 +32,7 @@ const message: NotificationMessage = {
 describe("notification policy and privacy", () => {
   it("defaults to important updates without content previews", () => {
     const settings = NotificationSettingsSchema.parse({});
-    expect(settings).toEqual({ level: "all", previews: false, mutedUntil: null, bots: {} });
+    expect(settings).toEqual({ level: "all", previews: false, mutedUntil: null, bots: {}, taskReplies: true });
     expect(notificationAllowed(settings, "bot", "completion")).toBe(true);
     expect(privateNotification(message, false)).toEqual({
       title: "Mycellios",
@@ -76,6 +80,34 @@ describe("notification policy and privacy", () => {
     );
     expect(value.body).not.toMatch(/secret-value|secret-auth|sk-secretkey/);
     expect(value.body.length).toBeLessThanOrEqual(200);
+  });
+  it.each(NOTIFICATION_KINDS)("hidden previews of %s name neither the Mico nor the text", (kind) => {
+    const value = privateNotification({ ...message, kind, title: "Research", body: "Confidential content" }, false);
+    expect(value.title).toBe("Mycellios");
+    expect(value.body).not.toMatch(/Research|Confidential/);
+    expect(value.body.length).toBeGreaterThan(0);
+  });
+  it("lets the task-replies switch silence task conversations but never their requests", () => {
+    const off = NotificationSettingsSchema.parse({ taskReplies: false });
+    const task = { taskConversation: true };
+    for (const kind of ["completion", "failure", "not_started", "helper_failed"] as const) {
+      expect(notificationAllowed(off, "bot", kind, Date.now(), task)).toBe(false);
+      expect(notificationAllowed(off, "bot", kind)).toBe(true);
+      expect(notificationAllowed(NotificationSettingsSchema.parse({}), "bot", kind, Date.now(), task)).toBe(true);
+    }
+    for (const kind of ["help", "takeover", "usage_limit", "sign_in"] as const)
+      expect(notificationAllowed(off, "bot", kind, Date.now(), task)).toBe(true);
+  });
+  it("accepts pauses up to seven days or until turned back on", () => {
+    const now = Date.UTC(2026, 10, 22);
+    expect(validNotificationPause(new Date(now + 86_400_000).toISOString(), now)).toBe(true);
+    expect(validNotificationPause(new Date(now + 8 * 86_400_000).toISOString(), now)).toBe(false);
+    expect(validNotificationPause(NOTIFICATIONS_PAUSED_UNTIL_RESUMED, now)).toBe(true);
+    expect(notificationAllowed(NotificationSettingsSchema.parse({ mutedUntil: NOTIFICATIONS_PAUSED_UNTIL_RESUMED }), "bot", "help", now)).toBe(false);
+  });
+  it("never sends a silent close to Apple push", () => {
+    expect(silentPushAllowed("https://web.push.apple.com/device")).toBe(false);
+    expect(silentPushAllowed("https://fcm.googleapis.com/fcm/send/device")).toBe(true);
   });
   it("requires valid subscription key sizes", () => {
     expect(
@@ -145,6 +177,21 @@ describe("native compatibility", () => {
     } as unknown as WebPushService;
     await notificationChannels(existing, web).send(message, context);
     expect(existing.send).toHaveBeenCalledOnce();
+  });
+  it("names the waiting request for every channel and records it once a channel accepts", async () => {
+    const existing = { ...native(), deliver: vi.fn(async () => "delivered" as const), dismiss: vi.fn(async () => undefined) } as unknown as NotificationProvider;
+    const web = {
+      settings: async () => NotificationSettingsSchema.parse({}),
+      enqueue: vi.fn(async () => 0),
+      requestEvent: vi.fn(async () => "event-ask"),
+      recordRequest: vi.fn(async () => undefined),
+      useNativeDismiss: vi.fn(),
+    } as unknown as WebPushService;
+    const help = { ...message, kind: "help" as const };
+    await notificationChannels(existing, web).send(help, { ...context, runId: "run" });
+    expect(existing.deliver).toHaveBeenCalledWith(expect.objectContaining({ requestId: "event-ask", title: "Mycellios" }), expect.anything());
+    expect(web.recordRequest).toHaveBeenCalledWith(expect.objectContaining({ requestId: "event-ask" }), expect.anything());
+    expect(web.useNativeDismiss).toHaveBeenCalledOnce();
   });
   it("account-wide off also silences native mobile delivery", async () => {
     const existing = native();
