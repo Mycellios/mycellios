@@ -20,6 +20,16 @@ it("completes a native turn and releases its session without inventing a diagnos
   } finally {peer.close();}
 });
 
+it("ignores an older server's steeringPending, whose watch signal cannot cross the bridge",async()=>{
+  let received:unknown="not run";
+  const runtime:AgentRuntime={describe,abort:vi.fn(),async *run(input){received=input.steeringPending;yield {type:"done"};}};
+  const host=new DesktopAgentHost(runtime),peer=new DesktopAgentRpc(()=>{});
+  try {
+    for await(const _ of host.run("session",peer.encode({...request(),steeringPending:async()=>true}),"bot","run",context())) { /* drain */ }
+    expect(received).toBeUndefined();
+  } finally {peer.close();}
+});
+
 it("identifies callback drain expiry after the engine ends, without replaying it",async()=>{
   const expired=new AbortController();
   const timeout=vi.spyOn(AbortSignal,"timeout").mockReturnValue(expired.signal);

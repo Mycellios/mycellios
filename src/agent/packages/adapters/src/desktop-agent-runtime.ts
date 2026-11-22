@@ -12,6 +12,8 @@ import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
 import { desktopModelAccess } from "./desktop-model-access.js";
 import { ComputerUpdatingError } from "./computer-errors.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
+import { isSubagentToolExecution } from "./pi-tool-execution.js";
+import { watchSteeringDuringTool } from "./steering-delivery.js";
 
 const RESULT_DELIVERY_ATTEMPTS = 3;
 type DesktopImage = NonNullable<AgentRunRequest["currentTurnImages"]>[number];
@@ -120,6 +122,22 @@ async function deliverAgentResult(
   throw lastError;
 }
 
+/**
+ * A message the person sends while a main-turn tool runs moves its shell command to the
+ * background, as on the server. Helper calls never yield: only the main turn takes the message.
+ */
+function yieldToSteering(request: AgentRunRequest, signal: AbortSignal): NonNullable<AgentRunRequest["executeTool"]> {
+  const execute = request.executeTool!;
+  return async (name, args, executionId, route, observer) => {
+    const watch = isSubagentToolExecution(executionId) ? undefined : watchSteeringDuringTool(request, signal);
+    try {
+      return await execute(name, args, executionId, route, watch?.signal ? { ...observer, yieldSignal: watch.signal } : observer);
+    } finally {
+      watch?.stop();
+    }
+  };
+}
+
 export class DesktopAgentRuntime implements AgentRuntime {
   private active = new Map<string, AbortController>();
   constructor(private readonly options: {
@@ -193,6 +211,10 @@ export class DesktopAgentRuntime implements AgentRuntime {
       ...(request.resolveModel ? { resolveModel: async (provider: string, id: string) => nativeEngine ? request.resolveModel!(provider, id) : desktopModelAccess(await request.resolveModel!(provider, id), signal, cleanup, accounting) } : {}),
       ...(request.resolveFallbackModel ? { resolveFallbackModel: async (provider: string, id: string, connection?: string) => nativeEngine ? request.resolveFallbackModel!(provider, id, connection) : desktopModelAccess(await request.resolveFallbackModel!(provider, id, connection), signal, cleanup, accounting) } : {}),
       ...(capture ? { onCheckpoint: (blob: string, id: string) => capture(() => blob, id) } : {}),
+      // Given steeringPending, the engine hands every tool call an AbortSignal, which the
+      // bridge cannot carry: each tool failed. The server watches for steering instead.
+      steeringPending: undefined,
+      ...(request.executeTool ? { executeTool: yieldToSteering(request, signal) } : {}),
     });
     const callbacks = new Set<Promise<void>>();
     let completion: Extract<AgentRuntimeEvent, { type: "done" }> | undefined;
