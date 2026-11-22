@@ -56,7 +56,8 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
     const duplicate=path.join(path.dirname(interrupted.backup),'..',randomUUID());
     await cp(path.dirname(interrupted.backup),duplicate,{recursive:true});
     await writeFile(path.join(duplicate,'receipt.json'),JSON.stringify({...interrupted,backup:path.join(duplicate,'installation')}));
-    assert.throws(()=>invoke('prepare',[...args,'-TargetVersion','99.0.2'],retryJournal),/Interrupted installation recovery is ambiguous/);
+    // Windows PowerShell wraps Write-Error text at the console width, so allow line breaks.
+    assert.throws(()=>invoke('prepare',[...args,'-TargetVersion','99.0.2'],retryJournal),/Interrupted\s+installation\s+recovery\s+is\s+ambiguous/);
     await access(path.join(installation,'partial-new-version'));await access(path.join(interrupted.backup,'Mycellios Desktop.exe'));
     await assert.rejects(access(retryJournal));
     await rm(duplicate,{recursive:true,force:true});
