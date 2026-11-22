@@ -57,6 +57,34 @@ export function approvedMemoryEmbeddingExecution(execution: Execution): { backen
   return MEMORY_EMBEDDING_EXECUTIONS.find((pair) => pair.backend === stage.backend && pair.precision === stage.precision) ?? null;
 }
 
+/**
+ * Android phone candidate (spec: "Phone replicas"). ONNX Runtime cannot read
+ * the safetensors pins above, so a phone downloads this ONNX export of the
+ * same model instead, checked by size and sha256. Its tokenizer is byte-equal
+ * to the pinned one. On ONNX Runtime CPU (x86) the float16 export reached a
+ * canary cosine of 0.9999988, while the int8 (0.905) and q4 (0.943) exports
+ * failed, so only this export is pinned. No phone device/precision pair has
+ * been measured on a physical phone, so none is admitted and the Android
+ * host never advertises the model; `MemoryEmbeddingPins.java` mirrors these
+ * values and `tests/memory-embedding-phone.test.ts` checks the mirror.
+ */
+export const MEMORY_EMBEDDING_PHONE_RUNTIME = "mycellios-memory-embedding-phone/1";
+export const MEMORY_EMBEDDING_PHONE_SOURCE = Object.freeze({
+  repository: "onnx-community/Qwen3-Embedding-0.6B-ONNX",
+  revision: "c25a394dd583836952667c12f008335071b3f43d",
+});
+export const MEMORY_EMBEDDING_PHONE_FILES: Readonly<Record<string, { bytes: number; sha256: string }>> = Object.freeze({
+  "onnx/model_fp16.onnx": { bytes: 583_522, sha256: "f376cf065d912675dd559270e19361367ebc28c938b9811dd61d5834c78d0834" },
+  "onnx/model_fp16.onnx_data": { bytes: 1_199_927_296, sha256: "06fbfded30166e3a33fe5252d7002ed1c370a4ec1bf45aba778cdf6cf7d31439" },
+  "tokenizer.json": { bytes: 11_423_705, sha256: "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a" },
+});
+export const MEMORY_EMBEDDING_PHONE_DIGEST = "sha256:" + createHash("sha256").update([
+  MEMORY_EMBEDDING_PHONE_RUNTIME, MEMORY_EMBEDDING_PHONE_SOURCE.revision,
+  ...Object.keys(MEMORY_EMBEDDING_PHONE_FILES).sort().map((name) => `${name}:${MEMORY_EMBEDDING_PHONE_FILES[name]!.sha256}`),
+].join("\0")).digest("hex");
+/** Phone backend/precision pairs measured on a physical phone at cosine ≥ the canary gate. None yet. */
+export const MEMORY_EMBEDDING_PHONE_EXECUTIONS: ReadonlyArray<{ backend: string; precision: string }> = Object.freeze([]);
+
 export const memoryEmbeddingInputSchema = z.object({
   schema: z.literal(MEMORY_EMBEDDING_SCHEMA),
   input: z.array(z.string().min(1).max(32_768).refine((text) => text.trim().length > 0))
