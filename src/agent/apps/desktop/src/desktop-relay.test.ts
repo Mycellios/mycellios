@@ -30,13 +30,19 @@ it("tells the server once that a connected PC is going offline, without treating
       throw new Error(`unexpected ${action}`);
     },
   });
-  await new DesktopRelayClient({ base: "https://example.test/agent", localUrl: "", localToken: "", revoked,
-    fetch: async () => { throw new Error("A PC that never connected has nothing to release"); } }).release();
+  const offlineFetch = vi.fn<typeof fetch>();
+  const offline = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "", localToken: "", revoked, fetch: offlineFetch,
+  });
+  expect(offline.release()).toBeUndefined();
+  expect(offlineFetch).not.toHaveBeenCalled();
   await client.bind("bot");
   await vi.waitFor(() => expect(polled).toBe(true));
   await vi.waitFor(() => expect(client.online()).toBe(true));
-  await client.release();
-  await client.release();
+  const release = client.release();
+  expect(release).toBeInstanceOf(Promise);
+  expect(client.release()).toBeUndefined();
+  await release;
   expect(released).toEqual([{ deviceId: "11111111-1111-4111-8111-111111111111" }]);
   expect(client.online()).toBe(false);
   expect(revoked).not.toHaveBeenCalled();
