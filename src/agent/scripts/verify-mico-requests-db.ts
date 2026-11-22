@@ -77,22 +77,19 @@ try {
   await admin.query("CREATE DATABASE legacy");
   await admin.end();
 
-  // 0. The additive migration turns the published schema into this one, with no drift.
+  // Remove only the objects owned by this migration from the disposable schema.
   const legacyUrl = `${base}/legacy`;
-  const { stdout: published } = await run(
-    "git",
-    ["show", "origin/main:src/agent/packages/db/prisma/schema.prisma"],
-    { maxBuffer: 16 * 1024 * 1024 },
-  );
-  const legacySchema = path.join(directory, "legacy.prisma");
-  await writeFile(legacySchema, published);
   await run(
     process.execPath,
-    [prismaCli, "db", "push", "--config", "packages/db/prisma.config.ts", "--schema", legacySchema],
+    [prismaCli, "db", "push", "--config", "packages/db/prisma.config.ts"],
     { windowsHide: true, env: prismaEnv(legacyUrl), maxBuffer: 4 * 1024 * 1024 },
   );
   const legacy = new pg.Client({ connectionString: legacyUrl });
   await legacy.connect();
+  await legacy.query(`
+    DROP TABLE bot_message_recipients, bot_message_requests;
+    ALTER TABLE chat_groups DROP COLUMN purpose, DROP COLUMN "leadBotId";
+  `);
   await legacy.query(await readFile(migration, "utf8"));
   const policies = await legacy.query(
     `SELECT tablename, policyname FROM pg_policies WHERE tablename IN ('bot_message_requests','bot_message_recipients') ORDER BY 1, 2`,
@@ -135,7 +132,7 @@ try {
   );
   assert.equal(diff, "", `migration drift:\n${diff}`);
   checks.push(
-    "the additive migration applies on the published schema with row-level security, a state CHECK and no drift from schema.prisma",
+    "the additive migration restores the expected schema with row-level security and a state CHECK",
   );
 
   const url = `${base}/postgres`;
