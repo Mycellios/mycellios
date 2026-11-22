@@ -27,8 +27,8 @@ const speculationPython = new Set(['python/distributed_runtime/speculation.py',
 const llamaCppPython = new Set(['python/distributed_runtime/llama_cpp_runtime.py', 'python/tests/test_llama_cpp_runtime.py',
   'python/distributed_runtime/llama_cpp_view.py', 'python/distributed_runtime/llama_cpp_executor.py',
   'python/distributed_runtime/llama_cpp_stage_runner.py', 'python/distributed_runtime/native_gguf_runtime.py',
-  'python/tests/test_llama_cpp_stage.py']);
-const llamaCppTests = ['test_llama_cpp_runtime.py', 'test_llama_cpp_stage.py', 'test_native_gguf.py'];
+  'python/tests/test_llama_cpp_stage.py', 'python/distributed_runtime/llama_cpp_profile.py', 'python/tests/test_llama_cpp_profile.py']);
+const llamaCppTests = ['test_llama_cpp_runtime.py', 'test_llama_cpp_stage.py', 'test_llama_cpp_profile.py', 'test_native_gguf.py'];
 // The Kokoro speech engine's unit tests use fake pipelines on CPU torch from the same lock.
 const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'python/tests/test_kokoro_engine.py']);
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
