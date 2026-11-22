@@ -94,7 +94,7 @@ if (command === "docker") {
 `;
 
 async function deployment(options: { failures: Failure[]; branch?: string; composePath?: string }) {
-  const deployDir = await mkdtemp(path.join(os.tmpdir(), "rakazo-fork-recovery-"));
+  const deployDir = await mkdtemp(path.join(os.tmpdir(), "mycellios-fork-recovery-"));
   directories.push(deployDir);
   const bin = path.join(deployDir, "fake-bin");
   const composeFile = path.join(deployDir, options.composePath ?? DEFAULT_COMPOSE_FILE);

@@ -71,7 +71,7 @@ describe.skipIf(!databaseAvailable)("offline Pi computer approval", () => {
           },
         ],
       });
-      const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-computer-approval-"));
+      const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-computer-approval-"));
       let stop: (() => Promise<void>) | undefined;
       try {
         const { createApp } = await import("../../../apps/api/src/app.ts");

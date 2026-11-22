@@ -163,7 +163,7 @@ describe.skipIf(!enabled)("history retrieval through executor", () => {
           })),
         ],
       });
-      const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-history-redaction-"));
+      const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-history-redaction-"));
       let stop: (() => Promise<void>) | undefined;
       try {
         const { createApp } = await import("../../../apps/api/src/app.ts");

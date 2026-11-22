@@ -88,7 +88,7 @@ describe("MCP connector managed stdio launch", () => {
   const updateMany = vi.fn(async (_args: { data: Record<string, unknown> }) => ({ count: 1 }));
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "rakazo-mcp-launch-"));
+    root = await mkdtemp(join(tmpdir(), "mycellios-mcp-launch-"));
     env = {};
     updateMany.mockClear();
   });

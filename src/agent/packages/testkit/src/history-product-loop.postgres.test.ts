@@ -145,7 +145,7 @@ describe.skipIf(!enabled)("product history diagnostic loop", () => {
         })),
       ],
     });
-    const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-product-loop-"));
+    const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-product-loop-"));
     try {
       const { createApp } = await import("../../../apps/api/src/app.ts");
       const result = await runTrial(scenario, 1, {
