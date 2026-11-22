@@ -215,7 +215,8 @@
   with at least three new user messages (configurable/off). Archiving an owned
   conversation makes an otherwise eligible review due immediately with the same
   three-message minimum. Check for pending deletion before submitting a review
-  and before applying its facts. Use only the Mico's
+  and take the source thread lock before applying facts to defend against
+  a concurrent delete or context change. Use only the Mico's
   existing first-party model with a verifiable Credit quote; no unpriced fallback.
   Defaults reserve at most 0.01 Credits per Space/UTC day, 0.002 per review. Claim
   worst-case cost transactionally before a single paid POST, retain uncertain
@@ -561,7 +562,11 @@
   deleteAfter = now + 6 s (undo = restore), refuses writes meanwhile, and the
   thread.delete job or the reconciler removes it 5 s after: Mico outputs made only
   there, Pi/native session files, then the thread row, whose cascade takes messages,
-  steering, runs, pins, Tasks entry and task notes. Uploads and outputs shown in other
+  steering, runs, pins, Tasks entry and task notes. The same purge removes that
+  owner's revisions sourced from the conversation. If a shared note needs
+  restoring, save its latest independently sourced content as a new revision
+  through encrypted Prisma, or remove the note if nothing remains.
+  Uploads and outputs shown in other
   conversations stay. The main chat is never archived or deleted (also a DB CHECK).
   No open-conversation limit and nothing is archived automatically. finalizeRun,
   stopThreadRuns and expireStuckRun record outcome/lastError (2000 characters, never
