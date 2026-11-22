@@ -24,7 +24,11 @@ const speculationPython = new Set(['python/distributed_runtime/speculation.py',
   'python/distributed_runtime/engine.py', 'python/tests/test_engine.py']);
 // The pinned llama.cpp stage runtime: pure tests need numpy from the same lock;
 // its physical test is skipped on CI because no binary or model is present.
-const llamaCppPython = new Set(['python/distributed_runtime/llama_cpp_runtime.py', 'python/tests/test_llama_cpp_runtime.py']);
+const llamaCppPython = new Set(['python/distributed_runtime/llama_cpp_runtime.py', 'python/tests/test_llama_cpp_runtime.py',
+  'python/distributed_runtime/llama_cpp_view.py', 'python/distributed_runtime/llama_cpp_executor.py',
+  'python/distributed_runtime/llama_cpp_stage_runner.py', 'python/distributed_runtime/native_gguf_runtime.py',
+  'python/tests/test_llama_cpp_stage.py']);
+const llamaCppTests = ['test_llama_cpp_runtime.py', 'test_llama_cpp_stage.py', 'test_native_gguf.py'];
 // The Kokoro speech engine's unit tests use fake pipelines on CPU torch from the same lock.
 const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'python/tests/test_kokoro_engine.py']);
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
@@ -85,8 +89,8 @@ export function planChecks(files, availableAgentTests) {
     add('.', 'python3', ['-m', 'venv', venv], 'speculation runtime virtual environment');
     add('.', `${venv}/bin/python`, ['-m', 'pip', 'install', '--require-hashes', '--only-binary=:all:', '--no-deps', '-r', 'scripts/wheel-locks/linux-x64-cp312.txt'], 'hash-locked CPU runtime wheels');
     if (speculationChanged) for (const test of speculationTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `speculation runtime ${test} (CPU, no model or GPU)`);
+    if (llamaCppChanged) for (const test of llamaCppTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `llama.cpp native stage ${test} (no binary, model or GPU)`);
     if (kokoroChanged) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_kokoro_engine.py'], 'Kokoro speech engine (fake pipelines, no model or GPU)');
-    if (llamaCppChanged) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_llama_cpp_runtime.py'], 'pinned llama.cpp stage runtime (no binary, model or GPU)');
   }
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);

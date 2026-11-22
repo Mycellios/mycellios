@@ -32,6 +32,38 @@ physical computers, bait detection in practice, and protection against an
 owner who reads process memory or runs a modified worker, which the design
 explicitly does not claim.
 
+## Quantized llama.cpp stages on one machine — exploratory, 2026-11-22
+
+Not a physical claim under the evidence policy below: both stages ran on one
+Windows PC (AMD Radeon 890M integrated GPU) with an emulated 28 ms one-way
+delay, over the real server and stage processes and their loopback sockets.
+
+`specs/native-quantized-stages/spec.md` phase 1 runs a sealed native GGUF
+stage package through a pinned, unpatched llama.cpp build (b12613) in a
+Torch-free child process. SmolLM2-1.7B-Instruct, Q4_K_M, two stages split at
+block 12, 8 greedy requests per corpus, two rounds:
+
+| Arm | Mixed chat | Copy-heavy |
+| --- | ---: | ---: |
+| Torch on DirectML, float16 (2026-11-22, one round) | 3.68 tok/s | 4.72 tok/s |
+| llama.cpp CPU, no speculation | 9.8–10.0 tok/s | 9.4–10.2 tok/s |
+| llama.cpp CPU, fused lookup | ×1.17 | ×1.75 |
+| llama.cpp Vulkan, no speculation | 9.7–10.4 tok/s | 9.8 tok/s |
+| llama.cpp Vulkan, fused lookup | ×1.05 | ×1.51 |
+
+Every speculative answer was byte-identical to non-speculative decoding: 64 of
+64 across CPU and Vulkan. Each stage measures at startup which micro-batch
+sizes give the same bits as one-position execution (1–7 on this CPU, only 1
+on this Vulkan build) and cuts verification waves to those sizes. On Vulkan
+that makes a wave cost about as much as its positions decoded one by one, so
+speculation gains less there.
+
+An earlier pass on the same day had one chat request take 205 s instead of
+about 10 s. It did not recur in a traced rerun or in the two-round run above,
+after the benchmark started waiting for the previous run's processes to exit.
+It is attributed to a leftover process still using the GPU, but that is not
+proven.
+
 ## Speculative drafting over a two-machine relay route — exploratory, 2026-11-21
 
 Not a physical claim under the evidence policy below. TTFT, peak memory,
