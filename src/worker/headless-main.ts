@@ -12,6 +12,7 @@ import {
 } from "./headless-runtime.js";
 import { probeRuntimePerformanceProfile } from "../performance/runtime-profile-probe.js";
 import { probeQwen3EngineRuntimeProfile } from "../performance/engine-runtime-profile-probe.js";
+import { probeLlamaCppEngineRuntimeProfile } from "./llama-cpp-engine-probe.js";
 
 const environment = loadHeadlessWorkerEnvironment();
 const runtimeMetadata = readNativeRuntimeBuildMetadata(resolve(import.meta.dirname, "../.."));
@@ -60,7 +61,15 @@ const agent = new WorkerAgent(workerConfig, {
     cwd: process.cwd(),
     env: { HF_HOME: environment.cachePath },
   }),
-  engineRuntimeProfileProbe: (challenge) => probeQwen3EngineRuntimeProfile(
+  engineRuntimeProfileProbe: (challenge) => challenge.probeKind === "llama-cpp-gguf-v1"
+    ? probeLlamaCppEngineRuntimeProfile(challenge, {
+      pythonExecutable: environment.pythonExecutable,
+      pythonPath: [environment.pythonPath],
+      cacheDirectory: environment.cachePath,
+      cwd: process.cwd(),
+      env: { HF_HOME: environment.cachePath },
+    })
+    : probeQwen3EngineRuntimeProfile(
     challenge,
     {
       pythonExecutable: environment.pythonExecutable,

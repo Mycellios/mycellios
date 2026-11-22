@@ -33,6 +33,7 @@ import { NodeEnrollmentBootstrap } from "./enrollment-bootstrap.js";
 import { activateNativeNodeAccelerator, prepareNativeNodeAccelerator } from "./native-accelerator.js";
 import { DEFAULT_NODE_WORK_POLICY, evaluateNodeWorkPolicy } from "../contracts/node-work-policy.js";
 import { probeRuntimePerformanceProfile } from "../performance/runtime-profile-probe.js";
+import { probeLlamaCppEngineRuntimeProfile } from "../worker/llama-cpp-engine-probe.js";
 import { createNodeMemoryEmbeddingReplica, trackStageActivity, type MemoryEmbeddingNodeReplica } from "./memory-embedding-replica.js";
 import { MemoryEmbeddingArtifactStore } from "./memory-embedding-artifact.js";
 import { measureCacheDiskBytes } from "./cache-disk-usage.js";
@@ -168,6 +169,16 @@ try {
       cwd: process.cwd(),
       env: { HF_HOME: environment.cachePath },
     }),
+    // Native nodes qualify for the llama.cpp engine; it needs no Torch device.
+    engineRuntimeProfileProbe: async (challenge) => challenge.probeKind === "llama-cpp-gguf-v1"
+      ? await probeLlamaCppEngineRuntimeProfile(challenge, {
+        pythonExecutable: environment.pythonExecutable,
+        pythonPath: [environment.pythonPath],
+        cacheDirectory: config.runtime.cachePath,
+        cwd: process.cwd(),
+        env: { HF_HOME: environment.cachePath },
+      })
+      : undefined,
     contributionControl: {
       initialEnabled: controlState.contributionEnabled && !controlState.draining,
       onRemoteChange: async (enabled) => { await controlStore.setContributionEnabled(enabled); },

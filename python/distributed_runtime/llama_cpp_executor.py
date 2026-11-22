@@ -139,6 +139,9 @@ class _Executor:
             "exact_sizes": list(self.report.exact_sizes),
             "exact_window": self.exact_window,
             "runtime_abi": self.stage.library.build.runtime_abi,
+            # Blocks run on the GPU only when they were offloaded and ggml found one.
+            "backend": self.stage.library.offload_backend if self.stage.options.gpu_layers > 0 else "cpu",
+            "gpu_devices": [list(device) for device in self.stage.library.gpu_devices],
         }
 
     def _self_test(self, positions: int):
