@@ -35,6 +35,8 @@ export const engineActivationAuthoritySchema = z.object({
     tensorManifestUrl: z.string().url().max(2_048)
       .refine((value) => value.startsWith("https://"), "gguf_tensor_manifest_url_must_use_https"),
     tensorManifestId: z.string().regex(/^[0-9a-f]{64}$/),
+    // The executor every stage of this artifact runs (native-gguf-source.ts).
+    executor: z.enum(["torch", "llama-cpp"]),
   }).strict().optional(),
   probe: z.object({
     kind: z.literal("qwen3-dense-v1"),

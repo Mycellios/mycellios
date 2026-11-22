@@ -21,6 +21,7 @@ import {
   engineActivationAuthoritySchema,
 } from "./engine-activation-authority.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
+import { createNativeGgufModelResolver } from "./native-gguf-model.js";
 import { NativeDraftStrategyCatalog } from "../distribution/draft-strategy-catalog.js";
 import { readMeasuredActivationCatalog, buildMeasuredActivationCatalogEvidence } from "./measured-activation-catalog.js";
 import { loadNativeReplicaPlacementConfig, NativeReplicaPlacementBroker } from "./native-replica-placement.js";
@@ -116,6 +117,9 @@ const runtime = await createCoordinator(config, {
               connectedWorkerIds: hub.connectedWorkerIds(), pythonExecutable: currentConfig.runtime.pythonExecutable,
             }); } } : {}),
           cwd: runtimeRoot,
+          ...(engineActivationAuthority?.artifact
+            ? { resolveNativeGgufModel: createNativeGgufModelResolver(engineActivationAuthority) }
+            : {}),
           workerAgentVersion: runtimeMetadata.version,
           ...(runtimeMetadata.buildIdentity
             ? { workerBuildIdentity: runtimeMetadata.buildIdentity }

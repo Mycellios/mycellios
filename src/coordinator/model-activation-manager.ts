@@ -23,6 +23,7 @@ import {
   type PythonPipelineLaunchDescription,
 } from "../distribution/python-launcher.js";
 import type { ResolvedDraftStrategy } from "../distribution/draft-strategy-registry.js";
+import type { PythonNativeGgufSourceConfiguration } from "../distribution/native-gguf-source.js";
 import type { ModelActivationProgressEvent, ModelExecutionCapacityNode } from "./model-catalog.js";
 import { compileMeasuredModelActivation, compilePinnedActivationCalibration, selectMeasuredModelActivation, type MeasuredModelActivationEvidence } from "./measured-model-activation.js";
 
@@ -116,6 +117,17 @@ export interface DynamicModelActivationManagerOptions {
     result: AutoDistributionRunResult,
   ): void | Promise<void>;
   onStopped?(modelId: string): void | Promise<void>;
+  /**
+   * A certified quantized GGUF for this model, if one is pinned. Its profile
+   * replaces the safetensors profile, and every node builds its own stage
+   * from the GGUF instead of the Hugging Face checkpoint.
+   */
+  resolveNativeGgufModel?(model: { id: string; source: string; revision: string | null }): Promise<NativeGgufModel | null>;
+}
+
+export interface NativeGgufModel {
+  profile: import("../distribution/auto-distribute.js").CompiledModelProfile;
+  source: PythonNativeGgufSourceConfiguration;
 }
 
 export class AutomaticModelActivationManager implements ModelActivationManager {
@@ -352,7 +364,8 @@ export class DynamicModelActivationManager implements ModelActivationManager {
     const environment = this.options.environment ?? process.env;
     const running = (async () => {
       this.appendProgress(model.id, "profiling", "Reading the model and preparing its execution profile.");
-      const profile = await profileCompatibleModel(config, cwd, environment);
+      const gguf = await this.options.resolveNativeGgufModel?.({ id: model.id, source: model.source, revision: model.revision }) ?? null;
+      const profile = gguf?.profile ?? await profileCompatibleModel(config, cwd, environment);
       this.appendProgress(
         model.id,
         "profile_ready",
@@ -377,6 +390,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
       }
       config = parseAutoDistributionConfig({
         ...structuredClone(fresh),
+        ...(gguf ? { runtime: { ...structuredClone(fresh.runtime), nativeGgufSource: structuredClone(gguf.source) } } : {}),
         model: structuredClone(config.model),
         distribution: {
           ...structuredClone(config.distribution),
@@ -386,7 +400,9 @@ export class DynamicModelActivationManager implements ModelActivationManager {
         workload: structuredClone(config.workload),
         artifactsDirectory: config.artifactsDirectory,
       });
-      const calibrated = await this.options.measuredCandidateEvidence?.(model.id, structuredClone(config), structuredClone(profile));
+      // Measured candidates and dense calibration describe safetensors routes.
+      const calibrated = gguf ? null
+        : await this.options.measuredCandidateEvidence?.(model.id, structuredClone(config), structuredClone(profile));
       let compilation = calibrated
         ? this.options.calibrationCandidateId
           ? compilePinnedActivationCalibration(config, profile, calibrated, this.options.calibrationCandidateId)
@@ -409,7 +425,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
         compilation = compileAutoDistribution(config, profile);
       }
       await writeAutoDistributionArtifacts(config, compilation, cwd);
-      const measured = await this.options.measuredRouteEvidence?.(model.id, compilation);
+      const measured = gguf ? null : await this.options.measuredRouteEvidence?.(model.id, compilation);
       if (controller.signal.aborted) return;
       if (measured) compilation = await selectMeasuredModelActivation(compilation, measured, cwd, environment);
       const reservationStages = routeStagesForReservation(config, compilation, this.current.reservationCapacityMiBByNode);

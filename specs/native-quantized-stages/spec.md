@@ -271,9 +271,17 @@ What remains before selection is automatic, in order:
    The launch agent rejects llama.cpp host flags without the llama.cpp
    executor and a sealed package binding. A node without a local llama.cpp
    build refuses the route (`native_gguf_llama_cpp_runtime_unavailable`).
-   Still open: the coordinator emitting `nativeGgufSource` from the
-   authority's `artifact`, with a model profile derived from the tensor
-   manifest, and each node's build coming from the pinned runtime component.
+   The coordinator emits it: when the authority carries an `artifact` (which
+   now names its `executor`) and a requested model's source is the certified
+   `descriptor.model.modelId`, the activation manager fetches the tensor
+   manifest once, accepts it only with the pinned id, artifact hash and size,
+   and plans from a profile computed from it
+   (`src/distribution/gguf-model-profile.ts`). Layer sizes are the quantized
+   bytes each package holds, a tied head is budgeted at both ends, and the KV
+   cache is float16. The checkpoint is never profiled, and measured
+   safetensors candidates do not apply. The root loads only its tokenizer from
+   the Hugging Face source, at its default revision. Still open: each node's
+   llama.cpp build coming from the pinned runtime component.
 5. Requested models gain a pinned GGUF source, and nodes build their stage
    packages from it. The pin lives in the engine activation authority, not in
    the requested-model table, so it needs no migration and is bound by the
