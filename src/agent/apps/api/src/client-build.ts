@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import type { MinimumClientBuilds } from "@mycellios/contracts";
 import {
-  CLIENT_BUILD_HEADER,
   CLIENT_UPDATE_REQUIRED,
   CLIENT_UPDATE_REQUIRED_STATUS,
   clientUpdateRequired,
   isBuildId,
   SERVER_BUILD_HEADER,
 } from "@mycellios/contracts";
+import { HEADER_PREFIX, readHeader } from "@mycellios/core/legacy-env";
 import type { MiddlewareHandler } from "hono";
 
 /**
@@ -33,7 +33,7 @@ export function clientBuildMiddleware(options: {
   minimums: MinimumClientBuilds;
 }): MiddlewareHandler {
   return async (c, next) => {
-    if (clientUpdateRequired(c.req.header(CLIENT_BUILD_HEADER), options.minimums)) {
+    if (clientUpdateRequired(readHeader((name) => c.req.header(name), "client-build"), options.minimums)) {
       // The oRPC error shape, so web and mobile clients read it like any other RPC failure.
       return c.json(
         {
@@ -47,11 +47,16 @@ export function clientBuildMiddleware(options: {
         CLIENT_UPDATE_REQUIRED_STATUS,
         {
           "cache-control": "no-store",
-          ...(options.webBuild ? { [SERVER_BUILD_HEADER]: options.webBuild } : {}),
+          ...(options.webBuild
+            ? { [SERVER_BUILD_HEADER]: options.webBuild, [`${HEADER_PREFIX}build`]: options.webBuild }
+            : {}),
         },
       );
     }
     await next();
-    if (options.webBuild) c.header(SERVER_BUILD_HEADER, options.webBuild);
+    if (options.webBuild) {
+      c.header(SERVER_BUILD_HEADER, options.webBuild);
+      c.header(`${HEADER_PREFIX}build`, options.webBuild);
+    }
   };
 }

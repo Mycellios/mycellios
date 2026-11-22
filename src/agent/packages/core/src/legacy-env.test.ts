@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { deleteEnv, legacyEnvName, readEnv } from "./legacy-env.js";
+import {
+  ConflictingHeaderError,
+  deleteEnv,
+  HEADER_PREFIX,
+  legacyEnvName,
+  legacyHeaderName,
+  readEnv,
+  readHeader,
+} from "./legacy-env.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -34,5 +42,24 @@ describe("deleteEnv", () => {
     const target: Record<string, string | undefined> = { MYCELLIOS_PROBE_E: "a", [legacyEnvName("PROBE_E")]: "b", OTHER: "c" };
     deleteEnv("PROBE_E", target);
     expect(target).toEqual({ OTHER: "c" });
+  });
+});
+
+describe("readHeader", () => {
+  const from = (headers: Record<string, string>) => (name: string) => headers[name] ?? null;
+
+  it("reads the current header, then the legacy one", () => {
+    expect(readHeader(from({ [`${HEADER_PREFIX}space-id`]: "a" }), "space-id")).toBe("a");
+    expect(readHeader(from({ [legacyHeaderName("space-id")]: "b" }), "space-id")).toBe("b");
+    expect(readHeader(from({}), "space-id")).toBeUndefined();
+  });
+
+  it("accepts both when they agree and refuses them when they differ", () => {
+    const current = `${HEADER_PREFIX}space-id`;
+    const legacy = legacyHeaderName("space-id");
+    expect(readHeader(from({ [current]: "a", [legacy]: "a" }), "space-id")).toBe("a");
+    expect(() => readHeader(from({ [current]: "a", [legacy]: "b" }), "space-id")).toThrow(
+      ConflictingHeaderError,
+    );
   });
 });

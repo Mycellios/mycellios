@@ -7,6 +7,7 @@ import {
   CLIENT_UPDATE_REQUIRED,
   SERVER_BUILD_HEADER,
 } from "@mycellios/contracts";
+import { HEADER_PREFIX } from "@mycellios/core/legacy-env";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { clientBuildMiddleware, readDeployedWebBuild } from "./client-build.js";
@@ -28,6 +29,15 @@ describe("client build handshake", () => {
     const response = await call(app("20261022093015"), "web/20261001000000");
     expect(response.status).toBe(200);
     expect(response.headers.get(SERVER_BUILD_HEADER)).toBe("20261022093015");
+    expect(response.headers.get(`${HEADER_PREFIX}build`)).toBe("20261022093015");
+  });
+
+  it("reads the client build from the current header name", async () => {
+    const refused = await app("20261022093015", { web: "20261022000000" }).request("/rpc/me", {
+      method: "POST",
+      headers: { [`${HEADER_PREFIX}client-build`]: "web/20261021235959" },
+    });
+    expect(refused.status).toBe(426);
   });
 
   it("stays quiet without a known web build", async () => {
