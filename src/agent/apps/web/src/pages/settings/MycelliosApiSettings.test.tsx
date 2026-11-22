@@ -114,8 +114,8 @@ it("groups the last API requests by model and labels them as key usage", async (
   expect(div.textContent).toContain("Requests made with your API keys");
   expect(div.textContent).toContain("What your Micos use appears in Profile");
   expect(div.textContent).toContain("Last 50 requests by model");
-  expect(div.textContent).toContain("model-aRequests: 2 · Tokens: 200");
-  expect(div.textContent).toContain("model-bRequests: 1 · Tokens: 50");
+  expect(div.textContent).toContain("model-aAPI requests: 2 · Tokens: 200");
+  expect(div.textContent).toContain("model-bAPI requests: 1 · Tokens: 50");
 });
 
 it("explains a signed-out account without calling the API", async () => {

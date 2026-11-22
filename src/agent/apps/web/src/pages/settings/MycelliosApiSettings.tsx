@@ -263,7 +263,7 @@ export function ApiUsageSettingsPanel({ accountId }: { accountId?: string }) {
       ) : (
         <>
           <SettingsGroup title={t`Total`}>
-            <SettingsRow label={t`Requests`} description={usage.totals ? count(usage.totals.requestCount) : t`Unavailable`} />
+            <SettingsRow label={t`API requests`} description={usage.totals ? count(usage.totals.requestCount) : t`Unavailable`} />
             <SettingsRow label={t`Input tokens`} description={usage.totals ? count(usage.totals.inputTokens) : t`Unavailable`} />
             <SettingsRow label={t`Output tokens`} description={usage.totals ? count(usage.totals.outputTokens) : t`Unavailable`} />
           </SettingsGroup>
@@ -275,7 +275,7 @@ export function ApiUsageSettingsPanel({ accountId }: { accountId?: string }) {
                 <SettingsRow
                   key={model}
                   label={<span className="break-all">{model}</span>}
-                  description={`${t`Requests`}: ${count(total.requests)} · ${t`Tokens`}: ${count(total.tokens)}`}
+                  description={`${t`API requests`}: ${count(total.requests)} · ${t`Tokens`}: ${count(total.tokens)}`}
                 />
               ))}
             </SettingsGroup>
