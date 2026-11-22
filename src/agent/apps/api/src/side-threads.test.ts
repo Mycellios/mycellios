@@ -49,7 +49,7 @@ describe("archiveSideThread", () => {
     mocks.archive.mockResolvedValue({ archivedAt });
     await expect(archiveSideThread(d as never, actor, target)).resolves.toEqual({ archivedAt });
     expect(mocks.stopThreadRuns).toHaveBeenCalledWith(d, actor, target);
-    expect(mocks.stopWorkForThread).toHaveBeenCalledWith(d, actor, "side");
+    expect(mocks.stopWorkForThread).toHaveBeenCalledWith(d, actor, "side", { keepEventWaits: true });
     expect(mocks.archive).toHaveBeenCalledWith(tx, actor, { botId: "mico", threadId: "side" });
     expect(mocks.stopThreadRuns.mock.invocationCallOrder[0]).toBeLessThan(mocks.archive.mock.invocationCallOrder[0]!);
   });

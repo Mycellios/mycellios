@@ -6992,3 +6992,71 @@ msgstr "Vos Micos peuvent travailler sur plusieurs tâches à la fois."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Leurs réponses restent ici jusqu’à ce que vous les archiviez."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Attentes ouvertes"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "Attend jusqu’à {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "Attend la prochaine exécution de {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Attend la prochaine exécution d’une routine"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Attend la fin d’une exécution"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Réveillée"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "Reprise de la demande"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "En attente"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "Cette attente s’est déjà réveillée, elle n’a donc pas été annulée. Sa demande continue."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "Impossible d’annuler l’attente. Réessayez."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Limite : {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "Afficher la demande"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Note enregistrée"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Demande d’origine"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "Annulation…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Annuler l’attente"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "En attente d’un événement"

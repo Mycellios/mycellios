@@ -5,7 +5,7 @@ import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@mycellios/core/native-project-instructions";
 import { agentTaskInstructions, micoBehaviorInstructions } from "./mico-behavior.js";
 import { AGENT_TASK_TOOL_NAMES, agentTaskToolsAllowed, isAgentTaskToolName, runAgentTaskTool } from "./agent-tasks.js";
-import { AGENT_TASK_SURFACE_ERROR, AGENT_TASK_WAIT_REFUSAL, HISTORY_ACROSS_GUIDANCE, historyAcrossAllowed, PIN_MESSAGE_GUIDANCE } from "@mycellios/core";
+import { AGENT_TASK_SURFACE_ERROR, AGENT_TASK_WAIT_REFUSAL, EVENT_WAIT_GUIDANCE, EVENT_WAIT_SURFACE_ERROR, HISTORY_ACROSS_GUIDANCE, historyAcrossAllowed, PIN_MESSAGE_GUIDANCE } from "@mycellios/core";
 import { isPersonRequestedRoutineRun, missedRoutineOccurrences, ROUTINE_FAILURE_REASON_MAX_LENGTH } from "@mycellios/core";
 import { type HistoryAccess, runHistoryTool, runPinMessageTool } from "./history-tools.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
@@ -320,7 +320,7 @@ import {
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { nativeWorkProjectSession } from "@mycellios/core";
 import { projectExecutionLeaseKey, PROJECT_SHARED_SCREEN_TOOLS } from "./project-execution.js";
-import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait } from "@mycellios/db";
+import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait, listEventWaits, closeEventWait, IsolationError, type EventWaitView } from "@mycellios/db";
 import type { NativeCommandReceipt } from "./native-command-journal.js";
 import { connectApp } from "./connect-app.js";
 import { connectedContext, selectRunConnections } from "./connection-context.js";
@@ -593,8 +593,35 @@ function connectorTrustKeys(
 
 /** Effects that got past the approval gate: approved, allowed by a rule or review, or run. */
 const PASSED_EFFECT_STATUSES = ["approved", "executing", "uncertain", "completed"];
+/** A Mico's await_event waits: offered together, refused together. */
+const EVENT_WAIT_TOOL_NAMES: readonly string[] = ["await_event", "list_waits", "close_wait"];
+
+/**
+ * A wait as list_waits returns it: ids, state, timing and the Mico's own note. The request it
+ * parked is left out (it may be outside text); read it with the history tools when needed.
+ */
+function eventWaitForModel(wait: EventWaitView, currentThreadId: string) {
+  return {
+    waitId: wait.waitId,
+    status: wait.status,
+    waitsFor: wait.routineId
+      ? { routineId: wait.routineId, ...(wait.routineName ? { routineName: wait.routineName } : {}) }
+      : wait.runId ? { runId: wait.runId } : { resumeAt: wait.resumeAt },
+    note: wait.note,
+    openedAt: wait.openedAt,
+    expiresAt: wait.expiresAt,
+    ...(wait.outcome ? { outcome: wait.outcome } : {}),
+    ...(wait.settledAt ? { wokeAt: wait.settledAt } : {}),
+    ...(wait.closedAt ? { closedAt: wait.closedAt, closedBy: wait.closedBy === "person" ? "the person" : "you" } : {}),
+    conversation: wait.threadId === currentThreadId ? { current: true }
+      : wait.thread.main ? { mainChat: true }
+      : { taskId: wait.threadId, title: wait.thread.title ?? "", ...(wait.thread.archived ? { archived: true } : {}) },
+  };
+}
+
 const READ_ONLY_AGENT_TOOLS = new Set([
   "app_read",
+  "list_waits",
   "pc_windows",
   "pc_snapshot",
   "command_status",
@@ -4632,7 +4659,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if (!pinAllowed) disabledBuiltinTools.add("pin_message");
         // A conversation the Mico opened finishes with a report; it never parks on a wait.
         const agentStartedThread = thread.taskBotId === bot.id && thread.startedBy === "agent";
-        if (agentStartedThread) disabledBuiltinTools.add("await_event");
+        if (agentStartedThread) for (const name of EVENT_WAIT_TOOL_NAMES) disabledBuiltinTools.add(name);
         // A routine's own run may mark itself failed; nothing else can.
         const routineFailureAllowed =
           Boolean(run.routineId) && (run.trigger === "routine" || run.trigger === "webhook") && !messagingChannelRun;
@@ -4839,6 +4866,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.trigger === "created" ? builtins : [...builtins, ...exposedConnectorTools];
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
+          : undefined;
+        const eventWaitInstruction = tools.some((tool) => tool.name === "await_event")
+          ? EVENT_WAIT_GUIDANCE
           : undefined;
         const agentTaskInstruction = agentTaskInstructions({
           offersStartTask: tools.some((tool) => tool.name === "start_task"),
@@ -5198,7 +5228,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const ownerDisabled = disabledBuiltinToolSet(bot.disabledBuiltinTools).has(name);
             if (!ownerDisabled && isAgentTaskToolName(name) && !agentTasksAllowed)
               return { error: AGENT_TASK_SURFACE_ERROR };
-            if (!ownerDisabled && name === "await_event" && agentStartedThread)
+            if (!ownerDisabled && EVENT_WAIT_TOOL_NAMES.includes(name) && agentStartedThread)
               return { error: AGENT_TASK_WAIT_REFUSAL };
             if (!ownerDisabled && name === "routine_report_failure" && !routineFailureAllowed)
               return { error: ROUTINE_FAILURE_SURFACE_ERROR };
@@ -8286,9 +8316,33 @@ export function createRunExecutor(deps: ExecutorDeps) {
               effectKey,
             ));
           }
+          if (name === "list_waits" || name === "close_wait") {
+            if (agentStartedThread) return finish({ error: AGENT_TASK_WAIT_REFUSAL });
+            if (messagingChannelRun || thread.groupId || thread.externalConversationId) return finish({ error: EVENT_WAIT_SURFACE_ERROR });
+            // The Mico's own waits; beyond this conversation only where its history reaches.
+            const threadIds = historyAccess === "across" ? undefined : [thread.id];
+            const scope = { spaceId: run.spaceId, userId: run.userId, botId: bot.id };
+            if (name === "list_waits") {
+              const waits = await listEventWaits(deps.prisma, scope, { threadIds, includeClosed: args.include_closed === true });
+              return finish({ waits: waits.map((wait) => eventWaitForModel(wait, thread.id)),
+                note: waits.length ? "Each wait wakes its request once. Close a wait whose request no longer needs it with close_wait." : "You have no open waits here." });
+            }
+            const waitId = typeof args.wait_id === "string" ? args.wait_id.trim() : "";
+            if (!waitId) return finish({ error: "wait_id is required" });
+            try {
+              const closed = await closeEventWait(deps.prisma, { ...scope, threadIds }, { waitId, by: "mico" });
+              return finish({ ok: true, waitId: closed.waitId, closed: closed.closed, alreadyClosed: closed.alreadyClosed,
+                cancelled: closed.cancelled, note: closed.alreadyClosed ? "This wait was already closed; nothing changed."
+                  : closed.cancelled ? "The wait was cancelled before it woke; it will not wake its request."
+                  : "This wait had already woken; it is now marked closed and its request goes on as before." });
+            } catch (error) {
+              if (error instanceof IsolationError) return finish({ error: "No wait of yours with that wait_id is available here. Use list_waits." });
+              throw error;
+            }
+          }
           if (name === "await_event") {
             if (agentStartedThread) return finish({ error: AGENT_TASK_WAIT_REFUSAL });
-            if (messagingChannelRun || thread.groupId) return finish({error:"Event waits are available only in the owner's private Mico conversations"});
+            if (messagingChannelRun || thread.groupId) return finish({error:EVENT_WAIT_SURFACE_ERROR});
             if(pendingCommands.size)return finish({error:"Inspect command_status before parking a request with a running or uncertain command"});
             const wait = await openEventWait(deps.prisma, { ...run, leaseOwner: workerId, leaseFence: fence }, {
               key: effectKey, note: redactSecrets(String(args.note ?? ""), runSecrets),
@@ -8830,6 +8884,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   computerInstruction,
                   pageBrowserAllowed,
                   taskCatalogInstruction,
+                  eventWaitInstruction,
                   agentTaskInstruction,
                   workspaceInstruction,
                   agentEnvironmentInstruction,
@@ -10370,6 +10425,8 @@ export function selectBuiltinToolsForRun(options: {
           "forget_memory",
           "task_catalog",
           "await_event",
+          "list_waits",
+          "close_wait",
           "board_tickets",
         ].includes(tool.name) &&
           !tool.name.startsWith("scratchpad_") &&
@@ -10695,6 +10752,8 @@ export function userTurnInstructions(parts: {
   computerInstruction: string;
   pageBrowserAllowed: boolean;
   taskCatalogInstruction?: string;
+  /** Long jobs and await_event waits, when await_event is offered. */
+  eventWaitInstruction?: string;
   /** When to open tasks (main chat, routine) or the side-conversation rules. */
   agentTaskInstruction?: string;
   workspaceInstruction: string;
@@ -10724,6 +10783,7 @@ export function userTurnInstructions(parts: {
     offeredBuiltinClause(parts.disabledBuiltinTools, "pin_message", PIN_MESSAGE_GUIDANCE),
     toolUsageLine(parts),
     parts.taskCatalogInstruction,
+    parts.eventWaitInstruction,
     parts.agentTaskInstruction,
     parts.workspaceInstruction,
     parts.agentEnvironmentInstruction,

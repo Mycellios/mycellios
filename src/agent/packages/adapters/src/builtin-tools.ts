@@ -1605,13 +1605,28 @@ export const builtinAgentTools: ConnectorTool[] = [
   },
   {
     name: "await_event",
-    description: "Park this authorized request durably and resume it automatically when an owned routine finishes its next run, another owned execution finishes, or a future time arrives. Choose exactly one routine_id, run_id, resume_at. Use an existing webhook/change routine for external events; this tool does not create schedules, grant permissions or keep polling the model. Save a concrete next-step note, then end the turn. Inspect waits with work_status; pause/cancel them with the existing task controls.",
+    description: "Park this authorized request durably and resume it automatically when an owned routine finishes its next run, another owned execution finishes, or a future time arrives. Choose exactly one routine_id, run_id, resume_at. Use an existing webhook/change routine for external events; this tool does not create schedules, grant permissions or keep polling the model. Save a concrete next-step note, tell the person in one sentence what you wait for, then end the turn. The wake repeats the request and your note in this conversation. The person sees the wait in this conversation and can cancel it; use list_waits and close_wait for your own waits.",
     inputSchema: { type: "object", properties: {
       note: { type: "string", minLength: 1, maxLength: 2000 },
       routine_id: { type: "string" }, run_id: { type: "string" },
       resume_at: { type: "string", description: "Future ISO timestamp with timezone." },
       timeout_minutes: { type: "number", minimum: 1, maximum: 43200, description: "Default 1440. Expiry resumes the request with an expired outcome, never a false success." },
     }, required: ["note"], additionalProperties: false },
+  },
+  {
+    name: "list_waits",
+    readOnly: true,
+    description: "List the waits you opened with await_event that are still open: what each one waits for, your saved note, when it times out, its conversation and whether it is waiting, paused, woke or already continuing its request. In your main chat or a side conversation this covers all your conversations; elsewhere only this one.",
+    inputSchema: { type: "object", properties: {
+      include_closed: { type: "boolean", description: "Also list waits that were closed, cancelled or finished in the last two days." },
+    }, additionalProperties: false },
+  },
+  {
+    name: "close_wait",
+    description: "Close one of your waits by the wait_id from await_event or list_waits, when its request was finished another way or is no longer needed, so it does not wake later. A wait that has not woken is cancelled and its request ends without another turn, unless other work of that request is still on its way. A wait that already woke is only marked closed; this never stops a running request. Closing a closed wait changes nothing.",
+    inputSchema: { type: "object", properties: {
+      wait_id: { type: "string", minLength: 1 },
+    }, required: ["wait_id"], additionalProperties: false },
   },
   {
     name: "start_task",

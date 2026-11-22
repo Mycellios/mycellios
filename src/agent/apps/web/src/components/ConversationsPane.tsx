@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import {
   Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@mycellios/ui-web";
-import { ChevronDown, Columns2, MessageCircle, MessageCirclePlus, MessageSquareText, X } from "lucide-react";
+import { ChevronDown, Columns2, Hourglass, MessageCircle, MessageCirclePlus, MessageSquareText, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import type { BesideConversations } from "../lib/conversation-pane";
 import { formatRelativeTime } from "../lib/relative-time";
@@ -140,6 +140,9 @@ export function ConversationsPane({
               onClick={() => onOpen(row.threadId)}>
               {status ? <ThreadStatusMark status={status} /> : <MessageCircle size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />}
               <span className="line-clamp-2 min-w-0 whitespace-normal break-words" dir="auto">{titleOf(row)}</span>
+              {row.openWaits ? <span data-open-waits={row.openWaits} title={t`Waiting for an event`} className="shrink-0 text-muted-foreground">
+                <Hourglass size={13} aria-hidden="true" /><span className="sr-only">{t`Waiting for an event`}</span>
+              </span> : null}
               {when ? <time dateTime={row.updatedAt} data-thread-time className="ms-auto shrink-0 text-xs text-muted-foreground">{when}</time> : null}
             </Button>
             {canBeside ? <Button size="icon-sm" variant="ghost" aria-pressed={isBeside} disabled={inChat}

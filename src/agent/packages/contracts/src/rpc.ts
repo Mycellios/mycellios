@@ -28,6 +28,7 @@ import * as z from "zod";
 import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
 import { SideThreadRequestSchema, SideThreadSchema, SideThreadTargetSchema } from "./side-threads.js";
+import { CancelOpenWaitResultSchema, OpenWaitSchema } from "./event-waits.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
@@ -1400,6 +1401,10 @@ export const appContract = {
     controlWork: oc.input(z.object({taskId:Id,expectedRevision:z.number().int().nonnegative(),
       action:z.enum(['pause','resume','cancel','reassign']),botId:Id.optional()}))
       .output(z.object({taskId:Id,revision:z.number().int(),paused:z.boolean(),stopping:z.boolean()})),
+    /** The open await_event waits of one of the Mico's conversations (its main chat or a side one). */
+    waits: oc.input(z.object({ botId: Id, threadId: Id })).output(z.array(OpenWaitSchema)),
+    /** "Cancel the wait": the existing durable cancellation; a wait that already woke is not cancelled. */
+    cancelWait: oc.input(z.object({ waitId: Id })).output(CancelOpenWaitResultSchema),
 
     get: oc.input(z.object({ runId: Id })).output(
       z.object({

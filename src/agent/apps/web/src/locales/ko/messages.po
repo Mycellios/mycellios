@@ -6991,3 +6991,71 @@ msgstr "Mico는 여러 작업을 동시에 진행할 수 있습니다."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "답변은 보관할 때까지 여기에 남아 있습니다."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "열린 대기"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "{time}까지 대기"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "{routine}의 다음 실행 대기"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "자동 실행의 다음 실행 대기"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "실행이 끝나기를 대기"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "깨어남"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "요청 계속 진행 중"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "대기 중"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "이 대기는 이미 깨어나서 취소되지 않았습니다. 요청은 계속됩니다."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "대기를 취소하지 못했습니다. 다시 시도하세요."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "제한 시간: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "요청 보기"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "저장된 메모"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "원래 요청"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "취소하는 중…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "대기 취소"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "이벤트 대기 중"

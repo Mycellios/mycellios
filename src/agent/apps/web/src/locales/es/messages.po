@@ -14437,3 +14437,67 @@ msgstr "Tus Micos pueden trabajar en varias tareas a la vez."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Sus respuestas se quedan aquí hasta que las archives."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Esperas abiertas"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "Espera hasta {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "Espera la próxima ejecución de {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Espera la próxima ejecución de una rutina"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Espera a que termine una ejecución"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Despertó"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "Continuando la petición"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "Esta espera ya despertó, así que no se canceló. Su petición sigue."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "No se pudo cancelar la espera. Inténtalo de nuevo."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Límite: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "Mostrar la petición"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Nota guardada"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Petición original"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "Cancelando…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Cancelar la espera"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "Esperando un evento"

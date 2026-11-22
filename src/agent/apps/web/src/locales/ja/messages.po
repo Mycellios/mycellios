@@ -6992,3 +6992,71 @@ msgstr "Mico は複数のタスクを同時に進められます。"
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "回答はアーカイブするまでここに残ります。"
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "未完了の待機"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "{time} まで待機"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "{routine} の次の実行を待機"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "ルーティンの次の実行を待機"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "実行の完了を待機"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "起動済み"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "リクエストを続行中"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "待機中"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "この待機はすでに起動したため、キャンセルされませんでした。リクエストは続行されます。"
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "待機をキャンセルできませんでした。もう一度お試しください。"
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "期限: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "リクエストを表示"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "保存されたメモ"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "元のリクエスト"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "キャンセル中…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "待機をキャンセル"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "イベントを待機中"

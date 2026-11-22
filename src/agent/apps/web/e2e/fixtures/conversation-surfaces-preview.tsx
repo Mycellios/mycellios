@@ -1,11 +1,12 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import type { Space, SideThreadRequest, ThreadSnapshot } from "@mycellios/contracts";
+import type { OpenWait, Space, SideThreadRequest, ThreadSnapshot } from "@mycellios/contracts";
 import { Toaster } from "@mycellios/ui-web";
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ConversationsPane } from "../../src/components/ConversationsPane";
 import { MirroredRequests } from "../../src/components/MirroredRequests";
+import { OpenWaits } from "../../src/components/OpenWaits";
 import { SideConversationView } from "../../src/components/SideConversationView";
 import { closeBeside, openBeside, showBeside, updateBeside, useBeside } from "../../src/lib/conversation-pane";
 import type { RpcClient } from "../../src/lib/rpc";
@@ -27,7 +28,7 @@ const spaceId = "fixture-space";
 const rows: ConversationRow[] = [
   { threadId: "plan", title: "Plan the spring trip", kind: "conversation", state: "running", createdAt: at(300), updatedAt: at(1) },
   { threadId: "asks", title: "Choose a supplier", kind: "conversation", state: "waiting", createdAt: at(200), updatedAt: at(5) },
-  { threadId: "offers", title: "Compare energy offers", kind: "conversation", state: "idle", unread: true, createdAt: at(150), updatedAt: at(12) },
+  { threadId: "offers", title: "Compare energy offers", kind: "conversation", state: "idle", unread: true, openWaits: 1, createdAt: at(150), updatedAt: at(12) },
   { threadId: "invoices", title: "Import invoices", kind: "conversation", state: "idle", outcome: "failed", createdAt: at(140), updatedAt: at(40) },
   { threadId: "notes", title: "Meeting notes", kind: "conversation", state: "idle", createdAt: at(400), updatedAt: at(90) },
   { threadId: "budget", title: "Yearly budget", kind: "conversation", state: "idle", createdAt: at(500), updatedAt: at(300) },
@@ -51,12 +52,34 @@ const requests: SideThreadRequest[] = [
   { threadId: "plan", title: "Plan the spring trip", runId: "run-plan", messageId: null, kind: "takeover", block: null, createdAt: at(3) },
 ];
 const answered: string[] = [];
+const soon = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+// Requests the Mico parked in the main chat with await_event; the second already woke.
+const waits: OpenWait[] = [
+  { waitId: "wait-report", threadId: "main", note: "Read tonight's sales report, compare it with last week and send the three biggest changes.",
+    request: "When the nightly report lands, tell me what changed most.", openedAt: at(30), expiresAt: soon(1410), timeoutMinutes: 1440,
+    routineId: "routine-report", routineName: "Nightly sales report", status: "waiting" },
+  { waitId: "wait-deploy", threadId: "main", note: "Open the site and confirm the new prices are live.",
+    request: "Deploy the price update and check it is live.", openedAt: at(20), expiresAt: soon(100), timeoutMinutes: 120,
+    resumeAt: soon(25), status: "waiting" },
+];
+const closedWaits: string[] = [];
+let deployWoke = false;
 /** Lets the synthetic server redraw the page after an answer, as a roster refresh would. */
 let redraw: () => void = () => undefined;
 const rpc = {
   development: {
     list: async () => rows.map(row => ({ projectKey: "mico:mico", taskKey: row.threadId, ...row })),
     requests: async () => requests.filter(request => !answered.includes(request.runId)),
+  },
+  tasks: {
+    waits: async () => waits.filter(wait => !closedWaits.includes(wait.waitId))
+      .map(wait => wait.waitId === "wait-deploy" && deployWoke ? { ...wait, status: "woke" as const } : wait),
+    // The deploy check woke on the server just before the click, so it is not cancelled.
+    cancelWait: async ({ waitId }: { waitId: string }) => {
+      if (waitId === "wait-deploy") { deployWoke = true; return { waitId, closed: false, alreadyClosed: false, status: "woke" as const }; }
+      closedWaits.push(waitId);
+      return { waitId, closed: true, alreadyClosed: false, status: "closed" as const };
+    },
   },
 } as unknown as RpcClient;
 // One client per conversation, bound to it: it reads the conversation first, then answers or sends.
@@ -127,6 +150,7 @@ function Preview() {
       <p data-testid="opened" className="text-sm text-muted-foreground">{shown ?? "Main chat"}</p>
       <div className="flex-1 overflow-auto">
         <p className="mx-auto max-w-[42rem] text-sm">The main chat with Existing Mico.</p>
+        <OpenWaits rpc={rpc} botId="mico" threadId="main" refreshKey="fixture" />
         <MirroredRequests botId="mico" enabled={answered.length < requests.length} revision={String(answered.length)} rpc={rpc}
           bind={bind} onOpenConversation={threadId => setShown(`/app/mico?task=${threadId}`)} />
       </div>

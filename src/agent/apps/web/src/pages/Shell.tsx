@@ -243,6 +243,7 @@ import {
 import { ConversationsPane, waitingConversations } from "../components/ConversationsPane";
 import { SideConversationView } from "../components/SideConversationView";
 import { MirroredRequests } from "../components/MirroredRequests";
+import { OpenWaits } from "../components/OpenWaits";
 import { closeBeside, openBeside, pruneBeside, showBeside, updateBeside, useBeside } from "../lib/conversation-pane";
 import { micoConversationScope } from "../lib/sidebar-conversations";
 import { SidebarViewMenu } from "./shell/sidebar-view-menu";
@@ -2839,11 +2840,21 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const mirrorEnabled = Boolean(mirrorBotId) && conversationsWaiting > 0;
   const mirrorRevision = active?.conversations?.revision;
   const bindMirroredRequest = useCallback((threadId: string) => besideClient(mirrorBotId ?? "", threadId), [besideClient, mirrorBotId]);
+  // Requests the Mico parked here with await_event: the main chat or the open side conversation.
+  const waitsBotId = active && !inGroup && !newConversation ? active.id : undefined;
+  const waitsThreadId = waitsBotId && activeSnapshot?.threadId &&
+    (!taskScope || activeSnapshot.threadId === taskScope.taskThreadId) ? activeSnapshot.threadId : undefined;
+  const waitsRefresh = `${activeSnapshot?.run?.id ?? ""}:${activeSnapshot?.run?.status ?? ""}`;
+  const openWaits = useMemo(() => waitsBotId && waitsThreadId
+    ? <OpenWaits rpc={rpc} botId={waitsBotId} threadId={waitsThreadId} refreshKey={waitsRefresh} /> : null,
+  [rpc, waitsBotId, waitsThreadId, waitsRefresh]);
   const transcriptFooter = useMemo(() => mirrorBotId ? <>
     {conversationFailure}
+    {openWaits}
     <MirroredRequests botId={mirrorBotId} enabled={mirrorEnabled} revision={mirrorRevision} rpc={rpc}
       bind={bindMirroredRequest} onOpenConversation={threadId => selectConversationRef.current(threadId)} />
-  </> : conversationFailure, [conversationFailure, mirrorBotId, mirrorEnabled, mirrorRevision, rpc, bindMirroredRequest]);
+  </> : openWaits ? <>{conversationFailure}{openWaits}</> : conversationFailure,
+  [conversationFailure, openWaits, mirrorBotId, mirrorEnabled, mirrorRevision, rpc, bindMirroredRequest]);
   const shellReady =
     initialBotsLoaded &&
     (inGroup

@@ -249,6 +249,26 @@ try {
   await pane().locator('[data-conversation-row="offers"]').waitFor();
   assert.equal(await page.locator("[data-side-conversation]").count(), 0);
 
+  // Open waits: what each wait is for, its request, and Cancel the wait that never claims a woken wait.
+  const waitsCard = page.getByTestId("open-waits");
+  assert.equal(await waitsCard.locator("[data-open-wait]").count(), 2);
+  assert.match(await waitsCard.textContent(), /Waits for the next run of Nightly sales report/);
+  assert.equal(await pane().locator('[data-conversation-row="offers"] [data-open-waits]').count(), 1);
+  await waitsCard.locator('[data-open-wait="wait-report"]').getByText("Show the request").click();
+  await waitsCard.locator('[data-open-wait="wait-report"]').getByText("When the nightly report lands", { exact: false }).waitFor();
+  await waitsCard.screenshot({ path: path.join(output, "surfaces-open-waits.png"), animations: "disabled" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await waitsCard.screenshot({ path: path.join(output, "surfaces-open-waits-dark.png"), animations: "disabled" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await waitsCard.locator('[data-open-wait="wait-report"]').getByRole("button", { name: "Cancel the wait" }).click();
+  await waitsCard.locator('[data-open-wait="wait-report"]').waitFor({ state: "detached" });
+  await waitsCard.locator('[data-open-wait="wait-deploy"]').getByRole("button", { name: "Cancel the wait" }).click();
+  await waitsCard.locator('[data-open-wait="wait-deploy"][data-wait-status="woke"]').waitFor();
+  assert.equal(await waitsCard.locator('[data-open-wait="wait-deploy"] [role="alert"]').textContent(),
+    "This wait already woke, so it was not cancelled. Its request goes on.");
+  assert.equal(await waitsCard.getByRole("button", { name: "Cancel the wait" }).count(), 0);
+  await page.screenshot({ path: path.join(output, "surfaces-open-waits-cancelled.png"), animations: "disabled" });
+
   // A conversation's approval, answered from the main chat through that conversation.
   const mirrored = page.getByTestId("mirrored-requests");
   assert.match(await mirrored.textContent(), /Approval needed in Choose a supplier/);
@@ -316,7 +336,8 @@ try {
     "Delete key, Ctrl+Shift+O and Alt+Shift+Up", "compact switcher below 200 px", "phone delete asks first",
     "return to main chat", "change Mico concurrency", "save and execute visual workflow", "stop workflow",
     "Conversations pane lists open conversations with state, time and Waiting for you", "a conversation opens beside the chat and its tab menu closes it with neighbour fallback",
-    "Open in the chat moves a beside conversation into the chat", "a conversation's approval answers from the main chat and resolves there",
+    "Open in the chat moves a beside conversation into the chat", "Open waits card shows each wait, its request, cancels one and never claims a woken wait",
+    "a conversation's approval answers from the main chat and resolves there",
     "sidebar unread count, numberless conversation badge and Needs you", "expanded Mico row with Show more / Show less opens a conversation",
     "hover card after a pause shows loaded conversations without reading them", "Mark all as read, Mico Mark as Unread and Mark as Read",
     "filter empty state and Clear filters", "surfaces at desktop and phone widths in light and dark", "no browser errors"] };

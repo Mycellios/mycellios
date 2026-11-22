@@ -184,6 +184,27 @@ export async function reopenSideThreadForSend(tx: Tx, scope: Scope, threadId: st
 }
 
 /**
+ * A wait (await_event) that wakes brings its archived conversation back, in the transaction that
+ * queues the continued turn, so that turn is not hidden. A conversation being deleted stays as
+ * it is; the main chat is never archived. Returns whether it was reopened.
+ */
+export async function reopenThreadForWakeInTransaction(
+  tx: Pick<Prisma.TransactionClient, "$executeRaw">,
+  scope: Scope,
+  threadId: string,
+): Promise<boolean> {
+  const reopened = await tx.$executeRaw`
+    UPDATE threads SET "archivedAt" = NULL
+    WHERE id = ${threadId} AND "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}
+      AND "archivedAt" IS NOT NULL AND "deleteAfter" IS NULL`;
+  if (!reopened) return false;
+  await tx.$executeRaw`
+    UPDATE task_inbox SET "archivedAt" = NULL, "reminderClaimedAt" = NULL
+    WHERE "threadId" = ${threadId} AND "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}`;
+  return true;
+}
+
+/**
  * Records how a finished turn ended on its thread, in the transaction that ends the run and
  * under the thread lock it holds. Background work never changes a conversation's outcome.
  */
@@ -217,6 +238,8 @@ export interface SideThreadListRow {
   updatedAt: Date;
   activeStatuses: string[] | null;
   unread?: boolean | null;
+  /** Waits (await_event) parked here that have not woken, paused ones included. */
+  openWaits?: number | null;
 }
 
 /**
@@ -234,7 +257,9 @@ export function listSideThreads(
     SELECT t.id, t."projectKey", t."taskKey", t."taskBotId", t.title, t."titleSource", t."startedBy",
       t.outcome, t."lastError", t."archivedAt", t."deleteAfter", t."createdAt", t.unread,
       GREATEST(t."createdAt", COALESCE(m."createdAt", t."createdAt"), COALESCE(t."archivedAt", t."createdAt")) AS "updatedAt",
-      a.statuses AS "activeStatuses"
+      a.statuses AS "activeStatuses",
+      (SELECT count(*)::int FROM tasks w WHERE w."spaceId" = t."spaceId" AND w."userId" = t."userId" AND w."threadId" = t.id
+        AND w."delegationState" IN ('waiting_event', 'paused') AND w."delegationKey" LIKE 'event-wait:%') AS "openWaits"
     FROM threads t
     LEFT JOIN LATERAL (
       SELECT "createdAt" FROM messages WHERE "threadId" = t.id ORDER BY seq DESC LIMIT 1

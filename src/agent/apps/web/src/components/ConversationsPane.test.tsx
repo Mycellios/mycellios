@@ -51,6 +51,15 @@ describe("Conversations pane", () => {
     expect(waitingConversations(rows)).toBe(2);
   });
 
+  it("marks a conversation where its Mico waits for an event", async () => {
+    const { host, draw } = render({ rows: [{ ...rows[3]!, openWaits: 1 }, rows[0]!] });
+    await draw();
+    const mark = host.querySelector('[data-conversation-row="done"] [data-open-waits]');
+    expect(mark?.getAttribute("title")).toBe("Waiting for an event");
+    expect(mark?.textContent).toBe("Waiting for an event");
+    expect(host.querySelector('[data-conversation-row="plan"] [data-open-waits]')).toBeNull();
+  });
+
   it("opens a conversation in the chat, or beside it with its toggle, and lists the draft", async () => {
     const { host, handlers, draw } = render();
     await draw({ draftOpen: true, currentId: "plan" });

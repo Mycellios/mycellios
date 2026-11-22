@@ -6992,3 +6992,71 @@ msgstr "आपके Micos एक साथ कई कामों पर का
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "उनके जवाब यहीं रहते हैं, जब तक आप उन्हें संग्रहित नहीं करते।"
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "खुली प्रतीक्षाएँ"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "{time} तक प्रतीक्षा"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "{routine} के अगले रन की प्रतीक्षा"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "किसी रूटीन के अगले रन की प्रतीक्षा"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "किसी रन के पूरा होने की प्रतीक्षा"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "जागा"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "अनुरोध जारी है"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "प्रतीक्षा में"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "यह प्रतीक्षा पहले ही जाग चुकी है, इसलिए इसे रद्द नहीं किया गया। इसका अनुरोध जारी है।"
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "प्रतीक्षा रद्द नहीं की जा सकी। फिर से कोशिश करें।"
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "समय सीमा: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "अनुरोध दिखाएँ"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "सहेजा गया नोट"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "मूल अनुरोध"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "रद्द किया जा रहा है…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "प्रतीक्षा रद्द करें"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "किसी इवेंट की प्रतीक्षा"

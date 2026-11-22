@@ -106,3 +106,45 @@ process teardown outbox together. An HTTP response does not certify OS teardown.
 Additive migrations 20261105100000 and 20261105101000 supply the concurrency policy
 and owner/Space-bound workflow records. Migration application, production promotion
 and native session concurrency are separate qualifications, not implied here.
+
+## Event waits
+
+`await_event` parks an authorized private request as a `waiting_event` child of its
+Task tree until an owned run finishes, the next result of an owned routine arrives
+or a bounded time comes (note up to 2000 characters, timeout 1 to 43,200 minutes).
+These conditions stay as they are: there is no new scheduler, no credential and no
+model polling. The reconciler wakes the request once, in the conversation where it
+parked. When that conversation was archived (by the person, or with its deleted
+routine) the wake reopens it in the same transaction that queues the turn. The
+woken turn starts with the original request and receives the note the Mico saved,
+escaped as data and never as new permission.
+
+The conversation shows an "Open waits" card for each wait that is waiting, paused,
+woke (the turn running there must end first) or continuing its request. It says
+what the wait is for and when it times out, shows the saved note and the original
+request, and offers "Cancel the wait" while the wait has not woken. The side
+panel's Conversations pane marks conversations with open waits.
+
+One operation serves the card and the Mico's close_wait, under the scoped work
+lock the reconciler takes, so a wait either wakes or is cancelled. A wait that has
+not woken goes through the revisioned tree cancellation and its teardown outbox,
+and records who closed it. When nothing else of its request is on the way, the
+request ends as cancelled instead of waking for a cancelled wait. A wait that
+already woke is never reported as cancelled: the card says so, and the Mico can
+only mark it closed. list_waits and close_wait reach only the Mico's own waits, in
+other conversations only where its history tools reach, and repeating a close
+changes nothing.
+
+Archive stops queued and running work but keeps a request parked only on its
+waits, so the wake can bring the conversation back; composer Stop and Tasks Stop
+still cancel it. With await_event the Mico is told to check a job expected to end
+within about 15 minutes inside the turn at growing intervals, and otherwise to save
+a wait, say what it waits for and end the turn, never using sleep loops, timers or
+a provider's own schedulers.
+
+Qualification: scripts/verify-autonomy-waits-db.ts on a fresh loopback PostgreSQL
+cluster (list, scoped and idempotent close, card cancellation with and without
+other pending work, a wait that woke first, archive and wake restore, Stop), the
+event-waits, work-continuation, executor-agent-tasks and OpenWaits tests, and
+`node scripts/verify-mico-tasks-ui.mjs` with synthetic RPCs. Live model use of the
+tools needs its own qualification.

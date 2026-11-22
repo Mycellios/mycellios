@@ -7,8 +7,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import EmbeddedPostgres from 'embedded-postgres';
-import { asSystem, createDb, openEventWait, reconcileWork, workStatus, controlWorkTree } from '@mycellios/db';
+import { archiveSideThreadInTransaction, asSystem, closeEventWait, createDb, listEventWaits, listSideThreads, openEventWait,
+  reconcileWork, workStatus, controlWorkTree, delegateWork } from '@mycellios/db';
 import { reconcileWorkStops } from '../packages/adapters/src/work-stop-reconciler.js';
+import { stopWorkForThread } from '../apps/api/src/work-controls.js';
 
 // Own new loopback cluster only. No .env, users, credentials, live models or paid requests.
 process.env.RAKAZO_PROJECT_LOCAL = '1';
@@ -66,8 +68,8 @@ try {
   await prisma.task.deleteMany({ where: { id: { in: [...originalTasks.map(task => task.id), eventState.id] } } });
   checks.push('real predecessor CHECK rejects waits; actual additive migration preserves all existing states and rejects unknown states');
   const workPlan = { version: 1, steps: [{ id: 'verify', title: 'Verify the observed result', status: 'pending' }], count: 2, nextCount: 0, repairs: 0 };
-  async function source(name: string) {
-    const task = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: bot.thread!.id,
+  async function source(name: string, threadId = bot.thread!.id) {
+    const task = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId,
       prompt: name, status: 'running', workPlan } });
     const run = await prisma.run.create({ data: { ...scope, botId: bot.id, threadId: task.threadId, taskId: task.id,
       status: 'running', trigger: 'user', leaseOwner: 'synthetic-worker', leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 300_000) } });
@@ -210,6 +212,119 @@ try {
     }
     checks.push(action === 'pause' ? 'pause suppresses automatic wake; explicit resume restores the same durable wait' : 'Stop cancels wait and late timer cannot reactivate it');
   }
+  // Open waits: what the conversation card and list_waits/close_wait read and change.
+  const stopDeps = { prisma, sandbox: {} as never, jobs: { cancel: async () => {} } as never } as never;
+  const listed = await source('Summarise the nightly report when it lands');
+  const nightly = await prisma.routine.create({ data: { ...scope, botId: bot.id, name: 'Nightly report', prompt: 'Synthetic', crons: [] } });
+  const nightlyWait = await openEventWait(prisma, listed, { key: 'list', note: 'Read the report and send the summary', routineId: nightly.id });
+  await finish(listed.id); await reconcileWork(prisma);
+  const [card] = await listEventWaits(prisma, { ...scope, botId: bot.id }, { threadIds: [bot.thread!.id] });
+  assert.equal(card?.waitId, nightlyWait.waitId);
+  assert.equal(card?.status, 'waiting');
+  assert.equal(card?.note, 'Read the report and send the summary');
+  assert.equal(card?.request, 'Summarise the nightly report when it lands');
+  assert.equal(card?.routineName, 'Nightly report');
+  assert.equal(card?.timeoutMinutes, 1440);
+  assert.deepEqual(await listEventWaits(prisma, { ...scope, botId: other.id }), [], 'another Mico never lists this wait');
+  await assert.rejects(closeEventWait(prisma, { ...scope, botId: other.id }, { waitId: nightlyWait.waitId, by: 'mico' }), /not available/);
+  await assert.rejects(closeEventWait(prisma, { spaceId: 'foreign-space', userId: scope.userId }, { waitId: nightlyWait.waitId, by: 'person' }), /not available/);
+  await assert.rejects(closeEventWait(prisma, { ...scope, botId: bot.id, threadIds: ['another-thread'] }, { waitId: nightlyWait.waitId, by: 'mico' }), /not available/,
+    'a Mico outside its history reach cannot close a wait of another conversation');
+  const [closedOnce, closedTwice] = [
+    await closeEventWait(prisma, { ...scope, botId: bot.id }, { waitId: nightlyWait.waitId, by: 'mico' }),
+    await closeEventWait(prisma, { ...scope, botId: bot.id }, { waitId: nightlyWait.waitId, by: 'mico' }),
+  ];
+  assert.deepEqual(closedOnce, { waitId: nightlyWait.waitId, closed: true, alreadyClosed: false, cancelled: true, status: 'closed' });
+  assert.deepEqual(closedTwice, { waitId: nightlyWait.waitId, closed: true, alreadyClosed: true, cancelled: false, status: 'closed' });
+  await reconcileWorkStops({ prisma, sandbox: {} as never, jobs: { cancel: async () => {} } as never }, scope);
+  const lateNightly = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: bot.thread!.id, prompt: 'Late nightly run', status: 'completed' } });
+  await prisma.run.create({ data: { ...scope, botId: bot.id, threadId: bot.thread!.id, taskId: lateNightly.id, routineId: nightly.id,
+    trigger: 'routine', status: 'completed', completedAt: new Date() } });
+  await reconcileWork(prisma); await reconcileWork(prisma);
+  assert.equal(await returned(listed.taskId), 0, 'a closed wait never wakes its request, even when its routine runs later');
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: listed.taskId } })).delegationState, 'cancelled');
+  const closedRow = await prisma.task.findUniqueOrThrow({ where: { id: nightlyWait.waitId } });
+  assert.equal(closedRow.delegationState, 'cancelled'); assert.equal(closedRow.workStopPending, false);
+  assert.equal((await listEventWaits(prisma, { ...scope, botId: bot.id }, { threadIds: [bot.thread!.id] }))
+    .some(wait => wait.waitId === nightlyWait.waitId), false, 'a closed wait leaves the card');
+  assert.equal((await listEventWaits(prisma, { ...scope, botId: bot.id }, { includeClosed: true }))
+    .find(wait => wait.waitId === nightlyWait.waitId)?.closedBy, 'mico');
+  checks.push('list_waits shows only the Mico\'s own waits with note, request and routine; close_wait is scoped, idempotent, durable and ends the parked request without a wake');
+
+  const carded = await source('Wait for the deploy to settle');
+  const cardWait = await openEventWait(prisma, carded, { key: 'card', note: 'Check the deploy', resumeAt: new Date(Date.now() + 3_600_000).toISOString() });
+  await finish(carded.id); await reconcileWork(prisma);
+  const sibling = await delegateWork(prisma, { ...(await source('Coordinator with a teammate and a wait')) }, {
+    key: 'card-sibling', botId: other.id, instruction: 'Collect the logs', expectedResult: 'The logs' });
+  const cancelled = await closeEventWait(prisma, scope, { waitId: cardWait.waitId, by: 'person' });
+  assert.deepEqual(cancelled, { waitId: cardWait.waitId, closed: true, alreadyClosed: false, cancelled: true, status: 'closed' });
+  await reconcileWorkStops({ prisma, sandbox: {} as never, jobs: { cancel: async () => {} } as never }, scope);
+  await reconcileWork(prisma);
+  assert.equal(await returned(carded.taskId), 0, 'Cancel the wait from the card starts no turn');
+  assert.equal(JSON.parse(JSON.stringify((await prisma.task.findUniqueOrThrow({ where: { id: cardWait.waitId } })).workPlan)).closedBy, 'person');
+  const mixed = await prisma.task.findFirstOrThrow({ where: { id: (await prisma.task.findUniqueOrThrow({ where: { id: sibling.taskId } })).parentTaskId! } });
+  const mixedRun = await prisma.run.findFirstOrThrow({ where: { taskId: mixed.id } });
+  const mixedWait = await openEventWait(prisma, { ...scope, id: mixedRun.id, taskId: mixed.id, botId: bot.id, threadId: mixed.threadId,
+    leaseOwner: 'synthetic-worker', leaseFence: 1 }, { key: 'mixed', note: 'Wait beside the teammate', resumeAt: new Date(Date.now() + 3_600_000).toISOString() });
+  await finish(mixedRun.id); await reconcileWork(prisma);
+  await closeEventWait(prisma, scope, { waitId: mixedWait.waitId, by: 'person' });
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: mixed.id } })).delegationState, 'waiting',
+    'a request with other work on its way keeps waiting for that work');
+  const mixedParent = await prisma.task.findUniqueOrThrow({ where: { id: mixed.id } });
+  await controlWorkTree(prisma, scope, { taskId: mixed.id, expectedRevision: mixedParent.delegationRevision, action: 'cancel' });
+  await reconcileWorkStops({ prisma, sandbox: {} as never, jobs: { cancel: async () => {} } as never }, scope);
+  checks.push('Cancel the wait from the card uses the durable cancellation, records who closed it and starts no turn; other work of the request keeps it waiting');
+
+  const racing = await source('Wake before the turn ends');
+  const raced = await openEventWait(prisma, racing, { key: 'race', note: 'Continue after the timer', resumeAt: due }, past);
+  await reconcileWork(prisma);
+  const [early] = await listEventWaits(prisma, { ...scope, botId: bot.id }, { threadIds: [bot.thread!.id] });
+  assert.equal(early?.waitId, raced.waitId); assert.equal(early?.status, 'woke');
+  assert.deepEqual(await closeEventWait(prisma, scope, { waitId: raced.waitId, by: 'person' }),
+    { waitId: raced.waitId, closed: false, alreadyClosed: false, cancelled: false, status: 'woke' },
+    'a wait that already woke is never reported as cancelled');
+  await finish(racing.id); await reconcileWork(prisma);
+  assert.equal(await returned(racing.taskId), 1, 'the woken request still continues exactly once');
+  assert.equal((await listEventWaits(prisma, { ...scope, botId: bot.id }, { threadIds: [bot.thread!.id] }))
+    .find(wait => wait.waitId === raced.waitId)?.status, 'continuing');
+  const racedParent = await prisma.task.findUniqueOrThrow({ where: { id: racing.taskId } });
+  await prisma.run.update({ where: { id: racedParent.returnRunId! }, data: { status: 'completed', completedAt: new Date() } });
+  await reconcileWork(prisma);
+  assert.equal((await listEventWaits(prisma, { ...scope, botId: bot.id }, { threadIds: [bot.thread!.id] }))
+    .some(wait => wait.waitId === raced.waitId), false, 'once its continued turn ends, a woken wait leaves the card');
+  checks.push('a wait that woke first cannot be cancelled from the card; it shows woke, then continuing, then leaves the card');
+
+  const side = await prisma.thread.create({ data: { ...scope, taskBotId: bot.id, projectKey: `mico:${bot.id}`,
+    taskKey: `mico-task:${bot.id}:person:synthetic-wait`, title: 'Deploy watch', titleSource: 'user', startedBy: 'user' } });
+  const sideOwner = await source('Deploy the site and confirm it is live', side.id);
+  const sideWait = await openEventWait(prisma, sideOwner, { key: 'side', note: 'Open the site and confirm the new version', resumeAt: new Date(Date.now() + 3_600_000).toISOString() });
+  await finish(sideOwner.id); await reconcileWork(prisma);
+  assert.equal((await listSideThreads(prisma, scope, { botId: bot.id })).find(row => row.id === side.id)?.openWaits, 1,
+    'the Conversations pane sees the open wait');
+  // Archive stops queued and running work but keeps a request parked only on its waits.
+  await stopWorkForThread(stopDeps, scope as never, side.id, { keepEventWaits: true });
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: sideWait.waitId } })).delegationState, 'waiting_event');
+  await prisma.$transaction(tx => archiveSideThreadInTransaction(tx, scope, { botId: bot.id, threadId: side.id }));
+  assert.ok((await prisma.thread.findUniqueOrThrow({ where: { id: side.id } })).archivedAt);
+  await prisma.task.update({ where: { id: sideWait.waitId }, data: { workPlan: { ...JSON.parse(JSON.stringify((await prisma.task.findUniqueOrThrow({ where: { id: sideWait.waitId } })).workPlan)), resumeAt: new Date(Date.now() - 1_000).toISOString() } } });
+  await reconcileWork(prisma);
+  assert.equal(await returned(sideOwner.taskId), 1);
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: side.id } })).archivedAt, null, 'the wake restores the archived conversation');
+  const wokenPrompt = (await prisma.task.findUniqueOrThrow({ where: { id: sideOwner.taskId } })).prompt;
+  assert.ok(wokenPrompt.startsWith('Deploy the site and confirm it is live'), 'the woken turn starts with the original request');
+  assert.match(wokenPrompt, /<saved_note>Open the site and confirm the new version<\/saved_note>/, 'the woken turn receives the saved note');
+  assert.match(wokenPrompt, /its time came/);
+  checks.push('archive keeps a parked wait; its wake restores the archived conversation and gives the turn the original request and the saved note');
+
+  const stopped = await source('Composer Stop clears a parked wait', side.id);
+  const stoppedWait = await openEventWait(prisma, stopped, { key: 'stop', note: 'Never wakes', resumeAt: new Date(Date.now() + 3_600_000).toISOString() });
+  await finish(stopped.id); await reconcileWork(prisma);
+  await prisma.run.update({ where: { id: (await prisma.task.findUniqueOrThrow({ where: { id: sideOwner.taskId } })).returnRunId! },
+    data: { status: 'completed', completedAt: new Date() } });
+  await stopWorkForThread(stopDeps, scope as never, side.id);
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: stoppedWait.waitId } })).delegationState, 'cancelled');
+  checks.push('composer Stop still cancels a parked wait');
+
   const result = { ok: true, isolatedPostgres: true, paidModelCalls: 0, productionAccess: false,
     verification: 'Real PostgreSQL scheduling and recovery; synthetic execution receipts, not live model inference', checks };
   const receipt = path.join(directory, 'result.json');

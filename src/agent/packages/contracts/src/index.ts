@@ -57,6 +57,7 @@ export * from "./routine-calendar.js";
 
 export * from "./task-inbox.js";
 export * from "./side-threads.js";
+export * from "./event-waits.js";
 
 export * from "./usage-dashboard.js";
 

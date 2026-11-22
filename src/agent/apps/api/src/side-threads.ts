@@ -59,6 +59,7 @@ export function sideThreadRow(row: SideThreadListRow): SideThread {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     unread: Boolean(row.unread),
+    openWaits: row.openWaits ?? 0,
   };
 }
 
@@ -80,7 +81,8 @@ export async function archiveSideThread(
   const deadline = now() + (options.settleMs ?? THREAD_ARCHIVE_SETTLE_MS);
   for (;;) {
     await stopThreadRuns(deps, actor, target);
-    await stopWorkForThread(deps, actor, target.threadId);
+    // A request parked on await_event stays parked: its wait brings the conversation back.
+    await stopWorkForThread(deps, actor, target.threadId, { keepEventWaits: true });
     try {
       return await deps.prisma.$transaction((tx) => archiveSideThreadInTransaction(tx, actor, ids));
     } catch (error) {
