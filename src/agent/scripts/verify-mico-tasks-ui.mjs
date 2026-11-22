@@ -18,7 +18,8 @@ const server = await createServer({ root, configFile: path.join(root, "vite.conf
   server: { host: "127.0.0.1", port: 0, strictPort: false },
   plugins: [{ name: "private-task-acceptance", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
-      const fixture = req.url === "/__task_acceptance" ? "mico-task-preview" : req.url === "/__surfaces_acceptance" ? "conversation-surfaces-preview" : null;
+      const fixture = req.url === "/__task_acceptance" ? "mico-task-preview" : req.url === "/__surfaces_acceptance" ? "conversation-surfaces-preview"
+        : req.url === "/__branch_acceptance" ? "conversation-branch-preview" : null;
       if (!fixture) return next();
       const html = await server.transformIndexHtml(req.url, `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/${fixture}.tsx"></script></body></html>`);
       res.setHeader("content-type", "text/html"); res.end(html);
@@ -326,6 +327,73 @@ try {
   await sidebar().locator('[data-roster-bot-id="mico"]').waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   await noOverflow();
+
+  // Branching: the action on the last Mico reply of each finished turn, waiting while a turn runs,
+  // the new tab right after its source, and the divider that links back.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`http://127.0.0.1:${address.port}/__branch_acceptance`);
+  const thread = () => page.getByTestId("fixture-transcript");
+  await thread().waitFor({ timeout: 90_000 });
+  const conversation = () => page.getByTestId("active-conversation").textContent();
+  const branchItem = () => menu().getByRole("menuitem", { name: "Branch in new conversation" });
+  const bubble = (text) => thread().locator("[data-message-id]").filter({ hasText: text });
+  const openMore = async (text) => { await bubble(text).hover(); await bubble(text).getByRole("button", { name: "More" }).click(); await menu().waitFor(); };
+  const branchTabs = () => page.evaluate(() => JSON.parse(localStorage.getItem("mycellios:open-task-tabs:branch-fixture") ?? "{}").ids ?? []);
+  const closeMenu = async () => { await page.keyboard.press("Escape"); await menu().waitFor({ state: "hidden" }); };
+  await openMore("Here is a first plan");
+  assert.equal(await branchItem().count(), 1);
+  await closeMenu();
+  assert.equal(await bubble("Plan the spring trip").getByRole("button", { name: "More" }).count(), 0);
+  await page.getByRole("button", { name: "Start a turn" }).click();
+  await openMore("Two hotels near each station");
+  assert.equal(await branchItem().isDisabled(), true);
+  assert.equal(await branchItem().getAttribute("title"), "Wait until the current turn ends to branch this conversation.");
+  await page.screenshot({ path: path.join(output, "branch-waiting.png"), animations: "disabled" });
+  await closeMenu();
+  await page.getByRole("button", { name: "Finish the turn" }).click();
+  await openMore("Two hotels near each station");
+  await page.screenshot({ path: path.join(output, "branch-menu.png"), animations: "disabled" });
+  await branchItem().click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="active-conversation"]')?.textContent?.startsWith("branch-"));
+  const fromMain = await conversation();
+  assert.deepEqual(await branchTabs(), [fromMain, "trip", "notes"]);
+  assert.deepEqual(await tabIds(), [fromMain, "trip", "notes"]);
+  assert.equal(await tab(fromMain).locator("button:not([aria-label])").textContent(), "And the hotels?");
+  assert.equal(await tab(fromMain).locator("button:not([aria-label])").getAttribute("aria-current"), "page");
+  assert.equal(await page.getByTestId("branch-origin-divider").textContent(), "Branched from Main chat");
+  await page.screenshot({ path: path.join(output, "branch-from-main.png"), animations: "disabled" });
+  await page.getByRole("button", { name: "Branched from Main chat" }).click();
+  assert.equal(await conversation(), "main");
+  assert.match(await page.getByTestId("jump-target").textContent(), /^main#main-[0-9]+$/);
+  // A side conversation: its tab gets the branch right after it, named "{title} #2".
+  await tab("trip").locator("button:not([aria-label])").click();
+  assert.equal(await conversation(), "trip");
+  await openMore("About 900 euros");
+  assert.equal(await branchItem().count(), 1);
+  await closeMenu();
+  await openMore("Night trains bring it down");
+  await branchItem().click();
+  await page.waitForFunction(id => document.querySelector('[data-testid="active-conversation"]')?.textContent !== "trip" &&
+    document.querySelector('[data-testid="active-conversation"]')?.textContent !== id, fromMain);
+  const fromTrip = await conversation();
+  assert.deepEqual(await branchTabs(), [fromMain, "trip", fromTrip, "notes"]);
+  // The row shows as many tabs as fit, always with the open one; the rest stay in the picker.
+  assert.ok((await tabIds()).includes(fromTrip));
+  assert.equal(await tab(fromTrip).locator("button:not([aria-label])").textContent(), "Trip budget #2");
+  assert.equal(await page.getByTestId("branch-origin-divider").textContent(), "Branched from Trip budget");
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await page.screenshot({ path: path.join(output, "branch-from-conversation-dark.png"), animations: "disabled" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  // Once the source is gone the divider says so and no longer links.
+  await page.getByRole("button", { name: "Delete the budget" }).click();
+  await tab("notes").locator("button:not([aria-label])").click();
+  await tab(fromTrip).locator("button:not([aria-label])").click();
+  await page.getByText("Branched from a deleted conversation", { exact: true }).waitFor();
+  assert.equal(await page.getByTestId("branch-origin-divider").getByRole("button").count(), 0);
+  await page.screenshot({ path: path.join(output, "branch-source-deleted.png"), animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow();
+  await page.screenshot({ path: path.join(output, "branch-mobile-width.png"), animations: "disabled" });
   assert.deepEqual(errors, []);
   const result = { passed: true, fixtureOnly: true, productionAccess: false, screenshots: output, checks: [
     "desktop and mobile overflow", "light and dark theme", "select private task", "status marks on tabs and picker rows",
@@ -340,6 +408,10 @@ try {
     "a conversation's approval answers from the main chat and resolves there",
     "sidebar unread count, numberless conversation badge and Needs you", "expanded Mico row with Show more / Show less opens a conversation",
     "hover card after a pause shows loaded conversations without reading them", "Mark all as read, Mico Mark as Unread and Mark as Read",
-    "filter empty state and Clear filters", "surfaces at desktop and phone widths in light and dark", "no browser errors"] };
+    "filter empty state and Clear filters", "surfaces at desktop and phone widths in light and dark",
+    "Branch in new conversation on the last Mico reply of each finished turn, disabled while a turn runs",
+    "a main-chat branch opens first with the last request as its title and a divider back to the main chat",
+    "a side branch opens right after its source as \"{title} #2\" and its divider names the source",
+    "the divider says when the source was deleted", "no browser errors"] };
   await writeFile(path.join(output, "result.json"), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
 } finally { await browser?.close(); await server.close(); }

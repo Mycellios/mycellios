@@ -7,7 +7,7 @@ it('restores the work plan and continuation budget across runtime instances',asy
  first.update({steps:[{id:'verify',title:'Verify the existing command result',status:'running'}]});
  first.next('Working');await first.flush();
  const restored=new WorkContinuation();restored.configure(snapshot);
- expect(restored.hasPendingWork()).toBe(true);
+ expect(restored.pendingTitles()).toHaveLength(1);
  expect(restored.next('Working')).toContain('different approach');
  expect(()=>restored.next('Working')).toThrow('No progress');
  const exhausted=new WorkContinuation();exhausted.configure({version:1,steps:[],count:8,nextCount:0,repairs:0});

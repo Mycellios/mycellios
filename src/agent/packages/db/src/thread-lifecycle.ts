@@ -3,6 +3,7 @@ import {
   ACTIVE_RUN_STATUSES,
   BACKGROUND_RUN_TRIGGERS,
   boundThreadError,
+  branchFileNoncePrefix,
   THREAD_ALREADY_DELETED_ERROR,
   THREAD_BEING_DELETED_ERROR,
   THREAD_DELETE_UNDO_MS,
@@ -240,6 +241,8 @@ export interface SideThreadListRow {
   unread?: boolean | null;
   /** Waits (await_event) parked here that have not woken, paused ones included. */
   openWaits?: number | null;
+  /** Set on branches while the conversation they were copied from still exists. */
+  branchedFromThreadId?: string | null;
 }
 
 /**
@@ -255,7 +258,7 @@ export function listSideThreads(
   const project = input.projectKey ? Prisma.sql`AND t."projectKey" = ${input.projectKey}` : Prisma.empty;
   return prisma.$queryRaw<SideThreadListRow[]>`
     SELECT t.id, t."projectKey", t."taskKey", t."taskBotId", t.title, t."titleSource", t."startedBy",
-      t.outcome, t."lastError", t."archivedAt", t."deleteAfter", t."createdAt", t.unread,
+      t.outcome, t."lastError", t."archivedAt", t."deleteAfter", t."createdAt", t.unread, t."branchedFromThreadId",
       GREATEST(t."createdAt", COALESCE(m."createdAt", t."createdAt"), COALESCE(t."archivedAt", t."createdAt")) AS "updatedAt",
       a.statuses AS "activeStatuses",
       (SELECT count(*)::int FROM tasks w WHERE w."spaceId" = t."spaceId" AND w."userId" = t."userId" AND w."threadId" = t.id
@@ -298,13 +301,14 @@ export function dueThreadDeletions(
 export interface ThreadDeletionPlan {
   thread: DueThreadDeletion;
   runIds: string[];
-  /** Mico output made only in this conversation and shown in no other one. */
+  /** Mico output (or a branch's copied files) made only for this conversation and shown in no other one. */
   artifacts: Array<{ id: string; storageKey: string; botId: string | null }>;
 }
 
 /**
  * What a due delete removes outside the cascade: Mico output families whose every version
- * was made by this conversation's runs and that no other conversation's message shows.
+ * was made by this conversation's runs, or copied into it when it was branched, and that no
+ * other conversation's message shows.
  * Files the person uploaded stay in their Library. Null when the delete is not due.
  */
 export async function planThreadDeletion(
@@ -320,18 +324,24 @@ export async function planThreadDeletion(
   const runs = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM runs WHERE "threadId" = ${thread.id}`;
   const runIds = runs.map((run) => run.id);
-  if (!runIds.length) return { thread, runIds, artifacts: [] };
+  // Made here: output of this conversation's runs, and the files copied into it when it was
+  // branched (their nonce names this thread). A branch's source never matches its copies.
+  const copies = branchFileNoncePrefix(thread.id);
+  const madeHere = (alias: Prisma.Sql) =>
+    runIds.length
+      ? Prisma.sql`(COALESCE(${alias}."runId" IN (${Prisma.join(runIds)}), false) OR starts_with(COALESCE(${alias}."clientNonce", ''), ${copies}))`
+      : Prisma.sql`starts_with(COALESCE(${alias}."clientNonce", ''), ${copies})`;
   const artifacts = await prisma.$queryRaw<ThreadDeletionPlan["artifacts"]>`
     WITH families AS (
       SELECT DISTINCT COALESCE(a."rootArtifactId", a.id) AS root FROM artifacts a
-      WHERE a."runId" IN (${Prisma.join(runIds)}) AND a."spaceId" = ${thread.spaceId} AND a."userId" = ${thread.userId}
+      WHERE ${madeHere(Prisma.raw("a"))} AND a."spaceId" = ${thread.spaceId} AND a."userId" = ${thread.userId}
     ), members AS (
-      SELECT a.id, a."storageKey", a."botId", a."runId", f.root FROM artifacts a
+      SELECT a.id, a."storageKey", a."botId", a."runId", a."clientNonce", f.root FROM artifacts a
       JOIN families f ON COALESCE(a."rootArtifactId", a.id) = f.root
       WHERE a."spaceId" = ${thread.spaceId} AND a."userId" = ${thread.userId}
     ), kept AS (
       SELECT DISTINCT m.root FROM members m
-      WHERE m."runId" IS NULL OR m."runId" NOT IN (${Prisma.join(runIds)})
+      WHERE NOT ${madeHere(Prisma.raw("m"))}
       UNION
       SELECT DISTINCT m.root FROM members m
       JOIN threads o ON o."spaceId" = ${thread.spaceId} AND o."userId" = ${thread.userId} AND o.id <> ${thread.id}

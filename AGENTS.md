@@ -251,8 +251,10 @@ These rules apply to the complete repository.
   Even expedited Windows releases run the narrow manual-update/helper, published
   feed and installer metadata regressions; keep Windows warnings owner-approved.
   `unsigned-windows-installer-qualification.yml` reuses an existing immutable EXE
-  for hosted fresh/legacy upgrade and recovery checks without rebuilding it;
-  its receipts do not replace physical-PC or Internet-origin prompt acceptance.
+  for hosted fresh/legacy upgrade and recovery checks without rebuilding it.
+  Download the legacy upgrade fixture from its versioned GitHub release with
+  a bounded transfer and verify the pinned SHA-256 before extracting it.
+  Its receipts do not replace physical-PC or Internet-origin prompt acceptance.
   The isolated page build uses `node scripts/build-desktop-downloads.mjs` and the
   same `DesktopDownloads` component as the main downloads screen. Publish the
   verified RPM builder's catalog entry as `fedora` in the `macos-all` response.

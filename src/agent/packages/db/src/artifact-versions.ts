@@ -18,6 +18,8 @@ export async function resolveNextArtifactVersion(
       botId: params.botId,
       groupId: params.groupId ?? null,
       name: { equals: params.name, mode: "insensitive" },
+      // A file copied into a branch is a snapshot of its own: new versions never build on it.
+      OR: [{ clientNonce: null }, { NOT: { clientNonce: { startsWith: "branch-copy:" } } }],
     },
     orderBy: [{ version: "desc" }, { createdAt: "desc" }],
     select: { id: true, rootArtifactId: true, version: true },

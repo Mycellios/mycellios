@@ -7060,3 +7060,27 @@ msgstr "Warten abbrechen"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Wartet auf ein Ereignis"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "In neuer Unterhaltung abzweigen"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Warte, bis der aktuelle Durchgang endet, um diese Unterhaltung abzuzweigen."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "Die Unterhaltung konnte nicht abgezweigt werden. Versuche es erneut."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Abgezweigt von einer gelöschten Unterhaltung"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Abgezweigt von {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Öffnen, wo diese Abzweigung begann"

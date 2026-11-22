@@ -39,8 +39,34 @@ export const SideThreadSchema = z.object({
   unread: z.boolean().optional(),
   /** Waits (await_event) its Mico parked here that have not woken yet. */
   openWaits: z.number().int().nonnegative().optional(),
+  /**
+   * For a branch (startedBy "branch"): the conversation it was copied from, or null once that
+   * conversation is gone. Absent for other conversations and on older servers.
+   */
+  branchedFromThreadId: Id.nullable().optional(),
 });
 export type SideThread = z.infer<typeof SideThreadSchema>;
+
+/**
+ * development.branch: copies a finished turn of the main chat (no taskThreadId) or of a side
+ * conversation into a new conversation of the same Mico. A retry with the same requestId
+ * returns the same branch.
+ */
+export const BranchConversationInputSchema = z.object({
+  botId: Id,
+  taskThreadId: Id.optional(),
+  /** A Mico message of the finished turn the copy ends with. */
+  messageId: Id,
+  requestId: z.string().uuid(),
+});
+export type BranchConversationInput = z.infer<typeof BranchConversationInputSchema>;
+export const BranchConversationOutputSchema = z.object({
+  threadId: Id,
+  title: z.string(),
+  /** The branch already existed for this requestId; nothing new was copied. */
+  replayed: z.boolean(),
+});
+export type BranchConversationOutput = z.infer<typeof BranchConversationOutputSchema>;
 
 /**
  * What an open conversation of a Mico waits for from the person: a question, an approval, a
