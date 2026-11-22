@@ -109,6 +109,15 @@ The wire protocol, the activation codec, the speculation controller and the
 VERIFY conveyor do not change. Hidden states leave llama.cpp as float32 and are
 encoded by the existing codec.
 
+llama.cpp runs in its own child process, which never imports Torch. On
+Windows, Torch's CPU wheels load Intel OpenMP and the official llama.cpp CPU
+backend loads LLVM OpenMP; the two abort when both initialize in one process
+(observed with b12613). The stage process keeps the wire protocol and Torch,
+and exchanges token ids, hidden states and logits rows with the child over a
+local pipe. A wave of 17 positions at hidden size 2048 is about 140 KB. The
+separation also keeps a native crash from taking down the stage server, which
+can report it and restart the child.
+
 ### Stage packages
 
 The stage package identity and manifest of `native_gguf.py` stay. The GGUF
