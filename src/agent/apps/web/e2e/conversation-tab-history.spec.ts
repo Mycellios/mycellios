@@ -4,7 +4,7 @@ import { activeBotId, completeOnboarding, rpc, signup } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("rakazo.uiLocale", "en");
+    localStorage.setItem("mycellios.uiLocale", "en");
     localStorage.setItem("mycellios.uiLocaleConfirmed", "en");
   });
 });
