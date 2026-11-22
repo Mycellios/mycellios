@@ -15,6 +15,7 @@ import {
   type SupportAssistantSettings,
 } from "../support/assistant.js";
 import { MeshDatabase } from "./database.js";
+import { ensureNetworkTelemetryFailedJobs } from "./network-telemetry-schema.js";
 import {
   engineRuntimeActivationPlanSchema,
   type EngineRuntimeActivationPlan,
@@ -137,6 +138,12 @@ export interface StoredNetworkTelemetrySample {
   inflightJobs: number;
   runningJobs: number;
   completedJobs: number;
+  /**
+   * Cumulative terminal failures: `failed` jobs and deadline-`expired` jobs.
+   * Client cancellations are excluded. Null when the sample predates the
+   * measurement (unknown, not zero).
+   */
+  failedJobs: number | null;
 }
 
 export interface StoredRuntimeLinkSample {
@@ -917,6 +924,17 @@ export class MeshStore {
     return Number(row.count);
   }
 
+  /**
+   * Terminal failures the network caused or observed: `failed` jobs and jobs
+   * that `expired` at their deadline. Client cancellations are excluded.
+   */
+  async countFailedJobs(): Promise<number> {
+    const row = (await this.database.raw
+      .prepare("SELECT COUNT(*) AS count FROM jobs WHERE status IN ('failed', 'expired')")
+      .get()) as { count: number };
+    return Number(row.count);
+  }
+
   async queueAllForRemotePersistence(): Promise<number> {
     return (await this.database.transaction(async () => {
       let queued = 0;
@@ -1399,13 +1417,26 @@ export class MeshStore {
     }));
   }
 
+  private networkTelemetryFailedJobs: Promise<boolean> | null = null;
+
+  /** Resolved once per store; a failed check is retried on the next call. */
+  private hasNetworkTelemetryFailedJobs(): Promise<boolean> {
+    this.networkTelemetryFailedJobs ??= ensureNetworkTelemetryFailedJobs(this.database.raw)
+      .catch((error: unknown) => {
+        this.networkTelemetryFailedJobs = null;
+        throw error;
+      });
+    return this.networkTelemetryFailedJobs;
+  }
+
   async recordNetworkTelemetrySample(sample: StoredNetworkTelemetrySample): Promise<void> {
+    const failed = (await this.hasNetworkTelemetryFailedJobs());
     (await this.database.raw.prepare(
       `INSERT INTO network_telemetry_history(
          captured_at, registered_nodes, connected_nodes, online_nodes, browser_nodes,
          active_models, model_replicas, model_pipelines, offered_vram_mb, free_vram_mb,
-         inflight_jobs, running_jobs, completed_jobs
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         inflight_jobs, running_jobs, completed_jobs${failed ? ", failed_jobs" : ""}
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${failed ? ", ?" : ""})
        ON CONFLICT(captured_at) DO UPDATE SET
          registered_nodes=excluded.registered_nodes,
          connected_nodes=excluded.connected_nodes,
@@ -1418,7 +1449,9 @@ export class MeshStore {
          free_vram_mb=excluded.free_vram_mb,
          inflight_jobs=excluded.inflight_jobs,
          running_jobs=excluded.running_jobs,
-         completed_jobs=excluded.completed_jobs`,
+         completed_jobs=excluded.completed_jobs${failed
+           ? ", failed_jobs=COALESCE(excluded.failed_jobs, network_telemetry_history.failed_jobs)"
+           : ""}`,
     ).run(
       sample.capturedAt,
       sample.registeredNodes,
@@ -1433,16 +1466,18 @@ export class MeshStore {
       sample.inflightJobs,
       sample.runningJobs,
       sample.completedJobs,
+      ...(failed ? [sample.failedJobs] : []),
     ));
   }
 
   async listNetworkTelemetrySamples(since: number, limit = 13_000): Promise<StoredNetworkTelemetrySample[]> {
     const boundedLimit = Math.max(1, Math.min(13_000, Math.trunc(limit)));
+    const failed = (await this.hasNetworkTelemetryFailedJobs());
     const rows = (await this.database.raw.prepare(
       `SELECT * FROM (
          SELECT captured_at, registered_nodes, connected_nodes, online_nodes, browser_nodes,
                 active_models, model_replicas, model_pipelines, offered_vram_mb, free_vram_mb,
-                inflight_jobs, running_jobs, completed_jobs
+                inflight_jobs, running_jobs, completed_jobs${failed ? ", failed_jobs" : ""}
          FROM network_telemetry_history
          WHERE captured_at >= ?
          ORDER BY captured_at DESC
@@ -1462,6 +1497,7 @@ export class MeshStore {
       inflight_jobs: number;
       running_jobs: number;
       completed_jobs: number;
+      failed_jobs?: number | null;
     }>;
     return rows.map((row) => ({
       capturedAt: Number(row.captured_at),
@@ -1477,6 +1513,10 @@ export class MeshStore {
       inflightJobs: Number(row.inflight_jobs),
       runningJobs: Number(row.running_jobs),
       completedJobs: Number(row.completed_jobs),
+      // Samples recorded before failures were measured stay unknown, not zero.
+      failedJobs: row.failed_jobs === null || row.failed_jobs === undefined
+        ? null
+        : Number(row.failed_jobs),
     }));
   }
 

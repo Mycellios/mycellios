@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   deviceHardware,
   deviceRows,
-  hourlyCompletedTasks,
+  hourlyTasks,
   modelDisplayName,
   modelKind,
   modelRows,
   onlineGpuCapacity,
-  recentTaskOutcome,
   type StatsSnapshot,
   type StatsWorker,
 } from "./overview-stats";
@@ -77,22 +76,53 @@ describe("overview statistics", () => {
     expect(Object.keys(rows[0]!).sort()).toEqual(["hardware", "id", "kind", "lastSeenAt", "online", "status", "version"]);
   });
 
-  it("summarizes how the latest tasks ended", () => {
-    expect(recentTaskOutcome(snapshot.jobs)).toEqual({ total: 3, completed: 1, failed: 1, inProgress: 1, since: Date.parse("2026-11-22T09:50:00.000Z") });
-  });
-
   it("derives hourly completed tasks from the cumulative history counter", () => {
     const now = Date.parse("2026-11-22T12:30:00.000Z");
     const samples = Array.from({ length: 146 }, (_, index) => ({
       capturedAt: new Date(now - (145 - index) * 600_000).toISOString(),
       completedJobs: 1_000 + index * 2 - (index === 100 ? 50 : 0),
     }));
-    const activity = hourlyCompletedTasks(samples, now);
+    const activity = hourlyTasks(samples, now);
     expect(activity.hours).toHaveLength(24);
     expect(activity.fullDay).toBe(true);
     expect(activity.hours.every((hour) => hour.completed >= 0)).toBe(true);
     expect(activity.completed).toBe(activity.hours.reduce((total, hour) => total + hour.completed, 0));
-    expect(hourlyCompletedTasks(samples.slice(-6), now)).toMatchObject({ fullDay: false });
-    expect(hourlyCompletedTasks([], now)).toMatchObject({ completed: 0, coverageStart: null, fullDay: false });
+    expect(hourlyTasks(samples.slice(-6), now)).toMatchObject({ fullDay: false });
+    expect(hourlyTasks([], now)).toMatchObject({ completed: 0, coverageStart: null, fullDay: false, failed: 0, failedCoverageStart: null });
+  });
+
+  it("maps failed tasks per hour and keeps hours before failures were measured unknown", () => {
+    const now = Date.parse("2026-11-22T12:30:00.000Z");
+    // Six samples per hour; failures are measured from 09:00 onwards.
+    const measuredFrom = Date.parse("2026-11-22T09:00:00.000Z");
+    const samples = Array.from({ length: 146 }, (_, index) => {
+      const at = now - (145 - index) * 600_000;
+      return {
+        capturedAt: new Date(at).toISOString(),
+        completedJobs: 500 + index * 3,
+        ...(at >= measuredFrom ? { failedJobs: 40 + Math.floor((at - measuredFrom) / 1_200_000) } : index % 2 ? { failedJobs: null } : {}),
+      };
+    });
+    const activity = hourlyTasks(samples, now);
+    const byHour = new Map(activity.hours.map((hour) => [new Date(hour.start).toISOString().slice(11, 16), hour]));
+    expect(byHour.get("08:00")).toMatchObject({ completed: 18, failed: null });
+    // 08:50→09:00 lacks a measured start, so 09:00 counts five intervals: +1 every 20 minutes.
+    expect(byHour.get("09:00")).toMatchObject({ completed: 18, failed: 2 });
+    expect(byHour.get("12:00")).toMatchObject({ completed: 12, failed: 2 });
+    expect(activity.failedCoverageStart).toBe(measuredFrom);
+    expect(activity.failedFullDay).toBe(false);
+    expect(activity.failed).toBe(activity.hours.reduce((total, hour) => total + (hour.failed ?? 0), 0));
+    expect(activity.hours.filter((hour) => hour.failed === null)).toHaveLength(24 - 4);
+  });
+
+  it("treats a lower failed counter as a reset and ignores malformed values", () => {
+    const now = Date.parse("2026-11-22T12:30:00.000Z");
+    const activity = hourlyTasks([
+      { capturedAt: "2026-11-22T12:00:00.000Z", completedJobs: 10, failedJobs: 9 },
+      { capturedAt: "2026-11-22T12:10:00.000Z", completedJobs: 11, failedJobs: 2 },
+      { capturedAt: "2026-11-22T12:20:00.000Z", completedJobs: 12, failedJobs: Number.NaN },
+    ], now);
+    expect(activity.hours.at(-1)).toMatchObject({ completed: 2, failed: 0 });
+    expect(activity.failed).toBe(0);
   });
 });

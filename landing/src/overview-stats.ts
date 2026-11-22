@@ -29,7 +29,12 @@ export interface StatsSnapshot {
   requestedModels: StatsRequestedModel[];
   jobs: StatsJob[];
 }
-export interface StatsHistorySample { capturedAt: string; completedJobs: number }
+/**
+ * One persisted history sample. Both counters are cumulative. `failedJobs` counts
+ * failed and deadline-expired tasks (not client cancellations); it is null or absent
+ * for samples recorded before the coordinator measured failures.
+ */
+export interface StatsHistorySample { capturedAt: string; completedJobs: number; failedJobs?: number | null }
 
 export const MODEL_KIND_LABELS: Record<ModelKind, string> = {
   voice: "Voz",
@@ -220,55 +225,69 @@ export function deviceRows(workers: readonly StatsWorker[]): DeviceRow[] {
 }
 
 export interface HourlyActivity {
-  /** 24 hourly buckets, oldest first; `start` is the bucket's start time. */
-  hours: Array<{ start: number; completed: number }>;
+  /**
+   * 24 hourly buckets, oldest first; `start` is the bucket's start time.
+   * `failed` is null when no measured failure counter covers that hour ("sin datos").
+   */
+  hours: Array<{ start: number; completed: number; failed: number | null }>;
   completed: number;
+  /** Failed tasks over the hours that have failure data. */
+  failed: number;
   /** When the history actually begins inside the 24-hour window. */
   coverageStart: number | null;
   fullDay: boolean;
+  /** When failure data begins inside the window; null when no hour has it. */
+  failedCoverageStart: number | null;
+  failedFullDay: boolean;
 }
 
 const HOUR = 3_600_000;
 
+function counter(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 /**
- * Completed tasks per hour over the last 24 hours, from the cumulative counter in
- * the telemetry history. Each increase is attributed to the sample that observed it.
+ * Completed and failed tasks per hour over the last 24 hours, from the cumulative
+ * counters in the telemetry history. Each increase is attributed to the sample that
+ * observed it. Failures are only counted between two samples that both measured them,
+ * so hours before the coordinator recorded failures stay unknown instead of zero.
  */
-export function hourlyCompletedTasks(samples: readonly StatsHistorySample[], now: number): HourlyActivity {
+export function hourlyTasks(samples: readonly StatsHistorySample[], now: number): HourlyActivity {
   const end = Math.floor(now / HOUR) * HOUR + HOUR;
   const start = end - 24 * HOUR;
-  const hours = Array.from({ length: 24 }, (_, index) => ({ start: start + index * HOUR, completed: 0 }));
+  const hours: HourlyActivity["hours"] = Array.from({ length: 24 }, (_, index) => ({ start: start + index * HOUR, completed: 0, failed: null }));
   const ordered = samples
-    .map((sample) => ({ at: Date.parse(sample.capturedAt), value: sample.completedJobs }))
+    .map((sample) => ({ at: Date.parse(sample.capturedAt), value: sample.completedJobs, failed: counter(sample.failedJobs) }))
     .filter((sample) => Number.isFinite(sample.at) && Number.isFinite(sample.value))
     .sort((left, right) => left.at - right.at);
   let completed = 0;
+  let failed = 0;
   let coverageStart: number | null = null;
+  let failedCoverageStart: number | null = null;
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]!;
     const current = ordered[index]!;
     if (current.at < start || current.at >= end) continue;
     coverageStart ??= previous.at;
+    const hour = hours[Math.floor((current.at - start) / HOUR)]!;
     // A lower counter is a reset, not negative work.
     const delta = Math.max(0, current.value - previous.value);
-    hours[Math.floor((current.at - start) / HOUR)]!.completed += delta;
+    hour.completed += delta;
     completed += delta;
+    if (previous.failed === null || current.failed === null) continue;
+    failedCoverageStart ??= previous.at;
+    const failedDelta = Math.max(0, current.failed - previous.failed);
+    hour.failed = (hour.failed ?? 0) + failedDelta;
+    failed += failedDelta;
   }
-  return { hours, completed, coverageStart, fullDay: coverageStart !== null && coverageStart <= now - 23 * HOUR };
-}
-
-export interface RecentOutcome { total: number; completed: number; failed: number; inProgress: number; since: number | null }
-
-/** How the latest published tasks ended; the window is as long as those tasks span. */
-export function recentTaskOutcome(jobs: readonly StatsJob[]): RecentOutcome {
-  let completed = 0, failed = 0, inProgress = 0;
-  let since: number | null = null;
-  for (const job of jobs) {
-    if (job.status === "completed") completed += 1;
-    else if (job.status === "failed" || job.status === "cancelled" || job.status === "expired") failed += 1;
-    else inProgress += 1;
-    const created = Date.parse(job.createdAt);
-    if (Number.isFinite(created)) since = since === null ? created : Math.min(since, created);
-  }
-  return { total: jobs.length, completed, failed, inProgress, since };
+  return {
+    hours,
+    completed,
+    failed,
+    coverageStart,
+    fullDay: coverageStart !== null && coverageStart <= now - 23 * HOUR,
+    failedCoverageStart,
+    failedFullDay: failedCoverageStart !== null && failedCoverageStart <= now - 23 * HOUR,
+  };
 }

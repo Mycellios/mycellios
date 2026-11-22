@@ -41,15 +41,26 @@ const snapshot: Snapshot = {
     createdAt: at(index * 0.3), updatedAt: at(index * 0.3),
   })),
 };
-const samples = Array.from({ length: 145 }, (_, index) => {
+type Sample = { capturedAt: string; completedJobs: number; failedJobs?: number | null };
+/** Cumulative history; failures are only measured for the last `failedForMinutes`, as after the coordinator update. */
+const history = (failedForMinutes: number) => Array.from({ length: 145 }, (_, index) => {
   const minutesAgo = (144 - index) * 10;
   const hour = new Date(NOW - minutesAgo * 60_000).getUTCHours();
   const perSample = 18 + Math.round(14 * Math.sin((hour / 24) * Math.PI * 2)) + (index % 3);
-  return { capturedAt: at(minutesAgo), minutesAgo, perSample };
-}).reduce<Array<{ capturedAt: string; completedJobs: number }>>((list, sample) => {
-  list.push({ capturedAt: sample.capturedAt, completedJobs: (list.at(-1)?.completedJobs ?? 56_000) + sample.perSample });
+  const failedPerSample = (index % 4 === 0 ? 1 : 0) + (hour === 15 ? 3 : 0);
+  return { capturedAt: at(minutesAgo), minutesAgo, perSample, failedPerSample };
+}).reduce<Sample[]>((list, sample) => {
+  const previous = list.at(-1);
+  const measured = sample.minutesAgo <= failedForMinutes;
+  list.push({
+    capturedAt: sample.capturedAt,
+    completedJobs: (previous?.completedJobs ?? 56_000) + sample.perSample,
+    ...(measured ? { failedJobs: (previous?.failedJobs ?? 1_200) + sample.failedPerSample } : {}),
+  });
   return list;
 }, []);
+const samples = history(9 * 60);
+const fullDaySamples = history(24 * 60);
 const empty: Snapshot = { ...snapshot, summary: { registered: 0, online: 0, completedJobs: 0 }, workers: [], models: [], requestedModels: [], jobs: [] };
 const meta = {
   title: "Screens/Overview", component: Overview, parameters: { layout: "fullscreen" },
@@ -62,4 +73,8 @@ export const Default: Story = {};
 export const Empty: Story = { args: { snapshot: empty, loadHistory: async () => [] } };
 export const Waiting: Story = { args: { snapshot: { ...empty, capturedAt: new Date(0).toISOString() }, connectionError: "Coordinator unavailable" } };
 export const Stale: Story = { args: { snapshot: { ...snapshot, capturedAt: new Date(NOW - 120_000).toISOString() }, connectionError: "Coordinator unavailable" } };
+/** Failed tasks measured for the whole day. */
+export const FailuresFullDay: Story = { args: { loadHistory: async () => fullDaySamples } };
+/** History recorded before the coordinator measured failures: every hour reads "sin datos". */
+export const FailuresNotMeasured: Story = { args: { loadHistory: async () => history(-1) } };
 export const HistoryUnavailable: Story = { args: { loadHistory: async () => { throw new Error("offline"); } } };

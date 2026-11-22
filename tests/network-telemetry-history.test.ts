@@ -9,6 +9,11 @@ import {
 } from "../src/coordinator/server.js";
 import { MeshDatabase } from "../src/storage/database.js";
 import { MeshStore, type StoredNetworkTelemetrySample } from "../src/storage/store.js";
+import {
+  ensureNetworkTelemetryFailedJobs,
+  networkTelemetryFailedJobsSchemaSql,
+} from "../src/storage/network-telemetry-schema.js";
+import type { SqlDriver } from "../src/storage/sql-driver.js";
 
 describe("network telemetry history", () => {
   const directories: string[] = [];
@@ -41,6 +46,80 @@ describe("network telemetry history", () => {
     store = new MeshStore(database);
     expect((await store.listNetworkTelemetrySamples(0))).toEqual([sample]);
     (await database.close());
+  });
+
+  it("adds the failed counter to an existing history and keeps older rows unknown", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "mycellios-network-history-"));
+    directories.push(directory);
+    const path = join(directory, "mesh.db");
+    let database = (await MeshDatabase.open(path));
+    // A history recorded before failed tasks were measured has no failed_jobs column.
+    expect((await database.raw.prepare("PRAGMA table_info(network_telemetry_history)").all())
+      .some((column) => column.name === "failed_jobs")).toBe(false);
+    (await database.raw.prepare(
+      `INSERT INTO network_telemetry_history(
+         captured_at, registered_nodes, connected_nodes, online_nodes, browser_nodes,
+         active_models, model_replicas, model_pipelines, offered_vram_mb, free_vram_mb,
+         inflight_jobs, running_jobs, completed_jobs
+       ) VALUES (600000, 4, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 12)`,
+    ).run());
+    (await database.close());
+
+    database = (await MeshDatabase.open(path));
+    let store = new MeshStore(database);
+    (await store.recordNetworkTelemetrySample(telemetrySample({
+      capturedAt: 1_200_000,
+      completedJobs: 15,
+      failedJobs: 3,
+    })));
+    (await database.close());
+
+    database = (await MeshDatabase.open(path));
+    store = new MeshStore(database);
+    expect((await store.listNetworkTelemetrySamples(0)).map((sample) => ({
+      capturedAt: sample.capturedAt,
+      completedJobs: sample.completedJobs,
+      failedJobs: sample.failedJobs,
+    }))).toEqual([
+      { capturedAt: 600_000, completedJobs: 12, failedJobs: null },
+      { capturedAt: 1_200_000, completedJobs: 15, failedJobs: 3 },
+    ]);
+    (await database.close());
+  });
+
+  it("only inspects PostgreSQL, leaving the additive column to the migration owner", async () => {
+    const statements: string[] = [];
+    const driver = (present: boolean): SqlDriver => ({
+      dialect: "postgres",
+      exec: async (sql) => { statements.push(sql); },
+      prepare: (sql) => {
+        statements.push(sql);
+        return {
+          get: async () => (present ? { present: 1 } : undefined),
+          all: async () => [],
+          run: async () => ({ changes: 0 }),
+        };
+      },
+      transaction: async (operation) => await operation(),
+      close: async () => {},
+    });
+    expect(await ensureNetworkTelemetryFailedJobs(driver(false))).toBe(false);
+    expect(await ensureNetworkTelemetryFailedJobs(driver(true))).toBe(true);
+    expect(statements.every((sql) => /^SELECT/.test(sql.trim()))).toBe(true);
+    expect(networkTelemetryFailedJobsSchemaSql)
+      .toBe("ALTER TABLE network_telemetry_history ADD COLUMN IF NOT EXISTS failed_jobs BIGINT");
+  });
+
+  it("never replaces a measured failed counter with an unknown one", async () => {
+    const database = await MeshDatabase.open(":memory:");
+    try {
+      const store = new MeshStore(database);
+      await store.recordNetworkTelemetrySample(telemetrySample({ capturedAt: 600_000, failedJobs: 4 }));
+      await store.recordNetworkTelemetrySample(telemetrySample({ capturedAt: 600_000, failedJobs: null }));
+      expect((await store.listNetworkTelemetrySamples(0))[0]?.failedJobs).toBe(4);
+    } finally {
+      await database.close();
+    }
   });
 
   it("returns the newest bounded samples in chronological order", async () => {
@@ -102,6 +181,55 @@ describe("network telemetry history", () => {
     );
   });
 
+  it("records network failures but not client cancellations in public history", async () => {
+    const runtime = await createCoordinator({
+      host: "127.0.0.1",
+      port: 0,
+      databasePath: ":memory:",
+      requestTimeoutMs: 1_000,
+    }, { logger: false });
+    runtimes.push(runtime);
+    const now = Date.now();
+    (await runtime.store.recordNetworkTelemetrySample(telemetrySample({
+      capturedAt: Math.floor(now / NETWORK_TELEMETRY_INTERVAL_MS) * NETWORK_TELEMETRY_INTERVAL_MS
+        - 2 * NETWORK_TELEMETRY_INTERVAL_MS,
+      failedJobs: null,
+    })));
+    const outcomes = [
+      ["completed", undefined],
+      ["failed", "worker_failed"],
+      ["failed", "no_feasible_runtime_pipeline"],
+      ["expired", "deadline_exceeded"],
+      ["cancelled", "cancelled_by_client"],
+    ] as const;
+    for (const [index, [status, code]] of outcomes.entries()) {
+      const id = `outcome-${index}`;
+      (await runtime.store.createJob({
+        id,
+        sessionId: "history-test",
+        model: "test-model",
+        workloadClass: "interactive",
+        deadlineAt: now + 60_000,
+      }));
+      (await runtime.store.setJobStatus(id, status, code));
+    }
+
+    const response = await runtime.app.inject({ method: "GET", url: "/public/v1/history?range=24h" });
+    expect(response.statusCode).toBe(200);
+    const history = response.json() as {
+      failedJobs: { counts: string[]; excludes: string[]; measuredSince: string | null };
+      samples: Array<{ capturedAt: string; completedJobs: number; failedJobs: number | null }>;
+    };
+    expect(history.failedJobs).toEqual({
+      counts: ["failed", "expired"],
+      excludes: ["cancelled"],
+      measuredSince: history.samples.at(-1)?.capturedAt,
+    });
+    expect(history.samples.map(({ completedJobs, failedJobs }) => ({ completedJobs, failedJobs })))
+      .toEqual([{ completedJobs: 0, failedJobs: null }, { completedJobs: 1, failedJobs: 3 }]);
+    expect(JSON.stringify(history)).not.toContain("history-test");
+  });
+
   it("counts completed work beyond the 100 jobs shown in a snapshot", async () => {
     const runtime = await createCoordinator({
       host: "127.0.0.1",
@@ -146,6 +274,7 @@ function telemetrySample(
     inflightJobs: 0,
     runningJobs: 0,
     completedJobs: 0,
+    failedJobs: 0,
     ...overrides,
   };
 }
