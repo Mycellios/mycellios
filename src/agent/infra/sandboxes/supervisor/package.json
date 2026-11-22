@@ -10,7 +10,7 @@
     "test": "vitest run --root ../../.. infra/sandboxes/supervisor/src"
   },
   "dependencies": {
-    "@hono/node-server": "2.1.5",
+    "@hono/node-server": "2.1.11",
     "@mycellios/core": "*",
     "@mycellios/logging": "*",
     "dockerode": "5.0.1",
