@@ -168,7 +168,7 @@ test("mobile navigation footer keeps the account identity readable and a ready d
       message: null,
       checkedAt: null,
     };
-    Object.defineProperty(window, "rakazoDesktop", {
+    Object.defineProperty(window, "mycelliosDesktop", {
       value: {
         platform: "darwin",
         window: {

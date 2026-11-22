@@ -17,6 +17,7 @@ export async function answerSideQuestion(
   input: {
     question: string;
     earlier: Array<{ question: string; answer: string }>;
+    extendedHistory?: true;
     responseLocale?: string;
   },
   requestSignal?: AbortSignal,
@@ -79,6 +80,7 @@ export async function answerSideQuestion(
       });
     };
     let answer = "";
+    const answerLimit = input.extendedHistory ? 32_000 : 16_000;
     let completed = false;
     for await (const event of deps.sideQuestions.runtime.run(
       {
@@ -104,10 +106,10 @@ export async function answerSideQuestion(
       { ...actor, operationId, traceId: operationId, signal },
     )) {
       if (event.type === "usage" && !event.accounted) await account(event);
-      if (event.type === "text") answer = (answer + event.text).slice(0, 16000);
+      if (event.type === "text") answer = (answer + event.text).slice(0, answerLimit);
       if (event.type === "done") {
         completed = true;
-        if (event.text) answer = event.text.slice(0, 16000);
+        if (event.text) answer = event.text.slice(0, answerLimit);
       }
       if (["tool", "ask", "takeover"].includes(event.type))
         throw new ORPCError("INTERNAL_SERVER_ERROR");

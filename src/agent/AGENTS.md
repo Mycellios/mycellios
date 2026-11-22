@@ -44,6 +44,11 @@
   Build with scripts/build-android-release.sh and verify scoped web/Java tests, APK
   signature, source seal, manual update continuity and physical Quick Tap separately.
 
+- The main, development and floating Desktop preloads publish the same scoped
+  API under both bridge names during migration. Renderers prefer the Mycellios
+  bridge. Preserve the floating window's narrower methods and keep both names
+  out of unprivileged previews. Check preload, desktop, RPC and PWA tests.
+
 - Expo mobile registers both app-link schemes and routes notifications from either.
   iOS screenshot flows exercise the Mycellios scheme. Keep old callback URLs
   working while deployed servers and supported builds still use them.
@@ -444,7 +449,10 @@
   there only when it has no files. Never send, steer or stop the main task from
   the aside pane. Respect the current contextStartSeq and send-key preference.
   Side-question generations are ephemeral: meter usage, but do not write a chat
-  message or a Pi session transcript. Verify scoped pane/composer/API tests.
+  message or a Pi session transcript. Clients send up to 20 recent exchanges when
+  the capability probe advertises extended history, and up to eight otherwise.
+  The server retains its context budget and model output token cap. Verify scoped
+  pane/composer/API tests.
 
 - Pinned messages are personal per account/Space/exact thread, or pinned for that
   person by their own Mico with pin_message in its own main chat or side conversation

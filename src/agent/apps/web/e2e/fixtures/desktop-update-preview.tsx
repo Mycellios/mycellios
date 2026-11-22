@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import type { DesktopUpdateState, RakazoDesktop } from "@mycellios/contracts";
+import type { DesktopUpdateState, MycelliosDesktop } from "@mycellios/contracts";
 import { createRoot } from "react-dom/client";
 import { DesktopSidebarUpdate, DesktopUpdatesProvider } from "../../src/components/DesktopUpdates";
 import "../../src/styles.css";
@@ -16,13 +16,13 @@ let state: DesktopUpdateState = {
 };
 const calls: string[] = [];
 (window as any).__updateFixture = { calls };
-window.rakazoDesktop = { update: {
+window.mycelliosDesktop = { update: {
   state: async () => state,
   install: async () => { calls.push("install"); state = { ...state, installPending: true }; return state; },
   cancelInstall: async () => { calls.push("cancel"); state = { ...state, installPending: false }; return state; },
   check: async () => { calls.push("check"); return state; },
   onPrepare: () => () => {},
-} } as unknown as RakazoDesktop;
+} } as unknown as MycelliosDesktop;
 createRoot(document.getElementById("root")!).render(<I18nProvider i18n={i18n}>
   <DesktopUpdatesProvider>
     <div className="flex h-dvh bg-background text-foreground">

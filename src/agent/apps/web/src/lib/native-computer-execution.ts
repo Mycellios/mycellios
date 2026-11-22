@@ -1,6 +1,6 @@
-import type { RakazoDesktop } from "@mycellios/contracts";
+import type { MycelliosDesktop } from "@mycellios/contracts";
 
-type Computer = NonNullable<RakazoDesktop["computer"]>;
+type Computer = NonNullable<MycelliosDesktop["computer"]>;
 type Fetch = typeof globalThis.fetch;
 
 /** A Desktop turn must obtain its native execution binding before the API can start it. */

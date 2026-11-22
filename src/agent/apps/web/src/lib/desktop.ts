@@ -1,21 +1,25 @@
 import type {
-  RakazoDesktop,
-  RakazoDesktopOAuthCallback,
-  RakazoDesktopWhatsApp,
-  RakazoDesktopWhatsAppStatus,
+  MycelliosDesktop,
+  MycelliosDesktopOAuthCallback,
+  MycelliosDesktopWhatsApp,
+  MycelliosDesktopWhatsAppStatus,
 } from "@mycellios/contracts";
 import { DEFAULT_COMPUTER_MODE, type ComputerMode } from "@mycellios/contracts";
 
-export type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@mycellios/contracts";
+export type { MycelliosDesktop, MycelliosDesktopOAuthCallback } from "@mycellios/contracts";
 
 declare global {
   interface Window {
-    rakazoDesktop?: RakazoDesktop;
+    mycelliosDesktop?: MycelliosDesktop;
+    rakazoDesktop?: MycelliosDesktop;
   }
 }
 
-export function desktopBridge(): RakazoDesktop | undefined {
-  return typeof window === "undefined" ? undefined : window.rakazoDesktop;
+export function desktopBridge(
+  host: Pick<Window, "mycelliosDesktop" | "rakazoDesktop"> | undefined =
+    typeof window === "undefined" ? undefined : window,
+): MycelliosDesktop | undefined {
+  return host?.mycelliosDesktop ?? host?.rakazoDesktop;
 }
 
 /**
@@ -25,7 +29,7 @@ export function desktopBridge(): RakazoDesktop | undefined {
  * their own isolated server workspace; an explicitly chosen installed account
  * keeps the shared computer route.
  */
-export function defaultComputerMode(desktop?: RakazoDesktop, installedAccountSelected = false): ComputerMode {
+export function defaultComputerMode(desktop?: MycelliosDesktop, installedAccountSelected = false): ComputerMode {
   if (desktop?.computer?.connect || (desktop && installedAccountSelected)) return "dedicated";
   return installedAccountSelected ? "team" : DEFAULT_COMPUTER_MODE;
 }
@@ -50,7 +54,7 @@ export async function connectThisComputer(botId: string): Promise<void> {
 }
 
 /** The compact `code#state` form the manual paste flow already accepts. */
-export function desktopOAuthCode(callback: RakazoDesktopOAuthCallback) {
+export function desktopOAuthCode(callback: MycelliosDesktopOAuthCallback) {
   return callback.state === undefined ? callback.code : `${callback.code}#${callback.state}`;
 }
 
@@ -88,7 +92,7 @@ export function onDesktopOAuthCallback(
   });
 }
 
-export function windowChromeKind(desktop?: RakazoDesktop): "spacer" | "darwin" | "native" | "controls" {
+export function windowChromeKind(desktop?: MycelliosDesktop): "spacer" | "darwin" | "native" | "controls" {
   if (!desktop) return "spacer";
   if (desktop.platform === "darwin") return "darwin";
   if (desktop.nativeWindowFrame) return "native";
@@ -96,17 +100,17 @@ export function windowChromeKind(desktop?: RakazoDesktop): "spacer" | "darwin" |
 }
 
 /** macOS hides the title bar into the page. Windows and Linux use the OS frame. */
-export function desktopHidesTitleBar(desktop: RakazoDesktop | undefined = desktopBridge()): boolean {
+export function desktopHidesTitleBar(desktop: MycelliosDesktop | undefined = desktopBridge()): boolean {
   return desktop?.platform === "darwin";
 }
 
-export function desktopDragClass(desktop?: RakazoDesktop): string {
+export function desktopDragClass(desktop?: MycelliosDesktop): string {
   return desktopHidesTitleBar(desktop) ? "app-drag" : "";
 }
 
 /** WhatsApp linked-device sessions held by this PC. Absent in browsers and older Desktop releases. */
-export type DesktopWhatsAppBridge = RakazoDesktopWhatsApp;
-export type DesktopWhatsAppStatus = RakazoDesktopWhatsAppStatus;
+export type DesktopWhatsAppBridge = MycelliosDesktopWhatsApp;
+export type DesktopWhatsAppStatus = MycelliosDesktopWhatsAppStatus;
 
 export function whatsappBridge(): DesktopWhatsAppBridge | undefined {
   return desktopBridge()?.whatsapp;

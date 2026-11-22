@@ -37,7 +37,7 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.addInitScript(() => {
-    window.rakazoDesktop = {
+    window.mycelliosDesktop = {
       appsStudio: { request: async () => ({ projects: [] }) },
     };
   });

@@ -1,3 +1,4 @@
+import { desktopBridge } from "./desktop";
 import { getGeneralPreferences } from "./general-preferences";
 import type { SettingsScope } from "@mycellios/contracts";
 import { readBoundedResponseBytes, toUtterances } from "@mycellios/core";
@@ -84,7 +85,7 @@ export class Speaker {
     this.token += 1;
     this.finishLocal?.(); this.finishLocal = undefined;
     void this.localContext?.close().catch(() => {}); this.localContext = undefined;
-    if (this.localActive) void window.rakazoDesktop?.localVoice?.stop().catch(() => {});
+    if (this.localActive) void desktopBridge()?.localVoice?.stop().catch(() => {});
     this.localActive = false;
     if (this.settleBrowser) {
       const settle = this.settleBrowser;
@@ -117,7 +118,7 @@ export class Speaker {
     this.stop();
     const network = opts.networkLanguage !== undefined;
     if (!network && (opts.browser || getGeneralPreferences().speechEngine === "device")) return this.speakBrowser(text, opts);
-    if (!network && typeof window !== "undefined" && window.rakazoDesktop?.localVoice && getGeneralPreferences().speechEngine === "local") return this.speakLocal(text, opts);
+    if (!network && desktopBridge()?.localVoice && getGeneralPreferences().speechEngine === "local") return this.speakLocal(text, opts);
     const mine = this.token;
     const controller = new AbortController();
     this.request = controller;
@@ -182,7 +183,7 @@ export class Speaker {
   }
 
   private async speakLocal(text: string, opts: SpeakOptions): Promise<string | undefined> {
-    const native = window.rakazoDesktop!.localVoice!; const mine = this.token;
+    const native = desktopBridge()!.localVoice!; const mine = this.token;
     this.localActive = true;
     this.set({ status: "preparing", botId: opts.botId, messageId: opts.messageId });
     try {

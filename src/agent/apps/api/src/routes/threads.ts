@@ -101,7 +101,9 @@ export function threadsRoutes(ctx: RouterContext) {
       ...messagePinRoutes(ctx),
       sideQuestionAvailable: authed.threads.sideQuestionAvailable.handler(async ({ context, input }) => {
         await resolveThreadTarget(deps.prisma, context.actor, input);
-        return { available: Boolean(deps.sideQuestions) };
+        return deps.sideQuestions
+          ? { available: true, extendedHistory: true as const }
+          : { available: false };
       }),
       sideQuestion: authed.threads.sideQuestion.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);

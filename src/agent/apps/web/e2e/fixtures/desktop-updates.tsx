@@ -1,7 +1,7 @@
 import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { createRoot } from "react-dom/client";
-import type { DesktopUpdateState, RakazoDesktop } from "@mycellios/contracts";
+import type { DesktopUpdateState, MycelliosDesktop } from "@mycellios/contracts";
 import { DesktopUpdatesProvider, DesktopSidebarUpdate } from "../../src/components/DesktopUpdates";
 import { messages } from "../../src/locales/es/messages.po";
 import "../../src/styles.css";
@@ -15,7 +15,7 @@ function show(patch: Partial<DesktopUpdateState>) {
   clearInterval(downloadTimer);
   state = { ...state, installPending: false, relaunchPending: false, automaticRestartAt: undefined, message: null, ...patch };
 }
-window.rakazoDesktop = { update: { state: snapshot, check: snapshot, onPrepare: () => () => {},
+window.mycelliosDesktop = { update: { state: snapshot, check: snapshot, onPrepare: () => () => {},
   download: async () => {
     show({phase:"downloading",percent:0});
     downloadTimer = setInterval(() => { const value = (state.percent ?? 0) + 9;
@@ -26,7 +26,7 @@ window.rakazoDesktop = { update: { state: snapshot, check: snapshot, onPrepare: 
   install: async () => { state = { ...state, relaunchPending:true, automaticRestartAt:Date.now()+15_000 }; return snapshot(); },
   cancelRestart: async () => { show({phase:"ready"}); return snapshot(); },
   cancelInstall: async () => { show({phase:"ready"}); return snapshot(); },
-} } as unknown as RakazoDesktop;
+} } as unknown as MycelliosDesktop;
 const i18n=setupI18n({locale:"es",messages:{es:messages}});
 createRoot(document.getElementById("root")!).render(<I18nProvider i18n={i18n}><DesktopUpdatesProvider>
   <div className="flex min-h-dvh bg-background text-foreground">

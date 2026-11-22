@@ -616,12 +616,16 @@ export const appContract = {
     setPin: oc.input(threadTarget.safeExtend({messageId:Id,pinned:z.boolean()})).output(z.object({ok:z.literal(true)})),
     /** Messages in this conversation that match, newest first, for in-chat search. */
     searchMessages: oc.input(threadTarget.safeExtend({q:z.string().trim().min(1).max(200)})).output(ThreadSearchOutputSchema),
-    sideQuestionAvailable: oc.input(threadTarget).output(z.object({ available: z.boolean() })),
+    sideQuestionAvailable: oc.input(threadTarget).output(z.object({
+      available: z.boolean(),
+      extendedHistory: z.literal(true).optional(),
+    })),
     sideQuestion: oc.input(threadTarget.safeExtend({
       question: z.string().trim().min(1).max(8000),
-      earlier: z.array(z.object({ question: z.string().max(8000), answer: z.string().max(16000) })).max(8),
+      earlier: z.array(z.object({ question: z.string().max(8000), answer: z.string().max(32000) })).max(20),
+      extendedHistory: z.literal(true).optional(),
       responseLocale: z.string().max(16).optional(),
-    })).output(z.object({ answer: z.string().max(16000) })),
+    })).output(z.object({ answer: z.string().max(32000) })),
 
     prepareProject: oc.input(z.object({
       botId: Id,

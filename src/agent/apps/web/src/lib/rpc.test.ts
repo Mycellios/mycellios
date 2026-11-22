@@ -21,7 +21,7 @@ describe("signed-out responses", () => {
   it("pins a floating chat to its Space without changing the main window's saved selection", async () => {
     const remove = vi.fn(), write = vi.fn(), read = vi.fn(() => "main-space");
     vi.stubGlobal("window", {
-      rakazoDesktop: { chatWindow: { kind: "floating", spaceId: "chat-space" } },
+      mycelliosDesktop: { chatWindow: { kind: "floating", spaceId: "chat-space" } },
       localStorage: { getItem: read, setItem: write, removeItem: remove },
     });
     expect(selectedSpaceId()).toBe("chat-space");

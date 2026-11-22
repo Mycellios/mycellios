@@ -1,12 +1,12 @@
 import {Trans, useLingui} from "@lingui/react/macro";
-import type {RakazoDesktop} from "@mycellios/contracts";
+import type {MycelliosDesktop} from "@mycellios/contracts";
 import {Button} from "@mycellios/ui-web";
 import {Code2, LoaderCircle, Square, Terminal} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {connectThisComputer, desktopBridge} from "../lib/desktop";
 import {useDeveloperMode} from "../lib/developer-mode";
 
-type DevStatus=NonNullable<Awaited<ReturnType<NonNullable<NonNullable<RakazoDesktop["development"]>["status"]>>>>;
+type DevStatus=NonNullable<Awaited<ReturnType<NonNullable<NonNullable<MycelliosDesktop["development"]>["status"]>>>>;
 
 function elapsed(ms:number) {
   const seconds=Math.max(0,Math.floor(ms/1000));

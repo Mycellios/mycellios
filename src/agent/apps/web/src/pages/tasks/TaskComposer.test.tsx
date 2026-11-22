@@ -108,7 +108,7 @@ it("prepares native voice only after explicit action and then starts dictation",
       ready = true;
     }),
   };
-  vi.stubGlobal("rakazoDesktop", { localVoice: native });
+  vi.stubGlobal("mycelliosDesktop", { localVoice: native });
   await click("Dictate task");
   expect(dictation.listen).not.toHaveBeenCalled();
   expect(native.prepare).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ it("installs only the dictation model on Desktop versions that support separate 
     prepare: vi.fn(),
     prepareModel: vi.fn(async () => { ready = true; }),
   };
-  vi.stubGlobal("rakazoDesktop", { localVoice: native });
+  vi.stubGlobal("mycelliosDesktop", { localVoice: native });
   await click("Dictate task");
   const prepare = [...container.querySelectorAll("button")].find(
     button => button.textContent === "Prepare local voice",

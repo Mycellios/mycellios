@@ -74,7 +74,7 @@ it("prepares local models once and never starts the microphone after the panel c
  let complete!: ()=>void;
  const prepare = vi.fn(()=>new Promise<void>(resolve=>{complete=resolve;}));
  const native={status:vi.fn(async()=>({ready:false,preparing:false,downloaded:0,total:200})),prepare,stop:vi.fn(async()=>{})};
- Object.defineProperty(window,"rakazoDesktop",{configurable:true,value:{localVoice:native}});
+ Object.defineProperty(window,"mycelliosDesktop",{configurable:true,value:{localVoice:native}});
  const get=vi.fn(); const host=document.createElement("div");root=createRoot(host);
  try {
   await act(async()=>root!.render(<VoiceConversation rpc={{threads:{get}} as unknown as RpcClient} bot={{id:"mico",name:"Mico",color:"#3F9F78"}} onClose={()=>{}} onSettings={()=>{}} />));
@@ -83,5 +83,5 @@ it("prepares local models once and never starts the microphone after the panel c
   await act(async()=>root!.unmount());root=undefined;
   await act(async()=>complete()); expect(get).not.toHaveBeenCalled(); expect(audio.listen).not.toHaveBeenCalled();
   expect(native.stop).toHaveBeenCalled();
- } finally {delete window.rakazoDesktop;}
+ } finally {delete window.mycelliosDesktop;}
 });

@@ -1,6 +1,6 @@
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
-import type { ProjectRunState, RakazoDesktop } from "@mycellios/contracts";
+import type { ProjectRunState, MycelliosDesktop } from "@mycellios/contracts";
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { ReviewWorkspaceProvider, useReviewWorkspace } from "../../src/lib/review-workspace";
@@ -14,7 +14,7 @@ const preview = query.get("preview")!;
 const failure = query.has("failure");
 let requests = 0, cancelled = 0, status = "queued", detail = "";
 let state: ProjectRunState = { phase: "idle", profiles: [], services: [], urls: [], logs: "" };
-window.rakazoDesktop = {
+window.mycelliosDesktop = {
   computer: { requestAccess: async () => true, connect: async () => {} },
   projectRunner: {
     state: async () => structuredClone(state),
@@ -25,7 +25,7 @@ window.rakazoDesktop = {
     },
     stop: async () => { state = { ...state, phase: "stopped", services: [], urls: [] }; return structuredClone(state); },
   },
-} as unknown as RakazoDesktop;
+} as unknown as MycelliosDesktop;
 
 function Workspace() {
   const review = useReviewWorkspace()!;

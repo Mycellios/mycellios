@@ -1,3 +1,4 @@
+import { desktopBridge } from "./desktop";
 import { authClient } from "./auth";
 import { speaker } from "./tts";
 import { prepareNetworkTranscriptionAudio } from "./transcription-audio";
@@ -60,10 +61,7 @@ export function webSpeechAvailable(): boolean {
  * recognition fails with `network`. Don't treat that API as available there.
  */
 function electronSpeechHost(): boolean {
-  if (typeof window !== "undefined") {
-    const host = window as Window & { rakazoDesktop?: unknown };
-    if (host.rakazoDesktop) return true;
-  }
+  if (desktopBridge()) return true;
   if (typeof navigator === "undefined") return false;
   const agent = navigator.userAgent;
   return typeof agent === "string" && agent.includes("Electron");
@@ -335,7 +333,7 @@ export class Dictation {
       });
       return;
     }
-    const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
+    const native = desktopBridge()?.localVoice;
     const nativeStatus = native ? await native.status().catch(() => null) : null;
     if (this.token !== mine) return;
     if (nativeStatus?.models?.asr.ready ?? nativeStatus?.ready) {
@@ -710,7 +708,7 @@ export class Dictation {
       TRANSCRIPTION_RESPONSE_TIMEOUT_MS,
     );
     try {
-      const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
+      const native = desktopBridge()?.localVoice;
       if (this.useLocalTranscription) {
         if (!native) throw new Error("Local transcription is unavailable.");
         const context = new AudioContext();

@@ -34,5 +34,5 @@ function Fixture(){
   </aside>
  </div>;
 }
-if(params.has('native'))(window as any).rakazoDesktop={platform:'win32',update:{state:async()=>({phase:'downloading',percent:43.6,currentVersion:'0.0.1',availableVersion:'0.0.2'}),check:async()=>null,install:async()=>null}};
+if(params.has('native'))(window as any).mycelliosDesktop={platform:'win32',update:{state:async()=>({phase:'downloading',percent:43.6,currentVersion:'0.0.1',availableVersion:'0.0.2'}),check:async()=>null,install:async()=>null}};
 createRoot(document.getElementById("root")!).render(<I18nProvider i18n={i18n}><DesktopUpdatesProvider><TooltipProvider><Fixture/></TooltipProvider><WebUpdates/></DesktopUpdatesProvider></I18nProvider>);

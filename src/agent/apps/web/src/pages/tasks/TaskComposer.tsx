@@ -1,3 +1,4 @@
+import { desktopBridge } from "../../lib/desktop";
 import { getGeneralPreferences } from "../../lib/general-preferences";
 import { botColors } from "@mycellios/ui-tokens";
 import { useLingui } from "@lingui/react/macro";
@@ -141,7 +142,7 @@ export function TaskComposer({
     preparing = useRef(false);
   useEffect(() => {
     if (!model?.preparing) return;
-    const native = window.rakazoDesktop?.localVoice;
+    const native = desktopBridge()?.localVoice;
     if (!native) return;
     const timer = setInterval(
       () =>
@@ -205,7 +206,7 @@ export function TaskComposer({
   }
   async function listen() {
     if (disabled || recording) return;
-    const native = window.rakazoDesktop?.localVoice;
+    const native = desktopBridge()?.localVoice;
     if (native && !getGeneralPreferences().networkTranscriptionAccount) {
       try {
         const fullStatus = await native.status();
@@ -244,7 +245,7 @@ export function TaskComposer({
     });
   }
   async function prepareVoice() {
-    const native = window.rakazoDesktop?.localVoice;
+    const native = desktopBridge()?.localVoice;
     if (!native || preparing.current) return;
     preparing.current = true;
     setModel({ ready: false, preparing: true, downloaded: 0, total: 0 });

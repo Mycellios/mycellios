@@ -62,7 +62,7 @@ try {
   assert.equal(await page.getByRole("button", { name: "Add folder" }).count(), 0);
   await page.addInitScript(() => {
     let folder = null;
-    window.rakazoDesktop = { computer: {
+    window.mycelliosDesktop = { computer: {
       projectAvailable: async () => true, requestAccess: async () => true, project: async () => folder,
       chooseProject: async () => folder = sessionStorage.getItem("repository")
         ? { name: "Example app", path: "C:\\Example app", repositoryId: "11111111-1111-4111-8111-111111111111" }

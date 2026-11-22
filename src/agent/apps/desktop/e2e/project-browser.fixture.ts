@@ -28,18 +28,18 @@ const browser = installProjectBrowser({
 const trace: unknown[] = [];
 try {
   await win.loadURL(process.env.MYCELLIOS_BROWSER_FIXTURE_OWNER!);
-  await win.webContents.executeJavaScript("window.__changes=[];window.rakazoDesktop.preview.onChanged(state=>window.__changes.push(state));void 0;");
+  await win.webContents.executeJavaScript("window.__changes=[];window.mycelliosDesktop.preview.onChanged(state=>window.__changes.push(state));void 0;");
   await win.webContents.session.cookies.set({ url:process.env.MYCELLIOS_BROWSER_FIXTURE_OWNER!, name:"fixture-owner-cookie", value:"fixture-only" });
   const target = process.env.MYCELLIOS_BROWSER_FIXTURE_URL!;
-  await win.webContents.executeJavaScript(`window.rakazoDesktop.preview.show(${JSON.stringify({id:"page",url:target,bounds:{x:650,y:110,width:600,height:650}})})`);
+  await win.webContents.executeJavaScript(`window.mycelliosDesktop.preview.show(${JSON.stringify({id:"page",url:target,bounds:{x:650,y:110,width:600,height:650}})})`);
   const page = await until(async () => webContents.getAllWebContents().find(wc => wc !== win.webContents && wc.getURL().startsWith(target)), value => Boolean(value), "native page");
   assert(page);
   page.on("ipc-message",(event,channel,...args)=>trace.push({channel,main:event.senderFrame===page.mainFrame,args}));
   page.on("console-message",details=>trace.push({console:details.message}));
   await until(async () => page.executeJavaScript("!!document.getElementById('target')"), Boolean, "project DOM");
-  assert.equal(await page.executeJavaScript("typeof window.rakazoDesktop"),"undefined");
+  assert.equal(await page.executeJavaScript("typeof (window.mycelliosDesktop ?? window.rakazoDesktop)"),"undefined");
   assert.equal((await page.session.cookies.get({url:target})).length,0,"Application cookie must not reach project");
-  await win.webContents.executeJavaScript("window.rakazoDesktop.preview.command({id:'page',action:'select',enabled:true})");
+  await win.webContents.executeJavaScript("window.mycelliosDesktop.preview.command({id:'page',action:'select',enabled:true})");
   await page.executeJavaScript("document.getElementById('target').click()");
   await pause(100);
   assert.equal(await win.webContents.executeJavaScript("window.__changes.some(state=>state.selection)"),false,"Synthetic page events must not trigger capture");
@@ -68,7 +68,7 @@ try {
     dialog.append(frame);document.body.append(dialog);dialog.showModal();
   })()`);
   await until(async()=>page.executeJavaScript("!!document.getElementById('framed').contentDocument?.getElementById('inside')"),Boolean,"framed project");
-  await win.webContents.executeJavaScript("window.__changes=[];window.rakazoDesktop.preview.command({id:'page',action:'select',enabled:true})");
+  await win.webContents.executeJavaScript("window.__changes=[];window.mycelliosDesktop.preview.command({id:'page',action:'select',enabled:true})");
   const framedPoint=await page.executeJavaScript("(()=>{const r=document.getElementById('framed').getBoundingClientRect();return{x:Math.round(r.x+25),y:Math.round(r.y+20)}})()");
   page.debugger.attach("1.3");
   await page.debugger.sendCommand("Input.dispatchMouseEvent",{type:"mousePressed",button:"left",clickCount:1,...framedPoint});
@@ -92,14 +92,14 @@ try {
     assert.equal(await page.executeJavaScript("window.__documentNonce"),nonce);
     assert.equal(await page.executeJavaScript("document.getElementById('work').value"),"preserved while editing");
   } finally { await writeFile(css,original); }
-  await win.webContents.executeJavaScript(`window.rakazoDesktop.preview.show(${JSON.stringify({id:"page",url:target+"next",bounds:{x:650,y:110,width:600,height:650}})})`);
+  await win.webContents.executeJavaScript(`window.mycelliosDesktop.preview.show(${JSON.stringify({id:"page",url:target+"next",bounds:{x:650,y:110,width:600,height:650}})})`);
   await until(async()=>page.getURL(),value=>value.endsWith("/next"),"navigation");
   await until(async()=>page.isLoading(),value=>!value,"navigation load");
-  await win.webContents.executeJavaScript("window.rakazoDesktop.preview.command({id:'page',action:'back'})");
+  await win.webContents.executeJavaScript("window.mycelliosDesktop.preview.command({id:'page',action:'back'})");
   await until(async()=>page.getURL(),value=>value===target,"history back");
   const oldId = page.id;
   scope="fixture-space:chat-two";
-  await win.webContents.executeJavaScript(`window.rakazoDesktop.preview.show(${JSON.stringify({id:"other",url:target,bounds:{x:650,y:110,width:600,height:650}})})`);
+  await win.webContents.executeJavaScript(`window.mycelliosDesktop.preview.show(${JSON.stringify({id:"other",url:target,bounds:{x:650,y:110,width:600,height:650}})})`);
   await until(async()=>webContents.getAllWebContents().some(wc=>wc.id===oldId),value=>!value,"old chat closed");
   await writeFile(path.join(output,"native-proof.json"),JSON.stringify({passed:true,nativeBrowser:true,isolatedSession:true,noAppBridge:true,trustedSelection:true,frameContainerSelection:true,noFrameClickThrough:true,routineCookiePreserved:true,screenshotBytes:png.length,hotReloadWithoutDocumentReload:true,history:true,chatIsolation:true,realAccount:false},null,2));
   browser.dispose(); win.destroy(); app.exit(0);

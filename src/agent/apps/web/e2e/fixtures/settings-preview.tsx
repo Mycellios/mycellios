@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import { DEFAULT_DESKTOP_COMPANIONS, type DesktopCompanionPreferences, type RakazoDesktop } from "@mycellios/contracts";
+import { DEFAULT_DESKTOP_COMPANIONS, type DesktopCompanionPreferences, type MycelliosDesktop } from "@mycellios/contracts";
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import type { Bot } from "@mycellios/contracts";
@@ -16,12 +16,12 @@ let preferences = structuredClone(DEFAULT_DESKTOP_COMPANIONS);
 preferences.dock.shown = true;
 const calls: unknown[] = [];
 (window as any).__settingsFixture = { calls };
-window.rakazoDesktop = { companions: {
+window.mycelliosDesktop = { companions: {
   state: async () => preferences,
   save: async (next: DesktopCompanionPreferences) => { preferences = next; calls.push(next); return next; },
   displays: async () => [{ id: 1, label: "Primary screen" }],
   openChat: async target => { calls.push(target); },
-} } as RakazoDesktop;
+} } as MycelliosDesktop;
 function MicosPreview() {
   const [bots, setBots] = useState(() => Array.from({ length: 12 }, (_, i) => ({ id: `fixture-${i}`, name: i ? `Mico ${i}` : "Investigación", color: "#399e7b" } as Bot)));
   return <section className="rk-settings-page" data-testid="mico-preferences-preview">

@@ -31,7 +31,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
-  delete window.rakazoDesktop;
+  delete window.mycelliosDesktop;
   vi.restoreAllMocks();
 });
 async function render(
@@ -84,7 +84,7 @@ function bridge(phase: DesktopUpdateState["phase"], percent: number | null = nul
     checkedAt: null,
   };
   const install = vi.fn(async () => state);
-  window.rakazoDesktop = {
+  window.mycelliosDesktop = {
     platform: "darwin",
     window: {
       close: async () => {},
@@ -229,7 +229,7 @@ it.each(["throw", "state"] as const)(
     if (failure === "throw") install.mockRejectedValueOnce(new Error("offline"));
     else
       install.mockResolvedValueOnce({
-        ...(await window.rakazoDesktop!.update.state()),
+        ...(await window.mycelliosDesktop!.update.state()),
         phase: "error",
         message: "Update could not be installed",
       });
