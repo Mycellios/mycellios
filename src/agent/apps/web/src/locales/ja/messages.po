@@ -6547,3 +6547,75 @@ msgstr "最初のメッセージを確認できませんでした。新しい会
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "会話「{name}」を開く"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} を実行しました"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} を実行しました。新しい情報はありません"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} は失敗しました"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} を実行し、自身を一時停止しました"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "{routine} の実行を表示"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "{routine} の実行を非表示"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, other {{routine} の実行 # 回}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "変更を検出"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "あなたが実行"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "ローカルスクリプト"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "チャットでメンション"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "GitHub イベント"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "自動再試行"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "新しい情報なし"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "遅れて実行: 予定は {due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, other {以前の # 回の実行は行われませんでした: その時刻にサーバーが動いていませんでした}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, other {以前の # 回の実行をこの実行にまとめました: その前の実行がまだ始まっていませんでした}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "{time} の実行で一時停止"

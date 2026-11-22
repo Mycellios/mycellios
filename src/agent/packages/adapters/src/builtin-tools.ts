@@ -1633,6 +1633,24 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "routine_report_failure",
+    description:
+      "Mark this routine run as failed when it could not do its job: a source it needs is down, a login expired, the data it checks is missing or wrong. The reason shows in the routine's run history and its failure notice. Use it only for a real failure, not for a run that simply has nothing new. Then end with a short reply saying what failed and what the person can do.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          minLength: 1,
+          maxLength: 500,
+          description: "Why the run failed, in one or two sentences the person understands.",
+        },
+      },
+      required: ["reason"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "work_status",
     readOnly: true,
     description: "Read the current request's durable parent/child task states and result run IDs. Read results before repeating work; do not poll unchanged status.",

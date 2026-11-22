@@ -11,7 +11,8 @@ import EmbeddedPostgres from "embedded-postgres";
 // A fresh loopback cluster and synthetic accounts only. No existing database, models or keys.
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, createThreadEvents, ensureRoutineThread, isOwnedRoutineThread, routineDeliveryRouting, claimMicoRun, controlWorkTree, workStatus, isOwnedWorkflowThread, stopWorkflowExecution } = await import("@mycellios/db");
+const { createDb, asSystem, createThreadEvents, ensureRoutineThread, isOwnedRoutineThread, routineDeliveryRouting, claimMicoRun, controlWorkTree, workStatus, isOwnedWorkflowThread, stopWorkflowExecution,
+  archiveRoutineThreadInTransaction, followRoutineRenameInTransaction, loadRunHistoryMessages, createRepos, runAsTenant } = await import("@mycellios/db");
 const { createWorkflowExecution, reconcileWorkflowExecutions } = await import("../packages/adapters/src/workflows.js");
 const { executeWorkflowTool } = await import("../packages/adapters/src/workflow-tools.js");
 const { acquireComputerExecutionLease, releaseComputerExecutionLease } = await import("../packages/adapters/src/computer-lifecycle.js");
@@ -42,6 +43,15 @@ try {
     await sql.query('DROP TABLE workflow_executions; DROP TABLE workflows');
     await sql.query(await readFile("packages/db/prisma/migrations/20261105101000_workflow_canvas/migration.sql", "utf8"));
     checks.push("actual additive Mico concurrency and workflow migrations apply with owned foreign keys");
+    await sql.query('ALTER TABLE runs DROP COLUMN quiet, DROP COLUMN "missedRuns", DROP COLUMN "missedReason"');
+    await sql.query('ALTER TABLE routines DROP COLUMN "pausedByRunId", DROP COLUMN "pausedByRunAt"');
+    await sql.query(await readFile("packages/db/prisma/migrations/20261122180000_routine_run_markers/migration.sql", "utf8"));
+    const added = await sql.query(`SELECT table_name, column_name, column_default, is_nullable FROM information_schema.columns
+      WHERE (table_name = 'runs' AND column_name IN ('quiet', 'missedRuns', 'missedReason'))
+        OR (table_name = 'routines' AND column_name IN ('pausedByRunId', 'pausedByRunAt')) ORDER BY table_name, column_name`);
+    assert.equal(added.rows.length, 5);
+    assert.deepEqual(added.rows.filter((row: { is_nullable: string }) => row.is_nullable === "NO").map((row: { column_name: string }) => row.column_name).sort(), ["missedRuns", "quiet"]);
+    checks.push("actual additive routine run migration applies with not-quiet, nothing-missed defaults");
   } finally { await sql.end(); }
   db = createDb(url, { encryptContent: false, applicationName: "synthetic-routine-acceptance" });
   const prisma = asSystem(db.prisma, "isolated routine acceptance fixtures");
@@ -203,6 +213,105 @@ try {
   await reconcileWorkflowExecutions(prisma, deps.jobs);
   assert.equal(await prisma.run.count({ where: { clientNonce: stoppedRun.clientNonce } }), 1);
   checks.push("workflow Stop atomically cancels its exact runs and persists teardown across retries and reconciliation");
+  // Routine runs in their own conversation leave a marker in the main chat (specs/mico-routine-runs).
+  const brief = await prisma.routine.create({ data: { ...scope, botId: bot.id, name: "Synthetic brief", prompt: "Synthetic brief", crons: [], active: true, webhookEnabled: true } });
+  const briefThread = await ensureRoutineThread(prisma, scope, brief.id);
+  const mainId = bot.thread!.id;
+  const finishBrief = async (options: { quiet?: boolean; reportedFailure?: string; text?: string; nonce?: string; pauses?: boolean }) => {
+    const task = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: briefThread.id, prompt: brief.prompt, status: "running" } });
+    const run = await prisma.run.create({ data: { ...scope, botId: bot.id, threadId: briefThread.id, taskId: task.id, routineId: brief.id,
+      trigger: "routine", status: "running", leaseOwner: "synthetic-worker", leaseFence: 1, startedAt: new Date(), clientNonce: options.nonce ?? null } });
+    const attempt = await prisma.attempt.create({ data: { runId: run.id, fence: 1, status: "running" } });
+    // What schedule_update records when the run turns its own routine off.
+    if (options.pauses) await prisma.routine.update({ where: { id: brief.id }, data: { active: false, pausedByRunId: run.id, pausedByRunAt: run.startedAt } });
+    const finished = await events.finalizeRun({ spaceId: scope.spaceId, threadId: briefThread.id, botId: bot.id, runId: run.id, taskId: task.id,
+      attemptId: attempt.id, leaseOwner: "synthetic-worker", leaseFence: 1, outcome: "completed",
+      blocks: options.text ? [{ kind: "text", text: options.text }] : [], quiet: options.quiet, reportedFailure: options.reportedFailure });
+    assert.ok(finished);
+    return prisma.run.findUniqueOrThrow({ where: { id: run.id } });
+  };
+  const roster = async () => (await runAsTenant(scope, () => createRepos(db!.prisma).listBots({ ...scope, email: "owner@example.invalid", isDeploymentOwner: false })))
+    .find(row => row.id === bot.id)!;
+  const markers = () => prisma.message.findMany({ where: { threadId: mainId, clientNonce: { startsWith: "routine-run:" } }, orderBy: { seq: "asc" } });
+  await prisma.thread.update({ where: { id: mainId }, data: { unread: false } });
+  const beforeBot = await roster();
+  const quietRun = await finishBrief({ quiet: true });
+  assert.equal(quietRun.quiet, true);
+  await assert.rejects(prisma.run.update({ where: { id: quietRun.id }, data: { missedReason: "later" } }));
+  await prisma.run.update({ where: { id: quietRun.id }, data: { missedRuns: 2, missedReason: "offline" } });
+  checks.push("the missed-run reason accepts only offline or busy");
+  let marked = await markers();
+  assert.equal(marked.length, 1);
+  assert.deepEqual(marked[0]!.blocks, [{ kind: "routine_run", fromBotId: bot.id, routineId: brief.id, routineName: "Synthetic brief",
+    taskId: briefThread.id, runId: quietRun.id, status: "quiet" }]);
+  assert.equal(marked[0]!.role, "system");
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: mainId } })).unread, false);
+  const afterBot = await roster();
+  assert.equal(afterBot.unread, false);
+  assert.equal(afterBot.preview, beforeBot.preview);
+  assert.equal(afterBot.updatedAt, beforeBot.updatedAt);
+  checks.push("a quiet routine run adds a folded marker that is never unread and keeps the Mico's preview and place");
+  const reported = await finishBrief({ text: "Synthetic news" });
+  assert.equal(reported.quiet, false);
+  marked = await markers();
+  assert.equal((marked[1]!.blocks as Array<{ status: string }>)[0]!.status, "reported");
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: mainId } })).unread, true);
+  assert.equal(await prisma.message.count({ where: { threadId: mainId, role: "bot" } }), 0);
+  assert.equal(await prisma.message.count({ where: { threadId: briefThread.id, runId: reported.id, role: "bot" } }), 1);
+  assert.equal((await roster()).preview, "Synthetic brief");
+  const reason = "The synthetic source refused the login, so nothing was checked.";
+  const failed = await finishBrief({ text: "Could not check today.", reportedFailure: reason, quiet: true });
+  assert.equal(failed.status, "failed"); assert.equal(failed.error, reason); assert.equal(failed.quiet, false);
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: failed.taskId } })).status, "failed");
+  assert.equal(await prisma.message.count({ where: { threadId: briefThread.id, runId: failed.id, role: "bot" } }), 1);
+  marked = await markers();
+  assert.equal((marked[2]!.blocks as Array<{ status: string }>)[0]!.status, "failed");
+  assert.equal(marked.length, 3);
+  checks.push("a reported routine run marks the main chat unread and keeps its answer in the routine conversation");
+  checks.push("routine_report_failure ends the run failed with its reason while keeping its reply");
+  const history = await loadRunHistoryMessages(prisma, { id: "synthetic-next-turn", threadId: mainId }, 50);
+  assert.equal(history.some(message => message.clientNonce?.startsWith("routine-run:")), false);
+  checks.push("routine run markers never enter the main chat model history");
+  await prisma.thread.update({ where: { id: mainId }, data: { unread: false } });
+  const pausing = await finishBrief({ pauses: true, quiet: true });
+  assert.equal(pausing.quiet, false);
+  assert.equal((await markers()).at(-1)!.blocks && ((await markers()).at(-1)!.blocks as Array<{ status: string }>)[0]!.status, "paused");
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: mainId } })).unread, true);
+  checks.push("a run that pauses its own routine is never a silent marker, even with nothing else to say");
+  const legacyTask = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: mainId, prompt: "Legacy target", status: "running" } });
+  const legacyRun = await prisma.run.create({ data: { ...scope, botId: bot.id, threadId: mainId, taskId: legacyTask.id, routineId: brief.id,
+    trigger: "routine", status: "running", leaseOwner: "synthetic-worker", leaseFence: 1 } });
+  const legacyAttempt = await prisma.attempt.create({ data: { runId: legacyRun.id, fence: 1, status: "running" } });
+  await events.finalizeRun({ spaceId: scope.spaceId, threadId: mainId, botId: bot.id, runId: legacyRun.id, taskId: legacyTask.id,
+    attemptId: legacyAttempt.id, leaseOwner: "synthetic-worker", leaseFence: 1, outcome: "completed", blocks: [{ kind: "text", text: "Legacy" }] });
+  assert.equal((await markers()).length, 4);
+  checks.push("runs in an older main-chat target add no marker; each run in its own conversation adds exactly one");
+  await prisma.routine.update({ where: { id: brief.id }, data: { active: true, pausedByRunId: null, pausedByRunAt: null } });
+  await prisma.$transaction(tx => followRoutineRenameInTransaction(tx, { ...brief, threadId: briefThread.id, name: "Renamed brief" }));
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: briefThread.id } })).title, "Renamed brief");
+  await prisma.thread.update({ where: { id: briefThread.id }, data: { title: "My own name", titleSource: "user" } });
+  await prisma.$transaction(tx => followRoutineRenameInTransaction(tx, { ...brief, threadId: briefThread.id, name: "Renamed again" }));
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: briefThread.id } })).title, "My own name");
+  await prisma.$transaction(tx => followRoutineRenameInTransaction(tx, { ...brief, threadId: mainId, name: "Never the main chat" }));
+  assert.notEqual((await prisma.thread.findUniqueOrThrow({ where: { id: mainId } })).title, "Never the main chat");
+  checks.push("a routine conversation follows routine renames unless the person named it; other targets keep their title");
+  await prisma.thread.update({ where: { id: briefThread.id }, data: { archivedAt: new Date() } });
+  await ensureRoutineThread(prisma, scope, brief.id, { reopen: false });
+  assert.ok((await prisma.thread.findUniqueOrThrow({ where: { id: briefThread.id } })).archivedAt);
+  await ensureRoutineThread(prisma, scope, brief.id);
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: briefThread.id } })).archivedAt, null);
+  checks.push("a run brings an archived routine conversation back; a change check that starts no run does not");
+  const briefRow = await prisma.routine.findUniqueOrThrow({ where: { id: brief.id } });
+  assert.equal(await prisma.$transaction(tx => archiveRoutineThreadInTransaction(tx, { ...briefRow, userId: "foreign" })), false);
+  await prisma.$transaction(async tx => {
+    assert.equal(await archiveRoutineThreadInTransaction(tx, briefRow), true);
+    await tx.routine.delete({ where: { id: brief.id } });
+  });
+  const kept = await prisma.thread.findUniqueOrThrow({ where: { id: briefThread.id } });
+  assert.ok(kept.archivedAt);
+  assert.equal(await prisma.message.count({ where: { threadId: briefThread.id } }), 2);
+  assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: mainId } })).archivedAt, null);
+  checks.push("deleting a routine archives its own conversation with its history, never another owner's or the main chat");
   const rls = database.getPgClient(); await rls.connect();
   try {
     await rls.query('CREATE ROLE routine_receipt_probe NOLOGIN');

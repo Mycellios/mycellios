@@ -10,12 +10,15 @@ import { afterEach, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ history: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ rpc: { routines: api } }));
-vi.mock("@lingui/core/macro", () => ({
-  t: (parts: TemplateStringsArray) => parts.join(""),
-}));
+const format = vi.hoisted(
+  () => (parts: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: parts }, ...values),
+);
+vi.mock("@lingui/core/macro", () => ({ t: format }));
 vi.mock("@lingui/react/macro", () => ({
-  useLingui: () => ({ i18n: { locale: "en" }, t: (parts: TemplateStringsArray) => parts.join("") }),
+  useLingui: () => ({ i18n: { locale: "en" }, t: format }),
   Trans: ({ children }: { children: ReactNode }) => children,
+  Plural: ({ value, one, other }: { value: number; one: string; other: string }) =>
+    (value === 1 ? one : other).replace("#", String(value)),
 }));
 vi.mock("@mycellios/ui-web", async (importOriginal) => ({
   ...(await importOriginal<typeof UiWeb>()),
@@ -385,6 +388,66 @@ it("omits error UI for a completed run carrying a stale error", async () => {
     expect(view.container.querySelector("details")).toBeNull();
     expect(view.container.textContent).not.toContain("Your model provider");
     expect(view.container.textContent).not.toContain("504: request timed out");
+  } finally {
+    await view.close();
+  }
+});
+
+it("labels each run by what started it and marks quiet, late and missed runs", async () => {
+  api.history.mockResolvedValue(
+    page([
+      {
+        ...run,
+        id: "late",
+        source: "schedule",
+        quiet: true,
+        scheduledFor: "2026-01-02T08:00:00Z",
+        missed: { count: 3, reason: "offline" },
+        messageId: null,
+        taskThreadId: "routine-thread",
+      },
+      { ...run, id: "manual", source: "manual", quiet: false, missed: { count: 1, reason: "busy" } },
+      { ...run, id: "hook", source: "webhook" },
+    ]),
+  );
+  const view = await mounted();
+  try {
+    const expand = [...view.container.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("Run history"),
+    );
+    await act(async () => expand?.click());
+    const rows = [...view.container.querySelectorAll('[data-testid="routine-run-row"]')];
+    expect(rows.map((row) => row.querySelector('[data-testid="routine-run-source"]')?.textContent)).toEqual([
+      "Scheduled · ",
+      "Run by you · ",
+      "Webhook · ",
+    ]);
+    // A quiet run reads as nothing new instead of a plain success.
+    expect(rows[0]?.querySelector('[data-testid="routine-run-quiet"]')?.textContent).toBe("Nothing new");
+    expect(rows[1]?.querySelector('[data-testid="routine-run-quiet"]')).toBeNull();
+    expect(rows[0]?.querySelector('[data-testid="routine-run-late"]')?.textContent).toMatch(/^Ran late: it was due /);
+    expect(rows[0]?.querySelector('[data-testid="routine-run-missed"]')?.textContent).toBe(
+      "3 earlier runs did not happen: the server was not running at their time",
+    );
+    expect(rows[1]?.querySelector('[data-testid="routine-run-missed"]')?.textContent).toBe(
+      "1 earlier run was folded into this one: the run before it had not started yet",
+    );
+    expect(rows[1]?.querySelector('[data-testid="routine-run-late"]')).toBeNull();
+    // The quiet run still opens its routine conversation.
+    expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/app/bot-1?task=routine-thread");
+  } finally {
+    await view.close();
+  }
+});
+
+it("shows the reason a run gave when it reported its own failure", async () => {
+  i18n.loadAndActivate({ locale: "en", messages: {} });
+  const error = "The supplier page asked for a login again, so no prices were checked.";
+  api.history.mockResolvedValue(page([{ ...run, status: "failed", error, source: "schedule" }]));
+  const view = await mounted();
+  try {
+    expect(view.container.textContent).toContain(error);
+    expect(view.container.querySelector('[data-testid="routine-run-quiet"]')).toBeNull();
   } finally {
     await view.close();
   }

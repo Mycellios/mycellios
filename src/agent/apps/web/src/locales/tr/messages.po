@@ -6546,3 +6546,75 @@ msgstr "İlk mesaj doğrulanamadı. Yeni sohbeti kontrol edin ve mesaj yoksa yen
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "{name} sohbetini aç"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} çalıştı"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} çalıştı, yeni bir şey yok"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} başarısız oldu"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} çalıştı ve kendini duraklattı"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "{routine} çalıştırmalarını göster"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "{routine} çalıştırmalarını gizle"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, one {{routine} için # çalıştırma} other {{routine} için # çalıştırma}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "Değişiklik algılandı"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "Sizin başlattığınız"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "Yerel betik"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "Sohbette anıldı"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "GitHub olayı"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "Otomatik yeniden deneme"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "Yeni bir şey yok"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "Geç çalıştı: zamanı {due} idi"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, one {Önceki # çalıştırma yapılmadı: o saatte sunucu çalışmıyordu} other {Önceki # çalıştırma yapılmadı: o saatlerde sunucu çalışmıyordu}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, one {Önceki # çalıştırma bununla birleştirildi: ondan öncekisi henüz başlamamıştı} other {Önceki # çalıştırma bununla birleştirildi: onlardan öncekisi henüz başlamamıştı}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "{time} çalıştırmasıyla duraklatıldı"

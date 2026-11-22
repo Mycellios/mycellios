@@ -16,6 +16,7 @@ import {
 } from "../../components/ImageGenerationCard";
 import { SubagentCard } from "../../components/SubagentCard";
 import { TaskReportCard } from "../../components/TaskReportCard";
+import { RoutineRunMarker } from "../../components/RoutineRunMarker";
 import {
   LIVE_TOOL_STEP_WINDOW,
   StandaloneToolActivity,
@@ -125,7 +126,7 @@ export const MessageView = memo(function MessageView({
   markedUnread?: boolean;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
 }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const isNarration =
     message.role === "bot" &&
     message.blocks.length > 0 &&
@@ -394,6 +395,16 @@ export const MessageView = memo(function MessageView({
                 key={i}
                 block={block}
                 color={peerBot(block.fromBotId)?.color ?? FALLBACK_BOT_COLOR}
+              />
+            );
+          }
+          if (block.kind === "routine_run") {
+            // The transcript groups these; anywhere else a marker shows as its own line.
+            return (
+              <RoutineRunMarker
+                key={i}
+                runs={[{ id: message.id, createdAt: message.createdAt, block }]}
+                locale={i18n.locale || "en"}
               />
             );
           }

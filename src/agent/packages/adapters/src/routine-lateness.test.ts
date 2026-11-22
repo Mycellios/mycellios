@@ -29,6 +29,21 @@ describe("lateRoutineRunInstruction", () => {
     );
   });
 
+  it("says how many earlier runs did not happen and why", () => {
+    const offline = lateRoutineRunInstruction(
+      { ...timerRun("2026-10-16T12:00:00.000Z"), missedRuns: 3, missedReason: "offline" },
+      daily,
+      new Date("2026-10-19T19:02:00Z"),
+    );
+    expect(offline).toContain("3 earlier scheduled runs did not happen (the server was not running at the time); this run covers them.");
+    const busy = lateRoutineRunInstruction(
+      { ...timerRun(mondayEight), missedRuns: 1, missedReason: "busy" },
+      daily,
+      new Date("2026-10-19T19:02:30Z"),
+    );
+    expect(busy).toContain("1 earlier scheduled run did not happen (an earlier run had not started yet)");
+  });
+
   it("measures a catch-up from the most recent missed occurrence", () => {
     // Created for Friday's 08:00; Saturday, Sunday and Monday were missed too.
     const note = lateRoutineRunInstruction(

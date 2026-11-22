@@ -51,6 +51,7 @@ import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
 import { type QueuedTaskReport, queueTaskReportInTransaction } from "./agent-tasks.js";
+import { type QueuedRoutineRunMarker, queueRoutineRunMarkerInTransaction } from "./routine-run-markers.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -141,6 +142,8 @@ export interface FinalizeRunResult {
   continuationRunId: string | null;
   /** A report this turn queued in the Mico's main chat (conversations it opened itself). */
   taskReport?: QueuedTaskReport | null;
+  /** The marker a routine run added to the Mico's main chat. */
+  routineMarker?: QueuedRoutineRunMarker | null;
 }
 
 interface FinalizeRunBase {
@@ -160,6 +163,13 @@ export type FinalizeRunInput = FinalizeRunBase &
         outcome: "completed";
         blocks: MessageBlock[];
         markUnread?: boolean;
+        /** A routine run that finished with nothing new: nothing posted, nobody notified. */
+        quiet?: boolean;
+        /**
+         * The run reported its own failure (routine_report_failure). It ends failed with this
+         * reason and its answer is kept as an ordinary reply.
+         */
+        reportedFailure?: string;
       }
     | {
         outcome: "failed";
@@ -1591,22 +1601,25 @@ export async function finalizeRun(
   await notifyRealtime(realtime, committed.threadId, committed.seq);
   if (committed.taskReport)
     await notifyRealtime(realtime, committed.taskReport.threadId, committed.taskReport.seq);
+  if (committed.routineMarker)
+    await notifyRealtime(realtime, committed.routineMarker.threadId, committed.routineMarker.seq);
   const timing = await readRunTimingFields(prisma, input.runId);
   if (committed.firstResponse) {
     getLogger().info("run.first_response", { "run.id": input.runId, ...timing });
   }
   getLogger().info("run.finished", {
     "run.id": input.runId,
-    "run.outcome": input.outcome,
+    "run.outcome": committed.status,
     ...timing,
     "space.id": input.spaceId,
     "thread.id": input.threadId,
     "bot.id": input.botId,
   });
-  void captureRunAnalytics(prisma, analytics, input.runId, `run.${input.outcome}`);
+  void captureRunAnalytics(prisma, analytics, input.runId, `run.${committed.status}`);
   return {
     continuationRunId: committed.continuationRunId,
     ...(committed.taskReport ? { taskReport: committed.taskReport } : {}),
+    ...(committed.routineMarker ? { routineMarker: committed.routineMarker } : {}),
   };
 }
 
@@ -1641,7 +1654,15 @@ async function finalizeRunOnce(
   continuationRunId: string | null;
   firstResponse: boolean;
   taskReport: QueuedTaskReport | null;
+  routineMarker: QueuedRoutineRunMarker | null;
+  status: "completed" | "failed";
 } | null> {
+  // A routine run that reports its own failure did its turn: its answer is a normal reply, its
+  // steering is answered, and only its status and error say that it failed.
+  const reportedFailure =
+    input.outcome === "completed" ? input.reportedFailure?.trim() || undefined : undefined;
+  const status = reportedFailure ? "failed" : input.outcome;
+  const error = input.outcome === "failed" ? input.error : (reportedFailure ?? null);
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
     let writableRun: { startedAt: Date | null; userId: string } | undefined;
@@ -1664,11 +1685,12 @@ async function finalizeRunOnce(
         leaseFence: input.leaseFence,
       },
       data: {
-        status: input.outcome,
-        error: input.outcome === "failed" ? input.error : null,
+        status,
+        error,
         completedAt: now,
         leaseOwner: null,
         leaseExpiresAt: null,
+        ...(input.outcome === "completed" && input.quiet && !reportedFailure ? { quiet: true } : {}),
       },
     });
     if (terminal.count !== 1) return null;
@@ -1676,8 +1698,8 @@ async function finalizeRunOnce(
     await recordThreadTurnOutcome(tx, {
       threadId: input.threadId,
       runIds: [input.runId],
-      outcome: input.outcome,
-      error: input.outcome === "failed" ? input.error : null,
+      outcome: status,
+      error,
     });
     await tx.externalEffect.deleteMany({
       where: {
@@ -1695,8 +1717,8 @@ async function finalizeRunOnce(
         status: "running",
       },
       data: {
-        status: input.outcome,
-        error: input.outcome === "failed" ? input.error : null,
+        status,
+        error,
         finishedAt: now,
       },
     });
@@ -1709,7 +1731,7 @@ async function finalizeRunOnce(
         threadId: input.threadId,
         botId: input.botId,
       },
-      data: { status: input.outcome },
+      data: { status },
     });
     if (task.count !== 1) throw new Error("Run task was not available to finalize");
 
@@ -1761,9 +1783,9 @@ async function finalizeRunOnce(
       spaceId: input.spaceId,
       threadId: input.threadId,
       botId: input.botId,
-      type: input.outcome === "completed" ? "run.completed" : "run.failed",
+      type: status === "completed" ? "run.completed" : "run.failed",
       runId: input.runId,
-      payload: input.outcome === "completed" ? {} : { error: input.error },
+      payload: status === "completed" ? {} : { error },
     });
     await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
     // A conversation the Mico opened reports this turn to its main chat in the same commit,
@@ -1771,8 +1793,14 @@ async function finalizeRunOnce(
     const taskReport = await queueTaskReportInTransaction(tx, {
       threadId: input.threadId,
       runIds: [input.runId],
-      outcome: input.outcome,
-      ...(input.outcome === "failed" ? { error: input.error } : {}),
+      outcome: status,
+      ...(status === "failed" ? { error } : {}),
+    });
+    // A routine run in its own conversation marks the main chat in the same commit.
+    const routineMarker = await queueRoutineRunMarkerInTransaction(tx, {
+      runId: input.runId,
+      threadId: input.threadId,
+      status,
     });
     if (writableRun) {
       await deleteRunSecretsInTransaction(tx, [
@@ -1796,6 +1824,8 @@ async function finalizeRunOnce(
       continuationRunId,
       firstResponse,
       taskReport,
+      routineMarker,
+      status,
     };
   }, FINALIZE_TRANSACTION_OPTIONS);
 }

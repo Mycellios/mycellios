@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { routinePausedLabel } from "../lib/routine-paused-label";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type {
   ModelCatalogEntry,
@@ -225,7 +226,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
 }
 
 export function routineTriggerSummary(routine: Routine): string {
-  if (!routine.active) return t`Paused`;
+  if (!routine.active) return routinePausedLabel(routine);
   const parts: string[] = [];
   if (routine.webhookEnabled) parts.push(t`When a webhook fires`);
   if (routine.githubEnabled) parts.push(t`Git event`);

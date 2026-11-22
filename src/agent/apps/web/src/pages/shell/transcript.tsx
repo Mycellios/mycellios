@@ -1,6 +1,8 @@
 import { PeerExchangeSummary } from "../../components/ai/PeerExchangeSummary";
 import { joinMessageBubbles } from "../../lib/message-bubble-group";
 import { peerExchanges } from "../../lib/peer-exchange-groups";
+import { routineRunGroups } from "../../lib/routine-run-groups";
+import { RoutineRunMarker } from "../../components/RoutineRunMarker";
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { NewChatDivider } from "../../components/composer/NewChatDivider";
 import { i18n } from "@lingui/core";
@@ -241,6 +243,8 @@ export const Transcript = memo(function Transcript({
   const threadItems = useMemo(() => groupVoiceChats(reactionView.visibleMessages), [reactionView.visibleMessages]);
   // Runs of messages between Micos fold into one row until the reader opens them.
   const exchangeOf = useMemo(() => peerExchanges(threadItems), [threadItems]);
+  // Routine runs that worked in their own conversation: one line per stretch of one routine.
+  const routineGroupOf = useMemo(() => routineRunGroups(threadItems), [threadItems]);
   const [openExchanges, setOpenExchanges] = useState<ReadonlySet<string>>(() => new Set());
   const toggleExchange = useCallback((key: string) => {
     following.current = false;
@@ -597,6 +601,22 @@ export const Transcript = memo(function Transcript({
             message.id.startsWith("progress:") &&
             (message.id === `progress:${activeRun.id}` || message.runId === activeRun.id));
           if (!messageHasVisibleBlocks(message.blocks, messageToolActivity)) return null;
+          const routineGroup = routineGroupOf.get(message.id);
+          if (routineGroup) {
+            if (routineGroup.key !== message.id) return null;
+            const holdsUnread = routineGroup.memberIds.some((id) => id === unreadDividerId);
+            return (
+              <Fragment key={message.id}>
+                {compactMessageActions && separatorIds.has(message.id) ? (
+                  <TimeSeparator createdAt={message.createdAt} locale={i18n.locale || "en"} />
+                ) : null}
+                {holdsUnread ? <UnreadDivider afterSeparator={separatorIds.has(message.id)} /> : null}
+                <div data-message-id={message.id} data-message-role={message.role} className="relative py-0.5">
+                  <RoutineRunMarker runs={routineGroup.runs} locale={i18n.locale || "en"} />
+                </div>
+              </Fragment>
+            );
+          }
           const exchange = exchangeOf.get(message.id);
           const exchangeOpen = exchange ? openExchanges.has(exchange.key) : false;
           const exchangeSummary = exchange && exchange.key === message.id ? (

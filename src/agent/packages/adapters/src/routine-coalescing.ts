@@ -1,4 +1,5 @@
 import type { Prisma } from "@mycellios/db";
+import { routineTimerScheduledAt } from "@mycellios/core";
 import { appendEventInTransaction } from "@mycellios/db";
 
 /** Reserved provenance for recurring timer ticks; manual/event/retry runs never use it. */
@@ -7,15 +8,7 @@ export function routineTimerNonce(routineId: string, scheduledFor: string): stri
 }
 
 /** The scheduled occurrence a recurring timer run was created for, if it is one. */
-export function routineTimerScheduledFor(
-  routineId: string,
-  clientNonce: string | null | undefined,
-): Date | undefined {
-  const prefix = routineTimerNonce(routineId, "");
-  if (!clientNonce?.startsWith(prefix)) return undefined;
-  const scheduledFor = new Date(clientNonce.slice(prefix.length));
-  return Number.isFinite(scheduledFor.getTime()) ? scheduledFor : undefined;
-}
+export const routineTimerScheduledFor = routineTimerScheduledAt;
 
 /**
  * Call while holding the routine row lock. Keep at most one unstarted catch-up

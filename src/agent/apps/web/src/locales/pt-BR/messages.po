@@ -6546,3 +6546,75 @@ msgstr "Não foi possível confirmar a primeira mensagem. Confira a nova convers
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "Abrir a conversa {name}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} foi executada"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} foi executada, nada de novo"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} falhou"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} foi executada e se pausou"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "Mostrar as execuções de {routine}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "Ocultar as execuções de {routine}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, one {# execução de {routine}} other {# execuções de {routine}}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "Mudança detectada"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "Executada por você"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "Script local"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "Mencionada no chat"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "Evento do GitHub"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "Nova tentativa automática"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "Nada de novo"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "Executada com atraso: estava prevista para {due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, one {# execução anterior não aconteceu: o servidor não estava rodando no horário} other {# execuções anteriores não aconteceram: o servidor não estava rodando no horário}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, one {# execução anterior foi incorporada a esta: a anterior ainda não tinha começado} other {# execuções anteriores foram incorporadas a esta: a anterior ainda não tinha começado}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "Pausada pela execução de {time}"

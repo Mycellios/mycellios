@@ -14,6 +14,7 @@ import {
   zonedDateTime,
 } from "@mycellios/core";
 import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
+import { archiveRoutineThreadInTransaction, followRoutineRenameInTransaction } from "@mycellios/db";
 
 import { localDateTime } from "./current-time.js";
 import { validateRoutineWatch } from "./routine-watch.js";
@@ -27,16 +28,37 @@ export const SCHEDULE_TOOL_NAMES = new Set([
   "schedule_cancel",
 ]);
 
-/** A routine run may list or cancel routines, but not write new unattended work. */
-const ROUTINE_RUN_HIDDEN_TOOLS = new Set(["schedule_create", "schedule_update"]);
+/**
+ * A routine run may list or cancel routines and pause its own routine (schedule_update, checked
+ * in the executor), but not write new unattended work.
+ */
+const ROUTINE_RUN_HIDDEN_TOOLS = new Set(["schedule_create"]);
+
+/** Only a routine's own run can mark itself failed. */
+const ROUTINE_ONLY_TOOLS = new Set(["routine_report_failure"]);
 
 export function filterBuiltinToolsForRun<T extends { name: string }>(
   tools: T[],
   runTrigger: string,
 ): T[] {
-  return runTrigger === "routine"
-    ? tools.filter((tool) => !ROUTINE_RUN_HIDDEN_TOOLS.has(tool.name))
-    : tools;
+  if (runTrigger === "routine") return tools.filter((tool) => !ROUTINE_RUN_HIDDEN_TOOLS.has(tool.name));
+  if (runTrigger === "webhook") return tools;
+  return tools.filter((tool) => !ROUTINE_ONLY_TOOLS.has(tool.name));
+}
+
+/** In a scheduled routine run schedule_update only pauses that routine itself. */
+export const ROUTINE_RUN_SCHEDULE_UPDATE_ERROR =
+  "In a routine run, schedule_update can only pause this routine: give its routineId and active false, nothing else.";
+
+export function routineRunMayUpdateSchedule(
+  ownRoutineId: string | null | undefined,
+  args: Record<string, unknown>,
+): boolean {
+  if (!ownRoutineId || String(args.routineId ?? "").trim() !== ownRoutineId || args.active !== false)
+    return false;
+  return Object.entries(args).every(
+    ([key, value]) => key === "routineId" || key === "active" || !isScheduleValueProvided(value),
+  );
 }
 
 /** Keep cross-bot messaging thread-specific while exposing schedules in DMs and groups. */
@@ -512,6 +534,8 @@ export async function updateScheduleFromTool(
     active?: boolean;
     timezone?: string;
     schedule: Record<string, unknown>;
+    /** A run of this routine itself: pausing records it, so the pause is never silent. */
+    ownRun?: { routineId: string; runId: string; startedAt: Date };
   },
 ) {
   const routineId = input.routineId.trim();
@@ -598,6 +622,16 @@ export async function updateScheduleFromTool(
   if (!active) nextRunAt = null;
   const timingChanged =
     retime || active !== existing.active || nextRunAt?.getTime() !== existing.nextRunAt?.getTime();
+  // A run of this routine that turns it off is named as the reason. Any other change of the
+  // switch (the person, or the Mico asked from chat) clears that reason.
+  const pausedByOwnRun =
+    existing.active && !active && input.ownRun?.routineId === existing.id ? input.ownRun : undefined;
+  const pausedBy =
+    input.active === undefined
+      ? {}
+      : pausedByOwnRun
+        ? { pausedByRunId: pausedByOwnRun.runId, pausedByRunAt: pausedByOwnRun.startedAt }
+        : { pausedByRunId: null, pausedByRunAt: null };
 
   // The scope is part of the write, so the routine cannot change hands between the read and it.
   // A name or prompt edit writes only those fields, so a run claimed meanwhile keeps its advance;
@@ -613,6 +647,7 @@ export async function updateScheduleFromTool(
       ...(name === undefined ? {} : { name }),
       ...(prompt === undefined ? {} : { prompt }),
       ...(timingChanged ? { crons, timezone, active, nextRunAt } : {}),
+      ...pausedBy,
     },
   });
   if (count === 0) {
@@ -626,6 +661,10 @@ export async function updateScheduleFromTool(
   if (timingChanged) {
     if (active && nextRunAt) await deps.jobs.enqueue(routineWakeupJob(existing.id, nextRunAt));
     else if (existing.active) await deps.jobs.cancel(routineJobKey(existing.id));
+  }
+  // Its own conversation follows the new name unless the person renamed it.
+  if (name !== undefined && name !== existing.name) {
+    await followRoutineRenameInTransaction(deps.prisma, { ...existing, name }).catch(() => undefined);
   }
 
   try {
@@ -650,6 +689,12 @@ export async function updateScheduleFromTool(
     nextRunAt: nextRunAt?.toISOString() ?? null,
     oneShot: isOneShotRoutineCrons(crons),
     ...describeRoutineTiming({ crons, timezone, nextRunAt }),
+    ...(pausedByOwnRun
+      ? {
+          pausedByThisRun: true as const,
+          note: "This run paused its own routine. Say so in your reply, with the reason; it stays paused until the person turns it back on.",
+        }
+      : {}),
   };
 }
 
@@ -683,7 +728,12 @@ export async function cancelScheduleFromTool(
   if (!existing) return { error: "Schedule not found." };
 
   // The scope is part of the delete, so the routine cannot change hands between the read and it.
-  const { count } = await deps.prisma.routine.deleteMany({ where: { ...scope, id: existing.id } });
+  // Its own conversation is archived in the same transaction and stays readable.
+  const count = await deps.prisma.$transaction(async (tx) => {
+    const deleted = await tx.routine.deleteMany({ where: { ...scope, id: existing.id } });
+    if (deleted.count) await archiveRoutineThreadInTransaction(tx, existing);
+    return deleted.count;
+  });
   if (count === 0) return { error: "Schedule not found." };
   await deps.jobs.cancel(routineJobKey(existing.id));
   return { ok: true as const, routineId: existing.id, name: existing.name };

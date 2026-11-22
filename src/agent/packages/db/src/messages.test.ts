@@ -136,6 +136,14 @@ it("keeps another turn's pending queue out of the model history", async () => {
   }) }));
 });
 
+it("keeps routine run markers out of the main chat model history", async () => {
+  const findMany = vi.fn().mockResolvedValue([]);
+  await loadRunHistoryMessages({ message: { findMany } } as unknown as PrismaClient, { id: "current", threadId: "main-thread" }, 20);
+  expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+    AND: [{ NOT: { role: "system", blocks: { array_contains: [{ kind: "routine_run" }] } } }],
+  }) }));
+});
+
 it("limits model history to messages after the new-chat boundary while leaving display paging alone", async () => {
  const findMany = vi.fn().mockResolvedValue([]);
  await loadRunHistoryMessages({ message: { findMany } } as unknown as PrismaClient, { id: "run", threadId: "thread" }, 20, undefined, 42);

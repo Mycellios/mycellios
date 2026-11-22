@@ -6546,3 +6546,75 @@ msgstr "לא ניתן לאשר את ההודעה הראשונה. יש לבדוק
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "פתיחת השיחה {name}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} רצה"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} רצה, אין חדש"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} נכשלה"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} רצה והשהתה את עצמה"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "הצגת ההרצות של {routine}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "הסתרת ההרצות של {routine}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, one {הרצה אחת של {routine}} other {# הרצות של {routine}}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "זוהה שינוי"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "הורצה על ידך"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "סקריפט מקומי"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "אוזכרה בצ'אט"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "אירוע GitHub"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "ניסיון חוזר אוטומטי"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "אין חדש"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "רצה באיחור: הייתה אמורה לרוץ ב-{due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, one {הרצה קודמת אחת לא התקיימה: השרת לא פעל בזמנה} other {# הרצות קודמות לא התקיימו: השרת לא פעל בזמנן}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, one {הרצה קודמת אחת אוחדה עם זו: הקודמת עוד לא התחילה} other {# הרצות קודמות אוחדו עם זו: הקודמת עוד לא התחילה}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "הושהתה על ידי ההרצה שלה מ-{time}"

@@ -274,7 +274,12 @@ describe("createRepos.listBots", () => {
       expect.objectContaining({ preview: "Older visible answer" }),
     ]);
     expect(messageFindMany).toHaveBeenCalledWith({
-      where: { threadId: "thread-1", seq: { lt: 20 } },
+      where: {
+        threadId: "thread-1",
+        seq: { lt: 20 },
+        // A quiet routine run marker never stands in for the preview.
+        NOT: { role: "system", blocks: { array_contains: [{ kind: "routine_run", status: "quiet" }] } },
+      },
       orderBy: { seq: "desc" },
       take: 16,
     });

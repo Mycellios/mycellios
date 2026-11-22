@@ -92,6 +92,7 @@ export const BUILTIN_TOOL_NAMES = [
   "start_task",
   "message_task",
   "close_task",
+  "routine_report_failure",
   "list_workflows",
   "save_workflow",
   "run_workflow",

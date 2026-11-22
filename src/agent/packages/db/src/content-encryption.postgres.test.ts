@@ -16,7 +16,8 @@ import {
 } from "./content-migration.js";
 import { appendEventInTransaction } from "./events.js";
 import { readHistory, searchHistory } from "./history-retrieval.js";
-import { createThreadMessage, createThreadMessageInTransaction } from "./messages.js";
+import { createThreadMessage, createThreadMessageInTransaction, loadRunHistoryMessages } from "./messages.js";
+import { isQuietRoutineRunMarker } from "./routine-run-markers.js";
 import { runAsSystem } from "./row-security.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -116,6 +117,29 @@ describePostgres("content encryption (PostgreSQL)", () => {
         select: { messages: { select: { blocks: true }, where: { id: message.id } } },
       });
       expect(nested?.messages).toEqual([{ blocks }]);
+    }));
+
+  it("keeps sealed routine run markers out of model history", () =>
+    runAsSystem("test fixture", async () => {
+      const blocks: MessageBlock[] = [
+        {
+          kind: "routine_run",
+          fromBotId: botId,
+          routineId: "routine-1",
+          routineName: "Private ledger check",
+          taskId: "routine-thread-1",
+          runId: "run-1",
+          status: "quiet",
+        },
+      ];
+      const marker = await createThreadMessage(prisma, { threadId, role: "system", blocks, markUnread: false });
+      const kept = await createThreadMessage(prisma, { threadId, role: "user", blocks: [{ kind: "text", text: "Kept turn" }] });
+      expect(await rawBlocks(marker.id)).not.toContain("Private ledger");
+      expect(isQuietRoutineRunMarker(marker.blocks)).toBe(true);
+      const history = await loadRunHistoryMessages(prisma, { id: "next-turn", threadId }, 500);
+      const ids = history.map((message) => message.id);
+      expect(ids).toContain(kept.id);
+      expect(ids).not.toContain(marker.id);
     }));
 
   it("rejects ciphertext moved to another row", () =>

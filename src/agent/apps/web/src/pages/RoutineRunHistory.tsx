@@ -1,6 +1,6 @@
 import { routineThreadPath } from "../lib/routine-thread-path";
-import { Trans, useLingui } from "@lingui/react/macro";
-import type { RoutineHistory } from "@mycellios/contracts";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
+import type { RoutineHistory, RoutineRun } from "@mycellios/contracts";
 import type { RpcClient } from "../lib/rpc";
 import { isRetryableError, normalizeRunError } from "@mycellios/core";
 import { Button, Collapsible, CollapsibleContent, Spinner } from "@mycellios/ui-web";
@@ -13,6 +13,15 @@ import { formatToolActivityDuration } from "../lib/tool-activity-view";
 import { statusLabel, statusTone } from "./ActivityList";
 
 export type RoutineHistoryState = { history: RoutineHistory | null; failed: boolean };
+
+/** A recurring run that starts this long after its scheduled time is shown as late. */
+const LATE_RUN_MS = 15 * 60_000;
+
+/** When a recurring run started late, the time it was due. */
+export function routineRunDueLate(run: Pick<RoutineRun, "scheduledFor" | "startedAt">): string | null {
+  if (!run.scheduledFor || !run.startedAt) return null;
+  return Date.parse(run.startedAt) - Date.parse(run.scheduledFor) >= LATE_RUN_MS ? run.scheduledFor : null;
+}
 export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, pollInterval = 15_000, onState }: {
   routineId: string;
   client?: RpcClient;
@@ -170,8 +179,62 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
     }
   }
 
+  function sourceLabel(source: RoutineRun["source"]): string | null {
+    switch (source) {
+      case "schedule":
+        return t`Scheduled`;
+      case "watch":
+        return t`Change detected`;
+      case "manual":
+        return t`Run by you`;
+      case "script":
+        return t`Local script`;
+      case "chat":
+        return t`Mentioned in chat`;
+      case "webhook":
+        return t`Webhook`;
+      case "github":
+        return t`GitHub event`;
+      case "retry":
+        return t`Automatic retry`;
+      default:
+        return null;
+    }
+  }
+
+  function renderMissed(missed: NonNullable<RoutineRun["missed"]>) {
+    const count = missed.count;
+    return (
+      <p data-testid="routine-run-missed" className="mt-1">
+        {missed.reason === "busy" ? (
+          <Plural
+            value={count}
+            one="# earlier run was folded into this one: the run before it had not started yet"
+            other="# earlier runs were folded into this one: the run before them had not started yet"
+          />
+        ) : (
+          <Plural
+            value={count}
+            one="# earlier run did not happen: the server was not running at its time"
+            other="# earlier runs did not happen: the server was not running at their time"
+          />
+        )}
+      </p>
+    );
+  }
+
   function renderRun(run: RoutineHistory["runs"][number]) {
     const at = run.startedAt ?? run.createdAt;
+    const label = sourceLabel(run.source);
+    const dueLate = routineRunDueLate(run);
+    const formatDue = (value: string) =>
+      new Date(value).toLocaleString(i18n.locale || "en", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    const due = dueLate ? formatDue(dueLate) : null;
     const duration =
       run.startedAt && run.completedAt
         ? formatToolActivityDuration(Date.parse(run.completedAt) - Date.parse(run.startedAt))
@@ -180,17 +243,37 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
     return (
       <li key={run.id} className="py-2.5 text-[13px]" data-testid="routine-run-row">
         <div className="flex items-center justify-between gap-2">
-          <time dateTime={at} title={new Date(at).toLocaleString(i18n.locale || "en")}>
-            {new Date(at).toLocaleString(i18n.locale || "en", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            })}
-          </time>
-          <span className={statusTone(run.status)}>{statusLabel(run.status)}</span>
+          <span className="min-w-0 truncate">
+            {label ? (
+              <span data-testid="routine-run-source">
+                {label}
+                <span aria-hidden> · </span>
+              </span>
+            ) : null}
+            <time dateTime={at} title={new Date(at).toLocaleString(i18n.locale || "en")}>
+              {new Date(at).toLocaleString(i18n.locale || "en", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </time>
+          </span>
+          {run.quiet && run.status === "completed" ? (
+            <span data-testid="routine-run-quiet" className="text-muted-foreground">
+              <Trans>Nothing new</Trans>
+            </span>
+          ) : (
+            <span className={statusTone(run.status)}>{statusLabel(run.status)}</span>
+          )}
         </div>
+        {due ? (
+          <p data-testid="routine-run-late" className="mt-1">
+            {t`Ran late: it was due ${due}`}
+          </p>
+        ) : null}
+        {run.missed ? renderMissed(run.missed) : null}
         {run.status === "failed" && run.error ? (
           <div className="mt-1 text-destructive">
             <p>{normalizeRunError(run.error, translateRunError, i18n.locale || "en").summary}</p>

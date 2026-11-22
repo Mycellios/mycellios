@@ -100,6 +100,7 @@ export * from "./tool-observations.js";
 export * from "./work-resources.js";
 export * from "./thread-lifecycle.js";
 export * from "./agent-tasks.js";
+export * from "./routine-runs.js";
 export * from "./agent-provider-selection.js";
 
 export * from "./memory-ranking.js";

@@ -19,7 +19,8 @@ import type { Prisma, PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";
 import { computerKindForMode, ensureComputerRecord, parseComputerMode } from "./computers.js";
 import { createThreadMessageInTransaction } from "./messages.js";
-import { withNewestThreadMessages } from "./preview-messages.js";
+import { NOT_QUIET_ROUTINE_RUN, withNewestThreadMessages } from "./preview-messages.js";
+import { isQuietRoutineRunMarker } from "./routine-run-markers.js";
 import { BotSectionNameConflictError, IsolationError } from "./scope.js";
 import { lockSpaceForContentCreation } from "./spaces.js";
 import {
@@ -63,6 +64,14 @@ function rosterRunErrorId(
 // section and reorder writes, so the newest message's time wins when the chat has one.
 function rosterUpdatedAt(newestMessage: { createdAt: Date } | undefined, botUpdatedAt: Date) {
   return newestMessage?.createdAt ?? botUpdatedAt;
+}
+
+/**
+ * The newest message the sidebar counts. A quiet routine run marker never is: it does not
+ * become the preview and does not move the Mico up the list.
+ */
+function newestRosterMessage<T extends { blocks: unknown }>(messages: readonly T[]): T | undefined {
+  return messages.find((message) => !isQuietRoutineRunMarker(message.blocks));
 }
 
 function mapBot(
@@ -209,7 +218,9 @@ export function createRepos(
       },
       orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
     });
-    const bots = await withNewestThreadMessages(prisma, await withLatestBotRuns(prisma, rows), 1);
+    const bots = await withNewestThreadMessages(prisma, await withLatestBotRuns(prisma, rows), 1, {
+      skipQuietRoutineRuns: true,
+    });
     return bots.map((bot) => {
       if (!bot.thread) throw new IsolationError("Bot is missing its thread");
       const activeRun = primaryActiveRun(bot.runs);
@@ -224,10 +235,10 @@ export function createRepos(
         sectionId: bot.sectionId,
         unread: bot.thread.unread,
         parentBotId: bot.parentBotId,
-        preview: previewFromBlocks(bot.thread.messages[0]?.blocks),
+        preview: previewFromBlocks(newestRosterMessage(bot.thread.messages)?.blocks),
         status: activeRun?.status ?? "idle",
         runErrorId: rosterRunErrorId(bot.thread.runs[0], primaryActiveRun(bot.runs, bot.thread.id)),
-        updatedAt: rosterUpdatedAt(bot.thread.messages[0], bot.updatedAt).toISOString(),
+        updatedAt: rosterUpdatedAt(newestRosterMessage(bot.thread.messages), bot.updatedAt).toISOString(),
       };
     });
   }
@@ -261,6 +272,7 @@ export function createRepos(
           }),
         ),
         SIDEBAR_PREVIEW_MESSAGE_WINDOW,
+        { skipQuietRoutineRuns: true },
       );
       const callThreadIds = capabilities.phoneCallsEnabled
         ? bots.flatMap((bot) => (bot.thread ? [bot.thread.id] : []))
@@ -318,7 +330,7 @@ export function createRepos(
       return Promise.all(
         bots.map(async (bot) => {
           let messages = bot.thread?.messages ?? [];
-          const updatedAt = rosterUpdatedAt(messages[0], bot.updatedAt);
+          const updatedAt = rosterUpdatedAt(newestRosterMessage(messages), bot.updatedAt);
           let preview = "";
           for (let attempt = 0; attempt < 5; attempt++) {
             const windowRunIds = [
@@ -339,12 +351,12 @@ export function createRepos(
                 includeDelegatedReplyText: false,
               },
             );
-            preview = previewFromBlocks(visible[0]?.blocks);
+            preview = previewFromBlocks(newestRosterMessage(visible)?.blocks);
             if (preview || messages.length === 0 || !bot.thread || attempt === 4) break;
             const oldest = messages[messages.length - 1];
             if (!oldest) break;
             messages = await prisma.message.findMany({
-              where: { threadId: bot.thread.id, seq: { lt: oldest.seq } },
+              where: { threadId: bot.thread.id, seq: { lt: oldest.seq }, ...NOT_QUIET_ROUTINE_RUN },
               orderBy: { seq: "desc" },
               take: SIDEBAR_PREVIEW_MESSAGE_WINDOW,
             });
