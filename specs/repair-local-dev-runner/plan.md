@@ -2,7 +2,7 @@
 
 ## Relevant Files
 
-- `.jarvis-dev.json`: Jarvis local dev command.
+- The local runner configuration: development command.
 - `package.json`: `dev`, `landing:dev`, and `dev:coordinator` scripts.
 - `vite.landing.config.ts`: existing Vite host/port behavior.
 
@@ -16,7 +16,7 @@
 
 ## Decisions
 
-- Use POSIX shell syntax in `.jarvis-dev.json` because the current command already assumes shell execution.
+- Use POSIX shell syntax in the runner configuration because the current command already assumes shell execution.
 - Keep the coordinator on loopback; only the Vite UI needs to honor the runner `HOST`.
 - Do not modify Vite config unless startup proves it is necessary; it already honors `PORT` and `HOST`.
 

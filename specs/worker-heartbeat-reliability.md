@@ -52,7 +52,7 @@ The production-image overlay candidate passed 18 isolated HTTP cases locally,
 including rejection without jobs or usage, valid envelopes, and unaffected
 Kokoro/other-model admission. This is candidate evidence, not deployment or a
 speedup measurement. Keep the original JSON contract and model revision;
-Jarvis's 900/1800 limits are UTF-8 bytes, while native budgets are 1024 tokens
+The external client's 900/1800 limits are UTF-8 bytes, while native budgets are 1024 tokens
 per micro and 2048 total. Do not convert one unit into the other by estimation.
 
 Promotion still requires a common admission barrier and deadline-preserving

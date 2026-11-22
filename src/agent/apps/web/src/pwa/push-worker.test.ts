@@ -8,7 +8,7 @@ const origin = "https://www.mycellios.com";
 const scope = origin + "/agent/";
 const now = Date.UTC(2026, 10, 8);
 const payload = {
-  version: 1, id: "event-1", accountId: "owner", botId: "jarvis", threadId: "thread",
+  version: 1, id: "event-1", accountId: "owner", botId: "mico-1", threadId: "thread",
   spaceId: "space", title: "Mycellios", body: "Your Mico has finished.",
   tag: "mycellios:thread", expiresAt: now + 1000,
 };
@@ -18,7 +18,7 @@ describe("Web Push navigation", () => {
     const parsed = parsePushPayload({ ...payload, taskThreadId: "task-1" }, now);
     expect(parsed).not.toBeNull();
     expect(notificationTarget(pushChatUrl(parsed!, scope), origin, "/agent"))
-      .toBe(scope + "app/jarvis?noticeSpace=space&task=task-1");
+      .toBe(scope + "app/mico-1?noticeSpace=space&task=task-1");
   });
   it("opens a group directly and rejects malformed or expired messages", () => {
     const parsed = parsePushPayload({ ...payload, groupId: "team", taskThreadId: "task-1" }, now);
@@ -37,7 +37,7 @@ describe("Web Push navigation", () => {
       body: "Abre el chat para responder.",
       icon: scope + "mycellios/notification-micos/mushroom.png",
       actions: [{ action: "open-chat", title: "Abrir chat" }],
-      data: { url: scope + "app/jarvis?noticeSpace=space", botId: "jarvis" },
+      data: { url: scope + "app/mico-1?noticeSpace=space", botId: "mico-1" },
     });
   });
   it.each(MICO_AVATAR_SHAPES)("accepts the bundled $id artwork", ({ id }) => {
@@ -53,10 +53,10 @@ describe("Web Push navigation", () => {
     expect(parsePushPayload({ ...payload, avatarArt: "https://external.test/track" }, now)).toBeNull();
   });
   it("shows the Mico on opt-in previews using only bundled artwork", () => {
-    const preview = { ...payload, title: "Jarvis", body: "Draft ready", kind: "completion", preview: true };
+    const preview = { ...payload, title: "Mico", body: "Draft ready", kind: "completion", preview: true };
     const parsed = parsePushPayload({ ...preview, avatar: "sprout" }, now)!;
     expect(pushNotification(parsed, scope, "en-US")).toMatchObject({
-      title: "Jarvis", options: { body: "Draft ready", icon: scope + "mycellios/notification-micos/sprout.png" },
+      title: "Mico", options: { body: "Draft ready", icon: scope + "mycellios/notification-micos/sprout.png" },
     });
     expect(parsePushPayload({ ...preview, avatar: "https://external.test/track" }, now)).toBeNull();
   });

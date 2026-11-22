@@ -2,7 +2,7 @@ import { MEMORY_EMBEDDING_MODEL } from "../contracts/memory-embedding.js";
 import type { MeshStore, StoredWorker } from "../storage/store.js";
 
 /**
- * Operator memory embeddings carry private memory text (Jarvis). The
+ * Operator memory embeddings carry private memory text. The
  * coordinator places them only on native nodes (paired devices, or enrolled
  * standalone replica cells) whose active ownership belongs to the requesting
  * account. This is a model-bound,

@@ -2,11 +2,11 @@
 
 ## Problem
 
-Jarvis Run local failed for Mycellios with `start_command_failed`. The local dev runner must start inside this checkout and expose the landing UI through the assigned Jarvis/Cloudflare dev URL without deployment or production changes.
+The local dev runner failed for Mycellios with `start_command_failed`. The local dev runner must start inside this checkout and expose the landing UI through the assigned Cloudflare dev URL without deployment or production changes.
 
 ## Actors
 
-- Jarvis Dev Runner, which supplies `PORT`/`HOST` and starts the configured command.
+- Local dev runner, which supplies `PORT`/`HOST` and starts the configured command.
 - Local developer or reviewer opening `https://dev-mycellios.example.io`.
 - Mycellios landing UI, backed by a local coordinator only for proxied API routes.
 
@@ -25,7 +25,7 @@ Jarvis Run local failed for Mycellios with `start_command_failed`. The local dev
 
 ## Acceptance Criteria
 
-- `.jarvis-dev.json` no longer risks binding the coordinator to the same port as the UI.
+- The runner configuration no longer risks binding the coordinator to the same port as the UI.
 - The command honors runner-provided `PORT`/`HOST` for the UI.
 - A local startup smoke test reaches the UI HTTP endpoint.
 - The working tree contains only scoped local-runner/spec changes.
@@ -36,4 +36,3 @@ Jarvis Run local failed for Mycellios with `start_command_failed`. The local dev
 - `graphify-out/GRAPH_REPORT.md` is absent in this checkout.
 - `README.md` requires Node.js 24 or later and documents coordinator defaults.
 - `vite.landing.config.ts` already reads `PORT` and `HOST` for the Vite server.
-- Jarvis memory search returned no prior runner-specific decision for this project.
