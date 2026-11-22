@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-22
+
+### Added
+
+- In Tasks, a question also offers "Answer in the chat", which opens the
+  conversation at that question. A conversation waiting for you to take over the
+  computer offers "Open in the chat".
+- The Tasks panel can be resized from its edge, with the mouse or the arrow keys.
+  It stays at least 320 pixels wide, leaves the list at least as much, and keeps
+  its width on this device.
+- The Mico picker in Tasks has a search box and says when no Mico matches.
+- After you start a task, the line names the Mico and the task's title. Its Open
+  button starts the task right away and shows it, without waiting for the six
+  seconds to undo.
+- A conversation where a Mico waits for a routine result, a run or a time now shows
+  an "Open waits" card: what each wait is for, when it times out, whether it is
+  still waiting or already continuing, the note the Mico saved and the original
+  request. "Cancel the wait" stops a wait that has not woken yet; a wait that
+  already woke is never reported as cancelled. The Conversations list in the side
+  panel marks conversations with an open wait.
+- A Mico can list its open waits and close one it no longer needs, so that wait
+  does not wake its request later.
+- When a wait wakes in an archived conversation, the conversation comes back, and
+  the continued turn gets the original request and the Mico's saved note again.
+
+### Changed
+
+- Tasks rows say how a conversation ended (Answered, Failed or Stopped). Failed and
+  stopped rows are red and rows that need you are amber, always with the words too.
+  Conversations a Mico opened by itself are marked.
+- The empty Tasks page explains what it is for in fewer words.
+- Archived tasks list the most recently archived first.
+- Archiving a conversation keeps a request that only waits for a routine result,
+  a run or a time, so it can continue there later. Stop still cancels it.
+- For a job that should end within about 15 minutes a Mico now checks it during
+  the same turn at growing intervals, and for longer jobs it saves a wait instead
+  of keeping the turn open.
+
+### Fixed
+
+- A message sent while Mycellios Desktop is quitting or installing an update no
+  longer fails with "Desktop execution interrupted; check existing results before
+  retrying". Desktop now tells the server it is going offline, so the message runs
+  as it would with the PC offline. If the PC goes away before it receives a
+  message, the message is tried again instead of being reported as possibly half
+  done, and the chat says the PC is offline if it has not come back.
+- A conversation that has not started yet is listed under Waiting instead of To
+  continue.
+- A conversation that failed stays under Needs you, with its reason, even when a
+  background step ran after the failure.
+- Conversation tabs could look empty while the same history was requested twice and slow reads were retried. Tabs now reuse their previous messages when reopened and show loading during the first read.
+
 ## [0.14.0] - 2026-11-22
 
 ### Added
