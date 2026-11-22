@@ -103,6 +103,17 @@ try {
   assert.equal(imported.status, null);
   assert.equal(await system.run.count(), 2);
   assert.equal((await call('list')).length, 3);
+  // Rows say who opened a conversation and how its last turn ended (labels only).
+  const opener=(await system.thread.findUniqueOrThrow({where:{id:opened.threadId}})).startedBy;
+  await system.thread.update({where:{id:opened.threadId},data:{startedBy:'agent',outcome:'failed',lastError:'Synthetic failure'}});
+  const labelled=(await call('list')).find((item:any)=>item.id===imported.id);
+  assert.equal(labelled.startedBy,'agent');assert.equal(labelled.outcome,'failed');assert.equal(labelled.lastError,'Synthetic failure');
+  assert.equal((await call('read',{id:imported.id})).item.startedBy,'agent');
+  assert.equal((await call('list')).find((item:any)=>item.id===first.id).startedBy,'user');
+  await system.thread.update({where:{id:opened.threadId},data:{startedBy:opener,outcome:null,lastError:null}});
+  assert.equal((await call('list')).find((item:any)=>item.id===imported.id).outcome,null);
+  assert.equal(await system.run.count(), 2);
+  checks.push('Tasks rows carry who opened the conversation and how its last turn ended, without starting work');
   await call('archive', {id:imported.id,archived:true});
   assert.ok((await call('list')).find((item:any)=>item.id===imported.id).archivedAt);
   assert.ok((await system.thread.findUniqueOrThrow({where:{id:opened.threadId}})).archivedAt);

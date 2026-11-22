@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { Id, IsoDate, RunStatus } from "./ids.js";
+import { SideThreadStartedBySchema } from "./side-threads.js";
 
 export const InboxTaskSchema = z.object({
   id: Id,
@@ -18,6 +19,8 @@ export const InboxTaskSchema = z.object({
   /** How the last finished turn ended, and its error; older servers omit both. */
   outcome: z.enum(["completed", "failed", "interrupted"]).nullable().optional(),
   lastError: z.string().max(4000).nullable().optional(),
+  /** Who opened the conversation, for its label only; older servers omit it. */
+  startedBy: SideThreadStartedBySchema.nullable().optional(),
   createdAt: IsoDate,
   updatedAt: IsoDate,
 });

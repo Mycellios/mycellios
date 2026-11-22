@@ -6964,3 +6964,31 @@ msgstr "24 uur"
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "Until I turn it back on"
 msgstr "Tot ik ze weer aanzet"
+
+#: src/pages/tasks/TaskDetail.tsx
+msgid "Answer in the chat"
+msgstr "Antwoorden in de chat"
+
+#: src/pages/tasks/TaskComposer.tsx
+msgid "No Mico matches “{search}”"
+msgstr "Geen Mico komt overeen met ‘{search}’"
+
+#: src/pages/tasks/TasksWorkspace.tsx
+msgid "{name} took “{title}”"
+msgstr "{name} heeft ‘{title}’ opgepakt"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Hand a task to a Mico."
+msgstr "Geef een Mico een taak."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Pick up the <0>answer</0> later."
+msgstr "Haal het <0>antwoord</0> later op."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Your Micos can work on several tasks at once."
+msgstr "Je Micos kunnen aan meerdere taken tegelijk werken."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Their answers stay here until you archive them."
+msgstr "Hun antwoorden blijven hier tot je ze archiveert."

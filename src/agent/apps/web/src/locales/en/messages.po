@@ -7682,10 +7682,6 @@ msgstr "Allowed"
 msgid "Angry"
 msgstr "Angry"
 
-#: pages/tasks/TaskEmpty.tsx
-msgid "answer"
-msgstr "answer"
-
 #: pages/shell/side-question.tsx
 msgid "Answering…"
 msgstr "Answering…"
@@ -7933,10 +7929,6 @@ msgstr "Close tools"
 #: components/call/VoiceConversation.tsx
 msgid "Close voice"
 msgstr "Close voice"
-
-#: pages/tasks/TaskEmpty.tsx
-msgid "Come back and find an"
-msgstr "Come back and find an"
 
 #: pages/WorkflowWorkspace.tsx
 msgid "Compare with"
@@ -8254,10 +8246,6 @@ msgstr "Day"
 msgid "Default provider"
 msgstr "Default provider"
 
-#: pages/tasks/TaskEmpty.tsx
-msgid "Delegate the work."
-msgstr "Delegate the work."
-
 #: components/MicoWorkMenu.tsx
 msgid "Delegated task failed"
 msgstr "Delegated task failed"
@@ -8381,10 +8369,6 @@ msgstr "Enter the requested secret on screen, then restart voice."
 #: pages/workflows/WorkflowCanvas.tsx
 msgid "Equals"
 msgstr "Equals"
-
-#: pages/tasks/TaskEmpty.tsx
-msgid "Every answer is waiting here."
-msgstr "Every answer is waiting here."
 
 #: pages/tasks/TaskEmpty.tsx
 msgid "Example tasks — these are not running."
@@ -9382,10 +9366,6 @@ msgstr "System permission"
 msgid "Talk with your Mico"
 msgstr "Talk with your Mico"
 
-#: pages/tasks/TasksWorkspace.tsx
-msgid "Task assigned"
-msgstr "Task assigned"
-
 #: pages/tasks/TaskDetail.tsx
 msgid "Task conversation"
 msgstr "Task conversation"
@@ -9753,10 +9733,6 @@ msgstr "You can attach up to 10 files."
 #: components/PushPermissionPrompt.tsx
 msgid "You’ll get an alert even when Mycellios is closed."
 msgstr "You’ll get an alert even when Mycellios is closed."
-
-#: pages/tasks/TaskEmpty.tsx
-msgid "Your agents work on tasks in parallel."
-msgstr "Your agents work on tasks in parallel."
 
 #: pages/model-settings/antseed-provider.tsx
 msgid "Your AntSeed gateway manages its own balance and spending limits."
@@ -14050,3 +14026,31 @@ msgstr "Replies in task conversations"
 #: pages/settings/NotificationsPanel.tsx
 msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
 msgstr "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+
+#: src/pages/tasks/TaskDetail.tsx
+msgid "Answer in the chat"
+msgstr "Answer in the chat"
+
+#: src/pages/tasks/TaskComposer.tsx
+msgid "No Mico matches “{search}”"
+msgstr "No Mico matches “{search}”"
+
+#: src/pages/tasks/TasksWorkspace.tsx
+msgid "{name} took “{title}”"
+msgstr "{name} took “{title}”"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Hand a task to a Mico."
+msgstr "Hand a task to a Mico."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Pick up the <0>answer</0> later."
+msgstr "Pick up the <0>answer</0> later."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Your Micos can work on several tasks at once."
+msgstr "Your Micos can work on several tasks at once."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Their answers stay here until you archive them."
+msgstr "Their answers stay here until you archive them."

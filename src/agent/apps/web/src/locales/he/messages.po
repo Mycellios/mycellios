@@ -6963,3 +6963,31 @@ msgstr "ל-24 שעות"
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "Until I turn it back on"
 msgstr "עד שאפעיל אותן מחדש"
+
+#: src/pages/tasks/TaskDetail.tsx
+msgid "Answer in the chat"
+msgstr "מענה בצ׳אט"
+
+#: src/pages/tasks/TaskComposer.tsx
+msgid "No Mico matches “{search}”"
+msgstr "אין Mico שתואם ל־“{search}”"
+
+#: src/pages/tasks/TasksWorkspace.tsx
+msgid "{name} took “{title}”"
+msgstr "“{title}” אצל {name}"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Hand a task to a Mico."
+msgstr "אפשר להעביר משימה ל־Mico."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Pick up the <0>answer</0> later."
+msgstr "את ה<0>תשובה</0> אפשר לקבל אחר כך."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Your Micos can work on several tasks at once."
+msgstr "ה־Micos שלך יכולים לעבוד על כמה משימות בבת אחת."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Their answers stay here until you archive them."
+msgstr "התשובות שלהם נשארות כאן עד שמעבירים אותן לארכיון."

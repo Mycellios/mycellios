@@ -73,6 +73,7 @@
   min-width: 0;
   overflow-y: auto;
   padding: 0 24px 40px;
+  container-type: inline-size;
 }
 .rk-tasks-column {
   max-width: 576px;
@@ -284,8 +285,28 @@
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.rk-task-row .rk-task-answered {
+.rk-task-row .rk-task-answered,
+.rk-task-row .rk-task-status-reply {
   color: var(--task-blue);
+}
+/* Red for failed or stopped work, amber when the person is needed; the text says it too. */
+.rk-task-row .rk-task-status-danger,
+.rk-task-row[data-tone="danger"] > svg:first-child {
+  color: var(--destructive);
+}
+.rk-task-row .rk-task-status-attention,
+.rk-task-row[data-tone="attention"] > svg:first-child {
+  color: var(--warning);
+}
+.rk-task-row .rk-task-status-danger,
+.rk-task-row .rk-task-status-attention {
+  font-weight: 500;
+}
+.rk-task-by-mico {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-inline-end: 5px;
+  color: var(--muted-foreground);
 }
 button.rk-task-row:hover,
 button.rk-task-row[aria-pressed="true"] {
@@ -294,6 +315,19 @@ button.rk-task-row[aria-pressed="true"] {
 button.rk-task-row:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
+}
+/* A list squeezed by a wide panel keeps the titles readable: the Mico shows as its avatar. */
+@container (max-width: 340px) {
+  .rk-task-row {
+    grid-template-columns: 16px minmax(0, 1fr) auto 18px;
+    gap: 8px;
+  }
+  .rk-task-row .rk-task-agent > span:last-child {
+    display: none;
+  }
+  .rk-task-row > :where(span:nth-last-child(2)) {
+    max-width: 96px;
+  }
 }
 .rk-task-section {
   margin-top: 16px;
@@ -353,10 +387,11 @@ button.rk-task-row:focus-visible {
   font-size: 12px;
 }
 .rk-task-detail {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex: 0 0 420px;
+  flex: 0 0 var(--task-panel-width, 420px);
   border-inline-start: 1px solid var(--border);
   background: var(--background);
   animation: rk-task-panel-in 200ms ease-out both;
@@ -364,6 +399,39 @@ button.rk-task-row:focus-visible {
 .rk-task-detail-expanded {
   flex: 1;
   border-inline-start: 0;
+}
+/* The panel's edge: drag it or use the arrow keys to give the panel or the list more room. */
+.rk-task-resizer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -4px;
+  z-index: 5;
+  width: 8px;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+.rk-task-resizer:hover,
+.rk-task-resizer:focus-visible,
+.rk-task-resizer[data-dragging] {
+  background: var(--border);
+  outline: none;
+}
+.rk-task-ask {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+.rk-task-ask-chat {
+  gap: 5px;
+  color: var(--muted-foreground);
+}
+.rk-task-agent-compact {
+  flex-shrink: 0;
+  padding-inline: 3px;
 }
 .rk-task-detail > header {
   display: flex;
@@ -460,11 +528,6 @@ span.rk-task-spinner {
     transform: translateX(8px);
   }
 }
-@media (max-width: 1100px) {
-  .rk-task-detail:not(.rk-task-detail-expanded) {
-    flex-basis: 380px;
-  }
-}
 @media (max-width: 767px) {
   .rk-tasks-header {
     padding: 0 8px;
@@ -511,6 +574,9 @@ span.rk-task-spinner {
   }
   .rk-task-shell[data-task-desktop="true"] .rk-task-detail {
     inset-block-start: 51px;
+  }
+  .rk-task-resizer {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -8564,21 +8564,6 @@ msgstr "Navegar desde el minimapa"
 msgid "Tasks"
 msgstr "Tareas"
 
-msgid "Delegate the work."
-msgstr "Delega el trabajo."
-
-msgid "Come back and find an"
-msgstr "Vuelve y encuentra una"
-
-msgid "answer"
-msgstr "respuesta"
-
-msgid "Your agents work on tasks in parallel."
-msgstr "Tus agentes trabajan en tareas en paralelo."
-
-msgid "Every answer is waiting here."
-msgstr "Cada respuesta te espera aquí."
-
 msgid "What would you like done?"
 msgstr "¿Qué quieres que se haga?"
 
@@ -8680,9 +8665,6 @@ msgstr "Mostrar Micos"
 
 msgid "Confirm task"
 msgstr "Confirmar tarea"
-
-msgid "Task assigned"
-msgstr "Tarea asignada"
 
 msgid "This server needs the Tasks update. Your draft stays in this browser."
 msgstr "Este servidor necesita la actualización de Tareas. Tu borrador se guarda en este navegador."
@@ -14427,3 +14409,31 @@ msgstr "Respuestas en conversaciones de tarea"
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
 msgstr "Avisa cuando un Mico termina o falla en una de sus conversaciones de tarea. Las preguntas y aprobaciones siempre avisan; las rutinas siguen su propio ajuste."
+
+#: src/pages/tasks/TaskDetail.tsx
+msgid "Answer in the chat"
+msgstr "Responder en el chat"
+
+#: src/pages/tasks/TaskComposer.tsx
+msgid "No Mico matches “{search}”"
+msgstr "Ningún Mico coincide con «{search}»"
+
+#: src/pages/tasks/TasksWorkspace.tsx
+msgid "{name} took “{title}”"
+msgstr "{name} se encarga de «{title}»"
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Hand a task to a Mico."
+msgstr "Encarga una tarea a un Mico."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Pick up the <0>answer</0> later."
+msgstr "Recoge la <0>respuesta</0> más tarde."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Your Micos can work on several tasks at once."
+msgstr "Tus Micos pueden trabajar en varias tareas a la vez."
+
+#: src/pages/tasks/TaskEmpty.tsx
+msgid "Their answers stay here until you archive them."
+msgstr "Sus respuestas se quedan aquí hasta que las archives."
