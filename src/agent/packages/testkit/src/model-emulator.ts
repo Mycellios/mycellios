@@ -86,7 +86,7 @@ export async function startModelEmulator(options: {
         chunks.push(Buffer.from(chunk));
       }
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as ModelEmulatorRequest;
-      assert.ok(allowedModelIds.has(body.model), `Unexpected model routing to ${body.model}`);
+      assert.ok(allowedModelIds.has(body.model), `Model routing changed to ${body.model}`);
       assert.equal(body.stream, true, "Expected streaming model request");
       assert.ok(Array.isArray(body.messages), "Expected model messages");
       const compacting = options.compactionSummary !== undefined && body.messages.some(
