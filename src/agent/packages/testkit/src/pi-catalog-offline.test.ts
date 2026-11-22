@@ -6,6 +6,7 @@ import { startModelEmulator } from "./model-emulator.js";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
 });
 
@@ -137,7 +138,8 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
     expect(events.at(-1)).toEqual({ type: "done", text: "Completed." });
   });
 
-  it("searches, loads and invokes the original executor, preserving correlated results", async () => {
+  it("searches and loads schemas without spending the action's only tool call", async () => {
+    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "1");
     const server = await startModelEmulator({
       steps: [
         {
@@ -159,7 +161,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
         },
         {
           expect(body) {
-            expect(body.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "search" });
+            expect(body.messages.findLast((message) => message.role === "tool")?.tool_call_id).toBe("search");
           },
           response: {
             type: "tool",
@@ -171,7 +173,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
         {
           expect(body) {
             expect(body.tools?.some((tool) => tool.function.name === "fixture_tool_0")).toBe(true);
-            expect(body.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "load" });
+            expect(body.messages.findLast((message) => message.role === "tool")?.tool_call_id).toBe("load");
           },
           response: {
             type: "tool",
@@ -182,7 +184,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
         },
         {
           expect(body) {
-            expect(body.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "write" });
+            expect(body.messages.findLast((message) => message.role === "tool")?.tool_call_id).toBe("write");
           },
           response: { type: "text", text: "Saved." },
         },

@@ -166,8 +166,9 @@ const FILE_EDIT_GUIDANCE = [
   "- Read before editing; never guess a file's contents.",
 ].join("\n");
 interface ToolCallBudget {
-  count: number;
-  exceeded: boolean;
+  taskCount: number;
+  bookkeepingCount: number;
+  exceeded?: "task" | "bookkeeping";
   limit: number;
   inFlight: number;
   answeredQuestionCheckpoint?: string;
@@ -699,7 +700,7 @@ export class PiAgentRuntime implements AgentRuntime {
           streamFn: (_m, ctx, options) =>
             fallbackAwareModelStream(
               fallbackState,
-              ctx,
+              withToolCallBudget(ctx, host.toolCallBudget),
               withAutomatedLabels({ ...options, fetch: this.modelFetch ?? options?.fetch }),
             ),
           getApiKey: hasBackups
@@ -1080,8 +1081,9 @@ export class PiAgentRuntime implements AgentRuntime {
               const checkpoint = createHash("sha256").update(request.turnCheckpoint).digest("hex");
               if (trackedBudget.answeredQuestionCheckpoint !== checkpoint) {
                 trackedBudget.answeredQuestionCheckpoint = checkpoint;
-                trackedBudget.count = 0;
-                trackedBudget.exceeded = false;
+                trackedBudget.taskCount = 0;
+                trackedBudget.bookkeepingCount = 0;
+                trackedBudget.exceeded = undefined;
               }
             }
             const unresolved = new Set(unresolvedCalls);
@@ -1269,8 +1271,11 @@ export class PiAgentRuntime implements AgentRuntime {
         // errorMessage set. Treat that as a soft stop so the turn still ends
         // with a durable assistant message instead of a failed run.
         const budgetExceeded = host.toolCallBudget.exceeded;
-        if (budgetExceeded && !host.pausePending && continuity.hasPendingWork()) {
-          throw new Error(`WORK_INCOMPLETE: The configured limit of ${host.toolCallBudget.limit} tool calls was reached with pending work.`);
+        if (budgetExceeded && !host.pausePending) {
+          const pending = continuity.pendingTitles();
+          if (pending.length) {
+            throw new Error(`WORK_INCOMPLETE: ${toolCallBudgetExceededMessage(host.toolCallBudget)} Pending: ${pending.join(", ")}.`);
+          }
         }
         const terminalMessage = agent.state.messages.at(-1);
         // pi-agent-core records ordinary provider failures as an empty assistant
@@ -1323,7 +1328,7 @@ export class PiAgentRuntime implements AgentRuntime {
           }
         }
         if (budgetExceeded && !host.pausePending) {
-          const budgetMessage = toolCallBudgetExceededMessage(host.toolCallBudget.limit);
+          const budgetMessage = toolCallBudgetExceededMessage(host.toolCallBudget);
           if (streamed.trim()) {
             const suffix = `\n\n${budgetMessage}`;
             queue.push({ type: "text", text: suffix });
@@ -2022,7 +2027,10 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
           if (host.depth === 0) await host.captureCheckpoint?.(rawCallId, executionId);
           if (host.pausePending)
             return { content: [], details: { skipped: true }, terminate: true };
-          if (!beginToolCall(host)) {
+          const bookkeeping = tool.name === WORK_PLAN_TOOL ||
+            (host.toolCatalog?.controls.includes(tool) === true &&
+              (tool.name === RUNTIME_TOOL_SEARCH || tool.name === RUNTIME_TOOL_LOAD));
+          if (!beginToolCall(host, bookkeeping)) {
             return {
               content: [{ type: "text", text: "Skipped: tool-call limit reached." }],
               details: { skipped: true },
@@ -2405,7 +2413,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
     streamFn: (_m, ctx, options) =>
       fallbackAwareModelStream(
         retryState,
-        ctx,
+        withToolCallBudget(ctx, nestedHost.toolCallBudget),
         withAutomatedLabels({ ...options, fetch: host.modelFetch ?? options?.fetch }),
       ),
     getApiKey: async () =>
@@ -2506,7 +2514,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
       return `Subagent failed: ${message}`;
     }
     const budgetMessage = budgetExceeded
-      ? toolCallBudgetExceededMessage(host.toolCallBudget.limit)
+      ? toolCallBudgetExceededMessage(host.toolCallBudget)
       : undefined;
     const result =
       budgetMessage && streamed.trim()
@@ -3118,8 +3126,27 @@ interface ToolHost {
   pendingShells: Array<Promise<FinishedShellCommand>>;
 }
 
-function toolCallBudgetExceededMessage(limit: number) {
-  return `I stopped after reaching the limit of ${limit} tool calls in this turn. Send another message to continue.`;
+function bookkeepingLimit(budget: ToolCallBudget) {
+  return Math.max(8, budget.limit);
+}
+
+function withToolCallBudget(context: TranscriptContext, budget: ToolCallBudget): TranscriptContext {
+  if (budget.limit <= 0) return context;
+  const remaining = Math.max(0, budget.limit - budget.taskCount);
+  const instruction = remaining === 0
+    ? "No task tool calls remain. Use existing results to answer what you verified and identify any unverified work. Use the plan tool only to record steps already verified."
+    : `This turn has ${remaining} remaining task tool ${remaining === 1 ? "call" : "calls"}, shared with subagents. Prioritize calls that directly verify the request. Plan updates and internal tool discovery have a separate limit.`;
+  return {
+    ...context,
+    messages: [...context.messages, { role: "system", content: instruction, timestamp: Date.now() }],
+  };
+}
+
+function toolCallBudgetExceededMessage(budget: ToolCallBudget) {
+  const limit = budget.exceeded === "bookkeeping"
+    ? `${bookkeepingLimit(budget)} internal planning and discovery calls`
+    : `${budget.limit} tool calls`;
+  return `I stopped after reaching the limit of ${limit} in this turn. Send another message to continue.`;
 }
 
 function toolCallBudgetFor(runId: string): ToolCallBudget {
@@ -3130,8 +3157,8 @@ function toolCallBudgetFor(runId: string): ToolCallBudget {
     return existing;
   }
   const budget: ToolCallBudget = {
-    count: 0,
-    exceeded: false,
+    taskCount: 0,
+    bookkeepingCount: 0,
     limit: maxToolCallsPerTurn(),
     inFlight: 0,
   };
@@ -3149,28 +3176,24 @@ function maybeAbortToolCallBudget(host: ToolHost) {
   }
 }
 
-function beginToolCall(host: ToolHost): boolean {
+function beginToolCall(host: ToolHost, bookkeeping: boolean): boolean {
   const budget = host.toolCallBudget;
-  if (budget.limit <= 0) {
-    budget.count += 1;
-    return true;
-  }
+  if (budget.limit <= 0) return true;
   if (budget.exceeded) {
     maybeAbortToolCallBudget(host);
     return false;
   }
-  budget.count += 1;
-  if (budget.count <= budget.limit) {
+  const count = bookkeeping ? ++budget.bookkeepingCount : ++budget.taskCount;
+  const limit = bookkeeping ? bookkeepingLimit(budget) : budget.limit;
+  if (count <= limit) {
     budget.inFlight += 1;
     return true;
   }
-  if (!budget.exceeded) {
-    budget.exceeded = true;
-    host.queue.push({
-      type: "progress",
-      text: `Stopped: more than ${budget.limit} tool calls in one turn.`,
-    });
-  }
+  budget.exceeded = bookkeeping ? "bookkeeping" : "task";
+  host.queue.push({
+    type: "progress",
+    text: `Stopped: more than ${limit} ${bookkeeping ? "internal planning and discovery calls" : "tool calls"} in one turn.`,
+  });
   maybeAbortToolCallBudget(host);
   return false;
 }
