@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { MessageBlock } from "./events.js";
 import { Id, IsoDate } from "./ids.js";
 
 /** What a Mico side thread is doing now; closed means archived or being deleted. */
@@ -38,3 +39,42 @@ export const SideThreadSchema = z.object({
   unread: z.boolean().optional(),
 });
 export type SideThread = z.infer<typeof SideThreadSchema>;
+
+/**
+ * What an open conversation of a Mico waits for from the person: a question, an approval, a
+ * plan to confirm, a credential, or someone to take over the computer.
+ */
+export const SideThreadRequestKindSchema = z.enum(["question", "approval", "plan", "secret", "takeover"]);
+export type SideThreadRequestKind = z.infer<typeof SideThreadRequestKindSchema>;
+
+/**
+ * One row of development.requests: a pending request of one of the Mico's open conversations,
+ * shown again in its main chat. The answer always goes through that conversation's own fenced
+ * answer operation (threads.answer with its taskThreadId).
+ */
+export const SideThreadRequestSchema = z.object({
+  threadId: Id,
+  title: z.string(),
+  runId: Id,
+  /** The message holding the pending ask; null for a takeover, which has none. */
+  messageId: Id.nullable(),
+  kind: SideThreadRequestKindSchema,
+  /** The pending ask block itself, as the conversation shows it. */
+  block: MessageBlock.nullable(),
+  createdAt: IsoDate,
+});
+export type SideThreadRequest = z.infer<typeof SideThreadRequestSchema>;
+
+/**
+ * A Mico's open conversations at a glance, for the sidebar: how many are open, how many have a
+ * reply the person has not read, wait for them or work. `revision` changes whenever any of them
+ * moves, so clients know when to read the list again.
+ */
+export const MicoConversationSummarySchema = z.object({
+  open: z.number().int().nonnegative(),
+  unread: z.number().int().nonnegative(),
+  waiting: z.number().int().nonnegative(),
+  working: z.number().int().nonnegative(),
+  revision: z.string().max(200),
+});
+export type MicoConversationSummary = z.infer<typeof MicoConversationSummarySchema>;

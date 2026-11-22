@@ -41,3 +41,8 @@ it("persists explicit device speech and dictation models while keeping automatic
   expect(getGeneralPreferences()).toMatchObject({ speechEngine: "device", dictationEngine: "provider" });
   expect(parseGeneralPreferences('{"dictationEngine":"invalid"}').dictationEngine).toBe("auto");
 });
+it("keeps the manual chat order by default and accepts recent activity only on request", () => {
+  expect(parseGeneralPreferences(null).sidebarChatOrder).toBe("manual");
+  expect(parseGeneralPreferences('{"sidebarChatOrder":"recent"}').sidebarChatOrder).toBe("recent");
+  expect(parseGeneralPreferences('{"sidebarChatOrder":"newest"}').sidebarChatOrder).toBe("manual");
+});

@@ -1,6 +1,6 @@
 import { parseThreadTitle, runFailureError } from "@mycellios/core";
 import { ORPCError } from "@orpc/server";
-import { createRepos, listSideThreads } from "@mycellios/db";
+import { createRepos, listSideThreadRequests, listSideThreads } from "@mycellios/db";
 import { archiveSideThread, deleteSideThread, restoreSideThread, sideThreadRow } from "../side-threads.js";
 import { resolveThreadTarget } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
@@ -114,6 +114,12 @@ export function developmentRoutes(ctx: RouterContext) {
         // Archive, outcome and title source live on the thread; state comes from its runs.
         const rows = await listSideThreads(deps.prisma, actor, { botId: input.botId, projectKey: input.projectKey });
         return rows.map(sideThreadRow);
+      }),
+      requests: authed.development.requests.handler(async ({ context, input }) => {
+        const actor = context.actor;
+        await createRepos(deps.prisma).getBot(actor, input.botId);
+        // Read only: answers go through each conversation's own threads.answer.
+        return listSideThreadRequests(deps.prisma, actor, { botId: input.botId });
       }),
       archive: authed.development.archive.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);

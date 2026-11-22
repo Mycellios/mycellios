@@ -66,6 +66,7 @@ import {
   screenProbeUrl,
   searchHitThreadTarget,
   settleReadBoundary,
+  sidebarFolderTree,
   speechFromBlocks,
   waitForScreenPage,
   withLiveStreamingProgress,
@@ -226,7 +227,7 @@ import {
   rightPanelStorageKey,
   writeRightPanelState,
 } from "../lib/right-panel-state";
-import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } from "../lib/rpc";
+import { clearSpaceSelection, createSpaceRpc, type RpcClient, rpcForSpace, selectedSpaceId, selectSpace } from "../lib/rpc";
 import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
 import { ResponseStyleContext, useSavedResponseStyle } from "../lib/response-style";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
@@ -234,8 +235,15 @@ import { MainTabMenu, MicoTaskTabs } from "../components/MicoTaskTabs";
 import { ConversationFailureCard, MicoStartedBanner, NewConversationIntro } from "../components/NewConversationIntro";
 import {
   adoptNewConversation, closeOtherTabs, forgetNewConversationRequest, isClosedConversation, NEW_CONVERSATION_TAB,
-  newConversationRequest, updateConversationTabs, useConversationRows,
+  newConversationRequest, openTab, updateConversationTabs, useConversationRows, useConversationTabs, writeConversationRows,
 } from "../lib/thread-tabs";
+import { ConversationsPane, waitingConversations } from "../components/ConversationsPane";
+import { SideConversationView } from "../components/SideConversationView";
+import { MirroredRequests } from "../components/MirroredRequests";
+import { closeBeside, openBeside, pruneBeside, showBeside, updateBeside, useBeside } from "../lib/conversation-pane";
+import { micoConversationScope } from "../lib/sidebar-conversations";
+import { SidebarViewMenu } from "./shell/sidebar-view-menu";
+import { NeedsYouGroup } from "./shell/needs-you-group";
 import { sendFirstMessage } from "../lib/new-conversation";
 import { MessagePinsContext, PinnedMessagesButton, useMessagePins } from "../components/PinnedMessages";
 import { ChatSearchButton } from "../components/ChatSearch";
@@ -1189,6 +1197,36 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     },
     [markBotRead, captureReadBoundary, newConversation],
   );
+  /** The new-messages banner's Mark as read: the divider goes and the open chat counts as read. */
+  const markReadFromBanner = useCallback(() => {
+    clearReadBoundary();
+    if (groupId) {
+      manuallyUnread.current.delete(groupId);
+      void readInOrder(`group:${groupId}`, () => rpc.threads.markRead({ groupId })).catch(() => undefined);
+    } else if (active) void markBotRead(active.id).catch(() => undefined);
+  }, [clearReadBoundary, groupId, readInOrder, rpc, active?.id, markBotRead]);
+  /** A Mico's Mark as read in the sidebar: its main chat and every open conversation at once. */
+  const markMicoAllRead = useCallback(async (bot: Pick<Bot, "id" | "spaceId">) => {
+    manuallyUnread.current.delete(bot.id);
+    if (readVisit.current.chat === `bot:${bot.id}`) setMarkedUnread(null);
+    await readInOrder(`bot:${bot.id}`, () => rpcForSpace(bot.spaceId).threads.markAllRead({ botId: bot.id }));
+    setBots(current => current.map(candidate => candidate.id === bot.id ? {
+      ...candidate, unread: false, unreadCount: undefined,
+      conversations: candidate.conversations ? { ...candidate.conversations, unread: 0 } : candidate.conversations,
+    } : candidate));
+    writeConversationRows(micoConversationScope(userId, bot.spaceId, bot.id), rows => rows.map(row => row.unread ? { ...row, unread: false } : row));
+  }, [readInOrder, userId]);
+  /** A Mico's Mark as unread in the sidebar: the newest reply of its main chat reads as new again. */
+  const markMicoUnread = useCallback(async (bot: Pick<Bot, "id" | "spaceId">) => {
+    manuallyUnread.current.add(bot.id);
+    try {
+      await readInOrder(`bot:${bot.id}`, () => rpcForSpace(bot.spaceId).threads.markUnread({ botId: bot.id }));
+    } catch (error) {
+      manuallyUnread.current.delete(bot.id);
+      throw error;
+    }
+    updateBotUnread(bot.id, true);
+  }, [readInOrder, updateBotUnread]);
   useEffect(() => userId ? watchNotificationFocus(userId) : undefined, [userId]);
   const replySoundGate = useMemo(() => createReplySoundGate(), [userId, currentSpaceId]);
   useEffect(() => {
@@ -2065,6 +2103,24 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       }),
     [sidebarSpaces, query, miniSidebar, t],
   );
+  const sidebarFolders = useMemo(() => sidebarSpaces.flatMap(space => sidebarFolderTree(space.botSections)
+    .map(folder => ({ id: folder.id, path: sidebarSpaces.length > 1 ? `${space.name} · ${folder.path}` : folder.path }))), [sidebarSpaces]);
+  const sidebarHasUnread = sidebarSpaces.some(space => space.groups.some(group => group.unread) ||
+    space.bots.some(bot => bot.unread || (bot.conversations?.unread ?? 0) > 0));
+  /** Mark all as read: every Space in the sidebar reads its own chats, one request per Space. */
+  const markEverythingRead = useCallback(async () => {
+    const unreadSpaces = sidebarSpaces.filter(space => space.groups.some(group => group.unread) ||
+      space.bots.some(bot => bot.unread || (bot.conversations?.unread ?? 0) > 0));
+    const results = await Promise.allSettled(unreadSpaces.map(space => rpcForSpace(space.id).threads.markAllRead({})));
+    if (results.some(result => result.status === "rejected")) toast.error(t`Could not mark every chat as read. Try again.`);
+    manuallyUnread.current.clear();
+    setMarkedUnread(null);
+    const read = new Set(unreadSpaces.filter((_, index) => results[index]?.status === "fulfilled").map(space => space.id));
+    setBots(current => current.map(bot => read.has(bot.spaceId) ? { ...bot, unread: false, unreadCount: undefined,
+      conversations: bot.conversations ? { ...bot.conversations, unread: 0 } : bot.conversations } : bot));
+    setGroups(current => current.map(group => read.has(group.spaceId) ? { ...group, unread: false } : group));
+    await refreshBots().catch(() => undefined);
+  }, [sidebarSpaces, t]);
   // The Dock badge ignores the roster search box: a filter must not hide unread chats.
   const unreadChatCount = useMemo(
     () => countUnreadChats(sidebarGroupsForSpaces(sidebarSpaces, "")),
@@ -2668,6 +2724,28 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, [bots.length, composerConnections.data]);
   const conversationScope = active && !inGroup ? JSON.stringify([userId, shellSpaceId, active.id]) : undefined;
   const conversationRows = useConversationRows(conversationScope);
+  const conversationTabState = useConversationTabs(conversationScope ?? "");
+  const besideConversations = useBeside(conversationScope);
+  // The Mico's tabs keep its list fresh; until it loads, the roster's summary stands in.
+  const conversationsWaiting = !active || inGroup ? 0
+    : conversationRows.length ? waitingConversations(conversationRows) : (active.conversations?.waiting ?? 0);
+  // A conversation opened in the chat, archived or deleted leaves the side panel.
+  useEffect(() => {
+    if (!conversationScope || !conversationRows.length) return;
+    updateBeside(conversationScope, state => pruneBeside(state, id => id !== taskScope?.taskThreadId &&
+      conversationRows.some(row => row.threadId === id && !isClosedConversation(row) && !row.deleteAfter)));
+  }, [conversationScope, conversationRows, taskScope?.taskThreadId]);
+  const besideClients = useRef(new Map<string, RpcClient>());
+  /** One immutable client per conversation beside the chat, bound to it alone. */
+  const besideClient = useCallback((botId: string, threadId: string) => {
+    const key = JSON.stringify([shellSpaceId, botId, threadId]);
+    let client = besideClients.current.get(key);
+    if (!client) {
+      client = createSpaceRpc(shellSpaceId, { botId, taskThreadId: threadId });
+      besideClients.current.set(key, client);
+    }
+    return client;
+  }, [shellSpaceId]);
   const currentConversation = taskScope ? conversationRows.find(row => row.threadId === taskScope.taskThreadId) : undefined;
   const mentionThreads = useMemo(() => active && !inGroup ? conversationRows
     .filter(row => row.title && row.threadId !== taskScope?.taskThreadId && !isClosedConversation(row) &&
@@ -2704,6 +2782,16 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     currentConversation.state !== "running" && currentConversation.state !== "queued"
     ? <ConversationFailureCard error={currentConversation.lastError} /> : null,
   [currentConversation?.outcome, currentConversation?.state, currentConversation?.lastError, displayedRunError]);
+  // Questions, approvals and takeovers of the Mico's conversations also show in its main chat.
+  const mirrorBotId = active && !inGroup && !taskScope && !newConversation ? active.id : undefined;
+  const mirrorEnabled = Boolean(mirrorBotId) && conversationsWaiting > 0;
+  const mirrorRevision = active?.conversations?.revision;
+  const bindMirroredRequest = useCallback((threadId: string) => besideClient(mirrorBotId ?? "", threadId), [besideClient, mirrorBotId]);
+  const transcriptFooter = useMemo(() => mirrorBotId ? <>
+    {conversationFailure}
+    <MirroredRequests botId={mirrorBotId} enabled={mirrorEnabled} revision={mirrorRevision} rpc={rpc}
+      bind={bindMirroredRequest} onOpenConversation={threadId => selectConversationRef.current(threadId)} />
+  </> : conversationFailure, [conversationFailure, mirrorBotId, mirrorEnabled, mirrorRevision, rpc, bindMirroredRequest]);
   const shellReady =
     initialBotsLoaded &&
     (inGroup
@@ -3537,6 +3625,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       // Reload starts with panel=null so storage restores. In-session chat switches used to
       // keep computer/settings open; only routine was cleared (handled above). Carry is
       // session-only — do not write the carried panel onto the destination's saved prefs.
+      if (panel === "conversations") {
+        // The pane follows the person from Mico to Mico; a group has no conversations.
+        pendingPanelRestore.current = null;
+        if (inGroup) setPanelState(null);
+        setRestoredPanelKey(null);
+        return;
+      }
       if (panel === "computer" || panel === "settings" || panel === "group-settings") {
         const carried = panel === "computer" ? "computer" : inGroup ? "group-settings" : "settings";
         pendingPanelRestore.current = null;
@@ -3847,7 +3942,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         const unread = !contextChat.unread;
         setBotMenu(null);
         if (contextBot) {
-          const request = unread ? markBotUnread(contextBot.id) : markBotRead(contextBot.id);
+          // From the sidebar: Mark as Read reads the conversations too; Mark as Unread marks the newest reply.
+          const request = unread ? markMicoUnread(contextBot) : markMicoAllRead(contextBot);
           void request.catch(() => undefined);
         } else {
           const groupId = contextGroup!.id;
@@ -3928,6 +4024,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       onNewConversation={contextBot ? () => {
         setBotMenu(null);
         openSpaceChat(contextBot.spaceId, `/app/${encodeURIComponent(contextBot.id)}?draft=1`);
+      } : undefined}
+      conversationsUnread={(contextBot?.conversations?.unread ?? 0) > 0}
+      onMarkAllRead={contextBot ? () => {
+        setBotMenu(null);
+        void markMicoAllRead(contextBot).catch(() => toast.error(t`Could not mark the chats as read. Try again.`));
       } : undefined}
     />
   ) : null;
@@ -4063,8 +4164,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     if (draft) next.set("draft", "1");
     navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() });
   }
-  const selectConversationRef = useRef(selectConversation);
-  selectConversationRef.current = selectConversation;
+  /** Opens a conversation, the draft or the main chat in the chat itself, keeping its tab. */
+  function openConversationInChat(target?: string) {
+    if (target && target !== NEW_CONVERSATION_TAB && conversationScope) updateConversationTabs(conversationScope, state => openTab(state, target));
+    selectConversation(target);
+  }
+  const selectConversationRef = useRef(openConversationInChat);
+  selectConversationRef.current = openConversationInChat;
   /** The main tab closes every conversation tab; it never closes itself. */
   const closeAllConversationTabs = () => {
     if (!conversationScope) return;
@@ -4080,6 +4186,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       botId={active.id} taskThreadId={taskScope?.taskThreadId} newConversationOpen={newConversation} rpc={rpc}
       confirmDelete={isMobileSidebar}
       messageCount={activeSnapshot?.messages.length ?? 0}
+      refreshKey={active.conversations?.revision}
       onSelect={threadId => {
         close?.();
         selectConversation(threadId);
@@ -4114,6 +4221,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         mico={!inGroup && active ? { rpc, scope: JSON.stringify([userId, shellSpaceId]), botId: active.id, name: active.name,
           threadId: activeSnapshot.threadId, onOpen: pin => void openPinnedConversation(pin) } : undefined} /> : null}
       {(active || activeGroup) ? <ChatHeaderTools triggerRef={mobileBrowserTrigger}
+        attention={conversationsWaiting > 0 && panel !== "conversations"}
         open={panel === "tools"} onToggle={() => {
           close?.();
           if (panel === "tools") setPanel(null);
@@ -4170,7 +4278,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             ) : null}
           </InputGroupButton>
         </InputGroupAddon>
-      ) : null}
+      ) : (
+        <InputGroupAddon align="inline-end">
+          <SidebarViewMenu folders={sidebarFolders} hasUnread={sidebarHasUnread} onMarkAllRead={markEverythingRead} mobile={isMobileSidebar} />
+        </InputGroupAddon>
+      )}
     </InputGroup>
   );
   const sidebarFooter = (close?: () => void, rail = false) => (
@@ -4436,6 +4548,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                   }}
                 />
               ) : null}
+              {!miniSidebar && !activityMode && !showSpaceSearch ? <NeedsYouGroup groups={sidebarGroups} mobile={isMobileSidebar} openSpaceChat={openSpaceChat} /> : null}
               {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, shellSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
                 activeThread={taskScope?.taskThreadId} creating={creatingProject} onCreating={setCreatingProject} onRefresh={projectCollection.refresh} failed={projectCollection.error}
                 onSelect={(botId, threadId) => { setMobileSidebarOpen(false); navigate(`/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}`); }} /> : null}
@@ -4477,6 +4590,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 reorderRosterBot={reorderRosterBot}
                 activeSnapshot={activeSnapshot}
                 botMenuContent={botMenuContent}
+                userId={userId}
+                activeThreadId={taskScope?.taskThreadId}
+                onOpenConversation={(spaceId, botId, threadId) => openSpaceChat(spaceId,
+                  `/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}&taskSpace=${encodeURIComponent(spaceId)}`)}
               />
             </>
           )}
@@ -4617,7 +4734,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><Transcript
               headerTabs={false}
               banner={conversationBanner}
-              footer={conversationFailure}
+              footer={transcriptFooter}
+              onMarkRead={markReadFromBanner}
               conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
@@ -4865,14 +4983,39 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         panel={panel ?? "closed"}
       >
         {panel && (active || activeGroup || panel === "import-agent") ? (
-          <div className={(panel === "computer" || panel === "tools") ? "rk-scroll flex h-full w-full flex-col overflow-y-auto" : "rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]"}>
+          <div className={(panel === "computer" || panel === "tools" || panel === "conversations") ? "rk-scroll flex h-full w-full flex-col overflow-y-auto" : "rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]"}>
+            {panel === "conversations" && active && !inGroup && conversationScope ? <ConversationsPane
+              botName={active.name}
+              rows={conversationRows}
+              draftOpen={newConversation || conversationTabState.ids.includes(NEW_CONVERSATION_TAB)}
+              currentId={newConversation ? NEW_CONVERSATION_TAB : taskScope?.taskThreadId}
+              beside={besideConversations}
+              canBeside={!isMobileSidebar}
+              onOpen={target => {
+                if (isMobileSidebar) setPanel(null);
+                updateBeside(conversationScope, state => closeBeside(state, target));
+                openConversationInChat(target);
+              }}
+              onNewConversation={() => { if (isMobileSidebar) setPanel(null); openConversationInChat(NEW_CONVERSATION_TAB); }}
+              onShow={id => updateBeside(conversationScope, state => showBeside(state, id))}
+              onToggleBeside={id => updateBeside(conversationScope, state => state.ids.includes(id) ? closeBeside(state, id) : openBeside(state, id))}
+              onCloseBeside={id => updateBeside(conversationScope, state => closeBeside(state, id))}
+              onClose={() => setPanel(null)}
+              renderConversation={row => <SideConversationView key={row.threadId} botId={active.id} threadId={row.threadId}
+                title={row.title || t`New conversation`} micoName={active.name} client={besideClient(active.id, row.threadId)}
+                onOpenInChat={() => { updateBeside(conversationScope, state => closeBeside(state, row.threadId)); openConversationInChat(row.threadId); }}
+                onClose={() => updateBeside(conversationScope, state => closeBeside(state, row.threadId))}
+                onRead={() => writeConversationRows(conversationScope, rows => rows.map(item => item.threadId === row.threadId && item.unread ? { ...item, unread: false } : item))} />}
+            /> : null}
             {panel === "tools" ? <ChatToolsPanel {...chatTools}
+              onConversations={active && !inGroup && !activeProject ? () => setPanel("conversations") : undefined}
+              conversationsWaiting={conversationsWaiting}
               onBrowser={reviewWorkspace ? chatTools.onBrowser : openComputerWorkspace}
               onClose={() => { setPanel(null); requestAnimationFrame(() => mobileBrowserTrigger.current?.focus({ preventScroll: true })); }}>
               {renderToolsExtras}
             </ChatToolsPanel> : null}
             {panel === "computer" && workAreaHeader("computer")}
-            {panel !== "tools" && panel !== "computer" && panel !== "routine" &&
+            {panel !== "tools" && panel !== "computer" && panel !== "routine" && panel !== "conversations" &&
             panel !== "create-group" &&
             panel !== "group-settings" &&
             panel !== "import-agent" ? (

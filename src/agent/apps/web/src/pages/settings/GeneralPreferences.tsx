@@ -66,7 +66,7 @@ export function ConversationExtras() {
   return <>
     <SettingsRow label={t`Chat order`} description={t`Choose how conversations are shown. Automatic orders keep your saved manual order.`}
       control={<OptionSelect aria-label={t`Chat order`} value={value.sidebarChatOrder} className="w-44 max-w-full"
-        options={[{ value: "manual", label: t`Manual` }, { value: "unread-group", label: t`Group unread` }, { value: "unread-first", label: t`Unread first` }]}
+        options={[{ value: "manual", label: t`Manual` }, { value: "unread-group", label: t`Group unread` }, { value: "unread-first", label: t`Unread first` }, { value: "recent", label: t`Recent activity` }]}
         onValueChange={sidebarChatOrder => { try { setGeneralPreferences({ sidebarChatOrder: sidebarChatOrder as GeneralPreferences["sidebarChatOrder"] }); setError(""); } catch { setError(t`Could not save this preference.`); } }} />} />
 
     <SettingsRow label={<Label htmlFor={id}>{t`Compact message actions`}</Label>}

@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@mycellios/ui-web";
+import { PreviewCard, PreviewCardContent, PreviewCardTrigger, Tooltip, TooltipContent, TooltipTrigger } from "@mycellios/ui-web";
 import { CircleAlert, CircleCheck, Hand, LoaderCircle, MessageCircleQuestion } from "lucide-react";
-import type { ReactElement } from "react";
+import { type ReactElement, type ReactNode, useState } from "react";
 import { rosterWorkStatusLabel } from "../lib/roster-status";
 
 export function RosterMessagePreviewContent({ name, status, preview, hasError = false, mini = false }: {
@@ -24,9 +24,28 @@ export function RosterMessagePreviewContent({ name, status, preview, hasError = 
   </>;
 }
 
-export function RosterMessagePreview({ children, disabled = false, ...message }: Parameters<typeof RosterMessagePreviewContent>[0] & {
+/** How long the pointer rests on a Mico with conversations before its card opens. */
+export const CONVERSATION_CARD_DELAY_MS = 700;
+
+export function RosterMessagePreview({ children, disabled = false, conversations, ...message }: Parameters<typeof RosterMessagePreviewContent>[0] & {
   children: ReactElement; disabled?: boolean;
+  /**
+   * A Mico with open conversations gets a card that can hold them as links, after a longer rest.
+   * Its content shows only what is already loaded: a hover reads nothing and marks nothing read.
+   */
+  conversations?: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  if (conversations) {
+    return <PreviewCard open={open && !disabled} onOpenChange={next => setOpen(next && !disabled)}>
+      <PreviewCardTrigger delay={CONVERSATION_CARD_DELAY_MS} closeDelay={200} render={children} />
+      <PreviewCardContent side="inline-end" align="start" sideOffset={8} data-testid="roster-conversation-card"
+        className="grid w-72 max-w-[calc(100vw-24px)] items-start gap-1 rounded-md border border-border bg-popover p-2.5 text-popover-foreground shadow-md">
+        <RosterMessagePreviewContent {...message} />
+        {conversations}
+      </PreviewCardContent>
+    </PreviewCard>;
+  }
   return <Tooltip disabled={disabled}>
     <TooltipTrigger delay={350} render={children} />
     <TooltipContent side="inline-end" align="start" sideOffset={8}

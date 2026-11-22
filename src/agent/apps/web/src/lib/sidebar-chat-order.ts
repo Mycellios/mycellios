@@ -1,4 +1,5 @@
-export type SidebarChatOrder = "manual" | "unread-group" | "unread-first";
+export type SidebarChatOrder = "manual" | "unread-group" | "unread-first" | "recent";
+export const SIDEBAR_CHAT_ORDERS: readonly SidebarChatOrder[] = ["manual", "unread-group", "unread-first", "recent"];
 type Row = { chat: { unread?: boolean; pinned?: boolean; status?: string; updatedAt: string } };
 const needsAnswer = (row: Row) => ["waiting_input", "waiting_takeover"].includes(row.chat.status ?? "");
 const activity = (row: Row) => Date.parse(row.chat.updatedAt) || 0;
@@ -8,6 +9,10 @@ export function orderSidebarChats<T extends { key: string; spaceId: string; bots
   groups: readonly T[], mode: SidebarChatOrder, unreadLabel: string,
 ): T[] {
   if (mode === "manual") return [...groups];
+  // Recent activity: each folder shows its most recently active chat first. Pins keep their
+  // manual order on top, and the saved manual order is untouched for when it comes back.
+  if (mode === "recent") return groups.map(group => group.key === "pinned" || group.key.endsWith(":pinned") ? group
+    : { ...group, bots: [...group.bots].sort((a, b) => activity(b) - activity(a)) });
   if (mode === "unread-first") return groups.map(group => ({ ...group, bots: [...group.bots].sort((a, b) =>
     Number(Boolean(b.chat.pinned)) - Number(Boolean(a.chat.pinned)) ||
     Number(needsAnswer(b)) - Number(needsAnswer(a)) ||

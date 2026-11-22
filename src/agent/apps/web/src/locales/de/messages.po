@@ -6700,3 +6700,223 @@ msgstr "Diese Nachricht ist nicht mehr in dieser Unterhaltung."
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "Die angeheftete Nachricht konnte nicht geöffnet werden."
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "Warten auf dich: {count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "Unterhaltungen von {botName}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "Im Chat öffnen"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "Unterhaltungen schließen"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "Noch keine Unterhaltungen"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "Entwurf"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "Neben dem Chat schließen"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "Neben dem Chat öffnen"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "Bereits im Chat geöffnet"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "Der Server hat diese Unterhaltung nicht zurückgegeben."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "Diese Unterhaltung konnte nicht geladen werden."
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "Die Nachricht konnte nicht gesendet werden. Versuche es erneut."
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName} arbeitet…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "Freigabe nötig in {title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "Plan bestätigen in {title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "Zugangsdaten nötig in {title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "Übernahme nötig in {title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "Frage in {title}"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "Anfragen aus Unterhaltungen"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "Öffne die Unterhaltung, um den Computer zu übernehmen."
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "Öffne die Unterhaltung, um zu antworten."
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "{hidden} weitere anzeigen"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "Unterhaltungen: {open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "Neue Antworten in Unterhaltungen"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "Zeile aufklappen, um sie zu sehen"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "Wartet auf deine Antwort"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "Wartet darauf, dass du übernimmst"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "{0} Unterhaltungen warten auf dich"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "Eine Unterhaltung wartet auf dich"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "Übernehmen"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "Prüfen"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "Letzte Aktivität"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "Chats filtern und sortieren, Filter aktiv"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "Chats filtern und sortieren"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "Anzeigen"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "Alle Chats"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "Ordner"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "Filter zurücksetzen"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "Chats sortieren"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "Alle als gelesen markieren"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "Keine Chats passen zu diesen Filtern"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr ", {unreadText} ungelesen"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr ", neue Antworten in Unterhaltungen"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "Unterhaltungen von {0} ausblenden"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "Unterhaltungen von {0} anzeigen"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "Unterhaltungen ausblenden"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "Unterhaltungen anzeigen"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "Eine Unterhaltung braucht dich"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "Arbeitet in einer Unterhaltung…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "1 neue Nachricht"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "{newMessageCount} neue Nachrichten"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "Springen"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "Als gelesen markieren"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "Nicht alle Chats konnten als gelesen markiert werden. Versuche es erneut."
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "Die Chats konnten nicht als gelesen markiert werden. Versuche es erneut."

@@ -6699,3 +6699,223 @@ msgstr "这条消息已不在此对话中。"
 #: src/pages/Shell.tsx
 msgid "The pinned message could not be opened."
 msgstr "无法打开置顶消息。"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for you: {count}"
+msgstr "等你处理：{count}"
+
+#: src/components/ConversationsPane.tsx
+msgid "Conversations of {botName}"
+msgstr "{botName} 的对话"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open in the chat"
+msgstr "在聊天中打开"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close conversations"
+msgstr "关闭对话"
+
+#: src/components/ConversationsPane.tsx
+msgid "No conversations yet"
+msgstr "还没有对话"
+
+#: src/components/ConversationsPane.tsx
+msgid "Draft"
+msgstr "草稿"
+
+#: src/components/ConversationsPane.tsx
+msgid "Close beside the chat"
+msgstr "关闭聊天旁的对话"
+
+#: src/components/ConversationsPane.tsx
+msgid "Open beside the chat"
+msgstr "在聊天旁打开"
+
+#: src/components/ConversationsPane.tsx
+msgid "Already open in the chat"
+msgstr "已在聊天中打开"
+
+#: src/components/SideConversationView.tsx
+msgid "The server did not return this conversation."
+msgstr "服务器没有返回此对话。"
+
+#: src/components/SideConversationView.tsx
+msgid "Could not load this conversation."
+msgstr "无法加载此对话。"
+
+#: src/components/SideConversationView.tsx
+msgid "Could not send the message. Try again."
+msgstr "无法发送消息。请重试。"
+
+#: src/components/SideConversationView.tsx
+msgid "{micoName} is working…"
+msgstr "{micoName} 正在处理…"
+
+#: src/components/MirroredRequests.tsx
+msgid "Approval needed in {title}"
+msgstr "{title} 需要批准"
+
+#: src/components/MirroredRequests.tsx
+msgid "Plan to confirm in {title}"
+msgstr "{title} 中有待确认的计划"
+
+#: src/components/MirroredRequests.tsx
+msgid "A credential is needed in {title}"
+msgstr "{title} 需要凭据"
+
+#: src/components/MirroredRequests.tsx
+msgid "Take over needed in {title}"
+msgstr "{title} 需要你接管"
+
+#: src/components/MirroredRequests.tsx
+msgid "Question in {title}"
+msgstr "{title} 中的问题"
+
+#: src/components/MirroredRequests.tsx
+msgid "Requests from conversations"
+msgstr "来自对话的请求"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to take over the computer."
+msgstr "打开对话以接管电脑。"
+
+#: src/components/MirroredRequests.tsx
+msgid "Open the conversation to answer."
+msgstr "打开对话以回答。"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Show {hidden} more"
+msgstr "再显示 {hidden} 个"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Conversations: {open}"
+msgstr "对话：{open}"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "New replies in conversations"
+msgstr "对话中有新回复"
+
+#: src/components/SidebarMicoConversations.tsx
+msgid "Expand the row to see them"
+msgstr "展开这一行即可查看"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for your answer"
+msgstr "等待你的回答"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Waiting for you to take over"
+msgstr "等待你接管"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "{0} conversations wait for you"
+msgstr "{0} 个对话在等你"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "A conversation waits for you"
+msgstr "有一个对话在等你"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Take over"
+msgstr "接管"
+
+#: src/pages/shell/needs-you-group.tsx
+msgid "Review"
+msgstr "查看"
+
+#: src/pages/settings/GeneralPreferences.tsx
+msgid "Recent activity"
+msgstr "最近活动"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats, filters on"
+msgstr "筛选和排序聊天，筛选已开启"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Filter and sort chats"
+msgstr "筛选和排序聊天"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Show"
+msgstr "显示"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "All chats"
+msgstr "所有聊天"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Folders"
+msgstr "文件夹"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Clear filters"
+msgstr "清除筛选"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Sort chats"
+msgstr "聊天排序"
+
+#: src/pages/shell/sidebar-view-menu.tsx
+msgid "Mark all as read"
+msgstr "全部标为已读"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "No chats match these filters"
+msgstr "没有符合这些筛选条件的聊天"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", {unreadText} unread"
+msgstr "，{unreadText} 条未读"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid ", new replies in conversations"
+msgstr "，对话中有新回复"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations of {0}"
+msgstr "隐藏 {0} 的对话"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations of {0}"
+msgstr "显示 {0} 的对话"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Hide conversations"
+msgstr "隐藏对话"
+
+#: src/pages/shell/sidebar-roster.tsx
+msgid "Show conversations"
+msgstr "显示对话"
+
+#: src/lib/roster-status.ts
+msgid "A conversation needs you"
+msgstr "有对话需要你"
+
+#: src/lib/roster-status.ts
+msgid "Working in a conversation…"
+msgstr "正在一个对话中处理…"
+
+#: src/pages/shell/transcript.tsx
+msgid "1 new message"
+msgstr "1 条新消息"
+
+#: src/pages/shell/transcript.tsx
+msgid "{newMessageCount} new messages"
+msgstr "{newMessageCount} 条新消息"
+
+#: src/pages/shell/transcript.tsx
+msgid "Jump"
+msgstr "跳转"
+
+#: src/pages/shell/transcript.tsx
+msgid "Mark as read"
+msgstr "标为已读"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark every chat as read. Try again."
+msgstr "无法将所有聊天标为已读。请重试。"
+
+#: src/pages/Shell.tsx
+msgid "Could not mark the chats as read. Try again."
+msgstr "无法将这些聊天标为已读。请重试。"

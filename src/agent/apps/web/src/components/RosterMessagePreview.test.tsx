@@ -16,3 +16,7 @@ it("keeps errors and computer takeover distinct from an ordinary reply", () => {
   const takeover = renderToStaticMarkup(<RosterMessagePreviewContent name="Mico" status="waiting_takeover" mini />);
   expect(takeover).toContain("Mico"); expect(takeover).toContain("Select to see execution"); expect(takeover).not.toContain("Select to reply");
 });
+it("waits longer before a Mico's card with its conversations opens", async () => {
+  const { CONVERSATION_CARD_DELAY_MS } = await import("./RosterMessagePreview");
+  expect(CONVERSATION_CARD_DELAY_MS).toBe(700);
+});

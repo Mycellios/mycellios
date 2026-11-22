@@ -18,6 +18,7 @@ import { chooseBotAvatar, chooseMicoAvatar } from "./bot-avatar-choice.js";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";
 import { computerKindForMode, ensureComputerRecord, parseComputerMode } from "./computers.js";
+import { rosterConversationSignals } from "./conversation-surfaces.js";
 import { createThreadMessageInTransaction } from "./messages.js";
 import { NOT_QUIET_ROUTINE_RUN, withNewestThreadMessages } from "./preview-messages.js";
 import { isQuietRoutineRunMarker } from "./routine-run-markers.js";
@@ -221,10 +222,13 @@ export function createRepos(
     const bots = await withNewestThreadMessages(prisma, await withLatestBotRuns(prisma, rows), 1, {
       skipQuietRoutineRuns: true,
     });
+    const signals = await rosterConversationSignals(prisma, actor.userId,
+      bots.flatMap((bot) => bot.thread ? [{ botId: bot.id, threadId: bot.thread.id, unread: bot.thread.unread }] : []));
     return bots.map((bot) => {
       if (!bot.thread) throw new IsolationError("Bot is missing its thread");
       const activeRun = primaryActiveRun(bot.runs);
       return {
+        ...signals.get(bot.id),
         id: bot.id,
         spaceId: bot.spaceId,
         name: bot.name,
@@ -327,7 +331,10 @@ export function createRepos(
         for (const id of missing) checkedRunIds.add(id);
       };
       await classifyRunIds(candidateRunIds);
-      return Promise.all(
+      // Archived Micos have no sidebar row to show counts on.
+      const signals = await rosterConversationSignals(prisma, actor.userId, options.archived ? [] :
+        bots.flatMap((bot) => bot.thread ? [{ botId: bot.id, threadId: bot.thread.id, unread: bot.thread.unread }] : []));
+      const listed = await Promise.all(
         bots.map(async (bot) => {
           let messages = bot.thread?.messages ?? [];
           const updatedAt = rosterUpdatedAt(newestRosterMessage(messages), bot.updatedAt);
@@ -377,6 +384,10 @@ export function createRepos(
           );
         }),
       );
+      return listed.map((bot) => {
+        const extra = signals.get(bot.id);
+        return extra ? { ...bot, ...extra } : bot;
+      });
     },
 
     listSpaceBotsForSpaces,

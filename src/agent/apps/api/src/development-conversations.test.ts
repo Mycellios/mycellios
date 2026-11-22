@@ -40,7 +40,7 @@ it("keeps ordinary Mico chat targets unchanged", async () => {
   const target = await resolveThreadTarget({} as never, actor, { botId: "mico" });
   expect(target.threadId).toBe("primary");
 });
-const ROUTES = ["open", "rename", "list", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove"];
+const ROUTES = ["open", "rename", "list", "requests", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove"];
 function routesFor(prisma: object) {
   const handler = { handler: (fn: unknown) => fn };
   const routes = developmentRoutes({
@@ -140,4 +140,32 @@ it.each(["", "   ", "x".repeat(121), "Dos\nlíneas"])("refuses the title %j with
   await expect(f.rename({context:{actor},input:{botId:"mico",taskThreadId:"task-thread",title}}))
     .rejects.toMatchObject({code:"BAD_REQUEST",message:expect.stringContaining("1 to 120 characters")});
   expect(f.prisma.thread.updateMany).not.toHaveBeenCalled();
+});
+
+it("mirrors the pending requests of the Mico's open conversations, after checking the Mico", async () => {
+  const at = new Date("2026-11-22T10:00:00.000Z");
+  const queryRaw = vi.fn().mockResolvedValue([
+    { threadId: "asks", title: "Choose a supplier", runId: "run-ask", status: "waiting_input", updatedAt: at },
+    { threadId: "screen", title: "Fill the form", runId: "run-screen", status: "waiting_takeover", updatedAt: at },
+    { threadId: "lost", title: null, runId: "run-lost", status: "waiting_input", updatedAt: at },
+  ]);
+  const ask = { kind: "ask", text: "Which supplier?", status: "pending" };
+  const findMany = vi.fn().mockResolvedValue([
+    { id: "m2", threadId: "asks", runId: "run-ask", createdAt: at, blocks: [{ kind: "text", text: "Two offers" }, ask] },
+    { id: "m1", threadId: "asks", runId: "run-ask", createdAt: at, blocks: [{ kind: "ask", text: "Old", status: "answered" }] },
+  ]);
+  const routes = routesFor({ $queryRaw: queryRaw, message: { findMany } });
+  const requests = await routes.requests!({ context: { actor }, input: { botId: "mico" } });
+  expect(getBot).toHaveBeenCalledWith(actor, "mico");
+  expect(requests).toEqual([
+    { threadId: "asks", title: "Choose a supplier", runId: "run-ask", messageId: "m2", kind: "question", block: ask, createdAt: at.toISOString() },
+    { threadId: "screen", title: "Fill the form", runId: "run-screen", messageId: null, kind: "takeover", block: null, createdAt: at.toISOString() },
+    { threadId: "lost", title: "", runId: "run-lost", messageId: null, kind: "question", block: null, createdAt: at.toISOString() },
+  ]);
+  // Only the waiting runs' own bot messages are read, through the client that decrypts them.
+  expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+    where: { threadId: { in: ["asks", "lost"] }, runId: { in: ["run-ask", "run-lost"] }, role: "bot" },
+  }));
+  getBot.mockRejectedValueOnce(new Error("not found"));
+  await expect(routes.requests!({ context: { actor }, input: { botId: "someone-else" } })).rejects.toThrow("not found");
 });

@@ -15,9 +15,12 @@ import {
   AnswerTooLongError,
   appendEventInTransaction,
   createExternalConversationRepos,
+  createRepos,
   createThreadMessageInTransaction,
   IsolationError,
   lockOwnedGroup,
+  markAllThreadsRead,
+  markNewestReplyUnread,
   touchGroupUpdatedAt,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
@@ -45,7 +48,6 @@ import {
   reactToThreadMessage,
   resolveThreadTarget,
   sendThreadMessage,
-  setThreadUnreadState,
   stopThreadRuns,
   threadHead,
   threadSnapshot,
@@ -649,9 +651,17 @@ export function threadsRoutes(ctx: RouterContext) {
         if (input.messageId) {
           await markThreadUnreadFrom(deps.prisma, context.actor, target, input.messageId);
         } else {
-          await setThreadUnreadState(deps.prisma, context.actor, target, true);
+          // The newest reply becomes unread until the chat is opened again.
+          const changed = await markNewestReplyUnread(deps.prisma, context.actor, target.threadId);
+          if (changed > 1) throw new IsolationError();
         }
         return { ok: true as const };
+      }),
+      markAllRead: authed.threads.markAllRead.handler(async ({ context, input }) => {
+        // The Mico must be the person's own in this Space; its threads are then read together.
+        if (input.botId) await createRepos(deps.prisma).getBot(context.actor, input.botId);
+        const threads = await markAllThreadsRead(deps.prisma, context.actor, { botId: input.botId });
+        return { ok: true as const, threads };
       }),
     },
     externalConversations: {

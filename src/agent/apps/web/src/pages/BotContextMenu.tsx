@@ -41,6 +41,8 @@ export function BotContextMenu({
   onArchive,
   onDelete,
   onNewConversation,
+  onMarkAllRead,
+  conversationsUnread = false,
 }: {
   bot: ChatMenuTarget;
   onClose: () => void;
@@ -57,6 +59,10 @@ export function BotContextMenu({
   onDelete: () => void;
   /** Opens a draft conversation with this Mico; groups have none. */
   onNewConversation?: () => void;
+  /** Reads the Mico's main chat and all of its conversations at once. */
+  onMarkAllRead?: () => void;
+  /** Only its conversations have unread replies; the main chat may be read. */
+  conversationsUnread?: boolean;
 }) {
   const { t } = useLingui();
 
@@ -109,10 +115,23 @@ export function BotContextMenu({
           ) : null}
         </ContextMenuSubContent>
       </ContextMenuSub>
-      <ContextMenuItem onClick={onToggleUnread}>
-        {bot.unread ? <BellDot /> : <Bell />}
-        {bot.unread ? t`Mark as Read` : t`Mark as Unread`}
-      </ContextMenuItem>
+      {(bot.unread || conversationsUnread) && onMarkAllRead ? (
+        <ContextMenuItem onClick={onMarkAllRead}>
+          <BellDot />
+          {t`Mark as Read`}
+        </ContextMenuItem>
+      ) : bot.unread ? (
+        <ContextMenuItem onClick={onToggleUnread}>
+          <BellDot />
+          {t`Mark as Read`}
+        </ContextMenuItem>
+      ) : null}
+      {!bot.unread ? (
+        <ContextMenuItem onClick={onToggleUnread}>
+          <Bell />
+          {t`Mark as Unread`}
+        </ContextMenuItem>
+      ) : null}
       <ContextMenuSeparator />
       <ContextMenuItem onClick={onEdit}>
         <Pencil />

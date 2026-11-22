@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   compactRosterStatusLabel,
+  rosterConversationStatusLabel,
   rosterHasUndismissedRunError,
+  rosterRowSignal,
   rosterWorkStatusLabel,
+  unreadBadgeText,
 } from "./roster-status";
 
 vi.mock("@lingui/core/macro", () => ({
@@ -47,5 +50,35 @@ describe("compactRosterStatusLabel", () => {
 
   it("does not add status text to idle rows", () => {
     expect(compactRosterStatusLabel("idle")).toBeNull();
+  });
+});
+
+describe("rosterRowSignal", () => {
+  const conversations = (extra: Partial<{ unread: number; waiting: number; working: number }> = {}) =>
+    ({ unread: 0, waiting: 0, working: 0, ...extra });
+  it("puts what waits for the person first, then failures, work, main-chat replies and conversation replies", () => {
+    expect(rosterRowSignal({ status: "waiting_input", unread: true, conversations: conversations({ waiting: 1 }) }, true)).toBe("answer");
+    expect(rosterRowSignal({ status: "waiting_takeover" })).toBe("takeover");
+    expect(rosterRowSignal({ status: "running", conversations: conversations({ waiting: 1 }) }, true)).toBe("conversation-waiting");
+    expect(rosterRowSignal({ status: "running", unread: true }, true)).toBe("error");
+    expect(rosterRowSignal({ status: "queued", unread: true })).toBe("working");
+    expect(rosterRowSignal({ status: "idle", unread: true, conversations: conversations({ working: 1 }) })).toBe("working");
+    expect(rosterRowSignal({ status: "idle", unread: true, unreadCount: 3, conversations: conversations({ unread: 2 }) })).toBe("unread");
+    expect(rosterRowSignal({ status: "idle", conversations: conversations({ unread: 2 }) })).toBe("conversation-unread");
+    expect(rosterRowSignal({ status: "idle", conversations: conversations() })).toBeNull();
+  });
+
+  it("shows a number for main-chat replies only, capped at 99+", () => {
+    expect(unreadBadgeText(undefined)).toBeNull();
+    expect(unreadBadgeText(0)).toBeNull();
+    expect(unreadBadgeText(7)).toBe("7");
+    expect(unreadBadgeText(100)).toBe("99+");
+  });
+
+  it("names a conversation's state only while the main chat is idle", () => {
+    expect(rosterConversationStatusLabel({ status: "idle", conversations: conversations({ waiting: 1, working: 1 }) })).toBe("A conversation needs you");
+    expect(rosterConversationStatusLabel({ status: "idle", conversations: conversations({ working: 2 }) })).toBe("Working in a conversation…");
+    expect(rosterConversationStatusLabel({ status: "running", conversations: conversations({ waiting: 1 }) })).toBeNull();
+    expect(rosterConversationStatusLabel({ status: "idle" })).toBeNull();
   });
 });
