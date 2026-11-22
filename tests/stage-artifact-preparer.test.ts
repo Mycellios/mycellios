@@ -17,9 +17,12 @@ import {
 } from "../src/distribution/auto-distribute.js";
 import {
   compilePythonLaunchDescription,
+  validatePythonLaunchDescription,
   type PythonLaunchProcess,
   type PythonPipelineLaunchDescription,
 } from "../src/distribution/python-launcher.js";
+import { validateLaunchAgentRpcStartRequest } from "../src/distribution/launch-agent-rpc.js";
+import { validateNativeGgufExecutorArguments } from "../src/distribution/native-gguf-source.js";
 import type { DistributedModelProfile } from "../src/distribution/types.js";
 import { prepareNodeStageArtifacts } from "../src/worker/stage-artifact-preparer.js";
 
@@ -242,6 +245,155 @@ describe("worker-local stage artifact preparation", () => {
       "native_stage_package_file_digest_mismatch:native-stage.gguf",
     );
     expect(compilerRunner).not.toHaveBeenCalled();
+  });
+});
+
+describe("stages built by each node from a pinned GGUF", () => {
+  const modelIdentity = `sha256:${"7".repeat(64)}`;
+  const source = (executor: "torch" | "llama-cpp" = "llama-cpp") => ({
+    schema: "mycellios-native-gguf-source/1" as const,
+    artifactUrl: "https://models.example/model-Q4_K_M.gguf",
+    artifactSha256: "1".repeat(64),
+    artifactSizeBytes: 1_056_000_000,
+    tensorManifestUrl: "https://models.example/model-Q4_K_M.tensors.json",
+    tensorManifestId: "2".repeat(64),
+    executor,
+  });
+  const sourceDescription = (executor: "torch" | "llama-cpp" = "llama-cpp", extra: Record<string, unknown> = {}) => {
+    const base = fixture();
+    return compilePythonLaunchDescription(base.sourceManifest, {
+      ...base.configuration,
+      runtimeModel: {
+        source: "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        revision: null,
+        snapshotIdentity: BigInt(`0x${modelIdentity.slice(7, 23)}`).toString(),
+        artifactIdentity: modelIdentity,
+        canonicalSource: "hf://HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        canonicalRevision: "c".repeat(40),
+      },
+      nativeGgufSource: source(executor),
+      ...extra,
+    });
+  };
+  const fetchRunner = (overrides: Record<string, unknown> = {}) =>
+    vi.fn(async (_executable: string, args: readonly string[]) => JSON.stringify({
+      destination: flagValue(args, "--destination"),
+      packageId: "3".repeat(64),
+      packageIdentity: `sha256:${"3".repeat(64)}`,
+      modelIdentity,
+      layerStart: Number(flagValue(args, "--layer-start")),
+      layerEnd: Number(flagValue(args, "--layer-end")),
+      totalLayers: 8,
+      weightsSizeBytes: 4_096,
+      ...overrides,
+    }));
+  const llamaCpp = { buildDirectory: "C:\\mycellios\\llama.cpp\\b12613", build: "llama.cpp-b12613-win-vulkan-x64", gpuOffload: true };
+
+  it("seals the source and engine into the route without naming any host path", () => {
+    const description = sourceDescription();
+    expect(() => validatePythonLaunchDescription(structuredClone(description))).not.toThrow();
+    expect(description.launchOrder.every((process) => process.kind !== "cell-member" && process.nativeGguf === null)).toBe(true);
+    for (const process of description.launchOrder) {
+      expect(flagValue(process.command.args, "--native-gguf-executor")).toBe("llama-cpp");
+      for (const flag of ["--native-gguf-package", "--llama-cpp-build-dir", "--llama-cpp-view-cache"]) {
+        expect(process.command.args).not.toContain(flag);
+      }
+    }
+    expect(sourceDescription("torch").route).not.toEqual(description.route);
+  });
+
+  it("rejects sources that are not pinned HTTPS artifacts or that mix stage bindings", () => {
+    const base = fixture();
+    const compile = (value: Record<string, unknown>, extra: Record<string, unknown> = {}) => () =>
+      compilePythonLaunchDescription(base.sourceManifest, {
+        ...base.configuration,
+        runtimeModel: sourceDescription().runtimeModel,
+        nativeGgufSource: value as never,
+        ...extra,
+      });
+    expect(compile({ ...source(), artifactUrl: "http://models.example/model.gguf" }))
+      .toThrow("python_native_gguf_source_artifact_url_is_invalid");
+    expect(compile({ ...source(), tensorManifestId: "Z".repeat(64) }))
+      .toThrow("python_native_gguf_source_tensor_manifest_id_is_invalid");
+    expect(compile({ ...source(), executor: "ollama" })).toThrow("python_native_gguf_source_executor_is_invalid");
+    expect(compile({ ...source(), buildDirectory: "C:\\llama" })).toThrow("python_native_gguf_source_keys_are_invalid");
+    expect(compile(source(), { stagePackageIdentities: { "node-a": `sha256:${"4".repeat(64)}` } }))
+      .toThrow("python_native_gguf_source_conflicts_with_stage_bindings");
+  });
+
+  it("builds each local range from the manifest and adds only node-owned paths", async () => {
+    const description = sourceDescription();
+    const runner = fetchRunner();
+    const verifier = vi.fn(async () => undefined);
+    const cacheDirectory = temporaryDirectory();
+    const prepared = await prepareNodeStageArtifacts(description, {
+      nodeId: "node-b",
+      pythonExecutable: "python",
+      cacheDirectory,
+      compilerRunner: runner,
+      nativePackageVerifier: verifier,
+      llamaCpp,
+    });
+    expect(prepared).toHaveLength(1);
+    const process = prepared[0]!;
+    const args = runner.mock.calls[0]![1];
+    expect(args.slice(0, 4)).toEqual(["-u", "-m", "distributed_runtime.native_gguf_remote", "fetch-stage"]);
+    expect(flagValue(args, "--manifest-url")).toBe(source().tensorManifestUrl);
+    expect(flagValue(args, "--manifest-id")).toBe(source().tensorManifestId);
+    expect(flagValue(args, "--model-revision")).toBe("c".repeat(40));
+    expect(args).toContain("--reuse-verified");
+    if (process.kind === "cell-member" || process.nativeGguf === null) throw new Error("binding is missing");
+    expect(process.nativeGguf.packageId).toBe("3".repeat(64));
+    expect(process.nativeGguf.packagePath.startsWith(join(cacheDirectory, "native-gguf-stages"))).toBe(true);
+    expect(verifier).toHaveBeenCalledWith(process.nativeGguf, undefined);
+    expect(flagValue(process.command.args, "--llama-cpp-build-dir")).toBe(llamaCpp.buildDirectory);
+    expect(flagValue(process.command.args, "--llama-cpp-gpu-layers")).toBe(String(process.layerEnd - process.layerStart + 1));
+    expect(flagValue(process.command.args, "--stage-package-identity")).toBe(`sha256:${"3".repeat(64)}`);
+    expect(() => validateLaunchAgentRpcStartRequest({
+      launchId: description.launchId,
+      pipelineId: description.pipelineId,
+      deploymentGeneration: description.deploymentGeneration,
+      nodeId: "node-b",
+      process,
+    })).not.toThrow();
+    const original = description.launchOrder.find((candidate) => candidate.processId === process.processId)!;
+    expect(() => validateLaunchAgentRpcStartRequest({
+      launchId: description.launchId,
+      pipelineId: description.pipelineId,
+      deploymentGeneration: description.deploymentGeneration,
+      nodeId: "node-b",
+      process: { ...original, command: { ...original.command, args: [...original.command.args, "--llama-cpp-build-dir", "C:\\x"] } },
+    })).toThrow("llama_cpp_executor_requires_native_gguf_package");
+  });
+
+  it("admits llama.cpp host flags only beside the executor and a native package", () => {
+    const host = ["--llama-cpp-build-dir", "C:\\b", "--llama-cpp-build", llamaCpp.build, "--llama-cpp-view-cache", "C:\\v"];
+    expect(() => validateNativeGgufExecutorArguments(["--native-gguf-executor", "llama-cpp", ...host], true)).not.toThrow();
+    expect(() => validateNativeGgufExecutorArguments(["--native-gguf-executor", "torch", ...host], true))
+      .toThrow("llama_cpp_flags_require_llama_cpp_executor");
+    expect(() => validateNativeGgufExecutorArguments(["--native-gguf-executor", "llama-cpp", "--native-gguf-executor", "torch"], true))
+      .toThrow("native_gguf_executor_flag_is_repeated");
+    expect(() => validateNativeGgufExecutorArguments(["--native-gguf-executor", "llama-cpp", ...host.slice(0, 2)], true))
+      .toThrow("llama_cpp_flag_is_missing:--llama-cpp-build");
+    expect(() => validateNativeGgufExecutorArguments(
+      ["--native-gguf-executor", "llama-cpp", ...host.slice(0, 3), "../evil", ...host.slice(4)], true,
+    )).toThrow("llama_cpp_build_is_invalid");
+  });
+
+  it("fails closed without a local llama.cpp build or when the package names another model", async () => {
+    await expect(prepareNodeStageArtifacts(sourceDescription(), {
+      nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(), compilerRunner: fetchRunner(),
+    })).rejects.toThrow("native_gguf_llama_cpp_runtime_unavailable");
+    await expect(prepareNodeStageArtifacts(sourceDescription("torch"), {
+      nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(),
+      compilerRunner: fetchRunner({ modelIdentity: `sha256:${"8".repeat(64)}` }),
+      nativePackageVerifier: async () => undefined,
+    })).rejects.toThrow("native_gguf_source_returned_wrong_model_identity");
+    const torch = await prepareNodeStageArtifacts(sourceDescription("torch"), {
+      nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(),
+      compilerRunner: fetchRunner(), nativePackageVerifier: async () => undefined,
+    });
+    expect(torch[0]!.command.args).not.toContain("--llama-cpp-build-dir");
   });
 });
 

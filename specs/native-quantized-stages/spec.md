@@ -259,6 +259,21 @@ What remains before selection is automatic, in order:
 4. The Python launcher and the launch agent accept `--native-gguf-executor
    llama-cpp` only when it is bound to the sealed engine authority. The stage
    artifact preparer supplies the pinned build directory and the view cache.
+   Done on the node side: a launch description may carry a `nativeGgufSource`
+   (`src/distribution/native-gguf-source.ts`) naming the GGUF, its tensor
+   manifest and the executor. It is sealed into the route identity and every
+   stage command, and it never names a host path. Each node's preparer
+   (`src/worker/native-gguf-stage-preparer.ts`) builds or reuses its package
+   with `native_gguf_remote fetch-stage --manifest-url ... --reuse-verified`,
+   checks the returned model identity against the description, verifies the
+   package again in process, and only then adds the package and its own
+   llama.cpp build directory, view cache and GPU offload to the local command.
+   The launch agent rejects llama.cpp host flags without the llama.cpp
+   executor and a sealed package binding. A node without a local llama.cpp
+   build refuses the route (`native_gguf_llama_cpp_runtime_unavailable`).
+   Still open: the coordinator emitting `nativeGgufSource` from the
+   authority's `artifact`, with a model profile derived from the tensor
+   manifest, and each node's build coming from the pinned runtime component.
 5. Requested models gain a pinned GGUF source, and nodes build their stage
    packages from it. The pin lives in the engine activation authority, not in
    the requested-model table, so it needs no migration and is bound by the
@@ -266,9 +281,8 @@ What remains before selection is automatic, in order:
    SHA-256 and size, and the URL and id of its tensor manifest
    (`src/contracts/gguf-tensor-manifest.ts`, whose identity matches the
    Python node byte for byte). The authority is valid only when the certified
-   `descriptor.model.manifestDigest` is that manifest's id. Still open: the
-   worker preparer fetching the manifest and calling
-   `native_gguf_remote fetch-stage`.
+   `descriptor.model.manifestDigest` is that manifest's id. The worker
+   preparer fetches the manifest and builds the package (step 4).
 
 ### Planning
 
