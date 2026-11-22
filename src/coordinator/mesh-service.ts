@@ -529,15 +529,15 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return;
     }
     const leaseId = newId("lea");
-    if (promote) (await this.store.promoteJobRoute(jobId, runtime.route, leaseId));
-    else (await this.store.setJobRoute(jobId, runtime.route, leaseId));
-    const job = (await this.store.getJob(jobId));
-    if (!job) return;
+    const deadlineAt = promote
+      ? await this.store.promoteJobRoute(jobId, runtime.route, leaseId)
+      : await this.store.setJobRoute(jobId, runtime.route, leaseId);
+    if (deadlineAt === null) return;
     const plain: JobPayload = {
       jobId,
       leaseId,
       modelDigest: stage.modelDigest,
-      deadlineAt: job.deadlineAt,
+      deadlineAt,
       request: this.workerRequestView.build(runtime.promptCheckpoint.request, stage.workerId),
     };
     const group = runtime.request.dispersion?.group;
@@ -596,7 +596,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       (await this.store.setJobStatus(job.id, "running"));
       if (runtime) {
         if (runtime.firstTokenTimer) clearTimeout(runtime.firstTokenTimer);
-        const firstTokenTimeoutMs = (await this.firstTokenTimeoutFor(job.id, runtime));
+        const firstTokenTimeoutMs = await this.firstTokenTimeoutFor(job.deadlineAt, runtime);
         runtime.queue.push({
           type: "progress",
           phase: "waiting_first_token",
@@ -1036,7 +1036,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     return job;
   }
 
-  private async firstTokenTimeoutFor(jobId: string, runtime: RuntimeJob): Promise<number> {
+  private async firstTokenTimeoutFor(deadlineAt: number, runtime: RuntimeJob): Promise<number> {
     if (this.options.firstTokenTimeoutMs !== undefined) {
       return Math.max(10, Math.round(this.options.firstTokenTimeoutMs));
     }
@@ -1047,8 +1047,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     );
     const expectedTtftMs = deployment?.ttftMs ?? 2_500;
     const adaptiveTimeoutMs = Math.max(15_000, expectedTtftMs * 6 + 2_000);
-    const job = (await this.store.getJob(jobId));
-    const remainingMs = job ? Math.max(1_000, job.deadlineAt - Date.now() - 1_000) : 30_000;
+    const remainingMs = Math.max(1_000, deadlineAt - Date.now() - 1_000);
     // An embedding is an atomic vector batch, not incremental text. Do not
     // apply the text decoder's 15-second first-token estimate to its full job.
     if (isDecisionDeployment(deployment)) return Math.max(1_000, Math.min(DECISION_DEADLINE_MS, remainingMs));
