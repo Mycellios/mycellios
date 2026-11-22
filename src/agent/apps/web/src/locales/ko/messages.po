@@ -6430,3 +6430,11 @@ msgstr "안 함"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "이전 모델"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "위임됨"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "기타"

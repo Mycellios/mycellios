@@ -27,6 +27,7 @@ import {
   projectPreparationStatus,
 } from "../project-preparation.js";
 import {admitMicoTaskComputer}from"../mico-task-computer.js";
+import { restoreArchivedTaskOnSend } from "../task-inbox-conversations.js";
 import { withResponseLanguage } from "../response-language.js";
 import { retryThreadRun } from "../retry-thread-run.js";
 import { stopWorkForThread } from "../work-controls.js";
@@ -239,6 +240,10 @@ export function threadsRoutes(ctx: RouterContext) {
           },
           target.kind === "bot"
             ? (runId) => releaseComputerControl(deps, context.actor, target.botId, "done", runId)
+            : undefined,
+          // Writing in an archived task conversation restores it in the Tasks inbox.
+          target.kind === "bot" && target.threadId !== target.bot.thread?.id
+            ? (tx) => restoreArchivedTaskOnSend(tx, context.actor, target.threadId).then(() => undefined)
             : undefined,
         );
       }),

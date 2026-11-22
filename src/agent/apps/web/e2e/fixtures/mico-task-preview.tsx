@@ -12,10 +12,15 @@ import type { RpcClient } from "../../src/lib/rpc";
 import "../../src/styles.css";
 
 const i18n = setupI18n({ locale: "en", messages: { en: {} } });
-const rows = [
-  { threadId: "task-one", title: "Review API" },
-  { threadId: "task-two", title: "A task with a deliberately long project and functionality name" },
+const rows: Array<{ threadId: string; title: string; kind?: string; archived?: boolean }> = [
+  { threadId: "task-one", title: "Review API", kind: "conversation", archived: false },
+  { threadId: "task-two", title: "A task with a deliberately long project and functionality name", kind: "conversation", archived: false },
+  { threadId: "task-routine", title: "Daily digest", kind: "routine", archived: false },
+  { threadId: "task-delegated", title: "Check supplier prices", kind: "delegation", archived: false },
+  { threadId: "task-archived", title: "Old budget", kind: "conversation", archived: true },
 ];
+// The two ordinary conversations start as open tabs; the rest stay in the picker.
+localStorage.setItem("mycellios:open-task-tabs:fixture", JSON.stringify(["task-one", "task-two"]));
 let limit = 4;
 let workflows: Workflow[] = [];
 let executions: WorkflowExecution[] = [];
@@ -36,10 +41,10 @@ const rpc = { tasks: {
   stop: async () => { executions = executions.map(value => ({ ...value, status: "cancelled" })); return { ok: true }; },
 }, development: {
   list: async () => rows,
-  open: async (input: { botId: string; taskKey: string; title: string }) => {
+  open: async (input: { botId: string; taskKey: string }) => {
     if (input.botId !== "mico-fixture") throw new Error("Wrong Mico");
-    const row = { threadId: input.taskKey, title: input.title };
-    rows.push(row); return row;
+    const row = { threadId: input.taskKey, title: "", kind: "conversation", archived: false };
+    rows.push(row); return { threadId: row.threadId };
   },
 } } as unknown as RpcClient;
 
@@ -48,7 +53,11 @@ function Preview() {
   const [flows, showFlows] = useState(false);
   return <SpaceRpcProvider spaceId="fixture" client={rpc}><main className="mx-auto flex h-dvh max-w-3xl flex-col bg-background p-4 text-foreground">
     <header className="mb-4 text-sm font-medium">Mycellios · Mico</header>
-    <MicoTaskTabs key={threadId ?? "main"} botId="mico-fixture" taskThreadId={threadId} rpc={rpc} onSelect={select} actions={<><MicoWorkMenu botId="mico-fixture" runId="run-fixture" userId="fixture" onOpenTask={() => undefined} /><Button size="sm" variant="ghost" onClick={() => showFlows(true)}>Workflows</Button></>} />
+    <div className="flex min-w-0 items-center gap-1">
+      <MicoTaskTabs key={threadId ?? "main"} botId="mico-fixture" scope="fixture" taskThreadId={threadId} rpc={rpc} onSelect={select} />
+      <MicoWorkMenu botId="mico-fixture" runId="run-fixture" userId="fixture" onOpenTask={() => undefined} />
+      <Button size="sm" variant="ghost" onClick={() => showFlows(true)}>Workflows</Button>
+    </div>
     <section className="flex-1 p-4" data-testid="active-task">{threadId ?? "Main chat"}</section>
     <div className="rounded-xl border p-3 text-sm">Message to Mico</div>
     {flows ? <WorkflowWorkspace botId="mico-fixture" bots={[{ id: "mico-fixture", name: "Existing Mico" }]} onClose={() => showFlows(false)} /> : null}

@@ -1,6 +1,7 @@
-import { runFailureError } from "@rakazo/core";
+import { runFailureError, taskThreadKind } from "@rakazo/core";
 import { ORPCError } from "@orpc/server";
 import { createRepos } from "@rakazo/db";
+import { getLogger } from "@rakazo/logging";
 import { resolveThreadTarget } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
 import { projectRoutes } from "./projects.js";
@@ -110,11 +111,24 @@ export function developmentRoutes(ctx: RouterContext) {
           orderBy: { createdAt: "desc" },
           take: 1000,
         });
+        // Archive lives in the Tasks inbox. Without it the picker still lists every thread.
+        const archived = rows.length
+          ? await deps.prisma.inboxTask.findMany({
+              where: { threadId: { in: rows.map((row) => row.id) }, userId: actor.userId, spaceId: actor.spaceId, archivedAt: { not: null } },
+              select: { threadId: true },
+            }).catch((error: unknown) => {
+              getLogger().warn("conversation picker archive state unavailable", { error: String(error) });
+              return [];
+            })
+          : [];
+        const archivedIds = new Set(archived.map((row) => row.threadId));
         return rows.map((row) => ({
           threadId: row.id,
           projectKey: row.projectKey!,
           taskKey: row.taskKey!,
           title: row.title ?? "",
+          kind: taskThreadKind(row),
+          archived: archivedIds.has(row.id),
         }));
       }),
     },

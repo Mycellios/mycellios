@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { nativeWorkProjectSession, normalizeWorkResources, workResourcesConflict } from "./work-resources.js";
+import { nativeWorkProjectSession, normalizeWorkResources, taskThreadKind, workResourcesConflict } from "./work-resources.js";
+describe("Mico side thread kinds", () => {
+  it("names what started each thread from its server-owned keys", () => {
+    const kind = (projectKey: string, taskKey: string) => taskThreadKind({ taskBotId: "mico", projectKey, taskKey });
+    expect(kind("mico:mico", "mico-task:mico:one")).toBe("conversation");
+    expect(kind("mico:mico", "mico-task:mico:inbox:nonce")).toBe("conversation");
+    expect(kind("routine:r1", "routine:r1")).toBe("routine");
+    expect(kind("routine:r1", "mico-task:mico:legacy")).toBe("routine");
+    expect(kind("workflow:flow", "workflow:execution:mico")).toBe("workflow");
+    expect(kind("work:root", "delegation:key")).toBe("delegation");
+    expect(kind("routine:r1", "delegation:key")).toBe("delegation");
+    expect(kind("work:root", "work-transfer:task:1")).toBe("delegation");
+    expect(kind("project:one", "project-task:login")).toBe("project");
+    expect(kind("mico:other", "mico-task:mico:one")).toBe("other");
+    expect(kind("app-cover:app", "cover")).toBe("other");
+  });
+});
 describe("work resource reservations", () => {
   it("retains native project admission for ordinary task chats and reuses workspaces only for structured internal work", () => {
     const thread={id:"thread",taskBotId:"mico",projectKey:"project",taskKey:"task"};
