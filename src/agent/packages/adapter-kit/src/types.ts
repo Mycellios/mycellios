@@ -354,6 +354,8 @@ export interface MemoryCommitRequest {
   expectedRevision?: number;
   sourceRunId?: string;
   sourceThreadId?: string;
+  /** Automatic reviews may save only while their owned source snapshot is current. */
+  sourceContext?: { generation: number; startSeq: number; nextSeq: number };
 }
 
 export interface MemoryRemoveRequest {

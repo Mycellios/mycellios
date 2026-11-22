@@ -63,6 +63,25 @@ export class MarkdownMemoryStore implements MemoryStore {
       this.prisma.$transaction(
         async (tx) => {
           if(context.botId && request.botId && context.botId!==request.botId) throw new Error("A Mico cannot access another Mico's memory");
+          if (request.sourceContext) {
+            const { sourceThreadId, sourceContext } = request;
+            if (!sourceThreadId || !context.botId) throw new Error("Memory review source unavailable");
+            // Take the same row lock as deletion and context changes before locking any note.
+            const source = await tx.thread.updateMany({
+              where: {
+                id: sourceThreadId,
+                spaceId: context.spaceId,
+                userId: context.userId,
+                OR: [{ botId: context.botId }, { taskBotId: context.botId }],
+                deleteAfter: null,
+                historyCompactionGeneration: sourceContext.generation,
+                contextStartSeq: sourceContext.startSeq,
+                nextMessageSeq: sourceContext.nextSeq,
+              },
+              data: { nextMessageSeq: { increment: 0 } },
+            });
+            if (!source.count) throw new Error("Memory review source changed");
+          }
           if (request.scope === "bot") {
             if (!request.botId || !await tx.bot.findFirst({where:{id:request.botId,spaceId:context.spaceId,userId:context.userId},select:{id:true}})) throw new Error("Memory Mico unavailable");
           }

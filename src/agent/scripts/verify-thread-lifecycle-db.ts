@@ -12,13 +12,14 @@ import EmbeddedPostgres from "embedded-postgres";
 // A verification CLI supplies its own environment and never loads a checkout's .env.
 process.env.NODE_ENV = "test";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, recordThreadTurnOutcome, createThreadMessageInTransaction } =
+const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, recordThreadTurnOutcome, createThreadMessageInTransaction, LocalKeyProvider } =
   await import("@mycellios/db");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
 const { threadsRoutes } = await import("../apps/api/src/routes/threads.js");
 const { purgeDeletedThread, reconcileThreadDeletions } = await import("../packages/adapters/src/thread-deletion.js");
 const { PiJsonlSessionRecorder, piSessionBotRoot, piSessionsRoot } = await import("../packages/adapters/src/pi-session.js");
+const { MarkdownMemoryStore } = await import("../packages/memory/src/index.js");
 
 const socket = createServer();
 await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
@@ -31,6 +32,7 @@ const postgres = new EmbeddedPostgres({ databaseDir: path.join(directory, "pg"),
   persistent: true, createPostgresUser: false, autoRehydrateSymlinks: true, initdbFlags: ["--encoding=UTF8", "--locale=C"],
   onLog: () => {}, onError: () => {} });
 let db: ReturnType<typeof createDb> | undefined;
+let memoryDb: ReturnType<typeof createDb> | undefined;
 const checks: string[] = [];
 try {
   await postgres.initialise();
@@ -219,6 +221,30 @@ try {
     const convMessage = await system.message.findFirstOrThrow({ where: { threadId: conv } });
     await system.messagePin.create({ data: { messageId: convMessage.id, threadId: conv, spaceId: "space", userId: "owner" } });
     await system.memoryDocument.create({ data: { spaceId: "space", userId: "owner", botId: "mico", scope: "bot", path: `tasks/${conv}/notes.md`, content: "Nota", taskThreadId: conv } });
+    memoryDb = createDb(url, {
+      encryptContent: true,
+      keyProvider: new LocalKeyProvider([{ id: "synthetic", key: randomBytes(32) }]),
+      applicationName: "synthetic-encrypted-memory",
+    });
+    const memoryPrisma = memoryDb.prisma;
+    const memorySystem = asSystem(memoryPrisma, "synthetic encrypted memories");
+    const memory = async (id: string, userId: string, sources: string[]) => {
+      const revisions = sources.map((sourceThreadId, index) => ({
+        sourceThreadId, revision: index + 1, content: `${id} version ${index + 1}`,
+      }));
+      const latest = revisions.at(-1)!;
+      await memorySystem.memoryDocument.create({ data: {
+        id, spaceId: actor.spaceId, userId, scope: "user", path: `reviews/${id}.md`,
+        content: latest.content, revision: latest.revision,
+      } });
+      for (const revision of revisions) {
+        await memorySystem.memoryRevision.create({ data: { documentId: id, ...revision } });
+      }
+    };
+    await memory("derived-only", actor.userId, [conv]);
+    await memory("restore-earlier", actor.userId, [main, conv]);
+    await memory("keep-current", actor.userId, [conv, main]);
+    await memory("other-owner", "another-user", [conv]);
     const child = await system.task.create({ data: { spaceId: "space", botId: "mico", threadId: "helper", userId: "owner", prompt: "Hijo", status: "completed",
       delegationState: "completed", parentTaskId: convRuns[0]!.taskId } });
     const recorder = new PiJsonlSessionRecorder(piSessionsRoot(dataDir), dataDir);
@@ -230,14 +256,39 @@ try {
     const store = { remove: async (key: string) => { removed.push(key); } } as never;
     const pending = await call(dev.remove, { botId: "mico", taskThreadId: conv });
     const due = new Date(new Date(pending.deleteAfter).getTime() + 1);
+    const source = await system.thread.findUniqueOrThrow({ where: { id: conv } });
+    const memoryStore = new MarkdownMemoryStore(memoryPrisma);
+    await assert.rejects(runAsTenant(actor, () => memoryStore.commit({
+      scope: "user", path: "reviews/late-review.md", content: "Late result",
+      sourceThreadId: conv, sourceContext: {
+        generation: source.historyCompactionGeneration, startSeq: source.contextStartSeq, nextSeq: source.nextMessageSeq,
+      },
+    }, {
+      ...actor, botId: "mico", operationId: "fixture", traceId: "fixture", signal: AbortSignal.timeout(5000),
+    })), /Memory review source changed/);
     assert.equal(await runAsTenant(actor, () => purgeDeletedThread({ prisma, artifacts: store, dataDir }, conv, new Date(due.getTime() - 1000))), "not_due");
     assert.equal(await system.thread.count({ where: { id: conv } }), 1);
-    assert.equal(await runAsTenant(actor, () => purgeDeletedThread({ prisma, artifacts: store, dataDir }, conv, due)), "purged");
+    assert.equal(await system.memoryDocument.count({ where: { id: "derived-only" } }), 1);
+    assert.equal(await runAsTenant(actor, () => purgeDeletedThread({ prisma: memoryPrisma, artifacts: store, dataDir }, conv, due)), "purged");
     assert.equal(await system.thread.count({ where: { id: conv } }), 0);
     assert.equal(await system.message.count({ where: { threadId: conv } }), 0);
     assert.equal(await system.run.count({ where: { threadId: conv } }), 0);
     assert.equal(await system.messagePin.count({ where: { threadId: conv } }), 0);
     assert.equal(await system.memoryDocument.count({ where: { taskThreadId: conv } }), 0);
+    assert.equal(await system.memoryDocument.count({ where: { id: "derived-only" } }), 0);
+    assert.deepEqual(await memorySystem.memoryDocument.findUnique({
+      where: { id: "restore-earlier" }, select: { content: true, revision: true },
+    }), { content: "restore-earlier version 1", revision: 3 });
+    assert.deepEqual(await memorySystem.memoryDocument.findUnique({
+      where: { id: "keep-current" }, select: { content: true, revision: true },
+    }), { content: "keep-current version 2", revision: 2 });
+    assert.notEqual((await one<{ content: string }>(
+      "SELECT content FROM memory_documents WHERE id = $1", ["restore-earlier"],
+    )).content, "restore-earlier version 1");
+    assert.equal(await system.memoryRevision.count({
+      where: { sourceThreadId: conv, document: { userId: actor.userId } },
+    }), 0);
+    assert.equal(await system.memoryRevision.count({ where: { documentId: "other-owner" } }), 1);
     assert.equal(await system.inboxTask.count({ where: { threadId: conv } }), 0);
     assert.deepEqual(removed.sort(), ["key-own", "key-own-v2"]);
     assert.deepEqual((await system.artifact.findMany({ orderBy: { id: "asc" }, select: { id: true } })).map((item) => item.id),
@@ -249,6 +300,7 @@ try {
     await assert.rejects(stat(nativeFolder));
     assert.equal(await system.thread.count({ where: { id: main } }), 1);
     checks.push("removal after the window deletes messages, runs, pins, task notes, the Tasks entry, owned outputs and session files; shared outputs, uploads and delegated children stay");
+    checks.push("a pending delete fences late reviews, and permanent deletion forgets only the owner's sourced memory revisions, restoring an independent encrypted version");
 
     // Lost jobs are finished by the reconciler; an undo after the window is refused.
     const late = await call(dev.open, { botId: "mico", projectKey: "mico:mico", taskKey: `mico-task:mico:${randomUUID()}` });
@@ -282,6 +334,7 @@ try {
   await writeFile(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } finally {
+  if (memoryDb) { await memoryDb.prisma.$disconnect(); await memoryDb.pool.end(); }
   if (db) { await db.prisma.$disconnect(); await db.pool.end(); }
   await postgres.stop();
 }
