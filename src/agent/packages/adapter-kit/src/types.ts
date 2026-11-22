@@ -15,6 +15,8 @@ export interface AdapterContext {
   /** Display name of `botId`; names a new PC folder for that Mico, never authorizes anything. */
   botName?: string;
   runId?: string;
+  /** Server-selected conversation for page tools on a shared browser display. */
+  browserThreadId?: string;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
   /** Server-selected workspace for this run, including after Desktop reconnects. */

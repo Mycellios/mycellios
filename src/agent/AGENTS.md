@@ -485,6 +485,11 @@
 
 - Mico task conversations use MicoTaskTabs: one Mico keeps independent named
   conversations behind the compact + action and the Conversations picker.
+  Mico page-browser tools use a tab keyed by the server-owned conversation on
+  Docker computers. A display lock serializes tab activation and CDP input.
+  Preserve the browser's existing cookies and desktop permissions. Scoped calls
+  require a compatible supervisor and helper; never replay against a focused
+  tab on an older image. Verify the supervisor route and page-browser tests.
   The phone menu groups conversations by unread, read and archived state, counts
   open conversations waiting for the person, and gives owned rows a touch menu
   with the same actions and a delete confirmation. Verify the mobile fixture in

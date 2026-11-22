@@ -50,8 +50,8 @@ beforeEach(() => {
   }));
 });
 
-async function snapshot(id: string, screen: string, lease: string, home = "home") {
-  return supervisorApp.request(`/computers/${id}/browser`, {
+async function snapshot(id: string, screen: string, lease: string, home = "home", conversationKey?: string) {
+  return supervisorApp.request(`/computers/${id}/browser${conversationKey ? "/scoped" : ""}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${resolveSupervisorToken(process.env)}`,
@@ -61,9 +61,22 @@ async function snapshot(id: string, screen: string, lease: string, home = "home"
       "x-rakazo-screen-id": screen,
       "x-rakazo-screen-lease-id": lease,
     },
-    body: JSON.stringify({ command: "snapshot" }),
+    body: JSON.stringify({ command: "snapshot", ...(conversationKey ? { conversationKey } : {}) }),
   });
 }
+
+it("forwards only a validated scoped command without weakening the display fence", async () => {
+  const key = "a".repeat(64);
+  expect(await (await snapshot("scoped", "first", "run:2", "home", key)).json()).toMatchObject({ ok: true });
+  expect(mock.exec.mock.calls.at(-1)?.[0].Cmd).toEqual([
+    "/usr/local/bin/rakazo-page-browser", "scoped-snapshot", JSON.stringify({ command: "snapshot", conversationKey: key }),
+  ]);
+  expect(JSON.parse(mock.stdin.join("").trim())).toMatchObject({ conversationKey: key });
+  mock.exec.mockClear();
+  expect(await (await snapshot("scoped", "first", "run:1", "home", key)).json()).toMatchObject({ ok: false });
+  expect((await snapshot("scoped", "first", "run:2", "home", "../outside")).status).toBeGreaterThanOrEqual(400);
+  expect(mock.exec).not.toHaveBeenCalled();
+});
 
 it("resolves the owned display and refuses an older fence before running the helper", async () => {
   expect(await (await snapshot("computer-lease", "first", "run:2")).json()).toMatchObject({

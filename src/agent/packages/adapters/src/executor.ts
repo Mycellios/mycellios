@@ -7145,6 +7145,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const redactions = () => [...runSecrets];
             const desktopTools =
               graphicalToolsAllowed && builtinOffered(disabledBuiltinTools, "computer_act");
+            const browserContext = { ...context, browserThreadId: thread.id };
             const tool =
               name === "browser_navigate"
                 ? browserNavigateFromTool
@@ -7154,7 +7155,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return computerScreenToolResult(async () => {
               const result = tool
                 ? redactConnectorPayload(
-                    await tool(browser, await getRunComputer("tool", name), context, args, {
+                    await tool(browser, await getRunComputer("tool", name), browserContext, args, {
                       desktopTools,
                     }),
                     redactions(),
@@ -7162,7 +7163,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : await browserActFromTool(
                     browser,
                     await getRunComputer("tool", name),
-                    context,
+                    browserContext,
                     args,
                     {
                       desktopTools,
