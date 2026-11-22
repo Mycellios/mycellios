@@ -1,6 +1,6 @@
 import { resolveUiLocale } from "../lib/ui-locale";
 
-const APPEARANCE_KEY = "rakazo.uiAppearance";
+const APPEARANCE_KEY = "mycellios.uiAppearance";
 
 function readSystemLight(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: light)").matches;

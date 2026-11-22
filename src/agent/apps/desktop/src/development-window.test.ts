@@ -184,7 +184,7 @@ describe("development boundary", () => {
       expect(fetchAccount.mock.calls[0]?.[1].credentials).toBe("include");
       fetchAsset.mockResolvedValueOnce(new Response("<head></head><body></body>",{headers:{"content-type":"text/html"}}));
       const html=await (await state.protocol(new Request("https://www.mycellios.com/agent/app/demo"))).text();
-      expect(html).toContain('"fixture-space"');expect(html).toContain('localStorage.setItem("rakazo:space-id",p.spaceId)');
+      expect(html).toContain('"fixture-space"');expect(html).toContain('localStorage.setItem("mycellios:space-id",p.spaceId)');
     } finally {
       vi.unstubAllGlobals();
     }

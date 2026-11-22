@@ -151,7 +151,7 @@ test("settings shell is two-pane and deep-links Models Memory Voice Usage", asyn
   await streamReplies.click();
   await expect(streamReplies).toBeChecked();
   await expect
-    .poll(() => page.evaluate(() => window.localStorage.getItem("rakazo.responseStreaming")))
+    .poll(() => page.evaluate(() => window.localStorage.getItem("mycellios.responseStreaming")))
     .toBe("on");
   const deleteAccount = settings.getByRole("button", { name: "Delete account", exact: true });
   await deleteAccount.scrollIntoViewIfNeeded();

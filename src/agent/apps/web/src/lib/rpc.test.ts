@@ -52,7 +52,7 @@ describe("signed-out responses", () => {
 
 describe("unavailable space", () => {
   function browser(selected: string, spaces: string[] | null) {
-    const items = new Map([["rakazo:space-id", selected]]);
+    const items = new Map([["mycellios:space-id", selected]]);
     const reload = vi.fn();
     vi.stubGlobal("window", {
       localStorage: {
@@ -87,7 +87,7 @@ describe("unavailable space", () => {
   it("drops a space the user is no longer in and reloads", async () => {
     const { items, reload } = browser("space-gone", ["home"]);
     await leaveUnavailableSpace("space-gone");
-    expect(items.has("rakazo:space-id")).toBe(false);
+    expect(items.has("mycellios:space-id")).toBe(false);
     expect(reload).toHaveBeenCalledOnce();
   });
 
@@ -102,14 +102,14 @@ describe("unavailable space", () => {
     );
     await expect(createSpaceRpc("space-gone").me()).rejects.toMatchObject({ status: 401 });
     await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce());
-    expect(items.has("rakazo:space-id")).toBe(false);
+    expect(items.has("mycellios:space-id")).toBe(false);
   });
 
   it("keeps a space the user still has, and keeps it when signed out", async () => {
     for (const spaces of [["home", "space-a"], null]) {
       const { items, reload } = browser("space-a", spaces);
       await leaveUnavailableSpace("space-a");
-      expect(items.get("rakazo:space-id")).toBe("space-a");
+      expect(items.get("mycellios:space-id")).toBe("space-a");
       expect(reload).not.toHaveBeenCalled();
     }
   });
@@ -136,7 +136,7 @@ describe("space selection storage", () => {
 
   it("treats an already-persisted selection as success when writes fail", () => {
     const localStorage = {
-      getItem: (key: string) => (key === "rakazo:space-id" ? "space-support" : null),
+      getItem: (key: string) => (key === "mycellios:space-id" ? "space-support" : null),
       setItem: () => {
         throw new Error("quota exceeded");
       },
@@ -156,7 +156,7 @@ describe("space selection storage", () => {
     vi.stubGlobal("localStorage", localStorage);
 
     expect(selectSpace("space-support")).toBe(true);
-    expect(setItem).toHaveBeenCalledWith("rakazo:space-id", "space-support");
+    expect(setItem).toHaveBeenCalledWith("mycellios:space-id", "space-support");
   });
 });
 
@@ -273,7 +273,7 @@ describe("shell RPC space isolation", () => {
 describe("space-bound clients", () => {
   function stubSelection(selected: string) {
     const localStorage = {
-      getItem: (key: string) => (key === "rakazo:space-id" ? selected : null),
+      getItem: (key: string) => (key === "mycellios:space-id" ? selected : null),
       setItem: vi.fn(),
       removeItem: vi.fn(),
     };

@@ -145,7 +145,7 @@ it("shows system mode separately from a saved manual language", async () => {
   try {
     await act(async()=>root.render(<GeneralSettingsPanels name="Jamie" />));
     expect(container.querySelector('[data-testid="ui-locale-select"]')?.textContent).toContain("System default");
-    localStorage.setItem("rakazo.uiLocale","es");
+    localStorage.setItem("mycellios.uiLocale","es");
     await act(async()=>root.render(<GeneralSettingsPanels key="manual" name="Jamie" />));
     expect(container.querySelector('[data-testid="ui-locale-select"]')?.textContent).toContain("Español");
   } finally {await act(async()=>root.unmount());container.remove();vi.unstubAllGlobals();}

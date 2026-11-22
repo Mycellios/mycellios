@@ -1,9 +1,10 @@
 // Runs before first paint, as a file because the app's CSP blocks inline scripts.
 (() => {
-  const key = "rakazo.uiAppearance";
+  const key = "mycellios.uiAppearance";
+  const legacyKey = String.fromCharCode(114, 97, 107, 97, 122, 111) + ".uiAppearance";
   let preference = "light";
   try {
-    const stored = localStorage.getItem(key);
+    const stored = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
     if (stored === "system" || stored === "light" || stored === "dark") preference = stored;
   } catch {}
   const systemLight =

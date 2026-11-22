@@ -109,7 +109,7 @@ const SUBSCRIPTIONS = [
   { name: "Claude", provider: "anthropic", option: "anthropic:sign-in" },
 ] as const;
 const FIRST_BOT_NAME = productBrand.companionName;
-const FIRST_BOT_LOCK = "rakazo:onboarding-first-bot";
+const FIRST_BOT_LOCK = "mycellios:onboarding-first-bot";
 
 function findFirstBot(
   bots: Array<{ id: string; name: string; spawnKey: string | null }>,

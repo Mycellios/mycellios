@@ -1,6 +1,6 @@
 /** Whether plain Enter sends the composer message, with a device default and saved override. */
 
-export const COMPOSER_ENTER_TO_SEND_STORAGE_KEY = "rakazo.composerEnterToSend";
+export const COMPOSER_ENTER_TO_SEND_STORAGE_KEY = "mycellios.composerEnterToSend";
 
 type EnterToSendStorage = Pick<Storage, "getItem" | "setItem">;
 

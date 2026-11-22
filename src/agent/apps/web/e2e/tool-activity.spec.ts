@@ -4,7 +4,7 @@ import { captureScreenshot, completeOnboarding, openUserSettings, signup } from 
 
 const fixture = "/e2e/fixtures/tool-activity.html";
 const REPLY_TEXT = "Tuesday at 2 pm is free.";
-const STORAGE_KEY = "rakazo.showToolActivity";
+const STORAGE_KEY = "mycellios.showToolActivity";
 
 const viewports = [
   { name: "desktop-1440x900", width: 1440, height: 900 },

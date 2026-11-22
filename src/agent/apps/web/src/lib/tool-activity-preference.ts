@@ -1,6 +1,6 @@
 export type ToolActivityPreference = "on" | "off" | "expanded";
 
-export const TOOL_ACTIVITY_STORAGE_KEY = "rakazo.showToolActivity";
+export const TOOL_ACTIVITY_STORAGE_KEY = "mycellios.showToolActivity";
 
 export type ResolveToolActivityOptions = {
   stored?: string | null;
