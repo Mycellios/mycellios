@@ -61,6 +61,8 @@ class NativeGgufRuntimeConfig:
 
     package: str
     package_id: str
+    # Execute the package with a pinned llama.cpp build instead of Torch.
+    llama_cpp: Any = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.package, str) or not self.package.strip():
@@ -82,6 +84,14 @@ def add_native_gguf_arguments(parser: argparse.ArgumentParser) -> None:
         "--native-gguf-package-id",
         help="sealed SHA-256 package identity expected by the coordinator",
     )
+    parser.add_argument("--native-gguf-executor", choices=("torch", "llama-cpp"), default="torch",
+        help="execute the package with Torch (default) or a pinned llama.cpp build")
+    parser.add_argument("--llama-cpp-build-dir", help="directory holding exactly the pinned llama.cpp libraries")
+    parser.add_argument("--llama-cpp-build", help="pinned llama.cpp build key")
+    parser.add_argument("--llama-cpp-view-cache", help="directory for derived llama.cpp views of stage packages")
+    parser.add_argument("--llama-cpp-gpu-layers", type=int, default=0, help="blocks offloaded to the GPU (0 keeps the stage on the CPU)")
+    parser.add_argument("--llama-cpp-max-sequences", type=int, default=4, help="concurrent requests the stage can hold")
+    parser.add_argument("--llama-cpp-context-tokens", type=int, default=4096, help="context tokens per request")
 
 
 def native_gguf_runtime_from_args(
@@ -95,7 +105,20 @@ def native_gguf_runtime_from_args(
         raise ValueError(
             "native GGUF package path and package id must be supplied together"
         )
-    return NativeGgufRuntimeConfig(package=package, package_id=package_id)
+    if getattr(args, "native_gguf_executor", "torch") != "llama-cpp":
+        return NativeGgufRuntimeConfig(package=package, package_id=package_id)
+    from .llama_cpp_stage_runner import DEFAULT_BUILD, LlamaCppExecutorConfig
+
+    if not args.llama_cpp_build_dir or not args.llama_cpp_view_cache:
+        raise ValueError("llama.cpp execution needs --llama-cpp-build-dir and --llama-cpp-view-cache")
+    return NativeGgufRuntimeConfig(package=package, package_id=package_id, llama_cpp=LlamaCppExecutorConfig(
+        build_dir=args.llama_cpp_build_dir,
+        view_cache=args.llama_cpp_view_cache,
+        build=args.llama_cpp_build or DEFAULT_BUILD,
+        gpu_layers=args.llama_cpp_gpu_layers,
+        max_sequences=args.llama_cpp_max_sequences,
+        context_tokens=args.llama_cpp_context_tokens,
+    ))
 
 
 class NativeGgufStageRunner(StageRunner):
@@ -604,6 +627,12 @@ def build_native_gguf_stage_runner(
 ) -> NativeGgufStageRunner:
     """Small construction seam shared by CLI, server and local engine paths."""
 
+    if runtime.llama_cpp is not None:
+        from .llama_cpp_stage_runner import LlamaCppStageRunner
+
+        if dense_tiering is not None and dense_tiering != DenseTieringConfig():
+            raise ValueError("llama.cpp stages do not use dense tiering")
+        return LlamaCppStageRunner(spec, runtime.package, runtime.package_id, runtime.llama_cpp)  # type: ignore[return-value]
     return NativeGgufStageRunner(
         spec,
         runtime,
