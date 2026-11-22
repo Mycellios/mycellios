@@ -144,6 +144,7 @@ export function planChecks(files, availableAgentTests) {
       [/sidebar.fold|bot-folders|20261115130000_sidebar_folders/, 'verify-sidebar-folders-db.ts', 'folder migration, isolation and hierarchy'],
       [/message-pins|20261115160000_message_pins|20261122200000_message_pin_authors/, 'verify-message-pins-db.ts', 'message pin migrations, Mico pins and account/thread isolation'],
       [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],
+      [/signup-invite|20261122233000_signup_invite/, 'verify-signup-invite-db.ts', 'invitation link migration and concurrent signup places on isolated PostgreSQL'],
       [/thread-lifecycle|side-threads|thread-deletion|20261122120000_thread_lifecycle/, 'verify-thread-lifecycle-db.ts', 'conversation lifecycle migration, archive, delete and lock races on isolated PostgreSQL'],
       [/routine-thread|routine-run-markers|verify-routine-isolation|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
       [/conversation-surfaces/, 'verify-conversation-surfaces-db.ts', 'sidebar counts, mark all read and mirrored requests on isolated PostgreSQL'],

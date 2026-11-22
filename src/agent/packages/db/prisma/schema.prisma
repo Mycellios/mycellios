@@ -316,6 +316,19 @@ model Account {
   @@map("account")
 }
 
+/// One place taken from the deployment's invitation link (SIGNUP_INVITE_CODE). System-only.
+/// No foreign key: the place is claimed while signup may still hold the user row uncommitted,
+/// and a deleted account keeps its place so a batch never admits more than its limit.
+model SignupInviteRedemption {
+  userId    String   @id
+  /// SHA-256 of the invitation code, never the code itself.
+  inviteId  String
+  createdAt DateTime @default(now())
+
+  @@index([inviteId])
+  @@map("signup_invite_redemptions")
+}
+
 model Verification {
   id         String    @id
   identifier String

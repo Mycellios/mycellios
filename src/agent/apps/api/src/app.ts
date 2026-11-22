@@ -2,6 +2,7 @@ import { eventDemoAgentKey } from "../../../../core/event-demo-agent-ticket.js";
 import { EventDemoAgent, DEMO_AGENT_HEADER } from "./event-demo-agent.js";
 import { hostedWebHttp } from "./hosted-webs/http.js";
 import { artifactShareHttp } from "./artifact-shares.js";
+import { signupInviteHttp } from "./signup-invite-http.js";
 import { modelsDevCatalog, tailnetServiceFromEnv } from "@mycellios/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
 import { ORPCError, onError } from "@orpc/server";
@@ -514,6 +515,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     webOrigin: env.webOrigin,
     signupsEnabled: env.signupsEnabled,
     signupAllowlist: env.signupAllowlist,
+    signupInvite: env.signupInvite,
     email,
     logger: {
       level: "error",
@@ -798,6 +800,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       desktopMinimumVersion: env.desktopMinimumVersion ?? null,
     } satisfies AuthCapabilities);
   });
+  app.route("/", signupInviteHttp(env));
   mountAppAssociation(app, env);
   if (localEmailEmulator && env.nodeEnv === "development") {
     app.get(
