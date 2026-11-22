@@ -1,5 +1,5 @@
 import { isPausingAskTool, pausingQuestionnaire } from "./ask-user-questionnaire.js";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { turnStyleReminder, withConversationStyle } from "./conversation-style.js";
 import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation, workContinuationEnabled } from "./work-continuation.js";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
@@ -172,6 +172,7 @@ interface ToolCallBudget {
   exceeded: boolean;
   limit: number;
   inFlight: number;
+  answeredQuestionCheckpoint?: string;
 }
 // Optional fuse is process-local. continueRun on another worker starts at zero.
 const toolCallBudgetsByRun = new Map<string, ToolCallBudget>();
@@ -1069,7 +1070,27 @@ export class PiAgentRuntime implements AgentRuntime {
           if (restored) {
             // Complete unresolved calls before another model choice. The executor
             // still enforces canonical approved arguments, routes and idempotency.
-            const unresolved = new Set(unresolvedTurnCheckpointCalls(history as Message[]));
+            const unresolvedCalls = unresolvedTurnCheckpointCalls(history as Message[]);
+            if (
+              trackedBudget.limit > 0 &&
+              request.turnCheckpoint &&
+              !restored.restartInterrupted &&
+              request.resumeToolResult?.content.some((part) => part.text.trim()) &&
+              unresolvedCalls.some(
+                (call) => call.id === restored.pendingToolCallId && call.name === "ask_user",
+              )
+            ) {
+              // The executor only resumes an ask_user checkpoint after the answer is
+              // committed. It begins a new human turn within the same task. Automatic
+              // plan starts, approval replays and retries keep their existing budget.
+              const checkpoint = createHash("sha256").update(request.turnCheckpoint).digest("hex");
+              if (trackedBudget.answeredQuestionCheckpoint !== checkpoint) {
+                trackedBudget.answeredQuestionCheckpoint = checkpoint;
+                trackedBudget.count = 0;
+                trackedBudget.exceeded = false;
+              }
+            }
+            const unresolved = new Set(unresolvedCalls);
             if (restored.executionMode !== "sequential") {
               for (const message of [...history]) {
                 if (message.role !== "assistant") continue;
@@ -1254,7 +1275,9 @@ export class PiAgentRuntime implements AgentRuntime {
         // errorMessage set. Treat that as a soft stop so the turn still ends
         // with a durable assistant message instead of a failed run.
         const budgetExceeded = host.toolCallBudget.exceeded;
-        if (budgetExceeded && continuity.hasPendingWork()) throw new Error('WORK_INCOMPLETE: Tool-call budget exhausted with pending work.');
+        if (budgetExceeded && !host.pausePending && continuity.hasPendingWork()) {
+          throw new Error(`WORK_INCOMPLETE: The configured limit of ${host.toolCallBudget.limit} tool calls was reached with pending work.`);
+        }
         const terminalMessage = agent.state.messages.at(-1);
         // pi-agent-core records ordinary provider failures as an empty assistant
         // message (stopReason "error" / "length") and still resolves the run.
@@ -1305,7 +1328,7 @@ export class PiAgentRuntime implements AgentRuntime {
             }
           }
         }
-        if (budgetExceeded) {
+        if (budgetExceeded && !host.pausePending) {
           const budgetMessage = toolCallBudgetExceededMessage(host.toolCallBudget.limit);
           if (streamed.trim()) {
             const suffix = `\n\n${budgetMessage}`;
@@ -1353,7 +1376,7 @@ export class PiAgentRuntime implements AgentRuntime {
         queue.close();
         if (trackedBudget) {
           const keepForResume =
-            (signal.aborted || Boolean(resumeHost?.pausePending)) && !trackedBudget.exceeded;
+            Boolean(resumeHost?.pausePending) || (signal.aborted && !trackedBudget.exceeded);
           releaseToolCallBudget(request.runId, keepForResume);
         }
       }
