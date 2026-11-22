@@ -241,13 +241,15 @@ describe("inference-only coordinator and worker", () => {
       expect(response.headers.get("content-type")).toContain("text/html");
       expect(await response.text()).toContain("mycellios test landing");
     }
-    for (const path of ["account", "dashboard"]) {
-      const response = await fetch(new URL(path, `${address}/`));
-      expect(response.status).toBe(200);
-      const html = await response.text();
-      expect(html).toContain(`mycellios test ${path}`);
-      expect(html).toContain('content="noindex, nofollow"');
-    }
+    const dashboard = await fetch(new URL("dashboard", `${address}/`));
+    expect(dashboard.status).toBe(200);
+    const html = await dashboard.text();
+    expect(html).toContain("mycellios test dashboard");
+    expect(html).toContain('content="noindex, nofollow"');
+    // Account management moved to Mycellios Agent; the old page only redirects there.
+    const account = await fetch(new URL("account", `${address}/`), { redirect: "manual" });
+    expect(account.status).toBe(302);
+    expect(account.headers.get("location")).toBe("https://www.mycellios.com/agent/app?settings=api-plan");
     for (const [path, destination] of [
       ["dashboard/", "/dashboard"],
       ["account/", "/account"],

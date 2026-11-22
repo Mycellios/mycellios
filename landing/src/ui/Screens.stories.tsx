@@ -20,10 +20,15 @@ const unavailableLoader = async () => unavailable;
 const failedLoader = async (): Promise<PublicDownloadAvailability> => { throw new Error("Preview: unavailable"); };
 
 export const Account: Story = {
-  render: () => <AccountModal config={{ enabled: false }} onConfigLoaded={() => {}} getValidSession={async () => null} session={null} identity={null} account={null} onAuthenticated={() => {}} onRetryRole={async () => {}} onSignOut={() => {}} onClose={() => {}} />,
+  render: () => <AccountModal config={{ enabled: false }} onConfigLoaded={() => {}} session={null} identity={null} onAuthenticated={() => {}} onRetryRole={async () => {}} onSignOut={() => {}} onClose={() => {}} />,
+};
+const previewSession = { accessToken: "storybook-unused", refreshToken: "storybook-unused", expiresAt: 0, user: { id: "preview", email: "person@example.com" } };
+const previewIdentity = { id: "preview", email: "person@example.com", role: "viewer" as const };
+export const AccountSignedIn: Story = {
+  render: () => <AccountModal config={{ enabled: false }} onConfigLoaded={() => {}} session={previewSession} identity={previewIdentity} onAuthenticated={() => {}} onRetryRole={async () => {}} onSignOut={() => {}} onClose={() => {}} />,
 };
 export const AccountLoading: Story = {
-  render: () => <AccountModal ready={false} config={{ enabled: false }} onConfigLoaded={() => {}} getValidSession={async () => null} session={null} identity={null} account={null} onAuthenticated={() => {}} onRetryRole={async () => {}} onSignOut={() => {}} onClose={() => {}} />,
+  render: () => <AccountModal ready={false} config={{ enabled: false }} onConfigLoaded={() => {}} session={null} identity={null} onAuthenticated={() => {}} onRetryRole={async () => {}} onSignOut={() => {}} onClose={() => {}} />,
 };
 export const Downloads: Story = { render: () => <DownloadsPage title={<Heading as="h1">Downloads</Heading>} publicLink={path => path} external={false} loadAvailability={unavailableLoader} /> };
 export const DownloadsError: Story = { render: () => <DownloadsPage title={<Heading as="h1">Downloads</Heading>} publicLink={path => path} external={false} loadAvailability={failedLoader} /> };

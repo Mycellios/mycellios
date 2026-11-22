@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ComponentProps } from "react";
 import { AssistantAdmin, Jobs, Models, NetworkHistoryReport, Nodes, SystemLogs, Tests } from "../Panel";
-import { BillingAccountPanel } from "../BillingAccountPanel";
-import type { BillingAccountOverview } from "../billing";
 
 const meta = { title: "Screens/Operations", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
@@ -16,10 +14,6 @@ const noop = async () => {};
 const noCredentials = async () => [];
 const emptyCatalog = async () => ({ data: [], nextCursor: null });
 const noBenchmarks = async () => [];
-const session = { accessToken: "storybook-unused", refreshToken: "storybook-unused", expiresAt: 0, user: { id: "preview", email: null } };
-const billing: BillingAccountOverview = { object: "billing_account", checkoutAvailable: false, portalAvailable: false, topUpsAvailable: false, tokenDebt: 0, plan: null, subscription: null };
-const loadBilling = async () => billing;
-const failedBilling = async (): Promise<BillingAccountOverview> => { throw new Error("The billing service is unavailable."); };
 const history: ComponentProps<typeof NetworkHistoryReport>["history"] = {
   capturedAt: "2026-10-20T12:20:00.000Z", intervalMinutes: 10, retentionDays: 90, range: "24h",
   samples: [0, 1, 2].map(index => ({
@@ -38,5 +32,3 @@ export const Logs: Story = { render: () => <SystemLogs snapshot={snapshot} conne
 export const Benchmarks: Story = { render: () => <Tests canRunLocally={false} loadBenchmarkRuns={noBenchmarks} /> };
 export const NetworkHistory: Story = { render: () => <section className="minimal-screen"><NetworkHistoryReport history={history} /></section> };
 export const Administration: Story = { render: () => <AssistantAdmin apiOrigin="" adminToken="" authSession={null} onAdminTokenChange={() => {}} /> };
-export const BillingUnavailable: Story = { render: () => <BillingAccountPanel session={session} titleId="billing-preview" account={null} loadOverview={loadBilling} navigate={() => {}} /> };
-export const BillingError: Story = { render: () => <BillingAccountPanel session={session} titleId="billing-error-preview" account={null} loadOverview={failedBilling} navigate={() => {}} /> };

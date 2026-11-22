@@ -1,13 +1,7 @@
 import { Button as UiButton, Heading as UiHeading, Link as UiLink } from "./ui/primitives";
-import { ArrowUpRight, CircleAlert, LoaderCircle, LogOut, UserRound } from "lucide-react";
+import { ArrowUpRight, CircleAlert, LogOut, UserRound } from "lucide-react";
 import { AGENT_ACCOUNT_URL } from "../../src/contracts/agent-account-links";
-import { lazy, Suspense, useEffect, useState } from "react";
-import type { ApiAccount, ApiUsage } from "./api-access";
-import type { AuthSession, NetworkIdentity, OAuthProvider, PublicAuthConfig } from "./auth";
-import { formatCompactTokens } from "./panel-ui-utilities";
-import { TABLE_PAGE_SIZE, TablePagination } from "./TablePagination";
-
-const BillingAccountPanel = lazy(() => import("./BillingAccountPanel").then(({ BillingAccountPanel }) => ({ default: BillingAccountPanel })));
+import type { AuthSession, NetworkIdentity } from "./auth";
 
 export function MetaMaskProviderIcon() {
   return <svg viewBox="0 0 35 34" aria-hidden="true">
@@ -35,62 +29,28 @@ export function MetaMaskProviderIcon() {
     <path d="M25.1721 30.5142L19.4817 33.9008V30.8346L19.9911 28.9778L25.1721 30.5142Z" fill="#E7EBF6" />
   </svg>;
 }
-export function AccountDetails({ tab, titleId, session, identity, account, usage, usageBusy, linkBusy, roleBusy, providers, error, onLinkProvider, onRetryRole, onSignOut }: {
-  tab: "account" | "billing" | "usage";
+/**
+ * The dashboard only says who is signed in. Profile, the API subscription, API usage
+ * and API keys live in the Mycellios Agent account.
+ */
+export function AccountDetails({ titleId, session, identity, roleBusy, error, onRetryRole, onSignOut }: {
   titleId: string;
   session: AuthSession;
   identity: NetworkIdentity | null;
-  account: ApiAccount | null;
-  usage: ApiUsage[];
-  usageBusy: boolean;
-  linkBusy: OAuthProvider | null;
   roleBusy: boolean;
-  providers?: PublicAuthConfig["providers"];
   error: string | null;
-  onLinkProvider: (provider: OAuthProvider) => void;
   onRetryRole: () => void;
   onSignOut: () => void;
 }) {
-  const totals = new Map<string, { requests: number; tokens: number }>();
-  for (const entry of usage) {
-    const current = totals.get(entry.model) ?? { requests: 0, tokens: 0 };
-    totals.set(entry.model, { requests: current.requests + 1, tokens: current.tokens + entry.total_tokens });
-  }
-  const usageByModel = [...totals.entries()].sort((left, right) => right[1].tokens - left[1].tokens);
-  const usagePageSize = TABLE_PAGE_SIZE;
-  const [usagePage, setUsagePage] = useState(0);
-  const usagePageCount = Math.max(1, Math.ceil(usageByModel.length / usagePageSize));
-  const visibleUsagePage = Math.min(usagePage, usagePageCount - 1);
-  const visibleUsageByModel = usageByModel.slice(visibleUsagePage * usagePageSize, visibleUsagePage * usagePageSize + usagePageSize);
-  const canLinkGoogle = providers?.google === true;
-  const canLinkX = providers?.twitter === true;
-  useEffect(() => setUsagePage(0), [usage.length]);
-
-  if (tab === "account") return <>
+  return <>
     <UiHeading as="h2" id={titleId}>Tu cuenta</UiHeading>
     <div className="account-identity-card"><UserRound /><span><small>Sesión iniciada como</small><strong>{identity?.email ?? session.user.email ?? identity?.id ?? session.user.id}</strong></span></div>
     {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>No se han podido comprobar los permisos de red. Las herramientas de administración siguen bloqueadas.</span><UiButton type="button" disabled={roleBusy} onClick={onRetryRole}>{roleBusy ? "Comprobando…" : "Reintentar"}</UiButton></div>}
     <UiLink className="account-agent-link" href={AGENT_ACCOUNT_URL}>
-      <span><strong>Cuenta en Mycellios Agent</strong><small>Perfil, facturación, uso y claves de API.</small></span>
+      <span><strong>Cuenta en Mycellios Agent</strong><small>Perfil, suscripción y uso de la API, y claves de API.</small></span>
       <ArrowUpRight size={16} aria-hidden="true" />
     </UiLink>
-    {(canLinkGoogle || canLinkX) && <section className="account-link-identities">
-      <div><strong>Métodos de inicio de sesión</strong><small>Vincula otro método disponible a esta cuenta.</small></div>
-      <span>
-        {canLinkGoogle && <UiButton type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("google")}>{linkBusy === "google" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">G</b>}Google</UiButton>}
-        {canLinkX && <UiButton type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("twitter")}>{linkBusy === "twitter" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">𝕏</b>}X</UiButton>}
-      </span>
-    </section>}
     {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
     <UiButton className="account-signout" onClick={onSignOut}><LogOut size={16} />Cerrar sesión</UiButton>
-  </>;
-
-  if (tab === "billing") return <Suspense fallback={<div className="account-usage-empty" role="status">Loading plan…</div>}><BillingAccountPanel session={session} titleId={titleId} account={account} /></Suspense>;
-
-  return <>
-    <UiHeading as="h2" id={titleId}>Usage</UiHeading>
-    <div className="account-usage-summary"><span><small>REQUESTS</small><strong>{account?.request_count ?? "—"}</strong></span><span><small>INPUT TOKENS</small><strong>{account ? formatCompactTokens(account.lifetime_input_tokens) : "—"}</strong></span><span><small>OUTPUT TOKENS</small><strong>{account ? formatCompactTokens(account.lifetime_output_tokens) : "—"}</strong></span></div>
-    <div className="account-usage-models"><span>LAST 50 REQUESTS BY MODEL</span>{usageBusy ? <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />Loading usage…</div> : error ? <div className="account-auth-error" role="alert"><CircleAlert size={16} />Usage could not be loaded: {error}</div> : usageByModel.length === 0 ? <div className="account-usage-empty">No usage recorded yet.</div> : visibleUsageByModel.map(([model, total]) => <div key={model}><strong>{model}</strong><span>{total.requests} request{total.requests === 1 ? "" : "s"}</span><b>{formatCompactTokens(total.tokens)} tokens</b></div>)}</div>
-    {usageByModel.length > usagePageSize && <TablePagination label="usage models" page={visibleUsagePage} pageCount={usagePageCount} total={usageByModel.length} onPageChange={setUsagePage} />}
   </>;
 }

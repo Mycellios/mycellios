@@ -30,6 +30,7 @@ export * from "./model-headers.js";
 export * from "./model-provider.js";
 export * from "./mycellios-account.js";
 export * from "./mycellios-api-keys.js";
+export * from "./mycellios-api-billing.js";
 export * from "./credit-units.js";
 export * from "./spore-rewards.js";
 export * from "./model-roles.js";

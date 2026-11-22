@@ -461,15 +461,22 @@ These rules apply to the complete repository.
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
   identities explicit. Healthchecks must not open AntSeed channels or run models.
-- API keys live in the Agent account (Settings → Account → API keys,
-  `/agent/app?settings=api-keys`). Agent API `mycelliosApiKeys` calls the coordinator's
-  unchanged `/v1/api-keys` with the user's OIDC token server-side, with bounded reads
-  and timeouts; the new secret is returned once to the caller and Agent's own
-  connection key is refused for revocation. The dashboard account dialog is minimal
-  (who is signed in, a link to the Agent account, sign out, plus the coordinator's
-  API plan and usage that Agent does not show yet); `/account?tab=api` redirects to
-  Agent. Check `mycellios-api-keys.test.ts`, `ApiKeysSettings.test.tsx`,
-  `landing/src/panel-issue.test.tsx`, `tests/landing-marketing-routes.test.ts` and
+- The Mycellios API account lives in Agent Settings → Account: API keys
+  (`settings=api-keys`), API subscription (Mycellios Go, `settings=api-plan`) and
+  API usage (requests made with the user's keys, `settings=api-usage`), labelled apart
+  from Agent's own Billing and Mico usage. Agent API `mycelliosApiKeys` and
+  `mycelliosApiBilling` call the coordinator's unchanged `/v1/api-keys`, `/v1/account`,
+  `/v1/account/usage` and `/v1/billing/*` with the user's OIDC token server-side, with
+  bounded reads and timeouts. The new secret is returned once to the caller and Agent's
+  own connection key is refused for revocation. Checkout/portal forward the browser's
+  reused idempotency key and return only Stripe-hosted HTTPS pages; a failed balance
+  read is unavailable, never zero. Return URLs stay coordinator-configured: every
+  `/account` link redirects to the matching Agent section (`checkout=success|cancelled`
+  becomes `apiCheckout`), so the dashboard account dialog shows only who is signed in,
+  the Agent account link, sign-out and actionable role errors. Check
+  `mycellios-api-keys.test.ts`, `mycellios-api-billing.test.ts`, `ApiKeysSettings.test.tsx`,
+  `MycelliosApiSettings.test.tsx`, `landing/src/panel-issue.test.tsx`,
+  `tests/agent-account-links.test.ts`, `tests/landing-marketing-routes.test.ts` and
   `tests/api-access.test.ts`.
 - Native requalification may refresh only explicitly approved worker/build/model/
   activation/node tuples. Keep the three-attempt daily cap and uncertain-request

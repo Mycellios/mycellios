@@ -41,5 +41,7 @@ export const settingsKeywords: Record<string, string> = {
     "updates version download release restart automatic install channel stable actualizaciones versión descarga novedades reiniciar automaticas instalar canal estable",
   billing: "billing payments subscription license servers credits factura facturacion pago suscripción licencia servidores creditos",
   "api-keys": "api keys key token developer openai compatible endpoint base url secret revoke claves clave api desarrollador secreto revocar",
+  "api-plan": "api subscription plan mycellios go stripe checkout portal tokens balance debt developer suscripcion plan api pago portal saldo deuda desarrollador",
+  "api-usage": "api usage requests tokens models keys developer uso api peticiones solicitudes modelos claves desarrollador",
   logs: "logs execution developer registros ejecución desarrollador",
 };

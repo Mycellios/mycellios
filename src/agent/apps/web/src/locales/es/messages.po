@@ -15000,3 +15000,179 @@ msgstr "No se pudo solicitar la compactación. Inténtalo de nuevo."
 #: src/components/composer/NewChatControl.tsx
 msgid "Requesting…"
 msgstr "Solicitando…"
+
+#: src/pages/SettingsOverlay.tsx
+msgid "API subscription"
+msgstr "Suscripción de la API"
+
+#: src/pages/SettingsOverlay.tsx
+msgid "API usage"
+msgstr "Uso de la API"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Your Mycellios session expired. Sign in again."
+msgstr "Tu sesión de Mycellios ha caducado. Vuelve a iniciar sesión."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "The Mycellios API account is available when you sign in with your Mycellios account."
+msgstr "La cuenta de la API de Mycellios está disponible cuando inicias sesión con tu cuenta de Mycellios."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "This account cannot manage the Mycellios API subscription."
+msgstr "Esta cuenta no puede gestionar la suscripción de la API de Mycellios."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "This account already has a subscription. Manage it from the billing portal."
+msgstr "Esta cuenta ya tiene una suscripción. Gestiónala desde el portal de facturación."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Could not load this information. Try again."
+msgstr "No se ha podido cargar esta información. Inténtalo de nuevo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Could not open Stripe Checkout. Try again."
+msgstr "No se ha podido abrir Stripe Checkout. Inténtalo de nuevo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Could not open the billing portal. Try again."
+msgstr "No se ha podido abrir el portal de facturación. Inténtalo de nuevo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Mycellios Go is the monthly plan for calling the Mycellios API with your API keys. It is separate from Billing, which covers Mycellios Agent."
+msgstr "Mycellios Go es el plan mensual para llamar a la API de Mycellios con tus claves de API. Es independiente de Facturación, que cubre Mycellios Agent."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Renews on {0}."
+msgstr "Se renueva el {0}."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Payment due"
+msgstr "Pago pendiente"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Update the payment method in the billing portal to keep access."
+msgstr "Actualiza el método de pago en el portal de facturación para mantener el acceso."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "The previous subscription is closed. You can start a new one."
+msgstr "La suscripción anterior está cerrada. Puedes empezar una nueva."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "The previous subscription is closed. Checkout is unavailable right now."
+msgstr "La suscripción anterior está cerrada. El pago no está disponible ahora mismo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Not subscribed"
+msgstr "Sin suscripción"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Checkout is being verified. Access stays unchanged until the payment is confirmed."
+msgstr "Se está verificando el pago. El acceso no cambia hasta que se confirme."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Subscribe securely through Stripe. Access starts after the payment is confirmed."
+msgstr "Suscríbete de forma segura con Stripe. El acceso empieza cuando se confirma el pago."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Subscription checkout is unavailable right now."
+msgstr "La suscripción no está disponible ahora mismo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Loading the API subscription…"
+msgstr "Cargando la suscripción de la API…"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Mycellios Go is active. Your payment is confirmed and the monthly tokens are ready."
+msgstr "Mycellios Go está activo. Tu pago está confirmado y los tokens del mes ya están disponibles."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Checking the checkout status. Access starts after Stripe confirms the payment."
+msgstr "Comprobando el estado del pago. El acceso empieza cuando Stripe confirme el pago."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "The checkout is still unverified. Refresh later before starting another checkout."
+msgstr "El pago sigue sin verificar. Actualiza más tarde antes de iniciar otro pago."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Checkout closed. Your current status is shown below."
+msgstr "Pago cerrado. Tu estado actual aparece abajo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "{0} per month"
+msgstr "{0} al mes"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Price unavailable"
+msgstr "Precio no disponible"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Refresh the API subscription"
+msgstr "Actualizar la suscripción de la API"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Included each month"
+msgstr "Incluido cada mes"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "No active plan"
+msgstr "No hay ningún plan activo"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "API token balance"
+msgstr "Saldo de tokens de la API"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Token debt"
+msgstr "Deuda de tokens"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "{0} tokens. Future grants repay reversed usage before increasing the balance."
+msgstr "{0} tokens. Las próximas asignaciones devuelven primero el uso revertido antes de aumentar el saldo."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Opening Stripe…"
+msgstr "Abriendo Stripe…"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Subscribe with Stripe"
+msgstr "Suscribirse con Stripe"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Plan unavailable"
+msgstr "Plan no disponible"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Checkout unavailable"
+msgstr "Pago no disponible"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Opening the portal…"
+msgstr "Abriendo el portal…"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Manage the API subscription"
+msgstr "Gestionar la suscripción de la API"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Requests made with your API keys from your own apps and scripts. What your Micos use appears in Profile."
+msgstr "Peticiones hechas con tus claves de API desde tus propias apps y scripts. Lo que usan tus Micos aparece en Perfil."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Loading API usage…"
+msgstr "Cargando el uso de la API…"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "API requests"
+msgstr "Peticiones a la API"
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "No requests with your API keys yet."
+msgstr "Aún no hay peticiones con tus claves de API."
+
+#: src/pages/settings/MycelliosApiSettings.tsx
+msgid "Last {limit} requests by model"
+msgstr "Últimas {limit} peticiones por modelo"
+
+#: src/pages/Shell.tsx
+msgid "Could not delete the message. Try again."
+msgstr "No se ha podido eliminar el mensaje. Inténtalo de nuevo."

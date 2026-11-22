@@ -53,42 +53,13 @@ describe("Benchmark controls", () => {
 });
 
 describe("AccountDetails", () => {
-  it("does not offer linking providers known to be disabled", () => {
-    const markup = renderToStaticMarkup(<AccountDetails
-      tab="account"
-      titleId="account-title"
-      session={{ accessToken: "access", refreshToken: "refresh", expiresAt: Date.now() + 60_000, user: { id: "user-1", email: "person@example.com" } }}
-      identity={null}
-      account={null}
-      usage={[]}
-      usageBusy={false}
-      linkBusy={null}
-      roleBusy={false}
-      providers={{ email: true, google: false, twitter: false }}
-      error={null}
-      onLinkProvider={() => undefined}
-      onRetryRole={() => undefined}
-      onSignOut={() => undefined}
-    />);
-    expect(markup).not.toContain("Métodos de inicio de sesión");
-    expect(markup).not.toContain(">Google</button>");
-    expect(markup).not.toContain(">X</button>");
-    expect(markup).not.toContain(">MetaMask</button>");
-  });
-
   it("shows the signed-in account without granting an unverified role", () => {
     const markup = renderToStaticMarkup(<AccountDetails
-      tab="account"
       titleId="account-title"
       session={{ accessToken: "access", refreshToken: "refresh", expiresAt: Date.now() + 60_000, user: { id: "user-1", email: "person@example.com" } }}
       identity={null}
-      account={null}
-      usage={[]}
-      usageBusy={false}
-      linkBusy={null}
       roleBusy={false}
       error={null}
-      onLinkProvider={() => undefined}
       onRetryRole={() => undefined}
       onSignOut={() => undefined}
     />);
@@ -96,62 +67,29 @@ describe("AccountDetails", () => {
     expect(markup).toContain("No se han podido comprobar los permisos de red.");
     expect(markup).toContain("Las herramientas de administración siguen bloqueadas.");
     expect(markup).toContain("Reintentar");
-    expect(markup).not.toContain("account-usage-summary");
-  });
-
-  it("shows usage errors instead of reporting missing data as zero activity", () => {
-    const markup = renderToStaticMarkup(<AccountDetails
-      tab="usage"
-      titleId="usage-title"
-      session={{ accessToken: "access", refreshToken: "refresh", expiresAt: Date.now() + 60_000, user: { id: "user-1", email: null } }}
-      identity={null}
-      account={null}
-      usage={[]}
-      usageBusy={false}
-      linkBusy={null}
-      roleBusy={false}
-      error="HTTP 503"
-      onLinkProvider={() => undefined}
-      onRetryRole={() => undefined}
-      onSignOut={() => undefined}
-    />);
-    expect(markup).toContain("Usage could not be loaded: HTTP 503");
-    expect(markup).toContain("LAST 50 REQUESTS BY MODEL");
-    expect(markup).not.toContain("No usage recorded yet.");
-    expect(markup).toContain("REQUESTS</small><strong>—</strong>");
   });
 });
 
 describe("AccountModal", () => {
   const signedInProps = {
-    initialTab: "account" as const,
     config: { enabled: true, apiAccessEnabled: true, publicApiBaseUrl: "https://api.example/v1" },
     session: { accessToken: "session", refreshToken: "refresh", expiresAt: 1, user: { id: "owner", email: "owner@example.com" } },
     identity: null,
-    account: null,
     onConfigLoaded: () => undefined,
-    getValidSession: async () => null,
     onAuthenticated: () => undefined,
     onRetryRole: async () => undefined,
     onSignOut: () => undefined,
     onClose: () => undefined,
   };
 
-  it("keeps the dashboard account minimal and sends account management to Agent", () => {
+  it("keeps only the signed-in identity, the Agent account link and sign-out", () => {
     const markup = renderToStaticMarkup(<AccountModal {...signedInProps} />);
     expect(markup).toContain("owner@example.com");
     expect(markup).toContain("Cuenta en Mycellios Agent");
     expect(markup).toContain('href="https://www.mycellios.com/agent/app?settings=profile"');
     expect(markup).toContain("Cerrar sesión");
-    expect(markup).not.toContain("Create key");
-    expect(markup).not.toContain("API keys");
-  });
-
-  it("keeps the API plan and usage that Agent does not show yet", () => {
-    const markup = renderToStaticMarkup(<AccountModal {...signedInProps} initialTab="usage" />);
-    expect(markup).toContain("Uso de la API");
-    expect(markup).toContain("Plan");
-    expect(markup).toContain("LAST 50 REQUESTS BY MODEL");
+    for (const removed of ["Plan", "Uso de la API", "Stripe", "REQUESTS", "Create key", "Métodos de inicio de sesión"]) expect(markup).not.toContain(removed);
+    expect(markup).not.toContain("account-detail-tabs");
   });
 
   it("asks a signed-out visitor to sign in", () => {
@@ -165,10 +103,8 @@ describe("AccountModal", () => {
       ready={false}
       config={{ enabled: false }}
       onConfigLoaded={() => undefined}
-      getValidSession={async () => null}
       session={null}
       identity={null}
-      account={null}
       onAuthenticated={() => undefined}
       onRetryRole={async () => undefined}
       onSignOut={() => undefined}
@@ -182,10 +118,8 @@ describe("AccountModal", () => {
     const markup = renderToStaticMarkup(<AccountModal
       config={{ enabled: false }}
       onConfigLoaded={() => undefined}
-      getValidSession={async () => null}
       session={null}
       identity={null}
-      account={null}
       onAuthenticated={() => undefined}
       onRetryRole={async () => undefined}
       onSignOut={() => undefined}
@@ -201,10 +135,8 @@ describe("AccountModal", () => {
     const markup = renderToStaticMarkup(<AccountModal
       config={{ enabled: true, url: "https://auth.example", anonKey: "anon", providers: { email: false, google: false, twitter: true } }}
       onConfigLoaded={() => undefined}
-      getValidSession={async () => null}
       session={null}
       identity={null}
-      account={null}
       onAuthenticated={() => undefined}
       onRetryRole={async () => undefined}
       onSignOut={() => undefined}
@@ -221,10 +153,8 @@ describe("AccountModal", () => {
     const markup = renderToStaticMarkup(<AccountModal
       config={{ enabled: true, url: "https://auth.example", anonKey: "anon", providers: { email: true, google: false, twitter: false, web3: true } }}
       onConfigLoaded={() => undefined}
-      getValidSession={async () => null}
       session={null}
       identity={null}
-      account={null}
       onAuthenticated={() => undefined}
       onRetryRole={async () => undefined}
       onSignOut={() => undefined}

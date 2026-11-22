@@ -187,6 +187,14 @@ import {
   MycelliosApiKeyListSchema,
   MycelliosApiKeyRevokeInput,
 } from "./mycellios-api-keys.js";
+import {
+  MycelliosApiCheckoutInput,
+  MycelliosApiPlanSchema,
+  MycelliosApiPortalInput,
+  MycelliosApiReadInput,
+  MycelliosApiRedirectSchema,
+  MycelliosApiUsageSchema,
+} from "./mycellios-api-billing.js";
 import { MessageReactionSchema } from "./reactions.js";
 import { RoutineWatchSchema } from "./routine-watch.js";
 import { RunLogsInputSchema, RunLogsOutputSchema } from "./run-logs.js";
@@ -271,6 +279,12 @@ export const appContract = {
     list: oc.input(MycelliosApiKeyListInput).output(MycelliosApiKeyListSchema),
     create: oc.input(MycelliosApiKeyCreateInput).output(MycelliosApiKeyCreatedSchema),
     revoke: oc.input(MycelliosApiKeyRevokeInput).output(z.object({ revoked: z.literal(true) })),
+  },
+  mycelliosApiBilling: {
+    plan: oc.input(MycelliosApiReadInput).output(MycelliosApiPlanSchema),
+    usage: oc.input(MycelliosApiReadInput).output(MycelliosApiUsageSchema),
+    checkout: oc.input(MycelliosApiCheckoutInput).output(MycelliosApiRedirectSchema),
+    portal: oc.input(MycelliosApiPortalInput).output(MycelliosApiRedirectSchema),
   },
   referrals: {
     invite: oc.input(ReferralOwnerInput).output(ReferralInviteSchema),
