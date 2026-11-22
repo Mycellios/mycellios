@@ -77,7 +77,24 @@ $updateLock=$null
 $canReopen=$false
 $verifiedVersion=$null
 $window=$null
-function Progress([string]$value){$script:phase=$value;$receipt=@{phase=$value;atUtc=(Get-Date).ToUniversalTime().ToString('o');pid=$PID};$receipt|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8;$receipt|ConvertTo-Json -Compress|Add-Content -LiteralPath (Join-Path $job 'progress-history.jsonl') -Encoding UTF8}
+function Progress([string]$value){
+ $script:phase=$value
+ $receipt=@{phase=$value;atUtc=(Get-Date).ToUniversalTime().ToString('o');pid=$PID}
+ $file=Join-Path $job 'progress.json'
+ $json=$receipt|ConvertTo-Json
+ $encoding=[Text.UTF8Encoding]::new($true)
+ for($attempt=0;$true;$attempt++){
+  try {[IO.File]::WriteAllText($file,$json,$encoding);break}
+  catch {
+   # Desktop polls this receipt while the helper advances to the next phase.
+   $cause=$_.Exception.GetBaseException()
+   $code=$cause.HResult -band 0xffff
+   if($attempt -ge 20 -or $cause -isnot [IO.IOException] -or $code -notin @(32,33)){throw}
+   Start-Sleep -Milliseconds 100
+  }
+ }
+ $receipt|ConvertTo-Json -Compress|Add-Content -LiteralPath (Join-Path $job 'progress-history.jsonl') -Encoding UTF8
+}
 function Write-Result($receipt){
  $temporary=$result+'.tmp'
  $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8

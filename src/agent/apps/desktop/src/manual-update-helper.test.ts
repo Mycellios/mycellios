@@ -20,17 +20,43 @@ it("does not acknowledge malformed or unrelated receipts", () => {
   expect(() => manualUpdatePhase("\uFEFF{partial")).toThrow();
 });
 
-it.runIf(process.platform === "win32")("reads the actual Windows PowerShell receipt encoding", async () => {
+it.runIf(process.platform === "win32")("writes a BOM-encoded progress receipt after a Windows sharing violation", async () => {
+  const helper = path.join(import.meta.dirname, "manual-update-helper.ps1");
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-receipt-"));
   try {
     const receipt = path.join(directory, "progress.json");
     const script = path.join(directory, "write.ps1");
-    await writeFile(script, "$ErrorActionPreference='Stop'\n@{phase='waiting-for-app'}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $PSScriptRoot 'progress.json') -Encoding UTF8");
-    await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", script], { windowsHide: true, timeout: 30_000 });
+    await writeFile(script, `param([string]$Helper)
+$ErrorActionPreference='Stop'
+$tokens=$null
+$issues=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($Helper,[ref]$tokens,[ref]$issues)
+if($issues.Count){throw ($issues.Message -join '; ')}
+$definition=$ast.Find({
+ param($node)
+ $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Progress'
+},$true)
+. ([scriptblock]::Create($definition.Extent.Text))
+$job=$PSScriptRoot
+$receipt=Join-Path $job 'progress.json'
+[IO.File]::WriteAllText($receipt,'{}')
+$lock=[IO.File]::Open($receipt,'Open','Read','Read')
+$script:retried=$false
+function Start-Sleep([int]$Milliseconds){
+ $script:retried=$true
+ $lock.Dispose()
+}
+try {
+ Progress 'waiting-for-app'
+ if(!$script:retried){throw 'Expected a retry while the receipt was open'}
+} finally {$lock.Dispose()}`);
+    await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", script, helper], { windowsHide: true, timeout: 30_000 });
     const bytes = await readFile(receipt);
     expect([...bytes.subarray(0, 3)]).toEqual([239, 187, 191]);
     expect(() => JSON.parse(bytes.toString("utf8"))).toThrow();
     expect(manualUpdatePhase(bytes.toString("utf8"))).toBe("waiting-for-app");
+    const history = (await readFile(path.join(directory, "progress-history.jsonl"), "utf8")).trim();
+    expect(manualUpdatePhase(history)).toBe("waiting-for-app");
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

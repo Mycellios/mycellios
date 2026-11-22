@@ -71,6 +71,7 @@ jobs:
           sudo chmod 4755 "$(dirname "$electron_bin")/chrome-sandbox"
           xvfb-run -a node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/web"
       - name: Launch the packaged app with an isolated profile
+        timeout-minutes: 3
         working-directory: src/agent
         run: |
           set -euo pipefail
@@ -95,8 +96,10 @@ jobs:
             await expect(page.getByText('Mycellios Linux proof')).toBeVisible();
             assert.equal(await page.evaluate(() => window.rakazoDesktop?.platform), 'linux');
             assert.equal(await app.evaluate(({ app }) => app.isPackaged), true);
+            console.log('Packaged renderer and native bridge verified');
           } finally {
             await app.close();
+            console.log('Packaged app exited cleanly');
           }
           NODE
       - name: Build and install the Fedora RPM

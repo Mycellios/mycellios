@@ -105,10 +105,13 @@
   or native runtimes. Keep scripts, ephemeral setup/retrieval/compaction and
   one-shot internal generations outside that loop. Retain persisted continuation
   counts, Stop, approvals and ordinary Credit admission on every model call.
-  With Pi's optional tool-call limit, a committed `ask_user` answer gives that
-  checkpoint one fresh budget while retaining the plan and prior tool results.
-  Automatic plan starts, approval replays and retries keep the existing budget.
-  Verify the handoff with the Pi checkpoint and tool-dispatch tests.
+  Pi shares the task tool budget across the parent and subagents. Plan updates
+  and internal tool discovery use a separate cap of max(8, configured limit).
+  Give the model the remaining task budget so it can prioritize verification and
+  close its plan. A committed `ask_user` answer starts a fresh budget once for
+  that checkpoint and retains the plan and prior tool results. Automatic plan
+  starts, approval replays and retries keep their existing budget. Verify with
+  the Pi checkpoint, catalog and tool-dispatch tests.
 - `await_event` parks a private Mico request as a `waiting_event` child of the
   existing Task tree. It waits for an owned run, the next owned routine result,
   or a bounded future time; external events use the existing routine ingress.
@@ -713,8 +716,9 @@
   files or scanning the profile in between: the NSIS fast-install journal keeps
   and restores the previous installation, and the installer never writes userData.
   Never force-stop another process, use Restart Manager shutdown or clear user data.
-  Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
-  actual Windows PowerShell encoding in manual-update-helper tests. Start the
+  Read PowerShell progress receipts as UTF-8 with an optional BOM. Retry only
+  temporary Windows sharing and lock violations on progress writes. Qualify real
+  Windows file contention and encoding in manual-update-helper tests. Start the
   worker through a hidden non-detached launcher so it survives Desktop's exit.
   Canonicalize owned file paths before Windows process identity checks, including
   8.3 TEMP aliases. Retain process handles before waiting or reading exit codes.
@@ -1886,7 +1890,9 @@
   active. Preserve owner/generation fencing, queued cancellation and distinct
   queue-pressure/disconnection errors without automatic command replay.
   Quitting or update restarts call the `release` action, ending presence at once
-  while keeping consent and the execution preference (unlike `revoke`). A start the
+  while keeping consent and the execution preference (unlike `revoke`). Wait at
+  most two seconds for pending notices before closing the windows. An offline
+  profile skips the relay wait. A start the
   PC never claimed requeues the run as not dispatched and frees its segment; a
   claimed start stays uncertain. Verify the broker, stream, runtime and API relay tests.
 
