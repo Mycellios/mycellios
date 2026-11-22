@@ -271,10 +271,28 @@ class Replica:
                     raise ServiceError(499, "client_closed")
                 if before is not None:
                     self.thermal.wait(MID_REQUEST_COOLING_S)
-            vectors, tokens = self.embedder.embed(texts, between)
-        if len(vectors) != len(texts) or not all(is_unit_vector(vector) for vector in vectors):
-            raise ServiceError(500, "invalid_model_output")
+            try:
+                vectors, tokens = self.embedder.embed(texts, between)
+            except ServiceError:
+                raise
+            except Exception:
+                # A faulted GPU backend (DirectML localizes its errors, so they
+                # can even surface as UnicodeDecodeError) is not a bad request:
+                # answer 500 so the caller retries elsewhere, and reload.
+                self._drop_faulted_backend()
+                raise ServiceError(500, "backend_failed")
+            if len(vectors) != len(texts) or not all(is_unit_vector(vector) for vector in vectors):
+                self._drop_faulted_backend()
+                raise ServiceError(500, "invalid_model_output")
         return vectors, tokens
+
+    def _drop_faulted_backend(self):
+        """Called with the lock held: the next reconcile loads a fresh model."""
+        embedder, self.embedder, self.state = self.embedder, None, "reloading"
+        try:
+            embedder.close()
+        except Exception:
+            pass
 
 
 def is_unit_vector(vector):
