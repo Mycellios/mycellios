@@ -451,6 +451,10 @@ These rules apply to the complete repository.
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
   identities explicit. Healthchecks must not open AntSeed channels or run models.
+- Account → API keys (`/account?tab=api`) uses the ordinary signed-in API key
+  routes for any client. Keep full keys a one-time creation response, preserve
+  account rate limits and native owner qualification, and use server-side
+  revocation. Check `landing/src/panel-issue.test.tsx` and `tests/api-access.test.ts`.
 - Native requalification may refresh only explicitly approved worker/build/model/
   activation/node tuples. Keep the three-attempt daily cap and uncertain-request
   backoff; source drift requires operator approval, not a widened allowlist.

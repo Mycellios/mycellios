@@ -1,4 +1,5 @@
 import { SPORE_WELCOME_REWARD } from "../../src/contracts/spore-rewards";
+import { ApiAccessPanel } from "./ApiAccessPanel";
 import { AgentNavigationLink, Sidebar, SidebarFooter } from "./ui/Sidebar";
 import { Badge as UiBadge, DialogPanel as UiDialogPanel, Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Select as UiSelect, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
 import { AppSelect, Toggle, PageTitle, PanelDisclosure, SummaryStrip, Metric, Empty, PanelLoading } from "./ui/patterns";
@@ -413,6 +414,9 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   const identityRequestSeq = useRef(0);
   const [authReady, setAuthReady] = useState(false);
   const [apiAccount, setApiAccount] = useState<ApiAccount | null>(null);
+  const [accountApiEntry, setAccountApiEntry] = useState(() =>
+    accountEntry && new URLSearchParams(window.location.search).get("tab") === "api"
+  );
   const [authOpen, setAuthOpen] = useState(accountEntry);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     const saved = window.localStorage.getItem("mycellios.theme");
@@ -846,6 +850,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
       window.history.replaceState({}, "", "/dashboard");
       applySeoMetadata("/dashboard");
     }
+    setAccountApiEntry(false);
     setAuthOpen(false);
   }, [accountEntry]);
 
@@ -973,7 +978,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
               if (identityRequestSeq.current === requestSeq) setApiAccount(account);
             }).catch(() => undefined);
           }
-          closeAccount();
+          if (!accountApiEntry) closeAccount();
         }}
         onRetryRole={async () => {
           const session = await getValidSession();
@@ -983,13 +988,16 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
           if (identityRequestSeq.current === requestSeq && authSessionRef.current?.accessToken === session.accessToken) setNetworkIdentity(identity);
         }}
         onSignOut={() => { closeAccount(); void disconnectAccount(); }}
-        initialTab={accountEntry && window.location.pathname === "/account" ? "billing" : "account"}
+        onSignInAgain={() => void disconnectAccount()}
+        initialTab={accountApiEntry ? "api" : accountEntry && window.location.pathname === "/account" ? "billing" : "account"}
         onClose={closeAccount}
       />}
       </div>
     </div>
   );
 }
+
+type AccountTab = "account" | "billing" | "usage" | "api";
 
 export function AccountModal({
   ready = true,
@@ -1002,20 +1010,22 @@ export function AccountModal({
   onAuthenticated,
   onRetryRole,
   onSignOut,
+  onSignInAgain = onSignOut,
   initialTab = "account",
   onClose,
 }: {
   ready?: boolean;
   config: PublicAuthConfig;
   onConfigLoaded: (config: PublicAuthConfig) => void;
-  getValidSession: () => Promise<AuthSession | null>;
+  getValidSession: (forceRefresh?: boolean) => Promise<AuthSession | null>;
   session: AuthSession | null;
   identity: NetworkIdentity | null;
   account: ApiAccount | null;
   onAuthenticated: (session: AuthSession, identity: NetworkIdentity | null) => void;
   onRetryRole: () => Promise<void>;
   onSignOut: () => void;
-  initialTab?: "account" | "billing" | "usage";
+  onSignInAgain?: () => void;
+  initialTab?: AccountTab;
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -1028,7 +1038,7 @@ export function AccountModal({
   const [roleBusy, setRoleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [accountTab, setAccountTab] = useState<"account" | "billing" | "usage">(initialTab);
+  const [accountTab, setAccountTab] = useState<AccountTab>(initialTab);
   const [usage, setUsage] = useState<ApiUsage[]>([]);
   const [usageBusy, setUsageBusy] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
@@ -1193,8 +1203,23 @@ export function AccountModal({
         <UiText>Restoring your session and sign-in options…</UiText>
         <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />Loading account…</div>
       </> : session ? <>
-        <div className="account-detail-tabs"><UiButton className={accountTab === "account" ? "active" : ""} onClick={() => setAccountTab("account")}>Account</UiButton><UiButton className={accountTab === "billing" ? "active" : ""} onClick={() => setAccountTab("billing")}>Plan</UiButton><UiButton className={accountTab === "usage" ? "active" : ""} onClick={() => setAccountTab("usage")}>Usage</UiButton></div>
-        <AccountDetails tab={accountTab} titleId={titleId} session={session} identity={identity} account={account} usage={usage} usageBusy={usageBusy} linkBusy={linkBusy} roleBusy={roleBusy} providers={config.providers} error={error} onLinkProvider={(provider) => void linkProvider(provider)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />
+        <div className="account-detail-tabs">
+          <UiButton className={accountTab === "account" ? "active" : ""} aria-pressed={accountTab === "account"} onClick={() => setAccountTab("account")}>Account</UiButton>
+          <UiButton className={accountTab === "billing" ? "active" : ""} aria-pressed={accountTab === "billing"} onClick={() => setAccountTab("billing")}>Plan</UiButton>
+          <UiButton className={accountTab === "usage" ? "active" : ""} aria-pressed={accountTab === "usage"} onClick={() => setAccountTab("usage")}>Usage</UiButton>
+          {(config.apiAccessEnabled || accountTab === "api") && <UiButton className={accountTab === "api" ? "active" : ""} aria-pressed={accountTab === "api"} onClick={() => setAccountTab("api")}>API keys</UiButton>}
+        </div>
+        {accountTab === "api" ? <>
+          <UiHeading as="h2" id={titleId}>API keys</UiHeading>
+          <ApiAccessPanel
+            embedded
+            enabled={config.apiAccessEnabled === true}
+            apiBaseUrl={configuredApiUrl(config.publicApiBaseUrl)}
+            accessToken={session.accessToken}
+            getValidSession={getValidSession}
+            onSignIn={onSignInAgain}
+          />
+        </> : <AccountDetails tab={accountTab} titleId={titleId} session={session} identity={identity} account={account} usage={usage} usageBusy={usageBusy} linkBusy={linkBusy} roleBusy={roleBusy} providers={config.providers} error={error} onLinkProvider={(provider) => void linkProvider(provider)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />}
       </> : <>
         <UiHeading as="h2" id={titleId}>{!emailAvailable ? "Continue to Mycellios" : mode === "signin" ? "Welcome back" : "Create your account"}</UiHeading>
         {(!emailAvailable || mode === "signup") && <UiText>Create your account and get {SPORE_WELCOME_REWARD} trial Spore in Mycellios Agent. Trial Spore has no monetary value.</UiText>}

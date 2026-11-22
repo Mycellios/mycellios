@@ -399,8 +399,9 @@ open the published Agent app. Reference-specific layout uses `mycellios-referenc
 over the existing marketing base and does not repaint the panel or studios.
 
 The hero has one action, How it works, which scrolls to `#network`. That chapter
-contains the API endpoint; computer/browser contribution choices appear only
-under `#contribute`. Desktop download links share `/downloads/desktop`. The
+contains the API endpoint and links to the signed-in key manager at
+`/account?tab=api`. Computer/browser contribution choices appear only under
+`#contribute`. Desktop download links share `/downloads/desktop`. The
 Agent illustration has one outbound handoff in its composer; its other controls
 stay within the example instead of opening the app under unrelated labels.
 

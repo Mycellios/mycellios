@@ -208,7 +208,7 @@ it("does not show activity from another run or completed history", () => {
 
 it("keeps commands and paths inside details and preserves the disclosure choice on updates", () => {
   mount(run);
-  const activity = 'Running: ssh -n jarvis-live "cd /srv/private/project && git status"';
+  const activity = 'Running: ssh -n example-live "cd /srv/private/project && git status"';
   const render = () => root!.render(<RunActivityStatus run={run} messages={[]} bots={[]} activity={activity} onRefresh={async () => undefined} />);
   act(render);
   const details = node.querySelector("details")!;

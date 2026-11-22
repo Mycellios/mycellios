@@ -14,12 +14,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  apiRequestUrl,
   createApiKey,
   loadApiKeys,
   revokeApiKey,
   type ApiAccount,
   type ApiKeySummary,
-  type CreatedApiKey,
 } from "./api-access";
 import type { AuthSession } from "./auth";
 import { TABLE_PAGE_SIZE, TablePagination } from "./TablePagination";
@@ -29,8 +29,9 @@ interface ApiAccessPanelProps {
   apiBaseUrl: string;
   accessToken: string | null;
   getValidSession?: (forceRefresh?: boolean) => Promise<AuthSession | null>;
-  account: ApiAccount | null;
-  availableModels: number;
+  account?: ApiAccount | null;
+  availableModels?: number;
+  embedded?: boolean;
   onSignIn: () => void;
 }
 
@@ -40,15 +41,17 @@ export function ApiAccessPanel({
   accessToken,
   getValidSession,
   account,
-  availableModels,
+  availableModels = 0,
+  embedded = false,
   onSignIn,
 }: ApiAccessPanelProps) {
-  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const open = embedded || expanded;
   const [keys, setKeys] = useState<ApiKeySummary[]>([]);
   const [keysLoaded, setKeysLoaded] = useState(false);
   const keysRequestSeq = useRef(0);
   const [name, setName] = useState("My application");
-  const [created, setCreated] = useState<CreatedApiKey | null>(null);
+  const [created, setCreated] = useState<{ id: string; secret: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorSource, setErrorSource] = useState<"connection" | "keys" | "mutation">("connection");
@@ -58,13 +61,16 @@ export function ApiAccessPanel({
   const keysPageCount = Math.max(1, Math.ceil(keys.length / keysPageSize));
   const visibleKeysPage = Math.min(keysPage, keysPageCount - 1);
   const visibleKeys = keys.slice(visibleKeysPage * keysPageSize, visibleKeysPage * keysPageSize + keysPageSize);
-  const normalizedBase = apiBaseUrl.replace(/\/+$/, "");
-  const origin = normalizedBase.replace(/\/v1$/, "");
+  const basePath = apiRequestUrl("/v1/", apiBaseUrl).replace(/\/$/, "");
+  const normalizedBase = typeof window === "undefined" ? basePath : new URL(basePath, window.location.origin).href;
+  // A refreshed session still belongs to the same owner. The account modal
+  // remounts this panel when the owner changes.
+  const keyListSession = getValidSession ? Boolean(accessToken) : accessToken;
   const commands = useMemo(() => [
     {
       label: "API ENDPOINT",
       value: normalizedBase,
-      help: "Use this base URL in an OpenAI-compatible client.",
+      help: "Paste this URL and your Mycellios API key into your app’s OpenAI-compatible settings.",
     },
     {
       label: "EXPORT BASE URL",
@@ -93,7 +99,7 @@ export function ApiAccessPanel({
   }
 
   async function reloadKeys() {
-    if (!accessToken) return;
+    if (!enabled || !accessToken) return;
     const requestSeq = ++keysRequestSeq.current;
     setBusy(true);
     setKeys([]);
@@ -110,9 +116,9 @@ export function ApiAccessPanel({
   }
 
   useEffect(() => {
-    if (open && accessToken) void reloadKeys();
+    if (enabled && open && accessToken) void reloadKeys();
     return () => { keysRequestSeq.current += 1; };
-  }, [accessToken, apiBaseUrl, open]);
+  }, [keyListSession, apiBaseUrl, enabled, open]);
 
   useEffect(() => setKeysPage(0), [keys.length]);
 
@@ -147,13 +153,13 @@ export function ApiAccessPanel({
 
   async function addKey(event: FormEvent) {
     event.preventDefault();
-    if (!accessToken || !name.trim()) return;
+    if (!enabled || !accessToken || busy || !name.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await withCurrentSession((token) => createApiKey(token, name.trim(), apiBaseUrl));
-      setCreated(next);
-      setKeys((current) => [next, ...current]);
+      const { secret, ...key } = await withCurrentSession((token) => createApiKey(token, name.trim(), apiBaseUrl));
+      setCreated({ id: key.id, secret });
+      setKeys((current) => [key, ...current.filter((currentKey) => currentKey.id !== key.id)]);
       setName("My application");
     } catch (caught) {
       setErrorSource("mutation");
@@ -164,11 +170,12 @@ export function ApiAccessPanel({
   }
 
   async function removeKey(keyId: string) {
-    if (!accessToken) return;
+    if (!enabled || !accessToken || busy) return;
     setBusy(true);
     setError(null);
     try {
       await withCurrentSession((token) => revokeApiKey(token, keyId, apiBaseUrl));
+      setCreated((current) => current?.id === keyId ? null : current);
       setKeys((current) => current.map((key) =>
         key.id === keyId ? { ...key, revoked_at: new Date().toISOString() } : key
       ));
@@ -181,26 +188,25 @@ export function ApiAccessPanel({
   }
 
   const live = availableModels > 0;
-  const targetLabel = live ? "MODEL AVAILABLE" : "NO MODEL ONLINE";
   const errorPresentation = error ? apiAccessErrorPresentation(error, errorSource) : null;
-  return <section className={`api-access-panel${open ? " open" : ""}`}>
-    <UiButton className="api-access-summary" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+  return <section className={`api-access-panel${embedded ? " embedded" : open ? " open" : ""}`}>
+    {!embedded && <UiButton className="api-access-summary" type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={open}>
       <span className="api-access-summary-copy"><Code2 size={15} />API Access</span>
       <span className="api-access-chevron">{open ? "−" : "+"}</span>
-    </UiButton>
+    </UiButton>}
     {open && <div className="api-access-body">
-      {!enabled && <div className="api-access-notice"><CircleAlert /><span><strong>Account access is not configured</strong>The local coordinator keeps the API available, but public keys require the account service.</span></div>}
+      {!enabled && <div className="api-access-notice"><CircleAlert /><span><strong>API key management is unavailable</strong>This network has not enabled account API keys.</span></div>}
       {enabled && !accessToken && <div className="api-access-notice signin"><LockKeyhole /><span><strong>Sign in to get a key</strong>The endpoint is visible, but access and balance belong to your account.</span><UiButton onClick={onSignIn}>Sign in</UiButton></div>}
 
       <div className="api-command-grid">
-        {commands.map((command) => <div className="api-command" key={command.label}>
-          <div><span>{command.label}</span><CopyButton value={command.value} /></div>
+        {(embedded ? commands.slice(0, 1) : commands).map((command) => <div className="api-command" key={command.label}>
+          <div><span>{command.label}</span><CopyButton value={command.value} label={embedded ? "Copy URL" : "Copy"} /></div>
           <code>{command.value}</code>
           <UiText>{command.help}</UiText>
         </div>)}
       </div>
 
-      <div className="api-access-status-row">
+      {!embedded && <div className="api-access-status-row">
         <div>
           <span>Model availability</span>
           <strong className={live ? "ready" : ""}>{live ? `${availableModels} model${availableModels === 1 ? "" : "s"} available` : "No models connected"}</strong>
@@ -209,28 +215,32 @@ export function ApiAccessPanel({
           {connection === "testing" ? <LoaderCircle className="spin" /> : connection === "ready" ? <Check /> : <Wifi />}
           {connection === "idle" ? "Test connection" : connection === "testing" ? "Testing…" : connection === "ready" ? "Connection ready" : connection === "empty" ? "API active, no model" : "Try again"}
         </UiButton>
-      </div>
+      </div>}
 
-      {accessToken && account && <div className="api-account-strip">
+      {!embedded && accessToken && account && <div className="api-account-strip">
         <div><span>BALANCE</span><strong>{formatTokens(account.token_balance)} TOK</strong></div>
         <div><span>LIMITS</span><strong>{account.limits.requests_per_minute}/min · {account.limits.max_concurrent} concurrent</strong></div>
       </div>}
 
-      {accessToken && <section className="api-keys-section">
-        <div className="api-keys-heading"><div><span>API KEYS</span><UiHeading as="h3">Revocable keys</UiHeading></div><small>The full key is shown only once.</small></div>
+      {enabled && accessToken && <section className="api-keys-section">
+        <div className="api-keys-heading">
+          {!embedded && <div><span>API KEYS</span><UiHeading as="h3">Revocable keys</UiHeading></div>}
+          <small>The full key is shown only once.</small>
+        </div>
         {created && <div className="api-created-key"><div><KeyRound /><span><strong>Save it now</strong><code>{created.secret}</code></span></div><CopyButton value={created.secret} label="Copy key" /></div>}
         <UiForm onSubmit={(event) => void addKey(event)} className="api-key-form">
           <UiInput value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="API key name" placeholder="Application name" />
-          <UiButton className="primary-button" disabled={busy || !name.trim()}><Plus />Create key</UiButton>
+          <UiButton type="submit" className="primary-button" disabled={busy || !name.trim()}><Plus />Create key</UiButton>
         </UiForm>
         <div className="api-key-list">
-          {busy && keys.length === 0 && <div className="api-key-empty"><LoaderCircle className="spin" />Loading keys…</div>}
-          {!busy && keys.length === 0 && <div className="api-key-empty"><KeyRound />{keysLoaded ? "You do not have any keys yet." : "API keys could not be loaded."}</div>}
+          {keys.length === 0 && (busy || (!keysLoaded && !error)
+            ? <div className="api-key-empty" role="status"><LoaderCircle className="spin" />Loading keys…</div>
+            : keysLoaded && <div className="api-key-empty"><KeyRound />You do not have any keys yet.</div>)}
           {visibleKeys.map((key) => <div className={`api-key-row${key.revoked_at ? " revoked" : ""}`} key={key.id}>
             <KeyRound />
             <span><strong>{key.name}</strong><code>{key.prefix}••••••••</code></span>
             <small>{key.revoked_at ? "Revoked" : key.last_used_at ? `Used ${relativeDate(key.last_used_at)}` : "Never used"}</small>
-            {!key.revoked_at && <UiButton aria-label={`Revoke ${key.name}`} disabled={busy} onClick={() => void removeKey(key.id)}><Trash2 /></UiButton>}
+            {!key.revoked_at && <UiButton type="button" aria-label={`Revoke ${key.name}`} disabled={busy} onClick={() => void removeKey(key.id)}><Trash2 /></UiButton>}
           </div>)}
         </div>
         {keys.length > keysPageSize && <TablePagination label="API keys" page={visibleKeysPage} pageCount={keysPageCount} total={keys.length} onPageChange={setKeysPage} />}

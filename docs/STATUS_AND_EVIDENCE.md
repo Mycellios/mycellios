@@ -1827,12 +1827,12 @@ was changed by this candidate. The earlier installed Play/Stop build is unchange
 
 ### Native agent project workflow (2026-11-02)
 
-- Qualified on the installed Windows Desktop with the actual Jarvis agent: local
+- Qualified on the installed Windows Desktop with the installed agent: local
   discovery, existing SSH configuration, service/mount identification of a live
   checkout, exclusive temporary-file creation/read/modification/removal observed
   from host and serving container. Final command/SSH exits were 0. HEAD, Git status
   and staged/unstaged diff hashes were unchanged; no functional code or services
-  were modified. This does not qualify a functional Jarvis feature release.
+  were modified. The evidence covers the project workflow.
 - After Desktop relaunch, a second actual agent execution read private PROJECT.md
   and reused its verified destination without repeating discovery; HEAD and marker
   absence checks passed in host/container with exit 0. Project notes contain no
@@ -2048,7 +2048,7 @@ committed, pushed or merged.
 
 An earlier SDK observation paused advertising with a Base mainnet balance of
 0.000038496637378844 ETH, below its 0.00005 ETH floor. The operator subsequently funded
-the wallet. Jarvis's recovery evidence at 18:43 UTC records the SDK reporting
+the wallet. The operator's recovery evidence at 18:43 UTC records the SDK reporting
 0.002168874558129165 ETH and advertising resumed. The previous funding request
 is obsolete; no additional transfer is requested. This intervention performed
 no transfer or gas-guard bypass. Successful requests and announcement recovery
@@ -2088,7 +2088,7 @@ body or retrying execution. Existing seller channels and engines were preserved.
 
 This covers the public chat-completions ingress used by the selected speech and
 embedding provider. Direct/internal port 4174 callers remain outside this filter;
-there is no claim of global coordinator admission closure. A subsequent Jarvis
+there is no claim of global coordinator admission closure. A subsequent client
 readback reported three new vectors after its post-activation baseline, all three
 valid, and eight successful free gateway responses with one concurrency rejection
 in a short window. Further validator rejections occurred after the single control

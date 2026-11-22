@@ -211,7 +211,7 @@
     "qualificationWatcher": "active"
   },
   "limitations": [
-    "The earlier gas pause was lifted after the operator funded the wallet; Jarvis observed SDK advertising resumed at 18:43 UTC. This does not establish continuous availability.",
+    "The earlier gas pause was lifted after the operator funded the wallet; the operator observed SDK advertising resumed at 18:43 UTC. This does not establish continuous availability.",
     "No wallet transfer performed.",
     "CPU public embedding has no internal settlement.",
     "Internal credits are not money or on-chain AntSeed settlement.",
@@ -219,7 +219,7 @@
     "No inference across two physical computers established by these probes."
   ],
   "advertisingRecovery": {
-    "source": "Jarvis qwen-status-20261026 recovery evidence",
+    "source": "Operator qwen-status-20261026 recovery evidence",
     "observedAt": "2026-10-26T18:43:00Z",
     "sdkBalanceEth": "0.002168874558129165",
     "advertisingResumed": true,
