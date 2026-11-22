@@ -6547,3 +6547,75 @@ msgstr "पहले संदेश की पुष्टि नहीं ह�
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "बातचीत {name} खोलें"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} चली"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} चली, कुछ नया नहीं"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} विफल रही"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} चली और खुद को रोक दिया"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "{routine} के रन दिखाएँ"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "{routine} के रन छिपाएँ"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, one {{routine} का # रन} other {{routine} के # रन}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "बदलाव मिला"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "आपने चलाया"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "स्थानीय स्क्रिप्ट"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "चैट में उल्लेख"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "GitHub इवेंट"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "स्वचालित पुनः प्रयास"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "कुछ नया नहीं"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "देर से चली: इसका समय {due} था"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, one {# पिछला रन नहीं हुआ: उसके समय सर्वर नहीं चल रहा था} other {# पिछले रन नहीं हुए: उनके समय सर्वर नहीं चल रहा था}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, one {# पिछला रन इसमें जोड़ दिया गया: उससे पहले वाला अभी शुरू नहीं हुआ था} other {# पिछले रन इसमें जोड़ दिए गए: उनसे पहले वाला अभी शुरू नहीं हुआ था}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "{time} के रन ने रोका"

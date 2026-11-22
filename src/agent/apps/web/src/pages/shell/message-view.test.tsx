@@ -19,6 +19,7 @@ vi.mock("@lingui/react/macro", () => ({
   Plural: ({ value, one, other }: { value: number; one: string; other: string }) =>
     (value === 1 ? one : other).replace("#", String(value)),
   useLingui: () => ({
+    i18n: { locale: "en" },
     t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw(strings, ...values),
   }),
 }));
@@ -366,6 +367,32 @@ it("folds a task report in the main chat behind an update marker that opens its 
   expect(container.querySelector('[data-testid="task-report-open"]')?.getAttribute("href")).toBe("/app/mico?task=task-1");
   act(() => toggle.click());
   expect(container.querySelector('[data-testid="task-report-body"]')).toBeNull();
+});
+
+it("shows a routine run marker as a compact line linking to the routine conversation", () => {
+  renderInRouter({
+    id: "marker",
+    threadId: "main",
+    seq: 5,
+    role: "system",
+    createdAt: new Date().toISOString(),
+    blocks: [
+      {
+        kind: "routine_run",
+        fromBotId: "mico",
+        routineId: "routine-1",
+        routineName: "Inbox check",
+        taskId: "routine-thread-1",
+        runId: "run-1",
+        status: "quiet",
+      },
+    ],
+  });
+  const line = container.querySelector('[data-testid="routine-run-marker"]');
+  expect(line?.textContent).toContain("Inbox check ran, nothing new");
+  expect(container.querySelector('[data-testid="routine-run-open"]')?.getAttribute("href")).toBe(
+    "/app/mico?task=routine-thread-1",
+  );
 });
 
 it("shows a Mico's brief on its side of the task conversation", () => {

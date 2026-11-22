@@ -44,6 +44,7 @@ import {
 import type { McpServer as McpServerRow, Prisma, PrismaClient, Routine } from "@mycellios/db";
 import {
   appendEventInTransaction,
+  archiveRoutineThreadInTransaction,
   createThreadMessageInTransaction,
   InstructionConflictError,
   IsolationError,
@@ -1107,10 +1108,17 @@ export async function undoAgentImport(
       if (count) removed.botMemory.push(row.id);
     }
     for (const row of plan.routines.remove) {
+      const identity = await tx.routine.findFirst({
+        where: { botId, id: row.id, updatedAt: row.updatedAt },
+        select: { id: true, botId: true, spaceId: true, userId: true, threadId: true },
+      });
       const { count } = await tx.routine.deleteMany({
         where: { botId, id: row.id, updatedAt: row.updatedAt },
       });
-      if (count) removed.routines.push(row.id);
+      if (!count) continue;
+      // The routine's own conversation stays readable under Archived.
+      if (identity) await archiveRoutineThreadInTransaction(tx, identity);
+      removed.routines.push(row.id);
     }
     const events: { threadId: string; seq: number }[] = [];
     for (const server of plan.mcpServers.remove) {

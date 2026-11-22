@@ -17,7 +17,13 @@ export const LATE_ROUTINE_RUN_MS = 15 * 60_000;
  * Returns undefined for on-time runs and for any run that is not a recurring timer tick.
  */
 export function lateRoutineRunInstruction(
-  run: { routineId: string | null; clientNonce: string | null },
+  run: {
+    routineId: string | null;
+    clientNonce: string | null;
+    /** Scheduled runs folded into this one, and why (see wakeRoutine). */
+    missedRuns?: number;
+    missedReason?: string | null;
+  },
   routine: { crons: string[]; timezone: string },
   now: Date,
 ): string | undefined {
@@ -51,8 +57,14 @@ export function lateRoutineRunInstruction(
     zone
       ? `${localDateTime(date, zone)} (${zone})`
       : `${date.toISOString().replace(/\.\d{3}Z$/, "Z")} (UTC)`;
+  const missed = run.missedRuns ?? 0;
   return [
     `This scheduled run started late: it was due ${format(new Date(latest))} and started ${format(now)}.`,
+    ...(missed > 0
+      ? [
+          `${missed} earlier scheduled ${missed === 1 ? "run" : "runs"} did not happen (${run.missedReason === "busy" ? "an earlier run had not started yet" : "the server was not running at the time"}); this run covers them.`,
+        ]
+      : []),
     "Adapt anything that depends on the time of day to the actual time, skip steps that no longer make sense, and mention the delay when it matters to the user.",
   ].join(" ");
 }

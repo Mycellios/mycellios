@@ -19,6 +19,8 @@ export function loadRunHistoryMessages(
       // Queued messages (the person's, or a follow-up from the Mico's main chat) join history
       // only with the turn that answers them.
       NOT: { steeringMessages: { some: { originTrigger: { in: ["queued_user", "agent_task"] }, claimedAt: null, OR: [{ runId: null }, { runId: { not: run.id } }] } } },
+      // A routine run marker only links the main chat to the routine conversation.
+      AND: [{ NOT: { role: "system", blocks: { array_contains: [{ kind: "routine_run" }] } } }],
       ...(channelId
         ? {
             OR: [

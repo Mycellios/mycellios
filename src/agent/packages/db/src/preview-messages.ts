@@ -2,6 +2,14 @@ import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
 import { contentEncryptionOf } from "./content-encryption.js";
 
+/** JSON containment probe for a quiet routine run marker. */
+const QUIET_ROUTINE_RUN_MARKER = JSON.stringify([{ kind: "routine_run", status: "quiet" }]);
+
+/** Prisma filter that leaves out quiet routine run markers. */
+export const NOT_QUIET_ROUTINE_RUN = {
+  NOT: { role: "system", blocks: { array_contains: [{ kind: "routine_run", status: "quiet" }] } },
+};
+
 /** Scalar columns the sidebar preview and its older-page fallback both read. */
 export interface SidebarPreviewMessage {
   id: string;
@@ -25,7 +33,13 @@ export async function withNewestThreadMessages<T extends { thread: { id: string 
   prisma: PrismaClient,
   parents: T[],
   limit: number,
+  options: { skipQuietRoutineRuns?: boolean } = {},
 ) {
+  // A quiet routine run's marker is never a preview and never the chat's last activity. Its
+  // kind and status stay plain when blocks are sealed, so the filter works either way.
+  const quiet = options.skipQuietRoutineRuns
+    ? Prisma.sql`AND NOT (role = 'system' AND blocks @> ${QUIET_ROUTINE_RUN_MARKER}::jsonb)`
+    : Prisma.empty;
   const threadIds = parents.flatMap((parent) => (parent.thread ? [parent.thread.id] : []));
   const loaded =
     threadIds.length === 0
@@ -38,7 +52,7 @@ export async function withNewestThreadMessages<T extends { thread: { id: string 
             SELECT id, "threadId", seq, role, blocks, "botId", "replyToMessageId", "replyQuote",
               "runId", "clientNonce", "createdAt"
             FROM messages
-            WHERE "threadId" = t.id
+            WHERE "threadId" = t.id ${quiet}
             ORDER BY seq DESC
             LIMIT ${limit}
           ) m

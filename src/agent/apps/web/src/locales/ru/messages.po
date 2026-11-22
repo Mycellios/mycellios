@@ -6547,3 +6547,75 @@ msgstr "Не удалось подтвердить первое сообщени
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "Открыть диалог «{name}»"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine}: выполнено"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine}: выполнено, ничего нового"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine}: сбой"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine}: выполнено и поставлено на паузу"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "Показать запуски {routine}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "Скрыть запуски {routine}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, one {# запуск {routine}} few {# запуска {routine}} many {# запусков {routine}} other {# запуска {routine}}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "Обнаружено изменение"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "Запущено вами"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "Локальный скрипт"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "Упомянуто в чате"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "Событие GitHub"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "Автоматический повтор"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "Ничего нового"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "Запущено с опозданием: по расписанию {due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, one {# предыдущий запуск не состоялся: сервер в это время не работал} few {# предыдущих запуска не состоялись: сервер в это время не работал} many {# предыдущих запусков не состоялись: сервер в это время не работал} other {# предыдущего запуска не состоялись: сервер в это время не работал}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, one {# предыдущий запуск объединён с этим: предыдущий ещё не начался} few {# предыдущих запуска объединены с этим: предыдущий ещё не начался} many {# предыдущих запусков объединены с этим: предыдущий ещё не начался} other {# предыдущего запуска объединены с этим: предыдущий ещё не начался}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "Приостановлено запуском {time}"

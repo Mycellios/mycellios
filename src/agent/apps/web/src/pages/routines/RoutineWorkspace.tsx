@@ -13,6 +13,7 @@ import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { statusLabel, statusTone } from "../ActivityList";
 import { routineDiagramSummary } from "./routine-summary";
+import { routinePausedLabel } from "../../lib/routine-paused-label";
 import type { RoutineHistoryState } from "../RoutineRunHistory";
 import { RoutineRunHistory } from "../RoutineRunHistory";
 import { previewMessageText } from "../shell/chat-shared";
@@ -119,7 +120,7 @@ export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onE
           {routines.map(routine => <NativeSelectOption key={routine.id} value={routine.id}>{routine.name}</NativeSelectOption>)}
         </NativeSelect>
         <span className="hidden min-w-0 truncate text-xs text-muted-foreground lg:block">{routineDiagramSummary(selected, i18n.locale)}</span>
-        <span className="ms-auto hidden truncate text-xs text-muted-foreground sm:block">{selected.active ? t`Active` : t`Paused`}</span>
+        <span className="ms-auto hidden truncate text-xs text-muted-foreground sm:block">{selected.active ? t`Active` : routinePausedLabel(selected, i18n.locale)}</span>
       </div>
       <div className="rk-routine-body">
         <RoutineCanvas bot={bot} routines={routines} selectedId={selected.id} scope={scope} onSelect={onSelect} onEdit={onEdit} onRun={run} canRun={canRun} status={stateLabel} output={output} onAsk={onAsk} />

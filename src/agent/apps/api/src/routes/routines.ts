@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { routineCalendar } from "../routine-calendar.js";
 import { ORPCError } from "@orpc/server";
 import { routineJobKey, routineWakeupJob, runContinueJob } from "@mycellios/adapter-kit";
@@ -12,8 +13,15 @@ import {
   expandSkillReferencesInPrompt,
   hasMixedOneShotSchedule,
   isOneShotRoutineCrons,
+  routineTestRunNonce,
 } from "@mycellios/core";
-import { ensureRoutineThread, IsolationError, Prisma } from "@mycellios/db";
+import {
+  archiveRoutineThreadInTransaction,
+  ensureRoutineThread,
+  followRoutineRenameInTransaction,
+  IsolationError,
+  Prisma,
+} from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 import { assertRoutineModel } from "../model-pins.js";
 import { listRoutineRuns } from "../routine-runs.js";
@@ -226,6 +234,8 @@ export function routinesRoutes(ctx: RouterContext) {
               webhookEnabled: input.webhookEnabled,
               githubEnabled: input.githubEnabled,
               messageProvider: input.messageProvider,
+              // The person chose the state now; a run's own pause no longer explains it.
+              ...(input.active !== undefined ? { pausedByRunId: null, pausedByRunAt: null } : {}),
               ...(touchesModel ? { modelProvider, modelId, thinkingLevel } : {}),
               // A changed watch starts from a fresh baseline.
               ...(input.watch === undefined
@@ -257,6 +267,12 @@ export function routinesRoutes(ctx: RouterContext) {
             }
             throw error;
           });
+        // The routine's own conversation follows the new name unless the person renamed it.
+        if (input.name !== undefined && row.name !== existing.name) {
+          await followRoutineRenameInTransaction(deps.prisma, row).catch((error: unknown) => {
+            getLogger().error("routine conversation rename", error);
+          });
+        }
         if (bot.thread) {
           await deps.events.append({
             spaceId: context.actor.spaceId,
@@ -286,7 +302,11 @@ export function routinesRoutes(ctx: RouterContext) {
           where: { id: input.routineId, spaceId: context.actor.spaceId },
         });
         if (!existing) throw new IsolationError();
-        await deps.prisma.routine.delete({ where: { id: existing.id } });
+        // Its own conversation stays readable under Archived; delete and archive commit together.
+        await deps.prisma.$transaction(async (tx) => {
+          await archiveRoutineThreadInTransaction(tx, existing);
+          await tx.routine.delete({ where: { id: existing.id } });
+        });
         await deps.jobs.cancel(routineJobKey(existing.id));
         return { ok: true as const };
       }),
@@ -305,10 +325,13 @@ export function routinesRoutes(ctx: RouterContext) {
           runId: row.id,
           ...(row.thread.groupId ? { groupId: row.thread.groupId } : row.thread.taskBotId === bot.id ? { taskThreadId: row.threadId } : {}),
         });
-        const nonce = input.clientNonce ? `routine-test:${input.clientNonce}` : undefined;
+        // Every run started here carries the test prefix, so it is never mistaken for a scheduled
+        // run (and never ends quiet). Only a client nonce makes a retry replay the same run.
+        const requested = input.clientNonce ? routineTestRunNonce(input.clientNonce) : undefined;
+        const nonce = requested ?? routineTestRunNonce(`once:${randomUUID()}`);
         const replayWhere = { routineId: routine.id, botId: bot.id,
           spaceId: context.actor.spaceId, userId: context.actor.userId, clientNonce: nonce };
-        if (nonce) {
+        if (requested) {
           const existing = await deps.prisma.run.findFirst({
             where: replayWhere,
             select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
@@ -322,7 +345,7 @@ export function routinesRoutes(ctx: RouterContext) {
         try {
           // Task + run must commit together so a nonce collision cannot leave an orphan queued Task.
           run = await deps.prisma.$transaction(async (tx) => {
-            if (nonce) {
+            if (requested) {
               const existing = await tx.run.findFirst({
                 where: replayWhere,
                 select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
@@ -361,7 +384,7 @@ export function routinesRoutes(ctx: RouterContext) {
             });
           });
         } catch (error) {
-          if (nonce) {
+          if (requested) {
             const existing = await deps.prisma.run.findFirst({
               where: replayWhere,
               select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },

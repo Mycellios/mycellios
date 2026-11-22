@@ -64,6 +64,15 @@ export async function withLatestBotRuns<T extends { thread: { id: string } | nul
 export function previewFromBlocks(blocks: unknown): string {
   const rows = Array.isArray(blocks) ? blocks : [];
   for (const block of rows) {
+    // A routine run marker names its routine; the answer stays in the routine conversation.
+    if (
+      block &&
+      typeof block === "object" &&
+      (block as { kind?: unknown }).kind === "routine_run" &&
+      typeof (block as { routineName?: unknown }).routineName === "string"
+    ) {
+      return (block as { routineName: string }).routineName;
+    }
     if (
       block &&
       typeof block === "object" &&

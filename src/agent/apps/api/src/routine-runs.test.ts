@@ -37,7 +37,7 @@ describe("routine history", () => {
         userId: actor.userId,
         bot: { archivedAt: null },
       },
-      select: { botId: true },
+      select: { botId: true, watch: true },
     });
     expect(runs).not.toHaveBeenCalled();
     expect(messages).not.toHaveBeenCalled();
@@ -75,7 +75,7 @@ describe("routine history", () => {
           spaceId: actor.spaceId,
           userId: actor.userId,
         },
-        take: 21,
+        take: 101,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       }),
     );
@@ -92,9 +92,9 @@ describe("routine history", () => {
       actor.userId,
     ]);
   });
-  it("bounds stored errors like thread failures", async () => {
+  it("bounds stored errors, keeping a reason the run reported (up to 500 characters) whole", async () => {
     const { prisma, runs } = fixture();
-    const error = "x".repeat(400);
+    const error = "x".repeat(600);
     runs.mockResolvedValue([
       {
         id: "failed-run",
@@ -109,10 +109,16 @@ describe("routine history", () => {
       },
     ]);
     const history = await listRoutineRuns(prisma, actor, "routine-1");
-    expect(history.runs[0]?.error).toBe(`${"x".repeat(300)}…`);
+    expect(history.runs[0]?.error).toBe(`${"x".repeat(500)}…`);
     expect(history.runs[0]?.error).toBe(
-      runFailureError({ type: "run.failed", payload: { error } }),
+      runFailureError({ type: "run.failed", payload: { error } }, 500),
     );
+    const reason = "The supplier site answered 503 three times; nothing was checked.".padEnd(480, ".");
+    runs.mockResolvedValue([
+      { id: "reported", botId: "bot-1", threadId: "thread-1", thread: { groupId: null },
+        status: "failed", error: reason, createdAt: at, startedAt: at, completedAt: at },
+    ]);
+    expect((await listRoutineRuns(prisma, actor, "routine-1")).runs[0]?.error).toBe(reason);
   });
   it("does not confuse a database failure with an empty history", async () => {
     const { prisma, runs, messages } = fixture();
@@ -133,8 +139,8 @@ describe("routine history", () => {
   it("pages all history using stable timestamp/id boundaries without including the lookahead row", async () => {
     const { prisma, runs } = fixture();
     runs.mockResolvedValue(
-      Array.from({ length: 21 }, (_, i) => ({
-        id: `run-${String(30 - i).padStart(2, "0")}`,
+      Array.from({ length: 101 }, (_, i) => ({
+        id: `run-${String(200 - i).padStart(3, "0")}`,
         botId: "bot-1",
         threadId: "thread-1",
         thread: { groupId: null },
@@ -145,8 +151,8 @@ describe("routine history", () => {
       })),
     );
     const first = await listRoutineRuns(prisma, actor, "routine-1");
-    expect(first.runs).toHaveLength(20);
-    expect(first.nextCursor).toEqual({ id: "run-11", createdAt: at.toISOString() });
+    expect(first.runs).toHaveLength(100);
+    expect(first.nextCursor).toEqual({ id: "run-101", createdAt: at.toISOString() });
     runs.mockResolvedValue([]);
     const next = await listRoutineRuns(prisma, actor, "routine-1", first.nextCursor!);
     expect(next).toEqual({ runs: [], nextCursor: null });
@@ -157,10 +163,52 @@ describe("routine history", () => {
           botId: "bot-1",
           spaceId: actor.spaceId,
           userId: actor.userId,
-          OR: [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: "run-11" } }],
+          OR: [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: "run-101" } }],
         },
       }),
     );
+  });
+  it("labels each run by what started it, and marks quiet, late and missed runs", async () => {
+    const { prisma, runs } = fixture();
+    const scheduledFor = "2026-01-02T08:00:00.000Z";
+    const row = (id: string, extra: Record<string, unknown>) => ({
+      id, botId: "bot-1", threadId: "thread-1", thread: { groupId: null, taskBotId: "bot-1" },
+      status: "completed", error: null, createdAt: at, startedAt: at, completedAt: at,
+      trigger: "routine", clientNonce: null, retryOfRunId: null, quiet: false, missedRuns: 0, missedReason: null,
+      ...extra,
+    });
+    runs.mockResolvedValue([
+      row("timer", { clientNonce: `routine-timer:routine-1:${scheduledFor}`, quiet: true, missedRuns: 3, missedReason: "offline" }),
+      row("manual", { clientNonce: "routine-test:abc" }),
+      row("script", { clientNonce: "routine-test:local:n1" }),
+      row("mention", { clientNonce: "routine-test:routine-mention:n2:routine-1" }),
+      row("hook", { trigger: "webhook", clientNonce: "webhook:bot-1:digest" }),
+      row("github", { trigger: "webhook", clientNonce: "github:bot-1:digest" }),
+      row("retry", { retryOfRunId: "timer", missedRuns: 1, missedReason: "busy" }),
+      row("once", {}),
+    ]);
+    const history = RoutineHistorySchema.parse(await listRoutineRuns(prisma, actor, "routine-1"));
+    expect(history.runs.map((run) => run.source)).toEqual([
+      "schedule", "manual", "script", "chat", "webhook", "github", "retry", "schedule",
+    ]);
+    expect(history.runs[0]).toMatchObject({
+      quiet: true,
+      scheduledFor,
+      missed: { count: 3, reason: "offline" },
+      taskThreadId: "thread-1",
+    });
+    expect(history.runs[1]).toMatchObject({ quiet: false, scheduledFor: null, missed: null });
+    expect(history.runs[6]?.missed).toEqual({ count: 1, reason: "busy" });
+  });
+  it("labels a run of a watching routine without a schedule nonce as a detected change", async () => {
+    const { prisma, routine, runs } = fixture();
+    routine.mockResolvedValue({ botId: "bot-1", watch: { kind: "command", command: "echo 1" } });
+    runs.mockResolvedValue([
+      { id: "watch-run", botId: "bot-1", threadId: "thread-1", thread: { groupId: null },
+        status: "completed", error: null, createdAt: at, startedAt: at, completedAt: at,
+        trigger: "routine", clientNonce: null, retryOfRunId: null },
+    ]);
+    expect((await listRoutineRuns(prisma, actor, "routine-1")).runs[0]?.source).toBe("watch");
   });
   it("keeps the group destination of a routine execution", async () => {
     const { prisma, runs, messages } = fixture();

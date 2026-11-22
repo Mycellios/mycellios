@@ -105,6 +105,14 @@ const ChartBlock = z
 export const TASK_REPORT_OUTCOMES = ["completed", "failed", "stopped", "interrupted"] as const;
 export type TaskReportOutcome = (typeof TASK_REPORT_OUTCOMES)[number];
 
+/**
+ * How a routine run that worked in its own conversation ended, as its main-chat marker says:
+ * it answered, it had nothing new (quiet), it failed or reported a failure, or it paused its
+ * own routine.
+ */
+export const ROUTINE_RUN_OUTCOMES = ["reported", "quiet", "failed", "paused"] as const;
+export type RoutineRunOutcome = (typeof ROUTINE_RUN_OUTCOMES)[number];
+
 export const SecretAskPurpose = z.enum(["otp", "password", "api_key"]);
 export type SecretAskPurpose = z.infer<typeof SecretAskPurpose>;
 
@@ -415,6 +423,22 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** The turn's answer (cut with a closing "[…]"), its error, or the title when neither exists. */
     text: z.string(),
     truncated: z.literal(true).optional(),
+  }),
+  z.object({
+    /**
+     * A run of a routine that works in its own conversation, marked in the Mico's main chat.
+     * The answer stays in the routine conversation; the marker only links to it. Consecutive
+     * markers of one routine fold into one line. Never part of the model's history.
+     */
+    kind: z.literal("routine_run"),
+    fromBotId: Id,
+    routineId: Id,
+    routineName: z.string(),
+    /** The routine conversation (side thread) the run worked in. */
+    taskId: Id,
+    runId: Id,
+    /** How the run ended. Kept as `status`, a key that stays queryable when blocks are sealed. */
+    status: z.enum(ROUTINE_RUN_OUTCOMES),
   }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;

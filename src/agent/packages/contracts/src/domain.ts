@@ -529,6 +529,8 @@ export const RoutineSchema = z.object({
   lastRunAt: z.string().nullable(),
   nextRunAt: z.string().nullable(),
   createdAt: z.string(),
+  /** When the routine is paused because one of its own runs paused it: that run's time. */
+  pausedByRunAt: z.string().nullable().optional(),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
 

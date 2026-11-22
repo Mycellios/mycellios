@@ -6546,3 +6546,75 @@ msgstr "첫 메시지를 확인하지 못했습니다. 새 대화를 확인하�
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "대화 {name} 열기"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} 실행됨"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} 실행됨, 새로운 내용 없음"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} 실패"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} 실행 후 스스로 일시 중지됨"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "{routine} 실행 기록 보기"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "{routine} 실행 기록 숨기기"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, other {{routine} 실행 #회}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "변경 감지"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "직접 실행"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "로컬 스크립트"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "채팅에서 언급됨"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "GitHub 이벤트"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "자동 재시도"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "새로운 내용 없음"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "늦게 실행됨: 예정 시각 {due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, other {이전 실행 #회가 이루어지지 않았습니다: 해당 시각에 서버가 실행 중이 아니었습니다}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, other {이전 실행 #회가 이 실행에 합쳐졌습니다: 그 앞의 실행이 아직 시작되지 않았습니다}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "{time} 실행에서 일시 중지됨"

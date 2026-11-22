@@ -145,6 +145,7 @@ export function planChecks(files, availableAgentTests) {
       [/message-pins|20261115160000_message_pins/, 'verify-message-pins-db.ts', 'message pin migration and account/thread isolation'],
       [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],
       [/thread-lifecycle|side-threads|thread-deletion|20261122120000_thread_lifecycle/, 'verify-thread-lifecycle-db.ts', 'conversation lifecycle migration, archive, delete and lock races on isolated PostgreSQL'],
+      [/routine-thread|routine-run-markers|verify-routine-isolation|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
     ]) {
       if (files.some(file => file.startsWith('src/agent/') && pattern.test(file)))
         add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);

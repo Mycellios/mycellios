@@ -6547,3 +6547,75 @@ msgstr "Het eerste bericht kon niet worden bevestigd. Controleer het nieuwe gesp
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "Gesprek {name} openen"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} is uitgevoerd"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} is uitgevoerd, niets nieuws"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} is mislukt"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} is uitgevoerd en heeft zichzelf gepauzeerd"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "Uitvoeringen van {routine} tonen"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "Uitvoeringen van {routine} verbergen"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, one {# uitvoering van {routine}} other {# uitvoeringen van {routine}}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "Wijziging gedetecteerd"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "Door jou gestart"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "Lokaal script"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "Genoemd in de chat"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "GitHub-gebeurtenis"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "Automatische nieuwe poging"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "Niets nieuws"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "Te laat uitgevoerd: gepland voor {due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, one {# eerdere uitvoering vond niet plaats: de server draaide toen niet} other {# eerdere uitvoeringen vonden niet plaats: de server draaide toen niet}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, one {# eerdere uitvoering is hierin samengevoegd: de vorige was nog niet begonnen} other {# eerdere uitvoeringen zijn hierin samengevoegd: de vorige was nog niet begonnen}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "Gepauzeerd door de uitvoering van {time}"

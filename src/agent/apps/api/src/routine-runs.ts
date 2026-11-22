@@ -1,6 +1,18 @@
 import { ORPCError } from "@orpc/server";
-import type { Actor, RoutineHistory, RoutineRun, RoutineRunCursor } from "@mycellios/contracts";
-import { runFailureError } from "@mycellios/core";
+import type {
+  Actor,
+  RoutineHistory,
+  RoutineMissedReason,
+  RoutineRun,
+  RoutineRunCursor,
+} from "@mycellios/contracts";
+import { ROUTINE_HISTORY_PAGE_SIZE, ROUTINE_MISSED_REASONS } from "@mycellios/contracts";
+import {
+  ROUTINE_FAILURE_REASON_MAX_LENGTH,
+  routineRunSource,
+  routineTimerScheduledAt,
+  runFailureError,
+} from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
 import { Prisma } from "@mycellios/db";
 
@@ -17,7 +29,7 @@ export async function listRoutineRuns(
       userId: actor.userId,
       bot: { archivedAt: null },
     },
-    select: { botId: true },
+    select: { botId: true, watch: true },
   });
   if (!routine) throw new ORPCError("NOT_FOUND");
 
@@ -46,14 +58,22 @@ export async function listRoutineRuns(
       createdAt: true,
       startedAt: true,
       completedAt: true,
+      trigger: true,
+      clientNonce: true,
+      retryOfRunId: true,
+      quiet: true,
+      missedRuns: true,
+      missedReason: true,
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: 21,
+    take: ROUTINE_HISTORY_PAGE_SIZE + 1,
   });
-  const runs = rows.slice(0, 20);
+  const runs = rows.slice(0, ROUTINE_HISTORY_PAGE_SIZE);
   const last = runs.at(-1);
   const nextCursor =
-    rows.length > 20 && last ? { id: last.id, createdAt: last.createdAt.toISOString() } : null;
+    rows.length > ROUTINE_HISTORY_PAGE_SIZE && last
+      ? { id: last.id, createdAt: last.createdAt.toISOString() }
+      : null;
   // Routine runs can finish silently. A chat link is offered only when a message exists.
   const messages = runs.length
     ? await prisma.$queryRaw<Array<{ id: string; runId: string; threadId: string }>>(Prisma.sql`
@@ -77,11 +97,27 @@ export async function listRoutineRuns(
       groupId: run.thread.groupId,
       ...(run.thread.taskBotId === run.botId ? { taskThreadId: run.threadId } : {}),
       status: run.status as RoutineRun["status"],
-      error: runFailureError({ type: `run.${run.status}`, payload: { error: run.error } }),
+      // A reason the run reported itself (up to 500 characters) is shown whole.
+      error: runFailureError(
+        { type: `run.${run.status}`, payload: { error: run.error } },
+        ROUTINE_FAILURE_REASON_MAX_LENGTH,
+      ),
       createdAt: run.createdAt.toISOString(),
       startedAt: run.startedAt?.toISOString() ?? null,
       completedAt: run.completedAt?.toISOString() ?? null,
       messageId: replyByRun.get(run.id) ?? null,
+      source: routineRunSource(run, routine),
+      scheduledFor: routineTimerScheduledAt(routineId, run.clientNonce)?.toISOString() ?? null,
+      quiet: run.quiet === true,
+      missed: missedRuns(run),
     })),
   };
+}
+
+function missedRuns(run: { missedRuns?: number | null; missedReason?: string | null }) {
+  if (!run.missedRuns || run.missedRuns <= 0) return null;
+  const reason = (ROUTINE_MISSED_REASONS as readonly string[]).includes(run.missedReason ?? "")
+    ? (run.missedReason as RoutineMissedReason)
+    : "offline";
+  return { count: run.missedRuns, reason };
 }

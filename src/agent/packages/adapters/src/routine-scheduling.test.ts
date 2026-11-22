@@ -23,8 +23,7 @@ describe("routine scheduling", () => {
   });
 });
 
-function pendingTimerFixture(reuse = true) {
-  const scheduledAt = new Date(Date.now() - 1_000);
+function pendingTimerFixture(reuse = true, scheduledAt = new Date(Date.now() - 1_000)) {
   const routine = {
     id: "routine-1",
     spaceId: "space-1",
@@ -90,6 +89,66 @@ function pendingTimerFixture(reuse = true) {
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return { executor, tx, enqueue, append, scheduledAt };
 }
+
+describe("missed occurrences", () => {
+  // Due at 12:00; the wake-up only comes at 12:03:30, after 12:01, 12:02 and 12:03 were due.
+  const due = new Date("2026-11-22T12:00:00.000Z");
+  const late = new Date("2026-11-22T12:03:30.000Z");
+  it("records the occurrences a late wake-up skips on the catch-up run", async () => {
+    vi.useFakeTimers({ now: late, toFake: ["Date"] });
+    try {
+      const { executor, tx } = pendingTimerFixture(false, due);
+      await executor.wakeRoutine("routine-1", due.toISOString());
+      expect(tx.run.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ missedRuns: 3, missedReason: "offline" }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("adds a folded tick and the skipped occurrences to the pending run", async () => {
+    vi.useFakeTimers({ now: late, toFake: ["Date"] });
+    try {
+      const { executor, tx } = pendingTimerFixture(true, due);
+      await executor.wakeRoutine("routine-1", due.toISOString());
+      expect(tx.run.updateMany).toHaveBeenCalledWith({
+        where: { id: "pending-1" },
+        data: { missedRuns: { increment: 4 }, missedReason: "offline" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("says a tick folded into a run that had not started was missed because it was busy", async () => {
+    vi.useFakeTimers({ now: new Date(due.getTime() + 10_000), toFake: ["Date"] });
+    try {
+      const { executor, tx } = pendingTimerFixture(true, due);
+      await executor.wakeRoutine("routine-1", due.toISOString());
+      expect(tx.run.updateMany).toHaveBeenCalledWith({
+        where: { id: "pending-1" },
+        data: { missedRuns: { increment: 1 } },
+      });
+      expect(tx.run.updateMany).toHaveBeenCalledWith({
+        where: { id: "pending-1", missedReason: null },
+        data: { missedReason: "busy" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("records nothing missed for an on-time run", async () => {
+    vi.useFakeTimers({ now: new Date(due.getTime() + 10_000), toFake: ["Date"] });
+    try {
+      const { executor, tx } = pendingTimerFixture(false, due);
+      await executor.wakeRoutine("routine-1", due.toISOString());
+      expect(tx.run.create).toHaveBeenCalledWith({
+        data: expect.not.objectContaining({ missedRuns: expect.anything() }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe("recurring routine catch-up", () => {
   it("keeps one pending run and advances the next tick without a duplicate firing event", async () => {

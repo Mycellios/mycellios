@@ -6,6 +6,7 @@ import {
   compactScheduleInput,
   createScheduleFromTool,
   filterBuiltinToolsForRun,
+  routineRunMayUpdateSchedule,
   filterBuiltinToolsForThread,
   isOneShotRoutineCron,
   listSchedulesFromTool,
@@ -228,7 +229,7 @@ describe("filterBuiltinToolsForThread", () => {
     ]);
   });
 
-  it("hides schedule creation from routine runs without removing schedule management", () => {
+  it("hides schedule creation from routine runs and keeps the failure report to routine runs", () => {
     expect(filterBuiltinToolsForRun(tools, "routine").map((tool) => tool.name)).toEqual([
       "handoff_to_bot",
       "message_bot",
@@ -239,13 +240,38 @@ describe("filterBuiltinToolsForThread", () => {
     expect(filterBuiltinToolsForRun(tools, "user").map((tool) => tool.name)).toContain(
       "schedule_create",
     );
-    const withUpdate = [...tools, { name: "schedule_update" }];
-    expect(filterBuiltinToolsForRun(withUpdate, "routine").map((tool) => tool.name)).not.toContain(
-      "schedule_update",
+    // A routine run keeps schedule_update so it can pause itself; the executor allows only that.
+    const withUpdate = [...tools, { name: "schedule_update" }, { name: "routine_report_failure" }];
+    expect(filterBuiltinToolsForRun(withUpdate, "routine").map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["schedule_update", "routine_report_failure"]),
+    );
+    expect(filterBuiltinToolsForRun(withUpdate, "webhook").map((tool) => tool.name)).toContain(
+      "routine_report_failure",
     );
     expect(filterBuiltinToolsForRun(withUpdate, "user").map((tool) => tool.name)).toContain(
       "schedule_update",
     );
+    for (const trigger of ["user", "agent_task", "task_report", "bot_message"]) {
+      expect(filterBuiltinToolsForRun(withUpdate, trigger).map((tool) => tool.name)).not.toContain(
+        "routine_report_failure",
+      );
+    }
+  });
+
+  it("lets a routine run only pause its own routine with schedule_update", () => {
+    expect(routineRunMayUpdateSchedule("routine-1", { routineId: "routine-1", active: false })).toBe(true);
+    expect(
+      routineRunMayUpdateSchedule("routine-1", { routineId: " routine-1 ", active: false, name: "", cron: null }),
+    ).toBe(true);
+    expect(routineRunMayUpdateSchedule("routine-1", { routineId: "routine-2", active: false })).toBe(false);
+    expect(routineRunMayUpdateSchedule("routine-1", { routineId: "routine-1", active: true })).toBe(false);
+    expect(
+      routineRunMayUpdateSchedule("routine-1", { routineId: "routine-1", active: false, prompt: "New work" }),
+    ).toBe(false);
+    expect(
+      routineRunMayUpdateSchedule("routine-1", { routineId: "routine-1", active: false, cron: "* * * * *" }),
+    ).toBe(false);
+    expect(routineRunMayUpdateSchedule(null, { routineId: "routine-1", active: false })).toBe(false);
   });
 
   it("composes thread then run filters without dropping group schedule tools", () => {
@@ -880,11 +906,23 @@ describe("schedule_create with a watch", () => {
 
 describe("cancelScheduleFromTool", () => {
   it("deletes with the caller's scope and does not cancel the job when the row moved", async () => {
-    const findFirst = vi.fn(async () => ({ id: "routine-1", name: "Daily" }));
+    const findFirst = vi.fn(async () => ({
+      id: "routine-1",
+      name: "Daily",
+      botId: "bot-1",
+      spaceId: "ws-1",
+      userId: "user-1",
+      threadId: "routine-thread-1",
+    }));
     const deleteMany = vi.fn(async () => ({ count: 1 }));
+    const executeRaw = vi.fn(async () => 1);
     const cancel = vi.fn(async () => undefined);
+    const tx = { routine: { deleteMany }, $executeRaw: executeRaw };
     const deps = {
-      prisma: { routine: { findFirst, deleteMany } },
+      prisma: {
+        routine: { findFirst, deleteMany },
+        $transaction: vi.fn(async (work: (client: typeof tx) => unknown) => work(tx)),
+      },
       events: { append: vi.fn(async () => undefined) },
       jobs: { enqueue: vi.fn(async () => undefined), cancel },
     } as unknown as Parameters<typeof cancelScheduleFromTool>[0];
@@ -911,13 +949,17 @@ describe("cancelScheduleFromTool", () => {
       },
     });
     expect(cancel).toHaveBeenCalledOnce();
+    // Deleting the routine archives its own conversation in the same transaction.
+    expect(executeRaw.mock.calls.some((call) => String(call[0]).includes('"archivedAt"'))).toBe(true);
 
     deleteMany.mockResolvedValueOnce({ count: 0 });
     cancel.mockClear();
+    executeRaw.mockClear();
     await expect(cancelScheduleFromTool(deps, input)).resolves.toEqual({
       error: "Schedule not found.",
     });
     expect(cancel).not.toHaveBeenCalled();
+    expect(executeRaw).not.toHaveBeenCalled();
   });
 });
 
@@ -956,8 +998,9 @@ describe("updateScheduleFromTool", () => {
     const enqueue = vi.fn(async () => undefined);
     const cancel = vi.fn(async () => undefined);
     const append = vi.fn(async () => undefined);
+    const executeRaw = vi.fn(async () => 1);
     const deps = {
-      prisma: { routine: { findFirst, updateMany } },
+      prisma: { routine: { findFirst, updateMany }, $executeRaw: executeRaw },
       events: { append },
       jobs: { enqueue, cancel },
     } as unknown as Parameters<typeof updateScheduleFromTool>[0];
@@ -971,7 +1014,7 @@ describe("updateScheduleFromTool", () => {
         schedule: {},
         ...patch,
       });
-    return { findFirst, updateMany, enqueue, cancel, append, update };
+    return { findFirst, updateMany, enqueue, cancel, append, update, executeRaw };
   }
 
   it("edits the prompt in place and keeps the timing", async () => {
@@ -1126,6 +1169,52 @@ describe("updateScheduleFromTool", () => {
     );
     expect(cancel).toHaveBeenCalledOnce();
     expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("records a pause by the routine's own run and asks the run to say so", async () => {
+    const { updateMany, update } = setup();
+    const startedAt = new Date("2026-10-20T00:10:00.000Z");
+    await expect(
+      update({ active: false, ownRun: { routineId: "routine-1", runId: "run-7", startedAt } }),
+    ).resolves.toMatchObject({ ok: true, active: false, pausedByThisRun: true, note: expect.stringContaining("paused") });
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ active: false, pausedByRunId: "run-7", pausedByRunAt: startedAt }),
+      }),
+    );
+  });
+
+  it("never names a run as the reason for a pause it did not make", async () => {
+    const { updateMany, update } = setup();
+    // A run of another routine (or a chat turn) pausing this routine.
+    const result = await update({
+      active: false,
+      ownRun: { routineId: "routine-9", runId: "run-7", startedAt: new Date() },
+    });
+    expect(result).not.toHaveProperty("pausedByThisRun");
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ active: false, pausedByRunId: null, pausedByRunAt: null }),
+      }),
+    );
+  });
+
+  it("clears the run that paused a routine when it is turned back on", async () => {
+    const { updateMany, update } = setup({ ...weekly, active: false, nextRunAt: null });
+    await update({ active: true });
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ active: true, pausedByRunId: null, pausedByRunAt: null }),
+      }),
+    );
+  });
+
+  it("renames the routine's own conversation with the routine", async () => {
+    const { executeRaw, update } = setup();
+    await update({ name: "Weekly groceries" });
+    const call = executeRaw.mock.calls[0] as unknown as [TemplateStringsArray, ...unknown[]];
+    expect(call[0].join("?")).toContain(`"titleSource" IS DISTINCT FROM 'user'`);
+    expect(call.slice(1)).toEqual(expect.arrayContaining(["Weekly groceries", "routine:routine-1"]));
   });
 
   it("resumes a paused repeat from now", async () => {

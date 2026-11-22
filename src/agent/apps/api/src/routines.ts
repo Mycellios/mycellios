@@ -94,6 +94,7 @@ export function mapRoutine(row: {
   lastRunAt: Date | null;
   nextRunAt: Date | null;
   createdAt: Date;
+  pausedByRunAt?: Date | null;
 }): Routine {
   return {
     id: row.id,
@@ -115,6 +116,7 @@ export function mapRoutine(row: {
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
+    pausedByRunAt: !row.active && row.pausedByRunAt ? row.pausedByRunAt.toISOString() : null,
   };
 }
 

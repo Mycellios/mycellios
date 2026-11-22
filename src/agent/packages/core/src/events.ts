@@ -288,11 +288,17 @@ export function withLiveStreamingProgress<
 
 const RUN_FAILURE_ERROR_MAX = 300;
 
-/** Reason a run failed, clamped for display, or null when there is no usable error to show. */
-export function runFailureError(event: {
-  type: string;
-  payload?: Record<string, unknown>;
-}): string | null {
+/**
+ * Reason a run failed, clamped for display, or null when there is no usable error to show.
+ * Routine history allows a longer bound so a reason the run reported itself is never cut.
+ */
+export function runFailureError(
+  event: {
+    type: string;
+    payload?: Record<string, unknown>;
+  },
+  max = RUN_FAILURE_ERROR_MAX,
+): string | null {
   if (event.type !== "run.failed") return null;
   const error = event.payload?.error;
   if (typeof error !== "string" || !error.trim()) return null;
@@ -305,15 +311,13 @@ export function runFailureError(event: {
       fallback.backups.map((item) => ({ ...item, reason: clampRunFailure(item.reason) })),
     );
   }
-  return clampRunFailure(message);
+  return clampRunFailure(message, max);
 }
 
 // A provider can fail with a stack or a whole response body; the run record keeps the full
 // text while the UI shows a bounded first line.
-function clampRunFailure(message: string): string {
-  return message.length > RUN_FAILURE_ERROR_MAX
-    ? `${message.slice(0, RUN_FAILURE_ERROR_MAX)}…`
-    : message;
+function clampRunFailure(message: string, max = RUN_FAILURE_ERROR_MAX): string {
+  return message.length > max ? `${message.slice(0, max)}…` : message;
 }
 
 export type LiveMessageUpdate =

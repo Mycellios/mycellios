@@ -6546,3 +6546,75 @@ msgstr "无法确认第一条消息。请查看新对话，如果消息不在其
 #: src/components/ThreadLinkChip.tsx
 msgid "Open conversation {name}"
 msgstr "打开对话 {name}"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran"
+msgstr "{routine} 已运行"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran, nothing new"
+msgstr "{routine} 已运行，没有新内容"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} failed"
+msgstr "{routine} 失败"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{routine} ran and paused itself"
+msgstr "{routine} 已运行并暂停了自身"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Show the runs of {routine}"
+msgstr "显示 {routine} 的运行记录"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "Hide the runs of {routine}"
+msgstr "隐藏 {routine} 的运行记录"
+
+#: src/components/RoutineRunMarker.tsx
+msgid "{count, plural, one {# run of {routine}} other {# runs of {routine}}}"
+msgstr "{count, plural, other {{routine} 的 # 次运行}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Change detected"
+msgstr "检测到变化"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Run by you"
+msgstr "由你运行"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Local script"
+msgstr "本地脚本"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Mentioned in chat"
+msgstr "在聊天中提及"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "GitHub event"
+msgstr "GitHub 事件"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Automatic retry"
+msgstr "自动重试"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Nothing new"
+msgstr "没有新内容"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ran late: it was due {due}"
+msgstr "延迟运行：原定于 {due}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run did not happen: the server was not running at its time} other {# earlier runs did not happen: the server was not running at their time}}"
+msgstr "{count, plural, other {之前有 # 次运行未进行：当时服务器未运行}}"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "{count, plural, one {# earlier run was folded into this one: the run before it had not started yet} other {# earlier runs were folded into this one: the run before them had not started yet}}"
+msgstr "{count, plural, other {之前的 # 次运行已并入本次：更早的那次运行尚未开始}}"
+
+#: src/lib/routine-paused-label.ts
+msgid "Paused by its {time} run"
+msgstr "已由 {time} 的运行暂停"

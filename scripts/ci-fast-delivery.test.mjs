@@ -97,6 +97,8 @@ test('mobile notification migration runs actual isolated database qualification'
   assert.ok(plan.some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
   assert.equal(plan.filter(c => c.args[0] === 'ci').length, 2);
   assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
+  assert.ok(planChecks(['src/agent/packages/db/src/routine-run-markers.ts']).some(c => c.args.includes('scripts/verify-routine-isolation-db.ts')));
+  assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-routine-isolation-db.ts')));
 });
 test('Agent test files share the existing two-worker budget without serializing discovery', () => {
   const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx', 'src/agent/apps/web/src/pages/shell/composer.test.tsx']);

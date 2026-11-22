@@ -150,6 +150,9 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       if (block.kind === "task_report") {
         return `[report from task "${block.title}" (taskId ${block.taskId}), ${block.outcome}] ${block.text}`;
       }
+      // A routine run marker only links the main chat to the routine conversation; the run
+      // and its answer stay there, so the main chat model never reads it.
+      if (block.kind === "routine_run") return "";
       if (block.kind === "handoff") {
         return `[handoff ${block.fromBotId} -> ${block.toBotId}] ${block.text}`;
       }

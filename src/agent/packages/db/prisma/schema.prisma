@@ -1123,6 +1123,13 @@ model Run {
   retryOfRunId         String?           @unique
   // Durable retry schedule; null means runnable immediately when queued.
   wakeAt               DateTime?
+  /// A routine run that finished with nothing new: it posted nothing and notified nobody.
+  quiet                Boolean           @default(false)
+  /// Scheduled routine runs that did not happen and were folded into this one.
+  missedRuns           Int               @default(0)
+  /// Why they did not happen: offline (the server was not running) or busy (an earlier
+  /// run had not started yet). Checked by runs_missed_reason_check.
+  missedReason         String?
   // Server-side first visible output, preserved across attempts and resumes.
   firstResponseAt      DateTime?
   startedAt            DateTime?
@@ -1298,6 +1305,10 @@ model Routine {
   nextRunAt      DateTime?
   /// Runs in a row the model provider refused for the account; each one spaces out the schedule.
   accountFailures Int      @default(0)
+  /// The run that paused this routine itself (schedule_update) and when it started. Cleared
+  /// when the routine is turned on again or paused by the person.
+  pausedByRunId  String?
+  pausedByRunAt  DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   runs           Run[]

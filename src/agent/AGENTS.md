@@ -908,6 +908,19 @@
   scheduler. Native private-task push targets use the exact web fallback until
   native task rendering is qualified; never silently open the primary chat.
 
+- Routine runs stay in their own conversation (specs/mico-routine-runs/spec.md). finalizeRun
+  adds one system `routine_run` marker per run to the Mico's main chat (nonce
+  `routine-run:<run>`; never for older main-chat/group targets). Reported, failed and paused
+  markers mark it unread; a quiet run (NO_RESPONSE, nothing posted) never does, nor becomes
+  the preview or moves the Mico. Markers never enter model history; the web folds consecutive
+  markers of one routine into one line. testRun runs carry `routine-test:` and a person's
+  Test/Run or chat mention is never quiet. `routine_report_failure` (≤500) is for routine runs
+  only: the reply stays, the run fails with that reason, no retry. A scheduled run may use
+  schedule_update only to pause its own routine (routines.pausedByRun*, never silent). Late
+  wake-ups count missed times on the run (runs.missedRuns/missedReason). The conversation
+  follows renames unless titleSource is user, a run reopens it, deleting the routine archives
+  it with its history. Verify with verify-routine-isolation-db.ts and the routine tests above.
+
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong
   to the admitted host/Mico and are observed with command_status; a lost observer or
