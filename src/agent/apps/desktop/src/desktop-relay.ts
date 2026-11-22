@@ -161,11 +161,14 @@ export class DesktopRelayClient {
    * are not handed to a poll that will never come. Consent stays; a failed or
    * refused notice is ignored and the server's presence lease still expires.
    */
-  async release() {
+  release(): Promise<void> | undefined {
     const online = !this.stopped && this.lastContact > 0;
     const deviceId = this.deviceId;
     this.stop();
-    if (!online) return;
+    return online ? this.notifyReleased(deviceId) : undefined;
+  }
+
+  private async notifyReleased(deviceId: string) {
     try {
       const response = await this.options.fetch(`${this.options.base}/api/desktop-relay/release`, {
         method: "POST",

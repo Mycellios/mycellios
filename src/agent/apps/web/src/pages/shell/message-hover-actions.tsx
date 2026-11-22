@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@mycellios/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
-import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Users, X } from "lucide-react";
+import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Split, Users, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { MessagePinsContext } from "../../components/PinnedMessages";
 import { SEND_TO_GROUP_MENU_LIMIT, SendToGroupContext } from "../../components/SendToGroup";
@@ -133,7 +133,15 @@ export function MessageHoverActions({
   markedUnread = false,
   onReact,
   onAddRoutine,
-}: MessageActions & { side: "start" | "end" }) {
+  onBranch,
+  branchDisabled = false,
+}: MessageActions & {
+  side: "start" | "end";
+  /** Offered on the last Mico message of a finished turn, on wide screens only. */
+  onBranch?: (message: ThreadMessage) => void;
+  /** The conversation works on a turn: branching waits until it ends. */
+  branchDisabled?: boolean;
+}) {
   const { t, i18n } = useLingui();
   const sendToGroup = useContext(SendToGroupContext);
   const pins=useContext(MessagePinsContext);
@@ -215,6 +223,12 @@ export function MessageHoverActions({
                 <Trans>Mark as unread</Trans>
               </DropdownMenuItem>
             ) : null}
+            {onBranch ? <DropdownMenuItem disabled={branchDisabled}
+              title={branchDisabled ? t`Wait until the current turn ends to branch this conversation.` : undefined}
+              onClick={() => { setMoreOpen(false); onBranch(message); }}>
+              <Split size={14} strokeWidth={1.7} />
+              <Trans>Branch in new conversation</Trans>
+            </DropdownMenuItem> : null}
             {onAddRoutine && message.role === "user" && copyableMessageText(message) ? <DropdownMenuItem onClick={() => { setMoreOpen(false); onAddRoutine(copyableMessageText(message).slice(0, 80), copyableMessageText(message)); }}>
               <Repeat2 size={14} /><Trans>Repeat automatically</Trans>
             </DropdownMenuItem> : null}

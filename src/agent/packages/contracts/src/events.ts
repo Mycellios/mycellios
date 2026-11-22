@@ -452,6 +452,21 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** How the run ended. Kept as `status`, a key that stays queryable when blocks are sealed. */
     status: z.enum(ROUTINE_RUN_OUTCOMES),
   }),
+  z.object({
+    /**
+     * Where the copied history of a branched conversation ends, shown as a divider that links
+     * back to the place it was copied from. A system message right after the copies.
+     */
+    kind: z.literal("branch_origin"),
+    /** The conversation the copy came from: the Mico's main chat or one of its conversations. */
+    threadId: Id,
+    /** The last message of the turn the copy ends with, in that conversation. */
+    messageId: Id,
+    /** The copy came from the Mico's main chat. */
+    main: z.literal(true).optional(),
+    /** The source's title when the copy was made; the divider prefers the current one. */
+    title: z.string().max(240),
+  }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;
 

@@ -81,6 +81,8 @@ export const MessageView = memo(function MessageView({
   onMarkUnread,
   markedUnread = false,
   onReact,
+  onBranch,
+  branchDisabled = false,
 }: {
   artifactTarget: ArtifactTarget;
   canAnswer: boolean;
@@ -125,6 +127,9 @@ export const MessageView = memo(function MessageView({
   onMarkUnread: (message: ThreadMessage) => void;
   markedUnread?: boolean;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
+  /** "Branch in new conversation", only on the last Mico message of a turn. */
+  onBranch?: (message: ThreadMessage) => void;
+  branchDisabled?: boolean;
 }) {
   const { t, i18n } = useLingui();
   const isNarration =
@@ -209,6 +214,8 @@ export const MessageView = memo(function MessageView({
       markedUnread={markedUnread}
       onReact={onReact}
       onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}
+      onBranch={onBranch}
+      branchDisabled={branchDisabled}
     />
   );
   if (isNarration && naturalStyle) {

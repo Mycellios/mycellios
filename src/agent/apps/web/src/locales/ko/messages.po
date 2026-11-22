@@ -7167,3 +7167,27 @@ msgstr "그룹에 보내기"
 #: src/pages/shell/message-hover-actions.tsx
 msgid "Send to {groupName}"
 msgstr "{groupName}에 보내기"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "새 대화로 분기"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "이 대화를 분기하려면 현재 차례가 끝날 때까지 기다려 주세요."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "대화를 분기하지 못했습니다. 다시 시도해 주세요."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "삭제된 대화에서 분기됨"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "{name}에서 분기됨"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "이 분기가 시작된 곳 열기"

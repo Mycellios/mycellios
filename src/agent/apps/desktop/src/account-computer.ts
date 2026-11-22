@@ -55,7 +55,7 @@ export class AccountComputerConnection {
   private updating = false;
   private deviceId?: string;
   private defaultSpace?: string;
-  private releasing: Promise<void> = Promise.resolve();
+  private releasing?: Promise<void>;
   constructor(
     private readonly options: {
       profile: string;
@@ -107,8 +107,15 @@ export class AccountComputerConnection {
   private halt(release: boolean) {
     this.stopped = true;
     clearTimeout(this.timer);
-    if (release && this.clients.size)
-      this.releasing = Promise.allSettled([this.releasing, ...[...this.clients.values()].map((c) => c.release())]).then(() => undefined);
+    if (release) {
+      const notices = [...this.clients.values()].map(client => client.release()).filter(Boolean);
+      if (notices.length) {
+        const releasing = Promise.allSettled([this.releasing, ...notices]).then(() => {
+          if (this.releasing === releasing) this.releasing = undefined;
+        });
+        this.releasing = releasing;
+      }
+    }
     this.disconnect();
     this.options.changed?.();
   }

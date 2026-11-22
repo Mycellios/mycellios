@@ -42,7 +42,7 @@ try {
   await system.space.create({ data: { id: scope.spaceId, name: "Synthetic", organizationId: id } });
   const bot = await system.bot.create({ data: { ...scope, name: "Fixture developer", color: "#10B981", thread: { create: scope } }, include: { thread: true } });
   const handler = { handler: (fn: unknown) => fn };
-  const routes = developmentRoutes({ deps: { prisma }, authed: { development: { open: handler, rename: handler, list: handler, status: handler, projects: handler, saveProject: handler, projectTask: handler, primaryRun: handler, requests: handler, archive: handler, restore: handler, remove: handler } } } as never).development as unknown as Record<string, (v: unknown) => Promise<any>>;
+  const routes = developmentRoutes({ deps: { prisma }, authed: { development: { open: handler, rename: handler, list: handler, status: handler, projects: handler, saveProject: handler, projectTask: handler, primaryRun: handler, requests: handler, archive: handler, restore: handler, remove: handler, branch: handler } } } as never).development as unknown as Record<string, (v: unknown) => Promise<any>>;
   const call = (name: string, input: object, actor = scope) => runAsTenant(actor, () => routes[name]!({ context: { actor }, input }));
   const project = { id: randomUUID(), name: "Synthetic application" };
   await call("saveProject", project); await call("saveProject", project);

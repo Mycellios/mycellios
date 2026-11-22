@@ -7168,3 +7168,27 @@ msgstr "Envoyer au groupe"
 #: src/pages/shell/message-hover-actions.tsx
 msgid "Send to {groupName}"
 msgstr "Envoyer à {groupName}"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "Créer une branche dans une nouvelle conversation"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Attendez la fin du tour en cours pour créer une branche de cette conversation."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "Impossible de créer une branche de la conversation. Réessayez."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Branche d’une conversation supprimée"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Branche de {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Ouvrir le point de départ de cette branche"

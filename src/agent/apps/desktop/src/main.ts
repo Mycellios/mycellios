@@ -2504,7 +2504,7 @@ app.on("window-all-closed", () => {
 });
 
 let localShutdownComplete = false;
-let relayReleased: Promise<unknown> | undefined;
+let relayShutdown: Promise<void> | undefined;
 let relayReleaseDone = false;
 let desktopDiagnostics: DesktopDiagnostics | undefined;
 let diagnosticsShutdown: Promise<void> | undefined;
@@ -2518,11 +2518,34 @@ app.on("before-quit", (event) => {
     });
     return;
   }
-  accountComputer?.stop();
+  if (!relayReleaseDone) {
+    if (relayShutdown) {
+      event.preventDefault();
+      return;
+    }
+    accountComputer?.stop();
+    const accountRelease = accountComputer?.released();
+    const cloudRelease = cloudComputer?.release();
+    // Give real notices time to use their owning Electron session before its
+    // windows close. An offline profile has no release to wait for.
+    if (accountRelease || cloudRelease) {
+      event.preventDefault();
+      let deadline: ReturnType<typeof setTimeout>;
+      relayShutdown = Promise.race([
+        Promise.allSettled([accountRelease, cloudRelease]),
+        new Promise<void>(resolve => { deadline = setTimeout(resolve, 2_000); }),
+      ]).then(() => {
+        clearTimeout(deadline);
+        relayReleaseDone = true;
+        app.quit();
+      });
+      return;
+    }
+    relayReleaseDone = true;
+  }
   appBehavior?.dispose();
   desktopCompanions?.dispose();
   floatingChats?.clear();
-  relayReleased = Promise.allSettled([accountComputer?.released(), cloudComputer?.release()]);
   quitting = true;
   clearTimeout(warmWindowTimer);
   // Containers keep running; only an in-flight pull/up is cut short.
@@ -2531,13 +2554,6 @@ app.on("before-quit", (event) => {
   localStack?.abort();
 });
 app.on("will-quit", event => {
-  // Briefly wait for the server to hear that this PC is offline; never block quitting.
-  if (relayReleased && !relayReleaseDone) {
-    event.preventDefault();
-    void Promise.race([relayReleased, new Promise<void>(resolve => setTimeout(resolve, 2_000))])
-      .then(() => { relayReleaseDone = true; app.quit(); });
-    return;
-  }
   if (desktopDiagnostics && !diagnosticsClosed) {
     event.preventDefault();
     diagnosticsShutdown ??= Promise.race([desktopDiagnostics.close(),new Promise<void>(resolve=>setTimeout(resolve,1_000))])

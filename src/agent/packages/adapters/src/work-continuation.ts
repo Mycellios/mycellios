@@ -91,7 +91,7 @@ export class WorkContinuation {
   constructor(private readonly enabled=true) {}
   stop() { this.stopped=true; }
   canContinue(answer='') { return this.enabled && !this.stopped && !this.waitingForTasks && !stopAcknowledgement.test(answer.trim()); }
-  hasPendingWork() { return this.steps.some(step=>step.status!=='done'); }
+  pendingTitles() { return this.steps.filter(step=>step.status!=='done').map(step=>step.title); }
   afterWait(result:string): string|undefined {
     if(!this.canContinue()) return undefined;
     if(this.count>=8) throw new Error('WORK_INCOMPLETE: Continuation budget reached after waiting for a command. Preserve its result.');

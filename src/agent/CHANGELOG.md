@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-22
+
+### Security
+
+- Carry the private beta invitation through hosted sign-in so a new Mycellios account can be admitted before it opens an Agent workspace.
+
+### Added
+
+- The iPhone app can open Mycellios links and continues to open existing links.
+- On desktop and the web, the menu of a Mico's last reply in a finished turn offers
+  "Branch in new conversation". It copies the conversation up to the end of that turn,
+  with its files, into a new conversation of the same Mico, which opens in a tab right
+  after the one it came from. It works from the main chat and from any conversation of
+  the Mico, and waits while a turn is still running.
+- A branch is named after its source with a number ("Trip budget #2"), or after your
+  last message when it comes from the main chat. A divider where the copy ends says
+  "Branched from …" and opens the original at that point, or says that the original
+  was deleted.
+- The Mico's first reply in a branch knows that the earlier messages are a copy and
+  that files on its computer were not rolled back to that point.
+- Reactions, pins, read marks, queued messages and usage stay with the original.
+  Deleting the original never deletes a branch; deleting a branch also removes the
+  files copied into it.
+
+### Changed
+
+- Open Settings faster on Desktop and reuse the system font list during the session.
+- Show layout-shaped loading placeholders across chats, the Library, tasks, schedules, usage, the Store, and Settings.
+
+### Fixed
+
+- Continue a Mico's task after answering its questionnaire with a fresh tool budget and the existing plan and results.
+- Desktop could hang when quitting from an offline profile. It now waits for the offline notice only if it has a relay connection to release.
+- Micos can spend their tool budget verifying the request and still close the work plan. Internal planning and tool discovery have their own limit.
+
 ## [0.15.0] - 2026-11-22
 
 ### Added

@@ -15,6 +15,56 @@ async function collect(events: AsyncIterable<AgentRuntimeEvent>) {
 }
 
 describe("paused turn context", () => {
+  it("checks evidence and closes the plan even when its only task tool call uses the full budget", async () => {
+    const step = { id: "verify", title: "Verify the integration", status: "running" };
+    const executeTool = vi.fn(async () => ({ evidence: "integration fixture verified" }));
+    const model = await startModelEmulator({
+      steps: [
+        {
+          expect() {},
+          response: { type: "tool", id: "plan", name: "update_work_plan", arguments: { steps: [step] } },
+        },
+        {
+          expect() {},
+          response: { type: "tool", id: "read", name: "read_file", arguments: { path: "integration.txt" } },
+        },
+        {
+          expect(request) {
+            expect(request.messages.find((message) => message.tool_call_id === "read")?.content)
+              .toContain("integration fixture verified");
+            expect(request.messages.filter((message) => message.role === "system").map((message) => message.content).join("\n"))
+              .toContain("No task tool calls remain.");
+          },
+          response: {
+            type: "tool", id: "done", name: "update_work_plan",
+            arguments: { steps: [{ ...step, status: "done" }] },
+          },
+        },
+        { expect() {}, response: { type: "text", text: "Integration verified." } },
+      ],
+    });
+    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "1");
+    try {
+      const events = await collect(new PiAgentRuntime().run({
+        runId: "fixture-budget-plan",
+        botId: "fixture-bot",
+        threadId: "fixture-thread",
+        instructions: "Verify the integration.",
+        prompt: "Check the integration.",
+        history: [],
+        model: model.model,
+        tools: builtinAgentTools.filter((tool) => tool.name === "read_file"),
+        executeTool,
+      }));
+      expect(executeTool).toHaveBeenCalledOnce();
+      expect(events.at(-1)).toEqual({ type: "done", text: "Integration verified." });
+      model.assertComplete();
+    } finally {
+      vi.unstubAllEnvs();
+      await model.close();
+    }
+  });
+
   it("keeps checkpointed tool batches parallel without serializing successful calls", async () => {
     const started: string[] = [];
     let release!: () => void;
@@ -256,6 +306,10 @@ describe("paused turn context", () => {
             expect(resultOf("plan")).toContain("Set up the daily summary");
             expect(resultOf("before")).toContain("fixture verified");
             expect(resultOf("ask")).toBe("Morning");
+            const prompt = request.messages.filter((message) => message.role === "system")
+              .map((message) => message.content).join("\n");
+            expect(prompt).toContain("This turn has 2 remaining task tool calls");
+            expect(prompt).not.toContain("This turn has 1 remaining task tool call");
           },
           response: { type: "tool", id: "write", name: "remember", arguments: { content: "Morning summary" } },
         },
@@ -286,7 +340,7 @@ describe("paused turn context", () => {
       saveWorkState: async (state) => { savedState = state; },
       executeTool,
     };
-    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "3");
+    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "2");
     try {
       const runtime = new PiAgentRuntime();
       const paused = await collect(runtime.run(request));

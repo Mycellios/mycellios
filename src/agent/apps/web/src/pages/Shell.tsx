@@ -237,6 +237,8 @@ import { ResponseStyleContext, useSavedResponseStyle } from "../lib/response-sty
 import type { TaskThreadScope } from "../lib/task-thread-scope";
 import { MainTabMenu, MicoTaskTabs } from "../components/MicoTaskTabs";
 import { ConversationFailureCard, MicoStartedBanner, NewConversationIntro } from "../components/NewConversationIntro";
+import { BranchOriginDivider } from "../components/BranchOriginDivider";
+import { type BranchOriginBlock, branchConversation, branchSource } from "../lib/conversation-branch";
 import {
   adoptNewConversation, closeOtherTabs, forgetNewConversationRequest, isClosedConversation, NEW_CONVERSATION_TAB,
   newConversationRequest, openTab, updateConversationTabs, useConversationRows, useConversationTabs, writeConversationRows,
@@ -4287,6 +4289,40 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }
   const selectConversationRef = useRef(openConversationInChat);
   selectConversationRef.current = openConversationInChat;
+  /** Copies the turn that ends with this Mico message into a new conversation and opens it next to this tab. */
+  const branching = useRef(false);
+  async function branchFromMessage(message: ThreadMessage) {
+    if (!active || inGroup || activeProject || !conversationScope || branching.current) return;
+    branching.current = true;
+    try {
+      const branch = await branchConversation({ rpc, scope: conversationScope, botId: active.id,
+        source: taskScope?.taskThreadId, messageId: message.id });
+      selectConversation(branch.threadId);
+    } catch (cause) {
+      toast.error(errorText(cause, t`Could not branch the conversation. Try again.`));
+    } finally { branching.current = false; }
+  }
+  const branchFromMessageRef = useRef(branchFromMessage);
+  branchFromMessageRef.current = branchFromMessage;
+  const onBranchMessage = useCallback((message: ThreadMessage) => { void branchFromMessageRef.current(message); }, []);
+  /** The branch divider opens its source at the turn it was copied from. */
+  function openBranchSource(block: BranchOriginBlock) {
+    if (!active) return;
+    const params = new URLSearchParams();
+    if (!block.main) {
+      params.set("task", block.threadId);
+      if (conversationScope) updateConversationTabs(conversationScope, state => openTab(state, block.threadId));
+    }
+    params.set("m", block.messageId);
+    navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `?${params}` });
+  }
+  const renderBranchOrigin = (message: ThreadMessage, block: BranchOriginBlock) => {
+    const source = branchSource(block, conversationRows, currentConversation);
+    return <BranchOriginDivider messageId={message.id} source={source}
+      onOpen={source.kind === "deleted" ? undefined : () => openBranchSource(block)} />;
+  };
+  // Branching is a desktop and web action: not on phones, in groups, projects or floating chats.
+  const branchingOffered = Boolean(active && !inGroup && !activeProject && !newConversation && !isMobileSidebar && !floatingChat);
   /** The main tab closes every conversation tab; it never closes itself. */
   const closeAllConversationTabs = () => {
     if (!conversationScope) return;
@@ -4933,6 +4969,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 setReplyQuote(quote);
               }}
               onReact={reactToMessage}
+              onBranch={branchingOffered ? onBranchMessage : undefined}
+              branchDisabled={composerRunning}
+              renderBranchOrigin={renderBranchOrigin}
               onJumpToMessage={jumpToReplyMessage}
               onOpenPeerMessages={(peer) => {
                 setPeerConversation(peer);
