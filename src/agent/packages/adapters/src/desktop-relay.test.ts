@@ -93,7 +93,7 @@ it("lazily admits all owned bots on one paired PC and expires offline presence",
  expect(broker.available({...owner,userId:"other"},"unopened")).toBe(false);
  broker.register(owner,{...binding,deviceId:"different-pc"});
  expect(broker.available(owner,"unopened")).toBe(true);
- now+=46000;expect(broker.available(owner,"unopened")).toBe(false);
+ now+=91000;expect(broker.available(owner,"unopened")).toBe(false);
  broker.connectAccountBot(owner,"new");expect(broker.available(owner,"new")).toBe(false);
  broker.register(owner,binding);broker.connectAccountBot(owner,"new");
  expect(broker.available(owner,"new")).toBe(true);
@@ -127,10 +127,10 @@ it("keeps two desktop instances present and routes each Mico to the computer tha
   expect(broker.poll(prod, "prod-pc").bindings?.map(item => item.botId)).toEqual(["bot"]);
   expect(broker.poll(dev, "dev-pc").bindings?.map(item => item.botId)).toEqual(["other"]);
   expect(broker.poll(dev, "dev-pc").operations).toEqual([]);
-  now = 40_000;
+  now = 60_000;
   broker.register(prod, { deviceId: "prod-pc", generation: "prod-gen", agentExecution: 1 });
   broker.poll(prod, "prod-pc");
-  now = 80_000;
+  now = 100_000;
   expect(broker.agentAvailable(prod, "bot")).toBe(true);
   expect(broker.available(dev, "other")).toBe(false);
   expect(broker.hasAgentDevice(prod)).toBe(true);
