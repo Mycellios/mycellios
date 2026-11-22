@@ -93,6 +93,13 @@ export const ENCRYPTED_MODELS: Record<string, ModelSpec> = {
     space: { parent: "memory_documents" },
     ownerRelation: "document",
   },
+  /** The unsaved edit of a queued message is message content, bound to that message. */
+  SteeringMessage: {
+    table: "steering_messages",
+    fields: { editDraft: {} },
+    space: { parent: "messages" },
+    ownerRelation: "message",
+  },
   /** The compacted summary of older history is derived message content. */
   Thread: {
     table: "threads",

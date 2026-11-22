@@ -192,6 +192,46 @@ describe("native agent protocol integration", () => {
     expect(events.at(-1)?.type).toBe("done");
     expect(test.executeTool).toHaveBeenCalledOnce();
   }, 25000);
+  it.each(["codex", "claude", "acp"] as const)(
+    "delivers a message the person sent mid-turn to %s at the next tool result, behind the framing note",
+    async (engine) => {
+      const test = await setup(engine, ["--fixture-echo-tool-result"]);
+      const onToolCompleted = vi.fn();
+      // Nothing waits when the turn starts; the correction arrives while the tool runs.
+      const claimSteering = vi.fn(async (seen: string[]) =>
+        claimSteering.mock.calls.length === 1 || seen.includes("steer-1")
+          ? []
+          : [{ id: "steer-1", messageId: "message-1", text: "Use the March figures instead." }],
+      );
+      test.request.claimSteering = claimSteering;
+      test.request.onToolCompleted = onToolCompleted;
+      let text = "";
+      for await (const event of test.runtime.run(test.request, test.context))
+        if (event.type === "text") text += event.text;
+      expect(text).toContain("fixture file");
+      expect(text).toContain("Use the March figures instead.");
+      expect(text).toContain("mycellios_steering");
+      expect(claimSteering).toHaveBeenNthCalledWith(1, []);
+      expect(claimSteering).toHaveBeenNthCalledWith(2, []);
+      // The tool's own result, as recorded for the chat, is unchanged.
+      expect(onToolCompleted.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ result: { content: "fixture file" } }));
+    },
+    25000,
+  );
+  it("moves a running shell to the background when a message for the turn waits", async () => {
+    const test = await setup("codex");
+    test.request.steeringPending = vi.fn(async () => true);
+    let yielded: AbortSignal | undefined;
+    test.request.executeTool = vi.fn(async (_name, _args, _id, _route, observer) => {
+      yielded = observer?.yieldSignal;
+      await new Promise<void>((resolve) => observer?.yieldSignal?.addEventListener("abort", () => resolve(), { once: true }));
+      return { content: "still running" };
+    });
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of test.runtime.run(test.request, test.context)) events.push(event);
+    expect(yielded?.aborted).toBe(true);
+    expect(events.at(-1)?.type).toBe("done");
+  }, 25000);
   it("ends the provider turn on approval without reporting completion", async () => {
     const test = await setup("codex");
     test.request.executeTool = vi.fn(async () => approvalPausedToolResult());

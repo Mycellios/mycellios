@@ -1,5 +1,6 @@
 import type { AgentToolCompletion, ConnectorTool } from "@mycellios/adapter-kit";
 import type { FinishTurn } from "@earendil-works/pi-agent-core";
+import { framedSteeringText } from "@mycellios/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { builtinAgentTools } from "./builtin-tools.js";
 
@@ -563,11 +564,11 @@ describe("Pi connector tool dispatch", () => {
     expect(fakeAgentState.preparedMessages).toEqual([
       expect.objectContaining({
         role: "user",
-        content: "Use the newer customer totals.",
+        content: framedSteeringText("Use the newer customer totals."),
       }),
       expect.objectContaining({
         role: "user",
-        content: "Keep the original date range.",
+        content: framedSteeringText("Keep the original date range."),
       }),
     ]);
   });
@@ -617,8 +618,8 @@ describe("Pi connector tool dispatch", () => {
     expect(claimSteering).toHaveBeenNthCalledWith(2, []);
     expect(claimSteering).toHaveBeenNthCalledWith(3, ["steering-1"]);
     expect(fakeAgentState.preparedMessages).toEqual([
-      expect.objectContaining({ content: "First boundary context." }),
-      expect.objectContaining({ content: "Next boundary context." }),
+      expect.objectContaining({ content: framedSteeringText("First boundary context.") }),
+      expect.objectContaining({ content: framedSteeringText("Next boundary context.") }),
     ]);
   });
 
@@ -737,7 +738,7 @@ describe("Pi connector tool dispatch", () => {
     expect(fakeAgentState.steeredMessages).toContainEqual({
       role: "user",
       content: [
-        { type: "text", text: "Compare the second image." },
+        { type: "text", text: framedSteeringText("Compare the second image.") },
         { type: "image", data: "BAUG", mimeType: "image/png" },
       ],
       timestamp: expect.any(Number),
@@ -786,6 +787,36 @@ describe("Pi connector tool dispatch", () => {
       ]);
     },
   );
+
+  it("moves a running shell to the background when the person's message waits for the turn", async () => {
+    fakeAgentState.invoke = { name: "shell", args: { command: "sleep 600" } };
+    let yielded: AbortSignal | undefined;
+    const executeTool = vi.fn(async (_name: string, _args: unknown, _id: string, _route: unknown, observer?: { yieldSignal?: AbortSignal }) => {
+      yielded = observer?.yieldSignal;
+      // A long command: it returns only once the waiting message asks it to yield.
+      await new Promise<void>((resolve) => observer?.yieldSignal?.addEventListener("abort", () => resolve(), { once: true }));
+      return { stdout: "", stderr: "", code: null, running: true };
+    });
+    const runtime = new PiAgentRuntime();
+    for await (const _event of runtime.run(
+      {
+        botId: "b",
+        threadId: "t",
+        runId: "r",
+        prompt: "run the long job",
+        instructions: "Use shell.",
+        history: [],
+        tools: [shellTool],
+        model: { provider: "test", id: "dispatch-test-model" },
+        executeTool: executeTool as never,
+        steeringPending: async () => true,
+      },
+      { signal: new AbortController().signal },
+    )) {
+      // Exhaust the runtime event stream.
+    }
+    expect(yielded?.aborted).toBe(true);
+  });
 
   it("exposes a provider-safe name while executing the original connector name", async () => {
     const executeTool = vi.fn(async () => ({ ok: true }));

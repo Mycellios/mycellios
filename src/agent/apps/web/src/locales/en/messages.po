@@ -14119,6 +14119,210 @@ msgstr "Cancel the wait"
 msgid "Waiting for an event"
 msgstr "Waiting for an event"
 
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "A routine is running now."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "The Mico is working on its own task here."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "The current turn is waiting for your answer."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "Nothing is running here now."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "This message already started or was removed."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "This message is being edited somewhere else."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "This edit was closed somewhere else."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "The queue changed meanwhile. It was refreshed; try again."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "A queued message needs text or a file."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "Only a message you sent to this Mico alone can move to a new conversation."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "Not steered: {reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "Could not update the queue. Try again."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "Queued message saved."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "Queued message deleted."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "Moved to position {position} of {total}."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "Moved to a new conversation: {title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "Waiting while the computer or the server restarts."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "Paused while a message is being edited."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "They go one at a time, after the current turn."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "Messages waiting to send"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "Queued message {position} of {total}: {preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "Edit queued message"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "Being edited somewhere else"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "Editing"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "Add it to the turn that is running now"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "Added to the current turn."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "Stop the current turn and send this message next"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "Sending this message now."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "Move to a new conversation"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "More actions for this message"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "Your edited text"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "Waiting to send"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "The queue waits until you save or cancel."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "Not steered"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "Steer now"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "Send now"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "Edit here instead"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "Use the up and down arrow keys to move a focused message in the queue."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "Delete queued message?"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "It is being edited somewhere else. Deleting it also discards that edit."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "Keep"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "Edit not saved"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "Put it in the message box"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, one {# file} other {# files}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "Waiting for background work…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "This runtime runs one task at a time, the main chat included."
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+
 #: src/pages/shell/message-hover-actions.tsx
 msgid "Branch in new conversation"
 msgstr "Branch in new conversation"

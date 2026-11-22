@@ -35,6 +35,12 @@ import {
   SideThreadTargetSchema,
 } from "./side-threads.js";
 import { CancelOpenWaitResultSchema, OpenWaitSchema } from "./event-waits.js";
+import {
+  MESSAGE_QUEUE_EDIT_MAX_LENGTH,
+  MESSAGE_QUEUE_REORDER_LIMIT,
+  MessageQueueStateSchema,
+  QueueHoldIdSchema,
+} from "./message-queue.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
@@ -209,6 +215,8 @@ const structuredMentionTarget = z.discriminatedUnion("kind", [
   /** One of the same Mico's conversations; the message links to it. */
   z.object({ kind: z.literal("thread"), id: Id }),
 ]);
+
+const queuedMessageTarget = threadTarget.safeExtend({ messageId: Id });
 
 const threadSendInput = threadTarget
   .safeExtend({
@@ -648,6 +656,35 @@ export const appContract = {
       .input(threadTarget.safeExtend({ cursor: z.number().int().min(-1) }))
       .output(eventIterator(ProductEventSchema)),
     queue: oc.input(threadTarget).output(z.array(z.object({ messageId: Id, text: z.string(), createdAt: z.string() }))),
+    /** The waiting messages with their order, edits, why they wait and whether Steer now applies. */
+    queueState: oc.input(threadTarget).output(MessageQueueStateSchema),
+    /** Steer now: the message joins the running turn as a correction (refused during a routine). */
+    queueSteer: oc.input(queuedMessageTarget).output(z.object({ ok: z.literal(true) })),
+    /** Send now: stops the current turn here and starts this message next. */
+    queueSendNow: oc.input(queuedMessageTarget).output(z.object({ ok: z.literal(true), runId: Id.optional() })),
+    /** Removes a message that still waits; `force` confirms one being edited somewhere else. */
+    queueDelete: oc.input(queuedMessageTarget.safeExtend({ force: z.boolean().optional() })).output(z.object({ ok: z.literal(true) })),
+    /** Opens an edit, which pauses the queue at this message until Save or Cancel; `takeOver` moves one open elsewhere here. */
+    queueEdit: oc.input(queuedMessageTarget.safeExtend({ holdId: QueueHoldIdSchema, takeOver: z.boolean().optional() })).output(
+      z.object({ text: z.string(), draft: z.string().nullable() }),
+    ),
+    /** Keeps the unsaved text of an open edit. */
+    queueEditDraft: oc.input(queuedMessageTarget.safeExtend({ holdId: QueueHoldIdSchema, draft: z.string().max(MESSAGE_QUEUE_EDIT_MAX_LENGTH) }))
+      .output(z.object({ ok: z.literal(true) })),
+    /** Saves the edit: the new text replaces the message, and the queue continues. */
+    queueEditSave: oc.input(queuedMessageTarget.safeExtend({ holdId: QueueHoldIdSchema, text: z.string().max(MESSAGE_QUEUE_EDIT_MAX_LENGTH) }))
+      .output(z.object({ ok: z.literal(true) })),
+    /** Cancels the edit; `gone` says the message no longer waits (it started or was removed). */
+    queueEditCancel: oc.input(queuedMessageTarget.safeExtend({ holdId: QueueHoldIdSchema }))
+      .output(z.object({ ok: z.literal(true), gone: z.boolean() })),
+    /** Reorders the first messages; `expected` is the order shown, refused when it changed. */
+    queueReorder: oc.input(threadTarget.safeExtend({
+      expected: z.array(Id).min(1).max(MESSAGE_QUEUE_REORDER_LIMIT),
+      order: z.array(Id).min(1).max(MESSAGE_QUEUE_REORDER_LIMIT),
+    })).output(z.object({ ok: z.literal(true) })),
+    /** Moves a waiting message to this Mico into a new conversation of its own, which starts with it. */
+    queueMove: oc.input(queuedMessageTarget.safeExtend({ responseLocale: z.string().max(16).optional() }))
+      .output(z.object({ threadId: Id, runId: Id, title: z.string() })),
     send: oc.input(threadSendInput).output(
       z.object({
         taskId: Id,

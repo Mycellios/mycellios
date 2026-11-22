@@ -220,6 +220,12 @@ export interface AgentToolExecutionObserver {
   onShellStillRunning?: (
     completion: Promise<{ stdout: string; stderr: string; code: number }>,
   ) => void;
+  /**
+   * Aborted when the person's message waits for this turn. A running shell command then
+   * returns what it printed so far and keeps running in the background (it is not killed),
+   * so the turn can take the message; its final output arrives as for any background command.
+   */
+  yieldSignal?: AbortSignal;
 }
 
 /** Ephemeral completion data for audit hooks; result contents must be redacted before persistence. */
@@ -578,6 +584,8 @@ export interface AgentRunRequest {
   onToolCompleted?: (completion: AgentToolCompletion) => Promise<void> | void;
   /** Atomically claim durable user steering at the runtime's next safe turn boundary. */
   claimSteering?: (seenIds: string[]) => Promise<AgentSteeringMessage[]>;
+  /** Whether a message for this turn waits to be claimed (read only; claims nothing). */
+  steeringPending?: () => Promise<boolean>;
 }
 
 export interface ScriptedTurn {
@@ -643,6 +651,8 @@ export type AgentRuntimeEvent =
       text: string;
       /** Provider-generated tool status rather than assistant-authored narration. */
       activity?: true;
+      /** The turn waits for its own background work (a command still running) to finish. */
+      waiting?: "background";
     }
   | { type: "tool"; name: string; args: Record<string, unknown>; executionId: string }
   | {

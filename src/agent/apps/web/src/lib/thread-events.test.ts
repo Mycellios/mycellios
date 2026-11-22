@@ -1613,6 +1613,24 @@ describe("thread event reduction", () => {
     expect(next?.messages[0]?.blocks[0]).toMatchObject({ status: "answered", answer: "Paris" });
   });
 
+  it("removes a queued message that was deleted or moved, and keeps the run of an edited one", () => {
+    const initial = snapshot([
+      { ...message("queued-1", [{ kind: "text", text: "First" }]), role: "user", runId: "run-live" },
+      { ...message("queued-2", [{ kind: "text", text: "Second" }]), role: "user", runId: "run-live" },
+    ]);
+    const edited = reduceThreadSnapshot(
+      initial,
+      event({ type: "thread.message.updated", seq: 9, runId: undefined, payload: { messageId: "queued-1", role: "user", blocks: [{ kind: "text", text: "First, edited" }] } }),
+    );
+    expect(edited?.messages[0]).toMatchObject({ id: "queued-1", runId: "run-live", blocks: [{ kind: "text", text: "First, edited" }] });
+    const removed = reduceThreadSnapshot(
+      edited,
+      event({ type: "thread.message.deleted", seq: 10, payload: { messageId: "queued-2" } }),
+    );
+    expect(removed?.messages.map((item) => item.id)).toEqual(["queued-1"]);
+    expect(removed?.cursor).toBe(10);
+  });
+
   it("titles the call marker in place when the wrap-up run names it", () => {
     const initial = snapshot([
       { ...message("marker-1", [{ kind: "voice_call", title: "", farewell: "" }]), callId: "c-1" },

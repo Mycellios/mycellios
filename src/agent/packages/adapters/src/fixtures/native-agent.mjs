@@ -2,6 +2,8 @@ import { appendFileSync } from "node:fs";
 import readline from "node:readline";
 
 const engine = process.argv[2];
+// Answers with the tool result it received, so tests can see what reached the engine.
+const echoToolResult = process.argv.includes("--fixture-echo-tool-result");
 const toolArguments = process.argv.includes("--fixture-questionnaire") ? {
   question: "Your trip", questions: [
     { question: "Where?", options: [{ label: "Paris", description: "Museums" }, "London"], multiSelect: true },
@@ -91,7 +93,11 @@ lines.on("line", (line) => {
         if (!message.result?.success) throw new Error("Tool bridge rejected fixture call");
         send({
           method: "item/agentMessage/delta",
-          params: { threadId: "fixture-thread", turnId: "fixture-turn", delta: "Fixture complete" },
+          params: {
+            threadId: "fixture-thread",
+            turnId: "fixture-turn",
+            delta: echoToolResult ? JSON.stringify(message.result.contentItems) : "Fixture complete",
+          },
         });
         send({
           method: "turn/completed",
@@ -131,6 +137,14 @@ lines.on("line", (line) => {
           }),
         });
         if (!response.ok) throw new Error("MCP bridge failed");
+        if (echoToolResult)
+          send({
+            type: "stream_event",
+            event: {
+              type: "content_block_delta",
+              delta: { type: "text_delta", text: JSON.stringify((await response.json()).result.content) },
+            },
+          });
         if (process.argv.includes("--fixture-retry-mcp")) {
           const retried = await fetch(bridge.url, {
             method: "POST",
@@ -169,7 +183,7 @@ lines.on("line", (line) => {
         const authorization = bridge.headers.find(
           (header) => header.name === "Authorization",
         ).value;
-        await fetch(bridge.url, {
+        const called = await fetch(bridge.url, {
           method: "POST",
           headers: { Authorization: authorization, "content-type": "application/json" },
           body: JSON.stringify({
@@ -179,6 +193,16 @@ lines.on("line", (line) => {
             params: { name: "tool_0", arguments: toolArguments },
           }),
         });
+        if (echoToolResult)
+          send({
+            method: "session/update",
+            params: {
+              update: {
+                sessionUpdate: "agent_message_chunk",
+                content: { type: "text", text: JSON.stringify((await called.json()).result.content) },
+              },
+            },
+          });
         send({
           method: "session/update",
           params: {
