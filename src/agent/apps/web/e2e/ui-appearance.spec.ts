@@ -54,7 +54,7 @@ async function captureSidebarSearchSelected(
 
 test("account settings appearance control switches to light mode", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `ui-appearance-${stamp}@rakazo.test`, "password12", "Appearance QA");
+  await signup(page, `ui-appearance-${stamp}@mycellios.test`, "password12", "Appearance QA");
   await completeOnboarding(page, testInfo);
 
   await page.getByTestId("workspace-rail").getByRole("button", { name: "Settings", exact: true }).click();
@@ -104,10 +104,10 @@ test("account settings appearance control switches to light mode", async ({ page
   await captureSidebarSearchSelected(page, testInfo, "sidebar-search-selected-dark");
 });
 
-test("workspace rail footer follows OpenBot and reaches integrations from Hifa Store", async ({
+test("workspace rail footer follows the reference app and reaches integrations from Hifa Store", async ({
   page,
 }, testInfo) => {
-  await signup(page, `footer-web-${Date.now()}@rakazo.test`, "password12", "Footer Demo");
+  await signup(page, `footer-web-${Date.now()}@mycellios.test`, "password12", "Footer Demo");
   await completeOnboarding(page);
   const rail = page.getByTestId("workspace-rail");
   await expect(rail).toBeVisible();
@@ -192,7 +192,7 @@ test("mobile navigation footer keeps the account identity readable and a ready d
       },
     });
   });
-  const email = `footer-${Date.now()}@rakazo.test`;
+  const email = `footer-${Date.now()}@mycellios.test`;
   await signup(page, email, "password12", "Footer Demo");
   await completeOnboarding(page);
   await page.request.post("/api/auth/update-user", { data: { name: "Footer Demo" } });
@@ -314,7 +314,7 @@ test("mobile navigation footer keeps the account identity readable and a ready d
 });
 
 test("mobile footer app marks follow the integrations overlay", async ({ page }) => {
-  await signup(page, `footer-apps-${Date.now()}@rakazo.test`, "password12", "Footer Demo");
+  await signup(page, `footer-apps-${Date.now()}@mycellios.test`, "password12", "Footer Demo");
   await completeOnboarding(page);
   let connected = true;
   let listed = true;
@@ -429,7 +429,7 @@ test("sidebar list fades above the credits foot and keeps the last row reachable
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await signup(page, `footer-scroll-${Date.now()}@rakazo.test`, "password12", "Demo User");
+  await signup(page, `footer-scroll-${Date.now()}@mycellios.test`, "password12", "Demo User");
   await completeOnboarding(page);
   for (let index = 0; index < 20; index++) {
     await rpc(page, "bots/create", {

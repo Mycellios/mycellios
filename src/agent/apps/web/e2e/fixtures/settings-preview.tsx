@@ -1,9 +1,9 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import { DEFAULT_DESKTOP_COMPANIONS, type DesktopCompanionPreferences, type RakazoDesktop } from "@rakazo/contracts";
+import { DEFAULT_DESKTOP_COMPANIONS, type DesktopCompanionPreferences, type RakazoDesktop } from "@mycellios/contracts";
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { MicosSettingsPanel } from "../../src/pages/settings/CompanionPanels";
 import { DesktopCompanionsPanel } from "../../src/pages/settings/DesktopCompanionsPanel";
 import { ServerLinkCode } from "../../src/components/ServerLinkCode";

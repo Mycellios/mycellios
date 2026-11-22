@@ -1,7 +1,7 @@
 import { startContributionGrowth, stopContributionGrowth } from "../lib/contribution-growth";
 import "./contribution.css";
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { LoaderCircle, Pause, Play, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";

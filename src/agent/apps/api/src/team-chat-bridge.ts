@@ -4,14 +4,14 @@ import type {
   TeamChatInboundMessage,
   TeamChatSendRequest,
   TeamChatSendResult,
-} from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT, AutomatedSenderPoliciesSchema } from "@rakazo/contracts";
-import { botMessageMaxHops, messageBlockForArtifact, promptTextForAttachments } from "@rakazo/core";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { clearEndedRunState } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_COUNT, AutomatedSenderPoliciesSchema } from "@mycellios/contracts";
+import { botMessageMaxHops, messageBlockForArtifact, promptTextForAttachments } from "@mycellios/core";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
+import { clearEndedRunState } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { MessagingReceipts } from "./messaging-receipts.js";
 import type { TeamChatEngagementJudge } from "./team-chat-judge.js";
 import {

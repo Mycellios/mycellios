@@ -1,9 +1,9 @@
 import { createHmac } from "node:crypto";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { bootstrapUserSpace, createRepos, runAsSystem, runAsTenant, saveModelPreference } from "@rakazo/db";
-import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@rakazo/contracts";
-import { serializeModelSecret } from "@rakazo/adapters";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { bootstrapUserSpace, createRepos, runAsSystem, runAsTenant, saveModelPreference } from "@mycellios/db";
+import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@mycellios/contracts";
+import { serializeModelSecret } from "@mycellios/adapters";
 import { eventAgentDigest, openEventAgentTicket } from "../../../../core/event-demo-agent-ticket.js";
 import { EVENT_DEMO_COMPANY, EVENT_DEMO_COMPANY_VERSION, eventCompanyInstructions, eventCompanySpawnKey } from "./event-demo-company.js";
 

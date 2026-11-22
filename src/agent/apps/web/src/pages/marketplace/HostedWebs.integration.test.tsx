@@ -14,7 +14,7 @@ vi.mock("./AppCover", () => ({ AppCover: ({ fallback }: { fallback?: ReactNode }
 vi.mock("../cadencia/Cadencia", () => ({ default: ({ onBack }: { onBack: () => void }) => <button onClick={onBack}>Volver de Cadencia</button> }));
 vi.mock("./VideoEditor", () => ({ VideoEditor: ({ onBack }: { onBack: () => void }) => <button onClick={onBack}>Volver del editor</button> }));
 vi.mock("./MycelliosCreate", () => ({ MycelliosCreate: () => <p>Creación multimedia</p> }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({ variant: _v, size: _s, ...props }: ComponentProps<"button"> & { variant?: string; size?: string }) => <button {...props} />,
   Input: (props: ComponentProps<"input">) => <input {...props} />,
   DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -33,7 +33,7 @@ async function mount() {
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   await act(async () => {
     root!.render(<MemoryRouter initialEntries={["/app/mico?view=marketplace&market=mycellios-apps"]}>
-      <HostedWebs scope='["owner","space"]' spaceId="space" bots={[]} onOpenBot={() => {}} onCreateBot={() => {}} />
+      <HostedWebs scope='["owner","space"]' spaceId="space" bots={[]} onShowBot={() => {}} onCreateBot={() => {}} />
       <Location />
     </MemoryRouter>);
     await new Promise(resolve => setTimeout(resolve, 20));

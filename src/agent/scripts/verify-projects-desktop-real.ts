@@ -123,7 +123,7 @@ try {
   if (!signup.ok) throw Error(`Local signup refused: ${signup.status} ${await signup.text()}`);
   const registered = await signup.json() as { user: { id: string } }; owner = registered.user.id;
   cookie = signup.headers.getSetCookie().map(v => v.split(";")[0]).join("; "); assert.ok(cookie);
-  const { asSystem, createRepos, runAsTenant } = await import("@rakazo/db");
+  const { asSystem, createRepos, runAsTenant } = await import("@mycellios/db");
   const prisma = asSystem(app.prisma, "isolated real-model project qualification");
   let membership = await prisma.spaceMember.findFirst({ where: { userId: owner } });
   if (!membership) {
@@ -149,7 +149,7 @@ try {
   for (const role of ["main", "approval"])
     await prisma.userModelRoleChoice.create({ data: { userId: owner, role, position: 0, provider: "openai-codex", modelId: model, credentialId: credential.id, thinkingLevel: "low" } });
   const { aiRecipient } = await import("../packages/adapters/src/ai-consent.js");
-  const { AI_DISCLOSURE_VERSION } = await import("@rakazo/contracts");
+  const { AI_DISCLOSURE_VERSION } = await import("@mycellios/contracts");
   const recipient = aiRecipient({ provider: "openai-codex", modelId: model, use: "model" });
   assert.ok(recipient);
   await prisma.aiDataConsent.create({ data: { ...scope, recipientKey: recipient.key, version: AI_DISCLOSURE_VERSION } });
@@ -293,7 +293,7 @@ try {
 } finally {
   if (diagnosticTimer) clearInterval(diagnosticTimer);
   await diagnostic?.end().catch(() => {});
-  if (app && owner) { const { asSystem } = await import("@rakazo/db"); await asSystem(app.prisma, "remove qualification model credential").secret.deleteMany({ where: { userId: owner } }).catch(() => {}); }
+  if (app && owner) { const { asSystem } = await import("@mycellios/db"); await asSystem(app.prisma, "remove qualification model credential").secret.deleteMany({ where: { userId: owner } }).catch(() => {}); }
   await electronApp?.close().catch(() => {}); await web?.close();
   for (const response of waiting) response.end("qualification ended");
   barrier.close(); http?.closeAllConnections(); http?.close(); await app?.stop(); await pg.stop();

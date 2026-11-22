@@ -65,7 +65,7 @@ jobs:
           DATABASE_URL: postgres://postgres:qualification@127.0.0.1:5432/qualification
         run: |
           npm run db:generate
-          npm run migrate --workspace @rakazo/db
+          npm run migrate --workspace @mycellios/db
           npx tsx scripts/verify-tailscale-live.ts
       - name: Seal the built image
         run: |

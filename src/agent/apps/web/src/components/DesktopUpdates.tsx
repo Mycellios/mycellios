@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { isBelowDesktopMinimum, productBrand, type DesktopUpdateState } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import { isBelowDesktopMinimum, productBrand, type DesktopUpdateState } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { UpdateNotice } from "./UpdateNotice";
 import { fetchAuthCapabilities, loadAuthCapabilities } from "../lib/auth-capabilities";
@@ -269,7 +269,7 @@ export function useSidebarUpdate() {
     state: updates?.state ?? null,
     callActive: updates?.callActive ?? false,
     error: updates?.message ?? null,
-    // Like OpenBot, an explicit Restart restarts now: native work is checkpointed
+    // Like the reference app, an explicit Restart restarts now: native work is checkpointed
     // instead of leaving the update waiting. Unsaved drafts and calls still block it.
     install: () => {
       void updates?.act(updates?.forceAvailable ? "forceInstall" : "install");

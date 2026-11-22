@@ -1,4 +1,4 @@
-import type { BackgroundJob, JobPublisher } from "@rakazo/adapter-kit";
+import type { BackgroundJob, JobPublisher } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { credentialDigest } from "./credential-digest.js";
 import type { ExpoPushTicket } from "./expo-push.js";

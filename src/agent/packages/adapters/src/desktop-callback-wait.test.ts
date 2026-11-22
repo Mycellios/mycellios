@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { desktopDiagnosticMessage } from "@rakazo/contracts";
+import { desktopDiagnosticMessage } from "@mycellios/contracts";
 import { busyBeforeDispatch, sendWhenPcHasRoom } from "./desktop-callback-wait.js";
 
 const busy = () => Error(desktopDiagnosticMessage({ code: "desktop_busy", phase: "callback", stage: "dispatch" }));

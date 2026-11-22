@@ -3,8 +3,8 @@ import { orderSidebarChats } from "../../lib/sidebar-chat-order";
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot, BotSection, Group, Me, Space, ThreadSnapshot } from "@rakazo/contracts";
-import { assertSidebarFolderParent, sidebarFolderTree } from "@rakazo/core";
+import type { Bot, BotSection, Group, Me, Space, ThreadSnapshot } from "@mycellios/contracts";
+import { assertSidebarFolderParent, sidebarFolderTree } from "@mycellios/core";
 import {
   BotAvatar,
   Button,
@@ -19,7 +19,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
   GroupAvatar,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check, ChevronDown, CircleAlert, Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { Suspense, useMemo } from "react";

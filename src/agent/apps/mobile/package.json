@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/mobile",
+  "name": "@mycellios/mobile",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "main": "index.ts",
@@ -19,11 +19,11 @@
   "dependencies": {
     "@expo/metro-runtime": "57.0.17",
     "@expo/ui": "57.0.26",
-    "@rakazo/chat-ui": "*",
-    "@rakazo/contracts": "*",
-    "@rakazo/core": "*",
-    "@rakazo/logging": "*",
-    "@rakazo/ui-tokens": "*",
+    "@mycellios/chat-ui": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/core": "*",
+    "@mycellios/logging": "*",
+    "@mycellios/ui-tokens": "*",
     "@react-native-vector-icons/ionicons": "13.1.4",
     "@react-native-vector-icons/material-design-icons": "13.1.4",
     "@sentry/react-native": "7.11.0",

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import type { HostedWebDraft } from "@rakazo/contracts";
+import type { HostedWebDraft } from "@mycellios/contracts";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({
     children,
     render,
@@ -109,7 +109,7 @@ async function mount() {
         spaceId="space"
         onBack={() => {}}
         onPublished={() => {}}
-        onOpenBot={() => {}}
+        onShowBot={() => {}}
         onCreateBot={() => {}}
       />,
     ),

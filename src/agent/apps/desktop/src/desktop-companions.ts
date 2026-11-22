@@ -3,7 +3,7 @@ import path from "node:path";
 import { DEFAULT_DESKTOP_COMPANIONS, DesktopCompanionPreferencesSchema, DesktopCompanionSnapshotSchema,
   DesktopQuestionAnswerSchema, desktopQuestionAnswerText,
   type DesktopQuestionRequest, type DesktopQuestionResult,
-  type DesktopCompanionPreferences, type DesktopCompanionSnapshot } from "@rakazo/contracts";
+  type DesktopCompanionPreferences, type DesktopCompanionSnapshot } from "@mycellios/contracts";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
 import { validDesktopIcon } from "./appearance-settings.js";
 import { windowIcon } from "./window-icon.js";

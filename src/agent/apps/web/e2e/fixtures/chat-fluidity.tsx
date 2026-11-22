@@ -1,6 +1,6 @@
 import { I18nProvider } from "@lingui/react";
-import type { ProductEvent, ThreadSnapshot } from "@rakazo/contracts";
-import { desktopDiagnosticMessage } from "@rakazo/contracts";
+import type { ProductEvent, ThreadSnapshot } from "@mycellios/contracts";
+import { desktopDiagnosticMessage } from "@mycellios/contracts";
 import { Profiler, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createFramePublisher } from "../../src/lib/frame-publisher";

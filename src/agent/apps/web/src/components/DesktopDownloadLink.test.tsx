@@ -5,7 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const bridge = vi.hoisted(() => vi.fn());
 vi.mock("../lib/desktop", () => ({ desktopBridge: bridge }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
-vi.mock("@rakazo/ui-web", () => ({ buttonVariants: () => "" }));
+vi.mock("@mycellios/ui-web", () => ({ buttonVariants: () => "" }));
 import { DesktopDownloadLink } from "./DesktopDownloadLink";
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); bridge.mockReturnValue(undefined); });
 async function rendered(check: (host: HTMLDivElement) => void, mini = false) {

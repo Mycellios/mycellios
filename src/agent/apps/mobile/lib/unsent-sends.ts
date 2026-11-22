@@ -1,4 +1,4 @@
-import { isModelRequiredSendError } from "@rakazo/core";
+import { isModelRequiredSendError } from "@mycellios/core";
 import { Alert, AppState } from "react-native";
 import {
   captureApiRequestContext,

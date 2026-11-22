@@ -1,4 +1,4 @@
-import { sanitizedError } from "@rakazo/logging/monitoring";
+import { sanitizedError } from "@mycellios/logging/monitoring";
 import { API_BASE_STORAGE_KEY, DEFAULT_API } from "./server-config";
 
 export interface StartupErrorStorage {

@@ -1,5 +1,5 @@
-import type { Routine } from "@rakazo/contracts";
-import { formatCron } from "@rakazo/core";
+import type { Routine } from "@mycellios/contracts";
+import { formatCron } from "@mycellios/core";
 import { t } from "./i18n";
 
 function routineTriggers(routine: Routine): string {

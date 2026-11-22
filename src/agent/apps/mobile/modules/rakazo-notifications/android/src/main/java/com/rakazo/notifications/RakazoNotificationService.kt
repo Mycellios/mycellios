@@ -85,7 +85,7 @@ class RakazoNotificationService : Service() {
     val generation = synchronized(sessionLock) {
       if (intent?.getBooleanExtra(EXTRA_RESET_TOKEN, false) == true) tokenCache.reset()
       sessionGeneration.incrementAndGet().also {
-        if (intent?.action == ACTION_THREAD_CHANGED && (openBotId != null || openThreadId != null)) {
+        if (intent?.action == ACTION_THREAD_CHANGED && (showBotId != null || openThreadId != null)) {
           clearLive()
         }
       }
@@ -354,7 +354,7 @@ class RakazoNotificationService : Service() {
   }
 
   private fun isOpenThread(run: RunRecord): Boolean = synchronized(sessionLock) {
-    if (openThreadId != null) openThreadId == run.threadId else openBotId == run.botId
+    if (openThreadId != null) openThreadId == run.threadId else showBotId == run.botId
   }
 
   @Suppress("DEPRECATION")
@@ -439,7 +439,7 @@ class RakazoNotificationService : Service() {
     private const val THREAD_NOTIFICATION_IDS = "thread_notification_ids"
     private val sessionLock = Any()
     private val sessionGeneration = AtomicLong()
-    private var openBotId: String? = null
+    private var showBotId: String? = null
     private var openThreadId: String? = null
 
     fun start(context: Context, resetToken: Boolean = true, action: String? = null) {
@@ -456,7 +456,7 @@ class RakazoNotificationService : Service() {
 
     fun setOpenThread(context: Context, botId: String?, threadId: String?) {
       synchronized(sessionLock) {
-        openBotId = botId
+        showBotId = botId
         openThreadId = threadId
       }
       if (threadId != null) {
@@ -468,7 +468,7 @@ class RakazoNotificationService : Service() {
     fun clearSession(context: Context) {
       synchronized(sessionLock) {
         sessionGeneration.incrementAndGet()
-        openBotId = null
+        showBotId = null
         openThreadId = null
         stop(context)
         context.getSharedPreferences(STATE_PREFERENCES, MODE_PRIVATE).edit().clear().apply()

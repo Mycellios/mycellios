@@ -58,7 +58,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 it("keeps only Activity, Search and Create in the transparent native home header", () => {
   const setOptions = vi.fn();
-  evaluate(slice(home, "  useLayoutEffect(() => {\n    if (!nativeHeader)", "  const openBot ="), {
+  evaluate(slice(home, "  useLayoutEffect(() => {\n    if (!nativeHeader)", "  const showBot ="), {
     useLayoutEffect: (effect: () => void) => effect(),
     nativeHeader: true,
     navigation: { setOptions },

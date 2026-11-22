@@ -1,6 +1,6 @@
-import type { Actor } from "@rakazo/contracts";
-import { controlWorkTree } from "@rakazo/db";
-import { reconcileWorkStops } from "@rakazo/adapters";
+import type { Actor } from "@mycellios/contracts";
+import { controlWorkTree } from "@mycellios/db";
+import { reconcileWorkStops } from "@mycellios/adapters";
 import type { RouterDeps } from "./router.js";
 
 /** Composer Stop also cancels children when the coordinator has already ended its turn. */

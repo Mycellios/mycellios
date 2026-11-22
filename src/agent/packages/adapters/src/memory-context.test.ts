@@ -1,4 +1,4 @@
-import type { AdapterContext, MemorySnapshot, MemoryStore } from "@rakazo/adapter-kit";
+import type { AdapterContext, MemorySnapshot, MemoryStore } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
 import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
 

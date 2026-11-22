@@ -1,14 +1,14 @@
-import type { SecretStore } from "@rakazo/adapter-kit";
-import { SecretStoreUnavailableError } from "@rakazo/adapter-kit";
-import type { Actor } from "@rakazo/contracts";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
+import type { Actor } from "@mycellios/contracts";
 import {
   canonicalPiProviderId,
   isOpenAiCompatibleProvider,
   selectCompatibleModelCredential,
   usableModelId,
-} from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { chooseModelCredential, findModelCredential, findModelCredentialById } from "@rakazo/db";
+} from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { chooseModelCredential, findModelCredential, findModelCredentialById } from "@mycellios/db";
 import { resolveDeploymentModel } from "./deployment-model.js";
 import { modelCredentialDto } from "./model-connect.js";
 import type { ModelCredentialAuthKind } from "./pi-catalog-availability.js";

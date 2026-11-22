@@ -4,7 +4,7 @@
 
 A Mico that works on This PC keeps its files in a folder the owner can find:
 `~/Mycellios/Micos/<Mico name>`. Mico settings (This PC, Desktop only) show that
-path read-only with an Open folder action. OpenBot keeps each agent's folder in
+path read-only with an Open folder action. The reference app keeps each agent's folder in
 the user's home in the same way; it is a behavior reference only (PolyForm
 Noncommercial), and no code or copy is taken from it.
 

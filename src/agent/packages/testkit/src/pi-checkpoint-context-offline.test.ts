@@ -1,5 +1,5 @@
-import type { AgentRunRequest, AgentRuntimeEvent, ConnectorTool } from "@rakazo/adapter-kit";
-import { PiAgentRuntime } from "@rakazo/adapters";
+import type { AgentRunRequest, AgentRuntimeEvent, ConnectorTool } from "@mycellios/adapter-kit";
+import { PiAgentRuntime } from "@mycellios/adapters";
 import { expect, it, vi } from "vitest";
 import { startModelEmulator } from "./model-emulator.js";
 

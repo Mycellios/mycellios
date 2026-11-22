@@ -1,8 +1,8 @@
 import type { OAuthCredential } from "@earendil-works/pi-ai";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import type { ThinkingLevel } from "@rakazo/contracts";
-import { ThinkingLevelSchema } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import type { ThinkingLevel } from "@mycellios/contracts";
+import { ThinkingLevelSchema } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { LiveCatalogCache, liveModelCatalogEnabled } from "./pi-live-cache.js";
 import type { CatalogSpaceAuth } from "./pi-live-catalog.js";
 import { liveCatalogEntry, overlayLiveCatalog } from "./pi-live-catalog.js";
@@ -13,7 +13,7 @@ import { CHATGPT_OAUTH_PROVIDER, oauthCredentialAccountId, parseModelSecret } fr
 
 /**
  * The ChatGPT backend reports which Codex models a subscription account can call,
- * filtered by the `client_version` the caller claims. Like OpenBot (fx), we
+ * filtered by the `client_version` the caller claims. Like the reference app (fx), we
  * resolve that version from npm `@openai/codex@latest` so models released after
  * our last deploy show up on their own. The pinned release is the floor: it is
  * used whenever npm cannot be read, and a registry answer older than it is ignored.

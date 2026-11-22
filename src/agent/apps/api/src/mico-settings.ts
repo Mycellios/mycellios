@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { readMicoDefaults, readMicoOverrides, type Actor, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
-import type { Prisma, PrismaClient } from "@rakazo/db";
-import { appendEventInTransaction, withTransactionRetry } from "@rakazo/db";
+import { readMicoDefaults, readMicoOverrides, type Actor, type MicoSettingsState, type MicoSettingsUpdate } from "@mycellios/contracts";
+import type { Prisma, PrismaClient } from "@mycellios/db";
+import { appendEventInTransaction, withTransactionRetry } from "@mycellios/db";
 
 type Store = Pick<Prisma.TransactionClient, "user" | "bot">;
 export async function micoSettingsState(db: Store, actor: Actor): Promise<MicoSettingsState> {

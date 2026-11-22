@@ -1,4 +1,4 @@
-import type { DesktopUpdateState } from "@rakazo/contracts";
+import type { DesktopUpdateState } from "@mycellios/contracts";
 import { reportDesktopError } from "./monitoring.js";
 
 /** Long enough that a cold launch is never competing with the update feed for bandwidth. */

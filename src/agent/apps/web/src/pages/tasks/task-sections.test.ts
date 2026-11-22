@@ -1,4 +1,4 @@
-import type { InboxTask } from "@rakazo/contracts";
+import type { InboxTask } from "@mycellios/contracts";
 import { expect, it } from "vitest";
 import { taskIsActive, taskSection } from "./task-sections";
 

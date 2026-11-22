@@ -13,7 +13,7 @@ import {
 test("Workers AI settings save the account without requiring a gateway", async ({
   page,
 }, testInfo) => {
-  await signup(page, `workers-settings-${Date.now()}@rakazo.test`, "password12", "Model setup");
+  await signup(page, `workers-settings-${Date.now()}@mycellios.test`, "password12", "Model setup");
   await completeOnboarding(page);
   await openUserSettings(page, "models");
   const dialog = await openModelConnection(page, "Cloudflare Workers AI");
@@ -47,7 +47,7 @@ test("Workers AI onboarding requires an account before continuing", async ({ pag
     const body = (await response.json()) as { json: Record<string, unknown> };
     await route.fulfill({ response, json: { json: { ...body.json, needsModel: true } } });
   });
-  await signup(page, `workers-onboarding-${Date.now()}@rakazo.test`, "password12", "Model setup");
+  await signup(page, `workers-onboarding-${Date.now()}@mycellios.test`, "password12", "Model setup");
   await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
   await chooseOption(
     page.getByRole("combobox", { name: "Provider", exact: true }),

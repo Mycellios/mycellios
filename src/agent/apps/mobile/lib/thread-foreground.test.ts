@@ -1,4 +1,4 @@
-import { createRefreshCoalescer } from "@rakazo/core";
+import { createRefreshCoalescer } from "@mycellios/core";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";

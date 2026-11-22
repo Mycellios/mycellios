@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { CircleCheck, Plus, Server } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../../lib/desktop";

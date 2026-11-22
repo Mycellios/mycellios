@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { createDb, runAsSystem } from "@rakazo/db";
+import { createDb, runAsSystem } from "@mycellios/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import webpush from "web-push";
 import { WebPushService } from "./web-push.js";
 import type { VapidConfig } from "./web-push.js";
-import { micoAvatarValue, type WebPushSubscription } from "@rakazo/contracts";
-import type { AdapterContext, JobPublisher, NotificationMessage } from "@rakazo/adapter-kit";
+import { micoAvatarValue, type WebPushSubscription } from "@mycellios/contracts";
+import type { AdapterContext, JobPublisher, NotificationMessage } from "@mycellios/adapter-kit";
 
 // This suite can only touch the task's disposable, loopback database.
 const connection = process.env.WEB_PUSH_TEST_DATABASE;

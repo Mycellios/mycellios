@@ -294,7 +294,7 @@ export interface ProjectBrowserState {
 }
 
 /**
- * How the desktop app was pointed at a Rakazo server during first-run setup.
+ * How the desktop app was pointed at a Mycellios server during first-run setup.
  * `new` is the Docker Compose stack this app installs and runs on the same computer.
  */
 export type DesktopInstanceMode = "new" | "existing";
@@ -306,7 +306,7 @@ export interface DesktopSetup {
 
 export interface DesktopSetupState {
   defaultLocalUrl: string;
-  /** Hosted Rakazo origin, saved as an `existing` server when chosen. */
+  /** Hosted Mycellios origin, saved as an `existing` server when chosen. */
   cloudUrl: string;
   saved: DesktopSetup | null;
   /** Present when a saved or newly selected server could not be reopened. */

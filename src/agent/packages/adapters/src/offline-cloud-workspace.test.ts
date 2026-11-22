@@ -1,11 +1,11 @@
-import type { SandboxProvider } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { SandboxProvider } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
-import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
+import { appendEventInTransaction, createThreadMessageInTransaction } from "@mycellios/db";
 import { OFFLINE_CLOUD_NOTICE, selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
 
-vi.mock("@rakazo/db", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@rakazo/db")>()),
+vi.mock("@mycellios/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mycellios/db")>()),
   createThreadMessageInTransaction: vi.fn(async () => ({ id: "notice" })),
   appendEventInTransaction: vi.fn(async () => undefined),
 }));

@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { DesktopMicoFolder } from "@rakazo/contracts";
-import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import type { DesktopMicoFolder } from "@mycellios/contracts";
+import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { FolderOpen, FolderPlus, GitBranch } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";

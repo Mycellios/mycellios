@@ -8,7 +8,7 @@ import type {
   ScreenRequest,
   ScreenSession,
   TerminalRequest,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   BROWSER_APPLICATIONS,
   browserLauncherPath,
@@ -22,7 +22,7 @@ import {
   screenPorts,
   shellQuote,
   stopAllDesktopBrowsersCommand,
-} from "@rakazo/core/node/desktop-runtime";
+} from "@mycellios/core/node/desktop-runtime";
 import {
   BrowserStoppedReleaseError,
   ComputerScreenUnavailableError,
@@ -361,7 +361,7 @@ const FIND_MISSING_DESKTOP_TOOLS = [
 ];
 
 /**
- * Same as infra/sandboxes/computer/browser-policy.json. Rakazo keeps credentials itself, so
+ * Same as infra/sandboxes/computer/browser-policy.json. Mycellios keeps credentials itself, so
  * the browser's save-password, address, and card prompts only cover the page.
  */
 export const BROWSER_POLICY = JSON.stringify({

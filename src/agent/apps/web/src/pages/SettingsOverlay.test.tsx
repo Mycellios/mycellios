@@ -18,7 +18,7 @@ const delayedDialog = vi.hoisted(() => ({ enabled: false }));
 const developer = vi.hoisted(() => ({ enabled: true }));
 vi.mock("../lib/developer-mode", () => ({ useDeveloperMode: () => [developer.enabled, vi.fn()] }));
 
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   BotAvatar: () => <span aria-hidden="true" />,
   Label: (props: React.ComponentProps<"label">) => <label {...props} />,
   Switch: ({ checked, onCheckedChange, ...props }: React.ComponentProps<"button"> & { checked: boolean; onCheckedChange: (value: boolean) => void }) => <button {...props} role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)} />,

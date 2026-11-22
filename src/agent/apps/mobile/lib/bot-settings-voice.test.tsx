@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { BOT_COLORS, BOT_SETTINGS_SECTIONS } from "@rakazo/contracts";
+import { BOT_COLORS, BOT_SETTINGS_SECTIONS } from "@mycellios/contracts";
 import type { ComponentProps, ReactNode } from "react";
 import { act, createElement, useEffect } from "react";
 import type { Root } from "react-dom/client";
@@ -802,7 +802,7 @@ describe("bot settings device voice menu", () => {
     );
     expect(mocks.rpc).toHaveBeenCalledWith("bots/setComputer", {
       botId: "bot-fixture",
-      mode: "dedicated",
+      mode: "isolated",
     });
     expect(mocks.rpc).toHaveBeenCalledWith(
       "bots/update",

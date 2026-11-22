@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import { SPORE_WELCOME_REWARD, TOKENS_PER_TRIAL_SPORE, type Actor, type SporeRewards, type UsageDashboard, type UsageDashboardTotals } from "@rakazo/contracts";
-import { Prisma, runAsSystem, type PrismaClient } from "@rakazo/db";
+import { SPORE_WELCOME_REWARD, TOKENS_PER_TRIAL_SPORE, type Actor, type SporeRewards, type UsageDashboard, type UsageDashboardTotals } from "@mycellios/contracts";
+import { Prisma, runAsSystem, type PrismaClient } from "@mycellios/db";
 
 // These SQL expressions use only canonical UsageRecord buckets. The one-hour
 // write bucket and reasoning tokens are subsets, so neither is added again.

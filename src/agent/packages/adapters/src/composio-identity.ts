@@ -1,5 +1,5 @@
-import type { AdapterContext } from "@rakazo/adapter-kit";
-import type { ConnectionIdentity } from "@rakazo/contracts";
+import type { AdapterContext } from "@mycellios/adapter-kit";
+import type { ConnectionIdentity } from "@mycellios/contracts";
 import type { ComposioClient } from "./composio-connector.js";
 
 const CACHE_MS = 60_000;

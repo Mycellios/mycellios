@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import type { Bot, Me, ModelCatalogEntry, ModelCredential } from "@rakazo/contracts";
+import type { Bot, Me, ModelCatalogEntry, ModelCredential } from "@mycellios/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { QueryUserProvider, spaceQueries } from "../../src/lib/query";

@@ -5,14 +5,14 @@ import {
   type WorkflowExecution,
   type WorkflowGraph,
   type WorkflowNode,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { NativeSelectOption, NativeSelect, Textarea, Input,
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   Bot as BotIcon,
   CircleCheck,

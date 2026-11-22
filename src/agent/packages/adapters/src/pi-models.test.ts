@@ -1,4 +1,4 @@
-import { MODEL_KEY_FORMAT_ERROR } from "@rakazo/contracts";
+import { MODEL_KEY_FORMAT_ERROR } from "@mycellios/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultCatalogModelId } from "./model-selection.js";
 import { modelAcceptsImageInput } from "./model-vision.js";

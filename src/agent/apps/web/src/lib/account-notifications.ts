@@ -1,4 +1,4 @@
-import { notificationAllowed, type NotificationSettings, type ProductEvent } from "@rakazo/contracts";
+import { notificationAllowed, type NotificationSettings, type ProductEvent } from "@mycellios/contracts";
 
 // Memory only, keyed by authenticated account. Never reuse another account's policy.
 const policies = new Map<string, NotificationSettings>();

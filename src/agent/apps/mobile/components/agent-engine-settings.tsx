@@ -1,5 +1,5 @@
-import type { Bot } from "@rakazo/contracts";
-import { productBrand } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
+import { productBrand } from "@mycellios/contracts";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";

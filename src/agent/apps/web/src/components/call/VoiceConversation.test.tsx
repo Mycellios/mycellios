@@ -6,7 +6,7 @@ import type { RpcClient } from "../../lib/rpc";
 
 const audio = vi.hoisted(() => ({ listen: vi.fn(), stop: vi.fn(), speak: vi.fn(), silence: vi.fn() }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((text, part, index) => text + part + (values[index] ?? ""), ""), i18n: { locale: "es" } }) }));
-vi.mock("@rakazo/ui-web", () => ({ BotAvatar: () => <span />, Button: ({ variant: _v, size: _s, ...props }: any) => <button {...props} /> }));
+vi.mock("@mycellios/ui-web", () => ({ BotAvatar: () => <span />, Button: ({ variant: _v, size: _s, ...props }: any) => <button {...props} /> }));
 vi.mock("../../lib/dictation", () => ({ webSpeechAvailable: () => true, dictation: { listen: audio.listen, stop: audio.stop, subscribe: () => () => {} } }));
 vi.mock("../../lib/tts", () => ({ browserSpeechAvailable: () => true, speaker: { speak: audio.speak, stop: audio.silence, subscribe: () => () => {} } }));
 vi.mock("../../lib/call-session", () => ({ endCall: vi.fn() }));

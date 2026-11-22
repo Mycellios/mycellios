@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { isMicoTaskThread } from "@rakazo/core";
+import type { MessageBlock } from "@mycellios/contracts";
+import { isMicoTaskThread } from "@mycellios/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 

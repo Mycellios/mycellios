@@ -5,10 +5,10 @@ import {
   migrateLocalArtifacts,
   migrateLocalPushTokens,
   PrismaPushTokenStore,
-} from "@rakazo/adapters";
-import { resolveEncryptionKey } from "@rakazo/core";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
-import { createDb } from "@rakazo/db";
+} from "@mycellios/adapters";
+import { resolveEncryptionKey } from "@mycellios/core";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
+import { createDb } from "@mycellios/db";
 
 loadRootEnv();
 const { values, positionals } = parseArgs({

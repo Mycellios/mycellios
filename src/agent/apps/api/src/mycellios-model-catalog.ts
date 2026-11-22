@@ -1,7 +1,7 @@
-import { createOpenAiCompatibleFetch, isChatModelId } from "@rakazo/adapters";
-import type { ModelCatalogEntry } from "@rakazo/contracts";
-import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { createOpenAiCompatibleFetch, isChatModelId } from "@mycellios/adapters";
+import type { ModelCatalogEntry } from "@mycellios/contracts";
+import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 
 function managedPrice(row: Record<string, unknown>) {
   if (!["external", "network"].includes(String(row.processing)) || !row.pricing || typeof row.pricing !== "object") return null;

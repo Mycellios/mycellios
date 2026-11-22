@@ -1,4 +1,4 @@
-import { attachmentMaxBytes } from "@rakazo/contracts";
+import { attachmentMaxBytes } from "@mycellios/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const file = vi.hoisted(() => ({

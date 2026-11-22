@@ -1,4 +1,4 @@
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import {
   callRequestRefusal,

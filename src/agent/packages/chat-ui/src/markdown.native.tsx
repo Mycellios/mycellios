@@ -1,5 +1,5 @@
-import type { ColorTokens, ResolvedAppearance } from "@rakazo/ui-tokens";
-import { darkTokens, fontWeight, MAX_FONT_SCALE, typeScale } from "@rakazo/ui-tokens";
+import type { ColorTokens, ResolvedAppearance } from "@mycellios/ui-tokens";
+import { darkTokens, fontWeight, MAX_FONT_SCALE, typeScale } from "@mycellios/ui-tokens";
 import type {
   ASTNode,
   MarkdownStyleMap,

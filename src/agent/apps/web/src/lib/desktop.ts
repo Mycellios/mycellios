@@ -3,10 +3,10 @@ import type {
   RakazoDesktopOAuthCallback,
   RakazoDesktopWhatsApp,
   RakazoDesktopWhatsAppStatus,
-} from "@rakazo/contracts";
-import { DEFAULT_COMPUTER_MODE, type ComputerMode } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import { DEFAULT_COMPUTER_MODE, type ComputerMode } from "@mycellios/contracts";
 
-export type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@rakazo/contracts";
+export type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@mycellios/contracts";
 
 declare global {
   interface Window {
@@ -19,7 +19,7 @@ export function desktopBridge(): RakazoDesktop | undefined {
 }
 
 /**
- * A Mico created in Desktop works on this PC, in its own folder, as OpenBot's
+ * A Mico created in Desktop works on this PC, in its own folder, as the reference app's
  * agents do (behavior reference only). Binding still waits for the owner's
  * local-access consent on the first send. Without a Desktop host, new Micos use
  * their own isolated server workspace; an explicitly chosen installed account

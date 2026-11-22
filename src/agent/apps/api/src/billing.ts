@@ -1,8 +1,8 @@
 import { ORPCError } from "@orpc/server";
-import type { BillingPrice, BillingProvider } from "@rakazo/adapter-kit";
-import { BillingCheckoutCompletedError, BillingCustomerNotFoundError } from "@rakazo/adapter-kit";
-import type { Actor, BillingStatus } from "@rakazo/contracts";
-import type { BillingAccount, PrismaClient } from "@rakazo/db";
+import type { BillingPrice, BillingProvider } from "@mycellios/adapter-kit";
+import { BillingCheckoutCompletedError, BillingCustomerNotFoundError } from "@mycellios/adapter-kit";
+import type { Actor, BillingStatus } from "@mycellios/contracts";
+import type { BillingAccount, PrismaClient } from "@mycellios/db";
 import {
   billingAccountForOrganization,
   createBillingAccount,
@@ -17,8 +17,8 @@ import {
   reconcileCreditPurchase,
   replaceBillingCustomer,
   syncBillingSnapshot,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 
 export const TRIAL_DAYS = 7;
 const PRICE_CACHE_MS = 60 * 60 * 1000;

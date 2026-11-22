@@ -35,7 +35,7 @@ const PREVIOUS_CLASSIC_STYLE = PREVIOUS_CONVERSATION_STYLE.replace(NATURAL_NARRA
 const SECOND_CLASSIC_STYLE = SECOND_CONVERSATION_STYLE.replace(NATURAL_NARRATION, CLASSIC_NARRATION);
 
 /*
- * Current default. The behavior follows OpenBot's response styles (a behavior reference only: its
+ * Current default. The behavior follows the reference app's response styles (a behavior reference only: its
  * license does not allow copying its text, so every sentence here is our own). Natural writes one
  * line before tool work and an update only on a change; classic does not narrate. Both keep chat
  * replies short. Explicit user/Mico requests still win.

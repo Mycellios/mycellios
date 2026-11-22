@@ -7,7 +7,7 @@ test("account settings save the timezone and offer this device's zone back", asy
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `timezone-${stamp}@rakazo.test`, "password12", "Timezone QA");
+  await signup(page, `timezone-${stamp}@mycellios.test`, "password12", "Timezone QA");
   await completeOnboarding(page);
 
   const settings = await openUserSettings(page);

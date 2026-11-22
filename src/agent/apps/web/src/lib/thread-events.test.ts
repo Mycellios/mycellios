@@ -3,8 +3,8 @@ import type {
   ProductEvent,
   ThreadMessage,
   ThreadSnapshot,
-} from "@rakazo/contracts";
-import { answerableAskMessageIds, withLiveStreamingProgress } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { answerableAskMessageIds, withLiveStreamingProgress } from "@mycellios/core";
 import { describe, expect, it } from "vitest";
 import {
   activeThreadRuns,

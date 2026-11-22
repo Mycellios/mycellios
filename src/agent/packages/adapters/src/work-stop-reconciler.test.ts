@@ -1,6 +1,6 @@
 import { describe,expect,it,vi } from 'vitest';
-import type { PrismaClient } from '@rakazo/db';
-import type { SandboxProvider } from '@rakazo/adapter-kit';
+import type { PrismaClient } from '@mycellios/db';
+import type { SandboxProvider } from '@mycellios/adapter-kit';
 import { reconcileWorkStops } from './work-stop-reconciler.js';
 describe('durable work teardown',()=>{
   it('validates the real Mico and task before cleaning up a namespaced project lease', async()=>{

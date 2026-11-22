@@ -1,19 +1,19 @@
 import type { MenuAction } from "@expo/ui/community/menu";
-import { ChatMarkdown, markdownCodeBlocks, withBlockMentions } from "@rakazo/chat-ui/native";
+import { ChatMarkdown, markdownCodeBlocks, withBlockMentions } from "@mycellios/chat-ui/native";
 import type {
   AgentSkillCatalogEntry,
   MessageBlock,
   MessageReaction,
   TaskCost,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   ATTACHMENT_MAX_COUNT,
   attachmentMaxBytes,
   canReactToThreadMessage,
   isAttachmentAudioMimeType,
   MESSAGE_REACTIONS,
-} from "@rakazo/contracts";
-import type { ChildBotBlock, ReadBoundary, SlashActionId, ThreadItem } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { ChildBotBlock, ReadBoundary, SlashActionId, ThreadItem } from "@mycellios/core";
 import {
   abortableDelay,
   answerableAskMessageIds,
@@ -62,8 +62,8 @@ import {
   unreadDividerMessageId,
   voiceChatHoldsMessage,
   withLiveStreamingProgress,
-} from "@rakazo/core";
-import { fontWeight, typeScale } from "@rakazo/ui-tokens";
+} from "@mycellios/core";
+import { fontWeight, typeScale } from "@mycellios/ui-tokens";
 import * as Clipboard from "expo-clipboard";
 import {
   useFocusEffect,
@@ -1049,7 +1049,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       );
   }
 
-  function openBotComputer() {
+  function showBotComputer() {
     router.push({
       pathname: "/computer",
       params: { botId: botId ?? "", name: displayName ?? t("Bot") },
@@ -1057,7 +1057,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   }
 
   const botActions = [
-    ...(!readOnly && botId ? [{ text: t("Open computer"), onPress: openBotComputer }] : []),
+    ...(!readOnly && botId ? [{ text: t("Open computer"), onPress: showBotComputer }] : []),
     {
       text: t("Profile"),
       onPress: () =>
@@ -1773,7 +1773,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
         ? findSwitchTarget(plan.trimmed, mentionBotsRef.current)
         : undefined;
     if (typedSwitch && typedSwitch.id !== initialBotTarget) {
-      openBotChat(typedSwitch, false);
+      showBotChat(typedSwitch, false);
       return;
     }
     preparingSend.current = true;
@@ -1917,7 +1917,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     [botId, groupId, readOnly],
   );
 
-  const openBot = useCallback(
+  const showBot = useCallback(
     (id: string, botName: string) =>
       router.push({ pathname: "/thread", params: { botId: id, name: botName } }),
     [router],
@@ -2020,7 +2020,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
         switchBot: (text) => {
           const target = findSwitchTarget(text, mentionBotsRef.current);
           if (!target || target.id === targetBotId) return undefined;
-          return { name: target.name, ring: () => openBotChat(target, true) };
+          return { name: target.name, ring: () => showBotChat(target, true) };
         },
       });
       if (plan.kind === "device") {
@@ -2038,7 +2038,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   }
 
   /** Opens another bot's chat in place of this one, ringing it when the switch came from a call. */
-  function openBotChat(target: MobileBot, ring: boolean): void {
+  function showBotChat(target: MobileBot, ring: boolean): void {
     if (ring) ringOnArrival(target.id);
     router.replace({ pathname: "/thread", params: { botId: target.id, name: target.name } });
   }
@@ -2344,7 +2344,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     react: (message, reaction) => reactToMessage(message, reaction),
     markUnread: markUnreadFrom,
     answer: answerMessage,
-    openBot,
+    showBot,
     openComputer,
     previewMarkdown: setMarkdownPreview,
     previewImage: (target) =>
@@ -2418,7 +2418,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       markUnread: (message) => rowActionsRef.current.markUnread(message),
       answer: (message, answer, username, dismiss) =>
         rowActionsRef.current.answer(message, answer, username, dismiss),
-      openBot: (id, name) => rowActionsRef.current.openBot(id, name),
+      showBot: (id, name) => rowActionsRef.current.showBot(id, name),
       openComputer: (id, name) => rowActionsRef.current.openComputer(id, name),
       previewMarkdown: (target) => rowActionsRef.current.previewMarkdown(target),
       previewImage: (target) => rowActionsRef.current.previewImage(target),
@@ -3308,7 +3308,7 @@ type MessageRowActions = {
     username?: string,
     dismiss?: boolean,
   ) => Promise<void>;
-  openBot: (id: string, name: string) => void;
+  showBot: (id: string, name: string) => void;
   openComputer: (id: string, name: string) => void;
   previewMarkdown: (target: MarkdownArtifactPreviewTarget) => void;
   previewImage: (target: ImageArtifactPreviewTarget) => void;
@@ -3724,7 +3724,7 @@ const MessageRow = memo(function MessageRow({
                 canAnswer={canAnswer}
                 canDismiss={canDismiss}
                 onAnswer={actions.answer}
-                onOpenBot={actions.openBot}
+                onShowBot={actions.showBot}
                 onOpenComputer={actions.openComputer}
                 onChoiceDismissed={onChoiceDismissed}
                 onPreviewMarkdown={actions.previewMarkdown}
@@ -3821,7 +3821,7 @@ const MessageBubble = memo(function MessageBubble({
         props.members?.find((member) => member.botId === id)?.color
       }
       tokens={mobileTokens()}
-      onOpenBot={props.onOpenBot}
+      onShowBot={props.onShowBot}
     >
       <MessageBubbleBody
         {...props}
@@ -3859,7 +3859,7 @@ function MessageBubbleBody(props: ComponentProps<typeof MessageBubbleContent>) {
         actionProps={props.actionProps}
         bots={props.bots}
         members={props.members}
-        onOpenBot={props.onOpenBot}
+        onShowBot={props.onShowBot}
         onHelperToggle={props.onHelperToggle}
         userBubble={props.userBubble}
       />
@@ -3926,7 +3926,7 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
     username?: string,
     dismiss?: boolean,
   ) => Promise<void>;
-  onOpenBot: (botId: string, name: string) => void;
+  onShowBot: (botId: string, name: string) => void;
   onOpenComputer: (botId: string, name: string) => void;
   onChoiceDismissed?: (question: string) => void;
   onPreviewMarkdown: (target: MarkdownArtifactPreviewTarget) => void;
@@ -4496,7 +4496,7 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
 
 type SpecialMessageCardProps = Pick<
   ComponentProps<typeof MessageBubbleContent>,
-  "actionProps" | "bots" | "members" | "onOpenBot" | "onHelperToggle" | "userBubble"
+  "actionProps" | "bots" | "members" | "onShowBot" | "onHelperToggle" | "userBubble"
 > & { special: SpecialMessageBlock };
 
 function HelperMessageCard({
@@ -4627,7 +4627,7 @@ function HelperMessageCard({
 }
 
 function SpecialMessageCard(props: SpecialMessageCardProps) {
-  const { special, actionProps, bots, members, onOpenBot, userBubble } = props;
+  const { special, actionProps, bots, members, onShowBot, userBubble } = props;
   const tokens = withUserBubble(mobileTokens(), userBubble);
   const { t } = useI18n();
   if (special.kind === "subagent") return <HelperMessageCard {...props} special={special} />;
@@ -4708,7 +4708,7 @@ function SpecialMessageCard(props: SpecialMessageCardProps) {
             members?.find((member) => member.botId === special.botId)?.color
           }
           tokens={tokens}
-          onOpenBot={onOpenBot}
+          onShowBot={onShowBot}
         />
         {special.status === "archived"
           ? ` ${t("archived")}`

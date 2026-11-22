@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Dialog, DialogContent, DialogTitle, Input } from "@rakazo/ui-web";
+import { Button, Dialog, DialogContent, DialogTitle, Input } from "@mycellios/ui-web";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { closeServerDialog, serverDialogSnapshot, subscribeServerDialog, type ServerDialog } from "../lib/server-dialogs";
 import { safeServerUrl, saveBrowserServer } from "../lib/server-connections";

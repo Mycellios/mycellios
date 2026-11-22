@@ -10,7 +10,7 @@ import {
   SandboxNotFoundError,
   TimeoutError,
 } from "@e2b/desktop";
-import type { CommandRequest, ComputerRef, ProcessEvent } from "@rakazo/adapter-kit";
+import type { CommandRequest, ComputerRef, ProcessEvent } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
 import { sandboxIdleMs } from "./computer-idle.js";
 import { shouldSkipPortableWorkspaceFile } from "./computer-workspace.js";
@@ -176,7 +176,7 @@ describe("E2B computer backend", () => {
     expect(sdk.create).not.toHaveBeenCalled();
   });
 
-  it("creates new computers from the Rakazo computer template", async () => {
+  it("creates new computers from the Mycellios computer template", async () => {
     const sdk: E2BSandboxSdk = {
       create: vi.fn().mockResolvedValue({ sandboxId: "fresh" }),
       connect: vi.fn(),

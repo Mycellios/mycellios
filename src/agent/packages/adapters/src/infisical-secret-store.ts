@@ -5,13 +5,13 @@ import type {
   SecretPutOptions,
   SecretRecord,
   SecretStore,
-} from "@rakazo/adapter-kit";
-import { SecretNotFoundError, SecretStoreUnavailableError } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { SecretNotFoundError, SecretStoreUnavailableError } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
 import { credentialDigest } from "./credential-digest.js";
 import { SecretChanges } from "./secret-changes.js";
 
-export { SecretNotFoundError, SecretStoreUnavailableError } from "@rakazo/adapter-kit";
+export { SecretNotFoundError, SecretStoreUnavailableError } from "@mycellios/adapter-kit";
 
 export const INFISICAL_REF_PREFIX = "infisical:v1:";
 export interface InfisicalSecretStoreOptions {

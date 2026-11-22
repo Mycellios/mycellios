@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { RunLogsOutput } from "@rakazo/contracts";
+import type { RunLogsOutput } from "@mycellios/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";

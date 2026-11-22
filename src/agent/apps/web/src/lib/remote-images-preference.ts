@@ -1,5 +1,5 @@
-import type { RemoteImagesPreference } from "@rakazo/core";
-import { normalizeRemoteImagesPreference, REMOTE_IMAGES_STORAGE_KEY } from "@rakazo/core";
+import type { RemoteImagesPreference } from "@mycellios/core";
+import { normalizeRemoteImagesPreference, REMOTE_IMAGES_STORAGE_KEY } from "@mycellios/core";
 
 export type { RemoteImagesPreference };
 

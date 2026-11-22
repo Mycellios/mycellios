@@ -4,14 +4,14 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { migrateJobQueue } from "@rakazo/adapters";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+import { migrateJobQueue } from "@mycellios/adapters";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import {
   databaseUrls,
   provisionRuntimeRole,
   RUNTIME_ROLE,
   SINGLE_DATABASE_URL_WARNING,
-} from "@rakazo/db";
+} from "@mycellios/db";
 
 loadRootEnv();
 const urls = databaseUrls(process.env);

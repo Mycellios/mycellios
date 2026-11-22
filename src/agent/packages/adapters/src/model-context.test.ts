@@ -1,4 +1,4 @@
-import { MODEL_CONTEXT_TOO_SMALL_ERROR } from "@rakazo/core";
+import { MODEL_CONTEXT_TOO_SMALL_ERROR } from "@mycellios/core";
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 import { ContextBudgetError, selectContext } from "./context-selection.js";

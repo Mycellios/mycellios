@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { WhatsAppLink, WhatsAppSender } from "@rakazo/contracts";
-import { productBrand } from "@rakazo/contracts";
+import type { WhatsAppLink, WhatsAppSender } from "@mycellios/contracts";
+import { productBrand } from "@mycellios/contracts";
 import {
   Button,
   Disclosure,
@@ -9,7 +9,7 @@ import {
   NativeSelectOption,
   RadioGroup,
   RadioGroupItem,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";

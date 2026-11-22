@@ -1,5 +1,5 @@
-import type { ComputerUpdate } from "@rakazo/contracts";
-import { createComputerUpdates, isUnauthorizedError } from "@rakazo/core";
+import type { ComputerUpdate } from "@mycellios/contracts";
+import { createComputerUpdates, isUnauthorizedError } from "@mycellios/core";
 import { rpc, spaceSelectionSeq } from "./api";
 export const computerUpdates = createComputerUpdates({
   list: async () => {

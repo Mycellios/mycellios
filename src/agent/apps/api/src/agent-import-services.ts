@@ -1,14 +1,14 @@
-import type { CodexLiveCatalog } from "@rakazo/adapters";
+import type { CodexLiveCatalog } from "@mycellios/adapters";
 import {
   isAllowedStdioCommand,
   providerCatalogCache,
   validateBotModelChange,
-} from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import { canonicalPiProviderId, ModelConnectInputSchema } from "@rakazo/contracts";
-import type { createRepos } from "@rakazo/db";
-import { findModelCredential, Prisma } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import { canonicalPiProviderId, ModelConnectInputSchema } from "@mycellios/contracts";
+import type { createRepos } from "@mycellios/db";
+import { findModelCredential, Prisma } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { AgentImportServices } from "./agent-import.js";
 import type { createBotRemoval } from "./bot-removal.js";
 import type { createMcpServers } from "./mcp-servers.js";

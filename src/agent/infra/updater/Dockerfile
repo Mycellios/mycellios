@@ -16,8 +16,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY src/agent/ .
 COPY src/contracts/ /contracts/
-RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --workspace @rakazo/updater --include-workspace-root=false --omit=dev --ignore-scripts --no-audit --no-fund \
+RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --workspace @mycellios/updater --include-workspace-root=false --omit=dev --ignore-scripts --no-audit --no-fund \
     && ln -s /app/node_modules /contracts/node_modules
 ARG GIT_SHA
 ENV GIT_SHA=$GIT_SHA
-CMD ["npm", "run", "start", "--workspace", "@rakazo/updater"]
+CMD ["npm", "run", "start", "--workspace", "@mycellios/updater"]

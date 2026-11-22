@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { PLAN_ALTERNATIVE, PLAN_CANCEL, PLAN_START } from "@rakazo/core";
-import { Button } from "@rakazo/ui-web";
+import { PLAN_ALTERNATIVE, PLAN_CANCEL, PLAN_START } from "@mycellios/core";
+import { Button } from "@mycellios/ui-web";
 import { useEffect, useState } from "react";
 import type { AskBlock } from "./AskCard";
 

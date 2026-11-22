@@ -1,4 +1,4 @@
-import type { AccountPlanLimit, PlanLimitWindow } from "@rakazo/contracts";
+import type { AccountPlanLimit, PlanLimitWindow } from "@mycellios/contracts";
 
 export const quotaPreferencesKey = (scope: string) => `mycellios:plan-limits:v1:${scope}`;
 export function readQuotaPreferences(scope: string): { accountId: string; autoRefresh: boolean } {

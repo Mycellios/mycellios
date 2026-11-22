@@ -1,6 +1,6 @@
-import type { AdapterContext, ManagedConnectorProvider } from "@rakazo/adapter-kit";
-import type { Actor, Connection, ConnectionIdentity } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { AdapterContext, ManagedConnectorProvider } from "@mycellios/adapter-kit";
+import type { Actor, Connection, ConnectionIdentity } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 
 export async function connectionAccountDetails(
   prisma: PrismaClient,

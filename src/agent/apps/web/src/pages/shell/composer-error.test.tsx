@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { i18n } from "@lingui/core";
-import { desktopDiagnosticMessage } from "@rakazo/contracts";
+import { desktopDiagnosticMessage } from "@mycellios/contracts";
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";

@@ -1,6 +1,6 @@
-import type { MycelliosAccount } from "@rakazo/contracts";
-import { ModelHeadersSchema, MycelliosAccountSchema } from "@rakazo/contracts";
-import { readBoundedResponseBytes } from "@rakazo/core";
+import type { MycelliosAccount } from "@mycellios/contracts";
+import { ModelHeadersSchema, MycelliosAccountSchema } from "@mycellios/contracts";
+import { readBoundedResponseBytes } from "@mycellios/core";
 import { mycelliosApiBaseUrl } from "./mycellios-api.js";
 import { createOpenAiCompatibleFetch } from "./pi-openai-compatible-provider.js";
 import { withAbort } from "./web-ssrf.js";

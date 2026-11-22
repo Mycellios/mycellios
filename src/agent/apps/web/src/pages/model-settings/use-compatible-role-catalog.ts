@@ -1,5 +1,5 @@
-import type { ModelCredential } from "@rakazo/contracts";
-import { ANTSEED_PROVIDER_ID, isMycelliosBaseUrl, isOpenAiCompatibleProvider, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
+import type { ModelCredential } from "@mycellios/contracts";
+import { ANTSEED_PROVIDER_ID, isMycelliosBaseUrl, isOpenAiCompatibleProvider, OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
 import { useQueries } from "@tanstack/react-query";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import type { RpcClient } from "../../lib/rpc";

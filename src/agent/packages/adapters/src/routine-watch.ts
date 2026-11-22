@@ -6,20 +6,20 @@ import type {
   ConnectorProvider,
   JobPublisher,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
-import { routineJobKey, routineWakeupJob } from "@rakazo/adapter-kit";
-import type { RoutineWatch, RoutineWatchState } from "@rakazo/contracts";
-import { RoutineWatchSchema, RoutineWatchStateSchema } from "@rakazo/contracts";
-import type { ActionApprovalRule } from "@rakazo/core";
-import { connectorKindFromToolName, watchToolRefusal } from "@rakazo/core";
-import type { ComputerMode, PrismaClient, ThreadEvents } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { routineJobKey, routineWakeupJob } from "@mycellios/adapter-kit";
+import type { RoutineWatch, RoutineWatchState } from "@mycellios/contracts";
+import { RoutineWatchSchema, RoutineWatchStateSchema } from "@mycellios/contracts";
+import type { ActionApprovalRule } from "@mycellios/core";
+import { connectorKindFromToolName, watchToolRefusal } from "@mycellios/core";
+import type { ComputerMode, PrismaClient, ThreadEvents } from "@mycellios/db";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
   listApprovalRules,
   parseComputerMode,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { scheduleComputerSleep } from "./computer-idle.js";
 import { ComputerBusyError, provisionComputer } from "./computer-lifecycle.js";
 import { resolveBotWorkspaceCwd, teamBotWorkspaceDirectory } from "./computer-support.js";

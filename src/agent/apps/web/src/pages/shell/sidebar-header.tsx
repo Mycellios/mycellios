@@ -1,7 +1,7 @@
 import { ServerConnections } from "../../components/ServerConnections";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Space } from "@rakazo/contracts";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import type { Bot, Space } from "@mycellios/contracts";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
@@ -113,7 +113,7 @@ export function SidebarHeader({
                   setMobileSidebarOpen(false);
                   setCreateBotOpen(true);
                 }}
-                onOpenBot={(id) => {
+                onShowBot={(id) => {
                   setCreateMenuOpen(false);
                   setMobileSidebarOpen(false);
                   navigate(`/app/${id}`);

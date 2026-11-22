@@ -1,12 +1,12 @@
 import { Trans } from "@lingui/react/macro";
-import { Button, Field, FieldError, FieldLabel, Input } from "@rakazo/ui-web";
+import { Button, Field, FieldError, FieldLabel, Input } from "@mycellios/ui-web";
 import { useId, useState } from "react";
 import type { ConnectionMode } from "./ConnectionModeFields";
 import { ConnectionModeFields } from "./ConnectionModeFields";
 import type { MemoryProviderConnectionDraft, MemoryProviderSettingsFormProps } from "./registry";
 
 const RESOURCE_ID_PATTERN = /^[A-Za-z0-9_-]{0,512}$/;
-// Rakazo writes to these peers, so they cannot be read as the user's own peer.
+// Mycellios writes to these peers, so they cannot be read as the user's own peer.
 function isReservedPeerId(value: string): boolean {
   return value === "rakazo-shared" || value.startsWith("bot-");
 }

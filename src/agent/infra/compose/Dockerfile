@@ -15,10 +15,10 @@ RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --ignore-
     && mkdir /repo/src/contracts/node_modules \
     && ln -s /repo/src/agent/node_modules/* /repo/src/agent/node_modules/.bin /repo/src/contracts/node_modules/ \
     && npm rebuild @prisma/engines \
-    && npm run generate --workspace @rakazo/db \
-    && npm run build --workspace @rakazo/api --workspace @rakazo/worker
+    && npm run generate --workspace @mycellios/db \
+    && npm run build --workspace @mycellios/api --workspace @mycellios/worker
 ARG APP_BASE_PATH=/
-RUN APP_BASE_PATH=$APP_BASE_PATH RAKAZO_ALLOW_DEV_SECRETS=1 npm run build --workspace @rakazo/web
+RUN APP_BASE_PATH=$APP_BASE_PATH RAKAZO_ALLOW_DEV_SECRETS=1 npm run build --workspace @mycellios/web
 # Existing runtime configurations and tools refer to /app.
 RUN ln -s /repo/src/agent /app \
     && install -d -m 750 -o node -g node /data /repo/src/agent/apps/web/node_modules/.vite-temp /repo/src/agent/apps/web/asset-archive
@@ -27,4 +27,4 @@ ENV NODE_ENV=production
 ENV GIT_SHA=$GIT_SHA
 EXPOSE 3100 5173 7091
 USER node
-CMD ["npm", "run", "start", "--workspace", "@rakazo/api"]
+CMD ["npm", "run", "start", "--workspace", "@mycellios/api"]

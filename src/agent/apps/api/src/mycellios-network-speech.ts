@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { createOpenAiCompatibleFetch } from "@rakazo/adapters";
-import { productBrand } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { createOpenAiCompatibleFetch } from "@mycellios/adapters";
+import { productBrand } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { networkSpeechIdentityIds } from "./network-speech-placement.js";
 import {
   KOKORO_MODEL,

@@ -1,4 +1,4 @@
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { t } from "./i18n";
 import { DEFAULT_API, LOCAL_API } from "./server-config";
 

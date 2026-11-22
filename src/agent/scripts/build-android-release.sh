@@ -34,10 +34,10 @@ node scripts/build-desktop-downloads.mjs
 cp -r build/desktop-downloads/web "$OUT/downloads-web"
 cd src/agent
 npm ci --ignore-scripts --no-audit --no-fund --cache /pnpm-store/npm-cache
-npm run generate --workspace @rakazo/db
+npm run generate --workspace @mycellios/db
 node node_modules/typescript/bin/tsc --noEmit --incremental --tsBuildInfoFile /tmp/android-web.tsbuildinfo -p apps/web/tsconfig.json
 node node_modules/vitest/vitest.mjs run apps/web/src/pages/shell/use-android-shortcut.test.tsx apps/web/src/lib/android-host.test.ts apps/web/src/lib/dictation.test.ts apps/web/src/pages/shell/use-voice-shortcut.test.tsx apps/web/src/pages/shell/reviewed-voice.test.tsx apps/web/src/pages/shell/composer.test.tsx --maxWorkers 2
-APP_BASE_PATH=/agent/ npm run build --workspace @rakazo/web
+APP_BASE_PATH=/agent/ npm run build --workspace @mycellios/web
 mkdir -p apps/android/app/src/main/assets
 mkdir -p apps/android/app/src/main/res/drawable
 cp apps/web/public/mycellios/app-icon-v2-512.png apps/android/app/src/main/res/drawable/ic_mycellios.png

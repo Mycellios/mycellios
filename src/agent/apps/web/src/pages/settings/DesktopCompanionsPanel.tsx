@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { DEFAULT_DESKTOP_COMPANIONS, type Bot, type DesktopCompanionPreferences } from "@rakazo/contracts";
-import { BotAvatar, Button, Input, Label, OptionSelect, Switch } from "@rakazo/ui-web";
+import { DEFAULT_DESKTOP_COMPANIONS, type Bot, type DesktopCompanionPreferences } from "@mycellios/contracts";
+import { BotAvatar, Button, Input, Label, OptionSelect, Switch } from "@mycellios/ui-web";
 import { useEffect, useId, useState, useRef } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";

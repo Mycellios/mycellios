@@ -1,7 +1,7 @@
 import type { Context } from "@earendil-works/pi-ai";
 import { Type } from "@earendil-works/pi-ai";
-import type { AgentRunModel } from "@rakazo/adapter-kit";
-import { normalizeRunError } from "@rakazo/core";
+import type { AgentRunModel } from "@mycellios/adapter-kit";
+import { normalizeRunError } from "@mycellios/core";
 import { withChatCompletionsCompatibility } from "./chat-completions-compat.js";
 import { withCloudflareAuth } from "./cloudflare-ai-gateway.js";
 import { reliableModelStream, resolveRuntimeModel } from "./pi-runtime.js";

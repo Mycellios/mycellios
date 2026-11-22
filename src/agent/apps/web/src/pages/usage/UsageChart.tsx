@@ -1,6 +1,6 @@
-import { Input } from "@rakazo/ui-web";
+import { Input } from "@mycellios/ui-web";
 import { useLingui } from "@lingui/react/macro";
-import type { UsageDashboard } from "@rakazo/contracts";
+import type { UsageDashboard } from "@mycellios/contracts";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   chartSeries,

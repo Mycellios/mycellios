@@ -6,8 +6,8 @@ import type {
   ConnectorProvider,
   ConnectorTool,
   SecretStore,
-} from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import {

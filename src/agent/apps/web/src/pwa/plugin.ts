@@ -1,9 +1,9 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { Script } from "node:vm";
-import { isBuildId } from "@rakazo/contracts/client-build";
-import { productBrand } from "@rakazo/contracts/product-brand";
-import { webDarkTokens } from "@rakazo/ui-tokens";
+import { isBuildId } from "@mycellios/contracts/client-build";
+import { productBrand } from "@mycellios/contracts/product-brand";
+import { webDarkTokens } from "@mycellios/ui-tokens";
 import type { Plugin, Rolldown } from "vite";
 import { build } from "esbuild";
 import { CACHE_PREFIX } from "./service-worker.js";

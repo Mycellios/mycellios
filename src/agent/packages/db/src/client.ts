@@ -1,7 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import type { KeyProvider } from "@rakazo/adapter-kit";
-import { resolveContentEncryption } from "@rakazo/core";
-import { getLogger } from "@rakazo/logging";
+import type { KeyProvider } from "@mycellios/adapter-kit";
+import { resolveContentEncryption } from "@mycellios/core";
+import { getLogger } from "@mycellios/logging";
 import type { PoolClient } from "pg";
 import { Pool } from "pg";
 import { withContentEncryption } from "./content-encryption.js";

@@ -6,7 +6,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createDb, createThreadMessage, runAsSystem} from '@rakazo/db';
+import {createDb, createThreadMessage, runAsSystem} from '@mycellios/db';
 import {developmentIdentity} from './desktop-dev-state.mjs';
 import {
   ARCHIVED_BOT, SEED_APP, SEED_BOTS, SEED_CONVERSATIONS, SEED_FILES, SEED_GROUP, SEED_MARKER,

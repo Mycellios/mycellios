@@ -14,9 +14,9 @@ test("new users answer the signup survey before their first chat", async ({ page
     await route.fulfill({ json: { json: { ok: true } } });
   });
 
-  await signup(page, `survey-${Date.now()}@rakazo.test`, "password12", "Survey");
+  await signup(page, `survey-${Date.now()}@mycellios.test`, "password12", "Survey");
 
-  await expect(page.getByRole("heading", { name: "Welcome to Rakazo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to Mycellios" })).toBeVisible();
   await expect(page).toHaveURL(/\/onboarding\/survey$/);
   await expect(page.getByRole("combobox", { name: "How big is your team?" })).toHaveCount(0);
   await captureScreenshot(page, testInfo, "01-signup-survey");
@@ -25,7 +25,7 @@ test("new users answer the signup survey before their first chat", async ({ page
   await chooseOption(page.getByRole("combobox", { name: "How big is your team?" }), "11–50");
   await page.getByLabel("How did you hear about us?").fill("A friend");
   await page
-    .getByLabel("What do you most want Rakazo to help with?")
+    .getByLabel("What do you most want Mycellios to help with?")
     .fill("  Keep my inbox at zero ");
   await captureScreenshot(page, testInfo, "02-signup-survey-filled");
 
@@ -38,11 +38,11 @@ test("new users answer the signup survey before their first chat", async ({ page
 
 test("each onboarding step opens directly from its URL", async ({ page }) => {
   // No survey or model is due, so only the URL can open these steps.
-  await signup(page, `step-links-${Date.now()}@rakazo.test`, "password12", "Step links");
+  await signup(page, `step-links-${Date.now()}@mycellios.test`, "password12", "Step links");
   await page.waitForURL(/\/app\//, { timeout: 20_000 });
 
   await page.goto("/onboarding/survey");
-  await expect(page.getByRole("heading", { name: "Welcome to Rakazo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to Mycellios" })).toBeVisible();
 
   await page.goto("/onboarding/model");
   await expect(page.getByRole("heading", { name: "Connect a model" })).toBeVisible();

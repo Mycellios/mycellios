@@ -1,11 +1,11 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Run, TaskCost, ThreadMessage } from "@rakazo/contracts";
-import { lastRunOutput, runHealth } from "@rakazo/core/run-health";
-import { observedTools, type ToolObservation } from "@rakazo/core";
-import { Button, GroupAvatar } from "@rakazo/ui-web";
-import type { GroupAvatarMember } from "@rakazo/ui-web";
-import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@rakazo/ui-web/components/ui/sheet";
-import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
+import type { Run, TaskCost, ThreadMessage } from "@mycellios/contracts";
+import { lastRunOutput, runHealth } from "@mycellios/core/run-health";
+import { observedTools, type ToolObservation } from "@mycellios/core";
+import { Button, GroupAvatar } from "@mycellios/ui-web";
+import type { GroupAvatarMember } from "@mycellios/ui-web";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";
 import { liveThreadDisconnected, subscribeLiveThreadConnection } from "../lib/live-thread-connection";

@@ -1,6 +1,6 @@
 import { createHash, createPrivateKey, randomUUID, sign } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import type { AdapterContext, NotificationMessage } from "@rakazo/adapter-kit";
+import type { AdapterContext, NotificationMessage } from "@mycellios/adapter-kit";
 
 type Credentials = { projectId: string; clientEmail: string; privateKey: ReturnType<typeof createPrivateKey> };
 export function androidFcmConfig(env: NodeJS.ProcessEnv): Credentials | undefined {

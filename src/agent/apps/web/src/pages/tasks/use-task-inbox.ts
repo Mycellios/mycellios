@@ -1,4 +1,4 @@
-import type { InboxTask } from "@rakazo/contracts";
+import type { InboxTask } from "@mycellios/contracts";
 import { useEffect, useRef, useState } from "react";
 import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";

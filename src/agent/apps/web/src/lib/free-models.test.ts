@@ -1,4 +1,4 @@
-import type { ModelCatalogEntry } from "@rakazo/contracts";
+import type { ModelCatalogEntry } from "@mycellios/contracts";
 import { expect, it } from "vitest";
 import { isFreeMycelliosModel, pickFreeMycelliosModel } from "./free-models";
 

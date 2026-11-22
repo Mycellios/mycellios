@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import path from "node:path";
-import { MAX_DESKTOP_DISPLAY, screenPorts } from "@rakazo/core/node/desktop-runtime";
+import { MAX_DESKTOP_DISPLAY, screenPorts } from "@mycellios/core/node/desktop-runtime";
 import type Docker from "dockerode";
 
 /**
@@ -61,7 +61,7 @@ export function resolveSpaceComputerLimit(
  * A computer runs Xvfb, a window manager and a full Chromium on behalf of an
  * agent that decides for itself what to open. #343 gave these containers a
  * pids ceiling, but Memory and NanoCpus are still unset, so one runaway page is
- * a host-wide memory and CPU event that takes every other bot and the Rakazo
+ * a host-wide memory and CPU event that takes every other bot and the Mycellios
  * services down with it. Every service in docker-compose.prod.yml already
  * carries mem_limit; this applies the same discipline to the containers that
  * actually run untrusted page content.

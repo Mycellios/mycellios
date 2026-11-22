@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentRunRequest, AgentRuntimeEvent, ConnectorTool } from "@rakazo/adapter-kit";
+import type { AgentRunRequest, AgentRuntimeEvent, ConnectorTool } from "@mycellios/adapter-kit";
 import { PiAgentRuntime } from "../../adapters/src/pi-runtime.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { startModelEmulator } from "./model-emulator.js";

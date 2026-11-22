@@ -1,6 +1,6 @@
-import type { JobPublisher, SandboxProvider, ComputerRef } from "@rakazo/adapter-kit";
-import { runJobKey } from "@rakazo/adapter-kit";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import type { JobPublisher, SandboxProvider, ComputerRef } from "@mycellios/adapter-kit";
+import { runJobKey } from "@mycellios/adapter-kit";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
 import { cancelComputerRunWorkArgv } from "./computer-idle.js";
 import { projectLeaseOwner } from "./project-execution.js";
 

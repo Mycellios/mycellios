@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { ChatModelChoice } from "@rakazo/core";
-import { groupModelChoices, MODEL_SEARCH_THRESHOLD } from "@rakazo/core";
+import type { ChatModelChoice } from "@mycellios/core";
+import { groupModelChoices, MODEL_SEARCH_THRESHOLD } from "@mycellios/core";
 import {
   Button,
   Command,
@@ -18,7 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check, ChevronDownIcon, Circle, Plus } from "lucide-react";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { TextOnlyMark } from "../../components/TextOnlyMark";

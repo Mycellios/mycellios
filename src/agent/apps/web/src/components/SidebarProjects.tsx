@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { ProjectSummary } from "@rakazo/contracts";
-import { Button, Input, OptionSelect, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import type { ProjectSummary } from "@mycellios/contracts";
+import { Button, Input, OptionSelect, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ChevronDown, Folder, MessageSquare, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";

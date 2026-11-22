@@ -1,6 +1,6 @@
-import type { ThreadMessage } from "@rakazo/contracts";
-import type { ThreadItem } from "@rakazo/core";
-import { isPeerReceiptBlocks } from "@rakazo/core";
+import type { ThreadMessage } from "@mycellios/contracts";
+import type { ThreadItem } from "@mycellios/core";
+import { isPeerReceiptBlocks } from "@mycellios/core";
 
 /** Consecutive messages between Micos that the transcript folds into one row. */
 export interface PeerExchange {

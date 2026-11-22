@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Bot, MicoSettingsState } from "@rakazo/contracts";
+import type { Bot, MicoSettingsState } from "@mycellios/contracts";
 import type { RpcClient } from "../../lib/rpc";
 const mocked = vi.hoisted(() => ({ client: {} as RpcClient }));
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => mocked.client }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (strings: TemplateStringsArray, ...values: unknown[]) => strings.reduce((out, text, i) => out + text + (values[i] ?? ""), "") }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   BotAvatar: () => null,
   Button: ({ children, variant: _, size: __, ...props }: Record<string, unknown> & { children: ReactNode }) => <button {...props}>{children}</button>,
   Input: (props: Record<string, unknown>) => <input {...props} />,

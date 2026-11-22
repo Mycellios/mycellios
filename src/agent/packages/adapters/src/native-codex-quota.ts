@@ -1,4 +1,4 @@
-import type { AccountPlanLimit, PlanLimitWindow } from "@rakazo/contracts";
+import type { AccountPlanLimit, PlanLimitWindow } from "@mycellios/contracts";
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 /** Allowlist quota metadata only; never forward CLI account identity or credentials. */

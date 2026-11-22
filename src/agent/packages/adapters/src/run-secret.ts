@@ -1,14 +1,14 @@
-import type { AdapterContext, ManagedConnectorProvider, SecretStore } from "@rakazo/adapter-kit";
+import type { AdapterContext, ManagedConnectorProvider, SecretStore } from "@mycellios/adapter-kit";
 import {
   BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
   LoginSecretValue,
   MessageBlock as MessageBlockSchema,
   SecretAskPurpose,
-} from "@rakazo/contracts";
-import { isSecretAskBlock } from "@rakazo/core";
-import type { PrismaClient, RunSecretWriter } from "@rakazo/db";
-import { runSecretKind, withTransactionRetry } from "@rakazo/db";
+} from "@mycellios/contracts";
+import { isSecretAskBlock } from "@mycellios/core";
+import type { PrismaClient, RunSecretWriter } from "@mycellios/db";
+import { runSecretKind, withTransactionRetry } from "@mycellios/db";
 import { type ApprovalPausedToolResult, resolveDuplicateEffectGate } from "./approval-effect.js";
 import { prepareBotSecret } from "./bot-secrets.js";
 import { persistPreparedSecret } from "./secret-persistence.js";

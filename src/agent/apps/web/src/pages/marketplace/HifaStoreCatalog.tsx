@@ -1,4 +1,4 @@
-import { Button, Input } from "@rakazo/ui-web";
+import { Button, Input } from "@mycellios/ui-web";
 import { ArrowUpRight, Globe, Film, Monitor, Search, Waves } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useSearchParams } from "react-router-dom";

@@ -1,7 +1,7 @@
 import type { RouterUtils } from "@orpc/tanstack-query";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import type { AppBootstrap } from "@rakazo/contracts";
-import { isRetryableError } from "@rakazo/core";
+import type { AppBootstrap } from "@mycellios/contracts";
+import { isRetryableError } from "@mycellios/core";
 import type { DataTag, QueryFunction, QueryKey } from "@tanstack/react-query";
 import { hashKey, isCancelledError, QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";

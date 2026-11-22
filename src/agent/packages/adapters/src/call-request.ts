@@ -1,20 +1,20 @@
 import { randomUUID } from "node:crypto";
-import type { JobPublisher } from "@rakazo/adapter-kit";
-import { callExpireJob } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import type { CallRequestBlock } from "@rakazo/core";
+import type { JobPublisher } from "@mycellios/adapter-kit";
+import { callExpireJob } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import type { CallRequestBlock } from "@mycellios/core";
 import {
   CALL_CLIENT_NONCE_PREFIX,
   callRequestBlock,
   callRequestClientNonce,
   phoneCallSettings,
-} from "@rakazo/core";
-import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
+} from "@mycellios/core";
+import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
   runAsSystem,
-} from "@rakazo/db";
+} from "@mycellios/db";
 
 const REASON_MAX = 120;
 const OPENING_MAX = 240;

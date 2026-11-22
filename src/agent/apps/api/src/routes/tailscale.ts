@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { TailnetError, TailnetService } from "@rakazo/adapters";
+import { TailnetError, TailnetService } from "@mycellios/adapters";
 import type { RouterContext } from "./context.js";
 
 export function tailscaleRoutes({ deps, authed }: RouterContext) {

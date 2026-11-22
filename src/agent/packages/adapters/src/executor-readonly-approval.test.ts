@@ -1,17 +1,17 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
 import type {
   AgentRunRequest,
   AutoReviewProvider,
   ConnectorCall,
   ConnectorTool,
-} from "@rakazo/adapter-kit";
-import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
-import type { ModelRoleSettings } from "@rakazo/contracts";
-import type { ActionApprovalRule } from "@rakazo/core";
-import { inboundRoutineBlock } from "@rakazo/core";
-import { approvalEffectKey, toolEffectIdempotencyKey } from "@rakazo/core/node/approval-effect-key";
-import type { PrismaClient } from "@rakazo/db";
-import { createPendingSteeringRun, sendUserMessage } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { MEMORY_REVISION_CONFLICT_ERROR } from "@mycellios/adapter-kit";
+import type { ModelRoleSettings } from "@mycellios/contracts";
+import type { ActionApprovalRule } from "@mycellios/core";
+import { inboundRoutineBlock } from "@mycellios/core";
+import { approvalEffectKey, toolEffectIdempotencyKey } from "@mycellios/core/node/approval-effect-key";
+import type { PrismaClient } from "@mycellios/db";
+import { createPendingSteeringRun, sendUserMessage } from "@mycellios/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isApprovalPausedResult } from "./approval-effect.js";
 import { MAX_SHARED_MEMORY_CHARS } from "./builtin-tools.js";
@@ -2374,8 +2374,8 @@ describe("standing owner permission for all agents' routines", () => {
 
 // These executor fixtures isolate post-admission behavior. Real concurrent SQL
 // admission is exercised by scripts/verify-workspace-sync-db.ts.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

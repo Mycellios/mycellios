@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import { ACTIVE_RUN_STATUSES, isRunWorking } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, isRunWorking } from "@mycellios/core";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 import * as React from "react";
 import { act, memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -85,7 +85,7 @@ function measure(before: boolean) {
     confirmDeleteSpace: action,
     deleteSection: action,
     me: { spaceId: "space-1" },
-    openBot: action,
+    showBot: action,
     openGroup: action,
     groupAction: action,
     organizeBot: action,
@@ -215,7 +215,7 @@ it.each(["midnight", "focus", "foreground"])(
       confirmDeleteSpace: action,
       deleteSection: action,
       me: { spaceId: "space-1" },
-      openBot: action,
+      showBot: action,
       openGroup: action,
       organizeBot: action,
       organizeGroup: action,
@@ -459,7 +459,7 @@ it("ties the pinned tiles' avatars to the pinned row, so they freeze when it scr
     editSectionFromMenu: action,
     groupAction: action,
     me: { spaceId: "space-1" },
-    openBot: action,
+    showBot: action,
     openGroup: action,
     organizeBot: action,
     organizeFromMenu: action,
@@ -555,7 +555,7 @@ it("collapses a section from its heading and keeps the choice for the account", 
     day: 0,
     editSectionFromMenu: action,
     groupAction: action,
-    openBot: action,
+    showBot: action,
     openGroup: action,
     organizeBot: action,
     organizeFromMenu: action,
@@ -777,7 +777,7 @@ it("gives the long-press menu, and with it Delete, only to chats in the current 
     confirmDeleteSpace: action,
     deleteSection: action,
     me: { spaceId: "space-current" },
-    openBot: action,
+    showBot: action,
     openGroup: action,
     organizeBot: action,
     organizeGroup: action,
@@ -861,7 +861,7 @@ it("offers every space heading's Settings, and Delete only where the member may 
     editSectionFromMenu: action,
     groupAction: action,
     me: { spaceId: "space-home" },
-    openBot: action,
+    showBot: action,
     openGroup: action,
     organizeBot: action,
     organizeFromMenu: action,
@@ -932,6 +932,7 @@ it("adds a bot made from the inbox's Create menu to the inbox roster before open
     spaceActionRef: { current: { busy: false, recoveryId: null } },
     rpc,
     normalizeCreateBotProfile: (profile: unknown) => profile,
+    DEFAULT_COMPUTER_MODE: "isolated",
     refreshBots: async () => undefined,
     allowFocusPrompt: () => undefined,
     scheduleFocusPrompt: () => undefined,

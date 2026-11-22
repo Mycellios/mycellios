@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import type { BotSecretDestination } from "@rakazo/contracts";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import type { BotSecretDestination } from "@mycellios/contracts";
 import {
   BotSecretAuth,
   BotSecretName,
@@ -10,10 +10,10 @@ import {
   decodeLoginSecret,
   isPrivateNetworkHost,
   SecretHttpRequest,
-} from "@rakazo/contracts";
-import type { Prisma, PrismaClient } from "@rakazo/db";
-import { withTransactionRetry } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/contracts";
+import type { Prisma, PrismaClient } from "@mycellios/db";
+import { withTransactionRetry } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { combineSignals, redactConnectorPayload } from "./connector-safety.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { createPrivateNetworkFetch, createSafeRemoteFetch } from "./remote-mcp.js";

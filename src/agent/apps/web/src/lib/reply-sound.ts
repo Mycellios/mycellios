@@ -1,4 +1,4 @@
-import type { ProductEvent } from "@rakazo/contracts";
+import type { ProductEvent } from "@mycellios/contracts";
 import { getGeneralPreferences } from "./general-preferences";
 
 const DURATION = 0.2;

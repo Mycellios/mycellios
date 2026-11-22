@@ -1,4 +1,4 @@
-import type { ComputerMode, ThinkingLevel } from "@rakazo/contracts";
+import type { ComputerMode, ThinkingLevel } from "@mycellios/contracts";
 import {
   BOT_COLORS,
   BOT_DESCRIPTION_MAX_LENGTH,
@@ -10,14 +10,14 @@ import {
   micoAvatarShape,
   withMicoAvatarPalette,
   withMicoAvatarShape,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   credentialForModel,
   MODEL_SEARCH_THRESHOLD,
   modelOptionKey,
   parseModelOptionKey,
   resolveSelectableModelId,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { Voice } from "expo-speech";
 import type { ReactNode } from "react";

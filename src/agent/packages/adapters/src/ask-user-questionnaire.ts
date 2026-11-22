@@ -1,5 +1,5 @@
-import { AgentQuestions } from "@rakazo/contracts";
-import { PLAN_CARD_TOOL } from "@rakazo/core";
+import { AgentQuestions } from "@mycellios/contracts";
+import { PLAN_CARD_TOOL } from "@mycellios/core";
 import { planCardQuestionnaire } from "./plan-card.js";
 
 /** Same form payload for API and native models; old string choices remain compatible. */

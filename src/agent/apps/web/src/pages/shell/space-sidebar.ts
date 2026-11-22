@@ -1,4 +1,4 @@
-import { groupBotsForSidebar, userFacingLabel, sidebarFolderTree } from "@rakazo/core";
+import { groupBotsForSidebar, userFacingLabel, sidebarFolderTree } from "@mycellios/core";
 
 type SidebarChat = {
   id: string;

@@ -1,4 +1,4 @@
-import type { ModelCatalogEntry } from "@rakazo/contracts";
+import type { ModelCatalogEntry } from "@mycellios/contracts";
 
 const zero = (value: string | undefined) => !value || /^0(\.0+)?$/.test(value);
 /** Managed Mycellios routes; the coordinator serves their zero-priced offers only from AntSeed. */

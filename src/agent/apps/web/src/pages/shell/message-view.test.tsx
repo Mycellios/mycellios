@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ThreadMessage } from "@rakazo/contracts";
+import type { ThreadMessage } from "@mycellios/contracts";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -59,7 +59,7 @@ function renderMessage(
   mentions?: ReturnType<typeof planner>[],
   options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean; runEnded?: boolean } = {},
 ) {
-  const onOpenBot = vi.fn();
+  const onShowBot = vi.fn();
   const message: ThreadMessage = {
     id: options.id ?? "message",
     threadId: "thread",
@@ -78,7 +78,7 @@ function renderMessage(
         message={message}
         mentions={mentions}
         onAnswer={vi.fn()}
-        onOpenBot={onOpenBot}
+        onShowBot={onShowBot}
         onOpenPeerMessages={vi.fn()}
         onTogglePeerReplies={vi.fn()}
         peerBot={peerBot}
@@ -101,11 +101,11 @@ function renderMessage(
   );
   const mention = container.querySelector<HTMLElement>('[data-testid="bot-mention"]')!;
   if (mention) act(() => mention.click());
-  return { mention, onOpenBot };
+  return { mention, onShowBot };
 }
 
 it("names a new bot inline in the reply, in its color", () => {
-  const { mention, onOpenBot } = renderMessage(
+  const { mention, onShowBot } = renderMessage(
     [{ kind: "text", text: "Planner is ready." }],
     existingBot,
     [planner()],
@@ -115,7 +115,7 @@ it("names a new bot inline in the reply, in its color", () => {
   expect(bubble?.textContent).toBe("Planner is ready.");
   expect(mention.tagName).toBe("BUTTON");
   expect(mention.querySelector("span[dir]")?.getAttribute("style")).toContain("color");
-  expect(onOpenBot).toHaveBeenCalledWith("child");
+  expect(onShowBot).toHaveBeenCalledWith("child");
 });
 
 it("puts the bot first when the reply does not name it", () => {
@@ -129,7 +129,7 @@ it.each([
   ["no longer exists", "created", missingBot],
   ["was deleted", "deleted", existingBot],
 ] as const)("keeps the name without color or link when the bot %s", (_, status, peerBot) => {
-  const { mention, onOpenBot } = renderMessage(
+  const { mention, onShowBot } = renderMessage(
     [{ kind: "text", text: "Planner is gone." }],
     peerBot,
     [planner(status)],
@@ -137,13 +137,13 @@ it.each([
   expect(mention.textContent).toBe("Planner");
   expect(mention.tagName).toBe("SPAN");
   expect(mention.querySelector("span[dir]")?.getAttribute("style")).toBeNull();
-  expect(onOpenBot).not.toHaveBeenCalled();
+  expect(onShowBot).not.toHaveBeenCalled();
 });
 
 it("shows an announcement with no reply yet on its own", () => {
-  const { mention, onOpenBot } = renderMessage([planner()], existingBot);
+  const { mention, onShowBot } = renderMessage([planner()], existingBot);
   expect(mention.textContent).toBe("Planner");
-  expect(onOpenBot).toHaveBeenCalledWith("child");
+  expect(onShowBot).toHaveBeenCalledWith("child");
 });
 
 it("names the bot once across a reply's text blocks", () => {

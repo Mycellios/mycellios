@@ -11,7 +11,7 @@ import {
 
 test("changing language updates settings overflow without resizing", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `settings-language-${stamp}@rakazo.test`, "password12", "Settings");
+  await signup(page, `settings-language-${stamp}@mycellios.test`, "password12", "Settings");
   await completeOnboarding(page);
   const settings = await openUserSettings(page);
   // Below the desktop breakpoint, where the section list scrolls sideways.
@@ -41,7 +41,7 @@ test("narrow settings reveals the active section and offers scroll controls", as
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `settings-narrow-${stamp}@rakazo.test`, "password12", "Settings");
+  await signup(page, `settings-narrow-${stamp}@mycellios.test`, "password12", "Settings");
   await completeOnboarding(page);
   const settings = await openUserSettings(page, "usage");
   const nav = settings.getByTestId("settings-nav");
@@ -103,10 +103,10 @@ test("settings shell is two-pane and deep-links Models Memory Voice Usage", asyn
 }, testInfo) => {
   const stamp = Date.now();
   const userName = `Settings shell ${stamp}`;
-  await signup(page, `settings-shell-${stamp}@rakazo.test`, "password12", userName);
+  await signup(page, `settings-shell-${stamp}@mycellios.test`, "password12", userName);
   await completeOnboarding(page);
 
-  // Desktop has no account menu: Settings sits in the rail footer, as in OpenBot.
+  // Desktop has no account menu: Settings sits in the rail footer, as in the reference app.
   const rail = page.getByTestId("workspace-rail");
   await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
   const order = await rail.locator("button[aria-label]").evaluateAll((buttons) =>
@@ -195,7 +195,7 @@ test("settings shell is two-pane and deep-links Models Memory Voice Usage", asyn
 test("Honcho memory settings empty and filled", async ({ page }, testInfo) => {
   // These screenshots never submit credentials or contact Honcho.
   const stamp = Date.now();
-  await signup(page, `memory-honcho-${stamp}@rakazo.test`, "password12", "Memory settings");
+  await signup(page, `memory-honcho-${stamp}@mycellios.test`, "password12", "Memory settings");
   await completeOnboarding(page);
   const settings = await openUserSettings(page, "memory");
   const memory = settings.getByTestId("memory-settings");
@@ -268,7 +268,7 @@ test("Honcho memory settings empty and filled", async ({ page }, testInfo) => {
 });
 
 test("shell overlays open from the URL and keep it in sync", async ({ page }, testInfo) => {
-  await signup(page, `settings-url-${Date.now()}@rakazo.test`, "password12", "Settings");
+  await signup(page, `settings-url-${Date.now()}@mycellios.test`, "password12", "Settings");
   await completeOnboarding(page);
   const botPath = new URL(page.url()).pathname;
 
@@ -292,7 +292,7 @@ test("shell overlays open from the URL and keep it in sync", async ({ page }, te
 
 test("usage lists spend per model", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `usage-models-${stamp}@rakazo.test`, "password12", "Usage");
+  await signup(page, `usage-models-${stamp}@mycellios.test`, "password12", "Usage");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

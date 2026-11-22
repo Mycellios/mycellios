@@ -1,12 +1,12 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { productBrand, SPORE_WELCOME_REWARD } from "@rakazo/contracts";
+import { productBrand, SPORE_WELCOME_REWARD } from "@mycellios/contracts";
 import {
   credentialIssue,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   signupRequiresEmailVerification,
-} from "@rakazo/core";
-import { Button, Input, InputOTP, InputOTPGroup, InputOTPSlot, Label } from "@rakazo/ui-web";
+} from "@mycellios/core";
+import { Button, Input, InputOTP, InputOTPGroup, InputOTPSlot, Label } from "@mycellios/ui-web";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";

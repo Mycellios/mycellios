@@ -1,5 +1,5 @@
 import type { Api, Model, Models } from "@earendil-works/pi-ai";
-import { DEFAULT_MODEL_CONTEXT_WINDOW } from "@rakazo/contracts";
+import { DEFAULT_MODEL_CONTEXT_WINDOW } from "@mycellios/contracts";
 import type { ModelsDevModel, ModelsDevSnapshot } from "./models-dev.js";
 import { modelsDevCatalog } from "./models-dev.js";
 

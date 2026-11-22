@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@rakazo/ui-web";
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@mycellios/ui-web";
 import { useState } from "react";
 import { useSpaceRpc } from "../lib/space-rpc";
 

@@ -1,6 +1,6 @@
-import type { BackgroundJobHandlers } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { createPool, currentDbContext, runAsTenant } from "@rakazo/db";
+import type { BackgroundJobHandlers } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { createPool, currentDbContext, runAsTenant } from "@mycellios/db";
 import { Pool } from "pg";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {

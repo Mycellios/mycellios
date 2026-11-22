@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { RunActivityRow, RunLogIssue, RunLogRow, RunLogsOutput, RoutineRunCursor } from "@rakazo/contracts";
-import { Button, Input, Label, NativeSelect, NativeSelectOption } from "@rakazo/ui-web";
+import type { RunActivityRow, RunLogIssue, RunLogRow, RunLogsOutput, RoutineRunCursor } from "@mycellios/contracts";
+import { Button, Input, Label, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useId, useState } from "react";

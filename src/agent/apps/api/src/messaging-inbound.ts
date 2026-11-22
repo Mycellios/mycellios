@@ -2,17 +2,17 @@ import type {
   JobPublisher,
   MessagingInboundAttachment,
   MessagingInboundMessage,
-} from "@rakazo/adapter-kit";
-import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT } from "@rakazo/contracts";
+} from "@mycellios/adapter-kit";
+import { messagingDeliverJob, runContinueJob } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_COUNT } from "@mycellios/contracts";
 import {
   displayName,
   messageBlockForArtifact,
   parseMessagingCommand,
   promptTextForAttachments,
   sanitizeMessagingLabel,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import type {
   MessagingIdentityRequest,
   Prisma,
@@ -20,14 +20,14 @@ import type {
   ProvisionedMessagingIdentity,
   SignupPolicyEnv,
   ThreadEvents,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import {
   createThreadMessage,
   crossSpaceCommunicationAllowed,
   normalizeMessagingLinkCode,
   redeemMessagingLinkCode,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { MessagingReceipts } from "./messaging-receipts.js";
 import {
   MESSAGE_ROUTING_REARMED_REASON,

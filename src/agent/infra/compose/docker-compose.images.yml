@@ -293,7 +293,7 @@ services:
   supervisor:
     image: ${RAKAZO_IMAGE:-ghcr.io/elie222/rakazo/app}:${RAKAZO_IMAGE_TAG:-edge}
     restart: unless-stopped
-    command: ["npm", "run", "start", "--workspace", "@rakazo/sandbox-supervisor"]
+    command: ["npm", "run", "start", "--workspace", "@mycellios/sandbox-supervisor"]
     init: true
     user: root
     security_opt:

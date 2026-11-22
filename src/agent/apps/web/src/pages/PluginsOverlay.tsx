@@ -11,8 +11,8 @@ import type {
   ConnectionCatalogItem,
   IntegrationCatalogResult,
   IntegrationCatalogSurface,
-} from "@rakazo/contracts";
-import { CONNECTION_LABEL_MAX_LENGTH } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import { CONNECTION_LABEL_MAX_LENGTH } from "@mycellios/contracts";
 import {
   buildFeaturedConnectorTiles,
   CONNECTION_CATALOG_PAGE_SIZE,
@@ -22,7 +22,7 @@ import {
   filterConnectionCatalogItems,
   humanizeToolName,
   isCatalogItemConnected,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   Badge,
   Button,
@@ -40,7 +40,7 @@ import {
   NativeSelect,
   NativeSelectOption,
   Spinner,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { queryOptions, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -70,7 +70,7 @@ function ConnectorIcon({ name, logo }: { name: string; logo?: string | null }) {
 type SourceKind = "treg" | "executor" | "mcp" | "api" | "graphql";
 
 const NO_CATALOG: ConnectionCatalogItem[] = [];
-const NO_MCP: import("@rakazo/contracts").McpServer[] = [];
+const NO_MCP: import("@mycellios/contracts").McpServer[] = [];
 const NO_CONNECTIONS: Connection[] = [];
 const NO_SOURCES: CapabilityInstall[] = [];
 

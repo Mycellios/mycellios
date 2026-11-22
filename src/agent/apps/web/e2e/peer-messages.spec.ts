@@ -19,7 +19,7 @@ async function expectPeerChip(transcript: Locator, chip: Locator, count?: number
 
 test("shows peer chips in transcript and opens view-only peer chat", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `peer-msg-${stamp}@rakazo.test`, "password12", "Peer Msg");
+  await signup(page, `peer-msg-${stamp}@mycellios.test`, "password12", "Peer Msg");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -135,7 +135,7 @@ const relayText = "Here's what Researcher found: done. i handled: peer-fold-alph
  * marker in Researcher's chat.
  */
 async function openFoldedPeerReply(page: Page, name: string, testInfo: TestInfo) {
-  await signup(page, `${name}-${Date.now()}@rakazo.test`, "password12", "Peer Fold");
+  await signup(page, `${name}-${Date.now()}@mycellios.test`, "password12", "Peer Fold");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -315,7 +315,7 @@ test("folds a peer run's reply under its marker and keeps its ask inline", async
 test("answers a message sent while the bot works on another bot's request", async ({
   page,
 }, testInfo) => {
-  await signup(page, `peer-busy-${Date.now()}@rakazo.test`, "password12", "Peer Busy");
+  await signup(page, `peer-busy-${Date.now()}@mycellios.test`, "password12", "Peer Busy");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Popover, PopoverContent, PopoverTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { Button, Popover, PopoverContent, PopoverTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@mycellios/ui-web";
 import { Bell, BellOff, Check, ChevronRight, ChevronsUpDown, ExternalLink, PanelLeft, PlusCircle, Settings, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";

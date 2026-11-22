@@ -1,12 +1,12 @@
 import { AppearanceExtras, ConversationExtras, DevicePrivacySettings, ExternalLinksPreference } from "./settings/GeneralPreferences";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AccountSecurity } from "@rakazo/contracts";
+import type { AccountSecurity } from "@mycellios/contracts";
 import {
   accountDisplay,
   displayName,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   Button,
   Field,
@@ -17,8 +17,8 @@ import {
   Switch,
   ToggleGroup,
   ToggleGroupItem,
-} from "@rakazo/ui-web";
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
+} from "@mycellios/ui-web";
+import { Disclosure } from "@mycellios/ui-web/components/ui/disclosure";
 
 import type { RefObject, ReactNode } from "react";
 import { useSignOut } from "../lib/sign-out";

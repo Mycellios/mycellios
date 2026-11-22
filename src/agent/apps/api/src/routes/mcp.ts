@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { runContinueJob } from "@rakazo/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
 import {
   persistPreparedSecret,
   prepareApiInstall,
@@ -8,12 +8,12 @@ import {
   recordMcpServerHealth,
   sanitizeComposioError,
   verifyMcpInstall,
-} from "@rakazo/adapters";
-import { productAppUrl, signupSurveyAsksTeamSize } from "@rakazo/contracts";
-import { containsSecret } from "@rakazo/core";
-import type { Prisma } from "@rakazo/db";
-import { IsolationError } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapters";
+import { productAppUrl, signupSurveyAsksTeamSize } from "@mycellios/contracts";
+import { containsSecret } from "@mycellios/core";
+import type { Prisma } from "@mycellios/db";
+import { IsolationError } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { searchIntegrationCatalog } from "../integration-catalog.js";
 import {
   queueMcpConnectedRun,

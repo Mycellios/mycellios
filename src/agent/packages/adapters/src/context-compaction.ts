@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Api, Context, Message, Model } from "@earendil-works/pi-ai";
-import { escapePromptData } from "@rakazo/core";
+import { escapePromptData } from "@mycellios/core";
 import { estimateContextTokens, estimateTextTokens } from "./context-selection.js";
 import type { ContextBudget } from "./context-selection.js";
 import { CONTEXT_ADMISSION_HEADROOM, MIN_REDUCED_OUTPUT_TOKENS } from "./model-context.js";

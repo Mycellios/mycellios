@@ -8,7 +8,7 @@ vi.mock("../lib/query",()=>({useQueryUserId:()=>f.owner}));
 vi.mock("../lib/rpc",()=>({rpc:{notifications:{settings:f.read,saveSettings:f.save}}}));
 vi.mock("@lingui/react/macro",()=>({useLingui:()=>({t:(s:TemplateStringsArray)=>s.join("")})}));
 vi.mock("./ServerConnectionSettings",()=>({ServerConnectionSettings:(p:any)=>{const[draft,setDraft]=useState("");return <div role="dialog"><span>{p.server.name}</span><input aria-label="identity draft" value={draft} onChange={e=>setDraft(e.target.value)}/><button onClick={()=>void p.onSave({name:"My team",color:"#334455"}).then(p.onClose)}>Save identity</button></div>;}}));
-vi.mock("@rakazo/ui-web",()=>{
+vi.mock("@mycellios/ui-web",()=>{
  const Box=({children}: {children?:ReactNode})=><div>{children}</div>;
  const Item=({children,onClick,disabled,"aria-label":label}:ComponentProps<"button">)=><button disabled={disabled} aria-label={label} onClick={onClick}>{children}</button>;
  return {Button:Item,Input:(p:ComponentProps<"input">)=><input {...p}/>,Dialog:Box,DialogContent:Box,DialogTitle:Box,Popover:Box,PopoverContent:Box,PopoverTrigger:Item,

@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Field, FieldLabel, Input } from "@rakazo/ui-web";
+import { Button, Field, FieldLabel, Input } from "@mycellios/ui-web";
 import { useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRows";
 import { spaceLabel } from "../lib/space-label";

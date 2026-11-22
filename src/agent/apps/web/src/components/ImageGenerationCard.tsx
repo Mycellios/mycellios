@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { ImageAspectRatio, MessageBlock } from "@rakazo/contracts";
-import { Button, cn, Dialog, DialogClose, DialogContent, DialogTitle } from "@rakazo/ui-web";
+import type { ImageAspectRatio, MessageBlock } from "@mycellios/contracts";
+import { Button, cn, Dialog, DialogClose, DialogContent, DialogTitle } from "@mycellios/ui-web";
 import { CircleAlert, Download, Maximize2, X } from "lucide-react";
 import { useState } from "react";
 import type { ArtifactTarget } from "../lib/artifact-open";

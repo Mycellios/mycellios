@@ -1,5 +1,5 @@
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { expect, it, vi } from "vitest";
 import { sendThreadMessage, type ThreadTarget } from "./thread-target.js";
 it.each(["queue", "steer"] as const)("persists the deliberate %s delivery without starting a duplicate run", async delivery => {

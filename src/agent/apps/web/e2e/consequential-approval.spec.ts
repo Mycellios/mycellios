@@ -13,7 +13,7 @@ test("Ask mode asks before a change, and approvals settings shape what asks", as
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `action-approvals-${stamp}@rakazo.test`, "password12", "Approval UI");
+  await signup(page, `action-approvals-${stamp}@mycellios.test`, "password12", "Approval UI");
   await completeOnboarding(page, testInfo);
 
   await requestDestinationWrite(page, "write this to the destination crm as a note");

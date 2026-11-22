@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { z } from "zod";
-import { effectiveMicoSettings, MicoSettingsState, RoutineSchema, ThreadSnapshotSchema } from "@rakazo/contracts";
+import { effectiveMicoSettings, MicoSettingsState, RoutineSchema, ThreadSnapshotSchema } from "@mycellios/contracts";
 
 const Id = z.string().regex(/^[a-zA-Z0-9_-]{1,200}$/);
 const base = { botId: Id, nonce: z.string().min(1).max(128) };

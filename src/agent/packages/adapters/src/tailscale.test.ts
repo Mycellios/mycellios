@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@rakazo/db";
+import type { PrismaClient } from "@mycellios/db";
 import { TailnetService } from "./tailscale.js";
 import * as remote from "./remote-mcp.js";
 

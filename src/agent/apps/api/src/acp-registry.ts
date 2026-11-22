@@ -1,4 +1,4 @@
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { z } from "zod";
 
 const registryUrl = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";

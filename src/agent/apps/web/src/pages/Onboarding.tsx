@@ -1,5 +1,5 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import type { CreateBotInput, ModelHeaderRow, ThinkingLevel } from "@rakazo/contracts";
+import type { CreateBotInput, ModelHeaderRow, ThinkingLevel } from "@mycellios/contracts";
 import {
   ANTSEED_PROVIDER_ID,
   CLOUDFLARE_AI_GATEWAY_PROVIDER_ID,
@@ -22,7 +22,7 @@ import {
   parseModelMaxImagesPerPrompt,
   parseModelMaxTokens,
   productBrand,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   COMPATIBLE_THINKING_LEVELS,
   clampCatalogThinkingLevel,
@@ -30,7 +30,7 @@ import {
   initialModelProbeState,
   pickCatalogModelId,
   popularModelProvidersFirst,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   Button,
   Input,
@@ -42,7 +42,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";

@@ -1,7 +1,7 @@
-import { readMycelliosAccount } from "@rakazo/adapters";
-import type { StoredModelSecret } from "@rakazo/adapters";
-import { productBrand } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { readMycelliosAccount } from "@mycellios/adapters";
+import type { StoredModelSecret } from "@mycellios/adapters";
+import { productBrand } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { readMycelliosChatModels } from "./mycellios-model-catalog.js";
 
 export class MycelliosConnectionUnavailable extends Error {

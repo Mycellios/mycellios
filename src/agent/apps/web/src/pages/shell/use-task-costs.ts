@@ -1,4 +1,4 @@
-import type { TaskCost, ThreadMessage } from "@rakazo/contracts";
+import type { TaskCost, ThreadMessage } from "@mycellios/contracts";
 import { useEffect, useState } from "react";
 import { rpc } from "../../lib/rpc";
 

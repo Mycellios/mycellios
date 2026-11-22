@@ -4,18 +4,18 @@ import type {
   JobPublisher,
   NotificationMessage,
   NotificationProvider,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   NotificationSettingsSchema,
   notificationAllowed,
   WebPushSubscriptionSchema,
-} from "@rakazo/contracts";
-import type { NotificationSettings, WebPushSubscription } from "@rakazo/contracts";
-import { micoAvatarShape, parseBotAvatarValue } from "@rakazo/contracts";
-import { currentMicoAvatarValue } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
-import { runAsSystem } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/contracts";
+import type { NotificationSettings, WebPushSubscription } from "@mycellios/contracts";
+import { micoAvatarShape, parseBotAvatarValue } from "@mycellios/contracts";
+import { currentMicoAvatarValue } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
+import { runAsSystem } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import webpush from "web-push";
 import { EncryptedSecretStore } from "./secrets.js";
 

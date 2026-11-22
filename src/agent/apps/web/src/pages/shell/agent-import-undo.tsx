@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AgentImportInfo } from "@rakazo/contracts";
+import type { AgentImportInfo } from "@mycellios/contracts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,7 +9,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useEffect, useState } from "react";
 import { agentImportErrorText } from "../../lib/agent-import-errors";
 import { rpc } from "../../lib/rpc";

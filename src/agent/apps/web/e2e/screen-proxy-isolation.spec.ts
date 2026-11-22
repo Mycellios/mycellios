@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
-import { openScreenCapability } from "@rakazo/core/node/screen-capability";
-import { screenProbeUrl } from "@rakazo/core/screen-reconnect";
+import { openScreenCapability } from "@mycellios/core/node/screen-capability";
+import { screenProbeUrl } from "@mycellios/core/screen-reconnect";
 import { createServer, type Plugin, preview, type ViteDevServer } from "vite";
 import { addScreenProxyCapability } from "../../api/src/screen-proxy";
 

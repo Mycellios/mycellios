@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
@@ -29,8 +29,8 @@ vi.mock("@lingui/react/macro", () => {
     parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`, "");
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
-vi.mock("@rakazo/ui-web", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@rakazo/ui-web")>()),
+vi.mock("@mycellios/ui-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mycellios/ui-web")>()),
   Button: ({
     variant: _variant,
     size: _size,

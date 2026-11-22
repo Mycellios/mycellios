@@ -776,6 +776,7 @@ export const DE_MESSAGES: Record<string, string> = {
   "Updating…": "Wird aktualisiert…",
   // components/computer-mode-picker.tsx
   Private: "Privat",
+  "This PC": "Dieser PC",
   Team: "Team",
   // components/computer-update-progress.tsx
   "Continue in Background": "Im Hintergrund fortfahren",

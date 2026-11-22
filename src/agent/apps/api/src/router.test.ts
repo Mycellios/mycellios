@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createRouterClient } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
-import type { ManagedConnectorProvider } from "@rakazo/adapter-kit";
-import { SecretStoreUnavailableError } from "@rakazo/adapter-kit";
-import type { McpOAuthSummary } from "@rakazo/adapters";
-import * as adapters from "@rakazo/adapters";
+import type { ManagedConnectorProvider } from "@mycellios/adapter-kit";
+import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
+import type { McpOAuthSummary } from "@mycellios/adapters";
+import * as adapters from "@mycellios/adapters";
 import {
   COMPUTER_SCREEN_UNAVAILABLE,
   CodexCatalogCache,
@@ -21,13 +21,13 @@ import {
   parseModelSecret,
   screenLeaseIdForRun,
   serializeModelSecret,
-} from "@rakazo/adapters";
-import type { Actor, Bot, ProductEvent } from "@rakazo/contracts";
-import { MODEL_KEY_FORMAT_ERROR, REPLY_QUOTE_MAX_LENGTH } from "@rakazo/contracts";
-import { openScreenCapability } from "@rakazo/core/node/screen-capability";
-import type { PrismaClient } from "@rakazo/db";
-import { AnswerTooLongError, runProviderTransaction } from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+} from "@mycellios/adapters";
+import type { Actor, Bot, ProductEvent } from "@mycellios/contracts";
+import { MODEL_KEY_FORMAT_ERROR, REPLY_QUOTE_MAX_LENGTH } from "@mycellios/contracts";
+import { openScreenCapability } from "@mycellios/core/node/screen-capability";
+import type { PrismaClient } from "@mycellios/db";
+import { AnswerTooLongError, runProviderTransaction } from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mainRole, withModelRoles } from "../../../packages/adapters/src/testing/model-roles.js";
 import type { RouterDeps } from "./router.js";
@@ -51,7 +51,7 @@ const enqueueBotIntroRun = (deps: RouterDeps, ...rest: [Actor, Bot]) =>
 describe("account preferences", () => {
   function preferencesDeps(avatarStyle: string, timezone: string | null = null) {
     const update = vi.fn().mockResolvedValue({});
-    const user = { email: "user@rakazo.test", name: "Test User", avatarStyle, timezone };
+    const user = { email: "user@mycellios.test", name: "Test User", avatarStyle, timezone };
     const updateMany = vi.fn(
       async ({ where, data }: { where: { timezone: null }; data: { timezone: string } }) => {
         if (user.timezone !== where.timezone) return { count: 0 };
@@ -82,7 +82,7 @@ describe("account preferences", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     return { update, updateMany, deps, actor, handler: new RPCHandler(createRouter(deps)) };
@@ -432,7 +432,7 @@ describe("billing", () => {
     const prisma = {
       user: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
-          email: "user@rakazo.test",
+          email: "user@mycellios.test",
           name: "Test User",
           avatarStyle: "robot",
           signupSurvey,
@@ -458,7 +458,7 @@ describe("billing", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner,
     } satisfies Actor;
     return createRouterClient(createRouter(deps), { context: { actor } });
@@ -583,7 +583,7 @@ describe("model setup gate", () => {
       }) },
       user: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
-          email: "user@rakazo.test",
+          email: "user@mycellios.test",
           name: "Test User",
           avatarStyle: "robot",
         }),
@@ -624,7 +624,7 @@ describe("model setup gate", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     return { actor, deps, handler: new RPCHandler(createRouter(deps)) };
@@ -849,7 +849,7 @@ describe("thread answer delivery", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const handler = new RPCHandler(createRouter(deps));
@@ -1108,7 +1108,7 @@ describe("thread stream authorization", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const stillAuthorized = vi.fn().mockResolvedValue(true);
@@ -1208,7 +1208,7 @@ describe("MCP server deletion", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const handler = new RPCHandler(createRouter(deps));
@@ -1352,7 +1352,7 @@ describe("MCP prepared credential updates", () => {
     const actor = {
       spaceId: "space",
       userId: "user",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const client = createRouterClient(createRouter(deps), { context: { actor } as never });
@@ -1454,7 +1454,7 @@ describe("MCP pre-registered OAuth client", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: isDeploymentOwner ? "owner-1" : "member-1",
-      email: "owner@rakazo.test",
+      email: "owner@mycellios.test",
       isDeploymentOwner,
     } satisfies Actor;
     return {
@@ -1887,7 +1887,7 @@ describe("MCP loopback endpoints", () => {
     return {
       spaceId: "workspace-1",
       userId: isDeploymentOwner ? "owner-1" : "member-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner,
     };
   }
@@ -2043,7 +2043,7 @@ describe("MCP server health", () => {
           actor: {
             spaceId: "workspace-1",
             userId: "owner-1",
-            email: "owner@rakazo.test",
+            email: "owner@mycellios.test",
             isDeploymentOwner: true,
             ...actor,
           },
@@ -2062,7 +2062,7 @@ describe("MCP server health", () => {
             actor: {
               spaceId: "workspace-1",
               userId: "owner-1",
-              email: "owner@rakazo.test",
+              email: "owner@mycellios.test",
               isDeploymentOwner: true,
             },
           } as never,
@@ -2302,7 +2302,7 @@ describe("MCP server health", () => {
           actor: {
             spaceId: "workspace-1",
             userId: "owner-1",
-            email: "owner@rakazo.test",
+            email: "owner@mycellios.test",
             isDeploymentOwner: true,
           },
         } as never,
@@ -2350,7 +2350,7 @@ describe("private API connectors", () => {
     return {
       spaceId: "workspace-1",
       userId: isDeploymentOwner ? "owner-1" : "member-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner,
     };
   }
@@ -2443,7 +2443,7 @@ describe("connections.begin", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const handler = new RPCHandler(createRouter(deps));
@@ -2547,7 +2547,7 @@ describe("connections.begin", () => {
             actor: {
               spaceId: "workspace-1",
               userId: "user-1",
-              email: "user@rakazo.test",
+              email: "user@mycellios.test",
               isDeploymentOwner: true,
             },
           },
@@ -2685,7 +2685,7 @@ describe("connections.complete", () => {
             actor: {
               spaceId: "workspace-1",
               userId: "user-1",
-              email: "user@rakazo.test",
+              email: "user@mycellios.test",
               isDeploymentOwner: true,
             },
           },
@@ -2766,7 +2766,7 @@ describe("connections.complete", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const handler = new RPCHandler(createRouter(deps));
@@ -2854,7 +2854,7 @@ describe("connections.complete", () => {
               actor: {
                 spaceId: "workspace-1",
                 userId: "user-1",
-                email: "user@rakazo.test",
+                email: "user@mycellios.test",
                 isDeploymentOwner: true,
               },
             },
@@ -2946,7 +2946,7 @@ describe("connections.complete", () => {
             actor: {
               spaceId: "workspace-1",
               userId: "user-1",
-              email: "user@rakazo.test",
+              email: "user@mycellios.test",
               isDeploymentOwner: true,
             },
             signal,
@@ -3063,7 +3063,7 @@ describe("connections.complete", () => {
           actor: {
             spaceId: "workspace-1",
             userId: "user-1",
-            email: "user@rakazo.test",
+            email: "user@mycellios.test",
             isDeploymentOwner: true,
           },
         } as never,
@@ -3097,7 +3097,7 @@ describe("updater owner gate", () => {
     const prisma = {
       user: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
-          email: "user@rakazo.test",
+          email: "user@mycellios.test",
           name: "Test User",
           avatarStyle: "robot",
         }),
@@ -3125,7 +3125,7 @@ describe("updater owner gate", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-2",
-      email: "member@rakazo.test",
+      email: "member@mycellios.test",
       isDeploymentOwner: false,
     } satisfies Actor;
 
@@ -3146,7 +3146,7 @@ describe("updater owner gate", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "owner@rakazo.test",
+      email: "owner@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
 
@@ -3167,7 +3167,7 @@ describe("updater owner gate", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "owner@rakazo.test",
+      email: "owner@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
 
@@ -3188,7 +3188,7 @@ describe("computer screen url", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const computerRow = {
@@ -3325,7 +3325,7 @@ describe("computer terminal and file transfer", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const controlled = {
@@ -3623,7 +3623,7 @@ describe("integration setup authorization", () => {
             actor: {
               userId: "user",
               spaceId: "space",
-              email: "user@rakazo.test",
+              email: "user@mycellios.test",
               isDeploymentOwner: owner,
             },
           },
@@ -3656,7 +3656,7 @@ describe("integration setup authorization", () => {
           actor: {
             userId: "member",
             spaceId: "space",
-            email: "member@rakazo.test",
+            email: "member@mycellios.test",
             isDeploymentOwner: false,
           },
         },
@@ -3731,7 +3731,7 @@ describe("OpenAI-compatible model probes", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const baseUrl = "https://127.0.0.1:8000/v1";
@@ -4047,7 +4047,7 @@ describe("model credential persistence", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
 
@@ -4784,7 +4784,7 @@ describe("model disconnect", () => {
   const actor = {
     spaceId: "space-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const connection = (id: string) => ({
@@ -4886,7 +4886,7 @@ describe("bot intro run", () => {
   const actor = {
     spaceId: "space-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const bot = { id: "bot-1", threadId: "thread-1" } as unknown as Bot;
@@ -5052,7 +5052,7 @@ describe("codex catalog auth", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const spark = "gpt-5.3-codex-spark";
@@ -5140,7 +5140,7 @@ describe("codex live catalog", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const spark = "gpt-5.3-codex-spark";
@@ -5658,7 +5658,7 @@ describe("model set default auth", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const spark = "gpt-5.3-codex-spark";
@@ -6043,7 +6043,7 @@ describe("bot model auth on save", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const spark = "gpt-5.3-codex-spark";
@@ -6315,7 +6315,7 @@ describe("bot restore computer quota", () => {
             actor: {
               spaceId: "space-1",
               userId: "user-1",
-              email: "user@rakazo.test",
+              email: "user@mycellios.test",
               isDeploymentOwner: true,
             },
           },
@@ -6372,7 +6372,7 @@ describe("group restore with archived bots", () => {
     );
     const call = async () =>
       handler.handle(
-        new Request("http://rakazo.test/rpc/groups/restore", {
+        new Request("http://mycellios.test/rpc/groups/restore", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ json: { groupId: "group-1" } }),
@@ -6430,7 +6430,7 @@ describe("routine live Codex model validation", () => {
   it.each(["create", "update"] as const)(
     "saves a listed live-only model on %s and rejects an unlisted id",
     async (operation) => {
-      const actor = { userId: "user-1", spaceId: "space-1", email: "user@rakazo.test" };
+      const actor = { userId: "user-1", spaceId: "space-1", email: "user@mycellios.test" };
       const modelId = "gpt-6-luna-latest";
       const stamp = new Date("2026-01-01T00:00:00Z");
       const row = {
@@ -6542,7 +6542,7 @@ describe("routines.update", () => {
   const actor = {
     spaceId: "space-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const routine = {
@@ -6765,7 +6765,7 @@ describe("openai-compatible enabled models", () => {
   const actor = {
     spaceId: "space-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const compatible = "openai-compatible";
@@ -7687,7 +7687,7 @@ describe("threads.answerCall and threads.declineCall", () => {
     const actor = {
       spaceId: "space-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const handler = new RPCHandler(createRouter(deps));
@@ -7803,7 +7803,7 @@ describe("threads.endCall", () => {
     const actor = {
       spaceId: "space-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
     const handler = new RPCHandler(createRouter(deps));
@@ -7984,7 +7984,7 @@ describe("groups.archive", () => {
     const actor = {
       spaceId: "workspace-1",
       userId: "user-1",
-      email: "user@rakazo.test",
+      email: "user@mycellios.test",
       isDeploymentOwner: true,
     } satisfies Actor;
 
@@ -8039,7 +8039,7 @@ describe("boards.rename", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
 
@@ -8120,7 +8120,7 @@ describe("boards.tickets.list", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
 
@@ -8165,7 +8165,7 @@ describe("export.bot", () => {
   const actor = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
   const roots: string[] = [];
@@ -8312,7 +8312,7 @@ describe("link favicons", () => {
   const reader = {
     spaceId: "workspace-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: false,
   } satisfies Actor;
 
@@ -8356,7 +8356,7 @@ describe("link favicons", () => {
 });
 
 describe("memory documents", () => {
-  const actor = { userId: "user-1", spaceId: "space-1", email: "user@rakazo.test" };
+  const actor = { userId: "user-1", spaceId: "space-1", email: "user@mycellios.test" };
 
   function memoryClient(
     doc: { id: string; path: string; scope: string; botId: string | null } | null,
@@ -8429,7 +8429,7 @@ describe("routine watch creation boundaries", () => {
   const actor = {
     spaceId: "space-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: true,
   } satisfies Actor;
 

@@ -1,8 +1,8 @@
-import type { BotSecretDestination } from "@rakazo/contracts";
-import { encodeLoginSecret } from "@rakazo/contracts";
-import { redactSecrets } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
-import * as Logging from "@rakazo/logging";
+import type { BotSecretDestination } from "@mycellios/contracts";
+import { encodeLoginSecret } from "@mycellios/contracts";
+import { redactSecrets } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
+import * as Logging from "@mycellios/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   credentialArgument,

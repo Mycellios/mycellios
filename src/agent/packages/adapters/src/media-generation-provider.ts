@@ -5,10 +5,10 @@ import type {
   MediaGenerationInput,
   MediaGenerationProvider,
   MediaVideoJob,
-} from "@rakazo/adapter-kit";
-import { MediaGenerationError } from "@rakazo/adapter-kit";
-import type { ImageAspectRatio } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_BYTES, IMAGE_ASPECT_RATIOS } from "@rakazo/contracts";
+} from "@mycellios/adapter-kit";
+import { MediaGenerationError } from "@mycellios/adapter-kit";
+import type { ImageAspectRatio } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_BYTES, IMAGE_ASPECT_RATIOS } from "@mycellios/contracts";
 import { z } from "zod";
 import { FAKE_VIDEO_BASE64 } from "./fake-media-assets.js";
 import type { ResolveHostname } from "./web-ssrf.js";

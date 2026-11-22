@@ -1,4 +1,4 @@
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 
 /** A model connection owns execution; unrelated profile edits keep its selection. */
 export function agentEngineForProviderSelection(selection: {

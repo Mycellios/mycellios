@@ -24,7 +24,7 @@ try{
  try{
   await sql.query('DROP TABLE "desktop_execution_preferences"');
   await sql.query(await readFile("packages/db/prisma/migrations/20261106220000_desktop_execution/migration.sql","utf8"));
-  const {createDb,asSystem}=await import("@rakazo/db");const db=createDb(url,{encryptContent:false});
+  const {createDb,asSystem}=await import("@mycellios/db");const db=createDb(url,{encryptContent:false});
   try{
    const system=asSystem(db.prisma),now=new Date();
    for(const id of ["owner","other"])await system.user.create({data:{id,name:id,email:`${id}@example.invalid`,createdAt:now,updatedAt:now}});

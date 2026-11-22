@@ -1,9 +1,9 @@
 import { useLingui } from "@lingui/react/macro";
 import { companionAvatar } from "../lib/companion-avatar";
-import { desktopQuestionAnswerText, type DesktopQuestionPrompt, type DesktopQuestionRequest } from "@rakazo/contracts";
+import { desktopQuestionAnswerText, type DesktopQuestionPrompt, type DesktopQuestionRequest } from "@mycellios/contracts";
 import { companionQuestions } from "../lib/companion-questions";
 import { rpc } from "../lib/rpc";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { desktopBridge } from "../lib/desktop";

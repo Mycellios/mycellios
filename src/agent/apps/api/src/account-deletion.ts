@@ -1,16 +1,16 @@
-import type { AdapterContext } from "@rakazo/adapter-kit";
+import type { AdapterContext } from "@mycellios/adapter-kit";
 import {
   destroyBot,
   removeAgentHome,
   removeDeletedBotsFromLegacyTeamHome,
   toComputerRef,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import {
   claimSpacesLeavingWithAccount,
   deleteSpaceLeavingWithAccount,
   recordComputerRunEnd,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { sweepHostedWebFiles } from "./hosted-webs/files.js";
 import type { SpaceDeletionDeps } from "./space-deletion.js";
 

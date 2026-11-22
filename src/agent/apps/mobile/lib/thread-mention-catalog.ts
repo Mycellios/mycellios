@@ -1,4 +1,4 @@
-import type { Connection, ConnectionCatalogItem, Routine } from "@rakazo/contracts";
+import type { Connection, ConnectionCatalogItem, Routine } from "@mycellios/contracts";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { captureApiRequestContext, currentApiBase, rpc, selectedSpaceId } from "./api";
 import { currentSessionGeneration, subscribeSessionGeneration } from "./session";

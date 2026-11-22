@@ -5,7 +5,7 @@ import { realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { AdapterContext, AgentRuntime, ComputerRef } from "@rakazo/adapter-kit";
+import type { AdapterContext, AgentRuntime, ComputerRef } from "@mycellios/adapter-kit";
 import { AppControlRunner } from "./app-control-runner.js";
 import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { safeNativeCommandError } from "./native-command-journal.js";

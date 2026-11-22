@@ -1,6 +1,6 @@
-import type { JobPublisher, NotificationMessage, NotificationProvider } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import type { StuckWorkStatus } from "@rakazo/core";
+import type { JobPublisher, NotificationMessage, NotificationProvider } from "@mycellios/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import type { StuckWorkStatus } from "@mycellios/core";
 import {
   isStuckWorkStatus,
   STUCK_WORK_NOTICE,
@@ -10,10 +10,10 @@ import {
   stuckWorkAgeMs,
   stuckWorkReminder,
   stuckWorkStoppedNotification,
-} from "@rakazo/core";
-import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
-import { appendEventInTransaction, expireStuckRun, withTransactionRetry } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/core";
+import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
+import { appendEventInTransaction, expireStuckRun, withTransactionRetry } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 
 type StuckCursor = { at: Date; id: string };
 

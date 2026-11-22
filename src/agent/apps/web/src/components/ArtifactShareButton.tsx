@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { ArtifactShare } from "@rakazo/contracts";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from "@rakazo/ui-web";
+import type { ArtifactShare } from "@mycellios/contracts";
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Link2 } from "lucide-react";
 import { useState } from "react";

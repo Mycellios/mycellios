@@ -1,7 +1,7 @@
-import { productAppUrl, productBrand } from "@rakazo/contracts";
+import { productAppUrl, productBrand } from "@mycellios/contracts";
 import { nativeExpo } from "./expo-native.js";
 import { passkey } from "@better-auth/passkey";
-import type { ProductAnalytics, TransactionalEmailProvider } from "@rakazo/adapter-kit";
+import type { ProductAnalytics, TransactionalEmailProvider } from "@mycellios/adapter-kit";
 import {
   displayName,
   emailAllowed,
@@ -9,9 +9,9 @@ import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   signupPolicyFromEnv,
-} from "@rakazo/core";
-import type { PrismaClient, SecurityEventType } from "@rakazo/db";
-import { bootstrapUserSpace, personalOrganizationIds, recordSecurityEvent } from "@rakazo/db";
+} from "@mycellios/core";
+import type { PrismaClient, SecurityEventType } from "@mycellios/db";
+import { bootstrapUserSpace, personalOrganizationIds, recordSecurityEvent } from "@mycellios/db";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -99,7 +99,7 @@ export const SIGN_IN_CODE_EXPIRES_IN_SECONDS = 10 * 60;
 
 /**
  * The email OTP plugin also exposes OTP email verification, password reset and
- * email change. Rakazo uses links for those, so only sign-in codes stay open.
+ * email change. Mycellios uses links for those, so only sign-in codes stay open.
  */
 function isUnusedEmailCodePath(path: string, body: { type?: unknown } | undefined): boolean {
   if (path === SEND_SIGN_IN_CODE_PATH) return body?.type !== "sign-in";

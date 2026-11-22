@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { readBoundedJsonResponse } from "@rakazo/core";
-import { ContributionEnrollmentSchema, ContributionStateSchema, ContributionOwnedNodesSchema, ContributionOwnerSchema } from "@rakazo/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
+import { ContributionEnrollmentSchema, ContributionStateSchema, ContributionOwnedNodesSchema, ContributionOwnerSchema } from "@mycellios/contracts";
 
 const origin = "https://www.mycellios.com";
 

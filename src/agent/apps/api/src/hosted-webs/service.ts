@@ -6,8 +6,8 @@ import {
   HostedWebBundle,
   type HostedWebDraft,
   type HostedWebSave,
-} from "@rakazo/contracts";
-import type { HostedWebTeam } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import type { HostedWebTeam } from "@mycellios/contracts";
 import {
   type HostedWebSnapshotSource,
   listHostedWebs,
@@ -16,7 +16,7 @@ import {
   recordHostedWebSnapshot,
   runAsSystem,
   runAsTenant,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import type * as z from "zod";
 import { admitStaticBundle } from "./bundle.js";
 

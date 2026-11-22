@@ -1,13 +1,13 @@
 import type * as TimersPromises from "node:timers/promises";
 import type { FileUrlResponse, SandboxStateEnum } from "@boatdev/sdk";
 import { ResponseError } from "@boatdev/sdk";
-import type { ComputerRef } from "@rakazo/adapter-kit";
+import type { ComputerRef } from "@mycellios/adapter-kit";
 import {
   SandboxRateLimitError,
   SandboxUnavailableError,
   SandboxUnresponsiveError,
-} from "@rakazo/adapter-kit";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { parse } from "shell-quote";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {

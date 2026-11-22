@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, expect, it, vi } from "vitest";
-import { DEFAULT_DESKTOP_COMPANIONS, DesktopCompanionPreferencesSchema, DesktopCompanionSnapshotSchema } from "@rakazo/contracts";
+import { DEFAULT_DESKTOP_COMPANIONS, DesktopCompanionPreferencesSchema, DesktopCompanionSnapshotSchema } from "@mycellios/contracts";
 const mocks = vi.hoisted(() => ({ cursor: { x: 0, y: 0 }, handlers: new Map<string, Function>(), listeners: new Map<string, Function>(), windows: [] as any[],
   matchingDisplay: 1, write: vi.fn(async () => undefined), read: vi.fn(async () => null), displays: [{ id: 1, label: "Primary", size: { width: 1920, height: 1080 }, workArea: { x: 0, y: 0, width: 1920, height: 1040 } }] }));
 vi.mock("./setup-store.js", () => ({ readPrivateFile: mocks.read, writePrivateFile: mocks.write }));

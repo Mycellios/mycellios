@@ -6,7 +6,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { ChevronDown, ExternalLink, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getSnapshot as activeCall } from "../lib/call-session";

@@ -1,11 +1,11 @@
-import type { Actor, Routine, RoutineCalendar, RoutineCalendarEntry } from "@rakazo/contracts";
+import type { Actor, Routine, RoutineCalendar, RoutineCalendarEntry } from "@mycellios/contracts";
 import {
   isOneShotRoutineCrons,
   nextCronDateAcrossStrict,
   nextRoutineRunDateAcross,
   runFailureError,
-} from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
 import { mapRoutine } from "./routines.js";
 
 const LIMIT = 5000;

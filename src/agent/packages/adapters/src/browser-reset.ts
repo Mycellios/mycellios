@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { AdapterContext, AgentHomeStore, SandboxProvider } from "@rakazo/adapter-kit";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
-import { computerScopeKey, legacyTeamHomeKey, type PrismaClient } from "@rakazo/db";
+import type { AdapterContext, AgentHomeStore, SandboxProvider } from "@mycellios/adapter-kit";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
+import { computerScopeKey, legacyTeamHomeKey, type PrismaClient } from "@mycellios/db";
 import { BrowserStoppedReleaseError } from "./computer-screens.js";
 import { isBusyError, REMOTE_TEAM_SANDBOX_KINDS, removeProfileOnceClosed } from "./child-bots.js";
 import { ComputerBusyError } from "./computer-errors.js";

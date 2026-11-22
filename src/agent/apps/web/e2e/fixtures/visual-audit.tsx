@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   OptionSelect,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { AuthFrame } from "../../src/pages/Auth";
 import { AskCard } from "../../src/components/AskCard";
 import { ArtifactFileCard } from "../../src/components/ArtifactFileCard";

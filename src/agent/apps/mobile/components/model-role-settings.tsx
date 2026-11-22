@@ -8,7 +8,7 @@ import type {
   ModelRoleSettings as Settings,
   SettingsScope,
   ThinkingLevel,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   backupChoiceKey,
   canonicalPiProviderId,
@@ -18,8 +18,8 @@ import {
   modelRoleChoiceKey,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   withConnectionName,
-} from "@rakazo/contracts";
-import { createModelRoleSettings } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { createModelRoleSettings } from "@mycellios/core";
 import type { Href } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";

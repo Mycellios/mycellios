@@ -6,7 +6,7 @@ test("pasting into the composer attaches images and inserts text", async ({
   context,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `composer-paste-${stamp}@rakazo.test`, "password12", "Paste Test");
+  await signup(page, `composer-paste-${stamp}@mycellios.test`, "password12", "Paste Test");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

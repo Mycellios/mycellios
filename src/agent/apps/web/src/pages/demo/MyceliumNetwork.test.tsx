@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
-vi.mock("@rakazo/ui-web", () => ({ BotAvatar: () => <span />, Button: (props: any) => <button {...props} /> }));
+vi.mock("@mycellios/ui-web", () => ({ BotAvatar: () => <span />, Button: (props: any) => <button {...props} /> }));
 import { MyceliumNetwork } from "./MyceliumNetwork";
 let root: ReturnType<typeof createRoot>, host: HTMLDivElement, onScreen = true;
 const guest = { number: 1, kind: "mobile", present: true, connected: true, working: false, earnedMicrounits: 0, inferences: 0 };

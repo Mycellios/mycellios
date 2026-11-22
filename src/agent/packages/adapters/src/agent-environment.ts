@@ -1,6 +1,6 @@
-import type { SecretStore } from "@rakazo/adapter-kit";
-import { AgentSecretInputSchema } from "@rakazo/contracts";
-import { redactSecrets } from "@rakazo/core";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import { AgentSecretInputSchema } from "@mycellios/contracts";
+import { redactSecrets } from "@mycellios/core";
 
 type EncryptedAgentSecret = {
   name: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRouterClient } from "@orpc/server";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import { agentUsage } from "./agent-usage.js";
 import { createRouter } from "./router.js";
 import type { RouterDeps } from "./router.js";

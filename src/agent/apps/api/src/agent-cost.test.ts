@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { agentCost } from "./agent-cost.js";
 import type { RouterDeps } from "./router.js";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 const actor = { userId: "owner", spaceId: "space" } as Actor;
 function fixture({all=3,known=3,amount=0.6,estimated=0,pending=0,active=0,owned=true}={}) {
  const count=vi.fn(async({where})=>where.pricingSnapshot?pending:where.costSource?estimated:all);

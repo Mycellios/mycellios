@@ -7,7 +7,7 @@ vi.mock("../lib/rpc", () => ({ rpc: { models: { contributionStatus: f.status, co
 vi.mock("../lib/auth-capabilities", () => ({ fetchAuthCapabilities: f.capabilities }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: f.bridge }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
-vi.mock("@rakazo/ui-web", () => ({ Button: (props: object) => <button {...props} />, buttonVariants: () => "" }));
+vi.mock("@mycellios/ui-web", () => ({ Button: (props: object) => <button {...props} />, buttonVariants: () => "" }));
 vi.mock("./BrowserContributionControl", () => ({ BrowserContributionControl: () => <button data-testid="browser-contribution-control" title="Contribute">Contribute</button> }));
 import { SidebarContribution } from "./SidebarContribution";
 beforeEach(() => {

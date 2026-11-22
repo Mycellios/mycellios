@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
-import type { AdapterContext, ProcessEvent } from "@rakazo/adapter-kit";
+import type { AdapterContext, ProcessEvent } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 import { startHostComputerServer } from "./host-computer-server.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";

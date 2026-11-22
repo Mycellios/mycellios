@@ -1,6 +1,6 @@
-import type { AdapterContext, SecretStore } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { findDefaultVoiceCredential } from "@rakazo/db";
+import type { AdapterContext, SecretStore } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { findDefaultVoiceCredential } from "@mycellios/db";
 import { OPENAI_COMPATIBLE_VOICE_PROVIDER_ID } from "./openai-compatible-voice.js";
 import type { VideoTranscriber } from "./video-reader.js";
 import { createVoiceProvider, MAX_TRANSCRIBE_BYTES } from "./voice-factory.js";

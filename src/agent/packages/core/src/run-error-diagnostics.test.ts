@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { desktopDiagnosticMessage, DESKTOP_FAILURE_CODES } from "@rakazo/contracts";
+import { desktopDiagnosticMessage, DESKTOP_FAILURE_CODES } from "@mycellios/contracts";
 import {
   desktopSetupInterruptedMessage,
   desktopRunDiagnosticText,

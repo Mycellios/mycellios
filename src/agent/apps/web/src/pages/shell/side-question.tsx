@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import { BotAvatar, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import { BotAvatar, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@mycellios/ui-web";
 import { ArrowUp, AudioLines, Folder, Globe, Maximize2, MessageCircleQuestion, Minimize2, Plus, Settings, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RpcClient } from "../../lib/rpc";

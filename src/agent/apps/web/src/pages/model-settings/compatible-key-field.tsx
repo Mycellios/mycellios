@@ -1,6 +1,6 @@
 import { Trans } from "@lingui/react/macro";
-import { isMycelliosBaseUrl, isOllamaCloudBaseUrl } from "@rakazo/contracts";
-import { Disclosure } from "@rakazo/ui-web";
+import { isMycelliosBaseUrl, isOllamaCloudBaseUrl } from "@mycellios/contracts";
+import { Disclosure } from "@mycellios/ui-web";
 import type { ReactNode } from "react";
 
 export function CompatibleKeyField({

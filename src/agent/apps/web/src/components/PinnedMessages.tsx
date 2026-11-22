@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff } from "lucide-react";
 import { createContext, useCallback, useMemo, useState } from "react";

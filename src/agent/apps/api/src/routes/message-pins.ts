@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { MessageBlock, type Actor } from "@rakazo/contracts";
-import { messageReplyPreview } from "@rakazo/core/message-quote";
-import { listMessagePins, setMessagePin } from "@rakazo/db";
+import { MessageBlock, type Actor } from "@mycellios/contracts";
+import { messageReplyPreview } from "@mycellios/core/message-quote";
+import { listMessagePins, setMessagePin } from "@mycellios/db";
 import { resolveThreadTarget } from "../thread-target.js";
 import { loadMessagePage, withoutPeerRunMessages } from "../thread-message-pages.js";
 import type { RouterContext } from "./context.js";

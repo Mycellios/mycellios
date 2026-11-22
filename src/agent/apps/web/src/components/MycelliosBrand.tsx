@@ -1,4 +1,4 @@
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 import { appPath } from "../lib/app-path";
 
 export function MycelliosWordmark({ compact = false }: { compact?: boolean }) {

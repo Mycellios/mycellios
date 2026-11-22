@@ -1,4 +1,4 @@
-import type { McpServerConfigInput } from "@rakazo/contracts";
+import type { McpServerConfigInput } from "@mycellios/contracts";
 import type { BuiltinIntegration } from "../pages/marketplace/builtin-integrations";
 import type { RpcClient } from "./rpc";
 import { connectMcpOauth } from "./mcp-connect";

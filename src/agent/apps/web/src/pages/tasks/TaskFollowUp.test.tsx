@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { InboxTask } from "@rakazo/contracts";
+import type { InboxTask } from "@mycellios/contracts";
 import type { RpcClient } from "../../lib/rpc";
 vi.mock("@lingui/react/macro",()=>({useLingui:()=>({t:(s:TemplateStringsArray,...v:unknown[])=>String.raw(s,...v)})}));
 import { TaskFollowUp } from "./TaskFollowUp";

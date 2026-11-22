@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { request } from "node:http";
-import type { ThreadMessage } from "@rakazo/contracts";
+import type { ThreadMessage } from "@mycellios/contracts";
 import { LocalScriptsHost, LocalScriptRateError, type ScriptSession } from "./local-scripts.js";
 
 const hosts: LocalScriptsHost[] = [];

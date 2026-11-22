@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 import { signupThroughForm } from "./helpers";
 
 // Opt in against the isolated development stack, with real auth and persistence.

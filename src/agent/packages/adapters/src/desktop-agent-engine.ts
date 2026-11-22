@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AgentRuntime } from "@rakazo/adapter-kit";
+import type { AgentRuntime } from "@mycellios/adapter-kit";
 import { NativeAgentRuntime } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";

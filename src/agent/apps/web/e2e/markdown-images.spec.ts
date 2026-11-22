@@ -23,7 +23,7 @@ test("remote markdown images in bot replies load only after the reader asks", as
   page,
 }, testInfo) => {
   const requests = await serveFakeImages(page);
-  await signup(page, `markdown-image-${Date.now()}@rakazo.test`, "password12", "Markdown Image");
+  await signup(page, `markdown-image-${Date.now()}@mycellios.test`, "password12", "Markdown Image");
   await completeOnboarding(page);
   const composer = page.getByRole("combobox", { name: /^Message/ });
   await composer.fill(`Here is the chart: ![Quarterly chart](${remoteImage})`);

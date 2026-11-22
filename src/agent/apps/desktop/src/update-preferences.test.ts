@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DesktopUpdateState } from "@rakazo/contracts";
+import type { DesktopUpdateState } from "@mycellios/contracts";
 import { UpdatePreferences } from "./update-preferences.js";
 
 function fixture(options: { packaged?: boolean; allowed?: boolean; saved?: string; installSupported?: boolean; autoInstallByDefault?: boolean } = {}) {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { McpServer } from "@rakazo/contracts";
+import type { McpServer } from "@mycellios/contracts";
 import {
   captureScreenshot,
   completeOnboarding,
@@ -43,7 +43,7 @@ function stdioServer(overrides: Partial<McpServer>): McpServer {
 
 test("adds a stdio MCP server with encrypted environment variables", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `mcp-stdio-${stamp}@rakazo.test`, "password12", "MCP stdio");
+  await signup(page, `mcp-stdio-${stamp}@mycellios.test`, "password12", "MCP stdio");
   await completeOnboarding(page);
 
   const servers: McpServer[] = [];
@@ -196,7 +196,7 @@ test("shows MCP server health, error details, and tests the connection on demand
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `mcp-health-${stamp}@rakazo.test`, "password12", "MCP health");
+  await signup(page, `mcp-health-${stamp}@mycellios.test`, "password12", "MCP health");
   await completeOnboarding(page);
 
   const failure = "npm error code ETIMEDOUT\nMCP error -32000: Connection closed";
@@ -273,7 +273,7 @@ test("shows MCP server health, error details, and tests the connection on demand
 
 test("polls the server list while a stdio package is installing", async ({ page }) => {
   const stamp = Date.now();
-  await signup(page, `mcp-installing-${stamp}@rakazo.test`, "password12", "MCP installing");
+  await signup(page, `mcp-installing-${stamp}@mycellios.test`, "password12", "MCP installing");
   await completeOnboarding(page);
 
   let listCalls = 0;

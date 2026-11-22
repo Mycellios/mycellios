@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
-import type { AgentRuntime } from "@rakazo/adapter-kit";
-import { startHostComputerServer } from "@rakazo/adapters/host-computer-server";
+import type { AgentRuntime } from "@mycellios/adapter-kit";
+import { startHostComputerServer } from "@mycellios/adapters/host-computer-server";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
 
 /** Remember the account and server, independently of sessions, Spaces and host credentials. */

@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
-import { isOpenAiCompatibleProvider, type ModelCredential } from "@rakazo/contracts";
-import { matchesSearchQuery } from "@rakazo/core";
-import { Button, Input, Spinner } from "@rakazo/ui-web";
+import { isOpenAiCompatibleProvider, type ModelCredential } from "@mycellios/contracts";
+import { matchesSearchQuery } from "@mycellios/core";
+import { Button, Input, Spinner } from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Check, Search } from "lucide-react";
 import { useDeferredValue, useState } from "react";

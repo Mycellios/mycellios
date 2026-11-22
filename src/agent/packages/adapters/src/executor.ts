@@ -1,18 +1,18 @@
 import { planShellSearch } from "./shell-command-budget.js";
 import { dockerAdaptiveSearchCommand } from "./docker-search-budget.js";
-import { eventDemoSessionActive } from "@rakazo/db";
+import { eventDemoSessionActive } from "@mycellios/db";
 import { scheduleLocalMemoryReview } from "./local-memory-review.js";
-import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
+import { NATIVE_PROJECT_INSTRUCTIONS } from "@mycellios/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
 import { planCardTool } from "./plan-card.js";
-import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, readMicoDefaults } from "@rakazo/contracts";
+import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, readMicoDefaults } from "@mycellios/contracts";
 import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
-import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread } from "@rakazo/db";
+import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread } from "@mycellios/db";
 import { randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -44,7 +44,7 @@ import type {
   SecretStore,
   SemanticMemoryProvider,
   WebProvider,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   DEFAULT_CONTEXT_STRATEGY,
   historyCompactJob,
@@ -58,8 +58,8 @@ import {
   runContinueJob,
   SandboxRateLimitError,
   TransientModelError,
-} from "@rakazo/adapter-kit";
-import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@rakazo/contracts";
+} from "@mycellios/adapter-kit";
+import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@mycellios/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
   BotSecretName,
@@ -76,8 +76,8 @@ import {
   HistorySearchInputSchema,
   isAttachmentImageMimeType,
   isOpenAiCompatibleProvider,
-} from "@rakazo/contracts";
-import type { ActionApprovalRule, ToolCallStreak } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { ActionApprovalRule, ToolCallStreak } from "@mycellios/core";
 import {
   appendTextSegment,
   appendToolCallSegment,
@@ -133,22 +133,22 @@ import {
   userRunError,
   userTurnMessageForRun,
   desktopSetupInterruptedMessage,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   isSiteFetchTool,
   normalizedHttpUrl,
   SITE_FETCH_TOOL_NAMES,
   sitesInText,
   urlSite,
-} from "@rakazo/core/egress";
+} from "@mycellios/core/egress";
 import {
   approvalEffectKey,
   isToolEffectIdempotencyKey,
   legacyScopedToolEffectIdempotencyKey,
   stableJsonValue,
   toolEffectIdempotencyKey,
-} from "@rakazo/core/node/approval-effect-key";
-import type { McpServer, Prisma, PrismaClient, ThreadEvents, WebPresence } from "@rakazo/db";
+} from "@mycellios/core/node/approval-effect-key";
+import type { McpServer, Prisma, PrismaClient, ThreadEvents, WebPresence } from "@mycellios/db";
 import {
   appendEventInTransaction,
   countUnreadInboxChats,
@@ -183,9 +183,9 @@ import {
   validateInstructionProposal,
   withTransactionRetry,
   writeBotInstructions,
-} from "@rakazo/db";
-import { enrichLogContext, getLogger } from "@rakazo/logging";
-import { sanitizedError } from "@rakazo/logging/monitoring";
+} from "@mycellios/db";
+import { enrichLogContext, getLogger } from "@mycellios/logging";
+import { sanitizedError } from "@mycellios/logging/monitoring";
 import { parse as parseShellCommand } from "shell-quote";
 import {
   connectAgent,
@@ -317,9 +317,9 @@ import {
   unchangedVisualStreakAfterPageBrowser,
 } from "./computer-tools.js";
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
-import { nativeWorkProjectSession } from "@rakazo/core";
+import { nativeWorkProjectSession } from "@mycellios/core";
 import { projectExecutionLeaseKey, PROJECT_SHARED_SCREEN_TOOLS } from "./project-execution.js";
-import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait } from "@rakazo/db";
+import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait } from "@mycellios/db";
 import type { NativeCommandReceipt } from "./native-command-journal.js";
 import { connectApp } from "./connect-app.js";
 import { connectedContext, selectRunConnections } from "./connection-context.js";

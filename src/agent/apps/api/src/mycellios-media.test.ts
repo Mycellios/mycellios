@@ -1,7 +1,7 @@
 import {afterEach,it,expect,vi} from "vitest";
 import {RPCHandler} from "@orpc/server/fetch";
-import {serializeModelSecret} from "@rakazo/adapters";
-import {productBrand,type Actor} from "@rakazo/contracts";
+import {serializeModelSecret} from "@mycellios/adapters";
+import {productBrand,type Actor} from "@mycellios/contracts";
 import {createRouter,type RouterDeps} from "./router.js";
 const actor:Actor={userId:"alice",spaceId:"personal",email:"alice@test.invalid",isDeploymentOwner:false};
 afterEach(()=>vi.unstubAllEnvs());

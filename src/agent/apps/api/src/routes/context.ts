@@ -25,7 +25,7 @@ import {
   savedCatalogSelections,
   scriptedCatalogEntry,
   validateConnectedModelChoice,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import type {
   Actor,
   ModelCatalogEntry,
@@ -34,14 +34,14 @@ import type {
   ModelRoleSettings,
   ModelRoleView,
   SettingsScope,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   appContract,
   canonicalPiProviderId,
   isOpenAiCompatibleProvider,
   modelSupportsRole,
-} from "@rakazo/contracts";
-import { createGroupRepos, createRepos, recordSecurityEvent, runAsTenant } from "@rakazo/db";
+} from "@mycellios/contracts";
+import { createGroupRepos, createRepos, recordSecurityEvent, runAsTenant } from "@mycellios/db";
 import { createAgentImportServices } from "../agent-import-services.js";
 import { createAgentSkillsService } from "../agent-skills.js";
 import { createBotRemoval } from "../bot-removal.js";

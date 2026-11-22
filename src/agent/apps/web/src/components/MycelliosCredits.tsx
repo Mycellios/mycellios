@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { CREDIT_MICROUNITS } from "@rakazo/contracts";
-import type { MycelliosAccount } from "@rakazo/contracts";
+import { CREDIT_MICROUNITS } from "@mycellios/contracts";
+import type { MycelliosAccount } from "@mycellios/contracts";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { rpc } from "../lib/rpc";

@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import type { ProjectBrowserState } from "@rakazo/contracts";
+import type { ProjectBrowserState } from "@mycellios/contracts";
 import { useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";
 

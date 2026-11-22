@@ -1,5 +1,5 @@
-import type { ProductEvent } from "@rakazo/contracts";
-import { displayName, plainTextFromMarkdown } from "@rakazo/core";
+import type { ProductEvent } from "@mycellios/contracts";
+import { displayName, plainTextFromMarkdown } from "@mycellios/core";
 import { appPath } from "./app-path";
 import { i18n } from "./i18n";
 import { desktopBridge } from "./desktop";

@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AgentUsageReport, AgentUsageTotals } from "@rakazo/contracts";
-import { formatTaskCostAmount } from "@rakazo/core";
-import { Button, Label, Switch } from "@rakazo/ui-web";
+import type { AgentUsageReport, AgentUsageTotals } from "@mycellios/contracts";
+import { formatTaskCostAmount } from "@mycellios/core";
+import { Button, Label, Switch } from "@mycellios/ui-web";
 import type { RefObject } from "react";
 import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsLabel, SettingsRow } from "../components/SettingsRows";

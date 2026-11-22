@@ -61,7 +61,7 @@ try {
     providerPricing: { openai: { defaults: { inputUsdPerMillion: 0, outputUsdPerMillion: 0 } } },
     providerServiceApiProtocols: { openai: { services: { [KOKORO_MODEL]: ["openai-chat-completions"] } } },
   };
-  const text = "Hola Daniel. Esta voz viaja por AntSeed y la genera Mycellios.";
+  const text = "Hola Alex. Esta voz viaja por AntSeed y la genera Mycellios.";
   const started = performance.now();
   const result = await buyer.sendRequest(peer, {
     requestId: randomUUID(), method: "POST", path: "/v1/chat/completions",

@@ -14,19 +14,19 @@ import type {
   ConnectorProvider,
   ConnectorTool,
   SecretStore,
-} from "@rakazo/adapter-kit";
-import { SecretStoreUnavailableError } from "@rakazo/adapter-kit";
-import type { McpOAuthEnvField } from "@rakazo/contracts";
+} from "@mycellios/adapter-kit";
+import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
+import type { McpOAuthEnvField } from "@mycellios/contracts";
 import {
   isLocalMcpHost,
   mcpOAuthEnvReferences,
   resolveMcpOAuthEnv,
   resolveMcpOAuthFileTemplate,
-} from "@rakazo/contracts";
-import type { McpServer, PrismaClient, ThreadEvents } from "@rakazo/db";
-import { containsSecret, redactSecrets } from "@rakazo/core";
-import { getLogger } from "@rakazo/logging";
-import { sanitizedError } from "@rakazo/logging/monitoring";
+} from "@mycellios/contracts";
+import type { McpServer, PrismaClient, ThreadEvents } from "@mycellios/db";
+import { containsSecret, redactSecrets } from "@mycellios/core";
+import { getLogger } from "@mycellios/logging";
+import { sanitizedError } from "@mycellios/logging/monitoring";
 import { catalogToolPrefix } from "./approval-effect.js";
 import {
   combineSignals,

@@ -1,4 +1,4 @@
-import type { AgentRunModel, AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
+import type { AgentRunModel, AgentRunRequest, AgentRuntimeEvent } from "@mycellios/adapter-kit";
 import type { Context, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import { reliableModelStream, resolveRuntimeModel } from "./pi-runtime.js";
 import { withCloudflareAuth } from "./cloudflare-ai-gateway.js";

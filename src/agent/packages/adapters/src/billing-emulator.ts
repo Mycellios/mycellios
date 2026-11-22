@@ -6,8 +6,8 @@ import type {
   BillingProvider,
   BillingSubscriptionSnapshot,
   BillingSubscriptionStatus,
-} from "@rakazo/adapter-kit";
-import { BillingCheckoutCompletedError, BillingCustomerNotFoundError } from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
+import { BillingCheckoutCompletedError, BillingCustomerNotFoundError } from "@mycellios/adapter-kit";
 import {
   holdsBillingSubscription,
   parseStripeWebhook,

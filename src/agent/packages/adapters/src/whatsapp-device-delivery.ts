@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { MessageBlock } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 
 /**
  * Replies to messages uploaded by the Desktop WhatsApp connector

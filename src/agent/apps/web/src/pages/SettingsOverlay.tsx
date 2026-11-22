@@ -1,12 +1,12 @@
 import "./settings/settings.css";
 import { ProfileOverview } from "./settings/ProfileOverview";
-import { Disclosure, ExpandedSettings } from "@rakazo/ui-web/components/ui/disclosure";
+import { Disclosure, ExpandedSettings } from "@mycellios/ui-web/components/ui/disclosure";
 import { DesktopCompanionsPanel } from "./settings/DesktopCompanionsPanel";
 import { AppBehaviorPanel } from "./settings/GeneralPreferences";
 import { desktopBridge } from "../lib/desktop";
 import { useLingui } from "@lingui/react/macro";
 import { spaceLabel } from "../lib/space-label";
-import type { Bot, BusyMessageMode, SpaceMemoryConfig } from "@rakazo/contracts";
+import type { Bot, BusyMessageMode, SpaceMemoryConfig } from "@mycellios/contracts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,7 @@ import {
   DialogTitle,
   Input,
   OptionSelect,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -88,7 +88,7 @@ type NavItem = {
   label: string;
   icon: ComponentType<{ className?: string; strokeWidth?: number }>;
   keywords?: string;
-  /** Account and this computer sections sit under their own heading, as in OpenBot. */
+  /** Account and this computer sections sit under their own heading, as in the reference app. */
   group?: "account" | "computer";
 };
 

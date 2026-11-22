@@ -2,7 +2,7 @@
 import { act } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import type { BillingStatus } from "@rakazo/contracts";
+import type { BillingStatus } from "@mycellios/contracts";
 import { expect, it, vi } from "vitest";
 
 vi.mock("../lib/rpc", () => ({ rpc: { billing: {} } }));
@@ -11,7 +11,7 @@ vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (s: TemplateStringsArray, ...v: unknown[]) => s.reduce((a, p, i) => a + p + (v[i] ?? ""), ""), i18n: { locale: "en" } }),
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("@rakazo/ui-web", () => {
+vi.mock("@mycellios/ui-web", () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return Object.fromEntries(["Button", "Card", "CardContent", "CardFooter", "CardHeader", "Dialog", "DialogContent", "DialogDescription", "DialogHeader", "DialogTitle", "Select", "SelectContent", "SelectGroup", "SelectItem", "SelectTrigger", "SelectValue", "Separator"].map(name => [name, Wrapper]));
 });

@@ -1,5 +1,5 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { ComputerBusyError } from "./computer-lifecycle.js";
@@ -155,8 +155,8 @@ describe("execution start timing", () => {
 });
 
 // Isolate timing after admission; the PostgreSQL workspace fixture exercises the real gate.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

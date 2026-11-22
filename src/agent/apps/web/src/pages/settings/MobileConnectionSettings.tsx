@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@rakazo/ui-web";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@mycellios/ui-web";
 import { Link, Plus, Globe } from "lucide-react";
 import { useState } from "react";
 import { MobileSessions } from "./MobileSessions";

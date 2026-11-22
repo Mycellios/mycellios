@@ -1,4 +1,4 @@
-import type { UsageDashboard } from "@rakazo/contracts";
+import type { UsageDashboard } from "@mycellios/contracts";
 import { civilDate, dateInZone, shiftDay } from "../schedule/calendar-dates";
 import { usageDayStart } from "../usage/usage-chart";
 

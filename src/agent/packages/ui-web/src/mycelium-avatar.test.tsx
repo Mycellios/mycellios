@@ -3,8 +3,8 @@ import { renderToString } from "react-dom/server";
 import {
   MICO_MYCELIUM_SHAPES, MICO_AVATAR_PALETTES, micoAvatarDetails, micoAvatarValue,
   parseBotAvatarValue, withMicoAvatarPalette,
-} from "@rakazo/contracts";
-import { compactMicoArt, compactMicoEyes, compactMicoEyeColor, COMPACT_EYE_WIDTH, COMPACT_EYE_HEIGHT, currentMicoAvatarValue, liveliness, myceliumEyeFrame } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { compactMicoArt, compactMicoEyes, compactMicoEyeColor, COMPACT_EYE_WIDTH, COMPACT_EYE_HEIGHT, currentMicoAvatarValue, liveliness, myceliumEyeFrame } from "@mycellios/core";
 import { BotAvatar } from "./bot-avatar.js";
 
 describe("mycelium avatars", () => {

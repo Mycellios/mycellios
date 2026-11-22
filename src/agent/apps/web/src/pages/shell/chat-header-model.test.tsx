@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { i18n } from "@lingui/core";
-import type { Bot, Me, ModelCredential, ModelCatalogEntry } from "@rakazo/contracts";
-import type { ChatModelChoice } from "@rakazo/core";
+import type { Bot, Me, ModelCredential, ModelCatalogEntry } from "@mycellios/contracts";
+import type { ChatModelChoice } from "@mycellios/core";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -33,7 +33,7 @@ vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
 vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onChange, initialProvider }: { choices: (ChatModelChoice & { unavailable?: boolean })[]; value: string; onChange: (key: string) => void; initialProvider?: string | null }) =>
   <div data-picker-provider={initialProvider}>{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-selected={choice.key === value} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
 }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Popover: ({ children, onOpenChange }: { children: ReactNode; onOpenChange: (open: boolean) => void }) => <div><button data-open onClick={() => onOpenChange(true)}>Open</button>{children}</div>,
   PopoverTrigger: ({ children }: { children: ReactNode }) => <button data-trigger>{children}</button>,
   PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,

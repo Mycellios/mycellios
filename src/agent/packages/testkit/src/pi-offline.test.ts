@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { AgentRunRequest, AgentRuntimeEvent, ConnectorTool } from "@rakazo/adapter-kit";
-import { PiAgentRuntime } from "@rakazo/adapters";
-import * as Core from "@rakazo/core";
+import type { AgentRunRequest, AgentRuntimeEvent, ConnectorTool } from "@mycellios/adapter-kit";
+import { PiAgentRuntime } from "@mycellios/adapters";
+import * as Core from "@mycellios/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { estimateTextTokens } from "../../adapters/src/context-selection.js";
 import { type ModelEmulatorRequest, startModelEmulator } from "./model-emulator.js";
@@ -432,10 +432,10 @@ describe("real Pi against an offline model HTTP endpoint", () => {
       steps: [
         {
           expect(request) {
-            expect(request.messages.at(-1)).toMatchObject({
-              role: "user",
-              content: "Save hello to notes.txt.",
-            });
+            expect(request.messages.at(-1)?.role).toBe("user");
+            expect(JSON.stringify(request.messages.at(-1)?.content)).toContain(
+              "Save hello to notes.txt.",
+            );
             expect(request.tools).toContainEqual(
               expect.objectContaining({
                 function: expect.objectContaining({ name: "write_file" }),

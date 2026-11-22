@@ -8,8 +8,8 @@ import type {
   ComputerRef,
   JobPublisher,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
-import { clearThread, type PrismaClient, type ThreadEvents } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { clearThread, type PrismaClient, type ThreadEvents } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import {
   acquireComputerExecutionLease,

@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMycelliosProvider } from "./mycellios-provider.js";
 import * as credentials from "./model-credentials.js";
 import type { RouterDeps } from "./router.js";
-import type { Actor } from "@rakazo/contracts";
-import type { CodexLiveCatalog } from "@rakazo/adapters";
-import { serializeModelSecret } from "@rakazo/adapters";
-import { getModelRole } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { CodexLiveCatalog } from "@mycellios/adapters";
+import { serializeModelSecret } from "@mycellios/adapters";
+import { getModelRole } from "@mycellios/db";
 import { mainRole, withModelRoles } from "../../../packages/adapters/src/testing/model-roles.js";
 
 const actor = { userId: "fixture-user", spaceId: "fixture-space" } as Actor;

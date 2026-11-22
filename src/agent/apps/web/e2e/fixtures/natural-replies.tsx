@@ -1,5 +1,5 @@
 import { I18nProvider } from "@lingui/react";
-import type { ThreadMessage } from "@rakazo/contracts";
+import type { ThreadMessage } from "@mycellios/contracts";
 import { createRoot } from "react-dom/client";
 import { bootstrapI18n, i18n } from "../../src/lib/i18n";
 import { ResponseStyleContext } from "../../src/lib/response-style";

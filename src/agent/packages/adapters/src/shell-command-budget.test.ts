@@ -6,15 +6,15 @@ it("caps the exact wide home search that left Videos waiting, including a larger
   expect(shellCommandTimeoutMs(command, 3_600_000)).toBe(45_000);
   expect(shellCommandTimeoutMs(command, 15_000)).toBe(15_000);
 });
-it.each(['cd ~ && find . -name "*.ts"', 'find / -name foo', 'find -L / -name foo', 'rg foo C:\\', 'grep -r foo ..', 'rg foo /c/Users/Daniel'])('refuses a whole-home/drive/parent scan before execution: %s', command => {
-  expect(planShellSearch(command, undefined, { home: "C:\\Users\\Daniel" }).refusal).toContain("not started");
+it.each(['cd ~ && find . -name "*.ts"', 'find / -name foo', 'find -L / -name foo', 'rg foo C:\\', 'grep -r foo ..', 'rg foo /c/Users/alex'])('refuses a whole-home/drive/parent scan before execution: %s', command => {
+  expect(planShellSearch(command, undefined, { home: "C:\\Users\\alex" }).refusal).toContain("not started");
 });
 it.each(['rg -n foo src', 'grep -rn foo src | head -20', 'find src -name "*.ts"', 'rg --files src'])('permits bounded result-driven extension: %s', command => {
   expect(planShellSearch(command).progress).toEqual({ maxMs: 180_000, roots: ["src"] });
 });
 it("requires an identified project for an implicit dot scope and preserves explicit budgets", () => {
   expect(planShellSearch('find . -name "*.ts"').progress).toBeUndefined();
-  expect(planShellSearch('find . -name "*.ts"', undefined, { cwd: "/home/daniel/project", home: "/home/daniel" }).progress?.maxMs).toBe(180_000);
+  expect(planShellSearch('find . -name "*.ts"', undefined, { cwd: "/home/alex/project", home: "/home/alex" }).progress?.maxMs).toBe(180_000);
   expect(planShellSearch('rg foo src', 60_000).progress?.maxMs).toBe(60_000);
   expect(planShellSearch('rg foo src', 15_000)).toEqual({ timeoutMs: 15_000 });
   expect(planShellSearch('npm run render', 1_800_000)).toEqual({ timeoutMs: 1_800_000 });

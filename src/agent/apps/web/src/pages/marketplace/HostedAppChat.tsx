@@ -1,6 +1,6 @@
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { HostedWebAgent, ThreadSnapshot } from "@rakazo/contracts";
-import { isActive, runThreadSubscription } from "@rakazo/core";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import type { HostedWebAgent, ThreadSnapshot } from "@mycellios/contracts";
+import { isActive, runThreadSubscription } from "@mycellios/core";
 import {
   Button,
   DropdownMenu,
@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Square, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AskCard } from "../../components/AskCard";
@@ -80,7 +80,7 @@ export function HostedAppChat({
   scope,
   blocked,
   onWorking,
-  onOpenBot,
+  onShowBot,
   teammates = [],
 }: {
   teammates?: readonly { id: string; name: string }[];
@@ -89,7 +89,7 @@ export function HostedAppChat({
   scope: string;
   blocked: boolean;
   onWorking: (working: boolean) => void;
-  onOpenBot: (id: string) => void;
+  onShowBot: (id: string) => void;
 }) {
   const client = useMemo(
     () =>
@@ -330,7 +330,7 @@ export function HostedAppChat({
             size="sm"
             onClick={() =>
               error.includes("Connect a model")
-                ? onOpenBot(agent.botId)
+                ? onShowBot(agent.botId)
                 : setRetry((n) => n + 1)
             }
           >

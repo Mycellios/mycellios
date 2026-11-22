@@ -11,9 +11,9 @@ export RAILWAY_ENVIRONMENT_ID
 RAILWAY_ENVIRONMENT_ID=$(node infra/railway/sandbox-environment.mjs)
 # Set DATABASE_MIGRATION_URL to the owner and DATABASE_URL to a runtime login to
 # enforce row-level security; with one URL the app runs as the owner and warns.
-pnpm --filter @rakazo/api db:deploy
+pnpm --filter @mycellios/api db:deploy
 unset DATABASE_MIGRATION_URL
-pnpm --filter @rakazo/api exec node dist/cli/bootstrap-owner.js
+pnpm --filter @mycellios/api exec node dist/cli/bootstrap-owner.js
 unset OWNER_PASSWORD
 # Personal template: registration is operator configuration, never an app-account permission.
 export SIGNUPS_ENABLED=false
@@ -28,8 +28,8 @@ trap 'exit 130' INT
 export CONTENT_ENCRYPTION="${CONTENT_ENCRYPTION:-on}"
 export TRUSTED_PROXIES="${TRUSTED_PROXIES:-127.0.0.1}"
 export CLIENT_IP_HEADER="${CLIENT_IP_HEADER:-x-real-ip}"
-pnpm --filter @rakazo/api start &
-pnpm --filter @rakazo/worker start &
+pnpm --filter @mycellios/api start &
+pnpm --filter @mycellios/worker start &
 (
   node --input-type=module -e '
   for (let attempt = 0; attempt < 60; attempt++) {
@@ -40,7 +40,7 @@ pnpm --filter @rakazo/worker start &
   throw new Error("API did not become ready");
 '
   exec env -u RAILWAY_API_TOKEN -u DATABASE_URL -u ENCRYPTION_KEY -u ENCRYPTION_MASTER_KEYS -u OBJECT_STORAGE_SECRET_ACCESS_KEY -u BETTER_AUTH_SECRET \
-    pnpm --filter @rakazo/web preview --host 0.0.0.0 --port 5173
+    pnpm --filter @mycellios/web preview --host 0.0.0.0 --port 5173
 ) &
 wait -n
 exit 1

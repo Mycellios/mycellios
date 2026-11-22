@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { Bot, InboxTask, ThreadSnapshot } from "@rakazo/contracts";
-import { Button, Spinner } from "@rakazo/ui-web";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import type { Bot, InboxTask, ThreadSnapshot } from "@mycellios/contracts";
+import { Button, Spinner } from "@mycellios/ui-web";
 import { Archive, ArchiveRestore, ArrowLeft, Maximize2, MessageCircle, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AskCard } from "../../components/AskCard";

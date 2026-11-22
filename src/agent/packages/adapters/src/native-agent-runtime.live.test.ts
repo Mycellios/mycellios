@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
+import type { AgentRunRequest, AgentRuntimeEvent } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
 import { findNativeCommand } from "./native-agent-process.js";
 import { NativeAgentRuntime } from "./native-agent-runtime.js";

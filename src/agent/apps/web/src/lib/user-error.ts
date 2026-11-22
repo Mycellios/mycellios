@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
-import { isNetworkVoiceErrorCode, isVoiceAccountErrorCode } from "@rakazo/contracts";
-import type { CredentialField } from "@rakazo/core";
-import { authErrorMessage, MAX_PASSWORD_LENGTH, userErrorMessage } from "@rakazo/core";
+import { isNetworkVoiceErrorCode, isVoiceAccountErrorCode } from "@mycellios/contracts";
+import type { CredentialField } from "@mycellios/core";
+import { authErrorMessage, MAX_PASSWORD_LENGTH, userErrorMessage } from "@mycellios/core";
 
 /** Text for a failure: human messages pass through; network and implementation detail become copy. */
 export function errorText(error: unknown, fallback = t`Something went wrong. Try again.`): string {

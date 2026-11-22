@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import EmbeddedPostgres from "embedded-postgres";
-import { createDb, asSystem, delegateWork, reconcileWork, saveWorkState, workStatus, controlWorkTree, settleObservedShell } from "@rakazo/db";
-import { nativeWorkProjectSession } from "@rakazo/core";
+import { createDb, asSystem, delegateWork, reconcileWork, saveWorkState, workStatus, controlWorkTree, settleObservedShell } from "@mycellios/db";
+import { nativeWorkProjectSession } from "@mycellios/core";
 import { reconcileWorkStops } from "../packages/adapters/src/work-stop-reconciler.js";
 
 // Synthetic loopback cluster only. Do not load .env, credentials, existing users or models.

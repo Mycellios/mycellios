@@ -1,5 +1,5 @@
 import { Composio } from "@composio/core";
-import type { AdapterContext } from "@rakazo/adapter-kit";
+import type { AdapterContext } from "@mycellios/adapter-kit";
 import { expect, it, vi } from "vitest";
 import type { ComposioClient } from "./composio-connector.js";
 import { FakeComposioClient } from "./composio-fake.js";

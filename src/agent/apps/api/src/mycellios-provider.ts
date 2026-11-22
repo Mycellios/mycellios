@@ -1,8 +1,8 @@
 import { ORPCError } from "@orpc/server";
-import type { CodexLiveCatalog } from "@rakazo/adapters";
-import { serializeModelSecret } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import { OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
+import type { CodexLiveCatalog } from "@mycellios/adapters";
+import { serializeModelSecret } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import { OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
 import { persistModelCredential } from "./model-credentials.js";
 import { ownedMycelliosConnection } from "./mycellios-owned-connection.js";
 import { MycelliosConnectionUnavailable, provisionMycelliosConnection } from "./mycellios-sso-connection.js";

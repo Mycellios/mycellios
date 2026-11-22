@@ -692,6 +692,7 @@ export const ZH_MESSAGES: Record<string, string> = {
   Submit: "提交",
   "Take control": "接管控制",
   "Tap + to create a bot": "点按 + 创建 Bot",
+  "This PC": "这台电脑",
   Team: "团队",
   "Team Computer": "团队电脑",
   "That doesn’t look like a URL": "这看起来不像 URL",

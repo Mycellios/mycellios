@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
-import type { Bot, RakazoDesktop } from "@rakazo/contracts";
+import type { Bot, RakazoDesktop } from "@mycellios/contracts";
 const fixture = vi.hoisted(() => ({ avatar: vi.fn(), navigate: vi.fn(), get: vi.fn(), answer: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ rpc: { threads: { get: fixture.get, answer: fixture.answer } } }));
 vi.mock("../lib/companion-avatar", () => ({ companionAvatar: fixture.avatar }));

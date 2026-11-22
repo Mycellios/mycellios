@@ -1,7 +1,7 @@
 import { SoundSettings } from "./SoundSettings";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, NotificationSettings } from "@rakazo/contracts";
-import { BotAvatar, Button, Label, Switch, OptionSelect } from "@rakazo/ui-web";
+import type { Bot, NotificationSettings } from "@mycellios/contracts";
+import { BotAvatar, Button, Label, Switch, OptionSelect } from "@mycellios/ui-web";
 import { Bell, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";

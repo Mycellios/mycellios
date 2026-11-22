@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot, Group } from "@rakazo/contracts";
-import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN, GROUP_NAME_MAX_LENGTH } from "@rakazo/contracts";
-import { BotAvatar, Button, Checkbox, Input } from "@rakazo/ui-web";
+import type { Bot, Group } from "@mycellios/contracts";
+import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN, GROUP_NAME_MAX_LENGTH } from "@mycellios/contracts";
+import { BotAvatar, Button, Checkbox, Input } from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { errorText } from "../lib/user-error";
@@ -25,13 +25,13 @@ function MemberPicker({
   bots,
   selected,
   onChange,
-  onOpenBot,
+  onShowBot,
   initiallyExpanded = false,
 }: {
   bots: Bot[];
   selected: string[];
   onChange: (selected: string[]) => void;
-  onOpenBot?: (botId: string) => void;
+  onShowBot?: (botId: string) => void;
   initiallyExpanded?: boolean;
 }) {
   const { t } = useLingui();
@@ -106,7 +106,7 @@ function MemberPicker({
             >
               <button
                 type="button"
-                onClick={() => onOpenBot?.(bot.id)}
+                onClick={() => onShowBot?.(bot.id)}
                 className="flex min-w-0 flex-1 items-center gap-3 text-start"
               >
                 <BotAvatar color={bot.color} identity={bot.id} size={32} status={bot.status} />
@@ -138,12 +138,12 @@ export function CreateGroupForm({
   bots,
   onCancel,
   onCreate,
-  onOpenBot,
+  onShowBot,
 }: {
   bots: Bot[];
   onCancel: () => void;
   onCreate: (input: { name: string; botIds: string[] }) => Promise<void>;
-  onOpenBot?: (botId: string) => void;
+  onShowBot?: (botId: string) => void;
 }) {
   const { t } = useLingui();
   const nameId = useId();
@@ -201,7 +201,7 @@ export function CreateGroupForm({
         bots={bots}
         selected={selected}
         onChange={setSelected}
-        onOpenBot={onOpenBot}
+        onShowBot={onShowBot}
         initiallyExpanded
       />
       <Button
@@ -221,7 +221,7 @@ export function GroupSettings({
   onSave,
   onRemove,
   onClose,
-  onOpenBot,
+  onShowBot,
   covered = false,
 }: {
   group: Group;
@@ -229,7 +229,7 @@ export function GroupSettings({
   onSave: (input: { name?: string; botIds?: string[] }) => Promise<void>;
   onRemove: () => Promise<void>;
   onClose: () => void;
-  onOpenBot?: (botId: string) => void;
+  onShowBot?: (botId: string) => void;
   /** A full-screen overlay is on top, so Escape belongs to it. */
   covered?: boolean;
 }) {
@@ -331,7 +331,7 @@ export function GroupSettings({
           className="mt-2"
         />
       </label>
-      <MemberPicker bots={bots} selected={selected} onChange={setSelected} onOpenBot={onOpenBot} />
+      <MemberPicker bots={bots} selected={selected} onChange={setSelected} onShowBot={onShowBot} />
       <Button
         className="mt-5 w-full"
         disabled={saving || !validSelection(name, selected)}

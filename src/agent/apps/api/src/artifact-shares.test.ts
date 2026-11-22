@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@rakazo/db";
-import { IsolationError } from "@rakazo/db";
+import type { PrismaClient } from "@mycellios/db";
+import { IsolationError } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import {
   SHARED_ARTIFACT_CSP,

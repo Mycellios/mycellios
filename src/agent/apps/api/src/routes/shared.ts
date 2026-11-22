@@ -1,13 +1,13 @@
-import type { AdapterContext } from "@rakazo/adapter-kit";
+import type { AdapterContext } from "@mycellios/adapter-kit";
 import {
   deploymentModelRole,
   findConnectedModelCredential,
   hasHostedModelCredits,
   hostCredentialSource,
   resolveMemberMainModel,
-} from "@rakazo/adapters";
-import type { Actor, Me } from "@rakazo/contracts";
-import { attachmentMaxBytes, canonicalPiProviderId, usableModelId } from "@rakazo/contracts";
+} from "@mycellios/adapters";
+import type { Actor, Me } from "@mycellios/contracts";
+import { attachmentMaxBytes, canonicalPiProviderId, usableModelId } from "@mycellios/contracts";
 import type { RouterDeps } from "../router.js";
 
 export function computerContext(actor: Actor, botId: string, operationId: string): AdapterContext {

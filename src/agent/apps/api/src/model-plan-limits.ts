@@ -3,12 +3,12 @@ import {
   oauthCredentialAccountId,
   parseModelSecret,
   readProviderPlanLimits,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import {
   type AccountPlanLimit,
   type AccountPlanLimits,
   canonicalPiProviderId,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import type { RouterDeps } from "./router.js";
 
 /** Passive subscription readings from this member's encrypted connections only. */

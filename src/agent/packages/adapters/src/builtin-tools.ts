@@ -1,4 +1,4 @@
-import type { ConnectorTool } from "@rakazo/adapter-kit";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
 import { workflowTools } from "./workflow-tools.js";
 import { hostedAppTools } from "./hosted-app-tools.js";
 import {
@@ -15,7 +15,7 @@ import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
   TICKET_TITLE_MAX_LENGTH,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { z } from "zod";
 import { allowPrivateHttpSecretOrigins } from "./bot-secrets.js";
 import { BROWSER_ACT_KINDS } from "./browser-tools.js";

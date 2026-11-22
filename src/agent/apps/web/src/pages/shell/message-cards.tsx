@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { MessageBlock } from "@rakazo/contracts";
-import { appConnectedInput, waitForConnection } from "@rakazo/core";
-import { Button, Dialog, DialogClose, DialogContent, DialogTitle } from "@rakazo/ui-web";
+import type { MessageBlock } from "@mycellios/contracts";
+import { appConnectedInput, waitForConnection } from "@mycellios/core";
+import { Button, Dialog, DialogClose, DialogContent, DialogTitle } from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BuiCard, SuccessPop } from "../../components/ai/primitives";
@@ -267,7 +267,7 @@ function ChartCanvas({
     // Plot loads lazily so threads without charts never pay for the library.
     void (async () => {
       try {
-        const { buildPlotParts } = await importChunk(() => import("@rakazo/core/plot"));
+        const { buildPlotParts } = await importChunk(() => import("@mycellios/core/plot"));
         if (cancelled || !ref.current) return;
         // Hover inspection by default: give the first mark a tooltip unless
         // the spec already asks for one somewhere.

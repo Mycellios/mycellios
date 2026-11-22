@@ -1,5 +1,5 @@
-import { usageSeriesColors } from "@rakazo/ui-tokens";
-import type { UsageDashboard } from "@rakazo/contracts";
+import { usageSeriesColors } from "@mycellios/ui-tokens";
+import type { UsageDashboard } from "@mycellios/contracts";
 import { civilDate, dateInZone, shiftDay } from "../schedule/calendar-dates";
 export type UsageMetric = "cost" | "tokens";
 const providerNames: Record<string, string> = {

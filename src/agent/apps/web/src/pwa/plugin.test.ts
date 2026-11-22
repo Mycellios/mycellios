@@ -1,4 +1,4 @@
-import { webDarkTokens } from "@rakazo/ui-tokens";
+import { webDarkTokens } from "@mycellios/ui-tokens";
 import { Script } from "node:vm";
 import type { Rolldown } from "vite";
 import { describe, expect, it } from "vitest";

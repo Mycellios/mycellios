@@ -1,4 +1,4 @@
-import { MessageBlock } from "@rakazo/contracts";
+import { MessageBlock } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 
 // The dev seed is a plain script module; load it by path so its JavaScript stays outside this package's types.

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import type { MessageBlock } from "@rakazo/contracts";
-import { fontWeight, typeScale } from "@rakazo/ui-tokens";
+import type { MessageBlock } from "@mycellios/contracts";
+import { fontWeight, typeScale } from "@mycellios/ui-tokens";
 import type { ReactNode } from "react";
 import React, { act, useEffect, useRef, useState } from "react";
 import type { Root } from "react-dom/client";
@@ -255,29 +255,29 @@ describe("thread cards", () => {
     ["no longer in the roster", child, []],
     ["deleted", { ...child, status: "deleted" }, [{ id: "child-1", name: "Planner" }]],
   ])("keeps a child bot's name without a link when it is %s", (_, block, bots) => {
-    const onOpenBot = vi.fn();
-    renderBlocks([block as MessageBlock], { bots, onOpenBot });
+    const onShowBot = vi.fn();
+    renderBlocks([block as MessageBlock], { bots, onShowBot });
     const row = container.firstElementChild as HTMLElement;
     expect(row.textContent).toContain("Planner");
     expect(row.querySelector('[role="link"]')).toBeNull();
     act(() => {
       for (const span of row.querySelectorAll("span")) span.click();
     });
-    expect(onOpenBot).not.toHaveBeenCalled();
+    expect(onShowBot).not.toHaveBeenCalled();
   });
 
   it("keeps child navigation and long-press actions on each card and text piece", () => {
-    const onOpenBot = vi.fn();
+    const onShowBot = vi.fn();
     const onLongPress = vi.fn();
     renderBlocks([helper(), child, text("After")], {
       bots: [{ id: "child-1", name: "Planner", color: "orange" }],
-      onOpenBot,
+      onShowBot,
       actionProps: { onLongPress },
     });
     const cards = [...container.firstElementChild!.children] as HTMLElement[];
     expect(cards).toHaveLength(3);
     act(() => cards[1]!.querySelector<HTMLElement>('[role="link"]')!.click());
-    expect(onOpenBot).toHaveBeenCalledWith("child-1", "Planner");
+    expect(onShowBot).toHaveBeenCalledWith("child-1", "Planner");
     act(() =>
       cards.forEach((card) => {
         const target = card.tagName === "DIV" ? card.querySelector("button")! : card;

@@ -1,4 +1,4 @@
-import type { MessageBlock } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
 
 type TextBlock = Extract<MessageBlock, { kind: "text" | "progress" }>;
 type StepsBlock = Extract<MessageBlock, { kind: "steps" }>;

@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import type { Actor } from "@rakazo/contracts";
-import { isUncertainDesktopRun, QUEUE_HOLDING_RUN_STATUSES } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import { isUncertainDesktopRun, QUEUE_HOLDING_RUN_STATUSES } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
 import { withSerializableRetry } from "./serializable-retry.js";
 import type { ThreadTarget } from "./thread-target.js";
 

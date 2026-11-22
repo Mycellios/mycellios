@@ -1,5 +1,5 @@
-import type { ProcessEvent } from "@rakazo/adapter-kit";
-import { redactSecrets } from "@rakazo/core";
+import type { ProcessEvent } from "@mycellios/adapter-kit";
+import { redactSecrets } from "@mycellios/core";
 import { redactShellStreams } from "./agent-environment.js";
 import { automated } from "./automated-messages.js";
 import { clipToolResultText } from "./pi-runtime-limits.js";

@@ -1,4 +1,4 @@
-import { anySignal } from "@rakazo/core";
+import { anySignal } from "@mycellios/core";
 
 // Bound only the reads that gate first paint. Writes and event streams retain
 // their own cancellation/timeout contracts; an expired read is never a sign-out.

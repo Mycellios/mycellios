@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/sandbox-supervisor",
+  "name": "@mycellios/sandbox-supervisor",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",
-    "@rakazo/core": "*",
-    "@rakazo/logging": "*",
+    "@mycellios/core": "*",
+    "@mycellios/logging": "*",
     "dockerode": "5.0.1",
     "hono": "4.13.14",
     "tsx": "4.23.15",

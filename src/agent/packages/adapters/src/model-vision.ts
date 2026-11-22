@@ -1,6 +1,6 @@
 import type { Models } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
-import { canonicalPiProviderId, isOpenAiCompatibleProvider } from "@rakazo/contracts";
+import { canonicalPiProviderId, isOpenAiCompatibleProvider } from "@mycellios/contracts";
 import { DEFAULT_OPENROUTER_MODEL_ID } from "./deployment-model.js";
 import { liveModelSibling } from "./pi-live-model.js";
 import { registerLocalProvider } from "./pi-local-provider.js";

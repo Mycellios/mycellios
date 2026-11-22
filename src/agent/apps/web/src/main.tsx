@@ -6,7 +6,7 @@ import { applyGeneralPreferences, subscribeGeneralPreferences } from "./lib/gene
 import { installAndroidHost, isAndroidHost } from "./lib/android-host";
 import "./monitoring-bootstrap";
 import "./lib/native-pc-bootstrap";
-import { Toaster, TooltipProvider } from "@rakazo/ui-web";
+import { Toaster, TooltipProvider } from "@mycellios/ui-web";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode, useEffect, useLayoutEffect, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";

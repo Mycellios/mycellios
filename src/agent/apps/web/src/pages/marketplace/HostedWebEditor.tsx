@@ -1,5 +1,5 @@
 import { StoreAppHeader } from "./StoreAppHeader";
-import {HOSTED_WEB_CAPABILITIES,HOSTED_WEB_COVER_FILES,HOSTED_WEB_LIMITS,type Bot,type HostedWebAgent,type HostedWebCapability,type HostedWebDraft} from "@rakazo/contracts";
+import {HOSTED_WEB_CAPABILITIES,HOSTED_WEB_COVER_FILES,HOSTED_WEB_LIMITS,type Bot,type HostedWebAgent,type HostedWebCapability,type HostedWebDraft} from "@mycellios/contracts";
 import {AppCoverEditor,type CoverImage} from "./AppCover";
 import {
   Button,
@@ -8,7 +8,7 @@ import {
   NativeSelectOption,
   Switch,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { ArrowUpRight, Eye, RefreshCw, Upload, ImagePlus } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { appPath } from "../../lib/app-path";
@@ -38,7 +38,7 @@ type EditorProps = {
   onBack: () => void;
   onPublished: () => void;
   bots: Bot[];
-  onOpenBot: (id: string) => void;
+  onShowBot: (id: string) => void;
   onCreateBot: () => void;
   spaceId: string | null;
 };
@@ -50,7 +50,7 @@ export function WebEditor({
   onPublished,
   bots,
   spaceId,
-  onOpenBot,
+  onShowBot,
   onCreateBot,
 }: EditorProps) {
   const editorId = useId();
@@ -479,7 +479,7 @@ export function WebEditor({
               spaceId={spaceId}
               blocked={dirty || busy}
               onWorking={setWorking}
-              onOpenBot={onOpenBot}
+              onShowBot={onShowBot}
               teammates={bots.filter((bot) => bot.id !== agent.botId)}
             />
           ) : (

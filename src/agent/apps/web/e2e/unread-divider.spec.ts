@@ -12,7 +12,7 @@ test("a chat opens with a New divider above replies that arrived while away", as
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `unread-divider-${stamp}@rakazo.test`, "password12", "Unread Divider");
+  await signup(page, `unread-divider-${stamp}@mycellios.test`, "password12", "Unread Divider");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -100,7 +100,7 @@ test("a late read answer from a chat you left doesn't remove the divider in the 
   page,
 }) => {
   const stamp = Date.now();
-  await signup(page, `unread-late-${stamp}@rakazo.test`, "password12", "Unread Late");
+  await signup(page, `unread-late-${stamp}@mycellios.test`, "password12", "Unread Late");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -157,7 +157,7 @@ test("marking a message unread brings the chat back with New above the reply fro
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `unread-message-${stamp}@rakazo.test`, "password12", "Unread Message");
+  await signup(page, `unread-message-${stamp}@mycellios.test`, "password12", "Unread Message");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

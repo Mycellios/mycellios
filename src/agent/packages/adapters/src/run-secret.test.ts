@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runSecretKind } from "@rakazo/db";
+import { runSecretKind } from "@mycellios/db";
 import {
   commitConsumedRunSecret,
   normalizeSecretAskPurpose,

@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { APP_COVER_MAX_BYTES, AppCoverImageType } from "@rakazo/contracts";
-import type { Actor, AppCoverWrite } from "@rakazo/contracts";
-import type { ArtifactStore } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { IsolationError, Prisma } from "@rakazo/db";
+import { APP_COVER_MAX_BYTES, AppCoverImageType } from "@mycellios/contracts";
+import type { Actor, AppCoverWrite } from "@mycellios/contracts";
+import type { ArtifactStore } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { IsolationError, Prisma } from "@mycellios/db";
 import { getSpaceArtifactById } from "./artifacts.js";
 
 type Deps = { prisma: PrismaClient; artifacts: ArtifactStore; maxUploadSizeBytes?: number };

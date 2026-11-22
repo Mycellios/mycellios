@@ -1,8 +1,8 @@
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { MessageReaction, ThreadMessage } from "@rakazo/contracts";
-import { canReactToThreadMessage, MESSAGE_REACTIONS } from "@rakazo/contracts";
-import { canMarkMessageUnread } from "@rakazo/core";
+import type { MessageReaction, ThreadMessage } from "@mycellios/contracts";
+import { canReactToThreadMessage, MESSAGE_REACTIONS } from "@mycellios/contracts";
+import { canMarkMessageUnread } from "@mycellios/core";
 import {
   Button,
   DropdownMenu,
@@ -12,8 +12,8 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@rakazo/ui-web";
-import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@rakazo/ui-web/components/ui/sheet";
+} from "@mycellios/ui-web";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
 import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { MessagePinsContext } from "../../components/PinnedMessages";

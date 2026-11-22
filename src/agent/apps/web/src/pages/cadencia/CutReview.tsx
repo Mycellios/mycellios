@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input } from "@rakazo/ui-web";
+import { Button, Checkbox, Input } from "@mycellios/ui-web";
 import { ArrowRight, Check, Pause, Play,ChevronDown } from "lucide-react";
 import type { Cut } from "./analysis";
 const seconds = (n: number) => `${n.toFixed(2).replace(".", ",")} s`;

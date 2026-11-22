@@ -1,4 +1,4 @@
-import type { SpaceSetting } from "@rakazo/contracts";
+import type { SpaceSetting } from "@mycellios/contracts";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text } from "react-native";

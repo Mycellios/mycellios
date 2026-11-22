@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { isOpenAiCompatibleProvider, productBrand } from "@rakazo/contracts";
-import { filterModelCatalog } from "@rakazo/core";
+import { isOpenAiCompatibleProvider, productBrand } from "@mycellios/contracts";
+import { filterModelCatalog } from "@mycellios/core";
 import {
   Command,
   CommandEmpty,
@@ -13,7 +13,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelCatalogEntry } from "../../lib/model-auth";

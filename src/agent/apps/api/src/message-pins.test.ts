@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const mocks=vi.hoisted(()=>({resolve:vi.fn(),list:vi.fn(),set:vi.fn(),page:vi.fn(),visible:vi.fn()}));
 vi.mock("./thread-target.js",()=>({resolveThreadTarget:mocks.resolve}));
 vi.mock("./thread-message-pages.js",()=>({loadMessagePage:mocks.page,withoutPeerRunMessages:mocks.visible}));
-vi.mock("@rakazo/db",async original=>({...await original<object>(),listMessagePins:mocks.list,setMessagePin:mocks.set}));
+vi.mock("@mycellios/db",async original=>({...await original<object>(),listMessagePins:mocks.list,setMessagePin:mocks.set}));
 import { messagePinRoutes } from "./routes/message-pins.js";
 const actor={userId:"owner",spaceId:"space"};
 const handler={handler:(fn:unknown)=>fn};

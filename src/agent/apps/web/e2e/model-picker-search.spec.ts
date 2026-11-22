@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import type { Bot, ModelRoleSettings } from "@rakazo/contracts";
+import type { Bot, ModelRoleSettings } from "@mycellios/contracts";
 import { activeBotId, captureScreenshot, completeOnboarding, openUserSettings, rpc, signup } from "./helpers";
 
 test("models are searched and selected directly in the Mico header", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `model-picker-${stamp}@rakazo.test`, "password12", `Model picker ${stamp}`);
+  await signup(page, `model-picker-${stamp}@mycellios.test`, "password12", `Model picker ${stamp}`);
   await completeOnboarding(page);
   const botId = activeBotId(page);
   const original = await rpc<ModelRoleSettings>(page, "models/role", { role: "main" });

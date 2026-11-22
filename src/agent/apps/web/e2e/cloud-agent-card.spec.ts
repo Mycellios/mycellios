@@ -5,7 +5,7 @@ import { activeBotId, captureScreenshot, completeOnboarding, rpc, signup } from 
 // cloud_agent_launch is consequential, so Ask mode, the default, shows a card first.
 test("renders a compact cloud agent card from an emulator launch", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `cloud-agent-${stamp}@rakazo.test`, "password12", "Cloud Agent");
+  await signup(page, `cloud-agent-${stamp}@mycellios.test`, "password12", "Cloud Agent");
   await completeOnboarding(page);
 
   const botId = activeBotId(page);

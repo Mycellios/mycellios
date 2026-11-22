@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { DEFAULT_MEMORY_REVIEW_POLICY, DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
-import { BotAvatar, Button, Input, OptionSelect, Switch } from "@rakazo/ui-web";
+import { DEFAULT_MEMORY_REVIEW_POLICY, DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@mycellios/contracts";
+import { BotAvatar, Button, Input, OptionSelect, Switch } from "@mycellios/ui-web";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import { desktopBridge } from "../../lib/desktop";

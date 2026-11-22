@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
-import type { ComposerMention, SlashActionId } from "@rakazo/core";
-import { BotAvatar } from "@rakazo/ui-web";
+import type { ComposerMention, SlashActionId } from "@mycellios/core";
+import { BotAvatar } from "@mycellios/ui-web";
 import { Clock, Puzzle, X } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { FALLBACK_BOT_COLOR } from "./chat-shared";

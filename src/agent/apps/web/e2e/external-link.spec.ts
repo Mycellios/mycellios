@@ -10,7 +10,7 @@ test("opening a bot reply link goes directly to a new tab", async ({ page }, tes
       route.fulfill({ body: "Docs", contentType: "text/plain" }),
     );
   const stamp = Date.now();
-  await signup(page, `external-link-${stamp}@rakazo.test`, "password12", "External Link");
+  await signup(page, `external-link-${stamp}@mycellios.test`, "password12", "External Link");
   await completeOnboarding(page);
 
   const composer = page.getByRole("combobox", { name: /^Message/ });

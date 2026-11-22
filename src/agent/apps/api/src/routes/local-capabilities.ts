@@ -2,10 +2,10 @@ import { ORPCError } from "@orpc/server";
 import {
   canInstallNativeOpenCode, discoverNativeCodexModels, discoverNativeCodexQuota, discoverNativeEngines, installManagedOpenCode,
   nativeHostAccess, reconcileWorkStops,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import { createTaskControls } from "../task-controls.js";
 import { createAcpRegistry } from "../acp-registry.js";
-import { controlWorkTree, workStatus, IsolationError } from "@rakazo/db";
+import { controlWorkTree, workStatus, IsolationError } from "@mycellios/db";
 import type { RouterContext } from "./context.js";
 
 export function localCapabilityRoutes({ authed, deps }: RouterContext) {

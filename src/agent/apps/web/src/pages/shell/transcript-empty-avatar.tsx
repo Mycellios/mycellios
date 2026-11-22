@@ -1,4 +1,4 @@
-import { BotAvatar } from "@rakazo/ui-web";
+import { BotAvatar } from "@mycellios/ui-web";
 import { AuthMushroom } from "../../components/AuthMushroom";
 
 /** A personal chat uses the same saved appearance as its roster and dock. */

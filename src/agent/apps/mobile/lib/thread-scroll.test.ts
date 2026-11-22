@@ -1,6 +1,6 @@
-import type { ThreadMessage } from "@rakazo/contracts";
-import type { ThreadScrollState } from "@rakazo/core";
-import { expandPeerReplies, foldPeerReplies, reconcileThreadScrollState } from "@rakazo/core";
+import type { ThreadMessage } from "@mycellios/contracts";
+import type { ThreadScrollState } from "@mycellios/core";
+import { expandPeerReplies, foldPeerReplies, reconcileThreadScrollState } from "@mycellios/core";
 import { describe, expect, it } from "vitest";
 import {
   isOwnThreadMessage,

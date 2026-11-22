@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { createOpenAiCompatibleFetch } from "@rakazo/adapters";
-import { productBrand } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { createOpenAiCompatibleFetch } from "@mycellios/adapters";
+import { productBrand } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { TRANSCRIPTION_MODEL, MAX_TRANSCRIPTION_RESULT_BYTES, transcriptionInputSchema,
   transcriptionAudio, verifiedTranscriptionEnvelope } from "../../../../contracts/transcription.js";
 import { networkSpeechIdentityIds } from "./network-speech-placement.js";

@@ -4,10 +4,10 @@ import {
   type JobPublisher,
   runContinueJob,
   type SandboxProvider,
-} from "@rakazo/adapter-kit";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { recordComputerRunEnd } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
+import { recordComputerRunEnd } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { toComputerRef } from "./computer-support.js";
 import { isSandboxGoneError } from "./sandbox-errors.js";
 

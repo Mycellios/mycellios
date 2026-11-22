@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MessageBlock } from "@rakazo/contracts";
+import { MessageBlock } from "@mycellios/contracts";
 import { askUserQuestionnaire } from "./ask-user-questionnaire.js";
 
 describe("shared agent questionnaire", () => {

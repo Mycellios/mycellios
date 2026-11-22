@@ -48,7 +48,7 @@ describe("MicoFolders", () => {
   let stateFile: string;
   const create = () => new MicoFolders({ hiddenRoot, visibleRoot, stateFile });
   beforeEach(async () => {
-    root = await realpath(await mkdtemp(path.join(tmpdir(), "rakazo-mico-folders-")));
+    root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-mico-folders-")));
     hiddenRoot = path.join(root, "computers", "desktop-computers");
     visibleRoot = path.join(root, "home", "Mycellios", "Micos");
     stateFile = path.join(root, "computers", "mico-folders.json");
@@ -128,7 +128,7 @@ describe("visible This PC folders over the host transport", () => {
   let server: Awaited<ReturnType<typeof startHostComputerServer>>;
   let client: HostComputerSandbox;
   beforeEach(async () => {
-    root = await realpath(await mkdtemp(path.join(tmpdir(), "rakazo-mico-host-")));
+    root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-mico-host-")));
     micoFolders = path.join(root, "home", "Mycellios", "Micos");
     server = await startHostComputerServer({
       root: path.join(root, "computers"),

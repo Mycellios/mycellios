@@ -12,7 +12,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "@rakazo/contracts": [
+      "@mycellios/contracts": [
         "../packages/contracts/src/index.ts"
       ]
     }

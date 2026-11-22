@@ -3,7 +3,7 @@ import path from "node:path";
 import { crc32, gzipSync } from "node:zlib";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import type { AgentImportInfo, AgentImportPlan, Bot, MemoryDocument } from "@rakazo/contracts";
+import type { AgentImportInfo, AgentImportPlan, Bot, MemoryDocument } from "@mycellios/contracts";
 import {
   activeBotId,
   captureScreenshot,
@@ -107,7 +107,7 @@ test("imports an OpenClaw folder and another assistant's document as new bots", 
   context,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `agent-import-${stamp}@rakazo.test`, "password12", "Import User");
+  await signup(page, `agent-import-${stamp}@mycellios.test`, "password12", "Import User");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -184,7 +184,7 @@ test("imports an OpenClaw folder and another assistant's document as new bots", 
   await expect(mcp.getByRole("checkbox", { name: "docs" })).not.toBeChecked();
   await expect(mcp.getByText("Credentials: Authorization", { exact: true })).toBeVisible();
   await expect(mcp.getByRole("checkbox", { name: "files" })).toBeDisabled();
-  await expect(mcp.getByText("Not supported in Rakazo", { exact: true })).toBeVisible();
+  await expect(mcp.getByText("Not supported in Mycellios", { exact: true })).toBeVisible();
   await captureScreenshot(page, testInfo, "agent-import-compatibility");
   // Choices made before the opt-in survive it, in both directions.
   const nameBox = homePreview.getByRole("textbox", { name: "Name" });
@@ -276,8 +276,8 @@ test("imports an OpenClaw folder and another assistant's document as new bots", 
   }
   await preview.getByRole("button", { name: "Not imported", exact: true }).click();
   await expect(preview.getByTestId("agent-import-skipped").getByRole("listitem")).toHaveText([
-    /IDENTITY\.md: Emoji\s*Not used by Rakazo/,
-    /TOOLS\.md\s*Not used by Rakazo/,
+    /IDENTITY\.md: Emoji\s*Not used by Mycellios/,
+    /TOOLS\.md\s*Not used by Mycellios/,
   ]);
   // IDENTITY.md names and describes the bot; it is not part of its instructions.
   await expect(preview.getByRole("textbox", { name: "Name" })).toHaveValue("Pebble");
@@ -423,7 +423,7 @@ test("imports Hermes and OpenClaw backups, reading them on this device", async (
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `agent-import-backup-${stamp}@rakazo.test`, "password12", "Backup User");
+  await signup(page, `agent-import-backup-${stamp}@mycellios.test`, "password12", "Backup User");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -514,7 +514,7 @@ test("an imported bot asks before using MCP servers, and its import can be undon
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `agent-import-undo-${stamp}@rakazo.test`, "password12", "Undo User");
+  await signup(page, `agent-import-undo-${stamp}@mycellios.test`, "password12", "Undo User");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -614,7 +614,7 @@ test("an imported bot asks before using MCP servers, and its import can be undon
 test("Undo removes only the import it showed, even after another tab undid it", async ({
   page,
 }, testInfo) => {
-  await signup(page, `agent-import-undo-shown-${Date.now()}@rakazo.test`, "password12", "Shown");
+  await signup(page, `agent-import-undo-shown-${Date.now()}@mycellios.test`, "password12", "Shown");
   await completeOnboarding(page);
   // A bot an import made, then a second import added to it.
   const files = [
@@ -662,7 +662,7 @@ const HERMES_DEFAULT_SOUL =
 test("untouched defaults start unticked, and OpenClaw runtime references are flagged", async ({
   page,
 }, testInfo) => {
-  await signup(page, `agent-import-defaults-${Date.now()}@rakazo.test`, "password12", "Defaults");
+  await signup(page, `agent-import-defaults-${Date.now()}@mycellios.test`, "password12", "Defaults");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -710,7 +710,7 @@ test("untouched defaults start unticked, and OpenClaw runtime references are fla
 test("imports into an existing bot only when chosen, keeping its instructions unless replaced", async ({
   page,
 }, testInfo) => {
-  await signup(page, `agent-import-existing-${Date.now()}@rakazo.test`, "password12", "Existing");
+  await signup(page, `agent-import-existing-${Date.now()}@mycellios.test`, "password12", "Existing");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -874,7 +874,7 @@ async function dropOnComposer(
 test("an agent dropped into a chat is offered for import, never uploaded first", async ({
   page,
 }, testInfo) => {
-  await signup(page, `agent-import-drop-${Date.now()}@rakazo.test`, "password12", "Dropper");
+  await signup(page, `agent-import-drop-${Date.now()}@mycellios.test`, "password12", "Dropper");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -949,7 +949,7 @@ test("an agent dropped into a chat is offered for import, never uploaded first",
 });
 
 test("an item with key-looking text starts unticked and says so", async ({ page }, testInfo) => {
-  await signup(page, `agent-import-key-${Date.now()}@rakazo.test`, "password12", "Keys");
+  await signup(page, `agent-import-key-${Date.now()}@mycellios.test`, "password12", "Keys");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

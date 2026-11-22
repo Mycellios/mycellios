@@ -1,4 +1,4 @@
-import type { HostedWebDraft } from "@rakazo/contracts";
+import type { HostedWebDraft } from "@mycellios/contracts";
 import { queryClient } from "./query";
 import { setUnsavedEditorWork } from "./unsaved-editor-work";
 

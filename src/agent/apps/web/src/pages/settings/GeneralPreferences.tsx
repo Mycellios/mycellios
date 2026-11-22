@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { DesktopBehaviorSettings } from "@rakazo/contracts";
-import { Label, OptionSelect, Switch } from "@rakazo/ui-web";
+import type { DesktopBehaviorSettings } from "@mycellios/contracts";
+import { Label, OptionSelect, Switch } from "@mycellios/ui-web";
 import { useEffect, useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";

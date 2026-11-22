@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import path from "node:path";
-import type { RunsListOutput, ThreadSnapshot } from "@rakazo/contracts";
-import { isTerminal } from "@rakazo/core";
+import type { RunsListOutput, ThreadSnapshot } from "@mycellios/contracts";
+import { isTerminal } from "@mycellios/core";
 import { computerNetworkNameFor } from "../../../../infra/sandboxes/supervisor/src/computer-spec.js";
 
 const composeFile = path.resolve("infra/compose/docker-compose.topology.yml");
@@ -146,7 +146,7 @@ async function signup(baseUrl: string) {
     method: "POST",
     headers: { "content-type": "application/json", origin: baseUrl },
     body: JSON.stringify({
-      email: `topology-${Date.now()}@rakazo.test`,
+      email: `topology-${Date.now()}@mycellios.test`,
       password: "password12",
       name: "Topology",
     }),

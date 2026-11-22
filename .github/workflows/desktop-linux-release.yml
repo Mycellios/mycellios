@@ -59,10 +59,10 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm run db:generate
           node --test apps/desktop/scripts/contribution-component.test.mjs apps/desktop/scripts/linux-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
-          npm run build --workspace @rakazo/web -- --desktop
-          npm run build --workspace @rakazo/desktop
-          npm run build:local-server --workspace @rakazo/desktop
-          npm exec --workspace @rakazo/desktop -- node scripts/package-linux.mjs --runtime "$RUNNER_TEMP/runtime.deb" --sha256 fff304aa909775d0098e5837a3cbdb986a87cdfefa0ffcb4cedfb4d67f8d6d09 --out "$RUNNER_TEMP/desktop-release"
+          npm run build --workspace @mycellios/web -- --desktop
+          npm run build --workspace @mycellios/desktop
+          npm run build:local-server --workspace @mycellios/desktop
+          npm exec --workspace @mycellios/desktop -- node scripts/package-linux.mjs --runtime "$RUNNER_TEMP/runtime.deb" --sha256 fff304aa909775d0098e5837a3cbdb986a87cdfefa0ffcb4cedfb4d67f8d6d09 --out "$RUNNER_TEMP/desktop-release"
           node node_modules/electron/install.js
           node -e 'require("electron")'
           electron_bin="$(node -p 'require("electron")')"

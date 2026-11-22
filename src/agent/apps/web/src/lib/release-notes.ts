@@ -1,6 +1,6 @@
 import { msg } from "@lingui/core/macro";
 import type { MessageDescriptor } from "@lingui/core";
-import { compareBuilds, isBuildId } from "@rakazo/contracts/client-build";
+import { compareBuilds, isBuildId } from "@mycellios/contracts/client-build";
 
 export type ReleaseGroupType = "added" | "changed" | "fixed";
 export interface ReleaseGroup {

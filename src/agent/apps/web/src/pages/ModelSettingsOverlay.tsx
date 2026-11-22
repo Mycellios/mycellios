@@ -1,6 +1,6 @@
-import { ExpandedSettings } from "@rakazo/ui-web/components/ui/disclosure";
+import { ExpandedSettings } from "@mycellios/ui-web/components/ui/disclosure";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { SettingsScope } from "@rakazo/contracts";
+import type { SettingsScope } from "@mycellios/contracts";
 import {
   ANTSEED_PROVIDER_ID,
   compatibleConnectionName,
@@ -11,7 +11,7 @@ import {
   OLLAMA_CLOUD_BASE_URL,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   savedCompatibleEndpointMatches,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +30,7 @@ import {
   Disclosure,
   ModelThinkingOptions,
   Spinner,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ModelCredential } from "../lib/model-auth";

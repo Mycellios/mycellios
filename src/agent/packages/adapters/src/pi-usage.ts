@@ -14,9 +14,9 @@ import type {
   AgentUsage,
   ModelCallObserver,
   UsageOperationKind,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import { Agent } from "undici";
-import { getLogger } from "@rakazo/logging";
+import { getLogger } from "@mycellios/logging";
 import { antseedCostObserver } from "./antseed-cost.js";
 import { withChatCompletionsCompatibility } from "./chat-completions-compat.js";
 import { isContextOverflow } from "./context-compaction.js";

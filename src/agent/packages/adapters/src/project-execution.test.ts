@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
-import type { PrismaClient } from "@rakazo/db";
-import type { SandboxProvider } from "@rakazo/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import type { SandboxProvider } from "@mycellios/adapter-kit";
 import { projectExecutionLeaseKey, projectLeaseOwner, PROJECT_SHARED_SCREEN_TOOLS } from "./project-execution.js";
 
 const run = { id: "run", botId: "mico", threadId: "thread", userId: "owner", spaceId: "space" };

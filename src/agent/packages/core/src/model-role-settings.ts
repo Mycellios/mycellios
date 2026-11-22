@@ -1,4 +1,4 @@
-import type { ModelCatalogEntry, ModelRoleSettings, ModelRoleView } from "@rakazo/contracts";
+import type { ModelCatalogEntry, ModelRoleSettings, ModelRoleView } from "@mycellios/contracts";
 
 export interface ModelRoleTransport {
   load(): Promise<ModelRoleView>;

@@ -1,7 +1,7 @@
-import type { ConnectorTool } from "@rakazo/adapter-kit";
-import { HostedWebBundle } from "@rakazo/contracts";
-import { admitStaticBundle } from "@rakazo/core/node/hosted-web-bundle";
-import { recordHostedWebSnapshot, runAsTenant, type PrismaClient } from "@rakazo/db";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
+import { HostedWebBundle } from "@mycellios/contracts";
+import { admitStaticBundle } from "@mycellios/core/node/hosted-web-bundle";
+import { recordHostedWebSnapshot, runAsTenant, type PrismaClient } from "@mycellios/db";
 import { createHash } from "node:crypto";
 import { presenceTarget } from "./hosted-app-presence.js";
 import type { PresenceTarget } from "./hosted-app-presence.js";

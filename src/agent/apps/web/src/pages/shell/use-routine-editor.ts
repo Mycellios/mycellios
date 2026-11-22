@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Routine, ThinkingLevel, ThreadSnapshot } from "@rakazo/contracts";
-import { cronFromPreset } from "@rakazo/core";
+import type { Bot, Routine, ThinkingLevel, ThreadSnapshot } from "@mycellios/contracts";
+import { cronFromPreset } from "@mycellios/core";
 import type { ComponentProps, Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useRef, useState } from "react";
 import { appPath } from "../../lib/app-path";

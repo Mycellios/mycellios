@@ -1,4 +1,4 @@
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { Film, Monitor, Globe2, Sparkles } from "lucide-react";
 import { appPath } from "../../lib/app-path";
 import { desktopBridge } from "../../lib/desktop";

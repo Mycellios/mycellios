@@ -1,4 +1,4 @@
-import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN, GROUP_NAME_MAX_LENGTH } from "@rakazo/contracts";
+import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN, GROUP_NAME_MAX_LENGTH } from "@mycellios/contracts";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, Text, TextInput } from "react-native";
@@ -105,7 +105,7 @@ export default function GroupSettingsScreen() {
             bots={bots}
             selected={selected}
             onChange={setSelected}
-            onOpenBot={(bot) =>
+            onShowBot={(bot) =>
               router.push({ pathname: "/bot-profile", params: { botId: bot.id, name: bot.name } })
             }
             disabled={pending}

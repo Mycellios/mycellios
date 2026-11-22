@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/adapters",
+  "name": "@mycellios/adapters",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -34,11 +34,11 @@
     "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
     "@opentelemetry/resources": "2.12.0",
     "@opentelemetry/sdk-trace-node": "2.12.0",
-    "@rakazo/adapter-kit": "*",
-    "@rakazo/contracts": "*",
-    "@rakazo/core": "*",
-    "@rakazo/db": "*",
-    "@rakazo/logging": "*",
+    "@mycellios/adapter-kit": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/core": "*",
+    "@mycellios/db": "*",
+    "@mycellios/logging": "*",
     "chat": "4.43.0",
     "chat-adapter-sendblue": "0.2.0",
     "d3-dsv": "3.0.1",
@@ -68,6 +68,6 @@
     "typescript": "7.0.2",
     "vitest": "4.1.12",
     "@types/web-push": "3.6.4",
-    "@rakazo/memory": "*"
+    "@mycellios/memory": "*"
   }
 }

@@ -1,4 +1,4 @@
-import { HTML_VIEWER_PATH } from "@rakazo/contracts/content-security-policy";
+import { HTML_VIEWER_PATH } from "@mycellios/contracts/content-security-policy";
 import { useEffect, useRef, useState } from "react";
 import { appPath } from "../lib/app-path";
 import type { ReviewSelection } from "../lib/review-workspace";

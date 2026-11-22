@@ -1,15 +1,15 @@
 import { ORPCError } from "@orpc/server";
-import type { McpOAuthBroker, McpOAuthSummary } from "@rakazo/adapters";
+import type { McpOAuthBroker, McpOAuthSummary } from "@mycellios/adapters";
 import {
   assertSafeRemoteUrl,
   buildMcpCredentialBlob,
   mcpServerHealthDto,
   recordMcpServerHealth,
-} from "@rakazo/adapters";
-import type { Actor, McpServer, McpServerConfigInput } from "@rakazo/contracts";
-import { mcpOAuthEnvReferences } from "@rakazo/contracts";
-import type { McpServer as McpServerRow, Prisma } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapters";
+import type { Actor, McpServer, McpServerConfigInput } from "@mycellios/contracts";
+import { mcpOAuthEnvReferences } from "@mycellios/contracts";
+import type { McpServer as McpServerRow, Prisma } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { dismissMcpServerApprovals } from "./mcp-approval.js";
 import type { McpSecretMaterial } from "./mcp-material.js";
 import type { RouterDeps } from "./router.js";

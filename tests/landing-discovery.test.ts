@@ -60,6 +60,6 @@ describe("public search and AI discovery", () => {
   });
   it("exposes real, crawlable language, credit and comparison links in the shared footer", () => {
     const links = MARKETING_FOOTER_GROUPS.flatMap<{ href: string }>(group => group.links);
-    for (const path of ["/guides", "/es/guias", "/compare/openbot", "/llms.txt", "/guides/models-and-credits"]) expect(links.some(link => link.href === path)).toBe(true);
+    for (const path of ["/guides", "/es/guias", "/compare/openclaw", "/llms.txt", "/guides/models-and-credits"]) expect(links.some(link => link.href === path)).toBe(true);
   });
 });

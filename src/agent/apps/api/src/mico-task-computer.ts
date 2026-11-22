@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import type { SandboxProvider } from "@rakazo/adapter-kit";
-import type { Actor } from "@rakazo/contracts";
+import type { SandboxProvider } from "@mycellios/adapter-kit";
+import type { Actor } from "@mycellios/contracts";
 import type { ThreadTarget } from "./thread-target.js";
 /** Fail before creating a task run if the native executor cannot prove its task/worktree binding. */
 export async function admitMicoTaskComputer(

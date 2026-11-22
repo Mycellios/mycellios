@@ -7,15 +7,15 @@ import {
   ComputerBusyError,
   DestinationEmulator,
   releaseComputerExecutionLease,
-} from "@rakazo/adapters";
-import { approvalEffectKey } from "@rakazo/core/node/approval-effect-key";
+} from "@mycellios/adapters";
+import { approvalEffectKey } from "@mycellios/core/node/approval-effect-key";
 import {
   createThreadEvents,
   createThreadMessage,
   loadRunHistoryMessages,
   runAsSystem,
   runAsTenant,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { createApp } from "../../../apps/api/src/app.ts";
 import { discardBotIntroFromCreate } from "./discard-bot-intro.js";
@@ -624,7 +624,7 @@ describeIntegration("run executor lifecycle", () => {
 
   it("applies the same no-parallel-run rule to the targeted group member", async () => {
     const cookie = await signup(
-      `executor-group-steering-${stamp}@rakazo.test`,
+      `executor-group-steering-${stamp}@mycellios.test`,
       "Executor group steering",
     );
     const me = await rpc<{ userId: string; spaceId: string }>(cookie, "me");
@@ -1320,7 +1320,7 @@ describeIntegration("run executor lifecycle", () => {
     } = {},
     computerMode?: "team" | "dedicated",
   ) {
-    const cookie = await signup(`executor-${label}-${stamp}@rakazo.test`, `Executor ${label}`);
+    const cookie = await signup(`executor-${label}-${stamp}@mycellios.test`, `Executor ${label}`);
     const me = await rpc<{ userId: string; spaceId: string }>(cookie, "me");
     const bot = await rpc<{ id: string }>(cookie, "bots/create", {
       name: `Executor ${label}`,

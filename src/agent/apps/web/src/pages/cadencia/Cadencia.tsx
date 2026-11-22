@@ -1,6 +1,6 @@
 import { StoreAppHeader } from "../marketplace/StoreAppHeader";
 import { CutReview } from "./CutReview";
-import { Button, Input } from "@rakazo/ui-web";
+import { Button, Input } from "@mycellios/ui-web";
 import {
   ArrowRight,
   AudioLines,

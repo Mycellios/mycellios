@@ -1,11 +1,11 @@
 // Import just the classifier: monitoring loads before the app, ahead of the full core barrel.
-import { isAbandonedRequest, isConnectionFailure } from "@rakazo/core/user-error";
-import type { ClientOperation, MonitoringConfig } from "@rakazo/logging/monitoring";
+import { isAbandonedRequest, isConnectionFailure } from "@mycellios/core/user-error";
+import type { ClientOperation, MonitoringConfig } from "@mycellios/logging/monitoring";
 import {
   createClientErrorReporter,
   isMonitoringUserId,
   sanitizeMonitoringEvent,
-} from "@rakazo/logging/monitoring";
+} from "@mycellios/logging/monitoring";
 import type * as SentryReact from "@sentry/react";
 import type { ErrorInfo } from "react";
 import { appPath } from "./app-path";

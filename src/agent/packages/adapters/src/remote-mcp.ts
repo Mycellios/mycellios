@@ -5,8 +5,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { ConnectorTool } from "@rakazo/adapter-kit";
-import { isCloudMetadataHost, isLocalMcpHost, isPrivateNetworkHost } from "@rakazo/contracts";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
+import { isCloudMetadataHost, isLocalMcpHost, isPrivateNetworkHost } from "@mycellios/contracts";
 import { Agent } from "undici";
 import { combineSignals } from "./connector-safety.js";
 import {

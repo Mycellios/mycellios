@@ -1,7 +1,7 @@
 import { RPCHandler } from "@orpc/server/fetch";
-import { ComposioConnector } from "@rakazo/adapters";
-import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import { ComposioConnector } from "@mycellios/adapters";
+import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";

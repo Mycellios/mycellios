@@ -4,16 +4,16 @@ import type {
   ComputerRef,
   JobPublisher,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   computerSleepJob,
   SandboxUnavailableError,
   SandboxUnresponsiveError,
-} from "@rakazo/adapter-kit";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { recordComputerRunEnd } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
+import { recordComputerRunEnd } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { expireComputerControl, hasActiveComputerControl } from "./computer-control.js";
 import { toComputerRef } from "./computer-support.js";
 import { checkpointComputerWorkspace, deletedTeamBotFolders } from "./computer-workspace.js";

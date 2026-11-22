@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { MAX_MODEL_CONTEXT_WINDOW, MAX_MODEL_MAX_TOKENS } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { MAX_MODEL_CONTEXT_WINDOW, MAX_MODEL_MAX_TOKENS } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { createOpenAiCompatibleFetch } from "./pi-openai-compatible-provider.js";
 
 /** Limits that one Mycellios catalog route publishes for admission planning. */

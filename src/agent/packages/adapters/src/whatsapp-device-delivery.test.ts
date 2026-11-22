@@ -1,5 +1,5 @@
-import type { MessagingSurface } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { MessagingSurface } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { mirrorMessagingOutbound } from "./messaging-delivery.js";
 import {

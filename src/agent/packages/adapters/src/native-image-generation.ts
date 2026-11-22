@@ -5,8 +5,8 @@ import type {
   GeneratedMedia,
   MediaGenerationProvider,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
-import { MediaGenerationError } from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
+import { MediaGenerationError } from "@mycellios/adapter-kit";
 import { CODEX_IMAGE_WORKER } from "./codex-image-worker.js";
 import { mediaPromptSchema } from "./media-generation-provider.js";
 

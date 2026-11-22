@@ -5,7 +5,7 @@ import {
   desktopDiagnosticStage,
   desktopFailureCode,
   desktopOperationId,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 
 const EVENTS = [
   "startup",

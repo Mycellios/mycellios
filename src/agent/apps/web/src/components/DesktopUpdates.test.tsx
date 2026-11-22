@@ -3,8 +3,8 @@ import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { DesktopUpdateState } from "@rakazo/contracts";
-import { isBelowDesktopMinimum } from "@rakazo/contracts";
+import type { DesktopUpdateState } from "@mycellios/contracts";
+import { isBelowDesktopMinimum } from "@mycellios/contracts";
 const fixture = vi.hoisted(() => ({ state: {} as DesktopUpdateState, safe: true, call: false }));
 const bridge = vi.hoisted(() => ({
   state: vi.fn(async () => ({ ...fixture.state })),
@@ -30,7 +30,7 @@ vi.mock("../lib/desktop-update-work", () => ({
   endDesktopUpdateCall: endCall,
 }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (strings: TemplateStringsArray) => strings[0] }), Trans: ({ children }: { children: ReactNode }) => children }));
-vi.mock("@rakazo/ui-web", () => ({ Button: (props: ComponentProps<"button">) => <button {...props} /> }));
+vi.mock("@mycellios/ui-web", () => ({ Button: (props: ComponentProps<"button">) => <button {...props} /> }));
 import { DesktopSidebarUpdate, DesktopUpdateSection, DesktopUpdatesProvider, REQUIRED_UPDATE_SNOOZE_MS } from "./DesktopUpdates";
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;

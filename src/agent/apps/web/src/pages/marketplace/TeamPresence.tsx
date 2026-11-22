@@ -1,5 +1,5 @@
-import type { HostedWebPresence, HostedWebTeamMember } from "@rakazo/contracts";
-import { BotAvatar, parseBotAvatar } from "@rakazo/ui-web";
+import type { HostedWebPresence, HostedWebTeamMember } from "@mycellios/contracts";
+import { BotAvatar, parseBotAvatar } from "@mycellios/ui-web";
 import type { CSSProperties, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { createSpaceRpc } from "../../lib/rpc";

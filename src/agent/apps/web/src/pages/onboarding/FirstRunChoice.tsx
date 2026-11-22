@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { MICO_AVATAR_DEFAULT_SHAPES, micoAvatarValue } from "@rakazo/contracts";
-import { BotAvatar, Checkbox, Spinner } from "@rakazo/ui-web";
+import { MICO_AVATAR_DEFAULT_SHAPES, micoAvatarValue } from "@mycellios/contracts";
+import { BotAvatar, Checkbox, Spinner } from "@mycellios/ui-web";
 import { useId } from "react";
 import { ProviderLogo } from "../../components/ProviderLogo";
 import { PRIVACY_URL, TERMS_URL } from "../../lib/legal-links";

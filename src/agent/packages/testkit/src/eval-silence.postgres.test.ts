@@ -222,7 +222,7 @@ describe.skipIf(!databaseAvailable)("offline judge model protocol", () => {
         },
       ],
     });
-    const { PiAgentRuntime } = await import("@rakazo/adapters");
+    const { PiAgentRuntime } = await import("@mycellios/adapters");
     try {
       const judge = createEvalJudge(new PiAgentRuntime(), {
         provider: model.model.provider,

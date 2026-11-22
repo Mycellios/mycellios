@@ -124,7 +124,7 @@ jobs:
         env:
           DATABASE_URL: postgres://rakazo:rakazo@127.0.0.1:5433/rakazo
       - name: Build renderer and Electron main process
-        run: pnpm --filter @rakazo/web build && pnpm --filter @rakazo/desktop build
+        run: pnpm --filter @mycellios/web build && pnpm --filter @mycellios/desktop build
         env:
           RAKAZO_ALLOW_DEV_SECRETS: "1"
 
@@ -201,7 +201,7 @@ jobs:
             # The main app alone gets the association; helpers keep entitlementsInherit.
             passkeys=("-c.mac.entitlements=$PASSKEY_ENTITLEMENTS" "-c.mac.provisioningProfile=$PASSKEY_PROFILE")
           fi
-          pnpm --filter @rakazo/desktop exec electron-builder \
+          pnpm --filter @mycellios/desktop exec electron-builder \
             --mac --universal --publish never -c.forceCodeSigning=true "${passkeys[@]}"
       - name: Remove the App Store Connect API key from the runner
         if: always() && runner.os == 'macOS'
@@ -289,7 +289,7 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.DESKTOP_WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_WIN_CSC_KEY_PASSWORD }}
         run: >-
-          pnpm --filter @rakazo/desktop exec electron-builder
+          pnpm --filter @mycellios/desktop exec electron-builder
           --win --x64 --publish never -c.forceCodeSigning=true
       - name: Verify Windows Authenticode signature and publisher-bound update feed
         if: runner.os == 'Windows'
@@ -321,7 +321,7 @@ jobs:
       - name: Package x64 Linux AppImage
         if: runner.os == 'Linux'
         run: >-
-          pnpm --filter @rakazo/desktop exec electron-builder
+          pnpm --filter @mycellios/desktop exec electron-builder
           --linux --x64 --publish never
       - name: Verify Linux update feed is pinned to the official GitHub channel
         if: runner.os == 'Linux'
@@ -428,7 +428,7 @@ jobs:
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
         run: >-
           gh release create "$RELEASE_TAG" release-artifacts/*
-          --draft --generate-notes --title "Rakazo $RELEASE_TAG" --verify-tag
+          --draft --generate-notes --title "Mycellios $RELEASE_TAG" --verify-tag
       - name: Publish the completed release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

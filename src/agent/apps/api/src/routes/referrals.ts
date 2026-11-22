@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import { productBrand, ReferralInviteSchema, ReferralRedemptionSchema } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { productBrand, ReferralInviteSchema, ReferralRedemptionSchema } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import type { RouterContext } from "./context.js";
 
 const COOKIE = "mycellios_referral_v1";

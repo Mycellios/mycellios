@@ -1,6 +1,6 @@
 import { Trans } from "@lingui/react/macro";
-import type { SearchHit } from "@rakazo/contracts";
-import { searchHitListKey } from "@rakazo/core";
+import type { SearchHit } from "@mycellios/contracts";
+import { searchHitListKey } from "@mycellios/core";
 
 export function SpaceSearchResults({
   hits,

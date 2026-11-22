@@ -1,8 +1,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { ThinkingLevel } from "@rakazo/contracts";
-import { ANTSEED_PROVIDER_ID, isOllamaCloudBaseUrl } from "@rakazo/contracts";
-import { toggleEnabledModelId } from "@rakazo/core";
-import { Button, Checkbox, Input, Label, ModelThinkingOptions } from "@rakazo/ui-web";
+import type { ThinkingLevel } from "@mycellios/contracts";
+import { ANTSEED_PROVIDER_ID, isOllamaCloudBaseUrl } from "@mycellios/contracts";
+import { toggleEnabledModelId } from "@mycellios/core";
+import { Button, Checkbox, Input, Label, ModelThinkingOptions } from "@mycellios/ui-web";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ModelPreflightFeedback } from "../../components/ModelConnectionPreflightNotice";

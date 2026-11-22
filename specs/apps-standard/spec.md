@@ -143,7 +143,7 @@ active run's instructions. Unpublishing hides discovery, not historical evidence
 
 ## Local validation
 
-Use the shared scheduler on Daniel's PC for commands in the
+Use the shared scheduler on the maintainer's PC for commands in the
 [authoring guide](../../src/agent/skills/create-mycellios-app/references/guide.md).
 The CLI verifies strict structure, known components/actions, graph/type/permission
 references, portable contained file paths, bounded files, SHA-256 and optionally

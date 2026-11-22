@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { BackgroundJobHandlers, JobPublisher } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { BackgroundJobHandlers, JobPublisher } from "@mycellios/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import {
   appendEvent,
   appendEventInTransaction,
@@ -13,8 +13,8 @@ import {
   provisionMessagingIdentity,
   runAsSystem,
   runAsTenant,
-} from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { InMemoryRealtimeFanout } from "./realtime.js";
 import { RunJobPublisher, RunWorkerHost } from "./run-wakeup.js";
@@ -28,7 +28,7 @@ describePostgres("direct run dispatch (PostgreSQL)", () => {
   let db: ReturnType<typeof createDb>;
   let system: PrismaClient;
   let identity: { userId: string; spaceId: string; botId: string; threadId: string };
-  const address = `dispatch-${randomUUID()}@rakazo.test`;
+  const address = `dispatch-${randomUUID()}@mycellios.test`;
   beforeAll(async () => {
     db = createDb(url!);
     system = asSystem(db.prisma);

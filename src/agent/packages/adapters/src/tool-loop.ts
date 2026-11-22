@@ -1,5 +1,5 @@
-import type { ToolCallStreak } from "@rakazo/core";
-import { trackToolCallStreak } from "@rakazo/core";
+import type { ToolCallStreak } from "@mycellios/core";
+import { trackToolCallStreak } from "@mycellios/core";
 
 const LOOP_GUARD_STOP_PREFIX = "I got stuck calling ";
 const LOOP_GUARD_STOP_COUNT_PREFIX = " with the same input ";

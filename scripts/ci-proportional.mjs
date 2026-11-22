@@ -29,8 +29,10 @@ const llamaCppPython = new Set(['python/distributed_runtime/llama_cpp_runtime.py
   'python/distributed_runtime/llama_cpp_stage_runner.py', 'python/distributed_runtime/native_gguf_runtime.py',
   'python/tests/test_llama_cpp_stage.py', 'python/distributed_runtime/llama_cpp_profile.py', 'python/tests/test_llama_cpp_profile.py']);
 const llamaCppTests = ['test_llama_cpp_runtime.py', 'test_llama_cpp_stage.py', 'test_llama_cpp_profile.py', 'test_native_gguf.py'];
+// The Kokoro speech engine's unit tests use fake pipelines on CPU torch from the same lock.
+const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'python/tests/test_kokoro_engine.py']);
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f));
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -63,6 +65,8 @@ export function planChecks(files, availableAgentTests) {
   const agentScriptTests = [];
   const add = (cwd, bin, args, label) => commands.push({ cwd, bin, args, label });
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
+  // Private names (people, companies, retired products) never return; see the script.
+  add('.', 'node', ['scripts/verify-private-terms.mjs'], 'private terms');
   if (files.some(f => installerPython.has(f))) {
     add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'deploy/installers', '-p', 'test_*.py'], 'installer promotion ownership, signing and recovery boundaries');
     add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...installerPython], 'installer publisher Python syntax');
@@ -78,13 +82,15 @@ export function planChecks(files, availableAgentTests) {
   if (root || agent) add('.', 'npm', ['install', '--global', 'npm@10.9.8', '--no-audit', '--no-fund'], 'pinned npm toolchain');
   const speculationChanged = files.some(f => speculationPython.has(f));
   const llamaCppChanged = files.some(f => llamaCppPython.has(f));
-  if (speculationChanged || llamaCppChanged) {
+  const kokoroChanged = files.some(f => kokoroPython.has(f));
+  if (speculationChanged || llamaCppChanged || kokoroChanged) {
     const venv = '.ci/speculation-venv';
     add('.', 'python3', ['-c', 'import sys; assert sys.version_info[:2] == (3, 12), sys.version'], 'speculation runtime interpreter is CPython 3.12');
     add('.', 'python3', ['-m', 'venv', venv], 'speculation runtime virtual environment');
     add('.', `${venv}/bin/python`, ['-m', 'pip', 'install', '--require-hashes', '--only-binary=:all:', '--no-deps', '-r', 'scripts/wheel-locks/linux-x64-cp312.txt'], 'hash-locked CPU runtime wheels');
     if (speculationChanged) for (const test of speculationTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `speculation runtime ${test} (CPU, no model or GPU)`);
     if (llamaCppChanged) for (const test of llamaCppTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `llama.cpp native stage ${test} (no binary, model or GPU)`);
+    if (kokoroChanged) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_kokoro_engine.py'], 'Kokoro speech engine (fake pipelines, no model or GPU)');
   }
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);
@@ -121,7 +127,7 @@ export function planChecks(files, availableAgentTests) {
   if (agent) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
     for (const file of agentScriptTests) add('.', 'node', ['--test',file], `test: ${file}`);
-    add('src/agent', 'npm', ['run', 'generate', '--workspace', '@rakazo/db'], 'Prisma client generation (no database connection)');
+    add('src/agent', 'npm', ['run', 'generate', '--workspace', '@mycellios/db'], 'Prisma client generation (no database connection)');
     const shared = agentShared;
     for (const app of ['web', 'api', 'worker', 'desktop']) {
       if (shared || files.some(f => f.startsWith(`src/agent/apps/${app}/`))) add('src/agent', 'node', ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', '--tsBuildInfoFile', `../../.ci/agent-${app}.tsbuildinfo`, '-p', `apps/${app}/tsconfig.json`], `Agent ${app} types`);

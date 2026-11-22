@@ -75,7 +75,7 @@ test("voice settings hide self-hosted speech when the deployment omits it", asyn
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `voice-cloud-${stamp}@rakazo.test`, "password12", `Voice Cloud ${stamp}`);
+  await signup(page, `voice-cloud-${stamp}@mycellios.test`, "password12", `Voice Cloud ${stamp}`);
   await completeOnboarding(page);
   // The E2E server opts into private endpoints; model the cloud catalog for this screen.
   await page.route("**/rpc/voice/catalog", async (route) => {
@@ -99,7 +99,7 @@ test("voice settings connect a key, speak a reply, and open a call", async ({ pa
   });
   const stamp = Date.now();
   const userName = `Voice ${stamp}`;
-  await signup(page, `voice-${stamp}@rakazo.test`, "password12", userName);
+  await signup(page, `voice-${stamp}@mycellios.test`, "password12", userName);
   await completeOnboarding(page);
 
   await expect(
@@ -219,7 +219,7 @@ test("voice settings connect a key, speak a reply, and open a call", async ({ pa
 
 test("voice settings take a self-hosted speech server by URL", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `voice-local-${stamp}@rakazo.test`, "password12", `Voice Local ${stamp}`);
+  await signup(page, `voice-local-${stamp}@mycellios.test`, "password12", `Voice Local ${stamp}`);
   await completeOnboarding(page);
 
   await openUserSettings(page, "voice");

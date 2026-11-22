@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { type Actor, HOSTED_WEB_DATA_LIMITS, type HostedWebCapability } from "@rakazo/contracts";
-import { type PrismaClient, runAsSystem, runAsTenant } from "@rakazo/db";
+import { type Actor, HOSTED_WEB_DATA_LIMITS, type HostedWebCapability } from "@mycellios/contracts";
+import { type PrismaClient, runAsSystem, runAsTenant } from "@mycellios/db";
 import { bundleCapabilities } from "./bundle.js";
 
 export type AppTarget = { id: string; preview: boolean };

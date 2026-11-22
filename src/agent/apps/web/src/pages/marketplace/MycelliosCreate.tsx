@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {Button,Textarea,NativeSelect} from "@rakazo/ui-web";
+import {Button,Textarea,NativeSelect} from "@mycellios/ui-web";
 import {Image, Mic, Video} from "lucide-react";
 import {StoreAppHeader} from "./StoreAppHeader";
 import "./studio-ia.css";

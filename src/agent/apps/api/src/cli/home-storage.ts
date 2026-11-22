@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
-import { createAgentHomeStore, ObjectAgentHomeStore } from "@rakazo/adapters";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
-import { createDb } from "@rakazo/db";
+import { createAgentHomeStore, ObjectAgentHomeStore } from "@mycellios/adapters";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
+import { createDb } from "@mycellios/db";
 
 loadRootEnv();
 

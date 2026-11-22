@@ -8,8 +8,8 @@ import {
   githubToolResultHasSeededRelease,
   RELEASE_WATCH_GITHUB_TOOL_NAMES,
   resolveReleaseWatchEvalModelId,
-} from "@rakazo/adapters";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+} from "@mycellios/adapters";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { afterAll, describe, expect, it } from "vitest";
 import { sessionCookieHeader } from "./index.js";
 
@@ -54,7 +54,7 @@ describeLive("live release-watch eval (GPT 5.6 Luna + GitHub emulator)", () => {
       method: "POST",
       headers: { "content-type": "application/json", origin: "http://127.0.0.1:5173" },
       body: JSON.stringify({
-        email: `release-watch-${stamp}@rakazo.test`,
+        email: `release-watch-${stamp}@mycellios.test`,
         password: "password12",
         name: "Release Watch",
       }),

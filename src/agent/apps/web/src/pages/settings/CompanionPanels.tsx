@@ -1,8 +1,8 @@
 import { DeviceVoiceSettings } from "./DeviceVoiceSettings";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, BusyMessageMode } from "@rakazo/contracts";
-import { BotAvatar, Button, Input, OptionSelect } from "@rakazo/ui-web";
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
+import type { Bot, BusyMessageMode } from "@mycellios/contracts";
+import { BotAvatar, Button, Input, OptionSelect } from "@mycellios/ui-web";
+import { Disclosure } from "@mycellios/ui-web/components/ui/disclosure";
 import { useEffect, useRef, useState } from "react";
 import { settingsMatch } from "./navigation";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";

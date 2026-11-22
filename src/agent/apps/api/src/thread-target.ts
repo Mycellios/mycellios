@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import type { JobPublisher, SandboxProvider } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import { cancelComputerRunWork, screenLeaseIdForRun, toComputerRef } from "@rakazo/adapters";
+import type { JobPublisher, SandboxProvider } from "@mycellios/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import { cancelComputerRunWork, screenLeaseIdForRun, toComputerRef } from "@mycellios/adapters";
 import type {
   Actor,
   GroupMember,
@@ -9,8 +9,8 @@ import type {
   MessageReaction,
   ReplyPreview,
   ThreadSnapshot,
-} from "@rakazo/contracts";
-import { GROUP_MEMBER_MIN, MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import { GROUP_MEMBER_MIN, MessageBlock as MessageBlockSchema } from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
   BACKGROUND_RUN_TRIGGERS,
@@ -22,9 +22,9 @@ import {
   QUEUE_HOLDING_RUN_STATUSES,
   resolveGroupTargetBotIds,
   runFailureError,
-} from "@rakazo/core";
-import { deriveMessageQuote, messageReplyPreview } from "@rakazo/core/message-quote";
-import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
+} from "@mycellios/core";
+import { deriveMessageQuote, messageReplyPreview } from "@mycellios/core/message-quote";
+import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
 import {
   answerWaitingRunWithTextInTransaction,
   appendEventInTransaction,
@@ -40,8 +40,8 @@ import {
   primaryActiveRun,
   retireWaitingQuestionInTransaction,
   touchGroupUpdatedAt,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import {
   buildSendPrompt,
   buildUserMessageBlocks,

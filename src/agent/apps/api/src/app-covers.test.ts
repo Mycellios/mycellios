@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Actor, AppCoverWrite } from "@rakazo/contracts";
+import type { Actor, AppCoverWrite } from "@mycellios/contracts";
 import { getAppCover, setAppCover, validateAppCover } from "./app-covers.js";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");

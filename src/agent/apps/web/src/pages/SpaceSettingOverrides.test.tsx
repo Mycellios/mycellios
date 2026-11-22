@@ -33,7 +33,7 @@ vi.mock("@lingui/react/macro", () => ({
       parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`),
   }),
 }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({
     variant: _variant,
     size: _size,
@@ -69,7 +69,7 @@ vi.mock("../components/ApprovalRulesSettings", () => ({
 
 import { QueryUserProvider } from "../lib/query";
 import { SpaceRpcProvider } from "../lib/space-rpc";
-import type { SpaceSetting } from "@rakazo/contracts";
+import type { SpaceSetting } from "@mycellios/contracts";
 import { SpaceSettingOverrides } from "./SpaceSettingOverrides";
 
 let container: HTMLDivElement;

@@ -43,7 +43,7 @@ const MANAGED = {
   runtime: "rakazo_dev",
   database: "rakazo",
 };
-const SERVICES = ["@rakazo/api", "@rakazo/worker", "@rakazo/web", "@rakazo/sandbox-supervisor"];
+const SERVICES = ["@mycellios/api", "@mycellios/worker", "@mycellios/web", "@mycellios/sandbox-supervisor"];
 
 const fileEnv = existsSync(path.join(root, ".env"))
   ? dotenv.parse(readFileSync(path.join(root, ".env")))

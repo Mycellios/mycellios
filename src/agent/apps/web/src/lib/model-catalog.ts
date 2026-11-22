@@ -1,9 +1,9 @@
 import { i18n } from "@lingui/core";
-import type { Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
-import type { ConnectedModelChoice } from "@rakazo/core";
-import { connectedModelChoices, resolveSelectableModelId } from "@rakazo/core";
+import type { Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@mycellios/contracts";
+import type { ConnectedModelChoice } from "@mycellios/core";
+import { connectedModelChoices, resolveSelectableModelId } from "@mycellios/core";
 
-export { modelOptionKey, parseModelOptionKey } from "@rakazo/core";
+export { modelOptionKey, parseModelOptionKey } from "@mycellios/core";
 
 /** The models the connected credentials can run, as one list for a picker. */
 export function connectedModelOptions(

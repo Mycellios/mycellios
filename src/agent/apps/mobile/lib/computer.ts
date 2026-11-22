@@ -1,6 +1,6 @@
-import type { ComputerMode, ComputerStatus as ContractComputerStatus } from "@rakazo/contracts";
-import type { ScreenPageState } from "@rakazo/core";
-import { isRetryableError, SCREEN_PAGE_STATES } from "@rakazo/core";
+import type { ComputerMode, ComputerStatus as ContractComputerStatus } from "@mycellios/contracts";
+import type { ScreenPageState } from "@mycellios/core";
+import { isRetryableError, SCREEN_PAGE_STATES } from "@mycellios/core";
 import { isLanOrLocalHost } from "./endpoint";
 import { t } from "./i18n";
 

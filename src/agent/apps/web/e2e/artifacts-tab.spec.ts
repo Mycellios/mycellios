@@ -5,7 +5,7 @@ test("opens the Library from the rail, and previews an existing file", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `artifacts-tab-${stamp}@rakazo.test`, "password12", "Artifacts Tab");
+  await signup(page, `artifacts-tab-${stamp}@mycellios.test`, "password12", "Artifacts Tab");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/(?!artifacts(?:\/|$))[^/]+$/);
@@ -14,7 +14,7 @@ test("opens the Library from the rail, and previews an existing file", async ({
   const sidebar = page.getByTestId("bots-sidebar");
   await expect(sidebar).toBeVisible();
   const rail = page.getByTestId("workspace-rail");
-  // The rail footer follows OpenBot: Hifa Store, Help, Settings, then the server.
+  // The rail footer follows the reference app: Hifa Store, Help, Settings, then the server.
   await expect(rail.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.getByTestId("user-menu-trigger")).toHaveCount(0);
   await rail.getByRole("button", { name: "More", exact: true }).click();

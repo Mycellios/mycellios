@@ -1,5 +1,5 @@
-import type {AgentRunRequest, ConnectorTool} from '@rakazo/adapter-kit';
-import type {MessageBlock} from '@rakazo/contracts';
+import type {AgentRunRequest, ConnectorTool} from '@mycellios/adapter-kit';
+import type {MessageBlock} from '@mycellios/contracts';
 
 type Step = {id: string; title: string; status: 'pending'|'running'|'done'};
 export const WORK_PLAN_TOOL = 'update_work_plan';

@@ -9,9 +9,9 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { Actor } from "@rakazo/contracts";
-import { asSystem, createDb, IsolationError, LocalKeyProvider, runAsTenant } from "@rakazo/db";
-import { createArtifactStore } from "@rakazo/adapters";
+import type { Actor } from "@mycellios/contracts";
+import { asSystem, createDb, IsolationError, LocalKeyProvider, runAsTenant } from "@mycellios/db";
+import { createArtifactStore } from "@mycellios/adapters";
 import EmbeddedPostgres from "embedded-postgres";
 import {
   SHARED_ARTIFACT_CSP,

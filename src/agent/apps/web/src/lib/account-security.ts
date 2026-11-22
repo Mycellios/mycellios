@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
-import { accountSecuritySchema, legacyAccountSecurity } from "@rakazo/contracts";
-import { readBoundedJsonResponse } from "@rakazo/core";
+import { accountSecuritySchema, legacyAccountSecurity } from "@mycellios/contracts";
+import { readBoundedJsonResponse } from "@mycellios/core";
 import { appPath } from "./app-path";
 import { authErrorText } from "./user-error";
 

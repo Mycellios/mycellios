@@ -1,5 +1,5 @@
-import { assertTailnetUrl, safeTailscaleAuthUrl, type TailnetConnection } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import { assertTailnetUrl, safeTailscaleAuthUrl, type TailnetConnection } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { createSafeRemoteFetch } from "./remote-mcp.js";
 
@@ -30,7 +30,7 @@ export class TailnetService {
   }
   /** Stop known devices after membership, network or company-policy revocation. */
   async reconcile() {
-    const { runAsTenant } = await import("@rakazo/db");
+    const { runAsTenant } = await import("@mycellios/db");
     for (const [id, entry] of this.watched) {
       try { await runAsTenant(entry.scope, () => this.authorize(id, entry.scope)); }
       catch {

@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/testkit",
+  "name": "@mycellios/testkit",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",
-    "@rakazo/adapter-kit": "*",
-    "@rakazo/adapters": "*",
-    "@rakazo/contracts": "*",
-    "@rakazo/core": "*",
-    "@rakazo/db": "*",
+    "@mycellios/adapter-kit": "*",
+    "@mycellios/adapters": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/core": "*",
+    "@mycellios/db": "*",
     "@testcontainers/postgresql": "12.2.1",
     "pngjs": "7.0.0"
   },

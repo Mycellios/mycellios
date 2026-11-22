@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { AgentRunRequest } from "@rakazo/adapter-kit";
+import type { AgentRunRequest } from "@mycellios/adapter-kit";
 
 /** A saved server checkpoint starts one continuation, never a fresh run replay. */
 export function desktopAgentSegmentId(request: Pick<AgentRunRequest, "turnCheckpoint" | "resumeFromCheckpoint">): string | undefined {

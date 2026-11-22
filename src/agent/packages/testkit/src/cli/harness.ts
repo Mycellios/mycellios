@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { globSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import type { createApp } from "../../../../apps/api/src/app.ts";
 import { createModelConnectionFixtureFetch } from "../model-connection-fixture.js";
@@ -97,7 +97,7 @@ async function main() {
     process.env.MCP_ALLOW_PRIVATE_ENDPOINT = "true";
     process.env.CI = "1";
 
-    execSync("pnpm --filter @rakazo/db generate", { stdio: "inherit", env: process.env });
+    execSync("pnpm --filter @mycellios/db generate", { stdio: "inherit", env: process.env });
     execSync("pnpm db:migrate", { stdio: "inherit", env: process.env });
 
     if (integration) {
@@ -185,9 +185,9 @@ async function main() {
       { createApp },
       { drainUnscopedDatabaseAccess },
     ] = await Promise.all([
-      import("@rakazo/adapters"),
+      import("@mycellios/adapters"),
       import("../../../../apps/api/src/app.ts"),
-      import("@rakazo/db"),
+      import("@mycellios/db"),
     ]);
     const { serve } = await import("@hono/node-server");
     const thirdParties = new ThirdPartyConnectorEmulator();
@@ -245,7 +245,7 @@ async function main() {
           "pnpm",
           [
             "--filter",
-            "@rakazo/web",
+            "@mycellios/web",
             "exec",
             "playwright",
             "test",

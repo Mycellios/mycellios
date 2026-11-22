@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { CREDIT_MICROUNITS, usdCentsToCreditMicrounits } from "@rakazo/contracts";
-import type { AgentUsage, BillingCreditPurchase } from "@rakazo/adapter-kit";
+import { CREDIT_MICROUNITS, usdCentsToCreditMicrounits } from "@mycellios/contracts";
+import type { AgentUsage, BillingCreditPurchase } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./generated/prisma/client.js";
 import type { CreditAllocation } from "./model-credit-lots.js";

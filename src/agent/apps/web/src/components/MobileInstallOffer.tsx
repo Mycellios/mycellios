@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { productBrand } from "@rakazo/contracts/product-brand";
+import { productBrand } from "@mycellios/contracts/product-brand";
 import {
   Button,
   Dialog,
@@ -9,7 +9,7 @@ import {
   DialogTitle,
   ToggleGroup,
   ToggleGroupItem,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check, Copy, Smartphone, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { appPath } from "../lib/app-path";

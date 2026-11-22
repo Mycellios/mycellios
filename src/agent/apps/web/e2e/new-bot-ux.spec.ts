@@ -5,7 +5,7 @@ test("create opens dialog, then empty chat; picker lists bots; sidebar collapses
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `new-bot-ux-${stamp}@rakazo.test`, "password12", "New Bot UX");
+  await signup(page, `new-bot-ux-${stamp}@mycellios.test`, "password12", "New Bot UX");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -137,7 +137,7 @@ test("create opens dialog, then empty chat; picker lists bots; sidebar collapses
 test("a stale roster refresh started before creation keeps the new bot selected", async ({
   page,
 }, testInfo) => {
-  await signup(page, `stale-create-${Date.now()}@rakazo.test`, "password12", "Stale Create");
+  await signup(page, `stale-create-${Date.now()}@mycellios.test`, "password12", "Stale Create");
   await completeOnboarding(page);
   await expect(page.getByPlaceholder("Message Mico")).toBeVisible();
 
@@ -201,7 +201,7 @@ test("a stale roster refresh started before creation keeps the new bot selected"
 
 test("later bot waits before showing the focus card; sending cancels it", async ({ page }) => {
   const stamp = Date.now();
-  await signup(page, `focus-delay-${stamp}@rakazo.test`, "password12", "Focus Delay");
+  await signup(page, `focus-delay-${stamp}@mycellios.test`, "password12", "Focus Delay");
   await completeOnboarding(page);
   await expect(page.getByText("What do you want me on first?", { exact: true })).toHaveCount(0);
 
@@ -241,7 +241,7 @@ test("later bot waits before showing the focus card; sending cancels it", async 
 });
 
 test("creation actions stay visible above a long bot list", async ({ page }, testInfo) => {
-  await signup(page, `create-menu-${Date.now()}@rakazo.test`, "password12", "Create menu");
+  await signup(page, `create-menu-${Date.now()}@mycellios.test`, "password12", "Create menu");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

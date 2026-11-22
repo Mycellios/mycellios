@@ -1,4 +1,4 @@
-import type { ThreadMessage } from "@rakazo/contracts";
+import type { ThreadMessage } from "@mycellios/contracts";
 
 /** Join presentation only; never merge transcript records or their actions. */
 export function joinMessageBubbles(previous: ThreadMessage | undefined, current: ThreadMessage | undefined, boundary = false): boolean {

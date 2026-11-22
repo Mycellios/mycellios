@@ -1,6 +1,6 @@
 import { MenuView } from "@expo/ui/community/menu";
-import type { AccountSecurity, UsageSummary } from "@rakazo/contracts";
-import { accountDisplay, displayName } from "@rakazo/core";
+import type { AccountSecurity, UsageSummary } from "@mycellios/contracts";
+import { accountDisplay, displayName } from "@mycellios/core";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";

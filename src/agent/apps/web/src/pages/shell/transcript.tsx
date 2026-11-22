@@ -5,8 +5,8 @@ import { useGeneralPreferences } from "../../lib/general-preferences";
 import { NewChatDivider } from "../../components/composer/NewChatDivider";
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
-import type { MessageReaction, ThreadMessage, Run } from "@rakazo/contracts";
-import type { FoldedTranscript } from "@rakazo/core";
+import type { MessageReaction, ThreadMessage, Run } from "@mycellios/contracts";
+import type { FoldedTranscript } from "@mycellios/core";
 import {
   expandPeerReplies,
   groupVoiceChats,
@@ -19,10 +19,10 @@ import {
   timeSeparatorIds,
   unreadDividerMessageId,
   voiceChatHoldsMessage,
-} from "@rakazo/core";
-import type { GroupAvatarMember } from "@rakazo/ui-web";
-import { Button, cn, Spinner } from "@rakazo/ui-web";
-import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
+} from "@mycellios/core";
+import type { GroupAvatarMember } from "@mycellios/ui-web";
+import { Button, cn, Spinner } from "@mycellios/ui-web";
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
 import { ArrowDown } from "lucide-react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import {
@@ -86,7 +86,7 @@ export const Transcript = memo(function Transcript({
   userBubble,
   onCallBack,
   onLoadOlder,
-  onOpenBot,
+  onShowBot,
   onAnswer,
   onReply,
   onMarkUnread,
@@ -134,7 +134,7 @@ export const Transcript = memo(function Transcript({
   /** Calls the bot back from a missed call in the transcript. */
   onCallBack?: () => void;
   onLoadOlder: () => void | Promise<void>;
-  onOpenBot: (botId: string) => void;
+  onShowBot: (botId: string) => void;
   onAnswer: (
     message: ThreadMessage,
     text: string,
@@ -660,7 +660,7 @@ export const Transcript = memo(function Transcript({
                       mentions={mentionView.mentions.get(message.id)}
                       canAnswer={answerableAskIds.has(message.id)}
                       canDismiss={dismissableAskIds.has(message.id)}
-                      onOpenBot={onOpenBot}
+                      onShowBot={onShowBot}
                       onOpenPeerMessages={onOpenPeerMessages}
                       peerReplies={
                         transcript.folded.has(message.id)

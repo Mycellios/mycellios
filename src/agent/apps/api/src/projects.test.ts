@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const { getBot } = vi.hoisted(() => ({ getBot: vi.fn() }));
-vi.mock("@rakazo/db", async original => ({ ...(await original<object>()), createRepos: () => ({ getBot }) }));
+vi.mock("@mycellios/db", async original => ({ ...(await original<object>()), createRepos: () => ({ getBot }) }));
 import { projectRoutes } from "./routes/projects.js";
 
 beforeEach(() => { getBot.mockReset(); getBot.mockResolvedValue({ id: "mico" }); });

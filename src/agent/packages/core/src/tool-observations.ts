@@ -1,4 +1,4 @@
-import { ComputerCommandSchema, type MessageBlock } from "@rakazo/contracts";
+import { ComputerCommandSchema, type MessageBlock } from "@mycellios/contracts";
 export type ToolObservation = NonNullable<
   Extract<MessageBlock, { kind: "steps" }>["tools"]
 >[number];

@@ -1,4 +1,4 @@
-import type { ModelHeaderRow, ModelOAuthBegin, ThinkingLevel } from "@rakazo/contracts";
+import type { ModelHeaderRow, ModelOAuthBegin, ThinkingLevel } from "@mycellios/contracts";
 import {
   ANTSEED_PROVIDER_ID,
   CLOUDFLARE_AI_GATEWAY_PROVIDER_ID,
@@ -20,7 +20,7 @@ import {
   parseModelMaxImagesPerPrompt,
   parseModelMaxTokens,
   savedCompatibleEndpointMatches,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   COMPATIBLE_THINKING_LEVELS,
   clampCatalogThinkingLevel,
@@ -30,7 +30,7 @@ import {
   pickCatalogModelId,
   savedCompatibleModelIds,
   toggleEnabledModelId,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import * as Clipboard from "expo-clipboard";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

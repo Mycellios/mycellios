@@ -1,9 +1,9 @@
 import { ORPCError } from "@orpc/server";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import { persistPreparedSecret } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { Prisma, withTransactionRetry } from "@rakazo/db";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import { persistPreparedSecret } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { Prisma, withTransactionRetry } from "@mycellios/db";
 
 type AgentSecretDeps = {
   prisma: PrismaClient;

@@ -1,4 +1,4 @@
-import { computerScopeKey, legacyTeamHomeKey } from "@rakazo/db";
+import { computerScopeKey, legacyTeamHomeKey } from "@mycellios/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({

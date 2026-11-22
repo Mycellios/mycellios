@@ -1,9 +1,9 @@
 import { StoreAppHeader } from "./StoreAppHeader";
 import { useEffect, useRef, useState } from "react";
 import {  Film, Upload, Download, RefreshCw } from "lucide-react";
-import { Button, Textarea } from "@rakazo/ui-web";
-import type { VideoEditBridge, VideoEditProject } from "@rakazo/contracts";
-import { VIDEO_EDIT_MAX_BYTES } from "@rakazo/contracts";
+import { Button, Textarea } from "@mycellios/ui-web";
+import type { VideoEditBridge, VideoEditProject } from "@mycellios/contracts";
+import { VIDEO_EDIT_MAX_BYTES } from "@mycellios/contracts";
 import { desktopBridge } from "../../lib/desktop";
 
 const price = (micros: number) => new Intl.NumberFormat("es", { maximumFractionDigits: 6 }).format(micros / 1_000_000);

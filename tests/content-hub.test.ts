@@ -295,7 +295,7 @@ describe("Content Hub blog integration", () => {
     });
     expect(dynamicSitemap.statusCode).toBe(200);
     expect(dynamicSitemap.headers["content-type"]).toContain("application/xml");
-    for (const path of ["/", "/network", "/pricing", "/compare", "/compare/openbot", "/guides/get-started", "/es/guias/empezar", "/downloads/desktop", "/stats", "/earn", "/downloads", "/browser/", "/blog"]) {
+    for (const path of ["/", "/network", "/pricing", "/compare", "/compare/openclaw", "/guides/get-started", "/es/guias/empezar", "/downloads/desktop", "/stats", "/earn", "/downloads", "/browser/", "/blog"]) {
       expect(dynamicSitemap.body).toContain(
         `<loc>https://www.mycellios.com${path}</loc>`,
       );

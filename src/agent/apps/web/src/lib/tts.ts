@@ -1,6 +1,6 @@
 import { getGeneralPreferences } from "./general-preferences";
-import type { SettingsScope } from "@rakazo/contracts";
-import { readBoundedResponseBytes, toUtterances } from "@rakazo/core";
+import type { SettingsScope } from "@mycellios/contracts";
+import { readBoundedResponseBytes, toUtterances } from "@mycellios/core";
 import { appPath } from "./app-path";
 import { rpc, selectedSpaceId, withSpaceHeaders } from "./rpc.js";
 import { errorText, voiceAccountErrorText } from "./user-error.js";

@@ -1,4 +1,4 @@
-import { COMPUTER_RATE_LIMIT_ERROR } from "@rakazo/contracts";
+import { COMPUTER_RATE_LIMIT_ERROR } from "@mycellios/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   APPROVED_ACTION_NOT_RUN_ERROR,
@@ -868,7 +868,7 @@ describe("the one action that fixes a failed run", () => {
   });
 
   it("rebrands the saved hosted model error without changing its recovery action", () => {
-    expect(normalizeRunError("Connect your own API key in Models or choose Rakazo credits in Billing."))
+    expect(normalizeRunError("Connect your own API key in Models or choose Mycellios credits in Billing."))
       .toEqual(normalizeRunError(HOSTED_MODEL_CREDITS_REQUIRED_ERROR));
   });
 

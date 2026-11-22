@@ -1,4 +1,4 @@
-import { createAuth } from "@rakazo/auth";
+import { createAuth } from "@mycellios/auth";
 import { describe, expect, it } from "vitest";
 import { isSameSiteRpcRequest, isTrustedOrigin, MOBILE_AUTH_ORIGINS } from "./app.js";
 

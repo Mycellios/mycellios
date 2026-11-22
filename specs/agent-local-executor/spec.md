@@ -42,10 +42,10 @@ from transport/component tests, on a disposable example project only.
 
 ## Automatic workspace reference
 
-OpenBot's official workspace documentation and current workspace-path/access
+The reference app's official workspace documentation and current workspace-path/access
 implementation were inspected on 2 November 2026:
-https://openbot.run/news/every-agent-gets-a-workspace and
-https://github.com/nightly-labs/openbot/blob/main/src/backend/agent/workspace-sandbox.ts.
+(reference source) and
+(reference source)
 Use these as behavioral references, not copied implementation. A persistent
 per-agent working directory is automatic; access to other paths is a separate
 policy. Mycellios already provisions its native per-agent workspace without a

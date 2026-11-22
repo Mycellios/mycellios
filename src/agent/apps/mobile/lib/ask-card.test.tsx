@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import { fontWeight, typeScale } from "@rakazo/ui-tokens";
+import { fontWeight, typeScale } from "@mycellios/ui-tokens";
 import type { ReactNode } from "react";
 import React, { act, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -260,7 +260,7 @@ it("closes the current sheet and keeps the card saved when refresh fails", async
   const rpc = vi.fn().mockResolvedValue(undefined);
   const handler = source.slice(
     source.indexOf("  const answerMessage = useCallback("),
-    source.indexOf("  const openBot = useCallback("),
+    source.indexOf("  const showBot = useCallback("),
   );
   const handlerScope = {
     useCallback: <T,>(callback: T) => callback,

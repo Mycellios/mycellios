@@ -1,4 +1,4 @@
-import type { Actor, AgentUsageTotals, AgentUsageReport } from "@rakazo/contracts";
+import type { Actor, AgentUsageTotals, AgentUsageReport } from "@mycellios/contracts";
 import type { RouterDeps } from "./router.js";
 
 /** Account-scoped lifetime totals: aggregate records once rather than summing nested task totals. */

@@ -14,7 +14,7 @@ vi.mock("./media", () => ({
   renderMedia: vi.fn(),
   stopError: () => new DOMException("Cancelled", "AbortError"),
 }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({
     children,
     variant,

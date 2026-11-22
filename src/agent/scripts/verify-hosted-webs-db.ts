@@ -8,14 +8,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { Script } from "node:vm";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import {
   asSystem,
   createDb,
   LocalKeyProvider,
   listHostedWebs,
   runAsTenant,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import EmbeddedPostgres from "embedded-postgres";
 import { ANTSEED_RADAR_HTML } from "../apps/api/src/hosted-webs/antseed-template.js";
 import { hostedWebHttp } from "../apps/api/src/hosted-webs/http.js";

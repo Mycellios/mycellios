@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Space } from "@rakazo/contracts";
+import type { Bot, Space } from "@mycellios/contracts";
 import {
   Button,
   DropdownMenu,
@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   ArrowLeft,
   ChevronDown,

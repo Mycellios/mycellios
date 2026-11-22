@@ -2,10 +2,10 @@
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { DesktopBehaviorSettings } from "@rakazo/contracts";
+import type { DesktopBehaviorSettings } from "@mycellios/contracts";
 vi.mock("../../lib/query",()=>({useQueryUserId:()=>"user-1"}));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Label: (p: React.ComponentProps<"label">) => <label {...p} />,
   Button: (p: React.ComponentProps<"button">) => <button {...p} />,
   Switch: ({ checked, onCheckedChange, ...p }: React.ComponentProps<"button"> & { checked: boolean; onCheckedChange: (v: boolean) => void }) => <button {...p} type="button" role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)} />,

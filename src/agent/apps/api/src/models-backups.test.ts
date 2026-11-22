@@ -1,8 +1,8 @@
 import { RPCHandler } from "@orpc/server/fetch";
-import * as adapters from "@rakazo/adapters";
-import { listPiCatalog, serializeModelSecret } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import * as adapters from "@mycellios/adapters";
+import { listPiCatalog, serializeModelSecret } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -10,7 +10,7 @@ import { createRouter } from "./router.js";
 const owner: Actor = {
   userId: "user-one",
   spaceId: "space-one",
-  email: "one@rakazo.test",
+  email: "one@mycellios.test",
   isDeploymentOwner: true,
 };
 
@@ -424,7 +424,7 @@ describe("model backup settings API", () => {
       ...owner,
       userId: "user-two",
       spaceId: "space-two",
-      email: "two@rakazo.test",
+      email: "two@mycellios.test",
     };
     const kept = { userId: owner.userId, provider: "openrouter", modelId: "keep", position: 0 };
     const { rows, call, userModelRoleChoice } = setup({ actor, existing: [kept] });

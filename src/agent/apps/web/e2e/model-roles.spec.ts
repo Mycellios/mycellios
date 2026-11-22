@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import type { ModelCatalogEntry, ModelRoleSettings } from "@rakazo/contracts";
+import type { ModelCatalogEntry, ModelRoleSettings } from "@mycellios/contracts";
 import { captureScreenshot, completeOnboarding, openUserSettings, rpc, signup } from "./helpers";
 
 async function pickModel(page: Page, search: string, label: string) {
@@ -17,7 +17,7 @@ test("main model settings preserve the saved approval role", async ({
 }, testInfo) => {
   test.setTimeout(45_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await signup(page, `model-roles-${Date.now()}@rakazo.test`, "password12", "Model roles");
+  await signup(page, `model-roles-${Date.now()}@mycellios.test`, "password12", "Model roles");
   await completeOnboarding(page);
   const catalog = await rpc<ModelCatalogEntry[]>(page, "models/list", {});
   const openRouter = catalog.filter(

@@ -1,7 +1,7 @@
 import { createHash, createHmac, generateKeyPairSync, randomBytes, sign } from "node:crypto";
-import type { TransactionalEmail } from "@rakazo/adapter-kit";
-import type * as Db from "@rakazo/db";
-import { bootstrapUserSpace, recordSecurityEvent } from "@rakazo/db";
+import type { TransactionalEmail } from "@mycellios/adapter-kit";
+import type * as Db from "@mycellios/db";
+import { bootstrapUserSpace, recordSecurityEvent } from "@mycellios/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CLIENT_IP_HEADER, createAuth } from "./index.js";
 
@@ -14,7 +14,7 @@ vi.mock("better-auth/adapters/prisma", async () => {
       memoryAdapter(prisma.authData),
   };
 });
-vi.mock("@rakazo/db", async (original) => ({
+vi.mock("@mycellios/db", async (original) => ({
   ...(await original<typeof Db>()),
   bootstrapUserSpace: vi.fn(async () => ({ spaceId: "space-1" })),
   recordSecurityEvent: vi.fn(async () => undefined),
@@ -786,7 +786,7 @@ describe("email code sign-in", () => {
     expect((await f.signin()).status).toBe(200);
   });
 
-  it("closes the OTP routes Rakazo does not use", async () => {
+  it("closes the OTP routes Mycellios does not use", async () => {
     const f = fixture();
     for (const type of ["email-verification", "forget-password", "change-email"]) {
       expect((await f.sendCode("approved@example.test", type)).status, type).toBe(404);

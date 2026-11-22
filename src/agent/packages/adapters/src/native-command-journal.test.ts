@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ProcessEvent } from "@rakazo/adapter-kit";
+import type { ProcessEvent } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NativeCommandJournal, replaceNativeReceipt } from "./native-command-journal.js";
 

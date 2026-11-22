@@ -31,7 +31,7 @@ test.afterEach(async ({ page }) => {
 test("model settings cleanup frames", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const stamp = Date.now();
-  await signup(page, `model-cleanup-${stamp}@rakazo.test`, "password12", "Model Preview");
+  await signup(page, `model-cleanup-${stamp}@mycellios.test`, "password12", "Model Preview");
   await completeOnboarding(page);
 
   // Keep account persistence real; the harness supplies offline provider verification.
@@ -123,7 +123,7 @@ test("custom connections persist reasoning support and bot thinking", async ({
 }, testInfo) => {
   const stamp = Date.now();
   const userName = `Reasoning ${stamp}`;
-  await signup(page, `reasoning-model-${stamp}@rakazo.test`, "password12", userName);
+  await signup(page, `reasoning-model-${stamp}@mycellios.test`, "password12", userName);
   await completeOnboarding(page);
   await openUserSettings(page, "models");
   const dialog = await openModelConnection(page, "OpenAI-compatible");
@@ -275,7 +275,7 @@ test("the bot's model picker marks models that cannot read images", async ({ pag
       },
     });
   });
-  await signup(page, `bot-text-only-${Date.now()}@rakazo.test`, "password12", "Bot Models");
+  await signup(page, `bot-text-only-${Date.now()}@mycellios.test`, "password12", "Bot Models");
   await completeOnboarding(page);
   await page.locator("main").getByRole("button", { name: "Chief", exact: true }).click();
   const settings = page.getByTestId("bot-settings");
@@ -416,7 +416,7 @@ test("connects, lists, and uses an OpenAI-compatible endpoint", async ({ page },
     // the fake endpoint from settings instead, so skip that step on the client.
     const skipModelStep = process.env.AGENT_RUNTIME === "pi";
     if (skipModelStep) await page.route("**/rpc/me", fulfillWithoutModelStep);
-    await signup(page, `local-model-${stamp}@rakazo.test`, "password12", userName);
+    await signup(page, `local-model-${stamp}@mycellios.test`, "password12", userName);
     await completeOnboarding(page);
     if (skipModelStep) await page.unroute("**/rpc/me", fulfillWithoutModelStep);
 
@@ -557,7 +557,7 @@ test("model settings connect, replace, and cancel provider authentication", asyn
 }, testInfo) => {
   const stamp = Date.now();
   const userName = `Models ${stamp}`;
-  await signup(page, `models-${stamp}@rakazo.test`, "password12", userName);
+  await signup(page, `models-${stamp}@mycellios.test`, "password12", userName);
   await completeOnboarding(page);
 
   await openUserSettings(page, "models");
@@ -752,7 +752,7 @@ test("a deployment default on server credentials says so and keeps an own key op
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `server-credentials-${stamp}@rakazo.test`, "password12", `Server ${stamp}`);
+  await signup(page, `server-credentials-${stamp}@mycellios.test`, "password12", `Server ${stamp}`);
   await completeOnboarding(page);
   // The E2E deployment runs on a scripted model, so present the active default as one that
   // authenticates from the host, the way an Amazon Bedrock deployment on an AWS role does.
@@ -797,7 +797,7 @@ test("a key connected in another space can replace server credentials for the sa
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `shared-model-${stamp}@rakazo.test`, "password12", "Model Owner");
+  await signup(page, `shared-model-${stamp}@mycellios.test`, "password12", "Model Owner");
   await completeOnboarding(page);
   const otherSpace = await rpc<{ id: string }>(page, "spaces/create", { name: "Other space" });
   const provider = "amazon-bedrock";
@@ -861,7 +861,7 @@ test("catalog models keep a space default thinking level per saved model", async
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `catalog-thinking-${stamp}@rakazo.test`, "password12", `Thinking ${stamp}`);
+  await signup(page, `catalog-thinking-${stamp}@mycellios.test`, "password12", `Thinking ${stamp}`);
   await completeOnboarding(page);
 
   await openUserSettings(page, "models");
@@ -945,7 +945,7 @@ test("catalog models keep a space default thinking level per saved model", async
 
 test("chat settings search a long model list", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `chat-model-search-${stamp}@rakazo.test`, "password12", `Search ${stamp}`);
+  await signup(page, `chat-model-search-${stamp}@mycellios.test`, "password12", `Search ${stamp}`);
   await completeOnboarding(page);
 
   const catalog = await rpc<
@@ -1019,7 +1019,7 @@ test("chat settings search a long model list", async ({ page }, testInfo) => {
 });
 
 test("Ollama Cloud preset saves an OpenAI-compatible connection", async ({ page }, testInfo) => {
-  await signup(page, `ollama-preset-${Date.now()}@rakazo.test`, "password12", "Model Preview");
+  await signup(page, `ollama-preset-${Date.now()}@mycellios.test`, "password12", "Model Preview");
   await completeOnboarding(page);
   await openUserSettings(page, "models");
   const dialog = await openModelConnection(page, "Ollama Cloud", { search: "Ollama" });
@@ -1061,7 +1061,7 @@ test("a Claude subscription folds the key form and bots move to the space defaul
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const stamp = Date.now();
-  await signup(page, `subscription-${stamp}@rakazo.test`, "password12", "Subscription Preview");
+  await signup(page, `subscription-${stamp}@mycellios.test`, "password12", "Subscription Preview");
   await completeOnboarding(page);
   const catalog = await rpc<Array<{ provider: string; id: string; placeholder?: boolean }>>(
     page,

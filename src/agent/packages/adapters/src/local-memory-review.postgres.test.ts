@@ -1,7 +1,7 @@
 import {randomUUID} from "node:crypto";
 import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
-import {createDb,asSystem,runAsTenant,type PrismaClient} from "@rakazo/db";
-import {MarkdownMemoryStore} from "@rakazo/memory";
+import {createDb,asSystem,runAsTenant,type PrismaClient} from "@mycellios/db";
+import {MarkdownMemoryStore} from "@mycellios/memory";
 import {reviewLocalMemory} from "./local-memory-review.js";
 const url=process.env.TEST_DATABASE_URL;
 const suite=url?describe:describe.skip;

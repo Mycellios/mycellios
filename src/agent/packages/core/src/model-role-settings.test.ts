@@ -1,4 +1,4 @@
-import type { ModelRoleSettings } from "@rakazo/contracts";
+import type { ModelRoleSettings } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { createModelRoleSettings } from "./model-role-settings.js";
 

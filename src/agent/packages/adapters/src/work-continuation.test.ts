@@ -1,5 +1,5 @@
 import {expect,it,vi} from 'vitest';
-import type {AgentRunRequest} from '@rakazo/adapter-kit';
+import type {AgentRunRequest} from '@mycellios/adapter-kit';
 import {WorkContinuation,withWorkContinuation,workContinuationEnabled,workPlanBlock,WORK_PLAN_TOOL,toolFailed} from './work-continuation.js';
 it('restores the work plan and continuation budget across runtime instances',async()=>{
  let snapshot:unknown;

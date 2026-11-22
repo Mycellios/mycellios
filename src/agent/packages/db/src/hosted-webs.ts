@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type Actor, HOSTED_WEB_CAPABILITIES, type HostedWebCard } from "@rakazo/contracts";
+import { type Actor, HOSTED_WEB_CAPABILITIES, type HostedWebCard } from "@mycellios/contracts";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { Prisma } from "./generated/prisma/client.js";
 import { runAsSystem } from "./row-security.js";

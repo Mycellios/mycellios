@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { withAbort } from "./web-ssrf.js";
-import { ModelAccountError, ModelOutputError, TransientModelError } from "@rakazo/adapter-kit";
+import { ModelAccountError, ModelOutputError, TransientModelError } from "@mycellios/adapter-kit";
 
 /** Ephemeral callbacks only. No executable code, paths, stack traces or credentials are logged. */
 export type AgentWire = null | boolean | number | string | {

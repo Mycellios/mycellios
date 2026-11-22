@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { AdapterContext, BackgroundJob, JobPublisher } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { asSystem, clearThread, createDb, runAsSystem, runAsTenant } from "@rakazo/db";
+import type { AdapterContext, BackgroundJob, JobPublisher } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { asSystem, clearThread, createDb, runAsSystem, runAsTenant } from "@mycellios/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CursorCloudAgentEmulator } from "./cloud-agent-emulator.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";

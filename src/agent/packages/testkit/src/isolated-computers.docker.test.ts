@@ -2,9 +2,9 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AdapterContext, ComputerRef, SandboxProvider } from "@rakazo/adapter-kit";
-import { DockerSandboxProvider, HostAwareSandbox } from "@rakazo/adapters";
-import { computerHomeKey } from "@rakazo/db";
+import type { AdapterContext, ComputerRef, SandboxProvider } from "@mycellios/adapter-kit";
+import { DockerSandboxProvider, HostAwareSandbox } from "@mycellios/adapters";
+import { computerHomeKey } from "@mycellios/db";
 import { describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
 import {

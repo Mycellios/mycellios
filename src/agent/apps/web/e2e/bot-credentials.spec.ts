@@ -16,7 +16,7 @@ test("bot and command credentials add, replace and remove without leaking values
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `bot-credentials-${stamp}@rakazo.test`, "password12", "Bot Credentials");
+  await signup(page, `bot-credentials-${stamp}@mycellios.test`, "password12", "Bot Credentials");
   await completeOnboarding(page);
   const botName = `Credentials ${stamp}`;
   const botId = await createNamedBot(page, botName);

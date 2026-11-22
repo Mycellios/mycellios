@@ -1,4 +1,4 @@
-import type { AgentRunModel } from "@rakazo/adapter-kit";
+import type { AgentRunModel } from "@mycellios/adapter-kit";
 import type { Api, AssistantMessage, Context, Model, Models, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";

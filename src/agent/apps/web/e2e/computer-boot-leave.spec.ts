@@ -29,7 +29,7 @@ async function routeScreen(page: Page) {
 test("a retrying computer can be closed and keeps booting without a stale error label", async ({
   page,
 }, testInfo) => {
-  await signup(page, `boot-leave-${Date.now()}@rakazo.test`, "password12", "Boot Leave");
+  await signup(page, `boot-leave-${Date.now()}@mycellios.test`, "password12", "Boot Leave");
   await completeOnboarding(page);
   await routeScreen(page);
   let staleError = true;
@@ -83,7 +83,7 @@ test("a retrying computer can be closed and keeps booting without a stale error 
 });
 
 test("a failed boot can be retried from the computer window", async ({ page }) => {
-  await signup(page, `boot-retry-${Date.now()}@rakazo.test`, "password12", "Boot Retry");
+  await signup(page, `boot-retry-${Date.now()}@mycellios.test`, "password12", "Boot Retry");
   await completeOnboarding(page);
   await page.route("https://screen.example/**", (route) =>
     route.fulfill({
@@ -147,7 +147,7 @@ test("a failed boot can be retried from the computer window", async ({ page }) =
 test("starting another bot's computer is not blocked by a boot still under way", async ({
   page,
 }) => {
-  await signup(page, `boot-two-${Date.now()}@rakazo.test`, "password12", "Boot Two");
+  await signup(page, `boot-two-${Date.now()}@mycellios.test`, "password12", "Boot Two");
   await completeOnboarding(page);
   const first = activeBotId(page);
   const second = await createNamedBot(page, "Bravo", { computerMode: "dedicated" });
@@ -183,7 +183,7 @@ test("starting another bot's computer is not blocked by a boot still under way",
 });
 
 test("opening a computer refreshes a stale booting snapshot", async ({ page }, testInfo) => {
-  await signup(page, `boot-stale-${Date.now()}@rakazo.test`, "password12", "Boot Stale");
+  await signup(page, `boot-stale-${Date.now()}@mycellios.test`, "password12", "Boot Stale");
   await completeOnboarding(page);
   await rpc(page, "computer/boot", { botId: activeBotId(page) });
   await routeScreen(page);
@@ -216,7 +216,7 @@ test("opening a computer refreshes a stale booting snapshot", async ({ page }, t
 test("opening a computer the server reports as booting does not start a second boot", async ({
   page,
 }) => {
-  await signup(page, `boot-server-${Date.now()}@rakazo.test`, "password12", "Boot Server");
+  await signup(page, `boot-server-${Date.now()}@mycellios.test`, "password12", "Boot Server");
   await completeOnboarding(page);
   // Another tab or the phone started this computer; the server reports it booting.
   await page.route("**/rpc/threads/get", async (route) => {
@@ -244,7 +244,7 @@ test("opening a computer the server reports as booting does not start a second b
 });
 
 test("Retry screen clears a failed takeover on a running computer", async ({ page }) => {
-  await signup(page, `boot-takeover-${Date.now()}@rakazo.test`, "password12", "Boot Takeover");
+  await signup(page, `boot-takeover-${Date.now()}@mycellios.test`, "password12", "Boot Takeover");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   await rpc(page, "computer/boot", { botId });

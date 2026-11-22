@@ -1,7 +1,7 @@
 import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { createRoot } from "react-dom/client";
-import type { DesktopUpdateState, RakazoDesktop } from "@rakazo/contracts";
+import type { DesktopUpdateState, RakazoDesktop } from "@mycellios/contracts";
 import { DesktopUpdatesProvider, DesktopSidebarUpdate } from "../../src/components/DesktopUpdates";
 import { messages } from "../../src/locales/es/messages.po";
 import "../../src/styles.css";

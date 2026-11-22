@@ -1,4 +1,4 @@
-import type { ImageAspectRatio } from "@rakazo/contracts";
+import type { ImageAspectRatio } from "@mycellios/contracts";
 import type { AdapterContext } from "./types.js";
 
 /** `aspectRatio` applies to images; providers treat a missing value as square. */

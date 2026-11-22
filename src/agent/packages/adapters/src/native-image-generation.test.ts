@@ -4,7 +4,7 @@ import type {
   ComputerRef,
   ProcessEvent,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
 import { FakeMediaGenerationProvider } from "./media-generation-provider.js";
 import {

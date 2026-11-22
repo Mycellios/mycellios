@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { normalizeOpenAiCompatibleBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
+import { normalizeOpenAiCompatibleBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
 import { MYCELLIOS_API_HOSTS } from "./mycellios-api.js";
 import { isCloudMetadataAddress, isLinkLocalAddress, isPrivateAddress } from "./network-address.js";
 

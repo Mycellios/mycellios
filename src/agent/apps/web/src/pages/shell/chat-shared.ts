@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
-import type { ThreadMessage } from "@rakazo/contracts";
-import { plainTextFromMarkdown, replyAttachment } from "@rakazo/core";
+import type { ThreadMessage } from "@mycellios/contracts";
+import { plainTextFromMarkdown, replyAttachment } from "@mycellios/core";
 
 export type PendingAttachment = {
   id: string;

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import EmbeddedPostgres from 'embedded-postgres';
-import { asSystem, createDb, openEventWait, reconcileWork, workStatus, controlWorkTree } from '@rakazo/db';
+import { asSystem, createDb, openEventWait, reconcileWork, workStatus, controlWorkTree } from '@mycellios/db';
 import { reconcileWorkStops } from '../packages/adapters/src/work-stop-reconciler.js';
 
 // Own new loopback cluster only. No .env, users, credentials, live models or paid requests.

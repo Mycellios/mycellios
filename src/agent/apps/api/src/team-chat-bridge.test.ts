@@ -3,11 +3,11 @@ import type {
   SandboxProvider,
   TeamChatInboundMessage,
   TeamChatSendRequest,
-} from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT } from "@rakazo/contracts";
-import { userTurnMessageForRun } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_COUNT } from "@mycellios/contracts";
+import { userTurnMessageForRun } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { materializeCurrentTurnFiles } from "../../../packages/adapters/src/thread-artifacts.js";
 import type { MessagingReceipts } from "./messaging-receipts.js";

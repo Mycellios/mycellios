@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { desktopBridge } from "../lib/desktop";

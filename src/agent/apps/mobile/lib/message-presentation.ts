@@ -1,7 +1,7 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { REPLY_QUOTE_MAX_LENGTH } from "@rakazo/contracts";
-import { isToolActivityBlock } from "@rakazo/core";
-import { MAX_QUOTABLE_SOURCE_LENGTH, visibleTextFromMarkdown } from "@rakazo/core/message-quote";
+import type { MessageBlock } from "@mycellios/contracts";
+import { REPLY_QUOTE_MAX_LENGTH } from "@mycellios/contracts";
+import { isToolActivityBlock } from "@mycellios/core";
+import { MAX_QUOTABLE_SOURCE_LENGTH, visibleTextFromMarkdown } from "@mycellios/core/message-quote";
 
 export function isCenteredAgentEvent(blocks: readonly MessageBlock[]): boolean {
   return blocks.some(

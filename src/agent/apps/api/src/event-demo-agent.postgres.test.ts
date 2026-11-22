@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { expect, it, vi } from "vitest";
-import { runAsSystem, eventDemoSessionActive } from "@rakazo/db";
+import { runAsSystem, eventDemoSessionActive } from "@mycellios/db";
 import { sealEventAgentTicket } from "../../../../core/event-demo-agent-ticket.js";
 import { createApp } from "./app.js";
 import { EVENT_DEMO_COMPANY, eventCompanySpawnKey } from "./event-demo-company.js";

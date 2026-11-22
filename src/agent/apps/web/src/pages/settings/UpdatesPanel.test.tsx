@@ -2,7 +2,7 @@
 import { act, type ComponentProps, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { DesktopUpdateState, DesktopUpdatePreferences } from "@rakazo/contracts";
+import type { DesktopUpdateState, DesktopUpdatePreferences } from "@mycellios/contracts";
 const mock = vi.hoisted(() => ({ desktop: false, modern: false, build: "20261029170000",
   native: { state: null as DesktopUpdateState | null, busy: false, message: null as string | null, confirmedCheck: null as string | null, act: vi.fn() },
   preferences: { channel: "stable", supported: true, autoDownload: true, autoInstall: false } as DesktopUpdatePreferences,
@@ -20,7 +20,7 @@ vi.mock("../../components/DesktopUpdates", () => ({
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (strings: TemplateStringsArray) => strings.join("") }),
 }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({ variant: _v, size: _s, ...props }: ComponentProps<"button"> & { variant?: string; size?: string }) => <button {...props} />,
   Label: (props: ComponentProps<"label">) => <label {...props} />,
   Switch: ({ checked, onCheckedChange, ...props }: ComponentProps<"button"> & { checked: boolean; onCheckedChange: (v: boolean) => void }) =>

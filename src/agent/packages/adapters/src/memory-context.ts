@@ -1,7 +1,7 @@
-import { rankLocalMemories, localMemorySnippet, escapePromptData } from "@rakazo/core";
-import type { AdapterContext, MemorySnapshot, MemoryStore } from "@rakazo/adapter-kit";
+import { rankLocalMemories, localMemorySnippet, escapePromptData } from "@mycellios/core";
+import type { AdapterContext, MemorySnapshot, MemoryStore } from "@mycellios/adapter-kit";
 import { byteLength, truncateUtf8 } from "./utf8.js";
-import { effectiveMemoryScope, type PrismaClient } from "@rakazo/db";
+import { effectiveMemoryScope, type PrismaClient } from "@mycellios/db";
 
 const MAX_AGENT_MEMORY_BYTES = 32 * 1024;
 

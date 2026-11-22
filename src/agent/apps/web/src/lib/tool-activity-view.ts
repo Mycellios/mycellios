@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { isRetiredImportSetup, isToolActivityBlock } from "@rakazo/core";
+import type { MessageBlock } from "@mycellios/contracts";
+import { isRetiredImportSetup, isToolActivityBlock } from "@mycellios/core";
 
 /**
  * Compact human duration for a tool-activity card summary.

@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import type { AgentImportSettings, ImportedMcpServer } from "@rakazo/adapters";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import type { AgentImportSettings, ImportedMcpServer } from "@mycellios/adapters";
 import {
   BUILTIN_AGENT_SKILLS,
   isCatalogModelChoice,
   readAgentImportSettings,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import type {
   Actor,
   AgentImportCreateInput,
@@ -23,15 +23,15 @@ import type {
   CreateRoutineInput as CreateRoutineInputType,
   McpServerConfigInput,
   MessageBlock,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
   CreateRoutineInput,
   isValidTimeZone,
   MEMORY_INDEX_PATH,
   MessageBlock as MessageBlockSchema,
-} from "@rakazo/contracts";
-import type { SkillFiles } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { SkillFiles } from "@mycellios/core";
 import {
   combineImportedInstructions,
   extractRoutineSkillMentions,
@@ -40,16 +40,16 @@ import {
   readAgentImportFolder,
   renameRoutineSkillMentions,
   resolveAgentImportNames,
-} from "@rakazo/core";
-import type { McpServer as McpServerRow, Prisma, PrismaClient, Routine } from "@rakazo/db";
+} from "@mycellios/core";
+import type { McpServer as McpServerRow, Prisma, PrismaClient, Routine } from "@mycellios/db";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
   InstructionConflictError,
   IsolationError,
   writeBotInstructions,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 
 type Reader = Pick<Prisma.TransactionClient, "memoryDocument" | "agentSkill" | "mcpServer">;
 type Stored = Awaited<ReturnType<SecretStore["put"]>> | null;

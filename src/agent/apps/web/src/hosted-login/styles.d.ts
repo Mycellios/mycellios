@@ -1,1 +1,1 @@
-declare module "@rakazo/ui-tokens/css";
+declare module "@mycellios/ui-tokens/css";

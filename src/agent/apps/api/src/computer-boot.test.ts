@@ -1,9 +1,9 @@
 import { RPCHandler } from "@orpc/server/fetch";
-import type * as Adapters from "@rakazo/adapters";
-import { ComputerBusyError } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { Prisma } from "@rakazo/db";
+import type * as Adapters from "@mycellios/adapters";
+import { ComputerBusyError } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { Prisma } from "@mycellios/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -14,7 +14,7 @@ const lifecycle = vi.hoisted(() => ({
   releaseComputerExecutionLease: vi.fn(),
 }));
 
-vi.mock("@rakazo/adapters", async (original) => ({
+vi.mock("@mycellios/adapters", async (original) => ({
   ...(await original<typeof Adapters>()),
   acquireComputerExecutionLease: lifecycle.acquireComputerExecutionLease,
   provisionComputer: lifecycle.provisionComputer,

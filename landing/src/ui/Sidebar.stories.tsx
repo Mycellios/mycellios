@@ -21,7 +21,7 @@ function SidebarExample({ initiallyCollapsed = false, signedIn = false, initialT
         const name = label as string;
         return <Button key={name} variant="navigation" className={view === name ? "active" : ""} aria-label={name} title={name} aria-current={view === name ? "page" : undefined} onClick={() => setView(name)}><Glyph size={18} /><span>{name}</span></Button>;
       })}<AgentNavigationLink /></nav>
-      <SidebarFooter accountLabel={signedIn ? "Daniel" : "Sign in"} accountTitle={signedIn ? "Open account" : "Sign in to Mycellios"} onAccount={() => {}} theme={theme} onTheme={() => setTheme(value => value === "light" ? "dark" : "light")} status="Connected" degraded={false} version="0.2.77" earnMenu={<EarnQuickMenu earnUrl="#earn" browserUrl="#browser" downloadsUrl="#downloads" external={false} onOpenEarn={() => {}} />} />
+      <SidebarFooter accountLabel={signedIn ? "Alex" : "Sign in"} accountTitle={signedIn ? "Open account" : "Sign in to Mycellios"} onAccount={() => {}} theme={theme} onTheme={() => setTheme(value => value === "light" ? "dark" : "light")} status="Connected" degraded={false} version="0.2.77" earnMenu={<EarnQuickMenu earnUrl="#earn" browserUrl="#browser" downloadsUrl="#downloads" external={false} onOpenEarn={() => {}} />} />
     </Sidebar>
     <div className="panel-main" style={{ padding: 40 }}><Heading as="h1">{view}</Heading><Text>Toggle the sidebar to inspect alignment and motion. The navigation and footer are the production components.</Text></div>
   </div>;

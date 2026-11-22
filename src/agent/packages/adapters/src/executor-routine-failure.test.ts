@@ -1,9 +1,9 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
-import type { NotificationMessage } from "@rakazo/adapter-kit";
-import { ModelAccountError, SandboxRateLimitError, TransientModelError } from "@rakazo/adapter-kit";
-import type * as DbModule from "@rakazo/db";
-import { countUnreadInboxChats } from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
+import type { NotificationMessage } from "@mycellios/adapter-kit";
+import { ModelAccountError, SandboxRateLimitError, TransientModelError } from "@mycellios/adapter-kit";
+import type * as DbModule from "@mycellios/db";
+import { countUnreadInboxChats } from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { createRunExecutor } from "./executor.js";
@@ -15,7 +15,7 @@ vi.mock("./computer-lifecycle.js", async (importOriginal) => ({
   provisionComputer: async () => ({ id: "computer-1", kind: "desktop" }),
 }));
 
-vi.mock("@rakazo/db", async (importOriginal) => ({
+vi.mock("@mycellios/db", async (importOriginal) => ({
   ...(await importOriginal<typeof DbModule>()),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),

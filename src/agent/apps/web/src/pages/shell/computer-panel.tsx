@@ -1,8 +1,8 @@
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
+import { Disclosure } from "@mycellios/ui-web/components/ui/disclosure";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { Bot, ComputerStatus, Routine } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import type { Bot, ComputerStatus, Routine } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { Maximize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { ComputersUnavailableHint } from "../../components/ComputersUnavailableHint";
@@ -29,7 +29,7 @@ type ComputerPanelProps = {
   onRecoveryDismissed: () => void;
   onOpenBrowser?: () => void;
   onOpenComputerSettings?: () => void;
-  onOpenBotSettings?: () => void;
+  onShowBotSettings?: () => void;
   onOpen: () => void;
   routines: Routine[];
   runningRoutineId?: string;
@@ -55,7 +55,7 @@ export function ComputerPanel({
   onRecoveryDismissed,
   onOpenBrowser,
   onOpenComputerSettings,
-  onOpenBotSettings,
+  onShowBotSettings,
   onOpen,
   routines,
   runningRoutineId,
@@ -127,8 +127,8 @@ export function ComputerPanel({
       </div>
       <Disclosure summary={t`Connection and diagnostics`} summaryClassName="w-full py-2 text-sm text-muted-foreground">
         <ComputersUnavailableHint sandboxProvider={sandboxProvider} onRecovered={onRecovered} onRecoveryDismissed={onRecoveryDismissed} onOpenComputerSettings={onOpenComputerSettings} />
-      {computer?.state !== "running" && onOpenBotSettings ? (
-        <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onOpenBotSettings}>
+      {computer?.state !== "running" && onShowBotSettings ? (
+        <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onShowBotSettings}>
           <Trans>Open Mico settings</Trans>
         </Button>
       ) : null}

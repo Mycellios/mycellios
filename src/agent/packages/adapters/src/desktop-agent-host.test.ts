@@ -1,5 +1,5 @@
-import type { AdapterContext, AgentRuntime } from "@rakazo/adapter-kit";
-import { parseDesktopDiagnostic } from "@rakazo/contracts";
+import type { AdapterContext, AgentRuntime } from "@mycellios/adapter-kit";
+import { parseDesktopDiagnostic } from "@mycellios/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";

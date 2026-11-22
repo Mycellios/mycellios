@@ -1,4 +1,4 @@
-import type { DesktopBehaviorSettings } from "@rakazo/contracts";
+import type { DesktopBehaviorSettings } from "@mycellios/contracts";
 
 type Ports = {
   packaged: boolean; platform: string;

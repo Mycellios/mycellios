@@ -7,9 +7,9 @@ import type {
   BillingProvider,
   BillingSubscriptionSnapshot,
   BillingSubscriptionStatus,
-} from "@rakazo/adapter-kit";
-import { BillingCheckoutCompletedError, BillingCustomerNotFoundError } from "@rakazo/adapter-kit";
-import { ModelCreditAmountSchema } from "@rakazo/contracts";
+} from "@mycellios/adapter-kit";
+import { BillingCheckoutCompletedError, BillingCustomerNotFoundError } from "@mycellios/adapter-kit";
+import { ModelCreditAmountSchema } from "@mycellios/contracts";
 import { z } from "zod";
 
 export const STRIPE_API_VERSION = "2026-09-30.endive";

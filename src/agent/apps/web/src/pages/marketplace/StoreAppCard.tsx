@@ -1,4 +1,4 @@
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { ChevronRight } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import "./store-app-card.css";

@@ -1,10 +1,10 @@
 import { Plural, Trans } from "@lingui/react/macro";
-import type { ThreadMessage } from "@rakazo/contracts";
+import type { ThreadMessage } from "@mycellios/contracts";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@rakazo/ui-web/components/ui/collapsible";
+} from "@mycellios/ui-web/components/ui/collapsible";
 import { Check, ChevronRight, LoaderCircle } from "lucide-react";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";

@@ -1,5 +1,5 @@
-import { micoAvatarDetails, micoAvatarShape } from "@rakazo/contracts";
-import type { AvatarMotionMode } from "@rakazo/core";
+import { micoAvatarDetails, micoAvatarShape } from "@mycellios/contracts";
+import type { AvatarMotionMode } from "@mycellios/core";
 import {
   AVATAR_LID_CLOSE,
   AVATAR_MOTION_UNITS,
@@ -27,7 +27,7 @@ import {
   organicAvatarPath,
   SHIPPED_BOT_AVATAR_CENTER,
   SHIPPED_BOT_AVATAR_VIEWBOX,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { memo, useId } from "react";
 import myceliumSheet from "../../../packages/core/assets/micos-mycelium-eyeless.png";
 import growthSheet from "../../../packages/core/assets/micos-mycelium-growth-eyeless.png";

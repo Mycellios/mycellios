@@ -1,4 +1,4 @@
-import { effectiveMicoSettings } from "@rakazo/contracts";
+import { effectiveMicoSettings } from "@mycellios/contracts";
 import { conversationStyle } from "./conversation-style.js";
 
 export function micoBehaviorInstructions(defaults: unknown, overrides: unknown) {

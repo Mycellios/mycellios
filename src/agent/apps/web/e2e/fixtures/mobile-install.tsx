@@ -1,6 +1,6 @@
 import {i18n} from "@lingui/core";
 import {I18nProvider} from "@lingui/react";
-import {TooltipProvider} from "@rakazo/ui-web";
+import {TooltipProvider} from "@mycellios/ui-web";
 import {useState} from "react";
 import {createRoot} from "react-dom/client";
 import {SidebarFooter} from "../../src/components/SidebarFooter";

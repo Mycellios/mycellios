@@ -1,5 +1,5 @@
-import type { HostedWebDraft, HostedWebSnapshot } from "@rakazo/contracts";
-import { Button, Disclosure } from "@rakazo/ui-web";
+import type { HostedWebDraft, HostedWebSnapshot } from "@mycellios/contracts";
+import { Button, Disclosure } from "@mycellios/ui-web";
 import { useEffect, useState } from "react";
 import type { createSpaceRpc } from "../../lib/rpc";
 import { issue } from "./hosted-web-files";

@@ -1,5 +1,5 @@
 import { I18nProvider } from "@lingui/react";
-import { BotAvatar, Button } from "@rakazo/ui-web";
+import { BotAvatar, Button } from "@mycellios/ui-web";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";

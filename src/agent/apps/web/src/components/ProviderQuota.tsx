@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { AccountPlanLimit, AccountPlanLimits, PlanLimitWindow } from "@rakazo/contracts";
-import { Button, Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@rakazo/ui-web";
+import type { AccountPlanLimit, AccountPlanLimits, PlanLimitWindow } from "@mycellios/contracts";
+import { Button, Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@mycellios/ui-web";
 import { ChevronDown, Gauge } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProviderLogo } from "./ProviderLogo";

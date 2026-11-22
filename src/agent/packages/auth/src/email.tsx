@@ -1,8 +1,8 @@
 /** @jsxRuntime automatic */
-import type { TransactionalEmail } from "@rakazo/adapter-kit";
-import { productBrand } from "@rakazo/contracts";
-import { displayName } from "@rakazo/core";
-import { lightTokens } from "@rakazo/ui-tokens";
+import type { TransactionalEmail } from "@mycellios/adapter-kit";
+import { productBrand } from "@mycellios/contracts";
+import { displayName } from "@mycellios/core";
+import { lightTokens } from "@mycellios/ui-tokens";
 import type { ReactNode } from "react";
 import { Body, Container, Head, Html, Link, render, Text, toPlainText } from "react-email";
 

@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AgentSkill, AgentSkillCatalogEntry } from "@rakazo/contracts";
-import { Button, Disclosure, NativeSelect, NativeSelectOption, Textarea } from "@rakazo/ui-web";
+import type { AgentSkill, AgentSkillCatalogEntry } from "@mycellios/contracts";
+import { Button, Disclosure, NativeSelect, NativeSelectOption, Textarea } from "@mycellios/ui-web";
 import { useEffect, useId, useRef, useState } from "react";
 import { useSpaceRpc } from "../lib/space-rpc";
 

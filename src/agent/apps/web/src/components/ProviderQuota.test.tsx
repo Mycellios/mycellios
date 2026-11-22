@@ -2,11 +2,11 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AccountPlanLimit } from "@rakazo/contracts";
+import type { AccountPlanLimit } from "@mycellios/contracts";
 const mocks = vi.hoisted(() => ({ planLimits: vi.fn(), native: vi.fn() }));
 vi.mock("../lib/space-rpc", () => { const rpc = { models: { planLimits: mocks.planLimits }, engines: { codexQuota: mocks.native } }; return { useSpaceRpc: () => rpc }; });
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((s, part, i) => `${s}${i ? values[i - 1] : ""}${part}`, ""), i18n: { locale: "en" } }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   PopoverTitle: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => <h2 {...props}>{children}</h2>,
   PopoverContent: ({ children, className }: { children: ReactNode; className: string }) => <div className={className}>{children}</div>,

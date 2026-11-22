@@ -1,6 +1,6 @@
-import type { AdapterContext, MemoryCommitRequest } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { asSystem, createDb, runAsSystem } from "@rakazo/db";
+import type { AdapterContext, MemoryCommitRequest } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { asSystem, createDb, runAsSystem } from "@mycellios/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MarkdownMemoryStore } from "./index.js";
 

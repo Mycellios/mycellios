@@ -1,4 +1,4 @@
-import { Button, cn } from "@rakazo/ui-web";
+import { Button, cn } from "@mycellios/ui-web";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 

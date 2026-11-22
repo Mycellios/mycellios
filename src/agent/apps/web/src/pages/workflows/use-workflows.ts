@@ -3,7 +3,7 @@ import {
   type WorkflowExecution,
   WorkflowGraphSchema,
   WorkflowSchema,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { useEffect, useRef, useState } from "react";
 import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";

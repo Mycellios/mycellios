@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import {
   BOT_AVATAR_COLORS,
   BotAvatar,
@@ -10,7 +10,7 @@ import {
   DialogTitle,
   Input,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Pin, Plus, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { useSpaceRpc } from "../../lib/space-rpc";

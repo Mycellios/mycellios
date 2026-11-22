@@ -13,7 +13,7 @@ vi.mock("@lingui/react/macro", () => {
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
 
-import type { MessageBlock } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
 import { generatedImageArtifactIds, ImageGenerationCard } from "./ImageGenerationCard";
 
 type Block = Extract<MessageBlock, { kind: "image_generation" }>;

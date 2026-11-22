@@ -1,8 +1,8 @@
-import type { AdapterContext } from "@rakazo/adapter-kit";
-import { MediaGenerationError } from "@rakazo/adapter-kit";
-import { ATTACHMENT_MAX_BYTES } from "@rakazo/contracts";
-import { toolRequiresApproval } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+import type { AdapterContext } from "@mycellios/adapter-kit";
+import { MediaGenerationError } from "@mycellios/adapter-kit";
+import { ATTACHMENT_MAX_BYTES } from "@mycellios/contracts";
+import { toolRequiresApproval } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { selectBuiltinToolsForRun } from "./executor.js";
 import { FakeMediaGenerationProvider } from "./media-generation-provider.js";

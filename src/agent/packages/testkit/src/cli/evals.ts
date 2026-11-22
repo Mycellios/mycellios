@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import type { AgentRunRequest } from "@rakazo/adapter-kit";
-import { ModelConnectInputSchema } from "@rakazo/contracts";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+import type { AgentRunRequest } from "@mycellios/adapter-kit";
+import { ModelConnectInputSchema } from "@mycellios/contracts";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { EVAL_CASES, HISTORY_EVAL_CASES } from "../evals/cases.js";
@@ -460,18 +460,18 @@ async function main() {
       CLOUD_AGENT_PROVIDER: "",
       MODEL_API_KEY: "",
     });
-    execFileSync("pnpm", ["--filter", "@rakazo/db", "generate"], {
+    execFileSync("pnpm", ["--filter", "@mycellios/db", "generate"], {
       stdio: "pipe",
       timeout: 120_000,
     });
-    execFileSync("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"], {
+    execFileSync("pnpm", ["--filter", "@mycellios/db", "exec", "prisma", "migrate", "deploy"], {
       stdio: "pipe",
       timeout: 120_000,
     });
     // Import runtime modules only after generation; their barrel exports load Prisma.
     const { createApp } = await import("../../../../apps/api/src/app.ts");
     const { runTrial } = await import("../evals/runner.js");
-    const { dispatcherFetch, PiAgentRuntime } = await import("@rakazo/adapters");
+    const { dispatcherFetch, PiAgentRuntime } = await import("@mycellios/adapters");
     const { EvalSandboxProvider } = await import("../evals/sandbox.js");
     for (let i = 0; i < trials.length; i++) {
       if (stopRequested) {

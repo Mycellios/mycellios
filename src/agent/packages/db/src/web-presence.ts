@@ -1,5 +1,5 @@
-import type { RealtimeFanout } from "@rakazo/adapter-kit";
-import { HostedWebPresence } from "@rakazo/contracts";
+import type { RealtimeFanout } from "@mycellios/adapter-kit";
+import { HostedWebPresence } from "@mycellios/contracts";
 
 /**
  * Transient "a Mico is reading or writing this app" signals. The worker publishes them

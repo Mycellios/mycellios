@@ -39,7 +39,7 @@ for (const theme of ["light", "dark"]) {
         },
       }),
     );
-    await signup(page, `app-marks-${theme}-${Date.now()}@rakazo.test`, "password12", "Demo User");
+    await signup(page, `app-marks-${theme}-${Date.now()}@mycellios.test`, "password12", "Demo User");
     await completeOnboarding(page);
     // The desktop rail has no Connect apps pill; the phone navigation footer keeps it.
     await expect(page.getByTestId("workspace-rail").getByTestId("sidebar-footer")).toHaveCount(0);

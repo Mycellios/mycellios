@@ -2,7 +2,7 @@ import { authClient } from "./auth";
 import { speaker } from "./tts";
 import { prepareNetworkTranscriptionAudio } from "./transcription-audio";
 import { getGeneralPreferences } from "./general-preferences";
-import { readBoundedResponseBytes, speechLocaleTag } from "@rakazo/core";
+import { readBoundedResponseBytes, speechLocaleTag } from "@mycellios/core";
 import { isAndroidHost, startAndroidDictation } from "./android-host";
 import { appPath } from "./app-path";
 import { getActiveUiLocale } from "./i18n.js";

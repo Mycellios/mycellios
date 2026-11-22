@@ -1,5 +1,5 @@
-import { runContinueJob } from "@rakazo/adapter-kit";
-import { MessageBlock } from "@rakazo/contracts";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import { MessageBlock } from "@mycellios/contracts";
 import {
   BOT_MESSAGE_MAX_LENGTH,
   botMessageContext,
@@ -8,7 +8,7 @@ import {
   renderBotGroupDirectory,
   renderGroupMembersContext,
   resolveBotAddress,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
@@ -16,8 +16,8 @@ import {
   lockOwnedGroup,
   type PrismaClient,
   touchGroupUpdatedAt,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { ExecutorDeps } from "./executor.js";
 
 export async function handoffToGroupBot(

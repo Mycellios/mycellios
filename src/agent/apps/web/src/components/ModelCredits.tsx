@@ -1,10 +1,10 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { BillingStatus } from "@rakazo/contracts";
+import type { BillingStatus } from "@mycellios/contracts";
 import {
   DEFAULT_MONTHLY_CREDIT_AMOUNT,
   MODEL_CREDIT_AMOUNTS,
   ModelCreditAmountSchema,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   Button,
   Card,
@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check } from "lucide-react";
 import { useState } from "react";
 import { appPath } from "../lib/app-path";

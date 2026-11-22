@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   BotAvatar: ({ color, identity }: { color: string; identity: string }) => <span data-color={color} data-identity={identity} />,
 }));
 vi.mock("../../components/AuthMushroom", () => ({ AuthMushroom: () => <span data-brand-avatar /> }));

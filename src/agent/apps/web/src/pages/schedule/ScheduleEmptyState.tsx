@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
-import { BotAvatar, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import { BotAvatar, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@mycellios/ui-web";
 import { Check, Pause, Play, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { calendarDays, civilDate } from "./calendar-dates";

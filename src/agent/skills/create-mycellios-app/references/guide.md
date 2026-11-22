@@ -50,11 +50,11 @@ npm run apps:validate -- /ruta/mi-app/app.json --previous /ruta/version-anterior
 npm run apps:validate -- --schema
 ```
 
-En el PC de Daniel, ejecuta validaciones y pruebas mediante `compilar.ps1`,
+En el PC del mantenedor, ejecuta validaciones y pruebas mediante `compilar.ps1`,
 con `WorkingDirectory` en `src/agent`; no anides el planificador. Por ejemplo:
 
 ```powershell
-pwsh -NoProfile -File "C:\Users\Daniel\Documents\Codex\2026-10-07\mira-x20\outputs\limite-tareas\compilar.ps1" -WorkingDirectory "RUTA_MYCellios\src\agent" -Command "npm run apps:validate -- skills/create-mycellios-app/assets/template/app.json --json"
+pwsh -NoProfile -File "RUTA_A\compilar.ps1" -WorkingDirectory "RUTA_MYCellios\src\agent" -Command "npm run apps:validate -- skills/create-mycellios-app/assets/template/app.json --json"
 ```
 
 Para calcular un hash sin ejecutar el recurso:

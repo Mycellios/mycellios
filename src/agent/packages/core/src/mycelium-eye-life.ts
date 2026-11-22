@@ -1,6 +1,6 @@
 // MIT, Copyright (c) 2026 Jérémy Perret. See ../assets/Bloub-LICENSE.txt.
 // Adapted from NorbertBodziony/bloub@7983de0bb7e868ac84881581eaa8c2e1f459dd30.
-// Pure idle gaze/blink math only; no OpenBot application code or Solid runtime.
+// Pure idle gaze/blink math only; no the reference app application code or Solid runtime.
 const TAU = Math.PI * 2;
 const clamp = (v: number) => Math.max(0, Math.min(1, v));
 export function loopNoise(t: number, period: number, seed = 0): number {

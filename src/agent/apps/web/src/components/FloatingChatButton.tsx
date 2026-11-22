@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { ExternalLink, PanelsTopLeft } from "lucide-react";
 import { useState } from "react";
 import { desktopBridge } from "../lib/desktop";

@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import type { JobPublisher } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import type { Actor, MessageBlock } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { JobPublisher } from "@mycellios/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import type { Actor, MessageBlock } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { withSerializableRetry } from "./serializable-retry.js";
 import type { ThreadTarget } from "./thread-target.js";
 

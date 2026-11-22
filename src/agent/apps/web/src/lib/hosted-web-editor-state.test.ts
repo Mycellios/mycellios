@@ -1,4 +1,4 @@
-import type { HostedWebDraft } from "@rakazo/contracts";
+import type { HostedWebDraft } from "@mycellios/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 
 vi.mock("./rpc", () => {

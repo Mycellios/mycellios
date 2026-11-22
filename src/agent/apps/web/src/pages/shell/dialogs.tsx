@@ -1,6 +1,6 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import type { Bot, BotSection } from "@rakazo/contracts";
-import { sidebarFolderTree } from "@rakazo/core";
+import type { Bot, BotSection } from "@mycellios/contracts";
+import { sidebarFolderTree } from "@mycellios/core";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +21,7 @@ import {
   OptionSelect,
   RadioGroup,
   RadioGroupItem,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Lock } from "lucide-react";
 import { useId, useState } from "react";
 import { spaceLabel } from "../../lib/space-label";

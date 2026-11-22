@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Routine } from "@rakazo/contracts";
-import { BotAvatar, Button } from "@rakazo/ui-web";
+import type { Bot, Routine } from "@mycellios/contracts";
+import { BotAvatar, Button } from "@mycellios/ui-web";
 import { Clock3, Maximize, Minus, Plus } from "lucide-react";
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";

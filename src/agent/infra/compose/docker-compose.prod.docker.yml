@@ -46,7 +46,7 @@ services:
       args:
         GIT_SHA: ${GIT_SHA:-}
     restart: unless-stopped
-    command: ["npm", "run", "start", "--workspace", "@rakazo/sandbox-supervisor"]
+    command: ["npm", "run", "start", "--workspace", "@mycellios/sandbox-supervisor"]
     init: true
     user: root
     security_opt:

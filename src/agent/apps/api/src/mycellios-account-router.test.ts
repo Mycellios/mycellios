@@ -1,6 +1,6 @@
 import { createRouterClient } from "@orpc/server";
-import { serializeModelSecret } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
+import { serializeModelSecret } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";

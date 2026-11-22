@@ -90,7 +90,7 @@ async function main() {
   const models = await request('model/list', {});
   const model = models.data?.find(m => m.isDefault);
   if (!model) throw new Error('unavailable');
-  // A thread whose only tool makes images, in Codex's built-in read-only sandbox (as OpenBot starts
+  // A thread whose only tool makes images, in Codex's built-in read-only sandbox (as the reference app starts
   // its media threads): every other tool and each of the user's MCP servers is off. A custom
   // filesystem profile that denies reading the root cannot start on Windows, where the sandbox
   // needs root read access.

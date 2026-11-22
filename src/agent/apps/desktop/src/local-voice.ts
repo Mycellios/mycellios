@@ -2,7 +2,7 @@ import { windowsProcessTree, type NativeProcessTree } from "../../../packages/ad
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import { lstat, mkdir, rename, stat, unlink } from "node:fs/promises";
-import type { LocalVoiceModelKind, LocalVoiceModelStatus, LocalVoiceStatus } from "@rakazo/contracts";
+import type { LocalVoiceModelKind, LocalVoiceModelStatus, LocalVoiceStatus } from "@mycellios/contracts";
 import { createRequire } from "node:module";
 import { join, sep } from "node:path";
 import { spawn } from "node:child_process";
@@ -13,7 +13,7 @@ import { pipeline } from "node:stream/promises";
 import models from "./local-voice-models.json" with { type: "json" };
 
 // Pinned public model manifests: Parakeet (CC-BY-4.0), Supertonic (OpenRAIL-M).
-// Pins match OpenBot's speech-models manifest; inference uses sherpa-onnx (Apache-2.0).
+// Pins match the reference app's speech-models manifest; inference uses sherpa-onnx (Apache-2.0).
 const require = createRequire(import.meta.url);
 const modelKinds = ["asr", "tts"] as const;
 

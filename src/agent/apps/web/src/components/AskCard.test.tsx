@@ -12,7 +12,7 @@ vi.mock("@lingui/react/macro", () => ({
     t: (parts: TemplateStringsArray, ...values: unknown[]) => String.raw(parts, ...values),
   }),
 }));
-vi.mock("@rakazo/chat-ui/web", () => ({
+vi.mock("@mycellios/chat-ui/web", () => ({
   ChatMarkdown: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }));
 vi.mock("../lib/rpc", () => ({ rpc: {} }));

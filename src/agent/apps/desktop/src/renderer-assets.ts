@@ -4,7 +4,7 @@ import {
   CSP_REPORTING_ENDPOINTS,
   appContentSecurityPolicy,
   contentSecurityPolicyFor,
-} from "@rakazo/contracts/content-security-policy";
+} from "@mycellios/contracts/content-security-policy";
 import { firstPartyRendererTarget, servesBundledRenderer } from "./setup-config.js";
 
 const PASSTHROUGH_PATHS = ["/api", "/rpc", "/novnc", "/auth"];

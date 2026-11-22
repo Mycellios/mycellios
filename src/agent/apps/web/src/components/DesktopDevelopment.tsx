@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { useRef, useState } from "react";
 import { appRoute } from "../lib/app-path";
 import { desktopBridge } from "../lib/desktop";

@@ -12,8 +12,8 @@ import type {
   ScreenRequest,
   TerminalRequest,
   WorkspaceDirectoryRequest,
-} from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import { cancelComputerRunWork } from "./computer-idle.js";
 import { manageComputerWorkspaceDirectories } from "./computer-workspace.js";
 import { desktopRelayAvailable, desktopRelayTransport } from "./desktop-relay.js";

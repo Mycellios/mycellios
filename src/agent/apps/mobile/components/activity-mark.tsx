@@ -1,5 +1,5 @@
-import { avatarPhotoDot } from "@rakazo/core";
-import { MAX_FONT_SCALE, typeScale } from "@rakazo/ui-tokens";
+import { avatarPhotoDot } from "@mycellios/core";
+import { MAX_FONT_SCALE, typeScale } from "@mycellios/ui-tokens";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";

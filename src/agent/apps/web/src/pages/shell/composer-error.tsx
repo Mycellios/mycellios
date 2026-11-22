@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
-import { MISSING_MODEL_RUN_ERROR, desktopRunDiagnosticText, isModelRequiredSendError, normalizeRunError } from "@rakazo/core";
-import { Button } from "@rakazo/ui-web/components/ui/button";
+import { MISSING_MODEL_RUN_ERROR, desktopRunDiagnosticText, isModelRequiredSendError, normalizeRunError } from "@mycellios/core";
+import { Button } from "@mycellios/ui-web/components/ui/button";
 import { X } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";

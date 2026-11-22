@@ -1,6 +1,6 @@
-import type { McpServerHealth } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+import type { McpServerHealth } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 
 const HEALTH_MESSAGE_MAX = 2000;
 

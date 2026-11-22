@@ -1,4 +1,4 @@
-import { BOT_INSTRUCTIONS_MAX_LENGTH, FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
+import { BOT_INSTRUCTIONS_MAX_LENGTH, FIRST_MICO_SPAWN_KEY } from "@mycellios/contracts";
 
 export const TEAM_SECTORS = [
   "sales",

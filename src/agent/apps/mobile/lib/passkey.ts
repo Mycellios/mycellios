@@ -1,5 +1,5 @@
-import type { AuthCapabilities } from "@rakazo/contracts";
-import { hostMatchesPasskeyRpId, passkeyOfferDismissedKey, shouldOfferPasskey } from "@rakazo/core";
+import type { AuthCapabilities } from "@mycellios/contracts";
+import { hostMatchesPasskeyRpId, passkeyOfferDismissedKey, shouldOfferPasskey } from "@mycellios/core";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { Alert, Platform } from "react-native";

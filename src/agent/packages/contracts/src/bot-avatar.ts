@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-/** Matches the eight shipped mascot shapes in `@rakazo/core`. */
+/** Matches the eight shipped mascot shapes in `@mycellios/core`. */
 export const BOT_AVATAR_SHAPE_COUNT = 8;
 
 // Keep the legacy shape slots and their modulo behavior for stored avatars.

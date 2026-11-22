@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { createAuth } from "@rakazo/auth";
-import { bootstrapUserSpace, createDb, runAsSystem } from "@rakazo/db";
+import { createAuth } from "@mycellios/auth";
+import { bootstrapUserSpace, createDb, runAsSystem } from "@mycellios/db";
 
 function required(name: string): string {
   const value = process.env[name];

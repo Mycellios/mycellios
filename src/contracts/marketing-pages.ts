@@ -1,7 +1,6 @@
 import { MARKETING_GUIDE_PATHS } from "./marketing-guides.js";
 export const STATS_HOST = "stats.mycellios.com";
 export const MARKETING_COMPARISONS = [
-  ["openbot", "OpenBot"],
   ["grok-bot", "Grok Bot"], ["hermes-agent", "Hermes Agent"], ["muse", "Muse"],
   ["openclaw", "OpenClaw"], ["claude-cowork", "Claude Cowork"], ["chatgpt-dots", "ChatGPT dots"],
   ["manus", "Manus"], ["devin", "Devin"], ["paperclip", "Paperclip"],

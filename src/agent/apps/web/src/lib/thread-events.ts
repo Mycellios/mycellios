@@ -7,8 +7,8 @@ import type {
   ThreadMessage,
   ThreadMessagePage,
   ThreadSnapshot,
-} from "@rakazo/contracts";
-import { RUN_TRIGGERS } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import { RUN_TRIGGERS } from "@mycellios/contracts";
 import {
   isActive,
   isBackgroundRunTrigger,
@@ -29,7 +29,7 @@ import {
   updateCloudAgentMessages,
   upsertMessageById,
   withLivePlan,
-} from "@rakazo/core";
+} from "@mycellios/core";
 
 const runTriggers = new Set<string>(RUN_TRIGGERS);
 
