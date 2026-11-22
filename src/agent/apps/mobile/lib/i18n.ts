@@ -108,7 +108,8 @@ export async function bootstrapI18n(): Promise<UiLocale> {
 
 export async function persistUiLocale(locale: UiLocale): Promise<void> {
   try {
-    const SecureStore = await import("./secure-store");
+    // Writes need no legacy fallback, so this skips the wrapper and its extra module load.
+    const SecureStore = await import("expo-secure-store");
     await SecureStore.setItemAsync(UI_LOCALE_STORAGE_KEY, locale);
   } catch {
     // Ignore SecureStore failures; in-memory locale still applies.
