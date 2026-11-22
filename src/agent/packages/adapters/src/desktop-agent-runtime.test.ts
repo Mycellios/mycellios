@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@mycellios/adapter-kit";
-import { isUncertainDesktopRun } from "@mycellios/core";
+import { DESKTOP_OWNER_UNRESOLVED_ERROR, isUncertainDesktopRun } from "@mycellios/core";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { DesktopUnreachableError } from "./computer-errors.js";
 import { desktopAgentSelection, desktopRelayKey } from "./desktop-relay.js";
@@ -207,6 +207,18 @@ it("keeps an explicitly selected native account from falling back to a paid API 
   await expect(async () => {
     for await (const _ of runtime.run({ ...request(), agentEngine: "codex" }, { ...context, isolatedWorkspace: true })) {}
   }).rejects.toThrow("Desktop is offline");
+  expect(fallback.run).not.toHaveBeenCalled(); expect(transport).not.toHaveBeenCalled();
+});
+
+it.each([true, false])("asks the owner to choose a PC instead of guessing or running on the server (preferred %s)", async preferred => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = vi.fn();
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred, unresolved: true }) });
+  for (const agentEngine of [undefined, "codex"] as const) {
+    await expect(async () => {
+      for await (const _ of runtime.run({ ...request(), agentEngine }, context)) {}
+    }).rejects.toThrow(DESKTOP_OWNER_UNRESOLVED_ERROR);
+  }
   expect(fallback.run).not.toHaveBeenCalled(); expect(transport).not.toHaveBeenCalled();
 });
 

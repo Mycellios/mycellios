@@ -100,6 +100,7 @@ export async function prepareHostComputer(
     lockProject: server.lockProject,
     project: server.project,
     workspace: server.workspace,
+    workspaceKeys: server.workspaceKeys,
     micoFolder: server.micoFolder,
     isEnabled: server.isEnabled,
     executionScope: () => server.isEnabled() && /^[a-f0-9]{64}$/.test(rememberedAccount ?? "") ? rememberedAccount! : undefined,

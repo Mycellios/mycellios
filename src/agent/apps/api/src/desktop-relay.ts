@@ -59,8 +59,10 @@ export function mountDesktopRelay(
         broker.connectAccountBot(input.scope,botId);
       }
       if (input.probe && !input.request) {
-        if (input.agentExecution === 1) return c.json({ agentExecution: 1, available: broker.agentAvailable(input.scope, input.probe), preferred: await deps.desktopExecution?.(input.scope) ?? false });
-        return c.json({ available: broker.available(input.scope, input.probe) });
+        // A PC is online but none could take this Mico: never report that as an offline PC.
+        const unresolved = broker.unresolved(input.scope, input.probe) ? { unresolved: true } : {};
+        if (input.agentExecution === 1) return c.json({ agentExecution: 1, available: broker.agentAvailable(input.scope, input.probe), preferred: await deps.desktopExecution?.(input.scope) ?? false, ...unresolved });
+        return c.json({ available: broker.available(input.scope, input.probe), ...unresolved });
       }
       if (!input.request || input.probe) return c.json({ error: "Invalid request" }, 400);
       return broker.dispatch(hostComputerRequest.parse(input.request), {
@@ -133,7 +135,8 @@ export function mountDesktopRelay(
           broker.register(owner,value);
           for(const botId of broker.ownedBindings(owner,value.deviceId))
             if(!await deps.ownsBot(session.actor,botId))broker.revokeBot(owner,botId);
-          return c.json({...await poll(value),identity});
+          // ownership: this server accepts the PC's Mico folder keys in later registrations.
+          return c.json({...await poll(value),identity,ownership:1});
         }
         case "bind": {
           const value = parseDesktopBinding(input);

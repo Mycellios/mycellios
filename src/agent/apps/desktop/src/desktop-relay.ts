@@ -6,7 +6,7 @@ import type {
   DesktopExecutorOperation,
   DesktopExecutorPoll,
 } from "../../../../contracts/desktop-executor.js";
-import {parseDesktopBinding} from "../../../../contracts/desktop-executor.js";
+import {DESKTOP_WORKSPACE_REPORT_LIMIT, parseDesktopBinding} from "../../../../contracts/desktop-executor.js";
 import {
   HOST_COMPUTER_MAX_BYTES,
   hostComputerRequest,
@@ -49,6 +49,8 @@ export class DesktopRelayClient {
   private accountIdentity?: {userId:string;spaceId:string;connectionId:string};
   private intent=0;
   private updating = false;
+  /** The server said it accepts this PC's Mico folder keys; older servers refuse unknown fields. */
+  private reportWorkspaces = false;
   private updateNotices = new Map<string, () => Promise<void>>();
   constructor(
     private readonly options: {
@@ -63,6 +65,8 @@ export class DesktopRelayClient {
       /** Keeps the OS from suspending the app while an operation runs; returns its release. */
       awake?: () => () => void;
       restoreUpdate?: (identity: {userId:string;spaceId:string;connectionId:string}, botId?: string) => Promise<UpdateResumeBinding | undefined>;
+      /** Keys of the Mico folders on this PC, reported with account presence. */
+      workspaces?: () => string[];
     },
   ) { if(options.deviceId)this.deviceId=options.deviceId; }
   private async post(action: string, input: unknown, signal?: AbortSignal) {
@@ -224,16 +228,28 @@ export class DesktopRelayClient {
     this.grants.clear();
     this.accountGeneration=undefined;
     this.accountIdentity=undefined;
+    this.reportWorkspaces=false;
+  }
+  private ownedWorkspaces() {
+    if (!this.accountGeneration || !this.reportWorkspaces || !this.options.workspaces) return undefined;
+    try {
+      return this.options.workspaces().filter(key => /^[a-f0-9]{64}$/.test(key)).slice(0, DESKTOP_WORKSPACE_REPORT_LIMIT);
+    } catch {
+      return undefined; // The server keeps the last report from this PC.
+    }
   }
   private async poll() {
     if (this.stopped) return;
     const pollController = new AbortController(); this.pollController = pollController;
     const previousActive = new Set(this.active.keys());
+    const workspaces = this.ownedWorkspaces();
     try {
       const state = (await (
-        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {})} : {}),...(this.options.agentExecution && this.lastContact ? {wait:true,active:[...previousActive]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
+        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {}),...(workspaces ? {workspaces} : {})} : {}),...(this.options.agentExecution && this.lastContact ? {wait:true,active:[...previousActive]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
       ).json()) as DesktopExecutorPoll & { identity?: unknown };
       if(this.stopped)return;
+      // Report Mico folders only to a server that asked for them, from its next poll on.
+      if (this.accountGeneration) this.reportWorkspaces = state.ownership === 1;
       if (!this.owner || JSON.stringify(state.identity) !== this.owner) {
         this.stop();
         this.options.revoked();
@@ -309,6 +325,9 @@ export class DesktopRelayClient {
         void this.execute(operation, controller).finally(() => { release?.(); this.active.delete(operation.id); this.settled.delete(operation.id); });
       }
     } catch (error) {
+      // An older API behind the same address refuses the extra field; the next poll
+      // goes without it until a server offers the report again.
+      if (workspaces) this.reportWorkspaces = false;
       if (!this.stopped && !pollController.signal.aborted) recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
       // A slow server is not an outage: running work keeps its operations until
       // the stall outlasts what the server's own presence lease tolerates.

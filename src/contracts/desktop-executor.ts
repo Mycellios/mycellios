@@ -10,15 +10,25 @@ export interface DesktopExecutorPoll {
   bindings?: DesktopExecutorBinding[];
   operations: DesktopExecutorOperation[];
   active: string[];
+  /** Account responses only: this server accepts `workspaces` in later registrations. */
+  ownership?: 1;
 }
-export function parseDesktopAccount(value: unknown): {deviceId: string; generation: string; agentExecution?: 1; wait?: boolean; active?: string[]; identity:{userId:string;spaceId:string;connectionId:string}} {
-  const input = object(value, ["deviceId", "generation", "identity", "agentExecution", "wait", "active"]);
+/** The most Mico folder keys one Desktop reports in a registration. */
+export const DESKTOP_WORKSPACE_REPORT_LIMIT = 256;
+export function parseDesktopAccount(value: unknown): {deviceId: string; generation: string; agentExecution?: 1; wait?: boolean; active?: string[]; workspaces?: string[]; identity:{userId:string;spaceId:string;connectionId:string}} {
+  const input = object(value, ["deviceId", "generation", "identity", "agentExecution", "wait", "active", "workspaces"]);
   const waiting = parseDesktopWait(input);
   if (input.agentExecution !== undefined && input.agentExecution !== 1) throw Error("Unsupported Desktop execution version");
   if (!uuid(input.deviceId) || !uuid(input.generation)) throw new Error("Invalid Desktop account grant");
+  // SHA-256 keys of the Mico folders that exist on this PC; never paths or names.
+  if (input.workspaces !== undefined && (!Array.isArray(input.workspaces) || input.workspaces.length > DESKTOP_WORKSPACE_REPORT_LIMIT ||
+      input.workspaces.some(key => typeof key !== "string" || !/^[a-f0-9]{64}$/.test(key))))
+    throw Error("Invalid Desktop workspaces");
   const owner=object(input.identity,["userId","spaceId","connectionId"]);
   if(!id(owner.userId)||!id(owner.spaceId)||!id(owner.connectionId))throw Error("Invalid account identity");
-  return {deviceId:input.deviceId,generation:input.generation,...waiting,...(input.agentExecution === 1 ? { agentExecution: 1 as const } : {}),identity:{userId:owner.userId,spaceId:owner.spaceId,connectionId:owner.connectionId}};
+  return {deviceId:input.deviceId,generation:input.generation,...waiting,...(input.agentExecution === 1 ? { agentExecution: 1 as const } : {}),
+    ...(input.workspaces !== undefined ? { workspaces: [...new Set(input.workspaces as string[])] } : {}),
+    identity:{userId:owner.userId,spaceId:owner.spaceId,connectionId:owner.connectionId}};
 }
 export interface DesktopExecutorResult { deviceId: string; id: string; seq: number; data: string; done: boolean }
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);

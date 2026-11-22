@@ -389,3 +389,44 @@ it("stays online when a poll also lists another desktop", async () => {
     expect(revoked).not.toHaveBeenCalled();
   } finally { client.stop(); }
 });
+
+it("reports this PC's Mico folders only to a server that asks for them and stops after a refusal", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(50_000);
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const folder = "a".repeat(64);
+  const registrations: Array<Record<string, unknown>> = [];
+  let ownership = true;
+  let refuse = false;
+  const client = new DesktopRelayClient({
+    base: "https://example.test",
+    localUrl: "http://127.0.0.1:1234",
+    localToken: "unused",
+    revoked: vi.fn(),
+    workspaces: () => [folder, "Not a key"],
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      if (action === "identity") return Response.json(identity);
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      registrations.push(body);
+      // An older API behind the same address refuses the unknown field.
+      if (refuse && "workspaces" in body) return Response.json({ error: "PC connection changed." }, { status: 409 });
+      return Response.json({ identity, bindings: [], active: [], operations: [], ...(ownership ? { ownership: 1 } : {}) });
+    },
+  });
+  try {
+    await client.registerAccount(identity);
+    expect(registrations[0]).not.toHaveProperty("workspaces");
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(registrations.at(-1)).toMatchObject({ workspaces: [folder] });
+    refuse = true;
+    ownership = false;
+    const before = registrations.length;
+    await vi.advanceTimersByTimeAsync(6_000);
+    const after = registrations.slice(before);
+    expect(after[0]).toHaveProperty("workspaces");
+    expect(after.length).toBeGreaterThan(1);
+    expect(after.slice(1).some((body) => "workspaces" in body)).toBe(false);
+    expect(client.online()).toBe(true);
+  } finally { client.stop(); }
+});

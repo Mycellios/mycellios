@@ -6,6 +6,7 @@ import { createServer } from "node:http";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AdapterContext, AgentRuntime, ComputerRef } from "@mycellios/adapter-kit";
+import { DESKTOP_WORKSPACE_REPORT_LIMIT } from "../../../../contracts/desktop-executor.js";
 import { AppControlRunner } from "./app-control-runner.js";
 import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { safeNativeCommandError } from "./native-command-journal.js";
@@ -544,6 +545,8 @@ export async function startHostComputerServer(options: {
     },
     /** Native-only location of this agent's existing default workspace. */
     workspace: (botId: string) => ref(botId).providerRef,
+    /** SHA-256 keys of the Mico folders on this PC, so the server can route each Mico to it. */
+    workspaceKeys: () => folders.keys(DESKTOP_WORKSPACE_REPORT_LIMIT),
     /** This Mico's folder when it exists on disk; never creates or chooses one. */
     micoFolder(botId: string) {
       if (!botId || botId.length > 256) return undefined;
