@@ -6,6 +6,78 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-22
+
+### Added
+
+- Messages that wait while a Mico works now show in a "Waiting to send" panel that
+  says why they wait: the current turn, a full set of conversation slots, a restart,
+  a usage limit or a needed sign-in, or an edit in progress.
+- Each waiting message can be sent into the running turn (Steer now), sent next by
+  stopping the current turn (Send now), edited, deleted, reordered by dragging or with
+  the arrow keys, or moved to a new conversation of the Mico with the +. A message
+  being edited holds the queue until you save or cancel, also after a reload or on
+  another device.
+- A turn that waits for its own background commands shows "Waiting for background
+  work…" with a timer.
+- A Mico can send one message to up to 32 teammates at once, share up to 10 files from
+  its workspace with them, answer a specific message, and say whether it expects a reply.
+  When it asked several teammates, it continues once all of them have answered or were
+  stopped, with every answer together and the names of anyone who did not answer.
+- A Mico's chat shows "Waiting for replies" above the message box: how many answers are
+  in, what each teammate is doing, and Stop for each one still working. A delegated task
+  that was stopped offers Continue, Reassign and Cancel. A finished list can be hidden.
+- Groups have a purpose and a lead that you choose when creating the group or in its
+  settings. Messages that name nobody go to the lead, which answers or hands the request
+  to the right member in the chat.
+- Writing "continue" or "keep going" in a group picks up the work that stopped on the
+  last request instead of starting over.
+- "Send to group" on a message opens the group with that text ready to send.
+- A Mico can see what its teammates are doing before it starts work, start work in one of
+  its groups and get the results back in its own chat, and stop work it asked a teammate
+  for when it is no longer needed.
+- Settings → Account has an API keys section (Claves de API in Spanish): it shows the API base URL, creates a named key
+  whose secret is shown once with a copy button, lists each key with its prefix, creation date and last use, and revokes a
+  key after you confirm. The key that Mycellios Agent uses for your Credits is marked "Used by Mycellios Agent" and cannot
+  be revoked there. Links to `?settings=api-keys` open this section directly, also after signing in.
+
+### Changed
+
+- A Mico's main chat no longer counts toward its limit of tasks at once, so it never
+  waits behind side conversations; side conversations past the limit wait for a free
+  slot. Native engines still run one turn at a time.
+- A message sent into a running turn reaches the Mico with a short note that it adds
+  to the current work, and Codex, Claude Code and ACP Micos now receive it after their
+  next tool step instead of only after the turn. A running shell command moves to the
+  background instead of holding the message back.
+- After a turn fails on a usage limit or a needed sign-in, the queued messages wait
+  for you instead of failing one after another.
+- Ask aside can follow up on more of the recent questions and answers in its panel.
+- Desktop uses the Mycellios bridge name while keeping older Desktop and web builds compatible.
+- Messages between Micos show as folded lines ("Messaged", "Informed", "Message from",
+  "Update from") that open to show the text. A teammate's quiet reply to an update folds
+  under it.
+- In a group, each member answers from its own view: it sees the other members' replies to
+  the same message only after it has replied.
+- Supermemory saves new memories under the Mycellios name and continues to find previously saved memories.
+- Servers accept Mycellios sign-in and account callback links for future iPhone app updates.
+- Expo notifications use Mycellios links when opening conversations.
+- The mobile Conversations menu groups unread, read and archived chats, shows how many need your attention, and puts conversation actions within reach of a tap.
+- Archiving a conversation can bring its memory review forward when automatic memory reviews are enabled and within your Credit limits.
+- Permanently deleting a conversation also removes saved memory revisions from that conversation. Notes from other conversations stay available.
+
+### Fixed
+
+- Let the Windows updater retry briefly when another process has its progress receipt open.
+- Switching conversations reuses recent messages while the history refreshes. The Answer shortcut opens the conversation with the pending question.
+
+### Self-host upgrade notes
+
+- Apply the additive migration `20261123090000_message_queue_controls` before starting
+  this version. It adds the nullable `position`, `heldBy`, `heldAt` and `editDraft`
+  columns to `steering_messages` and gives messages that already wait their current
+  order.
+
 ## [0.16.0] - 2026-11-22
 
 ### Security
