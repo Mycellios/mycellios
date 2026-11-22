@@ -187,7 +187,7 @@ it("disables switching and submission while registration is in progress", async 
   await act(async () => reject(new Error("fixture failure")));
 });
 it("respects the saved Spanish choice", async () => {
-  localStorage.setItem("rakazo.uiLocale", "es");
+  localStorage.setItem("mycellios.uiLocale", "es");
   await render();
   expect(host.querySelector(".login-switch")?.textContent).toBe("Crear cuenta");
   await click("Crear cuenta");
@@ -225,7 +225,7 @@ it.each([
   ["fr", "Connexion…"],
   ["ja", "サインインしています…"],
 ] as const)("uses the saved %s locale on the sign-in transition", async (locale, status) => {
-  localStorage.setItem("rakazo.uiLocale", locale);
+  localStorage.setItem("mycellios.uiLocale", locale);
   vi.mocked(restoreAuthSession).mockResolvedValue(session);
   vi.mocked(getOAuthAuthorization).mockReturnValue(new Promise(() => undefined));
   await act(async () => root.render(<OAuthConsent />));

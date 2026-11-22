@@ -190,13 +190,27 @@ chooses per route from measured costs.
 
 ### Binaries
 
-Each target's llama.cpp release artifact is published as a pinned,
-content-addressed runtime component (`scripts/publish-runtime-components.mjs`).
-A node downloads only the variants its hardware can run and verifies the hash
-before loading. The CPU variant loads its instruction-set kernels at runtime
-(the release ships one library per CPU generation), so one artifact covers every
-x64 CPU. The binding checks `llama.h` struct sizes against the pinned build at
-load and refuses to start on a mismatch.
+Each target's official llama.cpp release archive is pinned in
+`PINNED_BUILDS` (`llama_cpp_runtime.py`) by URL, size and SHA-256, and so is
+every library the node loads from it. A node installs its build only when the
+coordinator first routes a llama.cpp stage to it
+(`python -m distributed_runtime.llama_cpp_install`, called by the stage
+preparer): it downloads the archive over HTTPS, bounded by its pinned size,
+accepts it only with its pinned hash, extracts only the pinned libraries by
+exact name, verifies each one and moves the directory into the node's cache
+atomically. Later routes reuse a directory that still verifies; a damaged one
+is replaced. Because every byte is pinned, the archive can come from the
+upstream release or any mirror without being trusted; republishing it as a
+Mycellios component is only needed if the upstream asset disappears. The CPU
+variant loads its instruction-set kernels at runtime (the release ships one
+library per CPU generation), so one artifact covers every x64 CPU. The struct
+layouts in the binding are those of the pinned build, which is why only
+hash-verified libraries are ever loaded.
+
+Done for Windows x64: the Vulkan archive of b12613 (38.8 MB, which also
+carries every CPU backend). On the development PC the first installation took
+27 s and a reuse 4.5 s, most of it importing Torch. Other platforms report
+`llama_cpp_build_unavailable_for_platform` and keep their Torch routes.
 
 Initial targets: Windows and Linux x64 with `cpu` and `vulkan`, Linux x64 with
 `cuda`. Apple GPUs are an open question, because the backend enum has `mps`
@@ -280,8 +294,8 @@ What remains before selection is automatic, in order:
    bytes each package holds, a tied head is budgeted at both ends, and the KV
    cache is float16. The checkpoint is never profiled, and measured
    safetensors candidates do not apply. The root loads only its tokenizer from
-   the Hugging Face source, at its default revision. Still open: each node's
-   llama.cpp build coming from the pinned runtime component.
+   the Hugging Face source, at its default revision. A node without a
+   configured build installs the pinned one on demand (see Binaries).
 5. Requested models gain a pinned GGUF source, and nodes build their stage
    packages from it. The pin lives in the engine activation authority, not in
    the requested-model table, so it needs no migration and is bound by the

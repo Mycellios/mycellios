@@ -10,7 +10,7 @@ if (computer?.connect && computer.connected && computer.projectAvailable) {
     const base = match[1] ?? "";
     const send = window.fetch.bind(window);
     const admit = nativeComputerAdmission(computer, (botId) =>
-      prepareNativeWorkspace(send, window.location.origin, base, window.localStorage.getItem("rakazo:space-id"), botId),
+      prepareNativeWorkspace(send, window.location.origin, base, window.localStorage.getItem("mycellios:space-id"), botId),
     );
     window.fetch = nativeComputerFetch(
       send,

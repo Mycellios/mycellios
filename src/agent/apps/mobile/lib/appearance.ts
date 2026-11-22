@@ -1,4 +1,5 @@
 import {
+  LEGACY_UI_APPEARANCE_STORAGE_KEY,
   type AppearancePreference,
   normalizeAppearancePreference,
   type ResolvedAppearance,
@@ -25,7 +26,9 @@ export function getCachedAppearancePreference(): AppearancePreference {
 
 export async function loadAppearancePreference(): Promise<AppearancePreference> {
   try {
-    const stored = await SecureStore.getItemAsync(UI_APPEARANCE_STORAGE_KEY);
+    const stored =
+      (await SecureStore.getItemAsync(UI_APPEARANCE_STORAGE_KEY)) ??
+      (await SecureStore.getItemAsync(LEGACY_UI_APPEARANCE_STORAGE_KEY));
     memoryPreference = normalizeAppearancePreference(stored);
   } catch {
     memoryPreference = memoryPreference ?? "system";

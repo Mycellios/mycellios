@@ -137,7 +137,7 @@ test("preload recovery keeps Settings bound to another space", async ({ page }, 
   await completeOnboarding(page);
   await page.waitForURL((url) => url.pathname.startsWith("/app/") && url.href !== personalUrl);
   const originalUrl = page.url();
-  const selected = await page.evaluate(() => localStorage.getItem("rakazo:space-id"));
+  const selected = await page.evaluate(() => localStorage.getItem("mycellios:space-id"));
   await page.route(
     /\/pages\/SettingsOverlay\.tsx/,
     async (route) => {
@@ -161,7 +161,7 @@ test("preload recovery keeps Settings bound to another space", async ({ page }, 
       url.searchParams.get("settings") === "space" &&
       url.searchParams.has("space"),
   );
-  expect(await page.evaluate(() => localStorage.getItem("rakazo:space-id"))).toBe(selected);
+  expect(await page.evaluate(() => localStorage.getItem("mycellios:space-id"))).toBe(selected);
   await captureScreenshot(page, testInfo, "preload-recovered-space-settings");
 });
 
