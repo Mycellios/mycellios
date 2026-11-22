@@ -44,6 +44,10 @@
   Build with scripts/build-android-release.sh and verify scoped web/Java tests, APK
   signature, source seal, manual update continuity and physical Quick Tap separately.
 
+- Expo mobile registers both app-link schemes and routes notifications from either.
+  iOS screenshot flows exercise the Mycellios scheme. Keep old callback URLs
+  working while deployed servers and supported builds still use them.
+
 - Native Expo sign-in may share the configured HTTPS OIDC issuer origin with Agent.
   Its authorization proxy accepts only the configured issuer authorize path, client,
   callback, S256 challenge and live server-issued state/nonce. Preserve the upstream
