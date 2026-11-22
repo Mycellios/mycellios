@@ -105,10 +105,13 @@
   or native runtimes. Keep scripts, ephemeral setup/retrieval/compaction and
   one-shot internal generations outside that loop. Retain persisted continuation
   counts, Stop, approvals and ordinary Credit admission on every model call.
-  With Pi's optional tool-call limit, a committed `ask_user` answer gives that
-  checkpoint one fresh budget while retaining the plan and prior tool results.
-  Automatic plan starts, approval replays and retries keep the existing budget.
-  Verify the handoff with the Pi checkpoint and tool-dispatch tests.
+  Pi shares the task tool budget across the parent and subagents. Plan updates
+  and internal tool discovery use a separate cap of max(8, configured limit).
+  Give the model the remaining task budget so it can prioritize verification and
+  close its plan. A committed `ask_user` answer starts a fresh budget once for
+  that checkpoint and retains the plan and prior tool results. Automatic plan
+  starts, approval replays and retries keep their existing budget. Verify with
+  the Pi checkpoint, catalog and tool-dispatch tests.
 - `await_event` parks a private Mico request as a `waiting_event` child of the
   existing Task tree. It waits for an owned run, the next owned routine result,
   or a bounded future time; external events use the existing routine ingress.
