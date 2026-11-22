@@ -28,6 +28,7 @@ models are never mixed: Jarvis stores 0.6B vectors in their own column.
 |---|---|
 | GPU replica (fp16, primary) | MRPUCCHI `100.102.221.91:18495`, Windows service `MycelliosQwen06` |
 | Apple GPU replica (MPS fp16, shares load) | MacBook Air M1 `100.102.252.212:18495`, user LaunchAgent `io.mycellios.qwen06` |
+| DirectML replica (fp32, shares load) | PC-DANI Radeon 890M `100.102.1.112:18495`, user Startup entry `mycellios-qwen06.vbs` |
 | CPU replicas (backup / disabled) | HP ProBook `100.102.123.237:18495`, MSI GE60 `100.102.242.239:18495` |
 | Failover entry | control server `10.48.0.10:18495`, systemd `mycellios-qwen06-forwarder` |
 | Client | Jarvis API on prod-apps-01 (`10.48.0.6`) |
@@ -61,7 +62,9 @@ requests, port 18496 for the replica group only).
 - `query` makes the server apply Qwen's official query instruction; clients
   never add it.
 - The response is OpenAI-shaped, with `revision` and L2-normalized 1024-dim
-  vectors.
+  vectors. A replica refuses to return any vector whose length is not 1
+  (500 `invalid_model_output`), so a faulted backend cannot write all-zero
+  vectors into the index.
 - Errors: 401, 400, 413, and 503 `no_replica_available`.
 - `GET /health` (no auth) reports `ready`, `state`, model, revision and
   device.
@@ -147,3 +150,18 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   removing it from the forwarder configuration
   (`config.json.before-macbook-20261121`) and running
   `launchctl bootout gui/$(id -u)/io.mycellios.qwen06`.
+
+- On 2026-11-22 Daniel's PC (Radeon 890M) joined as a regular replica on
+  DirectML (weight 1). It runs `device: "directml"` in float32 with
+  1024-token micro-batches: float16 on DirectML gave a minimum cosine of 0.987
+  against CPU fp32, and larger micro-batches or the fused SDPA kernel fail on
+  this driver. It measured 114 tokens/s (CPU fp32 on the same PC: 117) and a
+  minimum cosine of 0.999996 against MRPUCCHI for documents and queries. Once,
+  right after a restart, it answered with all-zero vectors; the unit-length
+  check above now rejects such output. It runs from `%USERPROFILE%/Mycellios/qwen06`
+  (Python 3.12 venv: torch 2.4.1, torch-directml 0.2.5.dev240914,
+  transformers 4.57.1) at below-normal priority, started from the user's
+  Startup folder, so it serves only while Daniel is logged in. Its peer is in
+  `mycellios-embedding-replicas`; Windows Firewall already admits the
+  NetBird interface. Roll back with the forwarder's
+  `config.json.before-pcdani-20261122` and by deleting the Startup entry.

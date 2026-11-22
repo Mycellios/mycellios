@@ -5,12 +5,15 @@ token. A GPU replica loads the model only while the coordinator holds a
 committed reservation for its consumer (granted by the native replica
 placement broker) and unloads it as soon as the reservation disappears, so
 the shared GPU budget is never exceeded. A CPU replica needs no reservation.
+A DirectML replica (AMD/Intel GPUs on Windows) runs in float32: float16 on
+DirectML drifts too far from the other replicas' vectors.
 
 Contract: specs/memory-embedding-qwen06/spec.md
 """
 import argparse
 import hmac
 import json
+import math
 import threading
 import time
 import urllib.parse
@@ -28,6 +31,9 @@ QUERY_INSTRUCTION = "Instruct: Given a web search query, retrieve relevant passa
 
 MICRO_BATCH_TOKENS = 16_384
 MID_REQUEST_COOLING_S = 120
+# Returned vectors are L2-normalized; anything else (for example the all-zero
+# rows a faulted GPU backend can produce) must never reach a caller's index.
+UNIT_NORM_TOLERANCE = 1e-3
 
 
 def plan_micro_batches(lengths, budget):
@@ -109,15 +115,24 @@ class ReservationGate:
 
 
 class TorchEmbedder:
-    def __init__(self, path, device, dtype, revision):
+    def __init__(self, path, device, dtype, revision, micro_batch_tokens=MICRO_BATCH_TOKENS):
         import torch
         from transformers import AutoModel, AutoTokenizer
         self.torch = torch
         self.device = device
         self.revision = revision
+        self.micro_batch_tokens = micro_batch_tokens
         self.tokenizer = AutoTokenizer.from_pretrained(path, padding_side="left")
         torch_dtype = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}[dtype]
-        self.model = AutoModel.from_pretrained(path, torch_dtype=torch_dtype).to(device).eval()
+        options = {}
+        # torch-directml supports neither inference_mode nor the fused SDPA kernel.
+        self.no_grad = torch.inference_mode
+        if device == "directml":
+            import torch_directml
+            self.device = torch_directml.device()
+            self.no_grad = torch.no_grad
+            options["attn_implementation"] = "eager"
+        self.model = AutoModel.from_pretrained(path, torch_dtype=torch_dtype, **options).to(self.device).eval()
 
     def embed(self, texts, before_batch=None):
         torch = self.torch
@@ -126,12 +141,12 @@ class TorchEmbedder:
         tokens = 0
         # Padding to the longest text makes one long chunk inflate a whole
         # batch; bounded length-sorted micro-batches keep memory and time flat.
-        for group in plan_micro_batches(lengths, MICRO_BATCH_TOKENS):
+        for group in plan_micro_batches(lengths, self.micro_batch_tokens):
             if before_batch is not None:
                 before_batch()
             encoded = self.tokenizer([texts[i] for i in group], padding=True, truncation=True,
                                      max_length=MAX_TOKENS, return_tensors="pt").to(self.device)
-            with torch.inference_mode():
+            with self.no_grad():
                 hidden = self.model(**encoded).last_hidden_state[:, -1]
                 rows = torch.nn.functional.normalize(hidden.float(), dim=-1).cpu().tolist()
             for index, row in zip(group, rows):
@@ -205,7 +220,8 @@ class Replica:
     def __init__(self, config, load=None, gate=None, thermal=None):
         self.config = config
         self.thermal = thermal
-        self.load = load or (lambda: TorchEmbedder(config["modelPath"], config["device"], config["dtype"], config["revision"]))
+        self.load = load or (lambda: TorchEmbedder(config["modelPath"], config["device"], config["dtype"], config["revision"],
+                                                   int(config.get("microBatchTokens", MICRO_BATCH_TOKENS))))
         self.gate = gate
         self.embedder = None
         self.state = "starting"
@@ -246,9 +262,16 @@ class Replica:
                 if before is not None:
                     self.thermal.wait(MID_REQUEST_COOLING_S)
             vectors, tokens = self.embedder.embed(texts, between)
-        if len(vectors) != len(texts) or any(len(vector) != DIMENSIONS for vector in vectors):
+        if len(vectors) != len(texts) or not all(is_unit_vector(vector) for vector in vectors):
             raise ServiceError(500, "invalid_model_output")
         return vectors, tokens
+
+
+def is_unit_vector(vector):
+    if len(vector) != DIMENSIONS:
+        return False
+    norm = math.fsum(value * value for value in vector)
+    return math.isfinite(norm) and abs(norm - 1.0) <= UNIT_NORM_TOLERANCE
 
 
 def connection_closed(sock):
