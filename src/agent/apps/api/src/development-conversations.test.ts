@@ -40,7 +40,7 @@ it("keeps ordinary Mico chat targets unchanged", async () => {
   const target = await resolveThreadTarget({} as never, actor, { botId: "mico" });
   expect(target.threadId).toBe("primary");
 });
-const ROUTES = ["open", "rename", "list", "requests", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove"];
+const ROUTES = ["open", "rename", "list", "requests", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove", "branch"];
 function routesFor(prisma: object) {
   const handler = { handler: (fn: unknown) => fn };
   const routes = developmentRoutes({
@@ -168,4 +168,35 @@ it("mirrors the pending requests of the Mico's open conversations, after checkin
   }));
   getBot.mockRejectedValueOnce(new Error("not found"));
   await expect(routes.requests!({ context: { actor }, input: { botId: "someone-else" } })).rejects.toThrow("not found");
+});
+
+it("lists the source of a branch, and nothing of the kind for other conversations", async () => {
+  const base = { taskBotId: "mico", projectKey: "mico:mico", titleSource: "auto", outcome: null, lastError: null, archivedAt: null,
+    deleteAfter: null, createdAt: new Date(0), updatedAt: new Date(0), activeStatuses: null, branchedFromThreadId: null };
+  const prisma = { $queryRaw: vi.fn().mockResolvedValue([
+    { ...base, id: "copy", taskKey: "mico-task:mico:branch:r1", title: "Plan #2", startedBy: "branch", branchedFromThreadId: "plan" },
+    { ...base, id: "orphan", taskKey: "mico-task:mico:branch:r2", title: "Plan #3", startedBy: "branch" },
+    { ...base, id: "plan", taskKey: "mico-task:mico:one", title: "Plan", startedBy: "user" },
+  ]) };
+  const listed = await routesFor(prisma).list!({ context: { actor }, input: { botId: "mico" } });
+  expect(listed.map((row: any) => [row.threadId, row.kind, row.startedBy, row.branchedFromThreadId])).toEqual([
+    ["copy", "conversation", "branch", "plan"],
+    ["orphan", "conversation", "branch", null],
+    ["plan", "conversation", "user", undefined],
+  ]);
+});
+
+it("explains a refused branch with a status that says whose move it is, after checking the Mico", async () => {
+  const { ConversationBranchError } = await import("@mycellios/db");
+  const { branchErrorToRpc } = await import("./conversation-branch.js");
+  const status = (code: ConstructorParameters<typeof ConversationBranchError>[0]) =>
+    (branchErrorToRpc(new ConversationBranchError(code, `refused ${code}`)) as { code: string; message: string });
+  expect([status("not_found").code, status("busy").code, status("deleting").code, status("changed").code]).toEqual(["NOT_FOUND", "CONFLICT", "CONFLICT", "CONFLICT"]);
+  expect([status("message").code, status("source").code, status("too_large").code]).toEqual(["BAD_REQUEST", "BAD_REQUEST", "BAD_REQUEST"]);
+  expect(status("busy").message).toBe("refused busy");
+  const other = new Error("boom");
+  expect(branchErrorToRpc(other)).toBe(other);
+  getBot.mockRejectedValueOnce(new Error("not found"));
+  await expect(routesFor({}).branch!({ context: { actor }, input: { botId: "someone-else", messageId: "m", requestId: "00000000-0000-4000-8000-000000000000" } }))
+    .rejects.toThrow("not found");
 });

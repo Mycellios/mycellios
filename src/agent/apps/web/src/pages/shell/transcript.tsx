@@ -5,6 +5,8 @@ import { routineRunGroups } from "../../lib/routine-run-groups";
 import { RoutineRunMarker } from "../../components/RoutineRunMarker";
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { NewChatDivider } from "../../components/composer/NewChatDivider";
+import { BranchOriginDivider } from "../../components/BranchOriginDivider";
+import { type BranchOriginBlock, branchableMessageIds, branchOriginBlock } from "../../lib/conversation-branch";
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
 import type { MessageReaction, ThreadMessage, Run } from "@mycellios/contracts";
@@ -113,6 +115,9 @@ export const Transcript = memo(function Transcript({
   onOpenImportSetup,
   onOpenImport,
   onMarkRead,
+  onBranch,
+  branchDisabled = false,
+  renderBranchOrigin,
 }: {
   headerTabs?: boolean;
   /** Above the messages, e.g. who opened this conversation. */
@@ -172,6 +177,12 @@ export const Transcript = memo(function Transcript({
   onOpenImport?: () => void;
   /** "Mark as read" on the new-messages banner: the divider goes and the chat counts as read. */
   onMarkRead?: () => void;
+  /** "Branch in new conversation" on the last Mico message of each turn; absent where branching is not offered. */
+  onBranch?: (message: ThreadMessage) => void;
+  /** A turn is running in this conversation, so branching waits. */
+  branchDisabled?: boolean;
+  /** The divider where a branch's copied history ends, with its live source. */
+  renderBranchOrigin?: (message: ThreadMessage, block: BranchOriginBlock) => ReactNode;
 }) {
   const { t } = useLingui();
   const touchLayout = useIsMobile();
@@ -243,6 +254,10 @@ export const Transcript = memo(function Transcript({
     [reactionView.visibleMessages, showToolActivity],
   );
   const separatorIds = useMemo(() => timeSeparatorIds(shownMessages), [shownMessages]);
+  const branchableIds = useMemo(
+    () => (onBranch ? branchableMessageIds(reactionView.visibleMessages) : new Set<string>()),
+    [onBranch, reactionView.visibleMessages],
+  );
   const threadItems = useMemo(() => groupVoiceChats(reactionView.visibleMessages), [reactionView.visibleMessages]);
   // Runs of messages between Micos fold into one row until the reader opens them.
   const exchangeOf = useMemo(() => peerExchanges(threadItems), [threadItems]);
@@ -621,6 +636,9 @@ export const Transcript = memo(function Transcript({
           }
           const message = item.message;
           if (message.blocks.some(block => block.kind === "context_reset")) return <NewChatDivider key={message.id} messageId={message.id}/>;
+          const branchOrigin = branchOriginBlock(message);
+          if (branchOrigin) return <Fragment key={message.id}>{renderBranchOrigin?.(message, branchOrigin) ??
+            <BranchOriginDivider messageId={message.id} source={branchOrigin.main ? { kind: "main" } : { kind: "conversation", title: branchOrigin.title }} />}</Fragment>;
           const messageToolActivity = showToolActivity && !(running && activeRun &&
             message.id.startsWith("progress:") &&
             (message.id === `progress:${activeRun.id}` || message.runId === activeRun.id));
@@ -765,6 +783,8 @@ export const Transcript = memo(function Transcript({
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}
                       onReact={onReact}
+                      onBranch={branchableIds.has(message.id) ? onBranch : undefined}
+                      branchDisabled={branchDisabled}
                     />)}
                     {lastRun?.completedAt && message.runId === lastRun.id &&
                     costMessageIds.get(lastRun.id) === message.id ? (

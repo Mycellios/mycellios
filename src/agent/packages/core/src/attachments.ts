@@ -5,6 +5,7 @@ import {
   isAllowedAttachmentMimeType,
   isAttachmentImageMimeType,
 } from "@mycellios/contracts";
+import { BRANCH_ORIGIN_HISTORY_TEXT } from "./conversation-branch.js";
 
 export class AttachmentValidationError extends Error {
   constructor(message: string) {
@@ -153,6 +154,8 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       // A routine run marker only links the main chat to the routine conversation; the run
       // and its answer stay there, so the main chat model never reads it.
       if (block.kind === "routine_run") return "";
+      // Where a branch's copied history ends: the model reads that it continues from a copy.
+      if (block.kind === "branch_origin") return BRANCH_ORIGIN_HISTORY_TEXT;
       if (block.kind === "handoff") {
         return `[handoff ${block.fromBotId} -> ${block.toBotId}] ${block.text}`;
       }
