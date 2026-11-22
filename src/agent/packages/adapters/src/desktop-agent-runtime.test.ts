@@ -2,6 +2,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@mycellios/adapter-kit";
 import { isUncertainDesktopRun } from "@mycellios/core";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
+import { DesktopUnreachableError } from "./computer-errors.js";
+import { desktopAgentSelection, desktopRelayKey } from "./desktop-relay.js";
 import { startHostComputerServer } from "./host-computer-server.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
@@ -359,4 +361,29 @@ it("delivers a finished command result when the executor heartbeat marks the PC 
   for await (const event of runtime.run(input, context)) events.push(event);
   expect(events).toEqual([{ type: "text", text: "ok" }, { type: "done" }]);
   expect(fallback.run).not.toHaveBeenCalled();
+});
+
+it("leaves a turn retryable when the Desktop check times out before anything is sent", async () => {
+  const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout));
+  try {
+    const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+    const transport = vi.fn();
+    const onDesktopRunDispatched = vi.fn();
+    const runtime = new DesktopAgentRuntime({
+      fallback, transport, select: desktopAgentSelection("http://relay.invalid/internal", desktopRelayKey("fixture")),
+    });
+    const failure = await (async () => {
+      for await (const _ of runtime.run(request(), { ...context, onDesktopRunDispatched })) { /* no events */ }
+    })().catch((error: unknown) => error);
+    // No answer is neither "offline" (no cloud fallback) nor an uncertain dispatch.
+    expect(failure).toBeInstanceOf(DesktopUnreachableError);
+    expect((failure as Error).cause).toBe(timeout);
+    expect(isUncertainDesktopRun((failure as Error).message)).toBe(false);
+    expect(onDesktopRunDispatched).not.toHaveBeenCalled();
+    expect(transport).not.toHaveBeenCalled();
+    expect(fallback.run).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
