@@ -107,10 +107,14 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
       const worker = await options.store.getWorker(target.workerId);
       const sessionId = options.hub.currentWorkerSessionId(target.workerId);
       const deployment = worker?.capabilities.deployments.find(d => d.deploymentId === target.deploymentId);
+      // Native replicas qualify on one GPU stage; memory embeddings also admit
+      // their approved CPU fp32 stage, which must pass the same canary.
+      const device = deployment && isMemoryEmbeddingDeployment(deployment)
+        && approvedMemoryEmbeddingExecution(deployment.execution)?.backend === "cpu" ? "cpu" : "gpu";
       if (!worker || worker.status !== "online" || !sessionId || !deployment?.activationId
         || !worker.identityId || !worker.capabilities.buildIdentity || deployment.maxConcurrency !== 1
-        || deployment.execution?.deviceType !== "gpu" || deployment.execution.fallback
-        || deployment.execution.stages?.length !== 1 || deployment.execution.stages[0]!.deviceType !== "gpu") deny("native_replica_is_not_eligible", 422);
+        || deployment.execution?.deviceType !== device || deployment.execution.fallback
+        || deployment.execution.stages?.length !== 1 || deployment.execution.stages[0]!.deviceType !== device) deny("native_replica_is_not_eligible", 422);
       const selectedPlan = plan(deployment), physicalNodeId = deployment.execution.stages[0]!.nodeId;
       const samples: NativeReplicaEvidenceInput["samples"] = [];
       const current = async (): Promise<StoredWorker> => {
@@ -148,7 +152,7 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
           || trace.selectedRoute.length !== 1 || trace.selectedRoute[0]!.workerId !== worker.id
           || trace.selectedRoute[0]!.deploymentId !== deployment.deploymentId
           || trace.stages.length !== 1 || trace.stages[0]!.nodeId !== physicalNodeId
-          || trace.stages[0]!.deviceType !== "gpu" || trace.stages[0]!.modelDigest !== deployment.modelDigest) deny("native_replica_execution_evidence_is_invalid", 422);
+          || trace.stages[0]!.deviceType !== device || trace.stages[0]!.modelDigest !== deployment.modelDigest) deny("native_replica_execution_evidence_is_invalid", 422);
         verifyNativeQualificationResult(selectedPlan.kind, r.text);
         const signed = await options.attachReceipt(result, deployment.model, "replica");
         if (!signed.result.executionReceiptId) deny("native_replica_receipt_is_missing");

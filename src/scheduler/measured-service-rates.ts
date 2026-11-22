@@ -30,10 +30,66 @@ export interface ServiceObservation {
   predictedMs: number;
 }
 
+export interface ThroughputObservation {
+  workerId: string;
+  deploymentId: string;
+  /** Coordinator-estimated input tokens of the completed batch. */
+  tokens: number;
+  /** Wall time from the offer to the validated result, as the coordinator saw it. */
+  observedMs: number;
+  /** Fixed per-request cost (lease, transport) excluded from the rate. */
+  overheadMs: number;
+}
+
+/** Half of each new observation enters the average, so a throttled device shrinks quickly. */
+const THROUGHPUT_WEIGHT = 0.5;
+const MIN_THROUGHPUT = 0.5;
+const MAX_THROUGHPUT = 50_000;
+
 export class MeasuredServiceRates {
   private readonly samples = new Map<string, Sample[]>();
+  private readonly throughput = new Map<string, { tokensPerSecond: number; at: number }>();
 
   constructor(private readonly now: () => number = Date.now) {}
+
+  /**
+   * Batch input throughput (memory embeddings) measured by the coordinator.
+   * Unlike `factor`, this may also rise above the node's claims: the node only
+   * gets larger pieces after it has actually returned validated work faster.
+   */
+  recordThroughput(observation: ThroughputObservation): void {
+    const { tokens, observedMs, overheadMs } = observation;
+    if (!Number.isFinite(tokens) || !Number.isFinite(observedMs) || tokens <= 0 || observedMs <= 0) return;
+    // A fast answer cannot claim more than twice its raw speed by hiding inside the overhead.
+    const seconds = Math.max(0.05, observedMs / 2_000, (observedMs - Math.max(0, overheadMs)) / 1_000);
+    const measured = Math.min(MAX_THROUGHPUT, Math.max(MIN_THROUGHPUT, tokens / seconds));
+    const key = serviceKey(observation.workerId, observation.deploymentId);
+    const previous = this.currentThroughput(key);
+    if (previous === null && !this.throughput.has(key) && this.throughput.size >= MAX_TRACKED) {
+      const oldest = this.throughput.keys().next().value;
+      if (oldest !== undefined) this.throughput.delete(oldest);
+    }
+    this.throughput.delete(key);
+    this.throughput.set(key, {
+      tokensPerSecond: previous === null ? measured : previous + THROUGHPUT_WEIGHT * (measured - previous),
+      at: this.now(),
+    });
+  }
+
+  /** Recently measured input tokens per second, or null before any fresh measurement. */
+  throughputTokensPerSecond(workerId: string, deploymentId: string): number | null {
+    return this.currentThroughput(serviceKey(workerId, deploymentId));
+  }
+
+  private currentThroughput(key: string): number | null {
+    const entry = this.throughput.get(key);
+    if (!entry) return null;
+    if (entry.at < this.now() - SAMPLE_TTL_MS) {
+      this.throughput.delete(key);
+      return null;
+    }
+    return entry.tokensPerSecond;
+  }
 
   record(observation: ServiceObservation): void {
     const { observedMs, predictedMs } = observation;

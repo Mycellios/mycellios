@@ -71,3 +71,27 @@ export function createInferenceSettlement(context: {
     }
   };
 }
+
+type Completed = Extract<JobStreamEvent, { type: "completed" }>;
+
+/**
+ * A split memory embedding request has no single route, so each validated
+ * piece gets its own signed receipt; an ordinary completion gets one.
+ */
+export async function withPieceReceipts(event: Completed, attach: (event: Completed) => Promise<Completed>): Promise<Completed> {
+  if (!event.pieces) return await attach(event);
+  const pieces: Completed["result"][] = [];
+  for (const piece of event.pieces) pieces.push((await attach({ type: "completed", result: piece })).result);
+  return { ...event, pieces };
+}
+
+/** The executions to settle: each piece of a split request, or the completion itself. */
+export function completedParts(event: Completed): Completed["result"][] {
+  return event.pieces ?? [event.result];
+}
+
+/** Names each piece's request, tokens and receipt in the response and the stored message. */
+export function pieceSummary(event: Completed): { pieces?: Array<{ request_id: string; input_tokens: number; execution_receipt_id: string | null }> } {
+  return event.pieces ? { pieces: event.pieces.map((piece) => ({ request_id: piece.jobId, input_tokens: piece.metrics.inputTokens,
+    execution_receipt_id: piece.executionReceiptId ?? null })) } : {};
+}

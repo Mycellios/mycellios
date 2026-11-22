@@ -31,6 +31,9 @@ const CUDA = { deviceType: "gpu", backend: "cuda", deviceName: "NVIDIA GeForce R
     deviceName: "NVIDIA GeForce RTX 2060", precision: "float16", fallback: false }] } as const satisfies ModelDeployment["execution"];
 const withPrecision = (backend: string, precision: string) => ({ ...CUDA, backend, precision,
   stages: [{ ...CUDA.stages[0], backend, precision }] }) as unknown as ModelDeployment["execution"];
+const CPU = { deviceType: "cpu", backend: "cpu", deviceName: "Intel Core i5", precision: "float32", fallback: false,
+  stages: [{ nodeId: "hp-probook", stageIndex: 0, layerStart: 0, layerEnd: 28, deviceType: "cpu", backend: "cpu",
+    deviceName: "Intel Core i5", precision: "float32", fallback: false }] } as const satisfies ModelDeployment["execution"];
 const unit = (axis = 0) => Array.from({ length: MEMORY_EMBEDDING_DIMENSIONS }, (_, i) => i === axis ? 1 : 0);
 const envelope = (vectors: number[][], tokens = 7 * vectors.length) => JSON.stringify({ schema: MEMORY_EMBEDDING_SCHEMA, result: {
   object: "list", model: MEMORY_EMBEDDING_MODEL, revision: MEMORY_EMBEDDING_REVISION,
@@ -75,7 +78,7 @@ describe("memory embedding contract", () => {
     expect(MAX_MEMORY_EMBEDDING_RESPONSE_BYTES).toBeLessThan(2 * 1024 * 1024);
   });
 
-  it("admits only measured GPU device/precision pairs", () => {
+  it("admits only measured device/precision pairs, including the CPU fp32 reference", () => {
     expect(approvedMemoryEmbeddingExecution(CUDA)).toEqual({ backend: "cuda", precision: "float16" });
     expect(approvedMemoryEmbeddingExecution(withPrecision("directml", "float32"))).not.toBeNull();
     expect(approvedMemoryEmbeddingExecution(withPrecision("mps", "float16"))).not.toBeNull();
@@ -84,6 +87,11 @@ describe("memory embedding contract", () => {
     expect(approvedMemoryEmbeddingExecution({ ...CUDA, fallback: true, fallbackReason: "cpu" })).toBeNull();
     expect(approvedMemoryEmbeddingExecution({ ...CUDA, stages: undefined })).toBeNull();
     expect(approvedMemoryEmbeddingExecution(undefined)).toBeNull();
+    expect(approvedMemoryEmbeddingExecution(CPU)).toEqual({ backend: "cpu", precision: "float32" });
+    expect(approvedMemoryEmbeddingExecution({ ...CPU, precision: "bfloat16", stages: [{ ...CPU.stages[0], precision: "bfloat16" }] })).toBeNull();
+    // A CPU backend must run on a CPU stage, and a GPU backend on a GPU stage.
+    expect(approvedMemoryEmbeddingExecution({ ...CPU, deviceType: "gpu", stages: [{ ...CPU.stages[0], deviceType: "gpu" }] })).toBeNull();
+    expect(approvedMemoryEmbeddingExecution({ ...CUDA, deviceType: "cpu", stages: [{ ...CUDA.stages[0], deviceType: "cpu" }] } as never)).toBeNull();
   });
 
   it("gives memory embeddings their own deadline and output limit", () => {
@@ -105,6 +113,7 @@ describe("memory embedding worker configuration and deployments", () => {
 
   it("accepts the pinned replica and rejects drifted or unpinned ones", () => {
     expect(workerConfigSchema.safeParse(config).success).toBe(true);
+    expect(workerConfigSchema.safeParse({ ...config, deployment: { ...config.deployment, execution: CPU } }).success).toBe(true);
     for (const bad of [
       { ...config, deployment: { ...config.deployment, modelDigest: EMBEDDING_DIGEST } },
       { ...config, deployment: { ...config.deployment, execution: withPrecision("directml", "float16") } },

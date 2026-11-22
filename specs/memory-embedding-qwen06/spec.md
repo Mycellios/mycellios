@@ -128,11 +128,12 @@ the native cases in `python/tests/test_qwen06_embedding_service.py`.
   `vocab.json`) at the pinned revision. The artifact identity is
   `sha256("mycellios-memory-embedding/1", revision, "name:sha256"...)`,
   computed the same way in TypeScript and Python, and both test suites pin it.
-- Approved executions are single-stage GPU only: CUDA fp16, MPS fp16 and
-  DirectML fp32. These are the pairs measured at cosine ≥ 0.999996 against
-  CPU fp32. DirectML fp16 (0.987) is refused by the worker configuration, the
-  deployment schema, the adapter and the runtime. CPU backups cannot be
-  natively qualified, so they stay on the forwarder.
+- Approved executions are single-stage: CUDA fp16, MPS fp16 and DirectML
+  fp32 (measured at cosine ≥ 0.999996 against CPU fp32), and CPU fp32, which
+  is the reference itself. The device type must match the backend (`cpu` for
+  CPU, `gpu` otherwise). DirectML fp16 (0.987) and CPU bfloat16 are refused by
+  the worker configuration, the deployment schema, the adapter and the
+  runtime. A CPU replica qualifies with the same canary gate as a GPU one.
 - `GET /health` reports `status`, model, upstream model, revision, artifact
   identity, activation, runtime, dimensions, limits, device and dtype. The
   adapter is ready only when every field matches its configuration. A GPU
@@ -162,9 +163,61 @@ the native cases in `python/tests/test_qwen06_embedding_service.py`.
   503 `no_capacity`. Only the internal, identity-pinned qualification probe
   can reach an unqualified replica.
 - Each worker has one slot (`maxConcurrency: 1`), so a busy replica takes
-  no further work. `/v1/chat/completions` already waits up to 45 s for
-  capacity. The client should keep one request in flight per qualified
-  replica and retry 503 with backoff, as the backfill already does.
+  no further work. A non-streaming request is split across the idle replicas
+  (see "Splitting across replicas"), so one request already uses the whole
+  network. The client should keep one or two requests in flight and retry
+  503 with backoff, as the backfill already does.
+
+### Splitting across replicas
+
+Code: `src/coordinator/memory-embedding-split.ts`. Tests:
+`tests/memory-embedding-split.test.ts`.
+
+- **When.** A non-streaming `/v1/chat/completions` request with at least two
+  texts, when at least two idle, freshly qualified replicas would share it.
+  Otherwise the request runs on one replica as before. Contribution-funded,
+  streaming, dispersion-grouped and qualification requests are never split.
+- **Sizing.** Each text is estimated at about four characters per token
+  (capped at 8,192). Texts go largest first to the replica that would finish
+  them soonest, counting a fixed 750 ms per piece. A fast GPU gets most of
+  the texts; a slow CPU only gets a text when it finishes no later than a
+  faster replica would, so it never lengthens the request.
+- **Speed.** A replica starts from the measured prior of its execution (CUDA
+  and MPS fp16 380 tokens/s, DirectML fp32 114, CPU fp32 7). After each
+  validated batch the coordinator records the estimated tokens over the wall
+  time it observed (minus the fixed overhead, counting at least half of the
+  raw time), averaged with weight 0.5 and kept for six hours. A device that
+  throttles gets smaller pieces on the next request; unsplit requests feed
+  the same measurement.
+- **Pieces.** Each piece is an ordinary job pinned to one worker, so it keeps
+  the per-piece checks (count, order, 1024 dimensions, unit length, revision,
+  usage). The coordinator reassembles the vectors in the original order,
+  checks the whole batch again, and reports usage as the exact sum of the
+  pieces. Each piece gets its own signed receipt and its own settlement; the
+  response lists them in `x_network.pieces` (request id, input tokens,
+  receipt id). The parent request has no single route, so it has no receipt.
+- **Failures.** A piece may use three times its predicted time plus 10 s
+  (at least 15 s, never past the request deadline). A piece that fails or
+  runs out of time runs once more on a different idle replica that can
+  finish it in time; a second failure fails the request. A replica taken by
+  another request before the offer does not count as an attempt. Re-running
+  is safe because embeddings are deterministic and read-only, and a failed
+  attempt is never billed: usage and settlement come only from validated
+  pieces. Paid (contribution-funded) requests are not split, so the rule that
+  an uncertain paid request is never replayed is unchanged.
+- **Deadline.** The whole request ends at its deadline (300 s by default). At
+  that point the coordinator cancels the running pieces and answers
+  `deadline_exceeded` (job status `expired`). Cancelling the request
+  cancels every piece.
+- **CPU replicas and payment.** Unfunded requests may use qualified CPU
+  replicas. Economic settlement verifies GPU stages only, so a CPU piece
+  earns no contribution credit yet, and contribution-funded requests skip CPU
+  replicas (`requireGpuStages`) instead of failing settlement after the work.
+
+Measured versus tested: the speeds above were measured on 2026-11-21/22 on
+the forwarder path. Splitting, re-dispatch, deadlines and the speed feedback
+are covered by unit and in-memory coordinator tests only; they have not yet
+run against physical replicas through the coordinator.
 
 ### Deployment entry (worker configuration)
 
@@ -236,7 +289,8 @@ session and build, so a reconnect or new build needs a fresh run.
    forwarder's for the same documents and queries.
 3. Switch the Jarvis client and backfill to the coordinator. Then unpin the
    broker entry so placement follows real demand.
-4. Qualify the MacBook (MPS) and PC-DANI (DirectML) replicas the same way.
+4. Qualify the MacBook (MPS), PC-DANI (DirectML) and the CPU (fp32) replicas
+   the same way.
    Their workers add capacity without a placement reservation.
 5. Retire the forwarder and the bearer-token listeners only after the
    coordinator path has carried the backfill.
@@ -347,6 +401,7 @@ Package `com.mycellios.android.embedding`, not wired into the app:
 
 - Physically qualify the native replica (see "Migration and rollback").
 - Measure the phone path on a physical Android phone (see "Phone replicas").
+- Let economic settlement verify CPU stages, so CPU pieces can earn credit.
 - Add more CPU backups once nodes have spare RAM (the MSI GE60 has about
   3 GB free while it runs its 4B stage).
 
