@@ -41,7 +41,8 @@ test('llama.cpp stage runtime changes run its locked tests without the speculati
   const plan = planChecks(files);
   assert.ok(plan.some(c => c.args.includes('--require-hashes') && c.args.includes('scripts/wheel-locks/linux-x64-cp312.txt')));
   assert.ok(plan.some(c => c.cwd === 'python' && c.args.includes('test_llama_cpp_runtime.py')));
-  for (const test of ['test_llama_cpp_stage.py', 'test_native_gguf.py']) assert.ok(plan.some(c => c.cwd === 'python' && c.args.includes(test)));
+  for (const test of ['test_llama_cpp_stage.py', 'test_native_gguf.py', 'test_llama_cpp_install.py']) assert.ok(plan.some(c => c.cwd === 'python' && c.args.includes(test)));
+  assert.deepEqual(uncoveredNativeFiles(['python/distributed_runtime/llama_cpp_install.py']), []);
   assert.deepEqual(uncoveredNativeFiles(['python/distributed_runtime/llama_cpp_stage_runner.py', 'python/distributed_runtime/native_gguf_runtime.py']), []);
   assert.ok(!plan.some(c => c.args.includes('test_engine.py')));
   assert.deepEqual(uncoveredNativeFiles(files), []);

@@ -34,6 +34,8 @@ def _fake_build(files: dict[str, bytes]) -> PinnedLlamaCppBuild:
         build="b0",
         target="test",
         archive_sha256="0" * 64,
+        archive_url="https://example.invalid/llama.zip",
+        archive_size=1,
         library_name="llama.dll",
         ggml_name="ggml.dll",
         libraries={name: hashlib.sha256(data).hexdigest() for name, data in files.items()},
