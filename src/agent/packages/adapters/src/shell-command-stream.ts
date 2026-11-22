@@ -11,6 +11,14 @@ import { clipToolResultText } from "./pi-runtime-limits.js";
  */
 export const SHELL_STREAM_IDLE_MS = 1_000;
 
+/** The status a turn shows while it waits for its own background commands to finish. */
+export const BACKGROUND_WAIT_PROGRESS = {
+  type: "progress",
+  text: "Waiting for background work…",
+  activity: true,
+  waiting: "background",
+} as const;
+
 export const SHELL_STILL_RUNNING_NOTICE =
   "Still running. Tell the user any one-time code or sign-in URL in the output.";
 
@@ -58,9 +66,12 @@ export async function deliverFinishedShells(
   pending: Array<Promise<FinishedShellCommand>>,
   turn: { toolResults: Array<{ toolName?: string; details?: unknown }> },
   signal?: AbortSignal,
+  /** Called once when the turn starts waiting for its background commands. */
+  onWait?: () => void,
 ): Promise<void> {
   if (pending.length === 0 || turnReturnedRunningShell(turn)) return;
   const batch = pending.splice(0, pending.length);
+  onWait?.();
   const results = await Promise.all(batch.map((completion) => finishOrAbort(completion, signal)));
   const texts = results.filter((result): result is FinishedShellCommand => result !== undefined);
   if (texts.length === 0) return;
@@ -111,6 +122,11 @@ export async function observeShellCommand(
     secrets: string[];
     idleMs?: number;
     onOutput?: (snapshot: ShellCommandSnapshot) => void;
+    /**
+     * When aborted while the command runs, return what it printed so far and keep it
+     * running in the background (`completion`), as after quiet output. Never kills it.
+     */
+    yieldSignal?: AbortSignal;
   },
 ): Promise<{
   result: ShellCommandResult;
@@ -177,8 +193,15 @@ export async function observeShellCommand(
     return { ...redact({ stdout, stderr }, false), code };
   })();
 
+  const yielded = options.yieldSignal
+    ? new Promise<"idle">((resolve) => {
+        if (options.yieldSignal!.aborted) resolve("idle");
+        else options.yieldSignal!.addEventListener("abort", () => resolve("idle"), { once: true });
+      })
+    : undefined;
   const reason = await Promise.race([
     idlePromise,
+    ...(yielded ? [yielded] : []),
     done.then(
       () => "done" as const,
       () => "done" as const,

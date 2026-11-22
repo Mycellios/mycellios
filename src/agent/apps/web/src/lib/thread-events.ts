@@ -265,6 +265,7 @@ export function isThreadSnapshotEvent(event: ProductEvent): boolean {
     event.type === "computer.command" ||
     event.type === "thread.message.created" ||
     event.type === "thread.message.updated" ||
+    event.type === "thread.message.deleted" ||
     event.type === "thread.message.reaction" ||
     event.type === "run.started" ||
     event.type === "run.waiting_input" ||
@@ -560,6 +561,12 @@ export function reduceThreadSnapshot(
       messages: updateCloudAgentMessages(prev.messages, event.payload ?? {}),
     };
   }
+  if (event.type === "thread.message.deleted") {
+    // A waiting message left the queue: it was deleted or moved to a new conversation.
+    const id = String(event.payload.messageId ?? "");
+    const messages = prev.messages.filter((message) => message.id !== id);
+    return { ...prev, cursor: event.seq, messages };
+  }
   if (event.type === "thread.message.created" || event.type === "thread.message.updated") {
     const role = (event.payload.role as ThreadMessage["role"]) ?? "bot";
     const blocks = (event.payload.blocks as ThreadMessage["blocks"]) ?? [];
@@ -572,7 +579,8 @@ export function reduceThreadSnapshot(
       role,
       blocks,
       botId: event.botId,
-      runId: event.runId,
+      // An edit of a queued message carries no run; it keeps the one it had.
+      runId: event.runId ?? known?.runId,
       callId: typeof event.payload.callId === "string" ? event.payload.callId : known?.callId,
       ...(event.payload.progress === true || known?.progress ? { progress: true as const } : {}),
       ...replyMetadata(event.payload, known),

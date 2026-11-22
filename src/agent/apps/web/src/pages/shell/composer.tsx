@@ -51,7 +51,7 @@ import {
   slashActionLabel,
 } from "./composer-mentions";
 import { useComposerLayout } from "./use-composer-layout";
-import { QueuedMessages } from "./queued-messages";
+import { QueuePanel } from "./queue-panel";
 import { useVoiceShortcut } from "./use-voice-shortcut";
 import { ReviewedVoice, useReviewedVoice } from "./reviewed-voice";
 
@@ -105,6 +105,7 @@ export const Composer = memo(function Composer({
   onVoiceShortcutConsumed,
   placeholder: customPlaceholder,
   newConversation = false,
+  onQueuedMessageMoved,
 }: {
   activeName?: string;
   activeColor?: string;
@@ -158,6 +159,8 @@ export const Composer = memo(function Composer({
   placeholder?: string;
   /** A draft tab: no thread exists yet, so main-chat actions and its queue stay hidden. */
   newConversation?: boolean;
+  /** A queued message moved to a new conversation of this Mico: open it in the background. */
+  onQueuedMessageMoved?: (threadId: string, title: string) => void;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
@@ -1039,7 +1042,11 @@ export const Composer = memo(function Composer({
           ) : null}
         </div>
       </div>
-      {newConversation ? null : <QueuedMessages target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }} running={running} sending={sending} />}
+      {newConversation ? null : <QueuePanel
+        target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }}
+        artifactTarget={artifactTarget} running={running} sending={sending}
+        onUseText={text => updateDraft(draft ? `${draft}\n\n${text}` : text)}
+        onMoved={onQueuedMessageMoved} />}
       {busyMessages && acceptedMode ? <span className="sr-only" role="status">{acceptedMode === "queue" ? t`Message saved in the queue.` : t`Instructions sent to the current task.`}</span> : null}
 
     </fieldset>

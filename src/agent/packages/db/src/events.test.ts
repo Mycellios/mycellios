@@ -4566,6 +4566,41 @@ it("drains explicit queued messages one at a time in FIFO order", async () => {
   expect(tx.run.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceMessageId: "message-1", trigger: "follow_up" }) });
 });
 
+describe("queue order, holds and Send now", () => {
+  const queued = (n: number, extra: { position?: number | null; heldBy?: string | null; originTrigger?: string | null } = {}) => ({
+    id: `queued-${n}`, userId: "user", originTrigger: "queued_user", position: n, heldBy: null, messageId: `message-${n}`,
+    message: { id: `message-${n}`, blocks: [{ kind: "text", text: `request ${n}` }], seq: n }, ...extra,
+  });
+  const drain = (rows: unknown[]) => ({
+    run: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "next" }) },
+    task: { create: vi.fn().mockResolvedValue({ id: "task" }) },
+    steeringMessage: { findMany: vi.fn().mockResolvedValue(rows), updateMany: vi.fn() },
+  });
+
+  it("starts the queue's first message by position, not by when it was sent", async () => {
+    const tx = drain([queued(1, { position: 3 }), queued(2, { position: 2 }), queued(3, { position: 1 })]);
+    await createPendingSteeringRun(tx as never, { spaceId: "space", threadId: "thread", botId: "bot" });
+    expect(tx.run.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceMessageId: "message-3", trigger: "follow_up" }) });
+  });
+
+  it("waits while the first message is being edited, but other waiting messages still go", async () => {
+    const held = drain([queued(1, { heldBy: "hold" }), queued(2)]);
+    expect(await createPendingSteeringRun(held as never, { spaceId: "space", threadId: "thread", botId: "bot" })).toBeNull();
+    expect(held.run.create).not.toHaveBeenCalled();
+    const withSteer = drain([queued(1, { heldBy: "hold" }), queued(5, { originTrigger: null, position: null })]);
+    await createPendingSteeringRun(withSteer as never, { spaceId: "space", threadId: "thread", botId: "bot" });
+    expect(withSteer.run.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceMessageId: "message-5" }) });
+  });
+
+  it("starts the message chosen with Send now first, and holds the queue after a usage limit", async () => {
+    const chosen = drain([queued(1), queued(2), queued(3)]);
+    await createPendingSteeringRun(chosen as never, { spaceId: "space", threadId: "thread", botId: "bot" }, { preferMessageId: "message-3" });
+    expect(chosen.run.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceMessageId: "message-3" }) });
+    const limited = drain([queued(1), queued(2)]);
+    expect(await createPendingSteeringRun(limited as never, { spaceId: "space", threadId: "thread", botId: "bot" }, { holdQueue: true })).toBeNull();
+  });
+});
+
 describe("answerRunInput plan card", () => {
   function planTx(autoStartAt: string) {
     return {

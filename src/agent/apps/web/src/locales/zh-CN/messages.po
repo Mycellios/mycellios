@@ -7060,6 +7060,210 @@ msgstr "取消等待"
 msgid "Waiting for an event"
 msgstr "正在等待事件"
 
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "现在正在运行一个例程。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "Mico 正在这里处理它自己的任务。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "当前回合正在等待你的回答。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "这里现在没有正在运行的内容。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "这条消息已经开始或已被移除。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "这条消息正在别处编辑。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "此编辑已在别处关闭。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "队列在此期间已更改并已刷新，请重试。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "排队的消息需要包含文字或文件。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "只有你单独发给这个 Mico 的消息才能移到新对话中。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "未插入：{reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "无法更新队列，请重试。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "排队消息已保存。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "排队消息已删除。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "已移到第 {position} 位，共 {total} 条。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "已移到新对话：{title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "正在等待电脑或服务器重启。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "已暂停：上一回合达到了用量或额度上限。准备好后可立即发送一条。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "已暂停：上一回合需要登录或有效的密钥。修复后可立即发送一条。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "正在编辑消息，已暂停。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "它们会在当前回合结束后逐条发送。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "等待发送的消息"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "排队消息第 {position} 条，共 {total} 条：{preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "编辑排队消息"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "正在别处编辑"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "编辑中"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "加入正在进行的回合"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "已加入当前回合。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "停止当前回合，接着发送这条消息"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "正在立即发送这条消息。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "移到新对话"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "此消息的更多操作"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "你编辑的文本"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "等待发送"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "在你保存或取消之前，队列会暂停。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "未插入"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "立即插入"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "立即发送"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "改在这里编辑"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "使用上下方向键在队列中移动当前选中的消息。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "删除这条排队消息？"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "它正在别处编辑。删除后，那次编辑也会被丢弃。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "保留"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "编辑未保存"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "在你保存之前，这条消息已开始、被移除或在别处编辑。你的文本保留在下方。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "放入消息框"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, other {正在等待空位：这个 Mico 有 # 个对话正在进行。}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, other {# 个文件}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "正在等待后台工作…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "此运行环境一次只运行一个任务，包括主聊天。"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "多出的任务会排队等候。主聊天有自己的位置，从不在它们后面等待。"
+
 #: src/pages/shell/message-hover-actions.tsx
 msgid "Branch in new conversation"
 msgstr "在新对话中分支"

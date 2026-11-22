@@ -27,6 +27,28 @@ describe("observeShellCommand", () => {
     expect((error as Error).cause).toBeUndefined();
   });
 
+  it("moves a silent command to the background when asked to yield, without stopping it", async () => {
+    let releaseExit: () => void = () => undefined;
+    const exitGate = new Promise<void>((resolve) => {
+      releaseExit = resolve;
+    });
+    const yieldTurn = new AbortController();
+    const observedPromise = observeShellCommand(
+      (async function* () {
+        await exitGate;
+        yield { type: "stdout" as const, data: "done\n" };
+        yield { type: "exit" as const, code: 0 };
+      })(),
+      { secrets: [], idleMs: 10_000, yieldSignal: yieldTurn.signal },
+    );
+    yieldTurn.abort();
+    const observed = await observedPromise;
+    expect(observed.result).toEqual({ stdout: "", stderr: "", code: null, running: true });
+    releaseExit();
+    // The command kept running: its final output still arrives.
+    await expect(observed.completion).resolves.toEqual({ stdout: "done\n", stderr: "", code: 0 });
+  });
+
   it("returns a fast command only after it exits", async () => {
     const seen: string[] = [];
     const observed = await observeShellCommand(
@@ -254,6 +276,20 @@ describe("deliverFinishedShells", () => {
     ]);
     expect(followUps[0]).toContain("exit code: 0");
     expect(followUps[0]).toContain("logged in");
+  });
+
+  it("reports once that the turn waits for its background work, and only when it waits", async () => {
+    const waits: string[] = [];
+    await deliverFinishedShells(() => undefined, [], { toolResults: [] }, undefined, () => waits.push("idle"));
+    expect(waits).toEqual([]);
+    await deliverFinishedShells(
+      () => undefined,
+      [Promise.resolve({ stdout: "", stderr: "", code: 0 })],
+      { toolResults: [] },
+      undefined,
+      () => waits.push("waiting"),
+    );
+    expect(waits).toEqual(["waiting"]);
   });
 
   it("does not wait on the turn that first received the live output", async () => {
