@@ -173,7 +173,13 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   constructor(
-    private readonly opts: { root?: string; hostRoots?: string[] | (() => string[]); maxFileBytes?: number } = {},
+    private readonly opts: {
+      root?: string;
+      /** The host's already chosen home for a key; defaults to `<root>/desktop-computers/<key>`. */
+      home?: (botId: string) => string;
+      hostRoots?: string[] | (() => string[]);
+      maxFileBytes?: number;
+    } = {},
   ) {}
 
   describe() {
@@ -184,11 +190,13 @@ export class DesktopSandboxProvider implements SandboxProvider {
     request: { botId: string; homePath: string },
     _context: AdapterContext,
   ): Promise<ComputerRef> {
-    const home = path.resolve(
-      this.opts.root ?? path.join(process.cwd(), "data"),
-      "desktop-computers",
-      request.botId,
-    );
+    const home = this.opts.home
+      ? path.resolve(this.opts.home(request.botId))
+      : path.resolve(
+          this.opts.root ?? path.join(process.cwd(), "data"),
+          "desktop-computers",
+          request.botId,
+        );
     const existing = [...this.boxes.values()].find(
       (box) => box.ref.botId === request.botId || box.home === home,
     );

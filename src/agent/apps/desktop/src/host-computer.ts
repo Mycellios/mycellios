@@ -21,6 +21,8 @@ export async function prepareHostComputer(
   listen: { hostname?: string } = {},
   /** Pinned accessibility component, when this build ships one for the platform. */
   appControlComponent?: { binary: string; sha256: string },
+  /** Visible parent of new Mico folders (from the OS home in native main); absent keeps them private. */
+  micoFolders?: string,
 ) {
   const configFile = path.join(userDataDir, "host-computer.json");
   const consentFile = path.join(userDataDir, "host-computer-consent");
@@ -44,6 +46,7 @@ export async function prepareHostComputer(
     token,
     agentRuntime,
     ...listen,
+    ...(micoFolders ? { micoFolders } : {}),
     ...(appControlComponent
       ? { appControl: { ...appControlComponent, stateDir: path.join(userDataDir, "app-control") } }
       : {}),
@@ -97,6 +100,7 @@ export async function prepareHostComputer(
     lockProject: server.lockProject,
     project: server.project,
     workspace: server.workspace,
+    micoFolder: server.micoFolder,
     isEnabled: server.isEnabled,
     executionScope: () => server.isEnabled() && /^[a-f0-9]{64}$/.test(rememberedAccount ?? "") ? rememberedAccount! : undefined,
     hasActiveWork: server.hasActiveWork,

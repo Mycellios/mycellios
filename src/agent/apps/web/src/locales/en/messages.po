@@ -13539,3 +13539,9 @@ msgstr "Get pairing code"
 
 msgid "Talk to a Mico from your own WhatsApp number through Mycellios Desktop."
 msgstr "Talk to a Mico from your own WhatsApp number through Mycellios Desktop."
+
+msgid "Folder on this PC"
+msgstr "Folder on this PC"
+
+msgid "Open folder"
+msgstr "Open folder"

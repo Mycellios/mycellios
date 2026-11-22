@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
+import { statSync } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { homedir } from "node:os";
@@ -9,6 +10,7 @@ import { AppControlRunner } from "./app-control-runner.js";
 import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { safeNativeCommandError } from "./native-command-journal.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
+import { MicoFolders } from "./mico-folders.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
 import {
   HOST_COMPUTER_MAX_BYTES,
@@ -30,6 +32,8 @@ export async function startHostComputerServer(options: {
   agentRuntime?: AgentRuntime;
   /** Pinned accessibility runner; offered only while the owner's separate consent is on. */
   appControl?: { binary: string; sha256: string; stateDir: string };
+  /** Visible parent of new Mico folders, chosen by native main; absent keeps homes private. */
+  micoFolders?: string;
 }) {
   if (!/^[a-f0-9]{64}$/.test(options.token)) throw new Error("Invalid local computer credential");
   let enabled = false;
@@ -56,6 +60,11 @@ export async function startHostComputerServer(options: {
   >();
   const updateNotices = new Map<AbortController, () => void>();
   const providers = new Map<string, DesktopSandboxProvider>();
+  const folders = new MicoFolders({
+    hiddenRoot: path.join(options.root, "desktop-computers"),
+    visibleRoot: options.micoFolders,
+    stateFile: path.join(options.root, "mico-folders.json"),
+  });
   // Isolated project conversations never share the screen with other work.
   const appControlOffered = (projectSessionId: string | undefined) =>
     Boolean(appControl) && appControlAllowed && !projectSessionId;
@@ -64,6 +73,8 @@ export async function startHostComputerServer(options: {
     if (!provider) {
       provider = new DesktopSandboxProvider({
         root: options.root,
+        // ref() has already chosen this home; provision never picks another one.
+        home: (key) => folders.resolve(key, undefined, true),
         hostRoots: () => [projects.get(botId) ?? homedir()],
         maxFileBytes: HOST_COMPUTER_MAX_FILE_BYTES,
       });
@@ -223,13 +234,14 @@ export async function startHostComputerServer(options: {
   if (!address || typeof address === "string") throw new Error("Local computer unavailable");
 
   // Reconstruct only our own workspace path. Never trust a caller's providerRef or filesystem root.
-  function ref(botId: string): ComputerRef {
+  // An existing home stays where it is; only a new Mico home may get a visible folder.
+  function ref(botId: string, home: { name?: string; create?: boolean } = {}): ComputerRef {
     const key = createHash("sha256").update(botId).digest("hex");
     return {
       id: `desktop-${key}`,
       botId: key,
       kind: "desktop",
-      providerRef: path.join(options.root, "desktop-computers", key),
+      providerRef: folders.resolve(key, home.name, !home.create),
     };
   }
   async function* dispatch(
@@ -285,7 +297,11 @@ export async function startHostComputerServer(options: {
       if (projectLocks.has(input.botId) || projectGuards.get(input.botId) !== grant)
         throw new Error("Project binding changed");
     }
-    const computer = ref(input.botId);
+    // Task worktree keys and cleanup never choose a new folder.
+    const computer = ref(input.botId, {
+      name: input.botName,
+      create: !input.projectSessionId && !cleanup,
+    });
     const provider = providerFor(input.botId);
     async function fileTarget(value: string) {
       const project = projects.get(input.botId);
@@ -528,6 +544,16 @@ export async function startHostComputerServer(options: {
     },
     /** Native-only location of this agent's existing default workspace. */
     workspace: (botId: string) => ref(botId).providerRef,
+    /** This Mico's folder when it exists on disk; never creates or chooses one. */
+    micoFolder(botId: string) {
+      if (!botId || botId.length > 256) return undefined;
+      const folder = folders.existing(createHash("sha256").update(botId).digest("hex"));
+      try {
+        return folder && statSync(folder).isDirectory() ? folder : undefined;
+      } catch {
+        return undefined;
+      }
+    },
     lockProject(botId: string) {
       if (
         projectLocks.has(botId) || providers.get(botId)?.hasActiveCommands() ||
