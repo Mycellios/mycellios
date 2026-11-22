@@ -6619,3 +6619,84 @@ msgstr "{count, plural, one {# पिछला रन इसमें जोड�
 #: src/lib/routine-paused-label.ts
 msgid "Paused by its {time} run"
 msgstr "{time} के रन ने रोका"
+
+#: src/components/PinnedMessages.tsx
+msgid "Show pins from"
+msgstr "इनसे पिन दिखाएं"
+
+#: src/components/PinnedMessages.tsx
+msgid "This conversation"
+msgstr "यह बातचीत"
+
+#: src/components/PinnedMessages.tsx
+msgid "All of {name}'s conversations"
+msgstr "{name} की सभी बातचीत"
+
+#: src/components/PinnedMessages.tsx
+msgid "{title} (archived)"
+msgstr "{title} (आर्काइव)"
+
+#: src/components/PinnedMessages.tsx
+msgid "No pinned messages in {name}'s conversations yet."
+msgstr "{name} की बातचीत में अभी कोई पिन किया गया संदेश नहीं है।"
+
+#: src/components/PinnedMessages.tsx
+msgid "Showing the newest 200 pins."
+msgstr "सबसे नए 200 पिन दिखाए जा रहे हैं।"
+
+#: src/components/PinnedMessages.tsx
+#: src/pages/SpaceSearch.tsx
+msgid "Untitled conversation"
+msgstr "बिना शीर्षक की बातचीत"
+
+#: src/components/PinnedMessages.tsx
+msgid "Main chat"
+msgstr "मुख्य चैट"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by {byName}"
+msgstr "{byName} ने पिन किया"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by your Mico"
+msgstr "आपके Mico ने पिन किया"
+
+#: src/components/ChatSearch.tsx
+msgid "Search messages"
+msgstr "संदेश खोजें"
+
+#: src/components/ChatSearch.tsx
+msgid "Previous match"
+msgstr "पिछला मिलान"
+
+#: src/components/ChatSearch.tsx
+msgid "Next match"
+msgstr "अगला मिलान"
+
+#: src/components/ChatSearch.tsx
+msgid "Type to search this conversation."
+msgstr "इस बातचीत में खोजने के लिए टाइप करें।"
+
+#: src/components/ChatSearch.tsx
+msgid "Could not search this conversation."
+msgstr "इस बातचीत में खोज नहीं हो सकी।"
+
+#: src/components/ChatSearch.tsx
+msgid "No messages match."
+msgstr "कोई संदेश मेल नहीं खाता।"
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}+"
+msgstr "{count} में से {current}+"
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}"
+msgstr "{count} में से {current}"
+
+#: src/pages/Shell.tsx
+msgid "That message is no longer in this conversation."
+msgstr "वह संदेश अब इस बातचीत में नहीं है।"
+
+#: src/pages/Shell.tsx
+msgid "The pinned message could not be opened."
+msgstr "पिन किया गया संदेश खोला नहीं जा सका।"

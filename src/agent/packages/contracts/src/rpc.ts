@@ -166,7 +166,8 @@ import { MessageReactionSchema } from "./reactions.js";
 import { RoutineWatchSchema } from "./routine-watch.js";
 import { RunLogsInputSchema, RunLogsOutputSchema } from "./run-logs.js";
 import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } from "./runs.js";
-import { SearchQueryOutputSchema } from "./search.js";
+import { SearchFilterSchema, SearchQueryOutputSchema, ThreadSearchOutputSchema } from "./search.js";
+import { MessagePinSchema, MICO_PINS_LIST_LIMIT, MicoMessagePinSchema } from "./message-pins.js";
 import { SecurityEventListInputSchema, SecurityEventSchema } from "./security-events.js";
 import { SettingsScopeSchema, SpaceSettingSchema, settingsScopeInput } from "./settings-scope.js";
 import { AgentUsageReportSchema, LastModelCallSchema, TaskCostSchema } from "./task-cost.js";
@@ -587,8 +588,10 @@ export const appContract = {
     remove: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),deleteAfter:IsoDate})),
   },
   threads: {
-    pinned: oc.input(threadTarget).output(z.object({threadId:Id,pins:z.array(z.object({messageId:Id,seq:z.number().int().nonnegative(),role:z.enum(["user","bot"]),preview:z.string().max(800),createdAt:z.string(),pinnedAt:z.string()}))})),
+    pinned: oc.input(threadTarget).output(z.object({threadId:Id,pins:z.array(MessagePinSchema)})),
     setPin: oc.input(threadTarget.safeExtend({messageId:Id,pinned:z.boolean()})).output(z.object({ok:z.literal(true)})),
+    /** Messages in this conversation that match, newest first, for in-chat search. */
+    searchMessages: oc.input(threadTarget.safeExtend({q:z.string().trim().min(1).max(200)})).output(ThreadSearchOutputSchema),
     sideQuestionAvailable: oc.input(threadTarget).output(z.object({ available: z.boolean() })),
     sideQuestion: oc.input(threadTarget.safeExtend({
       question: z.string().trim().min(1).max(8000),
@@ -1338,7 +1341,14 @@ export const appContract = {
     unregisterPush: oc.output(z.object({ ok: z.literal(true) })),
   },
   search: {
-    query: oc.input(z.object({ q: z.string().max(200) })).output(SearchQueryOutputSchema),
+    /** `filter` narrows the results to one kind; older servers ignore it and return all. */
+    query: oc.input(z.object({ q: z.string().max(200), filter: SearchFilterSchema.optional() })).output(SearchQueryOutputSchema),
+  },
+  /** Pins across one Mico's main chat and side conversations; not bound to an open conversation. */
+  pins: {
+    mico: oc.input(z.object({ botId: Id })).output(z.object({ pins: z.array(MicoMessagePinSchema).max(MICO_PINS_LIST_LIMIT) })),
+    /** Removes a pin from the combined list, whoever made it. */
+    unpin: oc.input(z.object({ botId: Id, threadId: Id, messageId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   links: {
     /**

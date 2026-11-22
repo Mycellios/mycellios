@@ -5,8 +5,9 @@ import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@mycellios/core/native-project-instructions";
 import { agentTaskInstructions, micoBehaviorInstructions } from "./mico-behavior.js";
 import { AGENT_TASK_TOOL_NAMES, agentTaskToolsAllowed, isAgentTaskToolName, runAgentTaskTool } from "./agent-tasks.js";
-import { AGENT_TASK_NOT_AVAILABLE_ERROR, AGENT_TASK_SURFACE_ERROR, AGENT_TASK_WAIT_REFUSAL } from "@mycellios/core";
+import { AGENT_TASK_SURFACE_ERROR, AGENT_TASK_WAIT_REFUSAL, HISTORY_ACROSS_GUIDANCE, historyAcrossAllowed, PIN_MESSAGE_GUIDANCE } from "@mycellios/core";
 import { isPersonRequestedRoutineRun, missedRoutineOccurrences, ROUTINE_FAILURE_REASON_MAX_LENGTH } from "@mycellios/core";
+import { type HistoryAccess, runHistoryTool, runPinMessageTool } from "./history-tools.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
 import { planCardTool } from "./plan-card.js";
 import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, readMicoDefaults } from "@mycellios/contracts";
@@ -62,7 +63,7 @@ import {
   SandboxRateLimitError,
   TransientModelError,
 } from "@mycellios/adapter-kit";
-import type { ComputerCommand, ComputerMode, HistoryReadInput, HistorySearchInput, MessageBlock, ModelRoleChoice, RunStatus } from "@mycellios/contracts";
+import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@mycellios/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
   BotSecretName,
@@ -75,8 +76,6 @@ import {
   disabledBuiltinToolSet,
   FLEET_TOOL_NAMES,
   FLEET_WRITE_TOOL_NAMES,
-  HistoryReadInputSchema,
-  HistorySearchInputSchema,
   isAttachmentImageMimeType,
   isOpenAiCompatibleProvider,
 } from "@mycellios/contracts";
@@ -172,7 +171,6 @@ import {
   parseComputerMode,
   RUN_TURN_CHECKPOINT_KIND,
   RunHistoryWriteError,
-  readHistory,
   readRunTimingFields,
   recordUsage,
   reserveInstructionProposal,
@@ -181,7 +179,6 @@ import {
   runSecretKind,
   SpaceLimitError,
   saveRunTurnCheckpoint,
-  searchHistory,
   settleReleasedTakeoverCards,
   validateInstructionProposal,
   withTransactionRetry,
@@ -322,7 +319,7 @@ import {
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { nativeWorkProjectSession } from "@mycellios/core";
 import { projectExecutionLeaseKey, PROJECT_SHARED_SCREEN_TOOLS } from "./project-execution.js";
-import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait, isOwnedAgentTask, readHistoryPage } from "@mycellios/db";
+import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait } from "@mycellios/db";
 import type { NativeCommandReceipt } from "./native-command-journal.js";
 import { connectApp } from "./connect-app.js";
 import { connectedContext, selectRunConnections } from "./connection-context.js";
@@ -4620,6 +4617,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
           backgroundRun: isBackgroundRunTrigger(run.trigger),
         });
         if (!agentTasksAllowed) for (const name of AGENT_TASK_TOOL_NAMES) disabledBuiltinTools.add(name);
+        // History reaches the Mico's other conversations only from its main chat or an ordinary
+        // side conversation; a routine thread reads just the tasks it opened.
+        const historyAccess: HistoryAccess = historyAcrossAllowed(run, thread, { messagingChannelRun })
+          ? "across"
+          : agentTasksAllowed
+            ? "own_tasks"
+            : "current";
+        // Pins are made only in the Mico's own main chat or side conversations.
+        const pinAllowed = !thread.groupId && !thread.externalConversationId && !messagingChannelRun &&
+          !isBackgroundRunTrigger(run.trigger) &&
+          (thread.botId === bot.id || (!thread.botId && thread.taskBotId === bot.id));
+        if (!pinAllowed) disabledBuiltinTools.add("pin_message");
         // A conversation the Mico opened finishes with a report; it never parks on a wait.
         const agentStartedThread = thread.taskBotId === bot.id && thread.startedBy === "agent";
         if (agentStartedThread) disabledBuiltinTools.add("await_event");
@@ -7573,34 +7582,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
           }
           if (name === "search_history" || name === "read_history") {
-            const parsed =
-              name === "search_history"
-                ? HistorySearchInputSchema.parse(args)
-                : HistoryReadInputSchema.parse(args);
-            // A conversation this Mico opened, read from its main chat or a routine thread
-            // under the same owner/Space/Mico fence. Anything else is not available.
-            const taskId = parsed.taskId && parsed.taskId !== run.threadId ? parsed.taskId : undefined;
-            if (
-              taskId &&
-              (!agentTasksAllowed ||
-                !(await isOwnedAgentTask(deps.prisma, { spaceId: run.spaceId, userId: run.userId, botId: bot.id }, taskId)))
-            ) {
-              return finish({ untrusted: true, error: AGENT_TASK_NOT_AVAILABLE_ERROR });
-            }
-            const scope = {
-              spaceId: run.spaceId,
-              userId: run.userId,
-              threadId: taskId ?? run.threadId,
-              botId: run.botId,
-              ...(taskId ? {} : { channelId, searchBeforeSeq: historySearchBeforeSeq }),
-            };
-            const readInput = name === "read_history" ? (parsed as HistoryReadInput) : undefined;
-            const response =
-              name === "search_history"
-                ? await searchHistory(deps.prisma, scope, parsed as HistorySearchInput)
-                : readInput?.messageId
-                  ? await readHistory(deps.prisma, scope, { ...readInput, messageId: readInput.messageId })
-                  : await readHistoryPage(deps.prisma, scope, readInput ?? {});
+            const response = await runHistoryTool(deps.prisma, {
+              name,
+              args,
+              run: { spaceId: run.spaceId, userId: run.userId, botId: run.botId, threadId: run.threadId },
+              access: historyAccess,
+              channelId,
+              searchBeforeSeq: historySearchBeforeSeq,
+            });
             const redacted = redactConnectorPayload(response, runSecrets);
             // Redaction can expand short synthetic credentials; never let Pi clip the JSON.
             if (Buffer.byteLength(JSON.stringify(redacted), "utf8") > 11_000) {
@@ -7611,6 +7600,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
             return finish(redacted);
+          }
+          if (name === "pin_message") {
+            return finish(
+              await runPinMessageTool(deps.prisma, {
+                run: { spaceId: run.spaceId, userId: run.userId, botId: bot.id, threadId: run.threadId },
+                thread: { id: thread.id, contextStartSeq: thread.contextStartSeq },
+                args,
+              }),
+            );
           }
           if (name === "save_memory") {
             return finish(
@@ -8827,6 +8825,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     : undefined,
                   hasHistoricalContext: historicalContext.length > 0,
                   historyRetrievalEnabled: contextStrategy !== "current",
+                  historyAcross: historyAccess === "across",
                   computerInstruction,
                   pageBrowserAllowed,
                   taskCatalogInstruction,
@@ -10263,6 +10262,10 @@ export function selectBuiltinToolsForRun(options: {
         tool.name !== "call_user") &&
       (options.historyRetrievalEnabled ||
         !["search_history", "read_history"].includes(tool.name)) &&
+      (tool.name !== "pin_message" ||
+        (!options.groupId &&
+          !options.messagingChannelRun &&
+          !isBackgroundRunTrigger(options.trigger))) &&
       (!options.messagingChannelRun ||
         (![
           "remember",
@@ -10594,6 +10597,8 @@ export function userTurnInstructions(parts: {
   redactedTicketContext?: string | undefined;
   hasHistoricalContext: boolean;
   historyRetrievalEnabled?: boolean;
+  /** The history tools reach the Mico's other conversations (see historyAcrossAllowed). */
+  historyAcross?: boolean;
   computerInstruction: string;
   pageBrowserAllowed: boolean;
   taskCatalogInstruction?: string;
@@ -10617,6 +10622,13 @@ export function userTurnInstructions(parts: {
     builtinOffered(parts.disabledBuiltinTools, "read_history")
       ? "For questions about an earlier discussion, first check the visible conversation. Answer follow-ups from facts already present in original messages or prior source-verified replies when no later visible correction changes them; do not repeat retrieval solely because the user asks again. Use search_history when necessary evidence is missing or uncertain. Start with the project name alone, or one distinctive topic word if no project is named, then use read_history to check surrounding messages, outcomes, and later corrections before claiming exact recall. Verify that matches contain source statements answering the question. If matches lack the requested fact and nextSearch is present, call search_history with those arguments. Coverage applies only to the requested query and range. Empty narrower queries do not exhaust the broader topic query’s matches. Do not claim evidence is unavailable while that broader search still has an unexplored cursor. If a search is empty, try the single project or topic word before concluding the evidence is missing. If the requested fact remains absent, say so briefly without volunteering adjacent facts. If multiple projects match and none is selected, ask which project before giving candidate facts. Historical snapshots are navigation aids, not authoritative facts or approvals."
       : undefined,
+    parts.historyRetrievalEnabled &&
+    parts.historyAcross &&
+    builtinOffered(parts.disabledBuiltinTools, "search_history") &&
+    builtinOffered(parts.disabledBuiltinTools, "read_history")
+      ? HISTORY_ACROSS_GUIDANCE
+      : undefined,
+    offeredBuiltinClause(parts.disabledBuiltinTools, "pin_message", PIN_MESSAGE_GUIDANCE),
     toolUsageLine(parts),
     parts.taskCatalogInstruction,
     parts.agentTaskInstruction,

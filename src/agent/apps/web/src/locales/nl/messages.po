@@ -6619,3 +6619,84 @@ msgstr "{count, plural, one {# eerdere uitvoering is hierin samengevoegd: de vor
 #: src/lib/routine-paused-label.ts
 msgid "Paused by its {time} run"
 msgstr "Gepauzeerd door de uitvoering van {time}"
+
+#: src/components/PinnedMessages.tsx
+msgid "Show pins from"
+msgstr "Vastgezette berichten uit"
+
+#: src/components/PinnedMessages.tsx
+msgid "This conversation"
+msgstr "Dit gesprek"
+
+#: src/components/PinnedMessages.tsx
+msgid "All of {name}'s conversations"
+msgstr "Alle gesprekken van {name}"
+
+#: src/components/PinnedMessages.tsx
+msgid "{title} (archived)"
+msgstr "{title} (gearchiveerd)"
+
+#: src/components/PinnedMessages.tsx
+msgid "No pinned messages in {name}'s conversations yet."
+msgstr "Nog geen vastgezette berichten in de gesprekken van {name}."
+
+#: src/components/PinnedMessages.tsx
+msgid "Showing the newest 200 pins."
+msgstr "De 200 meest recent vastgezette berichten worden getoond."
+
+#: src/components/PinnedMessages.tsx
+#: src/pages/SpaceSearch.tsx
+msgid "Untitled conversation"
+msgstr "Gesprek zonder titel"
+
+#: src/components/PinnedMessages.tsx
+msgid "Main chat"
+msgstr "Hoofdchat"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by {byName}"
+msgstr "Vastgezet door {byName}"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by your Mico"
+msgstr "Vastgezet door je Mico"
+
+#: src/components/ChatSearch.tsx
+msgid "Search messages"
+msgstr "Berichten zoeken"
+
+#: src/components/ChatSearch.tsx
+msgid "Previous match"
+msgstr "Vorige resultaat"
+
+#: src/components/ChatSearch.tsx
+msgid "Next match"
+msgstr "Volgende resultaat"
+
+#: src/components/ChatSearch.tsx
+msgid "Type to search this conversation."
+msgstr "Typ om in dit gesprek te zoeken."
+
+#: src/components/ChatSearch.tsx
+msgid "Could not search this conversation."
+msgstr "Kan niet zoeken in dit gesprek."
+
+#: src/components/ChatSearch.tsx
+msgid "No messages match."
+msgstr "Geen berichten gevonden."
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}+"
+msgstr "{current} van {count}+"
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}"
+msgstr "{current} van {count}"
+
+#: src/pages/Shell.tsx
+msgid "That message is no longer in this conversation."
+msgstr "Dat bericht staat niet meer in dit gesprek."
+
+#: src/pages/Shell.tsx
+msgid "The pinned message could not be opened."
+msgstr "Het vastgezette bericht kon niet worden geopend."

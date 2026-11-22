@@ -13733,3 +13733,80 @@ msgstr "{count, plural, one {# earlier run was folded into this one: the run bef
 #: src/lib/routine-paused-label.ts
 msgid "Paused by its {time} run"
 msgstr "Paused by its {time} run"
+
+#: src/components/PinnedMessages.tsx
+msgid "Show pins from"
+msgstr "Show pins from"
+
+#: src/components/PinnedMessages.tsx
+msgid "This conversation"
+msgstr "This conversation"
+
+#: src/components/PinnedMessages.tsx
+msgid "All of {name}'s conversations"
+msgstr "All of {name}'s conversations"
+
+#: src/components/PinnedMessages.tsx
+msgid "{title} (archived)"
+msgstr "{title} (archived)"
+
+#: src/components/PinnedMessages.tsx
+msgid "No pinned messages in {name}'s conversations yet."
+msgstr "No pinned messages in {name}'s conversations yet."
+
+#: src/components/PinnedMessages.tsx
+msgid "Showing the newest 200 pins."
+msgstr "Showing the newest 200 pins."
+
+#: src/components/PinnedMessages.tsx
+#: src/pages/SpaceSearch.tsx
+msgid "Untitled conversation"
+msgstr "Untitled conversation"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by {byName}"
+msgstr "Pinned by {byName}"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by your Mico"
+msgstr "Pinned by your Mico"
+
+#: src/components/ChatSearch.tsx
+msgid "Search messages"
+msgstr "Search messages"
+
+#: src/components/ChatSearch.tsx
+msgid "Previous match"
+msgstr "Previous match"
+
+#: src/components/ChatSearch.tsx
+msgid "Next match"
+msgstr "Next match"
+
+#: src/components/ChatSearch.tsx
+msgid "Type to search this conversation."
+msgstr "Type to search this conversation."
+
+#: src/components/ChatSearch.tsx
+msgid "Could not search this conversation."
+msgstr "Could not search this conversation."
+
+#: src/components/ChatSearch.tsx
+msgid "No messages match."
+msgstr "No messages match."
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}+"
+msgstr "{current} of {count}+"
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}"
+msgstr "{current} of {count}"
+
+#: src/pages/Shell.tsx
+msgid "That message is no longer in this conversation."
+msgstr "That message is no longer in this conversation."
+
+#: src/pages/Shell.tsx
+msgid "The pinned message could not be opened."
+msgstr "The pinned message could not be opened."

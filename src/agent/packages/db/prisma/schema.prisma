@@ -740,6 +740,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  messagePins MessagePin[] @relation("MessagePinAuthor")
   localMemoryReviews LocalMemoryReview[] @relation("ReviewBot")
   hostedWebAgents HostedWebAgent[]
   inboxTasks InboxTask[]
@@ -984,12 +985,17 @@ model MessagePin {
   spaceId String
   userId String
   pinnedAt DateTime @default(now())
+  /// Set when the person's own Mico pinned it in its conversation; NULL is the person's pin.
+  pinnedByBotId String?
+  pinnedByBot Bot? @relation("MessagePinAuthor",fields:[pinnedByBotId],references:[id],onDelete:Cascade)
   message Message @relation(fields:[messageId,threadId],references:[id,threadId],onDelete:Cascade)
   thread Thread @relation(fields:[threadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction)
   space Space @relation(fields:[spaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
   user User @relation(fields:[userId],references:[id],onDelete:Cascade,onUpdate:NoAction)
   @@id([messageId,userId])
   @@index([spaceId,userId,threadId,pinnedAt])
+  @@index([spaceId,userId,pinnedAt])
+  @@index([pinnedByBotId])
   @@map("message_pins")
 }
 

@@ -1,4 +1,4 @@
-import type { Actor, MessageBlock, SearchHit } from "@mycellios/contracts";
+import type { Actor, MessageBlock, SearchFilter, SearchHit } from "@mycellios/contracts";
 import { GROUP_MEMBER_MIN } from "@mycellios/contracts";
 import {
   displayName,
@@ -9,7 +9,14 @@ import {
   snippetAroundMatch,
 } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
-import { contentEncryptionOf, INDEXED_MESSAGE, Prisma, UNINDEXED_MESSAGE } from "@mycellios/db";
+import {
+  contentEncryptionOf,
+  historyMessageText,
+  INDEXED_MESSAGE,
+  Prisma,
+  UNINDEXED_MESSAGE,
+} from "@mycellios/db";
+import { withoutPeerRunMessages } from "./thread-message-pages.js";
 
 const SEARCH_LIMIT = 25;
 /** Cap name matches so content hits (messages/files/links/routines) keep most of the budget. */
@@ -51,44 +58,71 @@ async function openMessages<T extends { id: string }>(prisma: PrismaClient, rows
   return (await contentEncryptionOf(prisma)?.openRows("Message", rows)) ?? rows;
 }
 
+/** A message in one of a Mico's side conversations names it, so a result can open it. */
+type FoundMessage = { id: string; seq: number; taskThreadId?: string; conversationTitle?: string };
+
+/** Side conversations shown in search: the Mico's own, not an outside chat or one being deleted. */
+const micoThread = Prisma.sql`t."groupId" IS NULL AND t."externalConversationId" IS NULL AND t."deleteAfter" IS NULL`;
+
+function conversationOf(row: { taskThreadId: string | null; threadTitle: string | null }) {
+  return row.taskThreadId
+    ? { taskThreadId: row.taskThreadId, conversationTitle: row.threadTitle?.trim() || "Untitled conversation" }
+    : {};
+}
+
 async function findArtifactMessages(
   prisma: PrismaClient,
   actor: Actor,
   artifacts: Array<{ id: string; targetId: string }>,
   target: "bot" | "group",
-): Promise<Map<string, { id: string; seq: number }>> {
+): Promise<Map<string, FoundMessage>> {
   if (artifacts.length === 0) return new Map();
-  const targetColumn = target === "bot" ? Prisma.sql`t."botId"` : Prisma.sql`t."groupId"`;
+  // A Mico's file can be in its main chat or one of its side conversations.
+  const targetColumn =
+    target === "bot"
+      ? Prisma.sql`COALESCE(t."botId", t."taskBotId")`
+      : Prisma.sql`t."groupId"`;
+  const threadScope = target === "bot" ? Prisma.sql`AND ${micoThread}` : Prisma.empty;
   const candidates = Prisma.join(
     artifacts.map(({ id, targetId }) => Prisma.sql`(${id}, ${targetId})`),
   );
-  const rows = await prisma.$queryRaw<Array<{ artifactId: string; id: string; seq: number }>>(
+  const rows = await prisma.$queryRaw<
+    Array<{ artifactId: string; id: string; seq: number; taskThreadId: string | null; threadTitle: string | null }>
+  >(
     Prisma.sql`
-      SELECT candidate."artifactId", message.id, message.seq
+      SELECT candidate."artifactId", message.id, message.seq, message."taskThreadId", message."threadTitle"
       FROM (VALUES ${candidates}) AS candidate("artifactId", "targetId")
       CROSS JOIN LATERAL (
-        SELECT m.id, m.seq
+        SELECT m.id, m.seq, CASE WHEN t."botId" IS NULL THEN t.id END AS "taskThreadId",
+          t.title AS "threadTitle"
         FROM messages m
         INNER JOIN threads t ON t.id = m."threadId"
         WHERE t."spaceId" = ${actor.spaceId}
           AND t."userId" = ${actor.userId}
           AND ${targetColumn} = candidate."targetId"
+          ${threadScope}
           AND m.blocks::text ILIKE ('%' || candidate."artifactId" || '%')
         ORDER BY m."createdAt" DESC
         LIMIT 1
       ) message
     `,
   );
-  return new Map(rows.map(({ artifactId, id, seq }) => [artifactId, { id, seq }]));
+  return new Map(
+    rows.map(({ artifactId, id, seq, ...thread }) => [artifactId, { id, seq, ...conversationOf(thread) }]),
+  );
 }
 
 export async function querySpaceSearch(
   prisma: PrismaClient,
   actor: Actor,
   q: string,
+  filter: SearchFilter = "all",
 ): Promise<SearchHit[]> {
   const query = q.trim();
   if (!query) return [];
+  const wants = (kind: Exclude<SearchFilter, "all">) => filter === "all" || filter === kind;
+  // One kind at a time fills the whole page with that kind.
+  const nameLimit = filter === "all" ? CONVERSATION_HIT_LIMIT : SEARCH_LIMIT;
   // The database side has to match the text the user typed, the way
   // `matchesSearchQuery` does in memory: a `%` or `_` would otherwise widen
   // the match, and a `\` would swallow the character after it.
@@ -113,7 +147,7 @@ export async function querySpaceSearch(
     bucket.push(hit);
   }
 
-  const bots = await prisma.bot.findMany({
+  const bots = !wants("micos") ? [] : await prisma.bot.findMany({
     where: {
       spaceId: actor.spaceId,
       userId: actor.userId,
@@ -124,7 +158,7 @@ export async function querySpaceSearch(
         { description: { contains: likeQuery, mode: "insensitive" } },
       ],
     },
-    take: CONVERSATION_HIT_LIMIT,
+    take: nameLimit,
   });
   for (const bot of bots) {
     pushInto(
@@ -136,7 +170,7 @@ export async function querySpaceSearch(
         title: bot.name,
         snippet: displayName(bot.title, "") || bot.description || displayName(bot.name, ""),
       },
-      CONVERSATION_HIT_LIMIT * 2,
+      filter === "all" ? CONVERSATION_HIT_LIMIT * 2 : SEARCH_LIMIT,
     );
   }
 
@@ -157,14 +191,14 @@ export async function querySpaceSearch(
     `,
   );
   const openableGroupIds = openableGroups.map(({ id }) => id);
-  const groups = await prisma.chatGroup.findMany({
+  const groups = !wants("groups") ? [] : await prisma.chatGroup.findMany({
     where: {
       spaceId: actor.spaceId,
       userId: actor.userId,
       id: { in: openableGroupIds },
       name: { contains: likeQuery, mode: "insensitive" },
     },
-    take: CONVERSATION_HIT_LIMIT,
+    take: nameLimit,
   });
   for (const group of groups) {
     pushInto(
@@ -176,13 +210,13 @@ export async function querySpaceSearch(
         title: group.name,
         snippet: displayName(group.name, ""),
       },
-      CONVERSATION_HIT_LIMIT * 2,
+      filter === "all" ? CONVERSATION_HIT_LIMIT * 2 : SEARCH_LIMIT,
     );
   }
 
   const contentBudget = Math.max(0, SEARCH_LIMIT - conversationHits.length);
 
-  const artifacts = await prisma.artifact.findMany({
+  const artifacts = !wants("files") ? [] : await prisma.artifact.findMany({
     where: {
       spaceId: actor.spaceId,
       userId: actor.userId,
@@ -217,12 +251,15 @@ export async function querySpaceSearch(
         artifactId: artifact.id,
         messageId: message.id,
         seq: message.seq,
+        ...(message.taskThreadId
+          ? { taskThreadId: message.taskThreadId, conversationTitle: message.conversationTitle }
+          : {}),
       },
       contentBudget,
     );
   }
 
-  const groupArtifacts = await prisma.artifact.findMany({
+  const groupArtifacts = !wants("files") ? [] : await prisma.artifact.findMany({
     where: {
       spaceId: actor.spaceId,
       userId: actor.userId,
@@ -260,7 +297,7 @@ export async function querySpaceSearch(
     );
   }
 
-  const routines = await prisma.routine.findMany({
+  const routines = !wants("routines") ? [] : await prisma.routine.findMany({
     where: {
       spaceId: actor.spaceId,
       userId: actor.userId,
@@ -288,8 +325,10 @@ export async function querySpaceSearch(
     );
   }
 
+  if (!wants("messages")) return [...conversationHits, ...contentHits].slice(0, SEARCH_LIMIT);
   const match = await messageMatch(prisma, actor.spaceId, query);
   const full = () => contentHits.length >= contentBudget;
+  // A Mico's main chat and its side conversations; side-conversation hits name their conversation.
   for (let page = 0; page < match.pages && !full(); page += 1) {
     const messageRows = await openMessages(
       prisma,
@@ -301,15 +340,20 @@ export async function querySpaceSearch(
           blocks: Prisma.JsonValue;
           botId: string;
           botName: string;
+          taskThreadId: string | null;
+          threadTitle: string | null;
         }>
       >`
-      SELECT m.id, m."threadId", m.seq, m.blocks, b.id AS "botId", b.name AS "botName"
+      SELECT m.id, m."threadId", m.seq, m.blocks, b.id AS "botId", b.name AS "botName",
+        CASE WHEN t."botId" IS NULL THEN t.id END AS "taskThreadId", t.title AS "threadTitle"
       FROM messages m
       INNER JOIN threads t ON t.id = m."threadId"
-      INNER JOIN bots b ON b.id = t."botId"
+      INNER JOIN bots b ON b.id = COALESCE(t."botId", t."taskBotId")
       WHERE t."spaceId" = ${actor.spaceId}
         AND t."userId" = ${actor.userId}
+        AND b."spaceId" = t."spaceId" AND b."userId" = t."userId"
         AND b."archivedAt" IS NULL
+        AND ${micoThread}
         AND ${match.sql}
       ORDER BY m."createdAt" DESC, m.id DESC
       LIMIT ${match.limit} OFFSET ${page * match.limit}
@@ -319,6 +363,7 @@ export async function querySpaceSearch(
       pushMessageHits(row.blocks as MessageBlock[], {
         botId: row.botId,
         botName: row.botName,
+        ...conversationOf(row),
         messageId: row.id,
         seq: row.seq,
         query,
@@ -375,6 +420,8 @@ function pushMessageHits(
   ctx: {
     botId?: string;
     botName?: string;
+    taskThreadId?: string;
+    conversationTitle?: string;
     groupId?: string;
     groupName?: string;
     messageId: string;
@@ -386,7 +433,13 @@ function pushMessageHits(
   // Discriminate on groupId (not name): empty group names must still target the group.
   const destination = ctx.groupId
     ? { groupId: ctx.groupId, groupName: ctx.groupName ?? "" }
-    : { botId: ctx.botId!, botName: ctx.botName! };
+    : {
+        botId: ctx.botId!,
+        botName: ctx.botName!,
+        ...(ctx.taskThreadId
+          ? { taskThreadId: ctx.taskThreadId, conversationTitle: ctx.conversationTitle ?? "" }
+          : {}),
+      };
   const title = ctx.groupId ? (ctx.groupName ?? "") : (ctx.botName ?? "");
   let messageHit = false;
   for (const block of blocks) {
@@ -427,4 +480,55 @@ function pushMessageHits(
       seq: ctx.seq,
     });
   }
+}
+
+/** In-chat search returns at most this many matches and scans a bounded number of pages. */
+const THREAD_SEARCH_LIMIT = 100;
+const THREAD_SEARCH_PAGE = 100;
+const THREAD_SEARCH_PAGES = 5;
+
+/**
+ * In-chat search: person and Mico messages of one conversation the caller already resolved,
+ * newest first. Encrypted messages match on blind-index tokens and are confirmed after
+ * decryption; rows not yet encrypted keep the substring match. Messages the transcript hides
+ * are left out so every result can be jumped to.
+ */
+export async function searchThreadMessages(
+  prisma: PrismaClient,
+  actor: Actor,
+  threadId: string,
+  q: string,
+): Promise<{ matches: Array<{ messageId: string; seq: number; snippet: string }>; more: boolean }> {
+  const query = q.trim();
+  if (!query) return { matches: [], more: false };
+  const match = await messageMatch(prisma, actor.spaceId, query);
+  const matches: Array<{ messageId: string; seq: number; snippet: string }> = [];
+  for (let page = 0; page < THREAD_SEARCH_PAGES; page += 1) {
+    const rows = await openMessages(
+      prisma,
+      await prisma.$queryRaw<
+        Array<{ id: string; seq: number; role: string; runId: string | null; blocks: Prisma.JsonValue }>
+      >`
+      SELECT m.id, m.seq, m.role, m."runId", m.blocks
+      FROM messages m
+      INNER JOIN threads t ON t.id = m."threadId"
+      WHERE m."threadId" = ${threadId}
+        AND t."spaceId" = ${actor.spaceId}
+        AND t."userId" = ${actor.userId}
+        AND m.role IN ('user', 'bot')
+        AND ${match.sql}
+      ORDER BY m.seq DESC
+      LIMIT ${THREAD_SEARCH_PAGE} OFFSET ${page * THREAD_SEARCH_PAGE}
+    `,
+    );
+    for (const row of await withoutPeerRunMessages(prisma, rows)) {
+      const text = historyMessageText(row.blocks);
+      if (!matchesSearchQuery(query, text)) continue;
+      if (matches.length === THREAD_SEARCH_LIMIT) return { matches, more: true };
+      matches.push({ messageId: row.id, seq: row.seq, snippet: snippetAroundMatch(text, query) });
+    }
+    if (rows.length < THREAD_SEARCH_PAGE) return { matches, more: false };
+  }
+  // Candidates remain past the scanned pages.
+  return { matches, more: true };
 }

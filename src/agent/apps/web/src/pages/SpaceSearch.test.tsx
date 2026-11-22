@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
+  useLingui: () => ({ t: (strings: TemplateStringsArray) => strings.join("") }),
 }));
 
 import { SpaceSearchResults } from "./SpaceSearch";
@@ -56,4 +57,36 @@ it("renders every file sent in one message without duplicate-key errors", async 
   );
   expect(error).not.toHaveBeenCalled();
   expect(container.querySelectorAll("button")).toHaveLength(2);
+});
+
+it("names the side conversation a message hit opens", async () => {
+  const hit: SearchHit = {
+    kind: "message",
+    botId: "bot-1",
+    botName: "Scout",
+    title: "Scout",
+    snippet: "the launch checklist",
+    messageId: "message-2",
+    seq: 7,
+    taskThreadId: "thread-2",
+    conversationTitle: "Launch plan",
+  };
+  const onSelect = vi.fn();
+  await act(async () => root.render(<SpaceSearchResults hits={[hit]} loading={false} onSelect={onSelect} />));
+  expect(container.querySelector('[data-testid="search-hit-conversation"]')?.textContent).toBe(" · Launch plan");
+  await act(async () => container.querySelector("button")!.click());
+  expect(onSelect).toHaveBeenCalledWith(hit);
+});
+
+it("offers result filters and reports the chosen one", async () => {
+  const onFilter = vi.fn();
+  await act(async () =>
+    root.render(<SpaceSearchResults hits={[]} loading={false} onSelect={() => {}} filter="all" onFilter={onFilter} />),
+  );
+  const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('[data-testid="search-filters"] button'));
+  expect(buttons.map((button) => button.textContent)).toEqual(["All", "Messages", "Micos", "Groups", "Files", "Routines"]);
+  expect(buttons[0]!.getAttribute("aria-pressed")).toBe("true");
+  await act(async () => buttons[1]!.click());
+  expect(onFilter).toHaveBeenCalledWith("messages");
+  expect(container.textContent).toContain("No results");
 });

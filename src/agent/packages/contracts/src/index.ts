@@ -43,6 +43,7 @@ export * from "./runs.js";
 export * from "./workflows.js";
 export * from "./whatsapp-link.js";
 export * from "./search.js";
+export * from "./message-pins.js";
 export * from "./security-events.js";
 export * from "./task-cost.js";
 export * from "./projects.js";

@@ -1,9 +1,11 @@
 import type { AgentRunRequest } from "@mycellios/adapter-kit";
 import { runContinueJob } from "@mycellios/adapter-kit";
 import {
-  AGENT_TASK_NOT_AVAILABLE_ERROR,
   AGENT_TASK_SURFACE_ERROR,
   AGENT_TASK_WAIT_REFUSAL,
+  HISTORY_ACROSS_GUIDANCE,
+  HISTORY_CONVERSATION_NOT_AVAILABLE_ERROR,
+  PIN_MESSAGE_GUIDANCE,
 } from "@mycellios/core";
 import type { AppendEventInput, Prisma } from "@mycellios/db";
 import { appendEventInTransaction } from "@mycellios/db";
@@ -161,7 +163,10 @@ async function turn(
       updateManyAndReturn: vi.fn(async () => [{ fence: 1 }]),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
-    $queryRaw: vi.fn(async () => [{ id: "row-1", scope: "dedicated" }]),
+    // A conversation outside this Mico's fence ("someone-elses") matches no rows.
+    $queryRaw: vi.fn(async (_strings: unknown, ...values: unknown[]) =>
+      values.includes("someone-elses") ? [] : [{ id: "row-1", scope: "dedicated" }],
+    ),
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
   });
   const finalizeRun = vi.fn(async () => ({
@@ -239,9 +244,19 @@ describe("tasks a Mico opens itself", () => {
     expect(offered.instructions).toContain("read a file again right before you change it");
   });
 
-  it("refuses to read a conversation this Mico did not open by taskId", async () => {
+  it("refuses to read a conversation outside this Mico's own by taskId", async () => {
     const { results } = await turn(MAIN, { calls: [{ name: "read_history", args: { taskId: "someone-elses" } }] });
-    expect(results[0]).toEqual(expect.objectContaining({ error: AGENT_TASK_NOT_AVAILABLE_ERROR }));
+    expect(results[0]).toEqual(expect.objectContaining({ error: HISTORY_CONVERSATION_NOT_AVAILABLE_ERROR }));
+  });
+
+  it("reaches across the Mico's conversations and offers pins from its main chat and ordinary side conversations", async () => {
+    const person = { ...AGENT_TASK, id: "person-thread", startedBy: "user", taskKey: "mico-task:bot-1:person" };
+    for (const thread of [MAIN, AGENT_TASK, person]) {
+      const { toolNames, offered } = await turn(thread, thread === AGENT_TASK ? { trigger: "agent_task" } : {});
+      expect(toolNames).toEqual(expect.arrayContaining(["search_history", "read_history", "pin_message"]));
+      expect(offered.instructions).toContain(HISTORY_ACROSS_GUIDANCE);
+      expect(offered.instructions).toContain(PIN_MESSAGE_GUIDANCE);
+    }
   });
 
   it("starts the report turn a finished task turn queued in the main chat", async () => {
