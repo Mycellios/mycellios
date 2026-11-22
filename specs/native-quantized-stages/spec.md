@@ -204,27 +204,53 @@ but no Metal entry.
 
 ### Per-node qualification
 
-The coordinator already issues engine runtime challenges and renews each
-profile an hour before its 24-hour expiry
-(`src/coordinator/engine-runtime-profile-scheduler.ts`). For this family the
-worker answers a challenge by:
+The coordinator has the pieces of an engine runtime challenge: a scheduler
+that renews each profile an hour before its 24-hour expiry
+(`src/coordinator/engine-runtime-profile-scheduler.ts`), a worker handler and
+coordinator-side sealing (`engine-profile-authority.ts`). As of 2026-11-22 it
+is not connected in production for any engine:
 
-1. loading the pinned binary and the stage package named in the challenge;
-2. running the deployment canary;
-3. checking the certification's parity evidence for its backend class;
-4. measuring its batch classes (finding 6) and whether a two-block slice is
-   row-independent (finding 7);
-5. timing decode, prefill and verify waves.
+- `buildEngineRuntimeActivationPlans` is never called outside tests, so no
+  challenge is ever issued. With an activation authority configured, every
+  node would wait for a profile that never arrives.
+- The challenge contract admits only the `qwen3-dense-v1` probe on `cuda` or
+  `rocm`. Its probe (`engine_runtime_profile.py`) times synthetic `torch.mm`
+  kernels and does not load the model.
+- Only the headless worker wires a probe; desktop nodes answer
+  `engine_runtime_probe_unavailable`. No node detects or reports Vulkan.
 
-The result is the existing sealed `EngineRuntimeProfile`. It needs one
-addition: the micro-batch sizes that are exact on that node, or none. Without
-them the route may still run, but its speculative output is reported as
-approximate.
+For this family the worker answers a challenge with
+`python -m distributed_runtime.llama_cpp_profile`. It loads the sealed package
+through the same runner as production (pinned binary, view, child process),
+runs the batch-class self-test, and times one-position decode, 32-position
+prefill and 8-position verification with the real weights. It prints the
+existing `engineRuntimeMeasurement` shape plus an `exactness` block: runtime
+ABI, backend, batch classes, exact micro-batch sizes, and whether speculation
+can be exact. On the development PC (SmolLM2-1.7B, 12-block stages) it
+reported 19.7 ms per decoded position on the CPU and 12.9 ms on Vulkan, with
+exact speculation on the CPU only.
+
+The sealed `EngineRuntimeProfile` needs that exactness block. Without it a
+route may still run, but its speculative output is reported as approximate.
 
 A node that fails any step publishes no profile for this family. It keeps
 serving the families it does qualify for, and the failure reason reaches the
 coordinator's activation incident. No operator action is needed for a node to
 fall back.
+
+What remains before selection is automatic, in order:
+
+1. The contract admits a `llama-cpp-gguf-v1` probe kind on `cpu` and `vulkan`
+   and seals the exactness block. The coordinator builds the challenge from the
+   package identity instead of Qwen3 shape fields.
+2. Both worker kinds wire the probe, and nodes report Vulkan availability.
+3. The coordinator builds activation plans after each automatic distribution,
+   which is the missing link for every engine family.
+4. The Python launcher and the launch agent accept `--native-gguf-executor
+   llama-cpp` only when it is bound to the sealed engine authority. The stage
+   artifact preparer supplies the pinned build directory and the view cache.
+5. Requested models gain a pinned GGUF source, and nodes build their stage
+   packages from it.
 
 ### Planning
 
