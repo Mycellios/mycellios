@@ -260,7 +260,15 @@ What remains before selection is automatic, in order:
    llama-cpp` only when it is bound to the sealed engine authority. The stage
    artifact preparer supplies the pinned build directory and the view cache.
 5. Requested models gain a pinned GGUF source, and nodes build their stage
-   packages from it.
+   packages from it. The pin lives in the engine activation authority, not in
+   the requested-model table, so it needs no migration and is bound by the
+   same certification: its optional `artifact` names the GGUF's HTTPS URL,
+   SHA-256 and size, and the URL and id of its tensor manifest
+   (`src/contracts/gguf-tensor-manifest.ts`, whose identity matches the
+   Python node byte for byte). The authority is valid only when the certified
+   `descriptor.model.manifestDigest` is that manifest's id. Still open: the
+   worker preparer fetching the manifest and calling
+   `native_gguf_remote fetch-stage`.
 
 ### Planning
 

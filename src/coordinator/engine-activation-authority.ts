@@ -24,6 +24,18 @@ export const engineActivationAuthoritySchema = z.object({
     tokenizerDigest: z.string().regex(/^sha256:[0-9a-f]{64}$/),
     vocabularyDigest: z.string().regex(/^sha256:[0-9a-f]{64}$/),
   }).strict().optional(),
+  // A quantized GGUF the certified engine runs. Nodes fetch the tensor manifest
+  // from `tensorManifestUrl`, verify its id and then fetch only their stage's
+  // tensors from `url` (python/distributed_runtime/native_gguf_remote.py).
+  artifact: z.object({
+    format: z.literal("gguf"),
+    url: z.string().url().max(2_048).refine((value) => value.startsWith("https://"), "gguf_artifact_url_must_use_https"),
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    sizeBytes: z.number().int().positive().safe(),
+    tensorManifestUrl: z.string().url().max(2_048)
+      .refine((value) => value.startsWith("https://"), "gguf_tensor_manifest_url_must_use_https"),
+    tensorManifestId: z.string().regex(/^[0-9a-f]{64}$/),
+  }).strict().optional(),
   probe: z.object({
     kind: z.literal("qwen3-dense-v1"),
     quantization: z.string().trim().min(1).max(64),
@@ -55,6 +67,19 @@ export const engineActivationAuthoritySchema = z.object({
       code: "custom",
       message: "engine_activation_authority_certification_identity_mismatch",
       path: ["certification", "certificationId"],
+    });
+  }
+  // The certification already binds descriptor.model.manifestDigest; for a
+  // GGUF artifact that digest is the tensor manifest, so the certified engine
+  // can only ever run the exact tensors the manifest pins.
+  if (
+    authority.artifact
+    && authority.descriptor.model.manifestDigest !== `sha256:${authority.artifact.tensorManifestId}`
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "engine_activation_authority_artifact_is_not_certified",
+      path: ["artifact", "tensorManifestId"],
     });
   }
   if (authority.certification.status !== "certified") {

@@ -109,6 +109,41 @@ function worker(id: string, nodeId: string, stageIndex: number): StoredWorker {
 }
 
 describe("engine activation authority", () => {
+  it("pins a GGUF artifact only when the certification binds its tensor manifest", () => {
+    const manifestId = "9".repeat(64);
+    const certified = authority();
+    certified.descriptor.model.manifestDigest = `sha256:${manifestId}` as typeof artifact;
+    const resealed = {
+      ...certified,
+      certification: sealEngineCertification({
+        ...certified.certification,
+        descriptorDigest: sha256CanonicalEvidence(certified.descriptor),
+        artifactManifestDigest: `sha256:${manifestId}`,
+      }),
+    };
+    const pin = {
+      format: "gguf" as const,
+      url: "https://huggingface.co/org/model-GGUF/resolve/0123/model-q4_k_m.gguf",
+      sha256: "8".repeat(64),
+      sizeBytes: 1_055_609_536,
+      tensorManifestUrl: "https://github.com/Mycellios/mycellios/releases/download/gguf-manifest/manifest.json",
+      tensorManifestId: manifestId,
+    };
+
+    expect(engineActivationAuthoritySchema.parse({ ...resealed, artifact: pin }).artifact).toEqual(pin);
+    expect(() => engineActivationAuthoritySchema.parse({
+      ...resealed, artifact: { ...pin, tensorManifestId: "7".repeat(64) },
+    })).toThrow("engine_activation_authority_artifact_is_not_certified");
+    expect(() => engineActivationAuthoritySchema.parse({
+      ...resealed, artifact: { ...pin, url: "http://huggingface.co/model.gguf" },
+    })).toThrow("gguf_artifact_url_must_use_https");
+    expect(() => engineActivationAuthoritySchema.parse({
+      ...resealed, artifact: { ...pin, tensorManifestUrl: "http://example.com/manifest.json" },
+    })).toThrow("gguf_tensor_manifest_url_must_use_https");
+    // Authorities without an artifact keep working unchanged.
+    expect(engineActivationAuthoritySchema.parse(authority()).artifact).toBeUndefined();
+  });
+
   it("accepts only canonical draft tokenizer and vocabulary fingerprints", () => {
     const current = authority();
     expect(engineActivationAuthoritySchema.parse({
