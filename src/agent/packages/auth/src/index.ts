@@ -151,6 +151,11 @@ export function authRateLimitOptions(nodeEnv = process.env.NODE_ENV) {
   };
 }
 
+export const LEGACY_NATIVE_AUTH_ORIGIN = "rakazo://";
+
+/** The app only returns native sign-in and account-management sessions to these authorities. */
+const NATIVE_AUTH_CALLBACKS = ["mycellios://sign-in", "mycellios://account"];
+
 export function createAuth(prisma: PrismaClient, env: AuthEnv) {
   if (env.passwordAuth === false && !env.oidc)
     throw new Error("Password auth requires OIDC when disabled");
@@ -179,7 +184,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
     secret: env.secret,
     baseURL: env.baseURL,
     session: authSessionOptions(env.sessionDurationSeconds),
-    trustedOrigins: [...buildTrustedOrigins(env), "rakazo://"],
+    trustedOrigins: [...buildTrustedOrigins(env), LEGACY_NATIVE_AUTH_ORIGIN, ...NATIVE_AUTH_CALLBACKS],
     account: {
       accountLinking: { enabled: true, disableImplicitLinking: true, trustedProviders: [] },
       encryptOAuthTokens: true,
