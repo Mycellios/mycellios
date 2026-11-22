@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { ENV_PREFIX, readEnv } from "@mycellios/core/legacy-env";
 import { loadIosScreenshotCatalog } from "../ios-screenshot-catalog.js";
 import type { IosGallerySection } from "../ios-screenshot-gallery.js";
 import { renderIosScreenshotGallery } from "../ios-screenshot-gallery.js";
@@ -37,11 +38,11 @@ async function main() {
     : catalog;
 
   const udid = requiredEnv("SIM_UDID");
-  const apiUrl = requiredEnv("RAKAZO_API_URL").replace(/\/$/, "");
+  const apiUrl = requiredMycelliosEnv("API_URL").replace(/\/$/, "");
   const databaseUrl = requiredEnv("DATABASE_URL");
-  const email = requiredEnv("RAKAZO_SCREENSHOT_EMAIL");
-  const emptyEmail = requiredEnv("RAKAZO_SCREENSHOT_EMPTY_EMAIL");
-  const password = requiredEnv("RAKAZO_SCREENSHOT_PASSWORD");
+  const email = requiredMycelliosEnv("SCREENSHOT_EMAIL");
+  const emptyEmail = requiredMycelliosEnv("SCREENSHOT_EMPTY_EMAIL");
+  const password = requiredMycelliosEnv("SCREENSHOT_PASSWORD");
   const outDir = path.resolve(
     process.env.IOS_SCREENSHOT_OUT || path.join(ROOT, "test-report", "ios-screenshots"),
   );
@@ -79,17 +80,17 @@ async function main() {
             "--test-output-dir",
             path.join(work, "out"),
             "-e",
-            `RAKAZO_SCREENSHOT_EMAIL=${email}`,
+            `MYCELLIOS_SCREENSHOT_EMAIL=${email}`,
             "-e",
-            `RAKAZO_SCREENSHOT_EMPTY_EMAIL=${emptyEmail}`,
+            `MYCELLIOS_SCREENSHOT_EMPTY_EMAIL=${emptyEmail}`,
             "-e",
-            `RAKAZO_SCREENSHOT_PASSWORD=${password}`,
+            `MYCELLIOS_SCREENSHOT_PASSWORD=${password}`,
             "-e",
-            `RAKAZO_SCREENSHOT_BOT_ID=${fixture.botId}`,
+            `MYCELLIOS_SCREENSHOT_BOT_ID=${fixture.botId}`,
             "-e",
-            `RAKAZO_SCREENSHOT_GROUP_ID=${fixture.groupId}`,
+            `MYCELLIOS_SCREENSHOT_GROUP_ID=${fixture.groupId}`,
             "-e",
-            `RAKAZO_SCREENSHOT_ROUTINE_ID=${fixture.routineId}`,
+            `MYCELLIOS_SCREENSHOT_ROUTINE_ID=${fixture.routineId}`,
             path.join(CATALOG_DIR, section.flow),
           ],
           process.env,
@@ -165,6 +166,12 @@ function parseSections(argv: string[]) {
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function requiredMycelliosEnv(name: string) {
+  const value = readEnv(name)?.trim();
+  if (!value) throw new Error(ENV_PREFIX + name + " is required");
   return value;
 }
 

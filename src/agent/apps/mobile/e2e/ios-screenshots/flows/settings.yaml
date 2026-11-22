@@ -1,10 +1,10 @@
-appId: com.rakazo.app
+appId: com.mycellios.agent
 name: Settings
 ---
 - runFlow:
     file: ../subflows/sign-in.yaml
     env:
-      RAKAZO_ACTIVE_EMAIL: ${RAKAZO_SCREENSHOT_EMAIL}
+      MYCELLIOS_ACTIVE_EMAIL: ${MYCELLIOS_SCREENSHOT_EMAIL}
 - openLink: "mycellios:///account"
 - extendedWaitUntil:
     visible: ".*Change password.*"
@@ -71,24 +71,24 @@ name: Settings
     visible: "AI data sharing"
     timeout: 15000
 - takeScreenshot: 10-ai-data-sharing
-- openLink: "mycellios:///routine?botId=${RAKAZO_SCREENSHOT_BOT_ID}&botName=Researcher&routineId=${RAKAZO_SCREENSHOT_ROUTINE_ID}"
+- openLink: "mycellios:///routine?botId=${MYCELLIOS_SCREENSHOT_BOT_ID}&botName=Researcher&routineId=${MYCELLIOS_SCREENSHOT_ROUTINE_ID}"
 - extendedWaitUntil:
     visible: ".*Weekly fixture review.*"
     timeout: 15000
 - takeScreenshot: 11-routine
-- openLink: "mycellios:///bot-settings?botId=${RAKAZO_SCREENSHOT_BOT_ID}"
+- openLink: "mycellios:///bot-settings?botId=${MYCELLIOS_SCREENSHOT_BOT_ID}"
 - scrollUntilVisible:
     element: "Advanced"
     direction: DOWN
     timeout: 15000
 - tapOn: "Advanced"
 - takeScreenshot: 12-bot-settings
-- openLink: "mycellios:///group-settings?groupId=${RAKAZO_SCREENSHOT_GROUP_ID}"
+- openLink: "mycellios:///group-settings?groupId=${MYCELLIOS_SCREENSHOT_GROUP_ID}"
 - extendedWaitUntil:
     visible: ".*Delete group.*"
     timeout: 15000
 - takeScreenshot: 13-group-settings
-- openLink: "mycellios:///computer?botId=${RAKAZO_SCREENSHOT_BOT_ID}&name=Researcher"
+- openLink: "mycellios:///computer?botId=${MYCELLIOS_SCREENSHOT_BOT_ID}&name=Researcher"
 - extendedWaitUntil:
     visible: ".*Take control.*|.*Open computer.*"
     timeout: 20000
