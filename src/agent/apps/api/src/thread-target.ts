@@ -81,13 +81,14 @@ function steersUserMessage(run: { status: string; trigger?: string | null }) {
   return STEERABLE_RUN_STATUSES.has(run.status) && isConversationalRun(run.trigger);
 }
 
-type MentionTargetInput = string | { kind: "bot" | "group" | "routine" | "connector"; id: string };
+type MentionTargetInput = string | { kind: "bot" | "group" | "routine" | "connector" | "thread"; id: string };
 
 function splitMentionTargets(mentions: MentionTargetInput[] | undefined) {
   const botMentionIds = new Set<string>();
   const groupMentionIds = new Set<string>();
   const routineMentionIds = new Set<string>();
   const connectorMentionIds = new Set<string>();
+  const threadMentionIds = new Set<string>();
   for (const mention of mentions ?? []) {
     if (typeof mention === "string") {
       botMentionIds.add(mention);
@@ -97,13 +98,44 @@ function splitMentionTargets(mentions: MentionTargetInput[] | undefined) {
     if (mention.kind === "group") groupMentionIds.add(mention.id);
     if (mention.kind === "routine") routineMentionIds.add(mention.id);
     if (mention.kind === "connector") connectorMentionIds.add(mention.id);
+    if (mention.kind === "thread") threadMentionIds.add(mention.id);
   }
   return {
     botMentionIds: [...botMentionIds],
     groupMentionIds: [...groupMentionIds],
     routineMentionIds: [...routineMentionIds],
     connectorMentionIds: [...connectorMentionIds],
+    threadMentionIds: [...threadMentionIds].slice(0, 8),
   };
+}
+
+/**
+ * Conversations a message points at: only this person's own, in this Space and of the same
+ * Mico, and not being deleted. Others are left out, so a link never reveals or reaches them.
+ */
+async function resolveThreadLinks(
+  tx: Prisma.TransactionClient,
+  actor: Actor,
+  botId: string,
+  threadIds: string[],
+): Promise<Array<Extract<MessageBlock, { kind: "thread_link" }>>> {
+  if (!threadIds.length) return [];
+  const rows = await tx.thread.findMany({
+    where: { id: { in: threadIds }, spaceId: actor.spaceId, userId: actor.userId, taskBotId: botId, deleteAfter: null },
+    select: { id: true, title: true },
+  });
+  const titles = new Map(rows.map((row) => [row.id, Array.from(row.title?.trim() ?? "").slice(0, 120).join("")]));
+  return threadIds.flatMap((threadId) => titles.has(threadId)
+    ? [{ kind: "thread_link" as const, botId, threadId, title: titles.get(threadId) ?? "" }]
+    : []);
+}
+
+/** Tells the model which of its conversations the person pointed at, by their titles. */
+function threadLinkPrompt(prompt: string, links: ReadonlyArray<{ title: string }>) {
+  if (!links.length) return prompt;
+  const titles = links.map((link) => `“${link.title || "Untitled conversation"}”`).join(", ");
+  const line = `The person points at these conversations of yours: ${titles}.`;
+  return prompt ? `${prompt}\n\n${line}` : line;
 }
 
 async function resolveOwnedConnectorDisplayNames(
@@ -746,7 +778,8 @@ export async function sendThreadMessage(
           actor,
           mentionTargets.connectorMentionIds,
         );
-        const blocks = buildUserMessageBlocks(input.text, attachmentBlocks);
+        const threadLinks = await resolveThreadLinks(tx, actor, target.botId, mentionTargets.threadMentionIds);
+        const blocks = [...buildUserMessageBlocks(input.text, attachmentBlocks), ...threadLinks];
         const message = await createThreadMessageInTransaction(tx, {
           threadId: target.threadId,
           role: "user",
@@ -852,7 +885,7 @@ export async function sendThreadMessage(
             threadId: target.threadId,
             userId: actor.userId,
             prompt: withResponseLanguage(
-              (input.taskInstructions ? input.taskInstructions + "\n\nCurrent user request:\n" : "") + buildSendPrompt(input.text, artifacts, connectorNames),
+              (input.taskInstructions ? input.taskInstructions + "\n\nCurrent user request:\n" : "") + threadLinkPrompt(buildSendPrompt(input.text, artifacts, connectorNames), threadLinks),
               input.responseLocale,
             ),
             status: "queued",

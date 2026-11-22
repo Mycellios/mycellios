@@ -426,6 +426,26 @@ function pressEnter(textarea: HTMLTextAreaElement) {
 }
 
 describe("Composer", () => {
+  it("uses a side conversation's placeholder and hides main-chat actions in a draft tab", () => {
+    const textarea = renderComposer(vi.fn(), { placeholder: "Message Ada in this conversation" });
+    expect(textarea.placeholder).toBe("Message Ada in this conversation");
+    expect(textarea.getAttribute("aria-label")).toBe("Message Ada in this conversation");
+    expect(container!.querySelector('[data-testid="composer-context-options"]')).not.toBeNull();
+    rerenderComposer({ newConversation: true, placeholder: "Start a new conversation with Ada", draftKey: "bot:bot-1:new-conversation" });
+    expect(container!.querySelector("textarea")!.placeholder).toBe("Start a new conversation with Ada");
+    // Reset context belongs to the main chat only.
+    expect(container!.querySelector('[data-testid="composer-context-options"]')).toBeNull();
+  });
+
+  it("offers the Mico's conversations as mentions and keeps the chosen one", () => {
+    const plan: ComposerMention = { kind: "thread", id: "thread-1", name: "Plan", botId: "bot-1", subtitle: "Conversation" };
+    const textarea = renderComposer(vi.fn(), { mentionTargets: [bob, plan] });
+    type(textarea, "@Pl");
+    expect(container?.querySelector('[data-testid="mention-picker"]')?.textContent).toContain("Plan");
+    pressEnter(textarea);
+    expect(container?.querySelector('[data-testid="mention-chip"]')?.textContent).toBe("Plan");
+  });
+
   it.each([false, true])(
     "keeps the keyboard mention selection when targets refresh (reorder: %s)",
     (reorder) => {

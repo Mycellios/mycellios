@@ -258,6 +258,23 @@ try {
     await reconcileThreadDeletions({ prisma, artifacts: store, dataDir }, new Date(Date.now() + 10_000));
     assert.equal(await system.thread.count({ where: { id: late.threadId } }), 0);
     checks.push("an undo after the window is refused and the reconciler finishes deletes whose job was lost");
+
+    // A conversation the Mico opened for the person is theirs to rename and delete; delegated work is not.
+    const startedId = "mico-started";
+    await system.thread.create({ data: { id: startedId, spaceId: "space", userId: "owner", taskBotId: "mico", projectKey: "mico:mico",
+      taskKey: `agent-task:mico:${randomUUID()}`, startedBy: "agent", title: "Comparar ofertas", titleSource: "agent" } });
+    const started = async () => (await call(dev.list, { botId: "mico" })).find((item: any) => item.threadId === startedId);
+    assert.deepEqual([(await started()).startedBy, (await started()).unread], ["agent", false]);
+    await sql.query(`UPDATE threads SET unread=true WHERE id=$1`, [startedId]);
+    assert.equal((await started()).unread, true);
+    await call(dev.rename, { botId: "mico", taskThreadId: startedId, title: " Ofertas de luz " });
+    assert.deepEqual([(await started()).title, (await started()).titleSource], ["Ofertas de luz", "user"]);
+    const startedDelete = await call(dev.remove, { botId: "mico", taskThreadId: startedId });
+    assert.equal((await started()).deleteAfter, startedDelete.deleteAfter);
+    assert.deepEqual(await call(dev.restore, { botId: "mico", taskThreadId: startedId }), { ok: true, restored: "delete" });
+    await assert.rejects(call(dev.rename, { botId: "mico", taskThreadId: "helper", title: "Mine" }));
+    await assert.rejects(call(dev.remove, { botId: "mico", taskThreadId: "helper" }), (error: any) => error.code === "not_deletable");
+    checks.push("a conversation the Mico opened lists its opener and unread replies, takes the person's title and deletes with undo; delegated work keeps its name and stays");
   } finally {
     sql.release();
   }

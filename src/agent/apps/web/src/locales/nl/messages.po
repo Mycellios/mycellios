@@ -6451,3 +6451,99 @@ msgstr "Update van {name} verbergen"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "Van {author}"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "Andere tabbladen sluiten"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "Tabbladen rechts sluiten"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "Stop dit gesprek voordat je het verwijdert."
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "Dit gesprek verwijderen?"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "‘{title}’, de berichten en de bestanden die alleen daar zijn gemaakt, worden definitief verwijderd. De hoofdchat blijft zoals hij is."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "Het gesprek kon niet worden gearchiveerd. Probeer het opnieuw."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "Het gesprek kon niet worden hersteld. Probeer het opnieuw."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} verwijderd"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "Het gesprek kon niet worden verwijderd. Probeer het opnieuw."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "Het verwijderen kon niet ongedaan worden gemaakt."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "Acties voor {title}"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "Herstellen en openen"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "Gesprek herstellen"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "Gesprekken, nieuwe antwoorden"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "Nieuw gesprek met {name}"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "Je eerste bericht start het. De hoofdchat met {name} blijft zoals hij is."
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "{name} heeft dit gesprek geopend"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "Dit gesprek is gestopt door een fout"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "Er is geen reden opgegeven. Stuur een bericht om het opnieuw te proberen."
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "Begin een nieuw gesprek met {micoName}"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "Bericht aan {micoName} in dit gesprek"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "Het gesprek kon niet worden gestart. Probeer het opnieuw."
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "Het eerste bericht kon niet worden bevestigd. Controleer het nieuwe gesprek en stuur het opnieuw als het ontbreekt."
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "Gesprek {name} openen"

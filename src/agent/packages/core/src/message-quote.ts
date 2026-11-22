@@ -145,6 +145,7 @@ export function messageReplyExcerpt(blocks: MessageBlock[], role: string): strin
 function replyBlockText(block: MessageBlock): string {
   switch (block.kind) {
     case "context_reset":
+    case "thread_link":
       return "";
     case "text":
     case "ask":

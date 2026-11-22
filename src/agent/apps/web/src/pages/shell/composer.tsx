@@ -103,6 +103,8 @@ export const Composer = memo(function Composer({
   voiceConversationActive = false,
   voiceShortcutRequested = false,
   onVoiceShortcutConsumed,
+  placeholder: customPlaceholder,
+  newConversation = false,
 }: {
   activeName?: string;
   activeColor?: string;
@@ -152,6 +154,10 @@ export const Composer = memo(function Composer({
   voiceConversationActive?: boolean;
   voiceShortcutRequested?: boolean;
   onVoiceShortcutConsumed?: () => void;
+  /** Replaces "Message {name}", e.g. in a side conversation or a draft tab. */
+  placeholder?: string;
+  /** A draft tab: no thread exists yet, so main-chat actions and its queue stay hidden. */
+  newConversation?: boolean;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
@@ -973,12 +979,12 @@ export const Composer = memo(function Composer({
               voice.state && mobileVoice
                 ? voice.transcriptAfterStop ? t`Text appears when you stop recording` : t`Listening…`
                 : showComposerPlaceholder
-                ? activeName
+                ? customPlaceholder ?? (activeName
                   ? t`Message ${activeName}`
-                  : t`Message…`
+                  : t`Message…`)
                 : undefined
             }
-            aria-label={activeName ? t`Message ${activeName}` : t`Message`}
+            aria-label={customPlaceholder ?? (activeName ? t`Message ${activeName}` : t`Message`)}
             role="combobox"
             aria-autocomplete="list"
             aria-haspopup="listbox"
@@ -999,7 +1005,7 @@ export const Composer = memo(function Composer({
             expanded ? "row-start-2" : ""
           }`}
         >
-          {sideQuestionBotId ? <NewChatControl key={draftKey} botId={sideQuestionBotId}
+          {sideQuestionBotId && !newConversation ? <NewChatControl key={draftKey} botId={sideQuestionBotId}
             name={activeName ?? t`Mico`} color={activeColor} onStarted={onNewChatStarted}
             disabled={Boolean(disabled || running || sending || onCall || voice.state || reviewedVoice.stage !== "closed")} /> : null}
           {desktopVoice ? <ComposerVoiceStrip voice={voice} compact /> : (
@@ -1033,7 +1039,7 @@ export const Composer = memo(function Composer({
           ) : null}
         </div>
       </div>
-      <QueuedMessages target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }} running={running} sending={sending} />
+      {newConversation ? null : <QueuedMessages target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }} running={running} sending={sending} />}
       {busyMessages && acceptedMode ? <span className="sr-only" role="status">{acceptedMode === "queue" ? t`Message saved in the queue.` : t`Instructions sent to the current task.`}</span> : null}
 
     </fieldset>

@@ -6451,3 +6451,99 @@ msgstr "Masquer la mise à jour de {name}"
 #: src/pages/shell/message-view.tsx
 msgid "From {author}"
 msgstr "De {author}"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close other tabs"
+msgstr "Fermer les autres onglets"
+
+#: src/components/ThreadMenu.tsx
+msgid "Close tabs to the right"
+msgstr "Fermer les onglets à droite"
+
+#: src/components/ThreadMenu.tsx
+msgid "Stop this conversation before you delete it."
+msgstr "Arrêtez cette conversation avant de la supprimer."
+
+#: src/components/ThreadMenu.tsx
+msgid "Delete this conversation?"
+msgstr "Supprimer cette conversation ?"
+
+#: src/components/ThreadMenu.tsx
+msgid "“{title}” and its messages, and the files made only there, are removed for good. The main chat stays as it is."
+msgstr "« {title} », ses messages et les fichiers créés uniquement là sont supprimés définitivement. Le chat principal ne change pas."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not archive the conversation. Try again."
+msgstr "Impossible d'archiver la conversation. Réessayez."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not restore the conversation. Try again."
+msgstr "Impossible de restaurer la conversation. Réessayez."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "{title} deleted"
+msgstr "{title} supprimée"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not delete the conversation. Try again."
+msgstr "Impossible de supprimer la conversation. Réessayez."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not undo the deletion."
+msgstr "Impossible d'annuler la suppression."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Actions for {title}"
+msgstr "Actions pour {title}"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore and open"
+msgstr "Restaurer et ouvrir"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Restore conversation"
+msgstr "Restaurer la conversation"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Conversations, new replies"
+msgstr "Conversations, nouvelles réponses"
+
+#: src/components/NewConversationIntro.tsx
+msgid "New conversation with {name}"
+msgstr "Nouvelle conversation avec {name}"
+
+#: src/components/NewConversationIntro.tsx
+msgid "Your first message starts it. The main chat with {name} stays as it is."
+msgstr "Votre premier message la démarre. Le chat principal avec {name} ne change pas."
+
+#: src/components/NewConversationIntro.tsx
+msgid "{name} opened this conversation"
+msgstr "{name} a ouvert cette conversation"
+
+#: src/components/NewConversationIntro.tsx
+msgid "This conversation stopped with an error"
+msgstr "Cette conversation s'est arrêtée sur une erreur"
+
+#: src/components/NewConversationIntro.tsx
+msgid "No reason was given. Send a message to try again."
+msgstr "Aucune raison n'a été donnée. Envoyez un message pour réessayer."
+
+#: src/pages/Shell.tsx
+msgid "Start a new conversation with {micoName}"
+msgstr "Commencer une nouvelle conversation avec {micoName}"
+
+#: src/pages/Shell.tsx
+msgid "Message {micoName} in this conversation"
+msgstr "Écrire à {micoName} dans cette conversation"
+
+#: src/pages/Shell.tsx
+msgid "Could not start the conversation. Try again."
+msgstr "Impossible de démarrer la conversation. Réessayez."
+
+#: src/pages/Shell.tsx
+msgid "Could not confirm the first message. Check the new conversation and send it again if it is missing."
+msgstr "Impossible de confirmer le premier message. Vérifiez la nouvelle conversation et renvoyez-le s'il manque."
+
+#: src/components/ThreadLinkChip.tsx
+msgid "Open conversation {name}"
+msgstr "Ouvrir la conversation {name}"

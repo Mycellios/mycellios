@@ -175,7 +175,7 @@ import {
   useCallSession,
 } from "../lib/call-session";
 import { newClientId } from "../lib/client-id";
-import { setComposerUnsavedWork } from "../lib/composer-draft";
+import { setComposerUnsavedWork, writeComposerDraft } from "../lib/composer-draft";
 import {
   getComposerEnterToSend,
   subscribeComposerEnterToSend,
@@ -228,7 +228,13 @@ import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } fro
 import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
 import { ResponseStyleContext, useSavedResponseStyle } from "../lib/response-style";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
-import { MicoTaskTabs } from "../components/MicoTaskTabs";
+import { MainTabMenu, MicoTaskTabs } from "../components/MicoTaskTabs";
+import { ConversationFailureCard, MicoStartedBanner, NewConversationIntro } from "../components/NewConversationIntro";
+import {
+  adoptNewConversation, closeOtherTabs, forgetNewConversationRequest, isClosedConversation, NEW_CONVERSATION_TAB,
+  newConversationRequest, updateConversationTabs, useConversationRows,
+} from "../lib/thread-tabs";
+import { sendFirstMessage } from "../lib/new-conversation";
 import { MessagePinsContext, PinnedMessagesButton, useMessagePins } from "../components/PinnedMessages";
 import { LocalProject } from "../components/LocalProject";
 import { MicoWorkMenu } from "../components/MicoWorkMenu";
@@ -390,6 +396,8 @@ export function ShellPage() {
   const reviewTarget = useParams();
   const [taskSearch] = useSearchParams();
   const taskThreadId = reviewTarget.botId && !taskSearch.has("view") ? taskSearch.get("task") || undefined : undefined;
+  // A draft tab has no thread yet: the shell shows the Mico without its main chat.
+  const newConversation = Boolean(reviewTarget.botId) && !taskThreadId && !taskSearch.has("view") && taskSearch.get("draft") === "1";
   const notificationSpace = taskSearch.get("noticeSpace");
   const taskSpaceId = (notificationSpace && /^[a-zA-Z0-9_-]{1,160}$/.test(notificationSpace)
     ? notificationSpace
@@ -403,13 +411,13 @@ export function ShellPage() {
     return () => document.documentElement.removeAttribute("data-preview-owner");
   }, [owner]);
   return <SpaceRpcProvider spaceId={taskSpaceId} client={scopedRpc} taskScope={taskScope}>
-    <ReviewWorkspaceProvider key={JSON.stringify([owner, spaceEpoch, taskSpaceId, taskScope])} scope={JSON.stringify(taskThreadId ? [owner, taskSpaceId, reviewTarget.botId, taskThreadId] : [owner, reviewTarget.botId ?? reviewTarget.groupId])}>
-      <SpaceShell taskScope={taskScope} spaceId={taskSpaceId} />
+    <ReviewWorkspaceProvider key={JSON.stringify([owner, spaceEpoch, taskSpaceId, taskScope, ...(newConversation ? [NEW_CONVERSATION_TAB] : [])])} scope={JSON.stringify(taskThreadId ? [owner, taskSpaceId, reviewTarget.botId, taskThreadId] : [owner, reviewTarget.botId ?? reviewTarget.groupId])}>
+      <SpaceShell taskScope={taskScope} newConversation={newConversation} spaceId={taskSpaceId} />
     </ReviewWorkspaceProvider>
   </SpaceRpcProvider>;
 }
 
-function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskThreadScope; spaceId?: string | null }) {
+function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceId }: { taskScope?: TaskThreadScope; newConversation?: boolean; spaceId?: string | null }) {
   const { t, i18n } = useLingui();
   const reviewWorkspace = useReviewWorkspace();
   const { botId, groupId } = useParams();
@@ -1161,7 +1169,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   // otherwise the auto-read below would undo the action on the next window focus.
   const markBotReadIfVisible = useCallback(
     (id: string) => {
-      if (manuallyUnread.current.has(id)) return;
+      if (manuallyUnread.current.has(id) || newConversation) return;
       if (document.visibilityState === "visible" && document.hasFocus()) {
         const visit = readVisit.current.visit;
         void markBotRead(
@@ -1175,7 +1183,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           .catch(() => undefined);
       }
     },
-    [markBotRead, captureReadBoundary],
+    [markBotRead, captureReadBoundary, newConversation],
   );
   useEffect(() => userId ? watchNotificationFocus(userId) : undefined, [userId]);
   const replySoundGate = useMemo(() => createReplySoundGate(), [userId, currentSpaceId]);
@@ -2630,6 +2638,13 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     }
     return options;
   }, [bots.length, composerConnections.data]);
+  const conversationScope = active && !inGroup ? JSON.stringify([userId, shellSpaceId, active.id]) : undefined;
+  const conversationRows = useConversationRows(conversationScope);
+  const currentConversation = taskScope ? conversationRows.find(row => row.threadId === taskScope.taskThreadId) : undefined;
+  const mentionThreads = useMemo(() => active && !inGroup ? conversationRows
+    .filter(row => row.title && row.threadId !== taskScope?.taskThreadId && !isClosedConversation(row) &&
+      (!row.kind || row.kind === "conversation" || row.startedBy === "agent"))
+    .map(row => ({ id: row.threadId, name: row.title, botId: active.id })) : [], [active?.id, inGroup, conversationRows, taskScope?.taskThreadId]);
   const composerMentionTargets = useMemo(
     () =>
       buildComposerMentionOptions({
@@ -2646,9 +2661,21 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           botName: routine.botName,
         })),
         connectors: mentionConnectors,
-      }),
-    [bots, groupId, groups, inGroup, mentionConnectors, mentionRoutines],
+        threads: mentionThreads,
+      }).filter(mention => !newConversation || (mention.kind !== "group" && mention.kind !== "routine")),
+    [bots, groupId, groups, inGroup, mentionConnectors, mentionRoutines, mentionThreads, newConversation],
   );
+  const micoName = active?.name ?? "";
+  const composerPlaceholder = !inGroup && micoName
+    ? newConversation ? t`Start a new conversation with ${micoName}` : taskScope ? t`Message ${micoName} in this conversation` : undefined
+    : undefined;
+  const conversationBanner = useMemo(() => currentConversation?.startedBy === "agent" && micoName
+    ? <MicoStartedBanner name={micoName} /> : null, [currentConversation?.startedBy, micoName]);
+  // The thread keeps its last failure until its next turn; the composer already shows a fresh run error.
+  const conversationFailure = useMemo(() => currentConversation?.outcome === "failed" && !displayedRunError &&
+    currentConversation.state !== "running" && currentConversation.state !== "queued"
+    ? <ConversationFailureCard error={currentConversation.lastError} /> : null,
+  [currentConversation?.outcome, currentConversation?.state, currentConversation?.lastError, displayedRunError]);
   const shellReady =
     initialBotsLoaded &&
     (inGroup
@@ -3004,6 +3031,69 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       sending,
       t,
     ],
+  );
+  /**
+   * The first message of a draft tab: the conversation is created with the draft's request key
+   * and the message goes through a client bound to that thread alone; the main chat's client
+   * never carries it. When the message may have arrived, its text moves to the new
+   * conversation's composer; when nothing was written, the draft keeps it.
+   */
+  const sendNewConversation = useCallback(
+    async (text: string, mentions: ComposerMention[], clientNonce: string) => {
+      const botTarget = activeBotId.current;
+      if (!newConversation || !botTarget || activeGroupId.current || sendingRef.current || !conversationScope) return false;
+      const attachments = attachmentsForThread(pendingAttachments, botTarget);
+      const plan = resolveComposerSendPlan({ text, mentions, hasAttachments: attachments.length > 0 });
+      if (!plan.shouldSend) return false;
+      sendingRef.current = true;
+      setSending(true);
+      setSendError(null);
+      try {
+        const artifactIds: string[] = [];
+        for (const pending of attachments) {
+          const mimeType = inferAttachmentMimeType(pending.file.name, pending.file.type);
+          if (!mimeType) throw new Error(t`Unsupported file type: ${pending.file.name}`);
+          const file = await prepareImage(pending.file);
+          const artifact = await rpc.artifacts.create({ botId: botTarget, name: pending.file.name, mimeType, contentBase64: await readFileAsBase64(file) });
+          artifactIds.push(artifact.id);
+        }
+        const result = await sendFirstMessage({
+          botId: botTarget,
+          requestKey: newConversationRequest(conversationScope, botTarget),
+          rpc,
+          bind: threadId => createSpaceRpc(shellSpaceId, { botId: botTarget, taskThreadId: threadId }),
+          message: {
+            clientNonce,
+            text: plan.trimmed || undefined,
+            mentions: plan.mentionPayload.length ? plan.mentionPayload : undefined,
+            artifactIds: artifactIds.length ? artifactIds : undefined,
+          },
+        });
+        if (result.status === "failed") {
+          if (!result.keepRequest) forgetNewConversationRequest(conversationScope);
+          if (activeBotId.current === botTarget) setSendError(errorText(result.error, t`Could not start the conversation. Try again.`));
+          return false;
+        }
+        forgetNewConversationRequest(conversationScope);
+        revokePendingAttachmentPreviews(attachments);
+        setPendingAttachments(current => current.filter(attachment => attachment.threadKey !== botTarget));
+        if (result.status === "unconfirmed") {
+          writeComposerDraft(`${floatingChat ? "floating:" : ""}bot:${botTarget}:task:${result.threadId}`, text);
+          toast.error(t`Could not confirm the first message. Check the new conversation and send it again if it is missing.`);
+        }
+        updateConversationTabs(conversationScope, state => adoptNewConversation(state, result.threadId));
+        void refreshBots().catch(() => undefined);
+        if (activeBotId.current === botTarget) selectConversationRef.current(result.threadId);
+        return true;
+      } catch (error) {
+        if (activeBotId.current === botTarget) setSendError(errorText(error, t`Failed to send message`));
+        return false;
+      } finally {
+        sendingRef.current = false;
+        setSending(false);
+      }
+    },
+    [newConversation, conversationScope, pendingAttachments, rpc, shellSpaceId, floatingChat, t],
   );
   const stopRun = useCallback(async () => {
     if (sending) return;
@@ -3807,6 +3897,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         else setDeleteGroupTarget(contextGroup!);
         setBotMenu(null);
       }}
+      onNewConversation={contextBot ? () => {
+        setBotMenu(null);
+        openSpaceChat(contextBot.spaceId, `/app/${encodeURIComponent(contextBot.id)}?draft=1`);
+      } : undefined}
     />
   ) : null;
   const asideKey = JSON.stringify([userId, currentSpaceId, active?.id, taskScope?.taskThreadId]);
@@ -3924,8 +4018,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     }
   };
   const openRosterChat = (spaceId: string, path: string) => openSpaceChat(spaceId, routineView && /^\/app\/[^/]+$/.test(path) ? `${path}?view=routines` : path);
-  function selectConversation(threadId?: string) {
-    if (!active || threadId === taskScope?.taskThreadId) return;
+  function selectConversation(target?: string) {
+    const draft = target === NEW_CONVERSATION_TAB;
+    const threadId = draft ? undefined : target;
+    if (!active || (draft ? newConversation : !newConversation && threadId === taskScope?.taskThreadId)) return;
     const state = seedStateRef.current;
     if (state?.me) {
       const { chat: _chat, me, ...lists } = state;
@@ -3934,16 +4030,27 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     }
     const next = new URLSearchParams(searchParamsRef.current);
     next.delete("m");
+    next.delete("draft");
     if (threadId) next.set("task", threadId); else next.delete("task");
+    if (draft) next.set("draft", "1");
     navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() });
   }
+  const selectConversationRef = useRef(selectConversation);
+  selectConversationRef.current = selectConversation;
+  /** The main tab closes every conversation tab; it never closes itself. */
+  const closeAllConversationTabs = () => {
+    if (!conversationScope) return;
+    updateConversationTabs(conversationScope, state => closeOtherTabs(state, null));
+    if (taskScope || newConversation) selectConversation();
+  };
   const renderTaskTabs = (close?: () => void, inMenu = isMobileSidebar) => (
     <>
     {active && !inGroup && !activeProject ? <MicoTaskTabs
       inMenu={inMenu}
       key={JSON.stringify([userId, shellSpaceId, active.id])}
       scope={JSON.stringify([userId, shellSpaceId, active.id])}
-      botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc}
+      botId={active.id} taskThreadId={taskScope?.taskThreadId} newConversationOpen={newConversation} rpc={rpc}
+      confirmDelete={isMobileSidebar}
       messageCount={activeSnapshot?.messages.length ?? 0}
       onSelect={threadId => {
         close?.();
@@ -3973,7 +4080,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {active && !inGroup && !activeProject ? <MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
         onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /> : null}
       {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-      {(active || activeGroup) && activeSnapshot ? <PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage} /> : null}
+      {(active || activeGroup) && activeSnapshot && !newConversation ? <PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage} /> : null}
       {(active || activeGroup) ? <ChatHeaderTools triggerRef={mobileBrowserTrigger}
         open={panel === "tools"} onToggle={() => {
           close?.();
@@ -4403,13 +4510,15 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 {active || activeGroup ? <ArrowLeft className="size-6" /> : <Menu strokeWidth={1.7} className="size-6" />}
               </Button>
             </div>
-            {firstMicoSetup ? <span className="text-sm font-medium"><Trans>New bot</Trans></span> : <Button
-              variant={active && !inGroup && !activeProject ? (!taskScope ? "secondary" : "ghost") : "floating"}
+            {firstMicoSetup ? <span className="text-sm font-medium"><Trans>New bot</Trans></span> : <MainTabMenu
+              enabled={Boolean(active && !inGroup && !activeProject && !isMobileSidebar)}
+              label={t`Main chat`} onCloseAll={closeAllConversationTabs}><Button
+              variant={active && !inGroup && !activeProject ? (!taskScope && !newConversation ? "secondary" : "ghost") : "floating"}
               data-testid="bot-settings-trigger"
-              aria-label={taskScope && !activeProject && !inGroup ? t`Main chat` : undefined}
-              aria-current={active && !taskScope && !inGroup ? "page" : undefined}
+              aria-label={(taskScope || newConversation) && !activeProject && !inGroup ? t`Main chat` : undefined}
+              aria-current={active && !taskScope && !newConversation && !inGroup ? "page" : undefined}
               onClick={() => {
-                if (taskScope && active && !activeProject && !inGroup) {
+                if ((taskScope || newConversation) && active && !activeProject && !inGroup) {
                   selectConversation();
                 } else setPanel(inGroup ? "group-settings" : "settings");
               }}
@@ -4437,8 +4546,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                     : (activeProject ? `${activeProject.name} · ${activeProject.conversations.find(chat => chat.threadId === taskScope?.taskThreadId)?.title ?? active?.name}` : active?.name ?? t`Select a bot`)}
                 </span>
               </span>
-            </Button>}
-            {active && !inGroup ? <DeveloperContextLink
+            </Button></MainTabMenu>}
+            {active && !inGroup && !newConversation ? <DeveloperContextLink
               key={`debug-link:${userId}:${currentSpaceId}:${active.id}:${activeSnapshot?.threadId}`}
               botId={active.id} spaceId={currentSpaceId} threadId={activeSnapshot?.threadId}
               taskThreadId={taskScope?.taskThreadId} runId={activeSnapshot?.run?.id}
@@ -4468,9 +4577,13 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 <Trans>New bot</Trans>
               </Button>
             </div>
+          ) : newConversation && active && !inGroup ? (
+            <NewConversationIntro bot={active} />
           ) : (
             <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><Transcript
               headerTabs={false}
+              banner={conversationBanner}
+              footer={conversationFailure}
               conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
@@ -4588,7 +4701,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             ) : null}
             <Composer
               key={inGroup ? `group:${groupId}` : `bot:${active?.id}`}
-              draftKey={(floatingChat ? "floating:" : "") + (inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : `bot:${active?.id}`)}
+              draftKey={(floatingChat ? "floating:" : "") + (inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : newConversation ? `bot:${active?.id}:new-conversation` : `bot:${active?.id}`)}
+              placeholder={composerPlaceholder}
+              newConversation={newConversation}
               enterToSend={enterToSend}
               onImportAgent={(agent) => {
                 setDroppedAgent(agent);
@@ -4598,10 +4713,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               activeColor={active?.color}
               onNewChatStarted={() => { closeAside(); if (active) void refreshThread(active.id).catch(() => undefined); }}
-              running={composerRunning}
-              busyMessages={currentRuns.some(run => run.status === "running" || run.status === "queued" || run.status === "leased")}
+              running={composerRunning && !newConversation}
+              busyMessages={!newConversation && currentRuns.some(run => run.status === "running" || run.status === "queued" || run.status === "leased")}
               busyMessageMode={inGroup ? undefined : active?.busyMessageMode}
-              disabled={Boolean(recordingSkill) || Boolean(taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId)}
+              disabled={Boolean(recordingSkill) || Boolean(taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId) || (newConversation && !active)}
               pendingAttachments={activePendingAttachments}
               attachmentNotice={attachmentNotice}
               sendError={sendError}
@@ -4619,8 +4734,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               }}
               onOpenConnections={() => openSettings("models")}
               onOpenComputerSettings={() => openSettings("computer")}
-              runError={displayedRunError}
-              runErrorId={displayedRunErrorId}
+              runError={newConversation ? null : displayedRunError}
+              runErrorId={newConversation ? null : displayedRunErrorId}
               runErrorProviderLabel={failedProviderLabel}
               runErrorModelAction={canChangeFailedModel ? (
                 <ChatHeaderModel
@@ -4634,19 +4749,19 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               ) : undefined}
               onRunErrorPresented={handleRunErrorPresented}
               onDismissError={dismissComposerError}
-              onRetryError={failedBot && displayedRunErrorId && !unretryableRunIds.has(displayedRunErrorId) && canRetryThreadRun(activeSnapshot, displayedRunErrorId) ? () => void retryFailedRun() : undefined}
+              onRetryError={!newConversation && failedBot && displayedRunErrorId && !unretryableRunIds.has(displayedRunErrorId) && canRetryThreadRun(activeSnapshot, displayedRunErrorId) ? () => void retryFailedRun() : undefined}
               retrying={retryingRunId === displayedRunErrorId && retryingRunId !== null}
               sending={sending}
               fileInputRef={fileInputRef}
               onAttachmentPick={onAttachmentPick}
               onRemoveAttachment={removeAttachment}
-              onSend={sendMessage}
+              onSend={newConversation ? sendNewConversation : sendMessage}
               onStop={stopRun}
-              onOpenVoice={!inGroup && active ? chatTools.onVoice : undefined}
-              onAskAside={!inGroup && active ? openAside : undefined}
+              onOpenVoice={!inGroup && active && !newConversation ? chatTools.onVoice : undefined}
+              onAskAside={!inGroup && active && !newConversation ? openAside : undefined}
               voiceConversationActive={Boolean(voiceConversation)}
               onCloseVoice={() => setVoiceConversation(null)}
-              voiceShortcutRequested={!inGroup && Boolean(active && activeSnapshot?.botId === active.id) && searchParams.get("dictate") === "1"}
+              voiceShortcutRequested={!inGroup && !newConversation && Boolean(active && activeSnapshot?.botId === active.id) && searchParams.get("dictate") === "1"}
               onVoiceShortcutConsumed={() => {
                 const next = new URLSearchParams(searchParams);
                 next.delete("dictate");
@@ -4654,8 +4769,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               }}
               dictationTranscribe={voiceStatus ? Boolean(voiceStatus.transcribe) : undefined}
               artifactTarget={transcriptArtifactTarget}
-              replyTarget={activeReplyTarget}
-              replyQuote={activeReplyQuote}
+              replyTarget={newConversation ? null : activeReplyTarget}
+              replyQuote={newConversation ? null : activeReplyQuote}
               replyTargetName={replyTargetName}
               onClearReply={clearReply}
               mentionTargets={composerMentionTargets}

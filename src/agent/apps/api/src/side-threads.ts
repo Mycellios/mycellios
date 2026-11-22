@@ -58,6 +58,7 @@ export function sideThreadRow(row: SideThreadListRow): SideThread {
     startedBy: pick(THREAD_STARTED_BY, row.startedBy) ?? threadStartedByForKind(kind),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    unread: Boolean(row.unread),
   };
 }
 

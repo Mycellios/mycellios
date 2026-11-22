@@ -433,22 +433,55 @@
   or delete history to make it fit. Keep New conversation first in that picker.
   development.list returns each thread's server-derived kind plus its lifecycle from
   the thread itself (archivedAt, deleteAfter, a run-derived state running/queued/
-  waiting/idle/closed, outcome, lastError, titleSource, startedBy, updatedAt): the
-  picker marks routine, workflow and delegated threads with a short label, lists
-  archived conversations last under Archived, hides deleting ones, and offers rename
-  only for ordinary conversations. A task tab marks its own thread read once that
+  waiting/idle/closed, outcome, lastError, titleSource, startedBy, updatedAt, unread):
+  the picker lists open threads by updatedAt with a ThreadStatusMark (working dots,
+  queued clock, needs-you question, failed X, unread dot) and a relative time, marks
+  routine, workflow and delegated threads with a short label, lists archived
+  conversations last under Archived (choosing one restores it and opens its tab),
+  hides deleting ones, and offers rename, archive and delete only for the person's
+  conversations and the ones their Mico started. A task tab marks its own thread read once that
   task's snapshot has loaded (never on hover) and never clears the main chat's dot.
   search_history/read_history read the run's own thread, including a Mico's side
   thread, or by taskId (main chat or routine thread) a conversation the Mico opened,
   under the same owner/Space/unarchived-Mico fence; results stay untrusted.
-  The + opens an untitled conversation directly. Its first committed user message
+  The + (also Ctrl/Cmd+Shift+O, the picker and the Mico's sidebar menu) opens a draft
+  tab (`?draft=1`, no thread): its composer keeps unsent text per Mico under
+  `bot:<id>:new-conversation`, and its first message creates the conversation with the
+  draft's stored request key (a retry reuses it) and sends through a new immutable
+  client bound to that thread, which reads it first; the main chat's client never
+  carries it. A refused first send removes the empty conversation; an unconfirmed one
+  moves the text to the new conversation's composer. The draft tab becomes that
+  conversation in place. Nothing is created for a draft that is never sent. The
+  draft hides main-chat parts (transcript, Reset context, queue, reply, voice, pins)
+  and never marks the main chat read. The first committed user message
   supplies the title in the same transaction, without a model request: its first
   non-empty line (else the first file name), at most 120 characters ending in "…",
   titleSource auto; later messages preserve it. Manual rename is owner/Space/Mico-
   scoped, accepts 1-120 characters on one line without control characters (the
   server explains a refusal) and sets titleSource user, which no automatic title
-  replaces. Rename stays available by clicking the selected title, from a tab's
-  context menu or the picker.
+  replaces. Rename stays available by clicking the selected title, double click, F2,
+  from a tab's context menu or the picker. Tabs (lib/thread-tabs.ts, one store per
+  user/Space/Mico shared by every strip and window) keep order, the active tab and
+  parked places, capped at 50 stored ids (never a limit on conversations). A tab's
+  menu offers Open, Close tab, Close other tabs, Close tabs to the right, then Rename,
+  Archive and Delete for own conversations; the Mico name (main tab) offers the close
+  actions only. Delete/Backspace and a middle click close a focused tab, Alt+Shift+
+  Left/Right and dragging reorder, Alt+Shift+Down/Up step through tabs (not inside a
+  text field holding text; the roster ignores Shift for its Alt+arrow reorder).
+  Archive goes through the server's stop-then-archive and closes the tab. Delete hides
+  the tab at once and shows "{title} deleted" with Undo for the server's window, which
+  restores it at its place; it is disabled while the conversation works and a phone
+  asks first without Undo. A tab whose conversation is archived or deleted elsewhere
+  closes (its open view leaves for the tab on the left) and returns on restore. A
+  conversation the Mico started (startedBy agent) joins the end of the tabs in the
+  background without navigating, shows "{Mico} opened this conversation" and can be
+  renamed and deleted like the person's own. Below 200 px the row is a title
+  switcher; below 48 px only the picker button. Side threads use the placeholder
+  "Message {Mico} in this conversation", show the thread's lastError card until the
+  next turn and load older messages by themselves near the top. A "thread" mention
+  (same owner, Space and Mico only) stores a thread_link block shown as "Open
+  conversation {name}". Verify MicoTaskTabs, thread-tabs, new-conversation, composer,
+  transcript-autoload and thread-target tests.
   Edit inline: Enter/blur saves and Escape cancels; retain failed edits for retry.
   Lifecycle (thread-lifecycle in core/db, side-threads.ts in the API): archive from
   a tab, Tasks or the phone stops first (queued messages, runs, delegated work),
@@ -860,7 +893,8 @@
 
 
 - Mico task tabs bind immutable bot/thread/Space RPC clients, separate query caches
-  and composer drafts. Reject snapshots for another thread; never derive task
+  and composer drafts. A draft tab has no thread: it keeps the main chat's client for
+  reads only and its first send creates a fresh client for the new thread id. Reject snapshots for another thread; never derive task
   identity from mutable global location state. Cron, Test and event routines use
   the owned routine-thread resolver, preserving explicit targets and history.
   Delivery receipts freeze routine recipients and retain Run nonces after clearing
