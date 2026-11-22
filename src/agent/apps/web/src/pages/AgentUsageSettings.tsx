@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentUsageReport, AgentUsageTotals } from "@mycellios/contracts";
 import { formatTaskCostAmount } from "@mycellios/core";
@@ -51,7 +52,7 @@ export function AgentUsageSettings({ panelRef }: { panelRef?: RefObject<HTMLDivE
   return <div ref={panelRef} tabIndex={-1} data-testid="usage-settings" className="min-w-0 space-y-6 outline-none">
     <SettingsGroup><SettingsRow label={<Label htmlFor={id}><Trans>Show cost on each response</Trans></Label>} help={{label:t`Show cost on each response`,description:t`Shows the cost below each reply when pricing is available. Hiding it does not change what you pay or remove usage from this page.`}} control={<Switch id={id} data-testid="response-cost-toggle" checked={show} onCheckedChange={setResponseCostVisible} />}/></SettingsGroup>
     {error ? <div role="alert" className="space-y-3"><p className="text-sm text-destructive">{t`Could not load agent usage`}</p><Button variant="outline" onClick={()=>setAttempt(n=>n+1)}><Trans>Retry</Trans></Button></div>
-     : !report ? <p className="text-sm text-muted-foreground" role="status"><Trans>Loading…</Trans></p>
+     : !report ? <LoadingSkeleton layout="detail" />
      : <>
        <section className="rounded-xl border border-border p-4" data-testid="usage-total"><h3 className="mb-4 text-sm font-medium"><SettingsLabel name={t`Tokens`} help={t`Tokens are small pieces of text processed by a model. Input is what it reads; output is what it writes.`}><Trans>Total usage</Trans></SettingsLabel></h3><UsageMetrics value={report.total}/></section>
        <section className="min-w-0 space-y-3"><h3 className="text-sm font-medium"><Trans>Usage by agent</Trans></h3>

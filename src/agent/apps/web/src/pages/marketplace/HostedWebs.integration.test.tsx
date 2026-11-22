@@ -5,6 +5,9 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock("@lingui/react/macro", () => ({
+  useLingui: () => ({ t: (parts: TemplateStringsArray) => parts.join("") }),
+}));
 vi.mock("../../lib/rpc", async importOriginal => ({
   ...(await importOriginal<typeof import("../../lib/rpc")>()),
   selectedSpaceId: () => "space", createSpaceRpc: () => ({ webs: api }),
@@ -40,6 +43,21 @@ async function mount() {
   });
 }
 const button = (name: string) => Array.from(host.querySelectorAll("button")).find(node => node.getAttribute("aria-label") === name || node.textContent === name)!;
+
+it("shows community loading placeholders alongside the usable built-in tools", async () => {
+  let finish!: (rows: unknown[]) => void;
+  api.list.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await mount();
+  await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+
+  const loading = () => host.querySelector('[role="status"][aria-label="Cargando apps…"]');
+  expect(loading()?.querySelector('[data-slot="skeleton"]')).toBeTruthy();
+  expect(button("Abrir Cadencia")).toBeDefined();
+
+  await act(async () => finish([]));
+  expect(loading()).toBeNull();
+  expect(button("Abrir Cadencia")).toBeDefined();
+});
 
 it("retains browser Cadencia, Desktop editors and community apps in one directory", async () => {
   api.list.mockResolvedValue([{ id: "site", title: "Antseed Radar", slug: "antseed", published: true, owned: false, pinned: false, views: 1 }]);

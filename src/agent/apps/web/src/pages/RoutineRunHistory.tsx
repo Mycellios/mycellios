@@ -1,9 +1,10 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { routineThreadPath } from "../lib/routine-thread-path";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import type { RoutineHistory, RoutineRun } from "@mycellios/contracts";
 import type { RpcClient } from "../lib/rpc";
 import { isRetryableError, normalizeRunError } from "@mycellios/core";
-import { Button, Collapsible, CollapsibleContent, Spinner } from "@mycellios/ui-web";
+import { Button, Collapsible, CollapsibleContent } from "@mycellios/ui-web";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -325,9 +326,7 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
           <Trans>Could not load run history</Trans>
         </p>
       ) : runs === null ? (
-        <p className="mt-2 text-[13.5px]">
-          <Spinner aria-label={t`Loading…`} />
-        </p>
+        <LoadingSkeleton className="mt-2" />
       ) : runs.length === 0 ? (
         <p className="mt-2 text-[13.5px]">
           <Trans>No runs yet</Trans>

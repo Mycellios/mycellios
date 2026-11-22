@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { Button, Input } from "@mycellios/ui-web";
 import { ArrowUpRight, Globe, Film, Monitor, Search, Waves } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
@@ -25,7 +26,7 @@ export function HifaStoreCatalog({
   }
   if (params.get("app") === "cadencia")
     return (
-      <Suspense fallback={<p role="status">Abriendo Cadencia…</p>}>
+      <Suspense fallback={<LoadingSkeleton label="Abriendo Cadencia…" layout="detail" className="mx-auto w-full max-w-3xl p-6" />}>
         <Cadencia scope={scope} onBack={() => openCadencia(false)} />
       </Suspense>
     );
