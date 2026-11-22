@@ -362,7 +362,7 @@ export async function planThreadDeletion(
  * Never touches a main chat, a not-yet-due delete or a thread that works again.
  */
 export async function purgeDueThreadInTransaction(
-  tx: Tx,
+  tx: Tx & Pick<Prisma.TransactionClient, "memoryDocument" | "memoryRevision">,
   plan: ThreadDeletionPlan,
   now: Date,
 ): Promise<"purged" | "gone" | "not_due" | "busy"> {
@@ -372,6 +372,7 @@ export async function purgeDueThreadInTransaction(
   if (!thread.taskBotId || !thread.deleteAfter || thread.deleteAfter.getTime() > now.getTime())
     return "not_due";
   if (await activeRunCount(tx, plan.thread.id)) return "busy";
+  await forgetConversationMemory(tx, plan.thread);
   await tx.$executeRaw`
     UPDATE tasks SET "parentTaskId" = NULL
     WHERE "threadId" <> ${plan.thread.id}
@@ -387,4 +388,47 @@ export async function purgeDueThreadInTransaction(
   }
   await tx.$executeRaw`DELETE FROM threads WHERE id = ${plan.thread.id} AND "deleteAfter" IS NOT NULL`;
   return "purged";
+}
+
+/** Remove only revisions sourced from this thread. Task-local documents cascade with it. */
+async function forgetConversationMemory(
+  tx: Tx & Pick<Prisma.TransactionClient, "memoryDocument" | "memoryRevision">,
+  thread: ThreadDeletionPlan["thread"],
+) {
+  const documents = await tx.$queryRaw<Array<{ id: string; revision: number }>>`
+    SELECT d.id, d.revision
+    FROM memory_documents d
+    WHERE d."spaceId" = ${thread.spaceId} AND d."userId" = ${thread.userId}
+      AND d."taskThreadId" IS DISTINCT FROM ${thread.id}
+      AND EXISTS (
+        SELECT 1 FROM memory_revisions r
+        WHERE r."documentId" = d.id AND r."sourceThreadId" = ${thread.id}
+      )
+    ORDER BY d.id FOR UPDATE OF d`;
+  for (const document of documents) {
+    const removed = await tx.memoryRevision.deleteMany({
+      where: { documentId: document.id, sourceThreadId: thread.id },
+    });
+    if (!removed.count) continue;
+    const latest = await tx.memoryRevision.findFirst({
+      where: { documentId: document.id },
+      orderBy: { revision: "desc" },
+      select: { revision: true, content: true, sourceRunId: true, sourceThreadId: true },
+    });
+    if (latest?.revision === document.revision) continue;
+    if (!latest) {
+      await tx.memoryDocument.delete({ where: { id: document.id } });
+      continue;
+    }
+    // Preserve optimistic concurrency and bind the restored content to its new
+    // revision through Prisma's encrypted-field extension.
+    const revision = document.revision + 1;
+    await tx.memoryDocument.update({
+      where: { id: document.id },
+      data: { revision, content: latest.content },
+    });
+    await tx.memoryRevision.create({
+      data: { ...latest, documentId: document.id, revision },
+    });
+  }
 }

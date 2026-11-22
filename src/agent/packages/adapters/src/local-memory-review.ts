@@ -125,7 +125,8 @@ export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:stri
   if(!existing&&result.basePaths?.some((d:any)=>d.path===path&&d.scope===memoryScope))continue;
   if(existing&&(existing.userControlled||result.baseRevisions?.[existing.id]!==existing.revision))continue;
   if(existing?.content.trim()===content.trim())continue;
-  await deps.memory.commit({scope:memoryScope,...(memoryScope==="bot"?{botId:scope.botId}:{}),path,content,expectedRevision:existing?.revision??0,...(fact.scope==="task"?{taskThreadId:threadId}:{}),sourceThreadId:threadId},
+  await deps.memory.commit({scope:memoryScope,...(memoryScope==="bot"?{botId:scope.botId}:{}),path,content,expectedRevision:existing?.revision??0,...(fact.scope==="task"?{taskThreadId:threadId}:{}),sourceThreadId:threadId,
+    sourceContext:{generation:record.generation,startSeq:result.contextStartSeq,nextSeq:result.snapshotSeq}},
     {operationId:record.id,traceId:record.id,spaceId:scope.spaceId,userId:scope.userId,botId:scope.botId,signal:AbortSignal.timeout(10000)});
  }
  await db.localMemoryReview.update({where:{id:record.id},data:{status:"completed"}});
