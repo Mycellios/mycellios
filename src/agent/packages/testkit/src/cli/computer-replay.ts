@@ -47,7 +47,7 @@ async function main() {
   execFileSync("docker", ["image", "inspect", image], { stdio: "ignore" });
   const supervisorImage = supervisorImageArg?.slice("--supervisor-image=".length) ?? "mycellios/supervisor:isolated-test";
   if (isolated) execFileSync("docker", ["image", "inspect", supervisorImage], { stdio: "ignore" });
-  const directory = await mkdtemp(path.join(tmpdir(), "rakazo-computer-replay-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "mycellios-computer-replay-"));
   // Retain only local process/Docker discovery settings. In particular, do not
   // inherit provider, telemetry, proxy credentials, or the maintainer's data dir.
   const env: NodeJS.ProcessEnv = {};

@@ -82,7 +82,7 @@ describe.skipIf(!enabled)("persisted Pi usage accounting", () => {
         },
       ],
     });
-    const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-usage-fixture-"));
+    const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-usage-fixture-"));
     let stop: (() => Promise<void>) | undefined;
     try {
       const { createApp } = await import("../../../apps/api/src/app.ts");

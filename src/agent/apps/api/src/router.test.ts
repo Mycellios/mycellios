@@ -8214,7 +8214,7 @@ describe("export.bot", () => {
   });
 
   async function homeWith(files: Record<string, string | Uint8Array>) {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-export-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-export-"));
     roots.push(root);
     const home = new LocalAgentHomeStore(root);
     for (const [file, content] of Object.entries(files)) {

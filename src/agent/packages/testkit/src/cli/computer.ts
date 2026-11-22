@@ -15,7 +15,7 @@ async function main() {
   for (const key of [sandbox.apiKeyEnv, "OPENROUTER_API_KEY", "COMPUTER_E2E_MODEL"]) {
     if (!process.env[key]) throw new Error(`${key} is required`);
   }
-  const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-computer-e2e-run-"));
+  const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-computer-e2e-run-"));
   const database = await new PostgreSqlContainer("postgres:18-alpine").start();
   const env = {
     ...process.env,

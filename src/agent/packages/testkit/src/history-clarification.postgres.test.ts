@@ -57,7 +57,7 @@ describe.skipIf(!enabled)("product history clarification eval boundary", () => {
           },
         ],
       });
-      const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-clarification-"));
+      const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-clarification-"));
       try {
         const { createApp } = await import("../../../apps/api/src/app.ts");
         const result = await runTrial(scenario, 1, {

@@ -26,7 +26,7 @@ local("desktop local database lifecycle", () => {
     isDeploymentOwner: true,
   };
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), "rakazo-desktop-postgres-"));
+    root = await mkdtemp(join(tmpdir(), "mycellios-desktop-postgres-"));
     const webRoot = join(root, "web");
     await mkdir(webRoot);
     await writeFile(join(webRoot, "index.html"), "<!doctype html><title>Local fixture</title>");

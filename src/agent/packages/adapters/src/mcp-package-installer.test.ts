@@ -88,7 +88,7 @@ describe("parseNpxLaunch", () => {
 
 describe("defaultMcpPackagesRoot", () => {
   it("prefers MCP_PACKAGES_DIR, then a writable DATA_DIR, then the temp dir", async () => {
-    const data = await mkdtemp(join(tmpdir(), "rakazo-data-"));
+    const data = await mkdtemp(join(tmpdir(), "mycellios-data-"));
     try {
       expect(defaultMcpPackagesRoot({ MCP_PACKAGES_DIR: "/srv/pkgs", DATA_DIR: data })).toBe(
         "/srv/pkgs",
@@ -139,7 +139,7 @@ describe("ensureMcpPackage", () => {
   let log: string;
 
   beforeEach(async () => {
-    work = await mkdtemp(join(tmpdir(), "rakazo-mcp-installer-"));
+    work = await mkdtemp(join(tmpdir(), "mycellios-mcp-installer-"));
     root = join(work, "packages");
     npm = join(work, "fake-npm");
     log = join(work, "npm.log");

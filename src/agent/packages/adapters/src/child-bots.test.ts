@@ -688,7 +688,7 @@ describe("destroyBot", () => {
   });
 
   it("stops the deleted team bot's screen and removes only its browser profile", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-delete-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-delete-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -774,7 +774,7 @@ describe("destroyBot", () => {
   });
 
   it("unlinks a profile symlink instead of following it into another bot's profile", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-symlink-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-symlink-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -821,7 +821,7 @@ describe("destroyBot", () => {
   });
 
   it("refuses a symlinked profile directory instead of deleting the directory it points at", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-parent-symlink-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-parent-symlink-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -871,8 +871,8 @@ describe("destroyBot", () => {
   it.each(["e2b", "createos"])(
     "removes the deleted bot's profile from a %s sandbox after the browser stops",
     async (kind) => {
-      const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-remote-delete-"));
-      const remote = await mkdtemp(path.join(tmpdir(), "rakazo-team-remote-workspace-"));
+      const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-remote-delete-"));
+      const remote = await mkdtemp(path.join(tmpdir(), "mycellios-team-remote-workspace-"));
       try {
         const home = new LocalAgentHomeStore(root);
         const teamHome = home.pathFor("team-workspace-1");
@@ -953,8 +953,8 @@ describe("destroyBot", () => {
   );
 
   it("leaves a remote profile in place when its parent directory is a symlink", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-remote-symlink-"));
-    const remote = await mkdtemp(path.join(tmpdir(), "rakazo-team-remote-symlink-workspace-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-remote-symlink-"));
+    const remote = await mkdtemp(path.join(tmpdir(), "mycellios-team-remote-symlink-workspace-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1011,8 +1011,8 @@ describe("destroyBot", () => {
   });
 
   it("does not remove a profile when stopping the browser fails", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-release-failed-"));
-    const remote = await mkdtemp(path.join(tmpdir(), "rakazo-team-release-failed-workspace-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-release-failed-"));
+    const remote = await mkdtemp(path.join(tmpdir(), "mycellios-team-release-failed-workspace-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1063,8 +1063,8 @@ describe("destroyBot", () => {
   });
 
   it("removes local and remote profiles when the browser stopped but slot cleanup failed", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-slot-cleanup-"));
-    const remote = await mkdtemp(path.join(tmpdir(), "rakazo-team-slot-cleanup-workspace-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-slot-cleanup-"));
+    const remote = await mkdtemp(path.join(tmpdir(), "mycellios-team-slot-cleanup-workspace-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1122,7 +1122,7 @@ describe("destroyBot", () => {
     }
   });
   it("does not wake a stopped remote Team Computer to remove the deleted bot's profile", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-profile-stopped-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-profile-stopped-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1169,7 +1169,7 @@ describe("destroyBot", () => {
   });
 
   it("removes the deleted bot's folder inside a running Docker Team Computer and keeps other folders", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-delete-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-delete-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1233,7 +1233,7 @@ describe("destroyBot", () => {
   });
 
   it("removes the Team Computer folder of a bot that moved to its own computer", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-moved-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-moved-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1439,8 +1439,8 @@ describe("destroyBot", () => {
   });
 
   it("removes the deleted bot's folder from a running remote Team Computer", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-remote-"));
-    const remote = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-remote-workspace-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-remote-"));
+    const remote = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-remote-workspace-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1507,7 +1507,7 @@ describe("destroyBot", () => {
   });
 
   it("removes the deleted bot's folder and profile from the space's shared Team Computer from before each person got their own", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-legacy-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-legacy-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const legacyHome = home.pathFor("team-workspace-1");
@@ -1564,7 +1564,7 @@ describe("destroyBot", () => {
   });
 
   it("does not wake a stopped Team Computer to remove the deleted bot's folder", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-stopped-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-stopped-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1611,8 +1611,8 @@ describe("destroyBot", () => {
   });
 
   it("unlinks a symlinked bot folder instead of following it into another bot's folder", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-symlink-"));
-    const remote = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-symlink-workspace-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-symlink-"));
+    const remote = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-symlink-workspace-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1671,7 +1671,7 @@ describe("destroyBot", () => {
   });
 
   it("leaves the Team Computer home alone when its bots folder is a symlink", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-parent-symlink-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-parent-symlink-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1716,7 +1716,7 @@ describe("destroyBot", () => {
   it.each(["docker", "desktop"])(
     "leaves a stopped %s Team Computer's stored home to its next boot",
     async (kind) => {
-      const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-docker-stopped-"));
+      const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-docker-stopped-"));
       try {
         const home = new LocalAgentHomeStore(root);
         const teamHome = home.pathFor("team-workspace-1");
@@ -1761,7 +1761,7 @@ describe("destroyBot", () => {
   );
 
   it("does not delete outside a Docker home when a bot swaps bots/ for a symlink mid-cleanup", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-folder-swap-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-folder-swap-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -1812,7 +1812,7 @@ describe("destroyBot", () => {
   });
 
   it("does not delete outside a Docker home when a bot swaps .browser-profiles/ mid-cleanup", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-profile-swap-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-profile-swap-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");
@@ -2063,7 +2063,7 @@ describe("archiveBot", () => {
   });
 
   it("releases the archived bot's screen and keeps its browser profile", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "rakazo-team-archive-"));
+    const root = await mkdtemp(path.join(tmpdir(), "mycellios-team-archive-"));
     try {
       const home = new LocalAgentHomeStore(root);
       const teamHome = home.pathFor("team-workspace-1");

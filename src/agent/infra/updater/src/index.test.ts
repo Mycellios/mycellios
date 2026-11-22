@@ -31,7 +31,7 @@ afterEach(async () => {
 });
 
 async function deployment(env = "RAKAZO_IMAGE_TAG=v1.0.0\nRAKAZO_IMAGE_TAG_PREVIOUS=v0.9.0\n") {
-  const deployDir = await mkdtemp(path.join(os.tmpdir(), "rakazo-updater-test-"));
+  const deployDir = await mkdtemp(path.join(os.tmpdir(), "mycellios-updater-test-"));
   temporaryDirectories.push(deployDir);
   await writeFile(path.join(deployDir, ".env"), env);
   return {
@@ -500,7 +500,7 @@ describe("child process environment", () => {
 
 describe("runHostCommand", () => {
   it("passes shell syntax to git as one argument and refuses any other program", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "rakazo-host-command-"));
+    const dir = await mkdtemp(path.join(os.tmpdir(), "mycellios-host-command-"));
     temporaryDirectories.push(dir);
     const bin = path.join(dir, "bin");
     await mkdir(bin);

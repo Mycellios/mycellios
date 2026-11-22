@@ -102,7 +102,7 @@ function memoryRing() {
 }
 
 async function setup(homeKeys = ["bot-1"]) {
-  const root = await mkdtemp(path.join(tmpdir(), "rakazo-object-homes-"));
+  const root = await mkdtemp(path.join(tmpdir(), "mycellios-object-homes-"));
   dirs.push(root);
   const rows: ComputerRow[] = homeKeys.map((homeKey, index) => ({
     id: `computer-${index + 1}`,
@@ -118,7 +118,7 @@ async function setup(homeKeys = ["bot-1"]) {
   const store = new ObjectAgentHomeStore(root, storage, records);
   /** Another API or worker host: same bucket and database, its own empty cache. */
   const otherHost = async () => {
-    const otherRoot = await mkdtemp(path.join(tmpdir(), "rakazo-object-homes-"));
+    const otherRoot = await mkdtemp(path.join(tmpdir(), "mycellios-object-homes-"));
     dirs.push(otherRoot);
     return new ObjectAgentHomeStore(otherRoot, storage, records);
   };
@@ -127,7 +127,7 @@ async function setup(homeKeys = ["bot-1"]) {
 
 /** A sandbox export staged for `commit`. */
 async function staged(files: Record<string, string>) {
-  const dir = await mkdtemp(path.join(tmpdir(), "rakazo-object-staging-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "mycellios-object-staging-"));
   dirs.push(dir);
   for (const [name, content] of Object.entries(files)) {
     await mkdir(path.dirname(path.join(dir, name)), { recursive: true });

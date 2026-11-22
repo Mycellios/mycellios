@@ -80,7 +80,7 @@ for (const mode of ["development", "preview"] as const) {
     let assetAttempts = 0;
     let upstreamRequests = 0;
     test.beforeAll(async () => {
-      const root = await mkdtemp(path.join(tmpdir(), "rakazo-screen-test-"));
+      const root = await mkdtemp(path.join(tmpdir(), "mycellios-screen-test-"));
       await mkdir(path.join(root, "dist"));
       const upstream = createHttpServer((req, res) => {
         upstreamRequests += 1;

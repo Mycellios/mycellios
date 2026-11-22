@@ -14,7 +14,7 @@ async function main() {
     );
   }
 
-  const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-canary-"));
+  const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-canary-"));
   let postgres: StartedPostgreSqlContainer | undefined;
   try {
     if (runOpenRouter) postgres = await new PostgreSqlContainer("postgres:18-alpine").start();
