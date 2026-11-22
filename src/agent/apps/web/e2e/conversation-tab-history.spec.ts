@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
-import type { ThreadMessage } from "@rakazo/contracts";
 import { activeBotId, completeOnboarding, rpc, signup } from "./helpers";
 
 test("conversation tabs render a slow first history read and reopen from cache", async ({ page }) => {
-  await signup(page, `tab-history-${Date.now()}@rakazo.test`, "password12", "Tab history");
+  await signup(page, `tab-history-${Date.now()}@example.test`, "password12", "Tab history");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   const title = "Campaign draft";
@@ -18,7 +17,7 @@ test("conversation tabs render a slow first history read and reopen from cache",
   await expect(transcript).toBeVisible();
 
   const text = "Saved message from the campaign tab";
-  const message: ThreadMessage = {
+  const message = {
     id: "fixture-campaign-message",
     threadId,
     seq: 0,
