@@ -136,6 +136,22 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
         const viewer = await fetch(viewerUrl, { signal: AbortSignal.timeout(10_000) });
         expect(viewer.ok).toBe(true);
         expect(await viewer.text()).toMatch(/<!doctype html|<html/i);
+        if (index === 0) {
+          const first = { ...context, browserThreadId: "conversation-a" };
+          const second = { ...context, browserThreadId: "conversation-b" };
+          const address = new URL(viewerUrl);
+          address.hostname = "127.0.0.1";
+          const firstUrl = new URL("#conversation-a", address).href;
+          const secondUrl = new URL("#conversation-b", address).href;
+          expect(await sandbox.pageBrowser!(ref, { command: "navigate", url: firstUrl }, first))
+            .toMatchObject({ ok: true, url: firstUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, second))
+            .toMatchObject({ ok: true, url: "about:blank" });
+          expect(await sandbox.pageBrowser!(ref, { command: "navigate", url: secondUrl }, second))
+            .toMatchObject({ ok: true, url: secondUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, first))
+            .toMatchObject({ ok: true, url: firstUrl });
+        }
         const socketPath = viewerUrl.searchParams.get("path");
         expect(socketPath).toMatch(/^websockify\?/);
         const socketUrl = new URL(socketPath!, viewerUrl);
