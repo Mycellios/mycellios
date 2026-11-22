@@ -271,4 +271,3 @@ pnpm test:e2e
 セキュリティ上の脆弱性は、公開の Issue を作成せず、[SECURITY.md](./SECURITY.md) の手順に従って報告してください。
 
 Mycellios は [Apache License 2.0](./LICENSE) のもとでライセンスされています。
-

@@ -295,4 +295,3 @@ request. For security vulnerabilities, follow [SECURITY.md](./SECURITY.md) inste
 issue.
 
 Mycellios is licensed under the [Apache License 2.0](./LICENSE).
-
