@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "./LoadingSkeleton";
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
@@ -235,9 +236,7 @@ function FilePreview({
       ) : null}
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {state.status === "loading" ? (
-          <div className="absolute inset-0 grid place-items-center text-muted-foreground">
-            <Spinner aria-label={t`Loading preview…`} />
-          </div>
+          <LoadingSkeleton label={t`Loading preview…`} layout="detail" className="mx-auto max-w-xl p-6" />
         ) : state.status === "error" ? (
           <div className="m-5 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive">
             {state.message}

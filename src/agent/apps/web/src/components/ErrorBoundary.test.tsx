@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ComponentProps, ReactNode } from "react";
-import { act, createContext, Suspense, useContext } from "react";
+import { act, createContext, Suspense, useContext, useEffect } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -96,6 +96,41 @@ it("renders the overlay once its chunk loads", async () => {
 
   expect(container.textContent).toContain("Integrations");
   expect(container.textContent).not.toContain("Could not load");
+});
+
+it("renders a preloaded overlay without showing Suspense and shares the pending import", async () => {
+  const load = vi.fn(async () => Integrations);
+  const Settings = lazyOverlay(load);
+  const coldFallback = vi.fn();
+  function Fallback() {
+    coldFallback();
+    return null;
+  }
+
+  await Promise.all([Settings.preload(), Settings.preload()]);
+  await act(async () => {
+    root.render(<Suspense fallback={<Fallback />}><Settings onClose={vi.fn()} /></Suspense>);
+  });
+
+  expect(load).toHaveBeenCalledOnce();
+  expect(coldFallback).not.toHaveBeenCalled();
+  expect(container.textContent).toBe("Integrations");
+});
+
+it("preserves the cold overlay instance on later renders", async () => {
+  const mounted = vi.fn();
+  function SettingsContent({ onClose }: { onClose: () => void }) {
+    useEffect(() => { mounted(); }, []);
+    return <button onClick={onClose}>Settings</button>;
+  }
+  const Settings = lazyOverlay(async () => SettingsContent);
+
+  await renderInShell(<Settings onClose={vi.fn()} />);
+  const first = button("Settings");
+  await renderInShell(<Settings onClose={vi.fn()} />);
+
+  expect(button("Settings")).toBe(first);
+  expect(mounted).toHaveBeenCalledOnce();
 });
 
 it("keeps the shell when an overlay chunk fails to load", async () => {

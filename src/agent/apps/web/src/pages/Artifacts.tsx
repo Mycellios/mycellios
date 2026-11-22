@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@mycellios/chat-ui/web";
@@ -499,9 +500,11 @@ function BrowsingPane({
 }) {
   if (items === null) {
     return (
-      <div className="grid flex-1 place-items-center text-sm text-muted-foreground/80">
-        {loadError ?? <Spinner aria-label={t`Loading…`} />}
-      </div>
+      loadError ? (
+        <div className="grid flex-1 place-items-center text-sm text-muted-foreground/80">{loadError}</div>
+      ) : (
+        <LoadingSkeleton layout={viewMode === "list" ? "list" : "cards"} className="flex-1 p-6" />
+      )
     );
   }
   if (items.length === 0) {
@@ -637,9 +640,9 @@ function IndexPane({
   return (
     <aside className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-e border-border lg:flex">
       {items === null ? (
-        <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground/80">
-          {loadError ?? <Spinner aria-label={t`Loading…`} />}
-        </div>
+        loadError ? (
+          <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground/80">{loadError}</div>
+        ) : <LoadingSkeleton className="p-4" />
       ) : items.length === 0 ? (
         <EmptyArtifacts
           className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground/80"
@@ -1039,9 +1042,7 @@ function PreviewPane({
 
       <div className="min-h-0 flex-1 p-5">
         {state.status === "loading" ? (
-          <div className="grid h-full place-items-center text-sm text-muted-foreground/80">
-            <Spinner aria-label={t`Loading…`} />
-          </div>
+          <LoadingSkeleton layout="detail" className="mx-auto w-full max-w-xl" />
         ) : state.status === "error" ? (
           <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive">
             {state.message}

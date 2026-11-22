@@ -126,6 +126,7 @@ import { lazyOverlay } from "../components/ErrorBoundary";
 import { IconTooltip } from "../components/IconTooltip";
 import { MycelliosCredits } from "../components/MycelliosCredits";
 import { SidebarContribution } from "../components/SidebarContribution";
+import { DialogLoading, SettingsLoading } from "../components/LoadingSkeleton";
 import { PageLoading } from "../components/PageLoading";
 import { PasskeyOffer } from "../components/PasskeyOffer";
 import { setLiveThreadConnection } from "../lib/live-thread-connection";
@@ -392,22 +393,12 @@ type PendingBrowserNotification = {
 type BrowserNoticeOptions = { quiet?: boolean; taskConversation?: boolean };
 
 const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
-/** Bound Settings leave so a hung voice status refresh cannot block dismissal. */
-const VOICE_STATUS_REFRESH_TIMEOUT_MS = 10_000;
 const NO_AGENT_SKILLS: AgentSkillCatalogEntry[] = [];
 const NO_PROVIDERS: string[] = [];
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
 function threadSnapshotSignal(parent: AbortSignal): AbortSignal {
   return anySignal([parent, AbortSignal.timeout(THREAD_SNAPSHOT_TIMEOUT_MS)]);
-}
-
-function voiceStatusRefreshTimeout(): Promise<never> {
-  return new Promise((_, reject) => {
-    AbortSignal.timeout(VOICE_STATUS_REFRESH_TIMEOUT_MS).addEventListener("abort", () => {
-      reject(new DOMException("Voice status refresh timed out", "TimeoutError"));
-    });
-  });
 }
 
 export function ShellPage() {
@@ -733,9 +724,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       transcribe: voiceStatus ? Boolean(voiceStatus.transcribe) : undefined,
     });
   };
-  const voiceStatusKey = queries.voice.status.queryKey();
+  // Voice readiness belongs to the Space, including when a task chat is open.
   const voiceStatus: VoiceStatus | null =
-    useQuery(queries.voice.status.queryOptions()).data ?? null;
+    useQuery(spaceQueries(userId ?? null, shellSpaceId).voice.status.queryOptions()).data ?? null;
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [dismissedRunErrorIds, setDismissedRunErrorIds] =
     useState<ReadonlySet<string>>(readSeenRunErrorIds);
@@ -2884,6 +2875,21 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       markAfterPaint("rk:renderer:shell-painted");
     }
   }, [active, initialBotsLoaded, shellReady, snapshot?.botId]);
+
+  useEffect(() => {
+    // Desktop has bundled assets. Leave hosted web chunk recovery on the user-initiated path.
+    if (!shellReady || floatingChat || !desktopBridge() || !window.requestIdleCallback) return;
+    let idle: number | undefined;
+    const frame = requestAnimationFrame(() => {
+      idle = window.requestIdleCallback(() => {
+        void SettingsOverlay.preload().catch(() => undefined);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (idle !== undefined) window.cancelIdleCallback(idle);
+    };
+  }, [floatingChat, shellReady]);
 
   useLayoutEffect(() => {
     const pin = pinnedAroundRef.current;
@@ -5279,7 +5285,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       </ResizableSidePanel>
       </FrozenWhileCovered>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={
+        overlay?.kind === "apps" || overlay?.kind === "mcp" || overlay?.kind === "messaging"
+          ? <DialogLoading title={overlay.kind === "apps" ? t`Apps` : overlay.kind === "mcp" ? "MCP" : t`Messaging`} onClose={() => setOverlay(null)} />
+          : null
+      }>
         {spaceMenu ? (
           <DropdownMenu
             open
@@ -5497,7 +5507,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         ) : null}
       </Suspense>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={
+        overlay?.kind === "settings" ? <SettingsLoading onClose={() => setOverlay(null)} />
+          : peerConversation ? <DialogLoading title={t`Messages`} layout="chat" onClose={() => setPeerConversation(null)} />
+          : null
+      }>
         {overlay?.kind === "settings" && (settingsSpaceId === null || settingsSpace) ? (
           <SettingsOverlay
             bots={bots.filter(bot => bot.spaceId === (settingsSpaceId ?? currentSpaceId))}
@@ -5540,17 +5554,6 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             memoryConfig={memoryProviderConfig}
             onMemoryConfigChange={(config) => {
               void writeSaved(queryClient, queries.memory.providerConfig.queryKey(), () => config);
-            }}
-            onVoiceStatusMaybeChanged={async () => {
-              try {
-                queryClient.setQueryData(
-                  voiceStatusKey,
-                  await Promise.race([rpc.voice.status(), voiceStatusRefreshTimeout()]),
-                );
-              } catch {
-                // Prefer reopening Voice settings over starting a call with stale readiness.
-                void queryClient.resetQueries({ queryKey: voiceStatusKey });
-              }
             }}
             onClose={() => setOverlay(null)}
           />
@@ -5605,7 +5608,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   );
 
   // Empty chrome until the first bot list lands would flash "Select a bot" before the chat.
-  return initialBotsLoaded || initialLoadFailed ? shell : <PageLoading />;
+  return initialBotsLoaded || initialLoadFailed ? shell : <PageLoading layout="chat" />;
 }
 
 function routineListData(results: Array<{ data?: Routine[] }>) {

@@ -1,14 +1,15 @@
-import { useLingui } from "@lingui/react/macro";
-import { MycelliosLoader } from "./MycelliosLoader";
+import { LoadingSkeleton } from "./LoadingSkeleton";
 
-/** A whole-page wait. The spinner fades in late, so a quick load paints nothing in between. */
-export function PageLoading(props: React.ComponentPropsWithoutRef<"div">) {
-  const { t } = useLingui();
+/** A whole-page placeholder for routes whose content has not loaded yet. */
+export function PageLoading({
+  label,
+  className = "",
+  layout = "detail",
+  ...props
+}: React.ComponentPropsWithoutRef<"div"> & { label?: string; layout?: "detail" | "chat" }) {
   return (
-    <div className="grid h-full place-items-center bg-background" role="status" aria-label={t`Loading…`} {...props}>
-      <span className="animate-in fade-in-0 fill-mode-both delay-500 duration-300 motion-reduce:animate-none">
-        <MycelliosLoader />
-      </span>
+    <div className={`h-full min-h-0 overflow-hidden bg-background ${className}`} {...props}>
+      <LoadingSkeleton label={label} layout={layout} rows={4} className="mx-auto w-full max-w-3xl px-6 py-8 sm:px-10" />
     </div>
   );
 }

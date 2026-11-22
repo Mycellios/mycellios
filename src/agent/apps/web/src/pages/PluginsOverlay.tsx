@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { TailscaleConnections } from "./TailscaleConnections";
 import { BUILTIN_CONNECTOR, BUILTIN_INTEGRATIONS, integrationCatalog, type BuiltinIntegration } from "./marketplace/builtin-integrations";
 import { connectBuiltinIntegration } from "../lib/connect-builtin-integration";
@@ -39,7 +40,6 @@ import {
   Input,
   NativeSelect,
   NativeSelectOption,
-  Spinner,
 } from "@mycellios/ui-web";
 import { queryOptions, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Search, X } from "lucide-react";
@@ -880,9 +880,7 @@ export function PluginsOverlay({
         </>
       ) : null}
       {loading ? (
-        <div className="grid flex-1 place-items-center" aria-busy="true">
-          <Spinner className="size-5 text-muted-foreground" aria-label={t`Loading integrations…`} />
-        </div>
+        <LoadingSkeleton label={t`Loading integrations…`} className="min-h-0 flex-1 px-4 py-4" />
       ) : null}
 
       <div id="integration-list" hidden={loading} className="rk-market-app-list">

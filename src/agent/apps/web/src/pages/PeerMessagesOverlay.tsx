@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@mycellios/chat-ui/web";
 import { loadPeerHistory, peerConversations } from "@mycellios/core";
@@ -8,7 +9,6 @@ import {
   DialogClose,
   DialogContent,
   DialogTitle,
-  Spinner,
 } from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -101,9 +101,7 @@ export function PeerMessagesOverlay({
           </div>
         ) : null}
         {!historyReady ? (
-          <div className="grid flex-1 place-items-center px-8 text-center text-[13.5px] text-muted-foreground/80">
-            <Spinner aria-label={t`Loading…`} />
-          </div>
+          <LoadingSkeleton layout="chat" className="min-h-0 flex-1 px-6 py-4" />
         ) : historyFailed ? (
           <div className="grid flex-1 place-items-center px-8 text-center text-[13.5px] text-muted-foreground/80">
             <div className="flex flex-col items-center gap-3">

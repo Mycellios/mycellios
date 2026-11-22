@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { DEFAULT_MEMORY_REVIEW_POLICY, DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@mycellios/contracts";
@@ -51,7 +52,7 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
   const chosen = settings.find(item => item.key === view);
   return <div className="space-y-6" data-testid="mico-behavior-settings">
     {error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{error}</p>{!state && <Button variant="outline" size="sm" onClick={() => setRetry(n => n + 1)}>{t`Retry`}</Button>}</div>}
-    {!state ? !error && <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p> : chosen ? <>
+    {!state ? !error && <LoadingSkeleton layout="settings" /> : chosen ? <>
       <Button variant="ghost" size="sm" disabled={saving} onClick={() => { setView(null); setSearch(""); }}>{t`Back to Micos`}</Button>
       <SettingsGroup title={t`Default`}><SettingsRow label={chosen.title} description={chosen.description}
         control={<Switch aria-label={chosen.title} checked={state.defaults[chosen.key]} disabled={saving} onCheckedChange={enabled => void save({ kind: "defaults", patch: { [chosen.key]: enabled } })} />} /></SettingsGroup>
