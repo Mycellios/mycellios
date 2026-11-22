@@ -313,6 +313,7 @@ describe("executor paused transcript", () => {
   it("keeps the original model through approval and uses the saved change on the next turn", async () => {
     const model = await startModelEmulator({
       modelId: "original-model",
+      additionalModelIds: ["next-model"],
       steps: [
         { expect: request => { expect(request.model).toBe("original-model"); },
           response: { type: "tool", id: "pending", name: "fixture_write", arguments: { content: "approved later" } } },
