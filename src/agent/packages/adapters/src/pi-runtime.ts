@@ -530,7 +530,9 @@ export class PiAgentRuntime implements AgentRuntime {
           const prepared = contextPolicy.prepareContext(ctx, m);
           sentContext = { context: prepared, sourceLength: uncompactedSourceLength ?? ctx.messages.length };
           uncompactedSourceLength = undefined;
-          return prepared;
+          // This hint is request-local. Including it in the checkpoint source
+          // would move the offset past the assistant's new tool call.
+          return withToolCallBudget(prepared, host.toolCallBudget);
         };
         const usageHooks = {
           prepareContext,
@@ -700,7 +702,7 @@ export class PiAgentRuntime implements AgentRuntime {
           streamFn: (_m, ctx, options) =>
             fallbackAwareModelStream(
               fallbackState,
-              withToolCallBudget(ctx, host.toolCallBudget),
+              ctx,
               withAutomatedLabels({ ...options, fetch: this.modelFetch ?? options?.fetch }),
             ),
           getApiKey: hasBackups
@@ -2351,7 +2353,8 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
               allowPrivateEndpoint: target.config.allowPrivateEndpoint,
             },
             {
-              prepareContext: contextPolicy.prepareContext,
+              prepareContext: (context, model) =>
+                withToolCallBudget(contextPolicy.prepareContext(context, model), nestedHost.toolCallBudget),
               imageTokens: estimatePiImageTokens,
               recordUsage: host.request.onUsage,
               onProviderError: (message) => providerFailures.add(message.content),
@@ -2413,7 +2416,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
     streamFn: (_m, ctx, options) =>
       fallbackAwareModelStream(
         retryState,
-        withToolCallBudget(ctx, nestedHost.toolCallBudget),
+        ctx,
         withAutomatedLabels({ ...options, fetch: host.modelFetch ?? options?.fetch }),
       ),
     getApiKey: async () =>
@@ -3130,7 +3133,7 @@ function bookkeepingLimit(budget: ToolCallBudget) {
   return Math.max(8, budget.limit);
 }
 
-function withToolCallBudget(context: TranscriptContext, budget: ToolCallBudget): TranscriptContext {
+function withToolCallBudget(context: Context, budget: ToolCallBudget): Context {
   if (budget.limit <= 0) return context;
   const remaining = Math.max(0, budget.limit - budget.taskCount);
   const instruction = remaining === 0

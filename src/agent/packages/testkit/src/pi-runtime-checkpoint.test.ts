@@ -306,6 +306,10 @@ describe("paused turn context", () => {
             expect(resultOf("plan")).toContain("Set up the daily summary");
             expect(resultOf("before")).toContain("fixture verified");
             expect(resultOf("ask")).toBe("Morning");
+            const prompt = request.messages.filter((message) => message.role === "system")
+              .map((message) => message.content).join("\n");
+            expect(prompt).toContain("This turn has 2 remaining task tool calls");
+            expect(prompt).not.toContain("This turn has 1 remaining task tool call");
           },
           response: { type: "tool", id: "write", name: "remember", arguments: { content: "Morning summary" } },
         },
@@ -336,7 +340,7 @@ describe("paused turn context", () => {
       saveWorkState: async (state) => { savedState = state; },
       executeTool,
     };
-    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "3");
+    vi.stubEnv("MAX_TOOL_CALLS_PER_TURN", "2");
     try {
       const runtime = new PiAgentRuntime();
       const paused = await collect(runtime.run(request));
