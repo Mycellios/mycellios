@@ -694,6 +694,12 @@
   display paging keeps earlier messages. Verify scoped DB/UI/native tests and
   PostgreSQL transaction tests with synthetic temporary tables.
 
+- Deleting a directly sent message from an idle private chat keeps a blank
+  sequence slot and the original send nonce. It removes the visible message,
+  its pin, saved quote links and source prompt, and invalidates summaries,
+  checkpoints and native session reuse for that context. Queued messages use
+  their own controls. Verify the isolated thread lifecycle and message action tests.
+
 - Composer audio follows one clear split: Mic dictates an editable text draft;
   AudioLines opens the voice conversation, or closes its owner when active.
   The empty composer uses Voice, a draft uses Send, and an empty running turn

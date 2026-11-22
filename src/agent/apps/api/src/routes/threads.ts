@@ -1,5 +1,6 @@
 import { resetThreadContext, ThreadContextBusyError } from "@mycellios/db";
 import { answerSideQuestion } from "../side-question.js";
+import { deleteOwnMessage } from "../delete-own-message.js";
 import { messagePinRoutes, micoPinRoutes } from "./message-pins.js";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
@@ -362,6 +363,15 @@ export function threadsRoutes(ctx: RouterContext) {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await stopThreadRuns(deps, context.actor, target);
         await stopWorkForThread(deps, context.actor, target.threadId);
+        return { ok: true as const };
+      }),
+      deleteOwnMessage: authed.threads.deleteOwnMessage.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("NOT_FOUND");
+        const seq = await deleteOwnMessage(deps.prisma, context.actor, target, input.messageId);
+        await deps.events.notify(target.threadId, seq).catch((error) => {
+          getLogger().error("deleted message notification failed", error);
+        });
         return { ok: true as const };
       }),
       newChat: authed.threads.newChat.handler(async ({ context, input }) => {

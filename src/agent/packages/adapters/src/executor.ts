@@ -8971,7 +8971,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               instructions: [
                 ...userTurnInstructions({
                   botInstructions: [runIdentityInstruction(bot, run.trigger), micoBehaviorInstructions(micoOwner.micoDefaults, bot.micoPreferences),
-                    thread.contextStartSeq > 0 ? `Conversation context begins at sequence ${thread.contextStartSeq}. Earlier chat messages are outside this conversation; persistent memories and workspace files remain available.` : ""].filter(Boolean).join("\n"),
+                    thread.contextStartSeq > 0 ? `Conversation context begins at sequence ${thread.contextStartSeq}. Earlier chat messages are outside this conversation; persistent memories and workspace files remain available.` : "",
+                    nativeEngine && thread.historyCompactionGeneration > 0 ? `Conversation context revision: ${thread.historyCompactionGeneration}.` : ""].filter(Boolean).join("\n"),
                   groupContext,
                   messagingContext,
                   redactedMemoryContext: memoryContext
