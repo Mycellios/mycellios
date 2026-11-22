@@ -1743,8 +1743,14 @@
   model. Validate and persist the model before the intro can be queued. Keep
   appearance options available in the compact creation form and Avatar Studio.
   After account/model setup, an empty space shows the first-Mico form in
-  Conversations. Create only on submit with the Space-scoped first-Mico key
-  and queue a brief greeting on the configured model or admitted engine.
+  Conversations. Create only on submit with the Space-scoped first-Mico key.
+  Every Mico starts with one welcome turn (`botIntroPrompt`): a single ask_user
+  card that says who it is and offers three first tasks for its role, following
+  the reference app's welcome (behavior only, our own words). bots.create queues
+  it at creation; profiles, spawned Micos and Micos still waiting for a model get
+  it through `bots.welcome` when their untouched main chat opens. The server
+  queues at most one and none after any run, user/bot message or import; spawned
+  Micos get no "Created by" notice. Verify the bot intro run tests in router.test.ts.
   Suggestions fill the editable name, purpose and avatar in both creation
   layouts, preserving the selected model and waiting for explicit submission.
 

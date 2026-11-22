@@ -94,11 +94,7 @@ export async function spawnBot(
       parentBotId: input.spawnedBy.id,
       spawnKey: input.spawnKey,
       computerMode: input.computerMode,
-      initialMessage: {
-        role: "system",
-        blocks: [{ kind: "meta", text: `Created by ${input.spawnedBy.name}` }],
-        runId: input.runId,
-      },
+      // The chat starts empty: opening it queues the Mico's welcome (bots.welcome).
     });
   } catch (error) {
     const existing = await deps.prisma.bot.findUnique({

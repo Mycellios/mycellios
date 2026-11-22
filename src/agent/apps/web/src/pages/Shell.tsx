@@ -2497,6 +2497,24 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   useLayoutEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
+  // An untouched Mico chat asks for its welcome once per model setup; the server queues at most
+  // one, and none after any run or message, so repeats and races are harmless.
+  const welcomeAttempts = useRef(new Set<string>());
+  const welcomeKey =
+    !inGroup && !taskScope && active && !active.archivedAt && activeSnapshot && !activeSnapshot.run &&
+    activeSnapshot.olderCursor == null && pendingMessages.length === 0 &&
+    !activeSnapshot.messages.some((message) => message.role === "user" || message.role === "bot")
+      ? [active.id, active.modelProvider, active.modelId, active.agentEngine, bootstrapMe?.defaultModel].join("|")
+      : null;
+  useEffect(() => {
+    if (!welcomeKey || welcomeAttempts.current.has(welcomeKey)) return;
+    welcomeAttempts.current.add(welcomeKey);
+    const botId = welcomeKey.split("|")[0]!;
+    void Promise.resolve()
+      .then(() => rpc.bots.welcome({ botId }))
+      .then(({ queued }) => (queued ? refreshBots() : undefined))
+      .catch(() => undefined);
+  }, [welcomeKey, rpc, refreshBots]);
   const transcriptArtifactTarget = useMemo<ArtifactTarget>(
     () => (inGroup ? { groupId: groupId ?? "" } : { botId: active?.id ?? "" }),
     [active?.id, groupId, inGroup],
