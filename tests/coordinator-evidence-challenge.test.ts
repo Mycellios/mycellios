@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createCoordinatorDeploymentCanaryEvidence,
 } from "../src/contracts/deployment-canary.js";
@@ -321,9 +321,70 @@ describe("coordinator evidence authority", () => {
         workerId: worker.id,
         sessionId: "session-test",
       })]);
+    expect(current.worker.capabilities.distributedExecutor?.engineProfiles?.[0]?.exactness).toBeUndefined();
+
+    // A llama.cpp stage runs on Vulkan beside the CUDA Torch runtime; its
+    // profile is accepted only with the exactness of the challenged backend.
+    const llamaRequest = {
+      ...engineRequest,
+      probeKind: "llama-cpp-gguf-v1",
+      backend: "vulkan",
+      runtimeAbi: "llama.cpp-b12613-win-vulkan-x64",
+      quantization: "Q4_K_M",
+      gguf: {
+        artifactUrl: "https://huggingface.co/org/model-GGUF/resolve/0123/model-q4_k_m.gguf",
+        artifactSha256: "8".repeat(64),
+        artifactSizeBytes: 1_055_609_536,
+        tensorManifestUrl: "https://models.example/model-q4_k_m.tensors.json",
+        tensorManifestId: "9".repeat(64),
+        modelSource: "hf://org/model",
+      },
+    } satisfies EngineRuntimeChallengeRequest;
+    current.plans = [{ ...current.plans[0]!, request: llamaRequest }];
+    const exactness = {
+      runtimeAbi: "llama.cpp-b12613-win-vulkan-x64", backend: "vulkan", exactMicroBatchSizes: [1], exactSpeculation: false,
+    };
+    const outcomes: unknown[] = [];
+    // A rejected challenge holds the next one back; let an hour pass each time.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    for (const reported of [undefined, { ...exactness, backend: "cpu" }, exactness]) {
+      vi.setSystemTime(Date.now() + 3_600_000);
+      const id = await hub.startEngineRuntimeProfileChallenge(worker.id, llamaRequest);
+      expect(id).toMatch(/^challenge-/);
+      const challenge = socket.sent.filter(
+        (message) => message.type === "evidence.challenge"
+          && (message.payload as { challengeId?: string }).challengeId === id,
+      )[0]!.payload as Record<string, unknown>;
+      expect(challenge.gguf).toEqual(llamaRequest.gguf);
+      await deliver(hub, state, "evidence.engine-runtime.complete", {
+        ...binding(challenge),
+        measurement: { ...lastMeasurement(socket), measuredAt: new Date().toISOString(), ...(reported ? { exactness: reported } : {}) },
+      });
+      outcomes.push(current.worker.capabilities.distributedExecutor?.engineProfiles
+        ?.find((profile) => profile.backend === "vulkan")?.exactness);
+    }
+    vi.useRealTimers();
+    expect(outcomes).toEqual([undefined, undefined, exactness]);
     (await hub.close());
   });
 });
+
+/** The engine measurement delivered last in the test above, reused for llama.cpp. */
+function lastMeasurement(_socket: unknown) {
+  return {
+    samples: 21,
+    confidenceHalfWidthPct: 8,
+    capacity: {
+      contextTokens: 8_192, maxLayerCount: 16, kvBytesPerToken: 32_768,
+      maxKvTokens: 16_384, usableMemoryBytes: 16 * 1024 * 1024 * 1024,
+    },
+    costs: {
+      decodeMsPerTokenP50: 4, decodeMsPerTokenP95: 5, prefillMsPerTokenP50: 0.2, prefillMsPerTokenP95: 0.3,
+      verifyMsPerTokenP50: 3, verifyMsPerTokenP95: 4, decodeScale: 0.5, prefillScale: 0.5,
+    },
+    features: { fastKernel: true, graphMode: "available", roles: ["head", "middle", "tail"] },
+  };
+}
 
 function buildIdentity(seed: string): NonNullable<WorkerCapabilities["buildIdentity"]> {
   return {

@@ -70,8 +70,7 @@ import {
   type RuntimePerformanceProfile,
 } from "../performance/runtime-profile.js";
 import {
-  engineRuntimeMeasurementSchema,
-  type EngineRuntimeMeasurement,
+  engineRuntimeExactnessMatches, engineRuntimeMeasurementSchema, type EngineRuntimeMeasurement,
 } from "../contracts/engine-runtime-profile.js";
 import {
   evidenceChallengeSchema,
@@ -1972,6 +1971,7 @@ export class WorkerAgent {
       || challenge.requiredRoles.some((role) => !measurement.features.roles.includes(role))
       || Date.parse(measurement.measuredAt) < Date.parse(challenge.issuedAt) - 5_000
       || Date.parse(measurement.measuredAt) > Date.parse(challenge.expiresAt)
+      || !engineRuntimeExactnessMatches(challenge, measurement)
     ) throw new Error("engine_runtime_measurement_does_not_match_challenge");
     return measurement;
   }

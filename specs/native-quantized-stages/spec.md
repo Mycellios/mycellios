@@ -222,7 +222,8 @@ The coordinator has the pieces of an engine runtime challenge: a scheduler
 that renews each profile an hour before its 24-hour expiry
 (`src/coordinator/engine-runtime-profile-scheduler.ts`), a worker handler and
 coordinator-side sealing (`engine-profile-authority.ts`). As of 2026-11-22 it
-is not connected in production for any engine:
+was not connected in production for any engine (the items below are fixed
+by the numbered steps that follow):
 
 - `buildEngineRuntimeActivationPlans` is never called outside tests, so no
   challenge is ever issued. With an activation authority configured, every
@@ -255,9 +256,28 @@ fall back.
 What remains before selection is automatic, in order:
 
 1. The contract admits a `llama-cpp-gguf-v1` probe kind on `cpu` and `vulkan`
-   and seals the exactness block. The coordinator builds the challenge from the
-   package identity instead of Qwen3 shape fields.
+   and seals the exactness block. Done: the challenge carries the authority's
+   GGUF (`gguf`: artifact, tensor manifest and the route's model source), and
+   the measurement and sealed profile carry `exactness` (runtime ABI, backend,
+   exact micro-batch sizes, exact speculation). The worker and the hub accept
+   a llama.cpp measurement only with the exactness of the challenged backend
+   and build, and reject exactness on other probe kinds. With a
+   `llama-cpp-gguf-v1` authority, which needs a `llama-cpp` artifact, a
+   route's plans bind to its GGUF source instead of a Hub snapshot; a node
+   with a GPU is challenged on Vulkan when a Vulkan target is certified and
+   otherwise on the CPU, whose certification class is `cpu`. The profile's
+   backend may differ from the Torch runtime evidence of the same node.
 2. Both worker kinds wire the probe, and nodes report Vulkan availability.
+   Done: the headless and native (desktop) nodes answer llama.cpp challenges
+   with `src/worker/llama-cpp-engine-probe.ts`: it installs the pinned build,
+   builds the challenged range from the GGUF into the cache the route uses,
+   and runs `llama_cpp_profile`. Vulkan is detected from the devices ggml
+   loads, not assumed: the profile reports the backend the stage really ran
+   on and the GPUs ggml found, so a node without a working Vulkan driver fails
+   a Vulkan challenge instead of publishing a CPU measurement. On the
+   development PC ggml listed the Radeon 890M as an integrated Vulkan GPU; a
+   12-block SmolLM2 stage reported `vulkan` with exact size 1, and `cpu` with
+   exact sizes 1-7.
 3. The coordinator builds activation plans after each automatic distribution,
    which is the missing link for every engine family. Done: after a route
    commits, `recordEngineRuntimeActivationPlans` stores one challenge per stage

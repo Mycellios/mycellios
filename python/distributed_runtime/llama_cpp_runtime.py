@@ -217,6 +217,13 @@ class LlamaCppLibrary:
         library.llama_backend_init()
         self.ggml = ggml
         self.api = library
+        self.gpu_devices = _gpu_devices(directory, build, ggml)
+
+    @property
+    def offload_backend(self) -> str:
+        """The backend offloaded blocks run on: the first GPU's, or the CPU."""
+
+        return self.gpu_devices[0][0] if self.gpu_devices else "cpu"
 
     @classmethod
     def load(cls, directory: str | os.PathLike[str], build: PinnedLlamaCppBuild) -> "LlamaCppLibrary":
@@ -229,6 +236,40 @@ class LlamaCppLibrary:
         library = cls(root, build)
         cls._loaded[build.runtime_abi] = library
         return library
+
+
+_GGML_DEVICE_GPU_TYPES = (1, 2)  # GGML_BACKEND_DEVICE_TYPE_GPU, _IGPU (integrated)
+
+
+def _gpu_devices(directory: Path, build: PinnedLlamaCppBuild, ggml: C.CDLL) -> tuple[tuple[str, str], ...]:
+    """(backend, description) of every GPU the loaded ggml backends found.
+
+    ggml lists the devices of every backend it loaded from the pinned
+    directory; a node without a usable Vulkan driver simply lists none.
+    """
+
+    base = C.CDLL(str(directory / build.ggml_name.replace("ggml", "ggml-base", 1)))
+    ggml.ggml_backend_dev_count.restype = C.c_size_t
+    ggml.ggml_backend_dev_get.restype = C.c_void_p
+    ggml.ggml_backend_dev_get.argtypes = [C.c_size_t]
+    for name, restype in (
+        ("ggml_backend_dev_type", C.c_int),
+        ("ggml_backend_dev_description", C.c_char_p),
+        ("ggml_backend_dev_backend_reg", C.c_void_p),
+    ):
+        getattr(base, name).restype = restype
+        getattr(base, name).argtypes = [C.c_void_p]
+    base.ggml_backend_reg_name.restype = C.c_char_p
+    base.ggml_backend_reg_name.argtypes = [C.c_void_p]
+    devices = []
+    for index in range(ggml.ggml_backend_dev_count()):
+        device = ggml.ggml_backend_dev_get(index)
+        if base.ggml_backend_dev_type(device) not in _GGML_DEVICE_GPU_TYPES:
+            continue
+        backend = (base.ggml_backend_reg_name(base.ggml_backend_dev_backend_reg(device)) or b"").decode("utf-8", "replace")
+        description = (base.ggml_backend_dev_description(device) or b"").decode("utf-8", "replace").strip()
+        devices.append((backend.lower(), description))
+    return tuple(devices)
 
 
 # --- Stage over one layer-range package -------------------------------------
