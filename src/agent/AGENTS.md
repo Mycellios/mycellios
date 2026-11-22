@@ -908,8 +908,10 @@
   Keep command/workflow/delegation tools in the canonical built-in registry so
   saved tool blocks remain enforceable. Pi shell parameters retain the declared
   bounded timeout, including its description and validation.
-  Pi concurrency is admitted atomically per Bot and serialized per thread; native
-  engines remain single-turn. Private Pi tasks reserve the existing computer lease
+  Pi concurrency is admitted atomically per Bot and serialized per thread; a Pi
+  Mico's main chat is its own lane outside its 1-4 conversation slots (claimMicoRun,
+  delegation capacity), so it never waits behind side work. Native engines remain
+  single-turn in total, main chat included. Private Pi tasks reserve the existing computer lease
   before computer/file/command tools, never share it between runs. Workflows reuse
   existing Micos, owner/Space RPCs and the existing reconciler, freeze graph versions
   and persist private step runs. Stop commits cancellation and process teardown
@@ -2020,13 +2022,27 @@
   chat after completion at an idle boundary, and invalidates old checkpoints.
   Keep history, queued work and manual-reset guards; never create a paid follow-up
   merely to rotate context. Plan/co-author guidance grants no action permission.
-  Explicit queue entries use steering origin queued_user and are drained FIFO;
-  the running turn must not claim them as steering or release a human takeover.
+  Explicit queue entries use steering origin queued_user and are drained one per
+  turn in queue order (steering_messages.position: the message seq, reordered among
+  the queue's own positions; Send now goes first); a held first entry (edit) stops the
+  drain until Save/Cancel and never expires; a usage-limit or sign-in failure leaves the
+  queue waiting. The running turn must not claim them as steering or release a human
+  takeover; only Steer now (refused during routine/own work) turns one into owner
+  steering. Queue controls (specs/mico-message-queue): Steer now, Send now (stops only
+  the current turn), Edit (sealed editDraft, takeover keeps it), Delete only while
+  queued (removes the message, thread.message.deleted), stale-checked reorder and Move
+  to a new conversation (one transaction, S1 title, bot targets only). Every action takes
+  the thread lock. Verify queue-panel, queued-message, events, steering-delivery and
+  runtime steering tests and `node --import tsx scripts/verify-message-queue-db.ts`.
+  Steered messages reach the model behind STEERING_FRAMING_NOTE (the chat keeps only
+  the person's words): Pi between steps, native engines after their next tool result;
+  a running shell yields to the background (never killed) while one waits. A turn
+  waiting for its own background commands shows a timed "Waiting for background work".
   Queue reads use the authenticated owned thread resolver, including side threads.
   Micos may override the device's busy-message default. A null override inherits
   the device setting. Keep group conversations and the per-message choice independent.
   Keep delivery choices inside the composer's Add menu, not in a persistent row
-  beneath the field. Show the pending list only when saved queue entries exist;
+  beneath the field. Show the queue panel only when saved queue entries exist;
   Ask aside shares the Add menu and never sends or steers the main task.
   Repeat automatically opens an unsaved routine from the original user request;
   it never schedules an assistant result or starts a routine before Save.

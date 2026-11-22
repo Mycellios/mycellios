@@ -243,6 +243,7 @@ import {
   adoptNewConversation, closeOtherTabs, forgetNewConversationRequest, isClosedConversation, NEW_CONVERSATION_TAB,
   newConversationRequest, openTab, updateConversationTabs, useConversationRows, useConversationTabs, writeConversationRows,
 } from "../lib/thread-tabs";
+import { openMovedConversation } from "../lib/moved-conversation";
 import { ConversationsPane, waitingConversations } from "../components/ConversationsPane";
 import { SideConversationView } from "../components/SideConversationView";
 import { MirroredRequests } from "../components/MirroredRequests";
@@ -5021,6 +5022,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               draftKey={(floatingChat ? "floating:" : "") + (inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : newConversation ? `bot:${active?.id}:new-conversation` : `bot:${active?.id}`)}
               placeholder={composerPlaceholder}
               newConversation={newConversation}
+              onQueuedMessageMoved={conversationScope ? (threadId, title) => openMovedConversation(conversationScope, threadId, title) : undefined}
               enterToSend={enterToSend}
               onImportAgent={(agent) => {
                 setDroppedAgent(agent);

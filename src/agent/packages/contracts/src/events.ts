@@ -18,6 +18,8 @@ export const ProductEventType = z.enum([
   "thread.message.created",
   "thread.cleared",
   "thread.message.updated",
+  /** A waiting message removed from the queue (deleted, or moved to a new conversation). */
+  "thread.message.deleted",
   "thread.message.reaction",
   "thread.progress",
   "thread.artifact",
@@ -244,6 +246,10 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     text: z.string(),
     /** Provider-generated tool status rather than assistant-authored narration. */
     activity: z.literal(true).optional(),
+    /** The turn waits for its own background work (a command still running) to finish. */
+    waiting: z.literal("background").optional(),
+    /** When that wait began (ISO time), for the elapsed timer. */
+    since: z.string().max(40).optional(),
     pendingToolNames: z.array(z.string()).optional(),
     pendingToolLabels: z.array(z.string().max(500)).max(32).optional(),
   }),

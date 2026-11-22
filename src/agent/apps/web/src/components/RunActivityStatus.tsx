@@ -185,6 +185,10 @@ export function RunActivityStatus({
   const latestTool = latestSteps?.kind === "steps" ? latestSteps.steps.at(-1)?.label : undefined;
   const tail = liveMessage?.blocks.at(-1);
   const scopedActivity = tail?.kind === "progress" && tail.activity ? tail.text : undefined;
+  // The turn waits for its own background work (a command still running): a timed row.
+  const backgroundSince = tail?.kind === "progress" && tail.waiting === "background"
+    ? Date.parse(tail.since ?? liveMessage?.createdAt ?? "") : NaN;
+  const backgroundWait = Number.isFinite(backgroundSince) || (tail?.kind === "progress" && tail.waiting === "background");
   const legacyActivity = messages.some(message => message.id.startsWith("progress:")) ? undefined : activity;
   const latestActivity = scopedActivity || latestTool || legacyActivity;
   const showActivity = latestActivity && ["running", "quiet", "unknown", "recovering"].includes(health.state);
@@ -243,6 +247,7 @@ export function RunActivityStatus({
     : "";
   const primaryLabel = liveUpdatesStopped
     ? t`Live updates stopped. The task was not cancelled.`
+    : backgroundWait && (health.state === "running" || health.state === "quiet") ? t`Waiting for background work…`
     : health.state === "quiet" ? t`Waiting for an activity update…`
     : health.state === "running" && specificNow ? specificNow
     : health.state === "running" && settledTool?.outcome === "paused" ? t`A tool is waiting for input`
@@ -250,7 +255,10 @@ export function RunActivityStatus({
   const status = liveUpdatesStopped
     ? <span role="alert" className="break-words text-destructive">{primaryLabel}</span>
     : <span role="status" className="break-words text-muted-foreground">{primaryLabel}</span>;
-  const elapsed = health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{duration(health.elapsedMs)}</span> : null;
+  const backgroundElapsed = backgroundWait && Number.isFinite(backgroundSince) ? Math.max(0, serverNow - backgroundSince) : null;
+  const elapsed = backgroundElapsed !== null
+    ? <span aria-live="off" className="shrink-0 text-xs tabular-nums" data-testid="background-wait-elapsed">{duration(backgroundElapsed)}</span>
+    : health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{duration(health.elapsedMs)}</span> : null;
   const hasDetails = Boolean(visibleSteps.length || showActivity);
   const hasExecutionDetails = Boolean(run.modelId || run.modelProvider || (cost?.runId === run.id));
   const legacyCommand = showActivity && !toolEvents.length && /^running:/i.test(latestActivity)
@@ -259,7 +267,7 @@ export function RunActivityStatus({
     toolEvents.some(tool => tool.command || tool.detail || tool.output || tool.error || tool.cwd || tool.name === "shell");
   const details = (
     <div className="mt-1 min-w-0 max-w-prose space-y-2 text-xs">
-      {elapsed ? <div className="text-muted-foreground">{elapsed}</div> : null}
+      {elapsed && backgroundElapsed === null ? <div className="text-muted-foreground">{elapsed}</div> : null}
       {visibleSteps.length ? <ol aria-label={t`Task activity`} className="space-y-1.5 border-s border-border py-1 ps-3">
         {visibleSteps.map((step, index) => <li key={`${index}:${step.label}`} className="min-w-0" aria-current={index === visibleSteps.length - 1 ? "step" : undefined}>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -284,7 +292,7 @@ export function RunActivityStatus({
       {hasDetails ? <Sheet key={run.id}>
         <SheetTrigger className="flex min-h-12 w-full min-w-0 items-center gap-2 rounded-md px-1 text-start text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={t`Show task activity`}>
           <GroupAvatar members={bots} size={28} />
-          <span className="min-w-0 flex-1 line-clamp-2">{status}</span>
+          <span className="min-w-0 flex-1 line-clamp-2">{status}{backgroundElapsed !== null ? <> {elapsed}</> : null}</span>
           <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-muted-foreground rtl:rotate-180" />
         </SheetTrigger>
         <SheetContent side="bottom" showCloseButton={false} className="max-h-[80dvh] gap-2 overflow-y-auto overscroll-contain rounded-t-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] motion-reduce:transition-none">
@@ -309,10 +317,11 @@ export function RunActivityStatus({
         }}>
           <summary className="flex w-fit max-w-full cursor-pointer list-none items-baseline gap-2 rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden" aria-label={t`Show task activity`}>
             {status}
+            {backgroundElapsed !== null ? elapsed : null}
             <ChevronDown aria-hidden="true" size={14} className="shrink-0 self-center transition-transform group-open/activity:rotate-180 motion-reduce:transition-none" />
           </summary>
           {details}
-        </details> : <div className="flex items-baseline gap-2 py-1">{status}</div>}
+        </details> : <div className="flex items-baseline gap-2 py-1">{status}{backgroundElapsed !== null ? elapsed : null}</div>}
         {health.state === "blocked" ? <p className="text-xs">{t`No model has started. Configure a virtual computer to continue.`}</p> : null}
         {computerAction}
       </div>

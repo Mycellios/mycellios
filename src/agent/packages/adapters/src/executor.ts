@@ -6831,6 +6831,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     const output = commandOutput(snapshot, true);
                     if (output) publishRunning(output);
                   },
+                  // The person's waiting message moves the command to the background.
+                  ...(observer?.yieldSignal ? { yieldSignal: observer.yieldSignal } : {}),
                 },
               );
               if (desktopCommand && observed.completion) {
@@ -9120,6 +9122,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   runSecrets,
                 );
               },
+              // Read only: a message sent into this turn that it has not taken yet.
+              steeringPending: async () =>
+                Boolean(
+                  await deps.prisma.steeringMessage.findFirst({
+                    where: { runId, claimedAt: null },
+                    select: { id: true },
+                  }),
+                ),
               claimSteering: async (seenIds) => {
                 const steering = await deps.events.claimSteering({
                   threadId: thread.id,
@@ -9258,6 +9268,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 payload: {
                   text: redactSecrets(event.text, runSecrets),
                   ...(event.activity ? { activity: true } : {}),
+                  ...(event.waiting ? { waiting: event.waiting, since: new Date().toISOString() } : {}),
                 },
               });
             } else if (event.type === "ask") {

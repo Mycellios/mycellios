@@ -310,3 +310,12 @@ it("summarizes a write tool without exposing its path or input", () => {
   expect(node.querySelector("summary")?.textContent).not.toContain("/private");
   expect(node.querySelector("details")?.open).toBe(false);
 });
+it("shows a timed row while the turn waits for its own background work", () => {
+  const started = { ...run, startedAt: at(-1) };
+  mount(started, false, [{
+    id: "progress:run", threadId: "thread", seq: 4, role: "bot", runId: "run", botId: "bot", createdAt: at(-1),
+    blocks: [{ kind: "progress", text: "Waiting for background work…", activity: true, waiting: "background", since: new Date(now - 75_000).toISOString() }],
+  }]);
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Waiting for background work…");
+  expect(node.querySelector("[data-testid=background-wait-elapsed]")?.textContent).toMatch(/1/);
+});

@@ -34,6 +34,18 @@ import { restoreArchivedTaskOnSend } from "../task-inbox-conversations.js";
 import { withResponseLanguage } from "../response-language.js";
 import { retryThreadRun } from "../retry-thread-run.js";
 import { stopWorkForThread } from "../work-controls.js";
+import {
+  cancelQueuedMessageEdit,
+  deleteQueuedMessageNow,
+  editQueuedMessage,
+  messageQueueState,
+  moveQueuedMessageToConversation,
+  reorderQueuedMessages,
+  saveQueuedMessageDraftNow,
+  saveQueuedMessageEditNow,
+  sendQueuedMessageNow,
+  steerQueuedMessageNow,
+} from "../message-queue.js";
 import { assertTeachingSendAllowed } from "../taught-skills.js";
 import {
   isBackgroundRun,
@@ -77,6 +89,13 @@ const HANG_UP_PROMPT =
 
 export function threadsRoutes(ctx: RouterContext) {
   const { deps, authed, callsEnabled } = ctx;
+  /** Starting a queued message is a send: the same model and teaching checks apply. */
+  const assertQueueSendAllowed = async (target: Awaited<ReturnType<typeof resolveThreadTarget>>, actor: Parameters<typeof threadNeedsModel>[1]) => {
+    if ((target.kind !== "bot" || !target.bot.agentEngine || target.bot.agentEngine === "pi") &&
+      await threadNeedsModel(deps, actor, target.kind === "bot" ? target.bot : undefined))
+      throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });
+    if (target.kind === "bot") await assertTeachingSendAllowed(deps.prisma, actor.spaceId, target.botId);
+  };
   return {
     threads: {
       ...messagePinRoutes(ctx),
@@ -221,6 +240,56 @@ export function threadsRoutes(ctx: RouterContext) {
           messageId: row.message.id, createdAt: row.message.createdAt.toISOString(),
           text: (row.message.blocks as Array<{ kind: string; text?: string }>).filter(block => block.kind === "text").map(block => block.text ?? "").join("\n").slice(0, 1000),
         }));
+      }),
+      queueState: authed.threads.queueState.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return messageQueueState(deps.prisma, context.actor, target);
+      }),
+      queueSteer: authed.threads.queueSteer.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return steerQueuedMessageNow(deps, context.actor, target, input.messageId);
+      }),
+      queueSendNow: authed.threads.queueSendNow.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        await assertQueueSendAllowed(target, context.actor);
+        return sendQueuedMessageNow(
+          { ...deps, stopWork: (threadId) => stopWorkForThread(deps, context.actor, threadId) },
+          context.actor,
+          target,
+          input.messageId,
+        );
+      }),
+      queueDelete: authed.threads.queueDelete.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return deleteQueuedMessageNow(deps, context.actor, target, input);
+      }),
+      queueEdit: authed.threads.queueEdit.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return editQueuedMessage(deps, context.actor, target, input);
+      }),
+      queueEditDraft: authed.threads.queueEditDraft.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return saveQueuedMessageDraftNow(deps, context.actor, target, input);
+      }),
+      queueEditSave: authed.threads.queueEditSave.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return saveQueuedMessageEditNow(deps, context.actor, target, input);
+      }),
+      queueEditCancel: authed.threads.queueEditCancel.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return cancelQueuedMessageEdit(deps, context.actor, target, input);
+      }),
+      queueReorder: authed.threads.queueReorder.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return reorderQueuedMessages(deps, context.actor, target, input);
+      }),
+      queueMove: authed.threads.queueMove.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        await assertQueueSendAllowed(target, context.actor);
+        return moveQueuedMessageToConversation(deps, context.actor, target, {
+          messageId: input.messageId,
+          responseLocale: input.responseLocale ?? context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined,
+        });
       }),
       send: authed.threads.send.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);

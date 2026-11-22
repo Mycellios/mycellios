@@ -1263,6 +1263,15 @@ model SteeringMessage {
   thinkingLevel String?
   claimedAt DateTime?
   createdAt DateTime @default(now())
+  /// Order of a queued_user row in its conversation's queue (lowest first). New rows take the
+  /// message's seq; a reorder reuses the queue's own positions; Send now goes before the first.
+  position  Int?
+  /// An edit in progress: the editing client's hold id. A held first row stops the queue from
+  /// sending until the edit is saved or cancelled; a hold never expires on its own.
+  heldBy    String?
+  heldAt    DateTime?
+  /// The unsaved text of that edit (sealed with the Space key like message content).
+  editDraft String?
 
   @@unique([messageId, botId])
   @@index([botId, runId, createdAt])

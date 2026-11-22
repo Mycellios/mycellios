@@ -369,9 +369,12 @@ describe("tab keyboard, mouse and menu", () => {
     } finally {
       requestFrame.mockRestore();
     }
+    // Reordering must leave the rename field focused even if its focus callbacks arrive late.
     await act(() => { for (const frame of pendingFrames) frame(performance.now()); });
-    expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
-    await act(() => key(host.querySelector("input")!, { key: "Escape" }));
+    const titleInput = host.querySelector('input[aria-label="Conversation title"]');
+    expect(titleInput).not.toBeNull();
+    expect(document.activeElement).toBe(titleInput);
+    await act(() => key(titleInput!, { key: "Escape" }));
     await act(() => tabButton(host, "c").dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
     expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
     await act(() => key(host.querySelector("input")!, { key: "Escape" }));

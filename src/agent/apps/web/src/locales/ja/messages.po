@@ -7169,6 +7169,210 @@ msgstr "グループに送信"
 msgid "Send to {groupName}"
 msgstr "{groupName} に送信"
 
+#: src/pages/shell/queue-panel.tsx
+msgid "A routine is running now."
+msgstr "現在ルーティンが実行中です。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The Mico is working on its own task here."
+msgstr "Mico はここで自分のタスクに取り組んでいます。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The current turn is waiting for your answer."
+msgstr "現在のターンはあなたの回答を待っています。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Nothing is running here now."
+msgstr "現在ここでは何も実行されていません。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message already started or was removed."
+msgstr "このメッセージはすでに開始されたか、削除されました。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This message is being edited somewhere else."
+msgstr "このメッセージは別の場所で編集中です。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "This edit was closed somewhere else."
+msgstr "この編集は別の場所で閉じられました。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue changed meanwhile. It was refreshed; try again."
+msgstr "その間にキューが変わりました。更新したので、もう一度お試しください。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "A queued message needs text or a file."
+msgstr "キュー内のメッセージにはテキストかファイルが必要です。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Only a message you sent to this Mico alone can move to a new conversation."
+msgstr "新しい会話に移せるのは、この Mico だけに送ったメッセージのみです。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered: {reason}"
+msgstr "反映されていません: {reason}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Could not update the queue. Try again."
+msgstr "キューを更新できませんでした。もう一度お試しください。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message saved."
+msgstr "キューのメッセージを保存しました。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message deleted."
+msgstr "キューのメッセージを削除しました。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to position {position} of {total}."
+msgstr "{total} 件中 {position} 番目に移動しました。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Moved to a new conversation: {title}"
+msgstr "新しい会話に移動しました: {title}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting while the computer or the server restarts."
+msgstr "コンピューターまたはサーバーの再起動を待っています。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn reached a usage or credit limit. Send one now when you are ready."
+msgstr "一時停止中: 前回のターンが使用量またはクレジットの上限に達しました。準備ができたら今すぐ送信してください。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused: the last turn needs a sign-in or a working key. Fix it, then send one now."
+msgstr "一時停止中: 前回のターンにはサインインまたは有効なキーが必要です。解決してから今すぐ送信してください。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Paused while a message is being edited."
+msgstr "メッセージの編集中は一時停止しています。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "They go one at a time, after the current turn."
+msgstr "現在のターンの後に 1 件ずつ送信されます。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Messages waiting to send"
+msgstr "送信待ちのメッセージ"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Queued message {position} of {total}: {preview}"
+msgstr "キューのメッセージ {position}/{total}: {preview}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit queued message"
+msgstr "キューのメッセージを編集"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Being edited somewhere else"
+msgstr "別の場所で編集中"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Editing"
+msgstr "編集中"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Add it to the turn that is running now"
+msgstr "実行中のターンに追加する"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Added to the current turn."
+msgstr "現在のターンに追加しました。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Stop the current turn and send this message next"
+msgstr "現在のターンを止めて、このメッセージを次に送信する"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Sending this message now."
+msgstr "このメッセージを今すぐ送信しています。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Move to a new conversation"
+msgstr "新しい会話に移動"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "More actions for this message"
+msgstr "このメッセージのその他の操作"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Your edited text"
+msgstr "編集したテキスト"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Waiting to send"
+msgstr "送信待ち"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The queue waits until you save or cancel."
+msgstr "保存またはキャンセルするまでキューは待機します。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Not steered"
+msgstr "未反映"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Steer now"
+msgstr "今すぐ反映"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Send now"
+msgstr "今すぐ送信"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit here instead"
+msgstr "代わりにここで編集"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Use the up and down arrow keys to move a focused message in the queue."
+msgstr "上下の矢印キーで、フォーカス中のメッセージをキュー内で移動できます。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Delete queued message?"
+msgstr "キューのメッセージを削除しますか？"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "It is being edited somewhere else. Deleting it also discards that edit."
+msgstr "別の場所で編集中です。削除するとその編集も破棄されます。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Keep"
+msgstr "残す"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Edit not saved"
+msgstr "編集は保存されませんでした"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "The message started, was removed or was edited somewhere else before you saved. Your text is kept below."
+msgstr "保存する前に、メッセージが開始された、削除された、または別の場所で編集されました。テキストは下に残っています。"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "Put it in the message box"
+msgstr "メッセージ欄に入れる"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{count, plural, one {Waiting for a free slot: # conversation of this Mico is working.} other {Waiting for a free slot: # conversations of this Mico are working.}}"
+msgstr "{count, plural, other {空きを待っています: この Mico の会話が # 件進行中です。}}"
+
+#: src/pages/shell/queue-panel.tsx
+msgid "{files, plural, one {# file} other {# files}}"
+msgstr "{files, plural, other {# 件のファイル}}"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for background work…"
+msgstr "バックグラウンドの作業を待っています…"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "This runtime runs one task at a time, the main chat included."
+msgstr "このランタイムはメインチャットを含め、一度に 1 つのタスクだけを実行します。"
+
+#: src/components/MicoWorkMenu.tsx
+msgid "Extra tasks wait their turn. The main chat has its own place and never waits behind them."
+msgstr "それ以上のタスクは順番を待ちます。メインチャットには専用の枠があり、その後ろで待つことはありません。"
+
 #: src/pages/shell/message-hover-actions.tsx
 msgid "Branch in new conversation"
 msgstr "新しい会話に分岐"
