@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { RunActivityRow, RunStatus } from "@mycellios/contracts";
@@ -10,7 +11,6 @@ import {
   Label,
   NativeSelect,
   NativeSelectOption,
-  Spinner,
 } from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
@@ -111,9 +111,7 @@ export function ActivityList({
       ) : null}
 
       {loading && !hasAnyRuns ? (
-        <p className="px-2.5 py-2 text-[13px] text-muted-foreground/80">
-          <Spinner aria-label={t`Loading activity…`} />
-        </p>
+        <LoadingSkeleton label={t`Loading activity…`} className="px-2.5 py-2" />
       ) : !error && filtersOn && hasAnyRuns && !hasVisibleRuns ? (
         <p className="px-2.5 py-2 text-[13px] text-muted-foreground/80" role="status">
           <Trans>No runs match these filters.</Trans>

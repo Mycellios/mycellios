@@ -319,16 +319,31 @@ describe("tab keyboard, mouse and menu", () => {
 
   it("closes with Delete, Backspace and a middle click, renames with F2 and double click, and moves with Alt+Shift+arrows", async () => {
     const { host, select } = await setup("keys");
-    await act(() => key(tabButton(host, "a"), { key: "ArrowRight", altKey: true, shiftKey: true }));
-    expect(readConversationTabs("keys").ids).toEqual(["b", "a", "c"]);
-    await act(() => key(tabButton(host, "a"), { key: "ArrowLeft", altKey: true, shiftKey: true }));
-    expect(readConversationTabs("keys").ids).toEqual(["a", "b", "c"]);
-    // A move gives focus back to the moved tab on the next frame. Let it land first, or it can
-    // take focus from a rename field opened below and close that rename.
-    await act(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
-    await act(() => key(tabButton(host, "b"), { key: "F2" }));
-    expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
-    await act(() => key(host.querySelector("input")!, { key: "Escape" }));
+    const pendingFrames: FrameRequestCallback[] = [];
+    const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => pendingFrames.push(callback));
+    try {
+      await act(() => {
+        const tab = tabButton(host, "a");
+        tab.focus();
+        key(tab, { key: "ArrowRight", altKey: true, shiftKey: true });
+      });
+      expect(readConversationTabs("keys").ids).toEqual(["b", "a", "c"]);
+      await act(() => {
+        const tab = tabButton(host, "a");
+        tab.focus();
+        key(tab, { key: "ArrowLeft", altKey: true, shiftKey: true });
+      });
+      expect(readConversationTabs("keys").ids).toEqual(["a", "b", "c"]);
+      await act(() => key(tabButton(host, "b"), { key: "F2" }));
+    } finally {
+      requestFrame.mockRestore();
+    }
+    // Reordering must leave the rename field focused even if its focus callbacks arrive late.
+    await act(() => { for (const frame of pendingFrames) frame(performance.now()); });
+    const titleInput = host.querySelector('input[aria-label="Conversation title"]');
+    expect(titleInput).not.toBeNull();
+    expect(document.activeElement).toBe(titleInput);
+    await act(() => key(titleInput!, { key: "Escape" }));
     await act(() => tabButton(host, "c").dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
     expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
     await act(() => key(host.querySelector("input")!, { key: "Escape" }));

@@ -1,8 +1,9 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { routineThreadPath } from "../../lib/routine-thread-path";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Routine, RoutineRun, ThreadMessage } from "@mycellios/contracts";
 import { isOneShotRoutineCrons } from "@mycellios/core";
-import { BotAvatar, Button, NativeSelect, NativeSelectOption, Spinner } from "@mycellios/ui-web";
+import { BotAvatar, Button, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -114,7 +115,7 @@ export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onE
     </header>
     {list.error ? <div role="alert" className="flex items-center gap-3 border-b border-border p-3 text-sm text-destructive">{errorText(list.error)}<Button size="xs" variant="outline" onClick={() => void list.refetch()}>{t`Retry`}</Button></div> : null}
     {selectedState?.error ? <p role="alert" className="border-b border-border px-4 py-2 text-xs text-destructive">{selectedState.error}</p> : null}
-    {list.isPending ? <div className="grid flex-1 place-items-center"><Spinner aria-label={t`Loading…`} /></div> : !selected ? (list.error ? <div className="grid flex-1 place-items-center p-6"><p className="text-sm text-muted-foreground">{t`Routines unavailable`}</p></div> : <RoutineEmptyState bot={bot} onCreate={() => onEdit()} />) : <>
+    {list.isPending ? <LoadingSkeleton className="min-h-0 flex-1 p-4" /> : !selected ? (list.error ? <div className="grid flex-1 place-items-center p-6"><p className="text-sm text-muted-foreground">{t`Routines unavailable`}</p></div> : <RoutineEmptyState bot={bot} onCreate={() => onEdit()} />) : <>
       <div className="app-no-drag flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <NativeSelect aria-label={t`Select routine`} value={selected.id} onChange={event => onSelect(event.target.value)} className="max-w-full text-xs">
           {routines.map(routine => <NativeSelectOption key={routine.id} value={routine.id}>{routine.name}</NativeSelectOption>)}
