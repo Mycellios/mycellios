@@ -144,33 +144,154 @@ computed alone or inside a wave. The measurements above give a concrete rule:
 Until this is settled, a Vulkan stage must be reported as approximate under
 speculation, as DirectML fp16 is today.
 
-### Distribution
-
-llama.cpp is MIT licensed. The runtime pins exact release artifacts per
-platform by hash, as the wheel locks do, and records them in `THIRD_PARTY.md`.
-`llama.h` struct layouts change between builds, so the binding is generated for
-the pinned build and checks struct sizes at load.
-
 ### Planner
 
 The cost model needs measured per-block costs for quantized stages, and stage
 memory must come from the GGUF tensor sizes plus the KV for the planned
-context. No planner change is part of the first phase.
+context. The next section describes how those measurements are produced.
+
+## Operation at network scale
+
+The network is meant to reach thousands of devices. Nothing in this design may
+need a person to configure, enable or repair an individual node. Every step
+below is driven by the coordinator from current measurements, and mostly
+reuses mechanisms that already exist.
+
+### An engine family, not a switch
+
+The native executor is a new engine family in the existing fail-closed seam
+(`src/contracts/engine-family.ts`, `src/distribution/engine-family-registry.ts`),
+next to `qwen3-dense`. Each descriptor names one model revision and lists its
+targets: platform, architecture, backend (`cpu`, `vulkan`, `cuda`, ...), a
+`runtimeAbi` naming the exact llama.cpp build and variant, and the accepted
+quantizations (for example `Q4_K_M`). A family is usable only while a current
+`EngineCertification` exists. Revoking it removes the family from every future
+plan at once; nodes then serve the families they still qualify for.
+
+The existing Torch families stay. A node may qualify for both, and the planner
+chooses per route from measured costs.
+
+### Binaries
+
+Each target's llama.cpp release artifact is published as a pinned,
+content-addressed runtime component (`scripts/publish-runtime-components.mjs`).
+A node downloads only the variants its hardware can run and verifies the hash
+before loading. The CPU variant loads its instruction-set kernels at runtime
+(the release ships one library per CPU generation), so one artifact covers every
+x64 CPU. The binding checks `llama.h` struct sizes against the pinned build at
+load and refuses to start on a mismatch.
+
+Initial targets: Windows and Linux x64 with `cpu` and `vulkan`, Linux x64 with
+`cuda`. Apple GPUs are an open question, because the backend enum has `mps`
+but no Metal entry.
+
+### Per-node qualification
+
+The coordinator already issues engine runtime challenges and renews each
+profile an hour before its 24-hour expiry
+(`src/coordinator/engine-runtime-profile-scheduler.ts`). For this family the
+worker answers a challenge by:
+
+1. loading the pinned binary and the stage package named in the challenge;
+2. running the deployment canary;
+3. checking the certification's parity evidence for its backend class;
+4. measuring its batch classes (finding 6) and whether a two-block slice is
+   row-independent (finding 7);
+5. timing decode, prefill and verify waves.
+
+The result is the existing sealed `EngineRuntimeProfile`. It needs one
+addition: the micro-batch sizes that are exact on that node, or none. Without
+them the route may still run, but its speculative output is reported as
+approximate.
+
+A node that fails any step publishes no profile for this family. It keeps
+serving the families it does qualify for, and the failure reason reaches the
+coordinator's activation incident. No operator action is needed for a node to
+fall back.
+
+### Planning
+
+The planner rules do not change; their inputs become measured:
+
+- One node when the model fits (`minimumNodes: 1` is accepted since #440).
+  Quantized weights are about a quarter of fp16, so most models up to about 8B
+  parameters fit one consumer GPU and run as replicas.
+- Otherwise the fewest large stages, using each node's profile costs and
+  capacity.
+- One engine family and one quantization per route. Stages exchange hidden
+  states, and those must come from the same weights.
+- Speculation is enabled on a route only when every stage reports an exact
+  micro-batch class covering the wave, or the request accepts approximate
+  output.
+
+### Stage packages
+
+At scale, packages must be cheap to build and reusable across nodes:
+
+- Cut points come from a small fixed set per model, for example every eighth
+  of the blocks. Two nodes holding the same range then hold the same package.
+- A node builds its own package from the published model GGUF.
+  `native_gguf.py` already copies only the selected raw tensors, so a node can
+  fetch just those byte ranges instead of the whole model.
+- The package identity is its content hash, as today. The coordinator can name
+  a package in a challenge without having built it.
+- Packages are cached under the owner's disk limit and evicted least recently
+  used.
+
+### Loading on demand
+
+`specs/on-demand-replica-placement/spec.md` already loads and releases native
+replicas from demand, with minimum residency and no thrashing. It is configured
+per replica today. Serving thousands of nodes needs the same ledger and planner
+driven by engine profiles instead of a configured list. That generalization is
+a separate change, and this spec depends on it for automatic multi-model
+placement.
+
+### Verification and settlement
+
+Text canaries today prove that a deployment completed requests at a measured
+speed, bound to the worker, session, activation and model digest
+(`src/contracts/deployment-canary.ts`). They do not compare output content, so
+a quantized artifact fits as long as the canary binds to its digest.
+
+Any check that compares output content must not require bits to match across
+backends. CPU, Vulkan and CUDA builds differ, and so do batch classes on one
+backend (about 1.0-1.5 in the logits, finding 6). Such a check either:
+
+- recomputes on the same backend, `runtimeAbi` and micro-batch class; or
+- compares tokens only where the reference's top-two margin exceeds a stated
+  threshold, and treats the rest as unverifiable rather than wrong.
+
+This applies to certification parity evidence and to any future spot-check of
+contributor work.
+
+### Rollout and reversal
+
+- A family is first certified for one target and a capped number of nodes.
+  The cap is raised as routes complete without fallback.
+- The signals to watch are challenge failures by reason and target, routes
+  falling back to Torch, the fraction of requests served unsplit, and
+  per-family token rate.
+- Revoking a certification reverses everything. Plans stop using the family
+  immediately, and running routes drain normally.
 
 ## Phases
 
-1. **Binding and runner, one host, CPU.** Explicit opt-in flag. Exit: a
-   two-stage loopback route answers with the same tokens as the complete GGUF
-   on the existing copy and chat corpora, with and without speculation.
-2. **Exact speculation policy.** Batch-class self-test and micro-batching.
-   Exit: speculative and non-speculative answers are identical on CPU; the
-   Vulkan tail is either exact or reported as approximate.
-3. **Vulkan and packages.** Package writer with the middle-stage vocabulary;
-   pinned artifacts. Exit: the same route on a GPU.
+1. **Runner and qualification on CPU.** Binding to a pinned build, the stage
+   runner, the challenge handler and the batch-class self-test, behind the
+   engine-family seam (no manual flag). Exit: on one host, a two-stage route
+   answers with the same tokens as the complete GGUF on the copy and chat
+   corpora, with and without speculation, and a node with a mismatched binary
+   or a failing self-test publishes no profile.
+2. **Packages.** Tensor-range package builder with the fixed cut points and the
+   middle-stage vocabulary, cache and eviction. Exit: two nodes build
+   byte-identical packages for the same range.
+3. **Vulkan.** Pinned GPU artifacts; settle finding 7 or report Vulkan routes as
+   approximate under speculation.
 4. **Two physical computers.** Exit: a measurement over native transport,
    recorded in `docs/STATUS_AND_EVIDENCE.md`.
-5. **Launcher and planner.** Certified engine profile, cost profile, then
-   retire torch-directml.
+5. **Network rollout.** Certification for a capped set of nodes, the
+   generalized on-demand placement, then retiring torch-directml.
 
 ## Open questions
 
@@ -183,3 +304,6 @@ context. No planner change is part of the first phase.
 - Sampling needs the logits, not only the greedy token. They are available
   from the tail, but the lossless sampling path is not prototyped.
 - Context size and KV precision per stage.
+- How Apple GPUs are named in the backend enum (`mps` or a new `metal`).
+- Whether a route may mix backends when speculation is off.
+- The margin threshold for content checks across backends.
