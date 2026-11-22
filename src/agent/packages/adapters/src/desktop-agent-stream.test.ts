@@ -89,3 +89,23 @@ it("does not invent a disconnection when an upstream rejection has no known caus
   expect(parseDesktopDiagnostic(error.message)).toEqual({code:"relay_stream_failure",phase:"callback",stage:"dispatch"});
   expect(error.message).not.toContain("private response");
 });
+it("waits for the PC when a start never reached it, but keeps a received start uncertain", async () => {
+  const run = async (response: Response) => {
+    for await (const _ of desktopAgentFrames(response, new AbortController().signal, "run")) { /* drain */ }
+  };
+  const rejection = (promise: Promise<unknown>) => promise.then(() => { throw new Error("Expected the stream to reject"); }, (e: unknown) => { if (!(e instanceof Error)) throw e; return e; });
+  const frame = (dispatched: boolean, error = "Desktop disconnected. Check results before retrying.") =>
+    new Response(JSON.stringify({ error, code: desktopLegacyFailureCode(error), dispatched }) + "\n", { headers: { "x-mycellios-desktop-operation": id } });
+  await expect(run(frame(false))).rejects.toMatchObject({ name: "ComputerUpdatingError", dispatched: false });
+  await expect(run(frame(false, "Desktop relay restarted. Check results before retrying."))).rejects.toMatchObject({ name: "ComputerUpdatingError", dispatched: false });
+  await expect(run(new Response(null, { status: 409, headers: { "x-mycellios-desktop-error": "desktop_disconnected" } })))
+    .rejects.toMatchObject({ name: "ComputerUpdatingError", dispatched: false });
+  for (const response of [frame(true), frame(false, "Local computer access was revoked.")]) {
+    const error = await rejection(run(response));
+    expect(error.name).not.toBe("ComputerUpdatingError");
+    expect(parseDesktopDiagnostic(error.message)?.phase).toBe("run");
+  }
+  // Callbacks belong to a start the PC already has; they never become a restart.
+  const callback = await rejection(collect(frame(false)));
+  expect(parseDesktopDiagnostic(callback.message)?.code).toBe("desktop_disconnected");
+});

@@ -156,6 +156,30 @@ export class DesktopRelayClient {
       /* API lease expires without another poll */
     }
   }
+  /**
+   * Stops and tells the server this PC is going offline now, so new messages
+   * are not handed to a poll that will never come. Consent stays; a failed or
+   * refused notice is ignored and the server's presence lease still expires.
+   */
+  async release() {
+    const online = !this.stopped && this.lastContact > 0;
+    const deviceId = this.deviceId;
+    this.stop();
+    if (!online) return;
+    try {
+      const response = await this.options.fetch(`${this.options.base}/api/desktop-relay/release`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", "x-mycellios-desktop": "1" },
+        body: JSON.stringify({ deviceId }),
+        redirect: "error",
+        signal: AbortSignal.timeout(2_000),
+      });
+      await response.body?.cancel();
+    } catch {
+      /* the presence lease expires on the server */
+    }
+  }
   connected(botId: string) {
     return !this.stopped && this.grants.has(botId) &&
       (this.options.now ?? Date.now)() - this.lastContact < 40_000;

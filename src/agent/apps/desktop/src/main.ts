@@ -227,7 +227,9 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
         await Promise.all([accountComputer?.beginUpdate(), cloudComputer?.beginUpdate()]);
         await hostComputer?.prepareUpdate();
         accountComputer?.stop();
-        cloudComputer?.stop();
+        // Tell the server now that this PC is going away, so new messages are not
+        // handed to it during the install; the restored generation reconnects after.
+        await Promise.allSettled([accountComputer?.released(), cloudComputer?.release()]);
         hostComputer?.activate(false);
         if (macosSelfUpdate) await launchMacosUpdate({ profile, bundle: macosSelfUpdate, dmg: file, release, oldPid: process.pid });
         else await launchManualUpdate({ profile, executable: process.execPath,
@@ -2502,6 +2504,8 @@ app.on("window-all-closed", () => {
 });
 
 let localShutdownComplete = false;
+let relayReleased: Promise<unknown> | undefined;
+let relayReleaseDone = false;
 let desktopDiagnostics: DesktopDiagnostics | undefined;
 let diagnosticsShutdown: Promise<void> | undefined;
 let diagnosticsClosed = false;
@@ -2518,7 +2522,7 @@ app.on("before-quit", (event) => {
   appBehavior?.dispose();
   desktopCompanions?.dispose();
   floatingChats?.clear();
-  cloudComputer?.stop();
+  relayReleased = Promise.allSettled([accountComputer?.released(), cloudComputer?.release()]);
   quitting = true;
   clearTimeout(warmWindowTimer);
   // Containers keep running; only an in-flight pull/up is cut short.
@@ -2527,6 +2531,13 @@ app.on("before-quit", (event) => {
   localStack?.abort();
 });
 app.on("will-quit", event => {
+  // Briefly wait for the server to hear that this PC is offline; never block quitting.
+  if (relayReleased && !relayReleaseDone) {
+    event.preventDefault();
+    void Promise.race([relayReleased, new Promise<void>(resolve => setTimeout(resolve, 2_000))])
+      .then(() => { relayReleaseDone = true; app.quit(); });
+    return;
+  }
   if (desktopDiagnostics && !diagnosticsClosed) {
     event.preventDefault();
     diagnosticsShutdown ??= Promise.race([desktopDiagnostics.close(),new Promise<void>(resolve=>setTimeout(resolve,1_000))])

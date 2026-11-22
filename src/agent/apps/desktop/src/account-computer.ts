@@ -55,6 +55,7 @@ export class AccountComputerConnection {
   private updating = false;
   private deviceId?: string;
   private defaultSpace?: string;
+  private releasing: Promise<void> = Promise.resolve();
   constructor(
     private readonly options: {
       profile: string;
@@ -96,16 +97,25 @@ export class AccountComputerConnection {
     this.signature = undefined;
     this.options.host.activate(false);
   }
+  /** Goes offline and tells the server at once; released() settles once it has been told. */
   stop() {
+    this.halt(true);
+  }
+  released() {
+    return this.releasing;
+  }
+  private halt(release: boolean) {
     this.stopped = true;
     clearTimeout(this.timer);
+    if (release && this.clients.size)
+      this.releasing = Promise.allSettled([this.releasing, ...[...this.clients.values()].map((c) => c.release())]).then(() => undefined);
     this.disconnect();
     this.options.changed?.();
   }
   async revoke() {
     const clients = [...this.clients.values()];
     this.scope = undefined;
-    this.stop();
+    this.halt(false);
     await Promise.allSettled(clients.map((c) => c.revoke()));
   }
   async connect(botId: string, spaceId: string | null) {

@@ -344,6 +344,38 @@ it("keeps the other signed-in desktop online when one instance disconnects", asy
   expect(preferred).toBe(false);
 });
 
+it("marks a quitting PC offline at once while keeping its owner's choice to run on it", async () => {
+  const app = new Hono();
+  let preferred = false;
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    desktopExecution: async (_actor, enabled) => {
+      if (enabled !== undefined) preferred = enabled;
+      return preferred;
+    },
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes" ? { actor: owner, sessionId: "session-a" } : null,
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const call = (action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const deviceId = randomUUID();
+  const identity = await (await call("identity", {})).json();
+  expect((await call("account", { deviceId, generation: randomUUID(), identity, agentExecution: 1 })).status).toBe(200);
+  const probe = async () => {
+    const body = JSON.stringify({ probe: "test-bot", agentExecution: 1, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+    const time = String(Date.now());
+    return (await app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body })).json();
+  };
+  expect(await probe()).toEqual({ agentExecution: 1, available: true, preferred: true });
+  expect((await call("release", { deviceId })).status).toBe(200);
+  expect(await probe()).toEqual({ agentExecution: 1, available: false, preferred: true });
+  expect(preferred).toBe(true);
+});
+
 it("reports actual disconnection distinctly from queue pressure without accepting work",async()=>{
  const app=fixture();const body=JSON.stringify({scope:{userId:owner.userId,spaceId:owner.spaceId},request:{method:"environment",botId:"test-bot"},nonce:randomUUID()}),time=String(Date.now());
  const r=await app.request("/api/desktop-relay/internal",{method:"POST",headers:{"x-desktop-time":time,"x-desktop-signature":signDesktopRelay(desktopRelayKey("test-purpose-secret"),time,body)},body});

@@ -13,6 +13,35 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it("tells the server once that a connected PC is going offline, without treating a refusal as revocation", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const released: unknown[] = [];
+  const revoked = vi.fn();
+  let polled = false;
+  const client = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "http://127.0.0.1:1234", localToken: "unused", revoked,
+    deviceId: "11111111-1111-4111-8111-111111111111",
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      if (action === "identity") return Response.json(identity);
+      if (action === "bind") return Response.json({ ok: true });
+      if (action === "poll") { polled = true; return Response.json({ identity, active: [], operations: [] }); }
+      if (action === "release") { released.push(JSON.parse(String(init?.body))); return new Response(null, { status: 401 }); }
+      throw new Error(`unexpected ${action}`);
+    },
+  });
+  await new DesktopRelayClient({ base: "https://example.test/agent", localUrl: "", localToken: "", revoked,
+    fetch: async () => { throw new Error("A PC that never connected has nothing to release"); } }).release();
+  await client.bind("bot");
+  await vi.waitFor(() => expect(polled).toBe(true));
+  await vi.waitFor(() => expect(client.online()).toBe(true));
+  await client.release();
+  await client.release();
+  expect(released).toEqual([{ deviceId: "11111111-1111-4111-8111-111111111111" }]);
+  expect(client.online()).toBe(false);
+  expect(revoked).not.toHaveBeenCalled();
+});
+
 it("still executes a newly delivered operation if the API rejects an orphan report", async () => {
   const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
   const local = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response('{"done":true}\n'));

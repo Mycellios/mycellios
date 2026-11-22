@@ -312,3 +312,32 @@ it("admits an approval continuation once, without admitting simultaneous or repe
   expect(() => broker.dispatch({ ...run, sessionId: crypto.randomUUID() }, context())).toThrow("already dispatched");
   broker.close(); await next.text();
 });
+
+it("ends a quitting PC's presence at once without revoking it, and lets an unreceived start run again",async()=>{
+  broker=new DesktopRelayBroker();broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
+  const run={method:"agentRun" as const,botId:"bot",runId:"quit-run",sessionId:crypto.randomUUID(),request:{}};
+  const unreceived=broker.dispatch(run,context());
+  broker.release({...owner,sessionId:"other"},"device");
+  expect(broker.agentAvailable(owner,"bot")).toBe(true);
+  broker.release(owner,"device");
+  expect(broker.agentAvailable(owner,"bot")).toBe(false);
+  expect(broker.hasAgentDevice(owner)).toBe(false);
+  expect(JSON.parse(await unreceived.text())).toMatchObject({code:"desktop_disconnected",dispatched:false});
+  // Reconnecting with the same restored generation admits the same start once.
+  broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
+  const again=broker.dispatch({...run,sessionId:crypto.randomUUID()},context());
+  expect(broker.poll(owner,"device").operations[0]?.request).toMatchObject({runId:run.runId});
+  expect(()=>broker.dispatch({...run,sessionId:crypto.randomUUID()},context())).toThrow("already dispatched");
+  broker.close();await again.text();
+});
+
+it("never lets a start the PC already received run again after it disconnects",async()=>{
+  broker=new DesktopRelayBroker();broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
+  const run={method:"agentRun" as const,botId:"bot",runId:"received-run",sessionId:crypto.randomUUID(),request:{}};
+  const received=broker.dispatch(run,context());
+  expect(broker.poll(owner,"device").operations).toHaveLength(1);
+  broker.release(owner,"device");
+  expect(JSON.parse(await received.text())).toMatchObject({code:"desktop_disconnected",dispatched:true});
+  broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
+  expect(()=>broker.dispatch({...run,sessionId:crypto.randomUUID()},context())).toThrow("already dispatched");
+});
