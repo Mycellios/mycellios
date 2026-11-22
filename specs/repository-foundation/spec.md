@@ -35,6 +35,6 @@ real monorepo, and add a fast structural verifier used by contributors and CI.
 ## Constraints
 
 - Preserve the documentation reset already in progress.
-- Preserve unrelated `.jarvis-dev.json` and `specs/repair-local-dev-runner/`
+- Preserve unrelated local dev-runner configuration and `specs/repair-local-dev-runner/`
   changes.
 - Use Node.js built-ins for the verifier.

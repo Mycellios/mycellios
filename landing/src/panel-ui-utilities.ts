@@ -53,3 +53,9 @@ export function relativeTimeEs(value: string, now = Date.now()): string {
   if (seconds < 5) return "ahora"; if (seconds < 60) return `hace ${seconds} s`;
   const minutes = Math.floor(seconds / 60); return minutes < 60 ? `hace ${minutes} min` : `hace ${Math.floor(minutes / 60)} h`;
 }
+
+export function errorText(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  if (error.name === "TimeoutError") return "Request timed out. Check the current status before trying again.";
+  return error.message;
+}

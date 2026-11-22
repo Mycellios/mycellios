@@ -5,7 +5,7 @@ Status: in progress (opened 2026-11-20).
 ## Problem
 
 `mycellios-qwen3-embedding-4b` (Qwen/Qwen3-Embedding-4B, revision
-`5cf2132abc99cad020ac570b19d031efec650f2b`) stopped serving Jarvis memory
+`5cf2132abc99cad020ac570b19d031efec650f2b`) stopped serving the external memory client
 embeddings. The AntSeed seller's model-health guard withdrew the offer after
 repeated 503 health checks, so the gateway answered "price unknown". No alert
 fired. Lexical search kept working.
@@ -88,10 +88,10 @@ detected VRAM (`src/node/main.ts`), so it is not a cause.
 
 - Restarted `mycellios-embedding-worker` on the control server. It now waits
   for its stages and restarts every 10 s through systemd.
-- Rebooted the MSI GE60 through Jarvis Local Node after confirming 36 days of
+- Rebooted the MSI GE60 through the operator’s remote management agent after confirming 36 days of
   console inactivity.
 - 2026-11-21: operator access to the HP, MSI GE60 and MRPUCCHI now goes
-  through NetBird SSH (JWT, the owner's native SSH policy), not Jarvis.
+  through NetBird SSH under the owner's native SSH policy (JWT).
   The MSI rejoined NetBird as a new peer; it was moved back to its previous
   address `100.102.242.239` and groups, and the duplicate peer was removed.
 - On the MSI: moved the empty lock aside
@@ -105,7 +105,7 @@ detected VRAM (`src/node/main.ts`), so it is not a cause.
   down: its runner exits with `embedding_gpu_qualification_lease_missing`
   because no keeper renews its committed reservation. Kokoro (2048 MiB) and
   Whisper (2048 MiB) hold the RTX 2060 safe budget (5221 MiB), so a third
-  2048 MiB reservation does not fit. Jarvis's bulk backfill uses this replica.
+  2048 MiB reservation does not fit. The operator's bulk backfill uses this replica.
 
 ## Remaining work (follow-up PRs)
 

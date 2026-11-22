@@ -28,7 +28,7 @@ to a removed document. Avoid behavior changes.
 - Search for broken local Markdown links and stale documentation paths.
 - Run documentation/policy tests and the normal TypeScript checks.
 - Run `git diff --check`.
-- Verify unrelated `.jarvis-dev.json` and `specs/repair-local-dev-runner/`
+- Verify unrelated local dev-runner configuration and `specs/repair-local-dev-runner/`
   changes remain outside this work.
 
 ## Decision

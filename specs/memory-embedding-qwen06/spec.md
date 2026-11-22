@@ -1,10 +1,12 @@
 # Operator memory embeddings: Qwen3-Embedding-0.6B
 
-Status: in production (opened 2026-11-21).
+Status: the Qwen 0.6B vectors are retained. The private forwarder and direct
+device route were retired on 2026-11-22. Clients use the native coordinator
+route once a paired node is qualified.
 
 ## Decision
 
-Jarvis memory (190,594 chunks, about 29M tokens) moves from
+The operator's memory index (190,594 chunks, about 29M tokens) moves from
 `mycellios-qwen3-embedding-4b` to `Qwen/Qwen3-Embedding-0.6B`, revision
 `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, 1024 dimensions. The owner
 approved the change. Two problems ruled out the 4B model:
@@ -20,9 +22,9 @@ Measured on MRPUCCHI's RTX 2060 (fp16): about 9,000 tokens/s in-process and
 about 4,300 tokens/s end-to-end over HTTP with 64-text batches. Peak memory is
 1.8 GB, so the replica fits beside Kokoro. The public Qwen3 Embedding report
 gives MMTEB of about 64 (0.6B) against about 69 (4B). Vectors from different
-models are never mixed: Jarvis stores 0.6B vectors in their own column.
+models belong in separate index columns.
 
-## Topology
+## Historical backfill topology
 
 | Piece | Where |
 |---|---|
@@ -31,7 +33,6 @@ models are never mixed: Jarvis stores 0.6B vectors in their own column.
 | DirectML replica (fp32, shares load) | PC-DANI Radeon 890M `100.102.1.112:18495`, user Startup entry `mycellios-qwen06.vbs` |
 | CPU replicas (backup / disabled) | HP ProBook `100.102.123.237:18495`, MSI GE60 `100.102.242.239:18495` |
 | Failover entry | control server `10.48.0.10:18495`, systemd `mycellios-qwen06-forwarder` |
-| Client | Jarvis API on prod-apps-01 (`10.48.0.6`) |
 
 - **GPU vs CPU vectors.** A canary on four cases gave a minimum cosine of
   0.999997 between the GPU (fp16) and the CPU (fp32) vectors, so the CPU
@@ -39,7 +40,7 @@ models are never mixed: Jarvis stores 0.6B vectors in their own column.
 - **Access control.** NetBird policy `mycellios-memory-embeddings` allows
   only the control server to reach port 18495 on the replica group. Windows
   Firewall on each PC admits only `100.102.50.179`. The forwarder admits only
-  Jarvis and loopback. Requests carry a bearer token.
+  the configured client and loopback. Requests carry a bearer token.
 
 ## Distribution
 
@@ -48,9 +49,8 @@ connections per unit of weight: GPU 2, each CPU 1), so every ready replica in
 the network takes part instead of the GPU alone. A GPU replica reports
 `ready: false` (state `cooling`) while it is above its thermal pause
 threshold (81 °C, resume 76 °C on MRPUCCHI), so new work goes to the other
-replicas until it cools. Jarvis keeps four requests in flight with a
-180 s timeout (`backfillConcurrency`, `requestTimeoutMs` in its state file)
-so the slower CPU replicas stay busy too. Replicas fetch the pinned model
+replicas until it cools. The backfill used four requests in flight with a
+180 s timeout to keep the slower CPU replicas busy. Replicas fetch the pinned model
 over NetBird from the control server (`qwen06-artifacts-persist`, range
 requests, port 18496 for the replica group only).
 
@@ -90,8 +90,6 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
 - `python/distributed_runtime/qwen06_embedding_forwarder.py`: the failover entry.
 - Tests: `python/tests/test_qwen06_embedding_service.py` and
   `python/tests/test_qwen06_embedding_forwarder.py`.
-- Jarvis side: the private Jarvis repository, PR #451, which adds migration 0232, the
-  client, the resumable backfill and the search switch.
 
 ## Operations
 
@@ -100,18 +98,17 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   `C:\ProgramData\Mycellios\Cache` trips the node's disk limit and pauses its
   contribution; this happened once on 2026-11-21.
 - The token is stored in `C:\ProgramData\Mycellios\Qwen06\token` (SYSTEM and
-  Administrators only) and in Jarvis state
-  `secrets/memory-embedding-qwen06.json` (mode 600).
+  Administrators only) and in the client's credential store.
 - Rollback:
-  - stop the Jarvis backfill and leave search on its previous vector; the 4B
+  - stop the client backfill and leave search on its previous vector; the 4B
     and Gemini columns are untouched;
   - stop `MycelliosQwen06`;
   - remove its replica from the broker configuration.
 
 ## Native replica (coordinator path)
 
-Status: implemented, not yet physically qualified. The forwarder path above
-is unchanged and stays the production route until the migration below.
+Status: implemented. Production contribution requires a physically qualified
+paired node through the coordinator.
 
 The replica is admitted through the coordinator like the 4B embedding
 replica: a worker with the `embedding` adapter, a pinned deployment, native
@@ -264,8 +261,7 @@ A standalone worker on the replica's PC, enrolled through
 The broker configuration keeps the existing reservation for consumer
 `qwen06-cuda-mrpucchi-20261121` and lists
 `"requestModels": ["mycellios-qwen3-embedding-0.6b"]`, so coordinator demand
-and busy slots count for placement. Until Jarvis moves to this path, keep that
-replica `pinned`, because forwarder traffic is not visible to the broker.
+and busy slots count for placement. Placement follows coordinator demand.
 
 ### Qualification
 
@@ -283,10 +279,14 @@ runtime applied the query instruction. The evidence is stored with
 `responseKind: "embedding"`. It lasts seven days and is bound to the worker
 session and build, so a reconnect or new build needs a fresh run.
 
-### Jarvis access
+### API access
 
-- An operator-owned Mycellios API key (`Authorization: Bearer <key>`), kept
-  in Jarvis state like the current token.
+Sign in to the Mycellios account and open **API keys** (`/account?tab=api`).
+Create a key for the client and save it in the client's credential store.
+Send it as `Authorization: Bearer <key>` to the coordinator. The account can
+revoke the key at any time. The coordinator still requires a paired, qualified
+node owned by the caller for this embedding route.
+
 - Operator-funded quota: add the key's ID to
   `MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON`
   (`{"<apiKeyId>":["mycellios-qwen3-embedding-0.6b"]}`). These requests reserve
@@ -296,31 +296,17 @@ session and build, so a reconnect or new build needs a fresh run.
 
 ### Migration and rollback
 
-1. Physically qualify on MRPUCCHI:
-   - add the `native` section to its replica configuration;
-   - start the standalone worker;
-   - run the qualification and keep the receipt.
-   The forwarder keeps serving the whole time, because both listeners share
-   the loaded model.
-2. Configure the operator key and quota, then point a Jarvis canary at the
-   coordinator. Its vectors must reach a cosine ≥ 0.9999 against the
-   forwarder's for the same documents and queries.
-3. Switch the Jarvis client and backfill to the coordinator. Then unpin the
-   broker entry so placement follows real demand.
-4. Qualify the MacBook (MPS), PC-DANI (DirectML) and the CPU (fp32) replicas
-   the same way.
-   Their workers add capacity without a placement reservation.
-5. Retire the forwarder and the bearer-token listeners only after the
-   coordinator path has carried the backfill.
+1. Deploy the coordinator and qualify a paired Mycellios node. Retain the
+   receipt for that node, build, model and activation.
+2. Configure the client's API key and run a public canary through the
+   coordinator. Require the pinned revision and compatible vectors before
+   reusing the stored generation.
+3. Verify semantic search from the client and qualify additional devices
+   through the same coordinator route.
 
-Rollback at any step:
-
-- point Jarvis back at the forwarder (its configuration is unchanged);
-- stop the standalone worker;
-- remove the `native` section;
-- remove the key from the operator quota map.
-
-Vectors from both paths are interchangeable, so nothing has to be re-embedded.
+On rollback, keep the direct device route and its reservation disabled.
+Preserve the vector generation and let the client use text recall until a qualified
+native route is available again.
 
 ## Automatic node replicas
 
@@ -429,8 +415,8 @@ and the node-managed mode of `qwen06_embedding_service.py`. Tests:
 1. Coordinator: set `MYCELLIOS_MEMORY_EMBEDDING_NODE_REPLICA_ACCOUNTS=<operator account id>`.
 2. Qualification watch: add the `memoryEmbedding` policy above, with the
    build source of the node release that carries this code.
-3. Jarvis (or another client) calls the coordinator with the operator's API
-   key, as described in "Jarvis access". The first request answers 503 while
+3. The client calls the coordinator with the operator’s API key, as described
+   in "API access". The first request answers 503 while
    nodes download and load; the client retries with backoff.
 
 Rollback: unset the variable and restart the coordinator through Nucleus
@@ -575,7 +561,7 @@ Package `com.mycellios.android.embedding`, not wired into the app:
   paused the node (limit 85 °C). The replica pauses at 82 °C and resumes at
   79 °C. The GPU clock is locked with `nvidia-smi -lgc 300,900` (reset with
   `-rgc`; a reboot clears it). At that clock it stays at 79-81 °C, about 70 %
-  busy, and the node stays ready. Jarvis receives about 150 chunks per minute.
+  busy, and the node stays ready. The client receives about 150 chunks per minute.
 - The MSI GE60 (i5-4210H) measured 7 tokens/s in bfloat16, which is too slow
   to help, so its replica is installed but disabled. The HP ProBook replica is
   added once its model download finishes, and only if it beats 100 tokens/s.

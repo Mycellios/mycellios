@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ChatCompletionRequest, ModelDeployment } from "./types.js";
 
 /**
- * Operator memory embeddings (Jarvis) served as a native replica.
+ * Operator memory embeddings served as a native replica.
  * Contract: specs/memory-embedding-qwen06/spec.md ("Native replica").
  * Vectors stay interchangeable with the private replicas: same pinned
  * artifact, 1024 dimensions, L2-normalized, query instruction applied by the

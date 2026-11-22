@@ -13,7 +13,7 @@ Native replicas today are Kokoro (speech), Whisper (transcription) and the
 Qwen3-Embedding-4B CUDA replica. All three are qualified on MRPUCCHI's RTX 2060
 (6143 MiB; safe budget 5221 MiB). Each needs a committed 2048 MiB reservation,
 so only two fit at a time. Before this change, two external keepers held Kokoro
-and Whisper permanently. The embedding keeper had died on 2026-10-31, so Jarvis
+and Whisper permanently. The embedding keeper had died on 2026-10-31, so the memory client
 background embeddings could never run (see
 `specs/embedding-lane-self-healing/spec.md`).
 
@@ -90,7 +90,7 @@ stop the runner before enabling the in-process broker.
    set the variable) and restart the coordinator through Nucleus.
 3. Stop the two keeper containers. The broker adopts their live reservations,
    because ownership is by `consumerId`, and from then on is the only writer.
-4. Verify on `/timeline`: grants and releases follow Jarvis embedding and
+4. Verify on `/timeline`: grants and releases follow embedding and
    speech traffic; no reservation exceeds 5221 MiB per node.
 
 Rollback: remove the file (or unset the variable), restart the coordinator
@@ -99,7 +99,7 @@ and start the keepers again.
 ### Limits
 
 - First request after an unload fails with `no_capacity` while the replica
-  loads. Callers that retry (Jarvis backfill) succeed; interactive speech may
+  loads. Callers that retry (the memory backfill) succeed; interactive speech may
   see one failure. Phase 2 removes this.
 - The AntSeed seller's health guard withdraws an offer whose model is
   unloaded. Demand that arrives through AntSeed then stops reaching the
