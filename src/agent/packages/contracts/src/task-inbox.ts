@@ -13,7 +13,11 @@ export const InboxTaskSchema = z.object({
   unread: z.boolean(),
   pinned: z.boolean().optional(),
   remindAt: IsoDate.nullable().optional(),
+  /** The thread's own archive mark. */
   archivedAt: IsoDate.nullable(),
+  /** How the last finished turn ended, and its error; older servers omit both. */
+  outcome: z.enum(["completed", "failed", "interrupted"]).nullable().optional(),
+  lastError: z.string().max(4000).nullable().optional(),
   createdAt: IsoDate,
   updatedAt: IsoDate,
 });

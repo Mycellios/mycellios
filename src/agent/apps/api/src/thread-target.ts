@@ -38,6 +38,7 @@ import {
   isOwnedWorkflowThread,
   lockOwnedGroup,
   primaryActiveRun,
+  recordThreadTurnOutcome,
   retireWaitingQuestionInTransaction,
   touchGroupUpdatedAt,
 } from "@mycellios/db";
@@ -1324,6 +1325,8 @@ export async function stopThreadRuns(
     });
     const ids = cancelled.map((run) => run.id);
     await clearEndedRunState(tx, ids);
+    // A stopped turn reads as stopped on its conversation until the next turn.
+    await recordThreadTurnOutcome(tx, { threadId: target.threadId, runIds: ids, outcome: "interrupted" });
     await tx.steeringMessage.deleteMany({
       where: {
         botId: { in: target.kind === "bot" ? [target.botId] : target.memberBotIds },

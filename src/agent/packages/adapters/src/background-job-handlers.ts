@@ -30,6 +30,7 @@ import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
 import { mirrorWhatsAppDeviceRun } from "./whatsapp-device-delivery.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
+import { purgeDeletedThread } from "./thread-deletion.js";
 
 type Tenant = { spaceId: string; userId: string };
 
@@ -72,6 +73,8 @@ export function createBackgroundJobHandlers(deps: {
   cloudAgent?: CloudAgentConnection | null;
   notifications?: ExpoPushProvider;
   webPush?: WebPushService;
+  /** Pi transcripts and native engine sessions of deleted conversations live here. */
+  dataDir?: string;
 }): BackgroundJobHandlers {
   const messagingDeps = deps.messaging
     ? {
@@ -199,6 +202,14 @@ export function createBackgroundJobHandlers(deps: {
     "push.receipt": async (payload) => {
       await runAsSystem("check a push receipt", () => deps.notifications?.checkReceipt(payload));
     },
+    "thread.delete": asOwner(thread, async (payload) => {
+      const result = await purgeDeletedThread(
+        { prisma: deps.prisma, artifacts: deps.artifacts, dataDir: deps.dataDir },
+        payload.threadId,
+      );
+      // Work that started again keeps the thread; the reconciler tries again once it ends.
+      if (result === "busy") getLogger().warn("conversation delete waits for its last run", { threadId: payload.threadId });
+    }),
     "memory.review": asOwner(thread, async (payload) => {
       if(deps.memory && deps.executor.resolveModel)await reviewLocalMemory({prisma:deps.prisma,memory:deps.memory,jobs:deps.jobs,resolveModel:deps.executor.resolveModel},payload.threadId);
     }),

@@ -25,6 +25,7 @@ const payloadSchemas = {
   "plan.autostart": z.object({ runId: z.string().min(1) }),
   "history.compact": z.object({ threadId: z.string().min(1) }),
   "memory.review": z.object({ threadId: z.string().min(1) }),
+  "thread.delete": z.object({ threadId: z.string().min(1) }),
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
   "messaging.credential-cleanup": z.object({
     installationId: z.string().min(1),
@@ -211,6 +212,16 @@ export function cloudAgentPollJob(
     payload,
     replaceKey: cloudAgentPollJobKey(payload.agentId),
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One pending removal per thread; deleting again after an undo replaces its time. */
+export function threadDeleteJob(threadId: string, availableAt: Date): BackgroundJob {
+  return {
+    name: "thread.delete",
+    payload: { threadId },
+    availableAt,
+    replaceKey: `thread.delete:${threadId}`,
   };
 }
 

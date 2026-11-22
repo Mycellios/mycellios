@@ -742,6 +742,8 @@ export interface BackgroundJobPayloads {
   "plan.autostart": { runId: string };
   "history.compact": { threadId: string };
   "memory.review": { threadId: string };
+  /** Finish a conversation delete whose undo window has passed; a restored one is left alone. */
+  "thread.delete": { threadId: string };
   "messaging.deliver": { runId?: string };
   "messaging.credential-cleanup": { installationId: string; ref: string };
   /** Reconcile durable remote-agent intent; scope is loaded from the database. */

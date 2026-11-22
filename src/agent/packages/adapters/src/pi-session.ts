@@ -54,6 +54,50 @@ export async function removePiBotSessions(
   });
 }
 
+const PI_SESSION_SCOPE_BYTES = 64 * 1024;
+
+/** Whether a recorded transcript's context entry, written right after its header, names this conversation. */
+function recordsConversation(head: string, threadId: string) {
+  return head.split("\n").some((line) => {
+    try {
+      const records: unknown = JSON.parse(line);
+      return (Array.isArray(records) ? records : [records]).some((record) => {
+        const data = (record as { type?: unknown; data?: unknown }).data;
+        return (record as { type?: unknown }).type === "custom" && data !== null && typeof data === "object" &&
+          Object.entries(data).some(([key, value]) => key.endsWith("ThreadId") && value === threadId);
+      });
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** Removes the recorded Pi transcripts of one deleted conversation. */
+export async function removePiThreadSessions(
+  dataDir: string | undefined,
+  userId: string,
+  botId: string,
+  threadId: string,
+): Promise<void> {
+  if (!dataDir) return;
+  const files: PiSessionFile[] = [];
+  await collectPiSessionFiles(piSessionBotRoot(piSessionsRoot(dataDir), userId, botId), files);
+  await Promise.all(
+    files.map(async (file) => {
+      const handle = await open(file.path, "r").catch(() => null);
+      if (!handle) return;
+      try {
+        const buffer = Buffer.alloc(PI_SESSION_SCOPE_BYTES);
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+        if (!recordsConversation(buffer.subarray(0, bytesRead).toString("utf8"), threadId)) return;
+      } finally {
+        await handle.close();
+      }
+      await rm(file.path, { force: true });
+    }),
+  );
+}
+
 export async function removePiUserSessions(
   dataDir: string | undefined,
   userId: string,

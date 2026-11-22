@@ -1,6 +1,7 @@
 import type { MessageBlock } from "@mycellios/contracts";
-import { isMicoTaskThread } from "@mycellios/core";
+import { automaticThreadTitle, isMicoTaskThread, THREAD_BEING_DELETED_ERROR } from "@mycellios/core";
 import type { Prisma, PrismaClient } from "./client.js";
+import { ThreadLifecycleError } from "./thread-lifecycle.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 /** Group turns use channel inputs and their own outputs, never private thread history. */
@@ -87,17 +88,21 @@ export async function createThreadMessageInTransaction(
     data: {
       nextMessageSeq: { increment: 1 },
       unread: (input.markUnread ?? input.role === "bot") ? true : undefined,
+      // The person's next message starts the next turn, which clears the last turn's result.
+      ...(input.role === "user" ? { outcome: null, lastError: null } : {}),
     },
-    select: { nextMessageSeq: true, title: true, taskBotId: true, projectKey: true, taskKey: true },
+    select: { nextMessageSeq: true, title: true, taskBotId: true, projectKey: true, taskKey: true, deleteAfter: true },
   });
+  // The row lock above waits for a concurrent delete, so a deleting thread never gets new history.
+  if (thread.deleteAfter) throw new ThreadLifecycleError("deleting", THREAD_BEING_DELETED_ERROR);
   await assertRunCanWriteHistory(tx, input.runId, { allowCancelled: input.allowCancelledRun });
   if (input.role === "user" && thread.title === null && isMicoTaskThread(thread)) {
-    const text = input.blocks.flatMap(block => block.kind === "text" ? [block.text]
-      : block.kind === "file" ? [block.name] : []).join(" ").replace(/[\s\u0000-\u001f\u007f]+/gu, " ").trim();
-    const characters = Array.from(text);
-    const title = characters.length > 80 ? `${characters.slice(0, 79).join("").trimEnd()}…` : text;
+    // First line or first file name, without a model. Only an empty title is filled, so a
+    // title someone typed (never empty) is never replaced.
+    const title = automaticThreadTitle(input.blocks);
     if (title) await tx.thread.updateMany({
-      where: { id: input.threadId, title: null }, data: { title },
+      where: { id: input.threadId, title: null },
+      data: { title, titleSource: "auto" },
     });
   }
   return tx.message.create({

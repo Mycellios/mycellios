@@ -59,7 +59,8 @@ export async function controlWorkTree(prisma: PrismaClient, actorInput: {spaceId
       if(!thread)throw new IsolationError();
       const destinationThread=thread.group?thread:await tx.thread.create({data:{...actor,
         taskBotId:bot.id,projectKey:thread.projectKey??`work:${root}`,
-        taskKey:`work-transfer:${selected.id}:${selected.delegationRevision}`,title:thread.title??selected.prompt.slice(0,100)}});
+        taskKey:`work-transfer:${selected.id}:${selected.delegationRevision}`,title:thread.title??selected.prompt.slice(0,100),
+        titleSource:"auto",startedBy:"delegation"}});
       destination={botId:bot.id,threadId:destinationThread.id};
     }
     for(const task of tasks){

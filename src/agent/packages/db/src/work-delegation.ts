@@ -62,7 +62,8 @@ export async function delegateWork(prisma: PrismaClient, source: Source, input: 
     if (dependencies.some(id => id === parent.id || id === root || !siblings.some(task => task.id === id)))
       throw new Error("Dependencies must name existing sibling tasks, never a parent or another request");
     const childThread=parentThread.group?parentThread:await tx.thread.create({data:{spaceId:source.spaceId,userId:source.userId,
-      taskBotId:bot.id,projectKey:isMicoTaskThread(parentThread)?`work:${root}`:parentThread.projectKey??`work:${root}`,taskKey:`delegation:${input.key}`,title:input.instruction.slice(0,100)}});
+      taskBotId:bot.id,projectKey:isMicoTaskThread(parentThread)?`work:${root}`:parentThread.projectKey??`work:${root}`,taskKey:`delegation:${input.key}`,title:input.instruction.slice(0,100),
+      titleSource:"auto",startedBy:"delegation",startedByRunId:source.id}});
     const child = await tx.task.create({ data: { spaceId: source.spaceId, userId: source.userId,
       botId: bot.id, threadId: childThread.id, prompt: input.instruction, status: "queued",
       parentTaskId: parent.id, delegationRootId: root, delegationKey: input.key,

@@ -1,6 +1,6 @@
 import { reconcileLocalMemoryReviews } from "@mycellios/adapters";
 import { modelsDevCatalog, tailnetServiceFromEnv } from "@mycellios/adapters";
-import { reconcileTaskReminders, WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
+import { reconcileTaskReminders, reconcileThreadDeletions, WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@mycellios/adapter-kit";
 import { ComposioConnector, IntegrationProviderSettings } from "@mycellios/adapters";
@@ -350,6 +350,7 @@ async function main() {
     cloudAgent,
     notifications: nativeNotifications,
     webPush,
+    dataDir,
   });
   const reconciler = createJobReconciler({
     prisma,
@@ -376,6 +377,7 @@ async function main() {
     reconcileHomeStorage: homeStorageSweeper(home),
     reconcileTaskReminders: () => reconcileTaskReminders({prisma,notifications}),
     reconcileLocalMemoryReviews: () => reconcileLocalMemoryReviews(prisma,jobs),
+    reconcileThreadDeletions: () => reconcileThreadDeletions({ prisma, artifacts, dataDir }),
   });
   let stopHealth: (() => Promise<void>) | undefined;
   const shutdown = new AbortController();

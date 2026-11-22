@@ -41,6 +41,7 @@ import {
   createCloudAgentConnection,
   createConnectorStack,
   createJobReconciler,
+  reconcileThreadDeletions,
   createMessagingContextLoader,
   createMessagingTeamChatHistory,
   createMessagingTeamChatSender,
@@ -115,6 +116,7 @@ import {
   runAsSystem,
   runAsTenant,
   securityEventRetentionDays,
+  ThreadLifecycleError,
   verifyContentKeys,
 } from "@mycellios/db";
 import type { Logger } from "@mycellios/logging";
@@ -643,6 +645,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     deploymentModelConfigured: env.deploymentModelConfigured,
     messaging,
     cloudAgent,
+    dataDir: env.dataDir,
   });
   if (inMemoryJobs) {
     webPush.start();
@@ -664,6 +667,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
           prisma,
           securityEventRetentionDays(),
         ),
+        reconcileThreadDeletions: () =>
+          reconcileThreadDeletions({ prisma, artifacts, dataDir: env.dataDir }),
       })
     : undefined;
   reconciler?.start();
@@ -1529,6 +1534,10 @@ export function handleRpcError(error: unknown, path: readonly string[]): void {
     getLogger().warn(`rpc ${path.join("/")} not found`, { "error.stack": error.stack });
     throw new ORPCError("NOT_FOUND", { message: error.message, cause: error });
   }
+  // A refused archive, restore, delete or send keeps its own explanation for the person.
+  if (error instanceof ThreadLifecycleError) {
+    throw new ORPCError(threadLifecycleErrorCode(error), { message: error.message, cause: error });
+  }
   // The user's own voice account is out of credit or rejected the key: theirs to fix.
   if (error instanceof VoiceAccountError) {
     getLogger().warn(`rpc ${path.join("/")} voice provider account rejected the request`, {
@@ -1560,6 +1569,12 @@ export function handleRpcError(error: unknown, path: readonly string[]): void {
     throw new ORPCError("TOO_MANY_REQUESTS", { message: error.message, cause: error });
   }
   logUnexpectedRpcError(error, path);
+}
+
+export function threadLifecycleErrorCode(error: ThreadLifecycleError) {
+  if (error.code === "not_found") return "NOT_FOUND";
+  if (error.code === "main_chat" || error.code === "not_deletable") return "BAD_REQUEST";
+  return "CONFLICT";
 }
 
 export function logUnexpectedRpcError(error: unknown, path: readonly string[]): void {

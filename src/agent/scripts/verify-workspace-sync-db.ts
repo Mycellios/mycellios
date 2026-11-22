@@ -107,7 +107,7 @@ try {
   assert.equal(target.threadId, first.threadId);
   assert.equal("projectSessionId" in target, false);
   checks.push("real starts retain nonce identity and create independent normal Mico task conversations");
-  const development = Object.fromEntries(["open", "rename", "list", "status", "projects", "saveProject", "projectTask", "primaryRun"].map(name => [name, handler]));
+  const development = Object.fromEntries(["open", "rename", "list", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove"].map(name => [name, handler]));
   const dev = developmentRoutes({ deps, authed: { development } } as never).development as unknown as Record<string, (v: unknown) => Promise<any>>;
   const tabs = await runAsTenant(actor, () => dev.list!({ context: { actor }, input: { botId: bot.id } }));
   assert.equal(tabs.length, 2);
@@ -168,12 +168,21 @@ try {
   assert.deepEqual(await system.computer.findUniqueOrThrow({ where: { id: local.id } }), local);
   await runAsTenant(actor, () => releaseComputerExecutionLease(prisma, cloudFence));
   checks.push("real offline workspace migration, worker fencing, owner isolation and separate provisioning after Desktop reconnects");
-  await assert.rejects(call("archive", { id: first.id, archived: true }));
-  await system.run.updateMany({ where: { threadId: first.threadId }, data: { status: "completed", completedAt: new Date() } });
+  // Archive stops the conversation's work first, then archives the thread itself.
   await call("archive", { id: first.id, archived: true });
-  await assert.rejects(call("send", { id: first.id, text: "Refuse archived", clientNonce: randomUUID() }));
+  assert.equal(await system.run.count({ where: { threadId: first.threadId,
+    status: { in: ["queued", "leased", "running", "waiting_input", "waiting_takeover"] } } }), 0);
+  assert.ok((await system.thread.findUniqueOrThrow({ where: { id: first.threadId } })).archivedAt);
+  // Writing from Tasks brings it back in the same transaction, with its history.
+  // A native engine needs no model connection in this synthetic fixture.
+  await system.bot.update({ where: { id: bot.id }, data: { agentEngine: "codex" } });
+  await call("send", { id: first.id, text: "Restore by writing", clientNonce: randomUUID() });
+  await system.bot.update({ where: { id: bot.id }, data: { agentEngine: "pi" } });
+  assert.equal((await system.thread.findUniqueOrThrow({ where: { id: first.threadId } })).archivedAt, null);
+  await call("archive", { id: first.id, archived: true });
   await call("archive", { id: first.id, archived: false });
-  checks.push("existing task tabs see inbox conversations; archive refuses active or archived sends");
+  assert.equal((await system.thread.findUniqueOrThrow({ where: { id: first.threadId } })).archivedAt, null);
+  checks.push("existing task tabs see inbox conversations; archive stops active work first and a send from Tasks restores");
   // The same persistence path used by bots.update must leave conversations,
   // memory and the computer's files intact when an owner selects another model.
   await system.memoryDocument.create({ data: {

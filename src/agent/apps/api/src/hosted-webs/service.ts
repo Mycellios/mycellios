@@ -195,6 +195,8 @@ export function hostedWebService(
               taskKey,
               projectKey: `mico:${botId}`,
               title: "App",
+              titleSource: "auto",
+              startedBy: "user",
             },
             update: {},
           });
