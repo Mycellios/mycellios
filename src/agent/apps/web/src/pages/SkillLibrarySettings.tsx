@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentSkill, AgentSkillCatalogEntry } from "@mycellios/contracts";
 import { Button, Disclosure, NativeSelect, NativeSelectOption, Textarea } from "@mycellios/ui-web";
@@ -246,9 +247,7 @@ export function SkillLibrarySettings() {
           </p>
         ) : null}
         {busy ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            <Trans>Loading…</Trans>
-          </p>
+          <LoadingSkeleton />
         ) : null}
       </div>
     </Disclosure>

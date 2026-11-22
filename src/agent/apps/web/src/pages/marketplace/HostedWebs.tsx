@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { StoreAppHeader } from "./StoreAppHeader";
 import type { Bot, HostedWebCard, HostedWebDraft } from "@mycellios/contracts";
 import { Button, Input, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@mycellios/ui-web";
@@ -187,15 +188,13 @@ export function HostedWebs({
         setRefresh((value) => value + 1);
       }
     });
-  if (params.get("app") === "video-edit") return <Suspense fallback={<p role="status">Abriendo editor…</p>}><VideoEditor onBack={() => openTool()} /></Suspense>;
-  if (["create", "ai-studio"].includes(params.get("app") ?? "")) return <Suspense fallback={<p role="status">Abriendo creación…</p>}><MycelliosCreate onBack={() => openTool()} /></Suspense>;
+  if (params.get("app") === "video-edit") return <Suspense fallback={<LoadingSkeleton label="Abriendo editor…" layout="detail" className="mx-auto w-full max-w-3xl p-6" />}><VideoEditor onBack={() => openTool()} /></Suspense>;
+  if (["create", "ai-studio"].includes(params.get("app") ?? "")) return <Suspense fallback={<LoadingSkeleton label="Abriendo creación…" layout="detail" className="mx-auto w-full max-w-3xl p-6" />}><MycelliosCreate onBack={() => openTool()} /></Suspense>;
   if (params.get("app") === "cadencia")
     return (
       <Suspense
         fallback={
-          <p role="status" className="hw-status">
-            Abriendo Cadencia…
-          </p>
+          <LoadingSkeleton label="Abriendo Cadencia…" layout="detail" className="mx-auto w-full max-w-3xl p-6" />
         }
       >
         <Cadencia
@@ -348,11 +347,6 @@ export function HostedWebs({
               </Button>
             </div>
           )}
-          {loading && (
-            <p className="hw-status" role="status">
-              Cargando apps…
-            </p>
-          )}
           {(
               <>
                 {filter === "trending" && (
@@ -404,7 +398,7 @@ export function HostedWebs({
                       />
                     ))}
                   </div>
-                ) : (
+                ) : !loading ? (
                   <div className="hw-empty">
                     <Globe2 size={36} strokeWidth={1.2} />
                     <h2>
@@ -434,7 +428,10 @@ export function HostedWebs({
                       </div>
                     )}
                   </div>
-                )}
+                ) : null}
+                {loading && rows.length === 0 ? (
+                  <LoadingSkeleton label="Cargando apps…" layout="cards" className="mt-4" />
+                ) : null}
               </>
           )}
         </>

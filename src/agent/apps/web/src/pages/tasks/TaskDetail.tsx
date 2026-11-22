@@ -1,7 +1,8 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@mycellios/chat-ui/web";
 import type { Bot, InboxTask, ThreadSnapshot } from "@mycellios/contracts";
-import { Button, Spinner } from "@mycellios/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { Archive, ArchiveRestore, ArrowLeft, Maximize2, MessageCircle, Square, X } from "lucide-react";
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { AskCard } from "../../components/AskCard";
@@ -261,7 +262,7 @@ export function TaskDetail({
           >{t`Load older messages`}</Button>
         ) : null}
         {!snapshot ? (
-          <Spinner aria-label={t`Loading…`} />
+          loadError ? null : <LoadingSkeleton layout="chat" />
         ) : (
           snapshot.messages.map((message) => (
             <div key={message.id} className={`rk-task-message rk-task-message-${message.role}`}>
