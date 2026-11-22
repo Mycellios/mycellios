@@ -70,7 +70,7 @@ const isRebrandRoute = window.location.pathname === "/rebrand" || window.locatio
 if (isRebrandRoute) window.history.replaceState({}, "", "/");
 const retiredDestination = retiredMarketingDestination(window.location.pathname);
 if (retiredDestination) window.history.replaceState({}, "", `${retiredDestination}${window.location.search}`);
-// API keys moved to the Agent account; old dashboard links keep working.
+// Account management moved to the Agent account; old dashboard links keep working.
 const movedAccountPage = legacyAccountRedirect(window.location.pathname, window.location.search);
 if (movedAccountPage) window.location.replace(movedAccountPage);
 if (window.location.pathname === "/join" || window.location.pathname === "/join/") {

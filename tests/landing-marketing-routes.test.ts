@@ -38,7 +38,7 @@ describe("marketing route entries", () => {
     expect((await app.inject("/es/guias/empezar/?from=footer")).headers.location).toBe("/es/guias/empezar?from=footer");
     expect((await app.inject("/es/guias/nonexistent")).statusCode).toBe(404);
     expect((await app.inject("/guides/models-and-credits")).statusCode).toBe(404); // Missing build must not serve home as a guide.
-    expect((await app.inject("/account")).headers["x-robots-tag"]).toContain("noindex");
+    expect((await app.inject("/dashboard")).headers["x-robots-tag"]).toContain("noindex");
     expect((await app.inject("/network?view=jobs")).headers["x-robots-tag"]).toContain("noindex");
   });
   it("selects the Stats document only on the exact Stats host and leaves APIs intact", async () => {
@@ -67,15 +67,27 @@ describe("marketing route entries", () => {
     expect(response.body).toContain("Mycellios Changelog");
     expect((await app.inject("/changelog/?product=agent")).headers.location).toBe("/changelog?product=agent");
   });
-  it("sends old dashboard API key links to the Agent account", async () => {
+  it("sends every old dashboard account link to the matching Agent account section", async () => {
     const app = await site();
-    for (const url of ["/account?tab=api", "/account?tab=api&from=landing"]) {
+    const agent = "https://www.mycellios.com/agent/app?settings=";
+    for (const [url, location] of <Array<[string, string]>>[
+      ["/account?tab=api", `${agent}api-keys`],
+      ["/account?tab=api&from=landing", `${agent}api-keys`],
+      ["/account?tab=usage", `${agent}api-usage`],
+      ["/account?tab=billing", `${agent}api-plan`],
+      ["/account", `${agent}api-plan`],
+      // The coordinator's configured Stripe return URLs land on the Agent plan section.
+      ["/account?checkout=success", `${agent}api-plan&apiCheckout=success`],
+      ["/account?tab=billing&checkout=cancelled", `${agent}api-plan&apiCheckout=cancelled`],
+      ["/account?checkout=https://attacker.example/", `${agent}api-plan`],
+      ["/account?tab=account", `${agent}profile`],
+      ["/account?tab=unknown", `${agent}profile`],
+    ]) {
       const response = await app.inject(url);
-      expect(response.statusCode).toBe(302);
-      expect(response.headers.location).toBe("https://www.mycellios.com/agent/app?settings=api-keys");
+      expect(response.statusCode, url).toBe(302);
+      expect(response.headers.location, url).toBe(location);
     }
-    expect((await app.inject("/account/?tab=api")).headers.location).toBe("/account?tab=api");
-    expect((await app.inject("/account?tab=billing")).statusCode).toBe(200);
-    expect((await app.inject("/account")).statusCode).toBe(200);
+    expect((await app.inject("/account/?tab=usage")).headers.location).toBe("/account?tab=usage");
+    expect((await app.inject("/dashboard")).statusCode).toBe(200);
   });
 });

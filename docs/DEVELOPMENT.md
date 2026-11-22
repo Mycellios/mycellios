@@ -400,7 +400,7 @@ over the existing marketing base and does not repaint the panel or studios.
 
 The hero has one action, How it works, which scrolls to `#network`. That chapter
 contains the API endpoint and links to the key manager in the Agent account
-(`/agent/app?settings=api-keys`; the old `/account?tab=api` redirects there). Computer/browser contribution choices appear only under
+(`/agent/app?settings=api-keys`; old `/account` links redirect to the matching Agent API keys, subscription or usage section). Computer/browser contribution choices appear only under
 `#contribute`. Desktop download links share `/downloads/desktop`. The
 Agent illustration has one outbound handoff in its composer; its other controls
 stay within the example instead of opening the app under unrelated labels.

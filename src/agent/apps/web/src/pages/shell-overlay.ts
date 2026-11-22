@@ -21,6 +21,8 @@ const SETTINGS_SECTIONS = [
   "computer",
   "billing",
   "api-keys",
+  "api-plan",
+  "api-usage",
   "updates",
 ] as const;
 

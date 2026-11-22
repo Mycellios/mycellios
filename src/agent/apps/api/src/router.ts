@@ -34,6 +34,7 @@ import type { BoardEvents, PrismaClient, ThreadEvents, WebPresence } from "@myce
 import type { BillingService } from "./billing.js";
 import { accountRoutes } from "./routes/account.js";
 import { mycelliosApiKeyRoutes } from "./routes/mycellios-api-keys.js";
+import { mycelliosApiBillingRoutes } from "./routes/mycellios-api-billing.js";
 import { referralRoutes } from "./routes/referrals.js";
 import { boardsRoutes } from "./routes/boards.js";
 import { botsRoutes } from "./routes/bots.js";
@@ -173,6 +174,7 @@ export function createRouter(deps: RouterDeps) {
     ...localCapabilityRoutes(ctx),
     ...accountRoutes(ctx),
     ...mycelliosApiKeyRoutes(ctx),
+    ...mycelliosApiBillingRoutes(ctx),
     ...referralRoutes(ctx),
     ...spacesRoutes(ctx),
     ...modelsRoutes(ctx),

@@ -14,17 +14,6 @@ export interface ApiAccount {
   updated_at: string;
 }
 
-export interface ApiUsage {
-  id: string;
-  model: string;
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  status: "pending" | "completed" | "failed";
-  created_at: string;
-  completed_at: string | null;
-}
-
 export interface ApiKeySummary {
   id: string;
   name: string;
@@ -80,11 +69,6 @@ export function apiRequestUrl(path: string, apiBaseUrl?: string): string {
   if (!base.endsWith("/v1")) return `${base}${path}`;
 
   return `${base}${path.startsWith("/v1/") ? path.slice("/v1".length) : path}`;
-}
-
-export async function loadApiUsage(accessToken: string, limit = 50, apiBaseUrl?: string): Promise<ApiUsage[]> {
-  const response = await apiRequest<{ data: ApiUsage[] }>(`/v1/account/usage?limit=${limit}`, accessToken, {}, apiBaseUrl);
-  return response.data;
 }
 
 export function loadOperatorEvidence(accessToken: string, apiBaseUrl?: string): Promise<OperatorEvidenceSnapshot> {

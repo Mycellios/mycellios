@@ -16,7 +16,6 @@ import {
   CircleAlert,
   CirclePower,
   Code2,
-  Coins,
   Cpu,
   Download,
   ExternalLink,
@@ -86,7 +85,7 @@ import type { BenchmarkMeasurement, BenchmarkRun } from "../../src/benchlab/type
 import { DownloadsPage } from "./Downloads";
 import { EarnQuickMenu } from "./EarnQuickMenu";
 import { TABLE_PAGE_SIZE, TablePagination } from "./TablePagination";
-import { errorText, firstFocusable, trapDialogTab, formatCompactNumber, formatCompactTokens, formatPower, shortId, shortFingerprint, formatMemory, relativeTime } from "./panel-ui-utilities";
+import { errorText, firstFocusable, trapDialogTab, formatCompactNumber, formatPower, shortId, shortFingerprint, formatMemory, relativeTime } from "./panel-ui-utilities";
 const brandIcon = "/assets/brand/favicon.png";
 const Contribute = lazy(() => import("./Contribute").then((module) => ({ default: module.Contribute })));
 
@@ -121,10 +120,8 @@ import {
   type PublicAuthConfig,
 } from "./auth";
 import {
-  loadApiAccount,
   loadOperatorEvidence,
   configuredApiUrl,
-  type ApiAccount,
   type OperatorEvidenceSnapshot,
 } from "./api-access";
 import "./panel.css";
@@ -339,15 +336,6 @@ export function panelIssueForErrors(
   return null;
 }
 
-export function ApiQuotaBadge({ account }: { account: ApiAccount | null }) {
-  if (!account) return null;
-  return <span
-    className="panel-balance-badge tokens"
-    aria-label={`API token balance: ${account.token_balance}`}
-    title="Current inference token balance; not money or compute credit"
-  ><Coins size={14} />{formatCompactTokens(account.token_balance)} API tokens</span>;
-}
-
 function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   const localBrowser = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(window.location.hostname);
   const localProductionProxy = localBrowser && window.location.port === "4174";
@@ -385,7 +373,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   const [networkIdentity, setNetworkIdentity] = useState<NetworkIdentity | null>(null);
   const identityRequestSeq = useRef(0);
   const [authReady, setAuthReady] = useState(false);
-  const [apiAccount, setApiAccount] = useState<ApiAccount | null>(null);
   const [authOpen, setAuthOpen] = useState(accountEntry);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     const saved = window.localStorage.getItem("mycellios.theme");
@@ -404,18 +391,12 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
     authSessionRef.current = session;
     setAuthSession(session);
     setNetworkIdentity(null);
-    setApiAccount(null);
     if (!session) {
       return;
     }
     void loadNetworkIdentity(session.accessToken).then((identity) => {
       if (identityRequestSeq.current === requestSeq) setNetworkIdentity(identity);
     }).catch(() => undefined);
-    if (authConfig.apiAccessEnabled) {
-      void loadApiAccount(session.accessToken, apiRequestBaseUrl).then((account) => {
-        if (identityRequestSeq.current === requestSeq) setApiAccount(account);
-      }).catch(() => undefined);
-    }
   }), [apiRequestBaseUrl, authConfig.apiAccessEnabled]);
 
   const getValidSession = useCallback(async (forceRefresh = false): Promise<AuthSession | null> => {
@@ -430,15 +411,9 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
         authSessionRef.current = next;
         setAuthSession(next);
         setNetworkIdentity(null);
-        setApiAccount(null);
         void loadNetworkIdentity(next.accessToken).then((identity) => {
           if (identityRequestSeq.current === requestSeq) setNetworkIdentity(identity);
         }).catch(() => undefined);
-        if (authConfig.apiAccessEnabled) {
-          void loadApiAccount(next.accessToken, apiRequestBaseUrl).then((account) => {
-            if (identityRequestSeq.current === requestSeq) setApiAccount(account);
-          }).catch(() => undefined);
-        }
       }
       return next;
     } catch (caught) {
@@ -448,13 +423,11 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
         identityRequestSeq.current += 1;
         authSessionRef.current = null;
         setAuthSession(null);
-        setApiAccount(null);
         setNetworkIdentity(null);
         return null;
       }
       if (sessionSurvivesRefreshFailure(current, caught)) return current;
       setNetworkIdentity(null);
-      setApiAccount(null);
       return null;
     }
   }, [apiRequestBaseUrl, authConfig]);
@@ -554,16 +527,11 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
         const identity = await loadNetworkIdentity(session.accessToken).catch(() => null);
         if (!cancelled && identityRequestSeq.current === requestSeq) {
           setNetworkIdentity(identity);
-          if (config.apiAccessEnabled) {
-            const account = await loadApiAccount(session.accessToken, config.publicApiBaseUrl).catch(() => null);
-            if (!cancelled && identityRequestSeq.current === requestSeq) setApiAccount(account);
-          }
         }
       } catch {
         if (!cancelled && identityRequestSeq.current === initialRequestSeq) {
           setAuthSession(null);
           setNetworkIdentity(null);
-          setApiAccount(null);
         }
       } finally {
         if (!cancelled) setAuthReady(true);
@@ -806,7 +774,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
     authSessionRef.current = null;
     setAuthSession(null);
     setNetworkIdentity(null);
-    setApiAccount(null);
     if (session) await signOut(authConfig, session);
   }
 
@@ -927,21 +894,13 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
         ready={authReady}
         config={authConfig}
         onConfigLoaded={setAuthConfig}
-        getValidSession={getValidSession}
         session={authSession}
         identity={networkIdentity}
-        account={apiAccount}
         onAuthenticated={(session, identity) => {
-          const requestSeq = ++identityRequestSeq.current;
+          identityRequestSeq.current += 1;
           authSessionRef.current = session;
           setAuthSession(session);
           setNetworkIdentity(identity);
-          setApiAccount(null);
-          if (authConfig.apiAccessEnabled) {
-            void loadApiAccount(session.accessToken, authConfig.publicApiBaseUrl).then((account) => {
-              if (identityRequestSeq.current === requestSeq) setApiAccount(account);
-            }).catch(() => undefined);
-          }
           closeAccount();
         }}
         onRetryRole={async () => {
@@ -952,7 +911,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
           if (identityRequestSeq.current === requestSeq && authSessionRef.current?.accessToken === session.accessToken) setNetworkIdentity(identity);
         }}
         onSignOut={() => { closeAccount(); void disconnectAccount(); }}
-        initialTab={accountEntry && window.location.pathname === "/account" ? "billing" : "account"}
         onClose={closeAccount}
       />}
       </div>
