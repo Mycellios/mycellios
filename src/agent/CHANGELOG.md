@@ -6,6 +6,81 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-22
+
+### Added
+
+- The server can now archive a Mico conversation from any device, restore it, and delete it with
+  a 6-second Undo. A conversation is never deleted while it works, and the main chat can never be
+  archived or deleted. Each conversation also reports whether it is working, waiting for you or
+  finished, how its last turn ended and its last error.
+- A Mico can open its own side conversation for a separate job, such as drafting and following
+  a forum thread, and keep talking with you in its main chat. The job appears as its own
+  conversation, and when it finishes a folded "Update from" note arrives in the main chat with
+  the result and a link to that conversation; the Mico then tells you the result. A Mico can
+  have up to 8 of these jobs unfinished at once, and it can send a job more instructions or
+  close it.
+- When you stop one of these jobs, the Mico learns that you stopped it and does not start it
+  again unless you ask.
+- A Mico can read a conversation it opened from its main chat to find more detail.
+
+### Changed
+
+- The Conversations list of a Mico now marks routine, workflow and delegated threads with a
+  short label, and shows conversations archived in Tasks in their own Archived group at the end.
+  Only conversations you started can be renamed there.
+- A new Mico now greets you in its chat with one question: it says who it is and offers three
+  first tasks that fit its role, and you can pick one or write your own. This also happens for
+  your first Mico, for the Micos of a team you set up and for Micos that another Mico creates.
+- Archiving a conversation in Tasks now stops it first and then archives it. Before, Tasks asked
+  you to stop it yourself.
+- Writing in an archived conversation from Tasks now brings it back with all its messages. Before,
+  Tasks asked you to restore it first.
+- A new conversation takes its title from the first line of your first message, up to 120
+  characters. Before, it joined the whole message and stopped at 80 characters.
+- A conversation title can have 1 to 120 characters on one line, and a title you set is never
+  replaced by an automatic one.
+- OpenRouter requests now name Mycellios as the referring site, and the Agent docs link to this
+  repository instead of the former upstream project.
+- Each finished job starts a turn in the Mico's main chat, which uses Credits like any other
+  turn.
+
+### Fixed
+
+- Opening a task conversation in a Mico tab now marks it as read, as the main chat does. Before,
+  its new replies stayed unread in Tasks until the window lost and regained focus or another
+  reply arrived.
+- A Mico can now find and reread earlier messages of a task conversation with its history tools.
+  Before, searching the history of a task conversation found nothing.
+- Writing to an archived conversation from its Mico tab now brings it back to Tasks, with all its
+  messages. Before, it stayed archived while the Mico worked on the new message.
+- Screens, messages and setup text that still showed the former upstream product name now say
+  Mycellios.
+- A Mico created by another Mico no longer opens to an empty chat with only a "Created by"
+  notice.
+- A Mico created before you chose a model no longer stays silent: its welcome starts the next
+  time you open its chat with a model ready.
+- Windows updates install in about a minute. Mycellios now quits,
+  installs and reopens without copying or scanning its files first: the installer already
+  keeps the previous version and puts it back if anything fails, and never touches your data.
+- On Windows, opening Mycellios while an update is still installing no longer breaks the
+  update. The app now says the update is in progress and closes, and the installer reopens
+  it when it finishes.
+- On Mac, Restart to update now replaces the app and opens the new version by itself instead
+  of leaving the disk image for you to drag. If the app cannot replace itself (for example
+  without write access to Applications), it opens the disk image as before.
+- Mycellios Desktop is smaller. The built-in local server no longer ships type definitions,
+  TypeScript sources or test and build tools that it never runs.
+- Pausing Generate AI always works. A failed update or settings command on the computer no
+  longer leaves the control stuck on "Could not confirm contribution", and a click on a
+  running contributor now sends a new pause instead of only checking again.
+
+### Self-host upgrade notes
+
+- The `20261122120000_thread_lifecycle` migration adds nullable columns, checks and indexes to
+  `threads` and copies the archive mark of each Tasks entry to its conversation. It changes no
+  existing column, so the previous release keeps working if you roll back.
+
 ## [0.10.0] - 2026-11-22
 
 ### Changed
