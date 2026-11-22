@@ -13,6 +13,8 @@ import { installAppsStudio } from "./apps-studio-ipc.js";
 import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpace, type ManualPackageKind } from "./manual-update.js";
 import { publishedDesktopRelease } from "./published-desktop-release.js";
 import { acknowledgeManualUpdate, launchManualUpdate } from "./manual-update-handoff.js";
+import { manualUpdateBlocksStartup } from "./manual-update-lock.js";
+import { launchMacosUpdate, macosSelfUpdateBundle } from "./manual-update-macos.js";
 import { pruneManualUpdates } from "./manual-update-retention.js";
 import { attachContextMenu } from "./context-menu.js";
 import { linuxPackageKind } from "./linux-package.js";
@@ -193,6 +195,9 @@ const catalogPackage: ManualPackageKind | null =
     : process.platform === "linux" && process.arch === "x64" ? linuxPackageKind(process.execPath)
       : process.platform === "darwin" ? macosPackageKind(process.arch)
         : null;
+// Without a Developer ID certificate, a writable ad-hoc app replaces itself from the
+// verified disk image and reopens, as Windows does; otherwise the disk image opens.
+const macosSelfUpdate = process.platform === "darwin" && app.isPackaged ? macosSelfUpdateBundle(process.execPath) : null;
 const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
   ? new ManualUpdateController({
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
@@ -201,12 +206,12 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
     packageKind: catalogPackage,
     catalogUrl: DESKTOP_CATALOG_ALL_URL,
     publishedRelease: () => publishedDesktopRelease(app.getVersion(), catalogPackage),
-    ...(catalogPackage !== "windows-x64" ? { installAction: "system-installer" as const } : {}),
+    ...(catalogPackage !== "windows-x64" && !macosSelfUpdate ? { installAction: "system-installer" as const } : {}),
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
-    handoff: catalogPackage !== "windows-x64" ? file => openSystemInstaller(file) : async (file, release) => {
+    handoff: catalogPackage !== "windows-x64" && !macosSelfUpdate ? file => openSystemInstaller(file) : async (file, release) => {
       const profile = app.getPath("userData");
-      await requireManualUpdateSpace(profile, process.execPath);
+      if (!macosSelfUpdate) await requireManualUpdateSpace(profile, process.execPath);
       const win = mainWindow;
       if (!win || win.isDestroyed()) throw Error("The app window changed");
       const reopen = new URL(win.webContents.getURL());
@@ -224,7 +229,8 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
         accountComputer?.stop();
         cloudComputer?.stop();
         hostComputer?.activate(false);
-        await launchManualUpdate({ profile, executable: process.execPath,
+        if (macosSelfUpdate) await launchMacosUpdate({ profile, bundle: macosSelfUpdate, dmg: file, release, oldPid: process.pid });
+        else await launchManualUpdate({ profile, executable: process.execPath,
           oldPid: process.pid, installer: file, release, reopenUrl: reopen.href });
         quitting = true;
         app.quit();
@@ -1394,6 +1400,15 @@ app.whenReady().then(async () => {
     ? "com.mycellios.agent.desktop" : "com.mycellios.agent.desktop.dev");
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
+  // Opening the app while the update worker copies this profile aborts the update.
+  if (manualDesktopUpdater && catalogPackage === "windows-x64" &&
+      await manualUpdateBlocksStartup(userDataDir, process.argv)) {
+    dialog.showMessageBoxSync({ type: "info", title: "Mycellios", noLink: true, buttons: ["OK"],
+      message: "Mycellios is installing an update.",
+      detail: "It will open by itself when the update finishes. Opening it now would interrupt the installation." });
+    app.quit();
+    return;
+  }
   desktopDiagnostics = startDesktopDiagnostics(userDataDir, app.getVersion(), process.platform);
   process.on("uncaughtExceptionMonitor", error => recordDesktopDiagnostic("main_failure", desktopExceptionFields(error)));
   app.on("render-process-gone", (_event, _contents, details) => recordDesktopDiagnostic("renderer_exit", {reason:details.reason,exitCode:details.exitCode}));

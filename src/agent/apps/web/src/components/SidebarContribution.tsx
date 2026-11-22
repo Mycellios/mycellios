@@ -104,6 +104,9 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const waiting = Boolean(node?.pending);
   const active = node?.enabled === true;
   const hasError = !incomplete && (error || Boolean(node?.rejected));
+  // Stopping must always stay possible: after a rejected command, a click on a
+  // running contributor sends a fresh pause. Starting again still only refreshes.
+  const retryPause = !error && Boolean(node?.rejected) && active;
   const confirmedActive = Boolean(runtime) && supported && active && node?.connected === true && !hasError && !incomplete && !accountUnavailable && !needsIdentity;
   useEffect(() => {
     const key = indicator.current;
@@ -129,7 +132,7 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const controls = <div data-testid="contribution-control" data-active={confirmedActive ? "true" : "false"} className={mini ? "shrink-0 px-2 py-1" : "rk-contribution-control min-w-0 max-w-full"}>
     <div className="flex min-w-0 items-center">
     <Button variant="ghost" className={actionClass}
-      onClick={event => { if (active) stopContributionGrowth(); else if (!hasError && !needsIdentity) startContributionGrowth(event.currentTarget); if (hasError && !needsIdentity) void refresh(); else void toggle(); }} disabled={unavailable || busy || (waiting && !hasError)} aria-label={label} title={unavailable ? t`Available on Desktop` : mini ? `${label}. ${detail}` : detail}>
+      onClick={event => { if (active) stopContributionGrowth(); else if (!hasError && !needsIdentity) startContributionGrowth(event.currentTarget); if (hasError && !needsIdentity && !retryPause) void refresh(); else void toggle(); }} disabled={unavailable || busy || (waiting && !hasError)} aria-label={label} title={unavailable ? t`Available on Desktop` : mini ? `${label}. ${detail}` : detail}>
       {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : t`Generate AI`}</span><span className="block text-[11px] text-muted-foreground">{hasError ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Share computing power with the network`}</span></span>}
       <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>{spinning ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : hasError || needsIdentity ? <RefreshCw size={22} className="size-5" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}</span>
     </Button>

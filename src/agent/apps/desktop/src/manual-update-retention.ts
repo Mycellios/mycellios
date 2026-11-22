@@ -5,11 +5,12 @@ import { newerRelease } from "./manual-update.js";
 
 const JOB = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const INSTALLER = /^Mycellios-Desktop-(\d{1,6}\.\d{1,6}\.\d{1,6})-windows-x64-pilot\.exe(?:\.part)?$/;
-/** The newest jobs keep their receipts and the most recent recoverable backup. */
+/** The newest jobs keep their receipts. */
 export const RETAINED_UPDATE_JOBS = 3;
 
 /**
- * Each Windows update leaves a job folder (with a profile backup) and its installer behind.
+ * Each Windows update leaves a job folder (older versions also left a profile backup there)
+ * and its installer behind.
  * Remove the older ones so the profile does not grow with every release. Nothing is removed
  * while a helper holds the install lock, and installers for the running or a newer version stay.
  */

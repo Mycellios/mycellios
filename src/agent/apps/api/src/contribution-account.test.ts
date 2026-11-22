@@ -19,6 +19,20 @@ it.each(["pause", "resume"] as const)("keeps %s pending until telemetry follows 
   expect(await api.status("own-node")).toMatchObject({ pending: null, enabled: action === "pause" });
 });
 
+it("reports only a rejected Play/Pause command that did not take effect", async () => {
+  let commands: { type: string; state: string }[] = [];
+  const transport = vi.fn(async () => Response.json({ data: [{ nodeId: "own-node", status: "active", generation: 7, connected: true,
+    observed: { contributionEnabled: true }, commands }] }));
+  const api = contributionAccount("private-session", transport);
+  // A rejected component update must not leave Pause stuck on an error.
+  commands = [{ type: "update", state: "rejected" }, { type: "resume", state: "applied" }];
+  expect(await api.status("own-node")).toMatchObject({ enabled: true, pending: null, rejected: false });
+  commands = [{ type: "pause", state: "rejected" }];
+  expect(await api.status("own-node")).toMatchObject({ enabled: true, rejected: true });
+  commands = [{ type: "resume", state: "rejected" }];
+  expect(await api.status("own-node")).toMatchObject({ enabled: true, rejected: false });
+});
+
 function fixture() {
   let command: { type: string; state: string } | undefined;
   const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {

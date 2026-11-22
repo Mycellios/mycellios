@@ -538,7 +538,9 @@
   Restart now transfers the queued policy intent to the manual controller before
   handoff, so its failure cannot leave a second idle restart waiting or retrying.
   A pending restart is cancellable. The hidden same-user helper waits for normal
-  exit, snapshots session/installation state, installs and reopens the same profile.
+  exit, installs and reopens the same profile, without copying
+  files or scanning the profile in between: the NSIS fast-install journal keeps
+  and restores the previous installation, and the installer never writes userData.
   Never force-stop another process, use Restart Manager shutdown or clear user data.
   Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
   actual Windows PowerShell encoding in manual-update-helper tests. Start the

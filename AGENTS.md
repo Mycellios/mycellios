@@ -329,6 +329,11 @@ These rules apply to the complete repository.
   Record Gatekeeper assessment separately: ad-hoc integrity is not notarization or an
   automatically trusted browser download. Keep manual updates and never remove
   quarantine or disable Gatekeeper as part of qualification.
+  An explicit in-app Restart on a writable, non-translocated app runs
+  `manual-update-macos.sh`: after the catalog SHA-256 check it mounts the image,
+  requires the bundle ID, version and strict ad-hoc codesign, swaps the .app
+  keeping the previous one until the new one opens, and reopens it, as Windows
+  does. Other installations keep opening the disk image.
   Intel Desktop must omit the ARM-only contribution PKG and report that capability
   unsupported before creating pairing grants or prompting for administrator access.
   Qualify each architecture natively; require macOS 13 or newer. Keep the default

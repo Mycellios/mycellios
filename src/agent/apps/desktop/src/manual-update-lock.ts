@@ -14,3 +14,14 @@ export async function requireNoManualUpdate(profile: string): Promise<void> {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ManualUpdateInProgressError();
   }
 }
+
+/**
+ * A normal launch while the worker backs up or replaces this installation would
+ * reopen the profile it is copying and abort the update. Only the worker's own
+ * confirmed reopen (`--manual-update-job=`) may start before the lock is released.
+ */
+export async function manualUpdateBlocksStartup(profile: string, argv: readonly string[]): Promise<boolean> {
+  if (argv.some(arg => arg.startsWith("--manual-update-job="))) return false;
+  try { await requireNoManualUpdate(profile); return false; }
+  catch (error) { return error instanceof ManualUpdateInProgressError; }
+}
