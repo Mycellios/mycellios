@@ -3,12 +3,13 @@ import { answerSideQuestion } from "../side-question.js";
 import { deleteOwnMessage } from "../delete-own-message.js";
 import { messagePinRoutes, micoPinRoutes } from "./message-pins.js";
 import { ORPCError } from "@orpc/server";
-import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
-import { settleCallRequest } from "@mycellios/adapters";
+import { historyCompactJob, runContinueJob, runJobKey } from "@mycellios/adapter-kit";
+import { idleCompactionThread, manualCompactionStart, MANUAL_COMPACTION_RECENT_MESSAGES, settleCallRequest } from "@mycellios/adapters";
 import type { ProductEvent } from "@mycellios/contracts";
 import {
   CALL_CLIENT_NONCE_PREFIX,
   callClientNonce,
+  isMicoTaskThread,
   MODEL_REQUIRED_SEND_ERROR,
   QUEUE_HOLDING_RUN_STATUSES,
 } from "@mycellios/core";
@@ -387,6 +388,35 @@ export function threadsRoutes(ctx: RouterContext) {
           if (error instanceof ThreadContextBusyError) throw new ORPCError("CONFLICT", { message: error.message });
           throw error;
         }
+      }),
+      compactContext: authed.threads.compactContext.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("NOT_FOUND");
+        const { spaceId, userId } = context.actor;
+        const [thread, bot] = await Promise.all([
+          deps.prisma.thread.findFirst({ where: {
+            id: target.threadId, spaceId, userId, externalConversationId: null, deleteAfter: null, archivedAt: null,
+          } }),
+          deps.prisma.bot.findFirst({ where: {
+            id: target.botId, spaceId, userId, agentEngine: "pi", archivedAt: null,
+          }, select: { id: true } }),
+        ]);
+        if (!thread || !bot || (thread.botId !== bot.id && !(thread.taskBotId === bot.id && isMicoTaskThread(thread)))) {
+          throw new ORPCError("NOT_FOUND");
+        }
+        const idle = await deps.prisma.thread.findFirst({
+          where: { id: thread.id, spaceId, userId, ...idleCompactionThread() }, select: { id: true },
+        });
+        if (!idle) throw new ORPCError("CONFLICT", { message: "Wait until the conversation and its queue are idle." });
+        if (thread.nextMessageSeq - manualCompactionStart(thread) - 1 <= MANUAL_COMPACTION_RECENT_MESSAGES) {
+          return { queued: false };
+        }
+        await deps.jobs.enqueue(historyCompactJob(thread.id, {
+          generation: thread.historyCompactionGeneration,
+          nextSeq: thread.nextMessageSeq,
+          cursor: thread.historyCompactedUpToSeq,
+        }));
+        return { queued: true };
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);

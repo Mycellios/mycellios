@@ -5117,6 +5117,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               }}
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               activeColor={active?.color}
+              canCompactContext={Boolean(active && !activeProject && !active.archivedAt && (!active.agentEngine || active.agentEngine === "pi"))}
               onNewChatStarted={() => { closeAside(); if (active) void refreshThread(active.id).catch(() => undefined); }}
               running={composerRunning && !newConversation}
               busyMessages={!newConversation && currentRuns.some(run => run.status === "running" || run.status === "queued" || run.status === "leased")}

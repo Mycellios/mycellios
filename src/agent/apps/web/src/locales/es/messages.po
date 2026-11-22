@@ -14968,3 +14968,35 @@ msgstr "Revocando…"
 #: src/pages/settings/ApiKeysSettings.tsx
 msgid "Revoke key"
 msgstr "Revocar clave"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Compact now…"
+msgstr "Compactar ahora…"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Compact now"
+msgstr "Compactar ahora"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Compact this conversation?"
+msgstr "¿Compactar esta conversación?"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Summarize older messages for future replies. All messages stay visible. This uses a model call and may spend Credits."
+msgstr "Resume los mensajes anteriores para las próximas respuestas. Todos los mensajes siguen visibles. Esta acción llama al modelo y puede consumir Créditos."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Context compaction requested."
+msgstr "Compactación solicitada."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "There are no older messages to compact yet."
+msgstr "Todavía no hay mensajes anteriores que compactar."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Could not request compaction. Try again."
+msgstr "No se pudo solicitar la compactación. Inténtalo de nuevo."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Requesting…"
+msgstr "Solicitando…"

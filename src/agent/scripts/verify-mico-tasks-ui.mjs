@@ -52,6 +52,17 @@ async function verifyMobileMenu(browser, url) {
     await dialog.waitFor({ state: "hidden" });
     if (!(await picker.isVisible())) await trigger.tap();
     await pending.getByText("A task with a deliberately long project and functionality name").waitFor();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Conversation options" }).tap();
+    await page.getByRole("menuitem", { name: "Compact now…" }).tap();
+    const compaction = page.getByRole("dialog", { name: "Compact this conversation?" });
+    await compaction.waitFor();
+    const bounds = await compaction.boundingBox();
+    assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390);
+    await page.screenshot({ path: path.join(output, "mobile-context-compaction.png"), animations: "disabled" });
+    await compaction.getByRole("button", { name: "Compact now", exact: true }).tap();
+    await compaction.waitFor({ state: "hidden" });
+    await page.getByText("Context compaction requested.").waitFor();
     assert.deepEqual(errors, []);
   } finally {
     await page.close();

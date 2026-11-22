@@ -64,6 +64,13 @@
 
 # AGENTS.md
 
+- Manual context compaction is for idle, owned Pi chats and side conversations.
+  The background job checks the message sequence, summary cursor, generation and
+  queue before summarizing and again before replacing the local summary. Keep
+  recent messages verbatim, preserve the visible transcript and meter a bounded
+  model call. Do not export manual summaries to semantic memory. Verify
+  history-compaction, NewChatControl and the mobile conversation browser fixture.
+
 - Team app builds follow the reference app's bot-crew preview (behavior reference only, no
   copied code) through specs/mico-team-build/spec.md. Presence is transient: the
   worker publishes it on the realtime fanout only after an authorized app_read/

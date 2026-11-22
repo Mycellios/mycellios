@@ -262,6 +262,7 @@ function compactionHarness(
     spaceId: "workspace-1",
     userId: "user-1",
     nextEventSeq: 0,
+    contextStartSeq: 0,
     nextMessageSeq: options.nextMessageSeq ?? messages.length,
     historyCompactedUpToSeq: options.historyCompactedUpToSeq ?? (null as number | null),
     historyCompactionSummary: options.historyCompactionSummary ?? (null as string | null),
@@ -278,6 +279,7 @@ function compactionHarness(
   const prisma = {
     thread: {
       findUniqueOrThrow: vi.fn(async () => thread),
+      findFirst: vi.fn(async (): Promise<typeof thread | null> => thread),
       updateMany: vi.fn(
         async (args: {
           where: {
@@ -299,6 +301,7 @@ function compactionHarness(
         },
       ),
     },
+    bot: { findFirst: vi.fn(async () => ({ id: "bot-1" })) },
     event: {
       findFirst: vi.fn(async () => (options.wasCleared ? { seq: 0 } : null)),
     },
@@ -473,6 +476,32 @@ describe("recordHistoryCompactAttemptsExhausted", () => {
 });
 
 describe("compactHistory", () => {
+  it("summarizes the current generation locally and retains the recent conversation suffix", async () => {
+    const harness = compactionHarness({ deploymentModelKey: "openrouter-key", historyCompactionGeneration: 3 });
+    harness.thread.contextStartSeq = 20;
+    await compactHistory(harness.deps, "thread-1", { generation: 3, nextSeq: 50, cursor: null });
+    const request = harness.runtime.run.mock.calls[0]?.[0];
+    expect(request?.prompt).toContain("message 20");
+    expect(request?.prompt).toContain("message 41");
+    expect(request?.prompt).not.toMatch(/message (19|42)/);
+    expect(request?.model.maxTokens).toBe(2048);
+    expect(harness.thread.historyCompactedUpToSeq).toBe(41);
+    expect(harness.memoryProviders.resolve).not.toHaveBeenCalled();
+    expect(harness.jobs.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("spends no model call when the snapshot is stale or the conversation is busy", async () => {
+    const harness = compactionHarness({ deploymentModelKey: "openrouter-key" });
+    harness.prisma.thread.findFirst.mockResolvedValueOnce(null);
+    await compactHistory(harness.deps, "thread-1", { generation: 1, nextSeq: 49, cursor: null });
+    expect(harness.prisma.thread.findFirst).toHaveBeenCalledWith({ where: expect.objectContaining({
+      nextMessageSeq: 49, historyCompactionGeneration: 1,
+      runs: { none: { status: { in: expect.arrayContaining(["running", "waiting_input"]) } } },
+      messages: { none: { steeringMessages: { some: { originTrigger: "queued_user", claimedAt: null } } } },
+    }) });
+    expect(harness.runtime.run).not.toHaveBeenCalled();
+  });
+
   it("summarizes the next batch, saves it through the provider, and advances the cursor", async () => {
     const harness = compactionHarness({ deploymentModelKey: "openrouter-key" });
 
