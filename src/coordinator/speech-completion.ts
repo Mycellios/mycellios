@@ -3,11 +3,13 @@ import { isKokoroDeployment, MAX_SPEECH_RESPONSE_BYTES, verifiedSpeechEnvelope, 
 import { isDecisionDeployment, MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import type { ChatCompletionRequest, CompletionResult, ModelDeployment } from "../contracts/types.js";
 import { isEmbeddingDeployment, MAX_EMBEDDING_RESPONSE_BYTES } from "../contracts/embedding.js";
+import { isMemoryEmbeddingDeployment, MAX_MEMORY_EMBEDDING_RESPONSE_BYTES } from "../contracts/memory-embedding.js";
 
 export function replicaOutputByteLimit(deployment: ModelDeployment | undefined, maxTokens = 256): number {
   if (isTranscriptionDeployment(deployment)) return MAX_TRANSCRIPTION_RESULT_BYTES;
   if (isDecisionDeployment(deployment)) return MAX_DECISION_RESPONSE_BYTES;
   if (isEmbeddingDeployment(deployment)) return MAX_EMBEDDING_RESPONSE_BYTES;
+  if (isMemoryEmbeddingDeployment(deployment)) return MAX_MEMORY_EMBEDDING_RESPONSE_BYTES;
   return isKokoroDeployment(deployment) ? MAX_SPEECH_RESPONSE_BYTES
     : Math.min(2 * 1024 * 1024, Math.max(4096, maxTokens * 32));
 }

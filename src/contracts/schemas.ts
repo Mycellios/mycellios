@@ -2,7 +2,8 @@ import { TRANSCRIPTION_MODEL, TRANSCRIPTION_DIGEST, transcriptionWorkerAdapterSc
 import { z } from "zod";
 import { DECISION_CONTEXT_LIMIT, DECISION_DEADLINE_MS, DECISION_DIGEST, DECISION_MODEL, decisionWorkerAdapterSchema, parseDecisionRequest } from "./decision.js";
 import { hostMemoryObservationSchema } from "./host-memory.js";
-import { embeddingWorkerAdapterSchema, EMBEDDING_DIGEST, EMBEDDING_MODEL } from "./embedding.js";
+import { embeddingDigestFor, embeddingWorkerAdapterSchema, EMBEDDING_MODEL } from "./embedding.js";
+import { approvedMemoryEmbeddingExecution, MEMORY_EMBEDDING_MODEL } from "./memory-embedding.js";
 import { kokoroWorkerAdapterSchema, KOKORO_WEIGHT_DIGEST, KOKORO_MODEL, speechOptionsSchema, resolveSpeechOptions } from "./speech.js";
 import {
   coordinatorRuntimePerformanceEvidenceSchema,
@@ -141,7 +142,7 @@ export const chatCompletionRequestSchema = z.object({
   }
 }).transform(({ stream_options: _streamOptions, ...request }) => ({ ...request,
   // HTTP response controls must not enter the versioned worker protocol.
-  deadline_ms: request.deadline_ms ?? (request.model === DECISION_MODEL ? DECISION_DEADLINE_MS : request.model === EMBEDDING_MODEL ? 300_000 : 120_000),
+  deadline_ms: request.deadline_ms ?? (request.model === DECISION_MODEL ? DECISION_DEADLINE_MS : (request.model === EMBEDDING_MODEL || request.model === MEMORY_EMBEDDING_MODEL) ? 300_000 : 120_000),
 }));
 
 export const deploymentSchema = z
@@ -279,8 +280,11 @@ export const deploymentSchema = z
     } else if (deployment.adapter === "transcription") {
       if (!deployment.activationId || deployment.model !== TRANSCRIPTION_MODEL || deployment.modelDigest !== TRANSCRIPTION_DIGEST || deployment.maxConcurrency !== 1 || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") context.addIssue({ code: "custom", message: "Transcription requires a pinned activation and separate native qualification" });
     } else if (deployment.adapter === "embedding") {
-      if (!deployment.activationId || deployment.modelDigest !== EMBEDDING_DIGEST || deployment.canaryEvidence || deployment.verificationState) {
+      if (!deployment.activationId || deployment.modelDigest !== embeddingDigestFor(deployment.model) || deployment.canaryEvidence || deployment.verificationState) {
         context.addIssue({ code: "custom", message: "Embedding requires its pinned activation and separate embedding qualification", path: ["activationId"] });
+      }
+      if (deployment.model === MEMORY_EMBEDDING_MODEL && (deployment.maxConcurrency !== 1 || !approvedMemoryEmbeddingExecution(deployment.execution))) {
+        context.addIssue({ code: "custom", message: "Memory embeddings require one slot and one approved device/precision stage", path: ["execution"] });
       }
     } else if (deployment.adapter === "kokoro" && deployment.activationId) {
       if (deployment.model !== KOKORO_MODEL || deployment.modelDigest !== KOKORO_WEIGHT_DIGEST
@@ -581,8 +585,11 @@ export const workerConfigSchema = z.object({
     context.addIssue({ code: "custom", message: "Decision replicas require a pinned activation, context limit, one slot and whole-cell scope" });
   }
   if (config.adapter.kind === "transcription" && (config.deployment.modelDigest !== TRANSCRIPTION_DIGEST || !config.deployment.activationId || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) context.addIssue({ code: "custom", message: "Transcription requires pinned artifact, activation, one slot and cell scope" });
-  if (config.adapter.kind === "embedding" && (config.deployment.modelDigest !== EMBEDDING_DIGEST || !config.deployment.activationId || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) {
+  if (config.adapter.kind === "embedding" && (config.deployment.modelDigest !== embeddingDigestFor(config.adapter.model) || !config.deployment.activationId || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) {
     context.addIssue({ code: "custom", message: "Embedding requires the pinned artifact, activation, one slot and whole-cell scope" });
+  }
+  if (config.adapter.kind === "embedding" && config.adapter.model === MEMORY_EMBEDDING_MODEL && !approvedMemoryEmbeddingExecution(config.deployment.execution)) {
+    context.addIssue({ code: "custom", message: "Memory embeddings require one approved device/precision execution stage", path: ["deployment", "execution"] });
   }
   if (config.adapter.kind === "kokoro" && (
     config.deployment.modelDigest !== KOKORO_WEIGHT_DIGEST || config.limits.maxConcurrency !== 1

@@ -103,10 +103,156 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   - stop `MycelliosQwen06`;
   - remove its replica from the broker configuration.
 
+## Native replica (coordinator path)
+
+Status: implemented, not yet physically qualified. The forwarder path above
+is unchanged and stays the production route until the migration below.
+
+The replica is admitted through the coordinator like the 4B embedding
+replica: a worker with the `embedding` adapter, a pinned deployment, native
+qualification receipts and placement by the broker. The public model is
+`mycellios-qwen3-embedding-0.6b`. Code: `src/contracts/memory-embedding.ts`,
+`src/adapters/memory-embedding.ts`, and the `native` listener in
+`qwen06_embedding_service.py`. Tests: `tests/memory-embedding.test.ts` and
+the native cases in `python/tests/test_qwen06_embedding_service.py`.
+
+### Runtime and adapter
+
+- With a `native` section (`{"port": 18497, "activationId": "..."}`) the
+  replica process also listens on loopback without a token, sharing the model
+  it already loaded for the forwarder. It refuses requests with an `Origin`
+  header, so a web page cannot use it.
+- It starts the listener only after it has hashed every pinned file
+  (`config.json`, `generation_config.json`, `merges.txt`,
+  `model.safetensors`, `tokenizer.json`, `tokenizer_config.json`,
+  `vocab.json`) at the pinned revision. The artifact identity is
+  `sha256("mycellios-memory-embedding/1", revision, "name:sha256"...)`,
+  computed the same way in TypeScript and Python, and both test suites pin it.
+- Approved executions are single-stage GPU only: CUDA fp16, MPS fp16 and
+  DirectML fp32. These are the pairs measured at cosine ≥ 0.999996 against
+  CPU fp32. DirectML fp16 (0.987) is refused by the worker configuration, the
+  deployment schema, the adapter and the runtime. CPU backups cannot be
+  natively qualified, so they stay on the forwarder.
+- `GET /health` reports `status`, model, upstream model, revision, artifact
+  identity, activation, runtime, dimensions, limits, device and dtype. The
+  adapter is ready only when every field matches its configuration. A GPU
+  replica without a committed reservation reports `waiting_reservation`, and
+  a hot one reports `cooling`, so the worker reads as not ready in both cases.
+- `POST /embed` takes the request envelope plus the worker lease
+  (`jobId`, `id`, `deadline`, `activationId`). It rejects a stale lease or
+  one for another activation with 409. The response is
+  `{"schema":"mycellios-memory-embeddings/1","result":{object, model, revision, data, usage}}`.
+  The existing unit-length guard applies here too.
+
+### Request contract
+
+- `POST /v1/chat/completions` with `model: "mycellios-qwen3-embedding-0.6b"`,
+  `max_tokens: 1`, `stream: false` and one user message whose content is
+  `{"schema":"mycellios-memory-embeddings/1","input":[...],"input_type":"document"|"query"}`
+  (1..64 non-blank texts of at most 32,768 characters; `input_type` defaults to
+  `document`). The runtime applies the query instruction; clients never add it.
+- The answer's message content is the result envelope above. The coordinator
+  rejects a completion unless it has one 1024-dimensional unit vector per input,
+  in order, with the pinned revision and matching usage. The limit is
+  1,900,000 response bytes, which fits 64 full vectors. The deadline is 300 s.
+- Requests for this model are served **only** by replicas with fresh native
+  qualification for the current worker, session, build and activation. If a
+  replica is connected but not qualified, the answer is 503
+  `native_qualification_unavailable`. With no replica at all, it is the usual
+  503 `no_capacity`. Only the internal, identity-pinned qualification probe
+  can reach an unqualified replica.
+- Each worker has one slot (`maxConcurrency: 1`), so a busy replica takes
+  no further work. `/v1/chat/completions` already waits up to 45 s for
+  capacity. The client should keep one request in flight per qualified
+  replica and retry 503 with backoff, as the backfill already does.
+
+### Deployment entry (worker configuration)
+
+A standalone worker on the replica's PC, enrolled through
+`MYCELLIOS_WORKER_ENROLLMENT_PATH` like other standalone replicas:
+
+```json
+{
+  "region": "eu-west", "capacityScope": "cell", "offeredVramMb": 1024,
+  "limits": { "maxConcurrency": 1 },
+  "adapter": { "kind": "embedding", "model": "mycellios-qwen3-embedding-0.6b",
+               "baseUrl": "http://127.0.0.1:18497/" },
+  "deployment": {
+    "modelDigest": "sha256:7ced807793a552878c586b4fc420c5f9edef134abe30e4202b9f2022487cdd55",
+    "activationId": "<same value as the runtime's native.activationId>",
+    "contextLimit": 524288,
+    "execution": { "deviceType": "gpu", "backend": "cuda", "deviceName": "<GPU>",
+      "precision": "float16", "fallback": false,
+      "stages": [{ "nodeId": "<node id>", "stageIndex": 0, "layerStart": 0, "layerEnd": 28,
+        "deviceType": "gpu", "backend": "cuda", "deviceName": "<GPU>",
+        "precision": "float16", "fallback": false }] }
+  }
+}
+```
+
+The broker configuration keeps the existing reservation for consumer
+`qwen06-cuda-mrpucchi-20261121` and lists
+`"requestModels": ["mycellios-qwen3-embedding-0.6b"]`, so coordinator demand
+and busy slots count for placement. Until Jarvis moves to this path, keep that
+replica `pinned`, because forwarder traffic is not visible to the broker.
+
+### Qualification
+
+`POST /internal/v1/native-replica-qualifications` (admin and network tokens)
+runs three normal leases on the target deployment. Each one embeds the query
+`What is the capital of Spain?`. Every sample must:
+
+- meet the general native checks (one GPU stage, the right worker, deployment
+  and node, zero output tokens, a signed receipt);
+- reach a cosine ≥ 0.9995 against a pinned CPU fp32 reference vector
+  (`memoryEmbeddingCanaryReference`).
+
+The reference check proves the precision is within bounds and that the
+runtime applied the query instruction. The evidence is stored with
+`responseKind: "embedding"`. It lasts seven days and is bound to the worker
+session and build, so a reconnect or new build needs a fresh run.
+
+### Jarvis access
+
+- An operator-owned Mycellios API key (`Authorization: Bearer <key>`), kept
+  in Jarvis state like the current token.
+- Operator-funded quota: add the key's ID to
+  `MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON`
+  (`{"<apiKeyId>":["mycellios-qwen3-embedding-0.6b"]}`). These requests reserve
+  and charge zero tokens and record `api_operator_funded_usage`. Rate and
+  concurrency limits still apply (default 30/min, 2 concurrent). Raise them
+  only through an approved `api-account-limits.json` override.
+
+### Migration and rollback
+
+1. Physically qualify on MRPUCCHI:
+   - add the `native` section to its replica configuration;
+   - start the standalone worker;
+   - run the qualification and keep the receipt.
+   The forwarder keeps serving the whole time, because both listeners share
+   the loaded model.
+2. Configure the operator key and quota, then point a Jarvis canary at the
+   coordinator. Its vectors must reach a cosine ≥ 0.9999 against the
+   forwarder's for the same documents and queries.
+3. Switch the Jarvis client and backfill to the coordinator. Then unpin the
+   broker entry so placement follows real demand.
+4. Qualify the MacBook (MPS) and PC-DANI (DirectML) replicas the same way.
+   Their workers add capacity without a placement reservation.
+5. Retire the forwarder and the bearer-token listeners only after the
+   coordinator path has carried the backfill.
+
+Rollback at any step:
+
+- point Jarvis back at the forwarder (its configuration is unchanged);
+- stop the standalone worker;
+- remove the `native` section;
+- remove the key from the operator quota map.
+
+Vectors from both paths are interchangeable, so nothing has to be re-embedded.
+
 ## Follow-ups
 
-- Admit this replica through the coordinator as a qualified native replica
-  (adapter, deployments, receipts) instead of a direct private service.
+- Physically qualify the native replica (see "Migration and rollback").
 - Add more CPU backups once nodes have spare RAM (the MSI GE60 has about
   3 GB free while it runs its 4B stage).
 

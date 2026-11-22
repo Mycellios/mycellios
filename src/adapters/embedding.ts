@@ -10,7 +10,7 @@ export class EmbeddingAdapter implements InferenceAdapter {
   private readonly jobs = new Map<string, AbortController>();
   constructor(options: { baseUrl: string; model: string; modelDigest: string; activationId: string }) {
     const config = embeddingWorkerAdapterSchema.parse({ kind: this.kind, model: options.model, baseUrl: options.baseUrl });
-    if (options.modelDigest !== EMBEDDING_DIGEST || !options.activationId) throw new Error("embedding_artifact_or_activation_missing");
+    if (config.model !== EMBEDDING_MODEL || options.modelDigest !== EMBEDDING_DIGEST || !options.activationId) throw new Error("embedding_artifact_or_activation_missing");
     this.options = options;
     this.baseUrl = new URL(config.baseUrl);
   }
@@ -65,7 +65,7 @@ export class EmbeddingAdapter implements InferenceAdapter {
     return { ready: this.ready, activeJobs: this.jobs.size, loadedModels: this.ready ? [EMBEDDING_MODEL] : [] };
   }
 }
-async function boundedBody(response: Response, maximum: number) {
+export async function boundedBody(response: Response, maximum: number) {
   if (!response.ok || !response.body) {
     await response.body?.cancel();
     throw new AdapterError("Embedding runtime HTTP " + response.status, "embedding_runtime_failed", response.status >= 500 || response.status === 429);

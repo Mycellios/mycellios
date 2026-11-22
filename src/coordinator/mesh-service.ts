@@ -2,6 +2,7 @@ import { TRANSCRIPTION_MODEL, isTranscriptionDeployment, parseTranscriptionReque
 import { isKokoroDeployment } from "../contracts/speech.js";
 import { DECISION_DEADLINE_MS, DECISION_MODEL, isDecisionDeployment, parseDecisionRequest, verifiedDecisionEnvelope } from "../contracts/decision.js";
 import { EMBEDDING_MODEL, isEmbeddingDeployment, parseEmbeddingRequest, verifiedEmbeddingEnvelope } from "../contracts/embedding.js";
+import { isMemoryEmbeddingDeployment, MEMORY_EMBEDDING_MODEL, parseMemoryEmbeddingRequest, verifiedMemoryEmbeddingEnvelope } from "../contracts/memory-embedding.js";
 import { replicaOutputByteLimit, validateSpeechCompletion } from "./speech-completion.js";
 import { EventEmitter } from "node:events";
 import type {
@@ -212,7 +213,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const queue = new AsyncQueue<JobStreamEvent>();
     // Atomic long-context embeddings have their own bounded execution budget.
     // Preserve the caller's shorter deadline and all other models' timeouts.
-    const deadlineCeiling = stableRequest.model === DECISION_MODEL ? DECISION_DEADLINE_MS : stableRequest.model === EMBEDDING_MODEL ? 300_000 : modelRequestTimeout(stableRequest.model, this.options.modelRequestTimeoutsMs, this.requestTimeoutMs);
+    const deadlineCeiling = stableRequest.model === DECISION_MODEL ? DECISION_DEADLINE_MS : (stableRequest.model === EMBEDDING_MODEL || stableRequest.model === MEMORY_EMBEDDING_MODEL) ? 300_000 : modelRequestTimeout(stableRequest.model, this.options.modelRequestTimeoutsMs, this.requestTimeoutMs);
     const deadlineMs = Math.min(request.deadline_ms ?? deadlineCeiling, deadlineCeiling);
     (await this.store.database.transaction(async () => {
       // Only the authenticated native qualification path supplies this permit.
@@ -233,7 +234,12 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     }));
 
     const connected = this.offerableWorkerIds();
-    const requireSettlementEvidence = submitOptions.requireSettlementEvidence === true;
+    // Memory vectors are only taken from replicas with fresh native
+    // qualification. The qualification probe itself is the one internal,
+    // identity-pinned request that may reach a replica before that evidence.
+    const requireQualifiedReplica = stableRequest.model === MEMORY_EMBEDDING_MODEL
+      && !(stableRequest.privacy?.boundary === "pinned-edges" && (stableRequest.privacy.pinned_identity_ids?.length ?? 0) > 0);
+    const requireSettlementEvidence = submitOptions.requireSettlementEvidence === true || requireQualifiedReplica;
     const planRoute = async (allowed: ReadonlySet<string>, settle = requireSettlementEvidence) => {
       const options = routeOptionsForRequest(stableRequest, allowed, settle);
       const plan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
@@ -260,6 +266,11 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
         return planned;
       })
       : await planRoute(connected);
+    if (!routePlan && requireQualifiedReplica && submitOptions.requireSettlementEvidence !== true && (await planRoute(connected, false)).plan) {
+      (await this.store.setJobStatus(jobId, "failed", "native_qualification_unavailable"));
+      throw new MeshServiceError("native_qualification_unavailable",
+        "A replica is connected but has no current native qualification for this model", 503);
+    }
     if (!routePlan && requireSettlementEvidence && (await planRoute(connected, false)).plan) {
       // A replica exists but none can settle a paid request (its native
       // qualification lapsed). Refuse before running it: running would only
@@ -949,7 +960,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     // An embedding is an atomic vector batch, not incremental text. Do not
     // apply the text decoder's 15-second first-token estimate to its full job.
     if (isDecisionDeployment(deployment)) return Math.max(1_000, Math.min(DECISION_DEADLINE_MS, remainingMs));
-    if (isEmbeddingDeployment(deployment)) return Math.max(1_000, Math.min(300_000, remainingMs));
+    if (isEmbeddingDeployment(deployment) || isMemoryEmbeddingDeployment(deployment)) return Math.max(1_000, Math.min(300_000, remainingMs));
     if (this.options.modelRequestTimeoutsMs && Object.hasOwn(this.options.modelRequestTimeoutsMs, runtime.request.model)) {
       return Math.max(1_000, Math.min(120_000, remainingMs));
     }
@@ -1012,6 +1023,13 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
         if (result.text !== runtime.output || result.finishReason !== "stop" || result.metrics.outputTokens !== 0 || result.metrics.inputTokens !== envelope.result.usage.prompt_tokens) throw new Error("embedding_billing_mismatch");
         return { ok: true };
       } catch { return { ok: false, reason: "Embedding integrity validation failed" }; }
+    }
+    if (isMemoryEmbeddingDeployment(deployment)) {
+      try {
+        const envelope = verifiedMemoryEmbeddingEnvelope(runtime.output, parseMemoryEmbeddingRequest(runtime.request));
+        if (result.text !== runtime.output || result.finishReason !== "stop" || result.metrics.outputTokens !== 0 || result.metrics.inputTokens !== envelope.result.usage.prompt_tokens) throw new Error("memory_embedding_billing_mismatch");
+        return { ok: true };
+      } catch { return { ok: false, reason: "Memory embedding integrity validation failed" }; }
     }
     const maximumOutputTokens = runtime.request.max_tokens ?? 256;
     const outputBytes = Buffer.byteLength(runtime.output, "utf8");

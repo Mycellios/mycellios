@@ -6,6 +6,7 @@ import { CoordinatorRttProbe } from "./coordinator-rtt-probe.js";
 import { RuntimePreparationQueue } from "./runtime-preparation-queue.js";
 import { MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import { MAX_EMBEDDING_RESPONSE_BYTES } from "../contracts/embedding.js";
+import { MAX_MEMORY_EMBEDDING_RESPONSE_BYTES, MEMORY_EMBEDDING_MODEL } from "../contracts/memory-embedding.js";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import {
@@ -2340,7 +2341,7 @@ export class WorkerAgent {
     let output = "";
     let outputBytes = 0;
     let backendMetrics: AdapterChunk["metrics"] | undefined;
-    const outputByteLimit = this.adapter.kind === "transcription" ? MAX_TRANSCRIPTION_RESULT_BYTES : this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "embedding" ? MAX_EMBEDDING_RESPONSE_BYTES : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
+    const outputByteLimit = this.adapter.kind === "transcription" ? MAX_TRANSCRIPTION_RESULT_BYTES : this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "embedding" ? (this.config.adapter.model === MEMORY_EMBEDDING_MODEL ? MAX_MEMORY_EMBEDDING_RESPONSE_BYTES : MAX_EMBEDDING_RESPONSE_BYTES) : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
       : Math.min(MAX_OUTPUT_BYTES, (payload.request.max_tokens ?? 256) * 32);
     try {
       for await (const chunk of this.adapter.generate(

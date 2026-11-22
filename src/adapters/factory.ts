@@ -2,6 +2,8 @@ import { TranscriptionAdapter } from "./transcription.js";
 import { KokoroAdapter } from "./kokoro.js";
 import { DecisionAdapter, decisionRuntimeToken } from "./decision.js";
 import { EmbeddingAdapter } from "./embedding.js";
+import { MemoryEmbeddingAdapter } from "./memory-embedding.js";
+import { MEMORY_EMBEDDING_MODEL } from "../contracts/memory-embedding.js";
 import type { WorkerConfig } from "../contracts/schemas.js";
 import type { InferenceAdapter } from "./base.js";
 import { MycelliosNativeControlAdapter } from "./mycellios-native-control.js";
@@ -13,6 +15,9 @@ export function createAdapter(config: WorkerConfig): InferenceAdapter {
     case "decision":
       return new DecisionAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest!, activationId: config.deployment.activationId!, runtimeToken: decisionRuntimeToken() });
     case "embedding":
+      if (config.adapter.model === MEMORY_EMBEDDING_MODEL) {
+        return new MemoryEmbeddingAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest!, activationId: config.deployment.activationId!, execution: config.deployment.execution });
+      }
       return new EmbeddingAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest!, activationId: config.deployment.activationId! });
     case "transcription":
       return new TranscriptionAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest! });

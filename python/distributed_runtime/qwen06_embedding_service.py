@@ -8,9 +8,15 @@ the shared GPU budget is never exceeded. A CPU replica needs no reservation.
 A DirectML replica (AMD/Intel GPUs on Windows) runs in float32: float16 on
 DirectML drifts too far from the other replicas' vectors.
 
+With a `native` section the same process also serves a credential-free
+loopback listener for a Mycellios worker (`MemoryEmbeddingAdapter`), so the
+coordinator can admit the replica as a qualified native replica. Both
+listeners share one loaded model.
+
 Contract: specs/memory-embedding-qwen06/spec.md
 """
 import argparse
+import hashlib
 import hmac
 import json
 import math
@@ -337,6 +343,136 @@ def make_handler(replica, token):
     return Handler
 
 
+# Native replica contract (src/contracts/memory-embedding.ts).
+NATIVE_MODEL = "mycellios-qwen3-embedding-0.6b"
+NATIVE_RUNTIME = "mycellios-memory-embedding/1"
+NATIVE_SCHEMA = "mycellios-memory-embeddings/1"
+PINNED_REVISION = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+PINNED_FILES = {
+    "config.json": "b5bf1f51fc45be473a54718cef92448d90a1be001bf9b9a44b8c7f10a19feaa9",
+    "generation_config.json": "28396d421a2108acce96383f6a7de78008f7f1b17f807958f3c14c51dbfb65fb",
+    "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+    "model.safetensors": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd",
+    "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a",
+    "tokenizer_config.json": "253153d0738ceb4c668d2eff957714dd2bea0b56de772a9fdccd96cbf517e6a0",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+}
+# GPU pairs measured against CPU fp32; DirectML float16 drifted (cosine 0.987).
+NATIVE_EXECUTIONS = {("cuda", "float16"), ("mps", "float16"), ("directml", "float32")}
+NATIVE_MAX_TEXT_CHARS = 32_768
+
+
+def artifact_identity(revision=PINNED_REVISION, files=None):
+    files = PINNED_FILES if files is None else files
+    parts = ["mycellios-memory-embedding/1", revision] + [name + ":" + files[name] for name in sorted(files)]
+    return "sha256:" + hashlib.sha256("\0".join(parts).encode()).hexdigest()
+
+
+def verify_artifact(model_path, files=None):
+    """Hash every pinned file on disk; refuse to serve natively on any mismatch."""
+    files = PINNED_FILES if files is None else files
+    for name, expected in files.items():
+        digest = hashlib.sha256()
+        with open(Path(model_path) / name, "rb") as handle:
+            for block in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(block)
+        if digest.hexdigest() != expected:
+            raise ValueError("artifact_mismatch:" + name)
+    return artifact_identity(files=files)
+
+
+def native_settings(config):
+    native = config.get("native")
+    if not native:
+        return None
+    host = native.get("host", "127.0.0.1")
+    activation = native.get("activationId")
+    if host not in ("127.0.0.1", "::1"):
+        raise ValueError("native_listener_must_be_loopback")
+    if config.get("revision") != PINNED_REVISION:
+        raise ValueError("native_revision_not_pinned")
+    if (config.get("device"), config.get("dtype")) not in NATIVE_EXECUTIONS:
+        raise ValueError("native_execution_not_approved")
+    if not isinstance(activation, str) or not 0 < len(activation) <= 256:
+        raise ValueError("native_activation_missing")
+    return {"host": host, "port": int(native["port"]), "activationId": activation}
+
+
+def validate_native_request(body, activation_id, now_ms):
+    if not isinstance(body, dict) or body.get("schema") != NATIVE_SCHEMA \
+            or not set(body) <= {"schema", "input", "input_type", "lease"}:
+        raise ServiceError(400, "invalid_request")
+    lease = body.get("lease")
+    if not isinstance(lease, dict) or lease.get("activationId") != activation_id \
+            or not isinstance(lease.get("id"), str) or not isinstance(lease.get("jobId"), str) \
+            or not isinstance(lease.get("deadline"), int) or lease["deadline"] <= now_ms:
+        raise ServiceError(409, "lease_invalid")
+    inputs = body.get("input")
+    if not isinstance(inputs, list) or any(not isinstance(text, str) or len(text) > NATIVE_MAX_TEXT_CHARS for text in inputs):
+        raise ServiceError(400, "invalid_input")
+    return validate_request({"input": inputs, "input_type": body.get("input_type", "document")})
+
+
+def make_native_handler(replica, settings, identity, clock=time.time):
+    """Loopback runtime for the worker adapter: no token, no browser origins."""
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "MycelliosQwen06Native/1"
+
+        def log_message(self, *args):
+            return
+
+        def reply(self, status, payload):
+            raw = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def browser(self):
+            # A web page can reach loopback; the worker never sends Origin.
+            return self.headers.get("Origin") is not None
+
+        def do_GET(self):
+            if self.browser():
+                return self.reply(403, {"error": {"code": "forbidden"}})
+            if self.path != "/health":
+                return self.reply(404, {"error": {"code": "not_found"}})
+            cooling = replica.thermal is not None and replica.thermal.paused
+            status = "cooling" if cooling and replica.state == "ready" else replica.state
+            self.reply(200, {"status": status, "model": NATIVE_MODEL, "upstream_model": MODEL_ID,
+                             "revision": replica.config["revision"], "artifact_identity": identity,
+                             "activation_id": settings["activationId"], "runtime": NATIVE_RUNTIME,
+                             "dimensions": DIMENSIONS, "max_inputs": MAX_INPUTS, "max_input_tokens": MAX_TOKENS,
+                             "device": replica.config["device"], "dtype": replica.config["dtype"]})
+
+        def do_POST(self):
+            try:
+                if self.browser():
+                    self.close_connection = True
+                    raise ServiceError(403, "forbidden")
+                if self.path != "/embed":
+                    raise ServiceError(404, "not_found")
+                length = int(self.headers.get("Content-Length") or 0)
+                if length <= 0 or length > MAX_BODY_BYTES:
+                    self.close_connection = True
+                    raise ServiceError(413 if length > MAX_BODY_BYTES else 400, "invalid_body_size")
+                raw = self.rfile.read(length)
+                texts = validate_native_request(json.loads(raw), settings["activationId"], int(clock() * 1000))
+                vectors, tokens = replica.embed(texts, lambda: connection_closed(self.connection))
+                self.reply(200, {"schema": NATIVE_SCHEMA, "result": {
+                    "object": "list", "model": NATIVE_MODEL, "revision": replica.config["revision"],
+                    "data": [{"object": "embedding", "index": i, "embedding": v} for i, v in enumerate(vectors)],
+                    "usage": {"prompt_tokens": tokens, "total_tokens": tokens}}})
+            except ServiceError as error:
+                self.reply(error.status, {"error": {"code": error.code}})
+            except (ValueError, json.JSONDecodeError):
+                self.reply(400, {"error": {"code": "invalid_request"}})
+            except Exception:
+                self.reply(500, {"error": {"code": "internal_error"}})
+    return Handler
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
@@ -344,6 +480,8 @@ def main():
     token = Path(config["tokenFile"]).read_text(encoding="utf-8").strip()
     if len(token) < 32:
         raise ValueError("token_too_short")
+    native = native_settings(config)
+    identity = verify_artifact(config["modelPath"]) if native else None
     gate = ReservationGate(config["reservation"]) if config.get("reservation") else None
     thermal = None
     if config["device"] == "cuda":
@@ -366,6 +504,10 @@ def main():
             time.sleep(3)
 
     threading.Thread(target=loop, daemon=True).start()
+    if native:
+        native_server = ThreadingHTTPServer((native["host"], native["port"]), make_native_handler(replica, native, identity))
+        native_server.daemon_threads = True
+        threading.Thread(target=native_server.serve_forever, daemon=True).start()
     server = ThreadingHTTPServer((config["host"], int(config["port"])), make_handler(replica, token))
     server.daemon_threads = True
     server.serve_forever()
