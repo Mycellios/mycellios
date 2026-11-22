@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentSkill, AgentSkillCatalogEntry, Bot } from "@mycellios/contracts";
 import {
@@ -233,9 +234,7 @@ export function SkillsMarketplace({ bots }: { bots: Bot[] }) {
         </Button>
       </div>
       {list.isPending ? (
-        <p role="status">
-          <Trans>Loading…</Trans>
-        </p>
+        <LoadingSkeleton layout="cards" />
       ) : null}
       {list.isError ? (
         <div role="alert" className="rk-market-error">
@@ -476,9 +475,7 @@ export function SkillsMarketplace({ bots }: { bots: Bot[] }) {
             </p>
           ) : null}
           {busy ? (
-            <p role="status">
-              <Trans>Loading…</Trans>
-            </p>
+            <LoadingSkeleton layout="detail" rows={2} />
           ) : null}
         </DialogContent>
       </Dialog>

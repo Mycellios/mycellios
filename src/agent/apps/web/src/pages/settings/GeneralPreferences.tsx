@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import type { DesktopBehaviorSettings } from "@mycellios/contracts";
 import { Label, OptionSelect, Switch } from "@mycellios/ui-web";
@@ -22,13 +23,28 @@ function ColorChoice({ label, value, onChange, swatches = false }: { label: stri
     onValueChange={onChange} />;
 }
 
+let installedFonts: string[] | undefined;
+let fontRequest: Promise<string[]> | undefined;
+
+function loadInstalledFonts() {
+  fontRequest ??= desktopBridge()?.settings?.fonts?.().then(
+    (list) => (installedFonts = list),
+    (error: unknown) => {
+      fontRequest = undefined;
+      throw error;
+    },
+  );
+  return fontRequest;
+}
+
 export function AppearanceExtras() {
   const { t } = useLingui();
   const value = useGeneralPreferences();
   const [error, setError] = useState("");
-  const [fonts, setFonts] = useState<string[]>([]);
-  useEffect(() => { let active = true;
-    void desktopBridge()?.settings?.fonts?.().then(list => { if (active) setFonts(list); }).catch(() => undefined);
+  const [fonts, setFonts] = useState(() => installedFonts ?? []);
+  useEffect(() => {
+    let active = true;
+    void loadInstalledFonts()?.then((list) => { if (active) setFonts(list); }).catch(() => undefined);
     return () => { active = false; };
   }, []);
   const [scheme, setScheme] = useState(() => document.documentElement.dataset.theme === "dark" ? "dark" : "light");
@@ -156,7 +172,7 @@ export function AppBehaviorPanel({ onBusyChange }: { onBusyChange?: (busy: boole
   return <div className="space-y-6">
     {!bridge ? <p className="text-sm text-muted-foreground">{t`Computer controls require Mycellios Desktop. Workspace restoration also works on the web.`}</p> : null}
     {!bridge && desktopBridge() && <p className="text-sm text-muted-foreground">{t`Restart the updated desktop app to manage computer settings here.`}</p>}
-    {bridge && !value && !error && <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p>}
+    {bridge && !value && !error && <LoadingSkeleton layout="settings" rows={2} />}
     <SettingsGroup title={t`Startup and quit`}>
       {value && value.launchAtLogin !== null && switchRow("login", t`Open Mycellios at login`,
         t`Open the application when you sign in on this computer.`, value.launchAtLogin, launchAtLogin => void save({ launchAtLogin }))}

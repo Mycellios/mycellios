@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@mycellios/ui-web";
 import { CircleCheck, Plus, Server } from "lucide-react";
@@ -33,7 +34,7 @@ export function BillingServers() {
       description={new URL(entry.serverUrl).origin}
       control={entry.serverUrl === data.current ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CircleCheck aria-hidden size={14} />{t`Current`}</span> : <Button variant="outline" size="sm" disabled={busy} onClick={() => void manage(entry.serverUrl)}>{t`Open`}</Button>} />)}</SettingsGroup>
       : <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">{t`No saved servers yet.`}</p>
-      : !error && <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p>
+      : !error && <LoadingSkeleton layout="settings" rows={2} />
       : <SettingsGroup><SettingsRow label={t`Current server`} description={window.location.origin} control={<span className="text-xs text-muted-foreground">{t`Web app`}</span>} />
         <SettingsRow label={t`Connect another server`} description={t`Use Mycellios Desktop to save and switch between servers.`} control={<a className="text-sm underline underline-offset-4" href="https://mycellios.com/downloads/desktop">{t`Download Desktop`}</a>} /></SettingsGroup>}
   </section>;

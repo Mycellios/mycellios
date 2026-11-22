@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Routine, RoutineCalendar, RoutineCalendarEntry, Space } from "@mycellios/contracts";
 import {
@@ -416,7 +417,6 @@ export function ScheduleWorkspace({
             role="status"
           >{t`Some occurrences could not be displayed. Choose a smaller range or review the routines.`}</p>
         ) : null}
-        {loading ? <p className="sr-only" role="status">{t`Loading schedule…`}</p> : null}
         {!loading && !error && data?.routines.length === 0 ? (
           <ScheduleEmptyState bots={bots.filter(bot => !spaceId || bot.spaceId === spaceId)} anchor={anchor} today={today} onCreateRoutine={onCreateRoutine} onCreateMico={onExit} />
         ) : null}
@@ -501,7 +501,7 @@ export function ScheduleWorkspace({
                   )}
                 </ul>
               ) : (
-                <p>{loading ? t`Loading schedule…` : t`No upcoming runs.`}</p>
+                loading ? <LoadingSkeleton label={t`Loading schedule…`} rows={2} /> : <p>{t`No upcoming runs.`}</p>
               )}
             </aside>
           </div>
