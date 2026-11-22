@@ -56,7 +56,10 @@
 - Native Expo sign-in may share the configured HTTPS OIDC issuer origin with Agent.
   Its authorization proxy accepts only the configured issuer authorize path, client,
   callback, S256 challenge and live server-issued state/nonce. Preserve the upstream
-  external-provider flow and verify packages/auth/src/oidc.test.ts for both routes.
+  external-provider flow. The auth allowlist accepts the Mycellios sign-in and
+  account callback authorities alongside the installed app scheme. Keep the
+  Expo client on the previous URLs until compatible servers are live. Verify
+  packages/auth/src/oidc.test.ts and apps/api/src/auth-origins.test.ts.
 
 # AGENTS.md
 

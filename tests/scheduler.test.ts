@@ -550,13 +550,32 @@ describe("multi-objective scheduler", () => {
       workloadClass: "interactive",
       deadlineAt: Date.now() + 60_000,
     }));
-    (await store.setJobRoute(job.id, initial, "queue-blocker-lease"));
+    expect(await store.setJobRoute(job.id, initial, "queue-blocker-lease")).toBe(job.deadlineAt);
 
     const decision = (await scheduler.selectExecutionRouteDecision(request, "queue-rejected", {
       connectedWorkerIds: new Set([worker.id]),
     }));
     expect(decision.selectedKind).toBe("unavailable");
     expect(decision.reasons).toContain("candidate_capacity_exhausted");
+  });
+
+  it("does not return a dispatch deadline for a cancelled job", async () => {
+    const worker = await addWorker(store, { id: "cancelled-before-dispatch" });
+    const route = await scheduler.selectRoute(request, "cancelled-session", {
+      connectedWorkerIds: new Set([worker.id]),
+    });
+    expect(route).not.toBeNull();
+    const job = await store.createJob({
+      id: "cancelled-job",
+      sessionId: "cancelled-session",
+      model: request.model,
+      workloadClass: "interactive",
+      deadlineAt: Date.now() + 60_000,
+    });
+    await store.setJobStatus(job.id, "cancelled");
+
+    expect(await store.setJobRoute(job.id, route!, "stale-lease")).toBeNull();
+    expect(await store.getJob(job.id)).toMatchObject({ status: "cancelled", leaseId: null });
   });
 });
 

@@ -93,7 +93,12 @@ import {
   verifyModelServesAgents,
   withSecretPersistence,
 } from "@mycellios/adapters";
-import { createAuth, isBlockedAuthPath, loopbackTwinOrigins } from "@mycellios/auth";
+import {
+  createAuth,
+  isBlockedAuthPath,
+  LEGACY_NATIVE_AUTH_ORIGIN,
+  loopbackTwinOrigins,
+} from "@mycellios/auth";
 import type { Actor, AuthCapabilities } from "@mycellios/contracts";
 import { productAppUrl, SERVER_BUILD_HEADER } from "@mycellios/contracts";
 import { signupPolicyFromEnv } from "@mycellios/core";
@@ -182,12 +187,10 @@ import { mountVoiceHttpRoutes, voiceAccountErrorStatus } from "./voice.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
 
 /**
- * Native clients always send the app scheme, including in Expo Go, so no
- * exp:// origin is trusted: it would accept any Expo host as a redirect target.
- * The loopback entries are the Expo web dev server.
+ * Origins for the Expo web dev server. Native clients send the app scheme.
+ * Keep arbitrary Expo hosts out of the origin allowlist.
  */
 export const MOBILE_AUTH_ORIGINS = [
-  "rakazo://",
   "http://localhost:8081",
   "http://127.0.0.1:8081",
   "http://localhost:19006",
@@ -1432,7 +1435,7 @@ export function isTrustedOrigin(
   env: Pick<AppEnv, "webOrigin" | "apiUrl" | "authUrl">,
 ) {
   if (!origin) return true;
-  if (origin.startsWith("rakazo://")) return true;
+  if (origin.startsWith(LEGACY_NATIVE_AUTH_ORIGIN)) return true;
   const allowed = new Set(
     [env.webOrigin, env.apiUrl, env.authUrl, ...MOBILE_AUTH_ORIGINS].flatMap(originVariants),
   );
@@ -1472,7 +1475,7 @@ function isLoopbackHost(host: string): boolean {
 }
 
 function originVariants(origin: string): string[] {
-  if (!origin || origin === "rakazo://") return [];
+  if (!origin) return [];
   const variants = [origin, ...loopbackTwinOrigins(origin)];
   try {
     const url = new URL(origin);
