@@ -59,7 +59,7 @@ function renderMessage(
   blocks: ThreadMessage["blocks"],
   peerBot: PeerBot,
   mentions?: ReturnType<typeof planner>[],
-  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean; runEnded?: boolean } = {},
+  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"]; style?: ResponseStyle; showToolActivity?: boolean; progress?: boolean; runEnded?: boolean; onBranch?: (message: ThreadMessage) => void; branchDisabled?: boolean } = {},
 ) {
   const onShowBot = vi.fn();
   const message: ThreadMessage = {
@@ -98,6 +98,8 @@ function renderMessage(
         onReply={vi.fn()}
         onMarkUnread={vi.fn()}
         onReact={vi.fn()}
+        onBranch={options.onBranch}
+        branchDisabled={options.branchDisabled}
       /></ResponseStyleContext.Provider>,
     ),
   );
@@ -409,4 +411,35 @@ it("shows a Mico's brief on its side of the task conversation", () => {
   expect(brief?.textContent).toContain("Draft the forum thread");
   expect(container.querySelector('[data-testid="message-user-bubble"]')).toBeNull();
   expect(brief?.parentElement?.className).not.toContain("items-end");
+});
+
+const menuItem = (text: string) =>
+  Array.from(document.querySelectorAll<HTMLElement>("[role=\"menuitem\"]")).find((item) => item.textContent === text);
+const openMore = () => act(() => container.querySelector<HTMLButtonElement>("button[aria-label=\"More\"]")!.click());
+
+it("offers Branch in new conversation in the message menu only where the transcript allows it", () => {
+  const onBranch = vi.fn();
+  renderMessage([{ kind: "text", text: "Two hotels near the station." }], existingBot, undefined, { id: "answer", onBranch });
+  openMore();
+  const item = menuItem("Branch in new conversation");
+  expect(item).toBeDefined();
+  act(() => item!.click());
+  expect(onBranch).toHaveBeenCalledTimes(1);
+  expect(onBranch.mock.calls[0]![0]).toMatchObject({ id: "answer", role: "bot" });
+  act(() => root.render(<span />));
+  renderMessage([{ kind: "text", text: "An earlier note." }], existingBot, undefined, { id: "note" });
+  openMore();
+  expect(menuItem("Copy")).toBeDefined();
+  expect(menuItem("Branch in new conversation")).toBeUndefined();
+});
+
+it("keeps Branch in new conversation visible but disabled while a turn runs", () => {
+  const onBranch = vi.fn();
+  renderMessage([{ kind: "text", text: "Two hotels near the station." }], existingBot, undefined, { onBranch, branchDisabled: true });
+  openMore();
+  const item = menuItem("Branch in new conversation")!;
+  expect(item.getAttribute("aria-disabled") ?? item.getAttribute("data-disabled")).not.toBeNull();
+  expect(item.getAttribute("title")).toBe("Wait until the current turn ends to branch this conversation.");
+  act(() => item.click());
+  expect(onBranch).not.toHaveBeenCalled();
 });
