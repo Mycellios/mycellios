@@ -1,10 +1,10 @@
 import type { AudioPlayer } from "expo-audio";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import type { WaitTone, WaitUnit } from "./wait-pattern";
 import { nextWaitUnit, WAIT_PATTERNS } from "./wait-pattern";
 
-export const CALL_SOUNDS_KEY = "rakazo.call-sounds";
-export const WAIT_SOUND_KEY = "rakazo.wait-sound";
+export const CALL_SOUNDS_KEY = "mycellios.call-sounds";
+export const WAIT_SOUND_KEY = "mycellios.wait-sound";
 
 export type CallCue = "start" | "end";
 

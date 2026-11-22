@@ -5,9 +5,6 @@ export type AppearancePreference = (typeof APPEARANCE_PREFERENCES)[number];
 export type ResolvedAppearance = "light" | "dark";
 
 export const UI_APPEARANCE_STORAGE_KEY = "mycellios.uiAppearance";
-/** The name the preference had before the rename; mobile still reads it once. */
-export const LEGACY_UI_APPEARANCE_STORAGE_KEY =
-  String.fromCharCode(114, 97, 107, 97, 122, 111) + ".uiAppearance";
 
 /**
  * Semantic palette shared by web, Electron, and Expo. Names follow the shadcn
