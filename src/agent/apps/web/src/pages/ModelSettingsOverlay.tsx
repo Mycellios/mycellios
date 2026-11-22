@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { ExpandedSettings } from "@mycellios/ui-web/components/ui/disclosure";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { SettingsScope } from "@mycellios/contracts";
@@ -29,7 +30,6 @@ import {
   DialogTitle,
   Disclosure,
   ModelThinkingOptions,
-  Spinner,
 } from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -494,7 +494,7 @@ export function ModelSettingsOverlay({
           </div>
         </>
       ) : loading ? (
-        <Spinner aria-label={t`Loading model catalog…`} />
+        <LoadingSkeleton label={t`Loading model catalog…`} layout="settings" />
       ) : catalog.length || model.loadError ? null : (
         <p className="text-[13px] leading-[1.5] text-muted-foreground">
           <Trans>No model catalog is available.</Trans>

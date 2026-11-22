@@ -9,7 +9,7 @@ import {
   Button,
 } from "@mycellios/ui-web";
 import type { ComponentType, ReactNode } from "react";
-import { Component } from "react";
+import { Component, useState } from "react";
 import { lazyComponent } from "../lib/preload-recovery";
 
 type ErrorBoundaryProps = {
@@ -48,8 +48,22 @@ export function SectionLoadFailed() {
 export function lazyOverlay<Props extends { onClose: () => void }>(
   load: () => Promise<ComponentType<Props>>,
 ) {
-  const Overlay = lazyComponent(load);
-  return function LazyOverlay(props: Props) {
+  let loaded: ComponentType<Props> | undefined;
+  let pending: Promise<ComponentType<Props>> | undefined;
+  const resolve = () => pending ??= Promise.resolve().then(load).then(
+    (component) => {
+      loaded = component;
+      return component;
+    },
+    (error: unknown) => {
+      pending = undefined;
+      throw error;
+    },
+  );
+  const DeferredOverlay = lazyComponent(resolve);
+  function LazyOverlay(props: Props) {
+    // A cold mount keeps its lazy component identity even after the import resolves.
+    const [Overlay] = useState(() => loaded ?? DeferredOverlay);
     return (
       <ErrorBoundary
         fallback={
@@ -80,5 +94,6 @@ export function lazyOverlay<Props extends { onClose: () => void }>(
         <Overlay {...props} />
       </ErrorBoundary>
     );
-  };
+  }
+  return Object.assign(LazyOverlay, { preload: resolve });
 }

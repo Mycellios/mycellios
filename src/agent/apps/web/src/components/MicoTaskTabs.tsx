@@ -420,8 +420,14 @@ export function MicoTaskTabs({
       event.preventDefault();
       const rtl = nav.current ? getComputedStyle(nav.current).direction === "rtl" : false;
       const delta = (event.key === "ArrowRight") !== rtl ? 1 : -1;
+      const wasFocused = document.activeElement === event.currentTarget;
       update(state => moveTab(state, tab.threadId, delta));
-      requestAnimationFrame(() => tabButtons.current.get(tab.threadId)?.focus({ preventScroll: true }));
+      if (wasFocused) requestAnimationFrame(() => {
+        // Moving a focused node may blur it. Never take focus back from a later action.
+        if (document.activeElement === document.body) {
+          tabButtons.current.get(tab.threadId)?.focus({ preventScroll: true });
+        }
+      });
     }
   }
 

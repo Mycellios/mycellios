@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@mycellios/ui-web";
 import { useEffect, useState, useRef, type ReactNode } from "react";
@@ -99,7 +100,7 @@ export function MobileSessions({ accountId, allDevices = false, onAddPhone, perm
           <Button variant="ghost" size="sm" aria-label={t`Refresh phones`} disabled={loading || removing} onClick={() => void load()}><RefreshCw aria-hidden size={15} /></Button>
           {onAddPhone && <Button size="sm" onClick={onAddPhone}><Plus aria-hidden size={14} />{t`Add phone`}</Button>}</div></div>
       {confirmation && <div className="mobile-connection-notice"><p><strong className="block text-foreground">{t`Confirm your account`}</strong>{t`Sign in again to manage your phones. Your conversations stay in your account.`}</p><SessionConfirmation accountId={accountId} onConfirmed={load} /></div>}
-      {loading && !ownedSessions && <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p>}
+      {loading && !ownedSessions && <LoadingSkeleton rows={2} />}
       <div className="mobile-device-grid">
         {ownedSessions?.map(session => <article key={session.id} className="mobile-device-card">
           <div className="mobile-device-icon"><Smartphone aria-hidden size={19} /></div><div className="mobile-device-copy"><h4>{mobileDeviceName(session.userAgent)}</h4>
@@ -118,7 +119,7 @@ export function MobileSessions({ accountId, allDevices = false, onAddPhone, perm
         control={<Button size="sm" variant="outline" disabled={loading || removing} onClick={() => void load()}>{t`Refresh`}</Button>} />
       {confirmation && <SettingsRow label={t`Confirm your account`} description={allDevices ? t`Sign in again to manage account sessions.` : t`Sign in again to manage your phones. Your conversations stay in your account.`}
         control={<SessionConfirmation accountId={accountId} onConfirmed={load} />} />}
-      {loading && !ownedSessions && <p role="status" className="px-4 py-3 text-sm text-muted-foreground">{t`Loading…`}</p>}
+      {loading && !ownedSessions && <LoadingSkeleton layout="settings" rows={2} className="px-4 py-3" />}
       {ownedSessions?.map(session => <SettingsRow key={session.id}
         label={allDevices ? deviceName(session.userAgent) : mobileDeviceName(session.userAgent)}
         description={t`Last activity · ${new Date(session.updatedAt).toLocaleString(i18n.locale)}`}

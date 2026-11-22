@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, InboxTask, Space } from "@mycellios/contracts";
 import { ATTACHMENT_MAX_BYTES } from "@mycellios/contracts";
@@ -416,10 +417,7 @@ export function TasksWorkspace({
                   {state.error}
                 </p>
               ) : state.available === null ? (
-                <div
-                  role="status"
-                  className="py-4 text-center text-xs text-muted-foreground"
-                >{t`Loading tasks…`}</div>
+                <LoadingSkeleton label={t`Loading tasks…`} className="py-4" />
               ) : null}
               {empty ? (
                 <TaskEmptyBoard bots={bots} />

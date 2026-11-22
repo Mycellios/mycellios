@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Disclosure, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useEffect, useId, useRef, useState } from "react";
@@ -160,7 +161,7 @@ export function TaskControls({ runId, autoOpen = false, embedded = false }: { ru
       ) : null}
     </>
   );
-  return embedded ? <div className="text-sm">{!task && !error ? <p className="text-xs text-muted-foreground" role="status"><Trans>Loading…</Trans></p> : null}{content}</div> : (
+  return embedded ? <div className="text-sm">{!task && !error ? <LoadingSkeleton layout="settings" rows={1} /> : null}{content}</div> : (
     <Disclosure defaultOpen={autoOpen} summary={t`Task controls`} className="ms-7 pb-2 text-sm" onOpenChange={(open) => void load(open)}>
       {content}
     </Disclosure>

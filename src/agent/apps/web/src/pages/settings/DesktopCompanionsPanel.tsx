@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import { DEFAULT_DESKTOP_COMPANIONS, type Bot, type DesktopCompanionPreferences } from "@mycellios/contracts";
 import { BotAvatar, Button, Input, Label, OptionSelect, Switch } from "@mycellios/ui-web";
@@ -45,7 +46,7 @@ export function DesktopCompanionsPanel({ kind, bots, onBusyChange, accountId, sp
     <SettingsRow label={<Label htmlFor={`${id}-${key}`}>{title}</Label>} description={description}
       control={<Switch id={`${id}-${key}`} checked={checked} disabled={busy || disabled} onCheckedChange={change} />} />;
   return <div className="rk-general-settings space-y-6">
-    {!value && !error && <p role="status" className="text-sm text-muted-foreground">{t`Loading…`}</p>}
+    {!value && !error && <LoadingSkeleton layout="settings" />}
     {error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{error}</p>{!value && <Button variant="outline" onClick={() => void load()}>{t`Retry`}</Button>}</div>}
     {value && <>
       {previewOnly && <p role="status" className="text-sm text-muted-foreground">{kind === "island" ? t`Interactive preview. Mycellios Desktop places the island above your other applications. Changes here are not saved.` : t`Interactive preview. Use Mycellios Desktop for the dock above other applications. Changes here are not saved.`}</p>}
