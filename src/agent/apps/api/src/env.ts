@@ -1,4 +1,5 @@
 import type { TelegramBotCredentials } from "@mycellios/adapters";
+import { readEnv } from "@mycellios/core/legacy-env";
 import { networkSpeechIdentityIds } from "./network-speech-placement.js";
 import {
   boatApiKeyFromEnv,
@@ -156,7 +157,7 @@ export interface AppEnv {
   mcpAllowPrivateEndpoint: boolean;
   port: number;
   gitSha: string | undefined;
-  /** Oldest client build per kind the API still serves (RAKAZO_MIN_CLIENT_BUILD). */
+  /** Oldest client build per kind the API still serves (MYCELLIOS_MIN_CLIENT_BUILD). */
   minimumClientBuilds?: MinimumClientBuilds;
   /** Browser error reporting, served to the web app at runtime. The DSN is public by design. */
   browserMonitoring:
@@ -254,7 +255,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     nodeEnv: source.NODE_ENV ?? "",
     databaseUrl: required(source, "DATABASE_URL"),
     realtimeDatabaseUrl: source.REALTIME_DATABASE_URL ?? required(source, "DATABASE_URL"),
-    desktopStackToken: optional(source.RAKAZO_DESKTOP_STACK_TOKEN),
+    desktopStackToken: optional(readEnv("DESKTOP_STACK_TOKEN", source)),
     whatsappDeviceEnabled: source.MYCELLIOS_WHATSAPP_DEVICE_ENABLED === "true",
     authSecret,
     authUrl: source.BETTER_AUTH_URL ?? source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
@@ -350,8 +351,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     mycelliosNetworkSpeechIdentityIds: networkSpeechIdentityIds(source.MYCELLIOS_NETWORK_SPEECH_IDENTITIES),
     mycelliosNetworkTranscriptionIdentityIds: networkSpeechIdentityIds(source.MYCELLIOS_NETWORK_TRANSCRIPTION_IDENTITIES),
     port: Number(source.API_PORT ?? 3100),
-    gitSha: optional(source.GIT_SHA) ?? optional(source.RAKAZO_GIT_SHA),
-    minimumClientBuilds: parseMinimumClientBuilds(source.RAKAZO_MIN_CLIENT_BUILD),
+    gitSha: optional(source.GIT_SHA) ?? optional(readEnv("GIT_SHA", source)),
+    minimumClientBuilds: parseMinimumClientBuilds(readEnv("MIN_CLIENT_BUILD", source)),
     browserMonitoring: browserMonitoringFromEnv(source),
   };
 }

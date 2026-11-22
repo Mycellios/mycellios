@@ -1,7 +1,8 @@
 import { unlink, writeFile } from "node:fs/promises";
+import { readEnv } from "@mycellios/core/legacy-env";
 import { getLogger, logSinkHealth } from "@mycellios/logging";
 
-export const WORKER_HEALTH_FILE = process.env.RAKAZO_WORKER_HEALTH_FILE ?? "/tmp/rakazo-worker-health.json";
+export const WORKER_HEALTH_FILE = readEnv("WORKER_HEALTH_FILE") ?? "/tmp/rakazo-worker-health.json";
 
 /** A separate Docker process can detect a dead or blocked worker even when it cannot log. */
 export function startWorkerHealth(lastReconciled: () => number) {

@@ -58,7 +58,7 @@ export function parseMinimumClientBuilds(value: string | undefined): MinimumClie
     const [kind, build, ...rest] = trimmed.split("=").map((part) => part.trim());
     if (rest.length || !CLIENT_KINDS.includes(kind as ClientKind) || !isBuildId(build)) {
       throw new Error(
-        `Invalid RAKAZO_MIN_CLIENT_BUILD entry "${trimmed}": use web=YYYYMMDDHHMMSS or mobile=YYYYMMDDHHMMSS`,
+        `Invalid MYCELLIOS_MIN_CLIENT_BUILD entry "${trimmed}": use web=YYYYMMDDHHMMSS or mobile=YYYYMMDDHHMMSS`,
       );
     }
     minimums[kind as ClientKind] = build;

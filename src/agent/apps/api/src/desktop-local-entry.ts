@@ -1,14 +1,15 @@
 import { readFile } from "node:fs/promises";
+import { deleteEnv, readEnv } from "@mycellios/core/legacy-env";
 import type { DesktopLocalConfig } from "./desktop-local-server.js";
 import { startDesktopLocalServer } from "./desktop-local-server.js";
 import { parseLocalDataKey } from "./local-identity-protection.js";
 
-const file = process.env.RAKAZO_LOCAL_SERVER_CONFIG;
+const file = readEnv("LOCAL_SERVER_CONFIG");
 if (!file) throw new Error("Missing local server configuration");
 // Desktop passes the data key only through this process's memory. Remove it before
 // PostgreSQL or any other child process inherits the environment.
-const dataKey = parseLocalDataKey(process.env.RAKAZO_LOCAL_DATA_KEY);
-delete process.env.RAKAZO_LOCAL_DATA_KEY;
+const dataKey = parseLocalDataKey(readEnv("LOCAL_DATA_KEY"));
+deleteEnv("LOCAL_DATA_KEY");
 const config = JSON.parse(await readFile(file, "utf8")) as DesktopLocalConfig;
 type ParentPort = {
   postMessage: (message: unknown) => void;

@@ -10,6 +10,11 @@
       "development": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./legacy-env": {
+      "types": "./src/legacy-env.ts",
+      "development": "./src/legacy-env.ts",
+      "default": "./src/legacy-env.ts"
+    },
     "./user-error": {
       "types": "./src/user-error.ts",
       "development": "./src/user-error.ts",
