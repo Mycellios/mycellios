@@ -428,6 +428,12 @@
   model menu. Do not expose a second Agent engine switch in Mico settings or
   select an unrelated CLI merely because a PC is connected. New Micos inherit
   the general connection unless the user selects an installed provider.
+  Conversational turns capture the resolved model, engine and owned connection
+  before their first model call, with the Run lease fence. Resume uses that
+  selection and rechecks credentials and native consent. A later turn reads the
+  saved Mico settings. Native session changes carry conversation history into a
+  fresh session in the same workspace. Verify executor-turn-checkpoint, the
+  native runtime protocol and verify-message-queue-db on isolated PostgreSQL.
   The account catalog resolves expired managed metadata with one owned GET refresh
   and a reread of the canonical enabled list. Inventory never authorizes models;
   retain the shared deadline, native results and fail-closed price filtering.

@@ -72,6 +72,14 @@ try {
     const legacy = [await legacyMessage(1), await legacyMessage(2), await legacyMessage(3)];
     await system.thread.update({ where: { id: main }, data: { nextMessageSeq: 4 } });
     const legacyRun = await liveRun(main);
+    await sql.query('ALTER TABLE runs DROP COLUMN "modelExecution"');
+    await sql.query(await readFile("packages/db/prisma/migrations/20261123100000_conversation_turn_model/migration.sql", "utf8"));
+    assert.equal((await system.run.findUniqueOrThrow({ where: { id: legacyRun.id } })).modelExecution, null);
+    const execution = { agentEngine: "codex", nativeConfig: { modelId: "fixture-model" }, provider: "native-codex",
+      modelId: "default", credentialId: null, thinkingLevel: null };
+    await system.run.update({ where: { id: legacyRun.id }, data: { modelExecution: execution } });
+    assert.deepEqual((await system.run.findUniqueOrThrow({ where: { id: legacyRun.id } })).modelExecution, execution);
+    checks.push("turn model migration preserves old rows and stores the native selection without credentials");
     await sql.query(`ALTER TABLE steering_messages DROP COLUMN "position", DROP COLUMN "heldBy", DROP COLUMN "heldAt", DROP COLUMN "editDraft"`);
     await sql.query(`INSERT INTO steering_messages (id,"messageId","botId","userId","runId","originTrigger") VALUES
       ('legacy-a',$1,'mico','owner',NULL,'queued_user'), ('legacy-b',$2,'mico','owner',NULL,'queued_user'), ('legacy-steer',$3,'mico','owner',$4,NULL)`,

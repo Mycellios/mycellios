@@ -525,6 +525,8 @@ export interface AgentRunRequest {
   saveWorkState?: (state: unknown) => Promise<void>;
   agentEngine?: "pi" | "codex" | "claude" | "acp" | "opencode";
   nativeConfig?: { modelId?: string | null; thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | null; fastMode?: boolean } | null;
+  /** Another engine ran this conversation since the saved native session. */
+  resetNativeSession?: boolean;
   /** Awaited producer-side accounting, independent of event-consumer cancellation. */
   onUsage?: (event: Extract<AgentRuntimeEvent, { type: "usage" }>) => void | Promise<void>;
   contextStrategy?: AgentContextStrategy;

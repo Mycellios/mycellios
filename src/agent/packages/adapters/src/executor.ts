@@ -457,6 +457,7 @@ import {
   tryCompleteConnectionWithCode,
 } from "./run-secret.js";
 import { interruptedTurnCheckpoint, restoreTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
+import { capturesTurnModel, readTurnModelSelection } from "./turn-model-selection.js";
 
 export { selectRunConnections } from "./connection-context.js";
 
@@ -3845,11 +3846,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
         where: { id: run.botId },
         select: {
           agentEngine: true,
+          nativeConfig: true,
+          modelProvider: true,
+          modelId: true,
+          thinkingLevel: true,
           computerId: true,
           computerSwitching: true,
           computer: { select: { id: true, kind: true, scope: true, providerRef: true, homeKey: true } },
         },
       });
+      const turnModel = readTurnModelSelection(current.modelExecution);
+      const agentEngine = (turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
@@ -3903,7 +3910,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ? await projectExecutionLeaseKey(deps.prisma, deps.sandbox, run, leaseTarget.computer)
         : undefined;
       const isolatedProjectRun = Boolean(projectLeaseKey);
-      const privateLane = !isolatedProjectRun && leaseTarget.agentEngine === "pi" && Boolean(await deps.prisma.thread.findFirst({
+      const privateLane = !isolatedProjectRun && (turnModel?.agentEngine ?? leaseTarget.agentEngine) === "pi" && Boolean(await deps.prisma.thread.findFirst({
         where: { id: run.threadId, taskBotId: run.botId, spaceId: run.spaceId, userId: run.userId }, select: { id: true },
       }));
       let pendingComputerReservation: Promise<void> | undefined;
@@ -4138,10 +4145,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ...initialBotCommandEnvironment,
         });
         // modelPinned distinguishes the captured choice from an attempt's recorded model.
-        const modelChoice = runModelChoice(run, bot);
+        const modelChoice = runModelChoice(run, leaseTarget);
         const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
         const overrideCredential =
-          hasModelOverride && modelChoice.modelProvider
+          turnModel?.credentialId
+            ? await findConnectedModelCredential(deps.prisma, deps.secretStore, run,
+                turnModel.provider, turnModel.modelId, { credentialId: turnModel.credentialId })
+            : !turnModel && hasModelOverride && modelChoice.modelProvider
             ? await findConnectedModelCredential(
                 deps.prisma,
                 deps.secretStore,
@@ -4344,17 +4354,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const runDeployment = deps.deploymentModelConfigured ? resolveDeploymentModel() : null;
         const runtimeFallback = runtimeFallbackModel(deps.runtime);
         const pinError =
-          run.modelPinned &&
+          !turnModel && run.modelPinned &&
           !(
             (await modelCreditBillingEnabled(deps)) &&
             modelChoice.modelProvider === runDeployment?.provider
           )
             ? pinnedModelCredentialError(modelChoice, overrideCredential)
             : undefined;
-        const nativeEngine = bot.agentEngine && bot.agentEngine !== "pi";
-        const selected = nativeEngine
+        const nativeEngine = agentEngine !== "pi";
+        const nativeConfig = agentEngine === "codex"
+          ? turnModel ? turnModel.nativeConfig : leaseTarget.nativeConfig as AgentRunRequest["nativeConfig"]
+          : null;
+        const selected = turnModel
+          ? { provider: turnModel.provider, id: turnModel.modelId, credential: overrideCredential, thinkingLevel: turnModel.thinkingLevel }
+          : nativeEngine
           ? {
-              provider: `native-${bot.agentEngine}`,
+              provider: `native-${agentEngine}`,
               id: "default",
               credential: null,
               thinkingLevel: null,
@@ -4384,12 +4399,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             await backOffRoutineAfterAccountError(deps, run.routineId);
           }
         };
-        if (pinError && !nativeEngine) {
-          await failRunBeforeModel(pinError, pinError === PINNED_PROVIDER_NOT_CONNECTED);
+        if ((pinError && !nativeEngine) || (turnModel?.credentialId && !credential)) {
+          await failRunBeforeModel(pinError ?? PINNED_PROVIDER_NOT_CONNECTED, !pinError || pinError === PINNED_PROVIDER_NOT_CONNECTED);
           return;
         }
         if (
-          run.modelPinned &&
+          !turnModel && run.modelPinned &&
           (selected.provider !== modelChoice.modelProvider || selected.id !== modelChoice.modelId)
         ) {
           await failRunBeforeModel(PINNED_PROVIDER_NOT_CONNECTED, true);
@@ -4413,6 +4428,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 runModelProvider,
                 runModelId,
                 (values) => runSecrets.push(...values),
+                turnModel?.credentialId ? { requireStoredSecret: true, preservePayer: true } : undefined,
               );
         } catch (error) {
           // A dead or account-switched credential is already deleted. Retrying
@@ -4426,13 +4442,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
           return;
         }
         runSecrets.push(...resolved.redact);
-        // A pin stays as it was created. Unpinned runs still record the model they
-        // used; modelPinned is what keeps that record from becoming the next choice.
-        if (!run.modelPinned) {
-          await deps.prisma.run.updateMany({
+        const effectiveThinkingLevel = turnModel ? turnModel.thinkingLevel : thinkingLevel ?? resolved.thinkingLevel ?? null;
+        // Persist the effective model before invoking it. Later leases of this
+        // turn keep the same engine and payer, including after a human pause.
+        const captureModel = !turnModel && capturesTurnModel(run.trigger);
+        if (!turnModel && (captureModel || !run.modelPinned)) {
+          const recorded = await deps.prisma.run.updateMany({
             where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
-            data: { modelProvider: runModelProvider, modelId: runModelId },
+            data: {
+              ...(!run.modelPinned ? { modelProvider: runModelProvider, modelId: runModelId } : {}),
+              ...(captureModel ? { modelExecution: {
+                agentEngine, nativeConfig: nativeConfig ?? null, provider: runModelProvider,
+                modelId: runModelId, credentialId: resolved.ownCredential ? credential?.id ?? null : null,
+                thinkingLevel: effectiveThinkingLevel,
+              } } : {}),
+            },
           });
+          if (captureModel && recorded.count !== 1) return;
         }
 
         const storedComputer = cloudComputer ?? bot.computer;
@@ -8939,14 +8965,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         // Provider kind and model id only: custom endpoints are identified by kind, never host.
         const activeModel = { "model.provider": runModelProvider, "model.id": runModelId };
+        const priorExecutedTurn = nativeEngine && capturesTurnModel(run.trigger)
+          ? await deps.prisma.run.findFirst({
+              where: { threadId: thread.id, botId: bot.id, modelProvider: { not: null }, startedAt: { not: null },
+                OR: [{ createdAt: { lt: run.createdAt } }, { createdAt: run.createdAt, id: { lt: runId } }] },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              select: { modelProvider: true },
+            })
+          : null;
 
         try {
           if (checkpointLoadError) throw checkpointLoadError;
           const runtimeEvents = deps.runtime.run(
             {
               botId: bot.id,
-              agentEngine: bot.agentEngine as AgentRunRequest["agentEngine"],
-              nativeConfig: bot.nativeConfig as AgentRunRequest["nativeConfig"],
+              agentEngine,
+              nativeConfig,
+              resetNativeSession: Boolean(priorExecutedTurn && priorExecutedTurn.modelProvider !== runModelProvider),
               threadId: thread.id,
               runId,
               routineId: run.routineId,
@@ -9028,7 +9063,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 maxTokens: resolved.maxTokens,
                 acceptsImages: resolved.acceptsImages,
                 maxImagesPerPrompt: resolved.maxImagesPerPrompt,
-                thinkingLevel: thinkingLevel ?? resolved.thinkingLevel ?? null,
+                thinkingLevel: effectiveThinkingLevel,
                 oauth: resolved.oauth
                   ? {
                       credential: resolved.oauth,
@@ -11791,7 +11826,7 @@ async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMateria
     throw new Error("Temporary event access is unavailable. No model was called.");
   const billingEnabled = await modelCreditBillingEnabled(deps);
   const scope = { userId, spaceId };
-  if (!userId.startsWith("ed_") && billingEnabled && (await hasHostedModelCredits(deps.prisma, scope, provider))) {
+  if (!args[7]?.preservePayer && !userId.startsWith("ed_") && billingEnabled && (await hasHostedModelCredits(deps.prisma, scope, provider))) {
     args[3] = null;
     // Funded managed backups use deployment credentials just like the primary.
     args[7] = { ...args[7], requireStoredSecret: false };
@@ -11862,7 +11897,7 @@ async function resolveModelKeyMaterial(
   provider: string,
   modelId: string,
   registerSecrets?: (values: string[]) => void,
-  { requireStoredSecret = false }: { requireStoredSecret?: boolean } = {},
+  { requireStoredSecret = false, preservePayer = false }: { requireStoredSecret?: boolean; preservePayer?: boolean } = {},
 ): Promise<{
   apiKey?: string;
   accountId?: string;
@@ -11894,6 +11929,7 @@ async function resolveModelKeyMaterial(
         where: { id: credential.secretId, userId, spaceId: null },
       });
       if (!row) {
+        if (preservePayer) throw new UnavailableModelForAuthError(PINNED_PROVIDER_NOT_CONNECTED);
         if (await modelCreditBillingEnabled(deps))
           throw new Error("Connect that model provider again.");
         if (requireStoredSecret) throw new Error("Backup model credential is no longer available");

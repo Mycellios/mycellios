@@ -328,6 +328,34 @@ it("forwards the saved model, effort and Fast tier through Codex turn/start", as
   expect(events.some(event => event.type === "done")).toBe(true);
 });
 
+it("hands off conversation history when a native model or engine changes", async () => {
+  const logRoot = await mkdtemp(join(tmpdir(), "mycellios-native-model-"));
+  roots.push(logRoot);
+  const log = join(logRoot, "protocol.log");
+  const test = await setup("codex", ["--protocol-log", log]);
+  test.request.history = [{ role: "user", content: "fixture history marker" }];
+  const attempt = async () => {
+    await writeFile(log, "");
+    const events = [];
+    for await (const event of test.runtime.run(test.request, { ...test.context, signal: AbortSignal.timeout(15000) })) events.push(event);
+    expect(events.some(event => event.type === "done")).toBe(true);
+    return readFile(log, "utf8");
+  };
+  expect(await attempt()).toContain("history handoff");
+  expect(await attempt()).toContain("thread/resume");
+  test.request.nativeConfig = { modelId: "fixture-model", thinkingLevel: "medium" };
+  const switched = await attempt();
+  expect(switched).toContain("thread/start");
+  expect(switched).toContain("history handoff");
+  expect(switched).not.toContain("thread/resume");
+  expect(await attempt()).toContain("thread/resume");
+  test.request.resetNativeSession = true;
+  const returned = await attempt();
+  expect(returned).toContain("thread/start");
+  expect(returned).toContain("history handoff");
+  expect(returned).not.toContain("thread/resume");
+}, 30_000);
+
 
 it("starts a fresh native session after a new-chat context change and keeps the workspace", async () => {
   const logRoot = await mkdtemp(join(tmpdir(), "mycellios-new-chat-")); roots.push(logRoot);
