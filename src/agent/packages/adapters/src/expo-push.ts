@@ -4,6 +4,7 @@ import type {
   AdapterContext,
   BackgroundJobPayloads,
   JobPublisher,
+  NotificationDismissal,
   NotificationMessage,
   NotificationProvider,
 } from "@mycellios/adapter-kit";
@@ -164,6 +165,25 @@ export class ExpoPushProvider implements NotificationProvider {
 
   async send(message: NotificationMessage, context: AdapterContext): Promise<void> {
     await this.deliver(message, context);
+  }
+
+  /**
+   * The Android host closes an answered request's notice from a data-only message. Expo has no
+   * silent close, so the legacy preview keeps its notice until it is opened or replaced.
+   */
+  async dismiss(request: NotificationDismissal): Promise<void> {
+    if (!this.androidPush || !this.tokens.list) return;
+    const fcm = (await this.tokens.list(request.userId)).filter((record) => record.transport === "fcm");
+    if (!fcm.length) return;
+    const live = new Set(await this.deliverableTokens(request.userId));
+    await Promise.allSettled(
+      fcm
+        .filter((record) => live.has(record.token))
+        .map(async (record) => {
+          if ((await this.androidPush!.dismiss(record.token, request)) === "unregistered")
+            await this.tokens.remove(request.userId, credentialDigest(record.token));
+        }),
+    );
   }
 
   /**

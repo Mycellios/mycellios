@@ -6919,3 +6919,47 @@ msgstr "无法将所有聊天标为已读。请重试。"
 #: src/pages/Shell.tsx
 msgid "Could not mark the chats as read. Try again."
 msgstr "无法将这些聊天标为已读。请重试。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause for…"
+msgstr "暂停时长…"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until you turn them back on."
+msgstr "直到你重新开启。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until {time}."
+msgstr "直到 {time}。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Replies in task conversations"
+msgstr "任务对话中的回复"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+msgstr "当 Mico 在它自己的任务对话中完成或失败时提醒。问题和批准请求始终会提醒；例行任务遵循各自的设置。"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 15 minutes"
+msgstr "15 分钟"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 1 hour"
+msgstr "1 小时"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 3 hours"
+msgstr "3 小时"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 8 hours"
+msgstr "8 小时"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 24 hours"
+msgstr "24 小时"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until I turn it back on"
+msgstr "直到我重新开启"

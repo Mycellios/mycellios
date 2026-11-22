@@ -1,6 +1,6 @@
 import { createHash, createPrivateKey, randomUUID, sign } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import type { AdapterContext, NotificationMessage } from "@mycellios/adapter-kit";
+import type { AdapterContext, NotificationDismissal, NotificationMessage } from "@mycellios/adapter-kit";
 
 type Credentials = { projectId: string; clientEmail: string; privateKey: ReturnType<typeof createPrivateKey> };
 export function androidFcmConfig(env: NodeJS.ProcessEnv): Credentials | undefined {
@@ -63,22 +63,37 @@ export class AndroidFcm {
       title: message.title.slice(0, 100), body: message.body.slice(0, 180), expiresAt: String(Date.now() + 300_000) };
     if (message.groupId) data.groupId = message.groupId;
     else if (message.taskThreadId) data.taskThreadId = message.taskThreadId;
+    if (message.requestId && /^[a-zA-Z0-9_-]{1,160}$/.test(message.requestId)) data.requestId = message.requestId;
     // Data-only: the native receiver must check account binding and deduplicate before displaying.
+    return this.post(token, data, message.threadId, context.signal);
+  }
+  /**
+   * Asks the host to close the notice it showed for this request. The host ignores it when it
+   * shows nothing for that request, so no alert is raised; older hosts reject the payload.
+   */
+  async dismiss(token: string, request: NotificationDismissal): Promise<"delivered" | "unregistered"> {
+    const data: Record<string, string> = { version: "1", type: "dismiss",
+      deliveryId: createHash("sha256").update(randomUUID()).digest("hex"), accountId: request.userId,
+      threadId: request.threadId, requestId: request.requestId, expiresAt: String(Date.now() + 300_000) };
+    // Normal priority: a close is not urgent and must not spend the high-priority allowance.
+    return this.post(token, data, request.threadId, AbortSignal.timeout(30_000), "normal");
+  }
+  private async post(token: string, data: Record<string, string>, threadId: string, signal: AbortSignal, priority: "high" | "normal" = "high"): Promise<"delivered" | "unregistered"> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const accessToken = await this.token();
       let response: Response;
       try { response = await this.request(`https://fcm.googleapis.com/v1/projects/${this.credentials.projectId}/messages:send`, {
-        method: "POST", redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), context.signal]),
+        method: "POST", redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), signal]),
         headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-        body: JSON.stringify({ message: { token, data, android: { priority: "high", ttl: "300s", collapse_key: createHash("sha256").update(message.threadId).digest("hex").slice(0, 32) } } }),
+        body: JSON.stringify({ message: { token, data, android: { priority, ttl: "300s", collapse_key: createHash("sha256").update(threadId).digest("hex").slice(0, 32) } } }),
       }); } catch {
-        if (attempt >= 2 || context.signal.aborted) throw new Error("Android push could not reach FCM");
-        await delay(500 * (2 ** attempt), undefined, { signal: context.signal }); continue;
+        if (attempt >= 2 || signal.aborted) throw new Error("Android push could not reach FCM");
+        await delay(500 * (2 ** attempt), undefined, { signal }); continue;
       }
       if (response.status === 401 && attempt < 2) { await response.body?.cancel(); this.cached = undefined; continue; }
       if ((response.status === 429 || response.status >= 500) && attempt < 2) {
         await response.body?.cancel();
-        await delay(500 * (2 ** attempt), undefined, { signal: context.signal }); continue;
+        await delay(500 * (2 ** attempt), undefined, { signal }); continue;
       }
       const body = await json(response);
       if (response.ok && typeof body?.name === "string") return "delivered";

@@ -67,6 +67,23 @@ describe("expo push", () => {
     expect(remove).toHaveBeenCalledWith("user-1", credentialDigest("native-device"));
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("closes an answered request only on live native Android devices", async () => {
+    const remove = vi.fn(async () => undefined), dismiss = vi.fn(async (token: string) => token === "gone" ? "unregistered" as const : "delivered" as const);
+    const tokens = { load: async () => undefined, list: async () => [
+      { token: "native-device", sessionId: "live-session", transport: "fcm" as const },
+      { token: "gone", sessionId: "live-session", transport: "fcm" as const },
+      { token: "ExponentPushToken[legacy]", sessionId: "live-session", transport: "expo" as const },
+      { token: "expired", sessionId: "old-session", transport: "fcm" as const },
+    ], save: async () => {}, importLegacy: async () => false, remove, endSession: async () => {} };
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    const push = new ExpoPushProvider(tokens, { sessionExpiresAt: async id => new Date(id === "old-session" ? 0 : Date.now() + 60_000), androidPush: { dismiss } as never });
+    const request = { userId: "user-1", spaceId: "w", botId: "b", threadId: "t", requestId: "event-1" };
+    await push.dismiss(request);
+    expect(dismiss.mock.calls.map(([token]) => token).sort()).toEqual(["gone", "native-device"]);
+    expect(dismiss).toHaveBeenCalledWith("native-device", request);
+    expect(remove).toHaveBeenCalledWith("user-1", credentialDigest("gone"));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("fans out to every live mobile session and keeps one expired device from blocking the others", async () => {
     let rows = [{ token: "ExponentPushToken[phone]", sessionId: "phone" }, { token: "ExponentPushToken[tablet]", sessionId: "tablet" }, { token: "ExponentPushToken[old]", sessionId: "old" }];
     const tokens = { load: async () => rows[0], list: async () => rows, save: async () => {}, importLegacy: async () => false,

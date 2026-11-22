@@ -20,6 +20,22 @@ const NOTICE_COPY = {
   },
 } as const;
 
+/** Refined failure kinds; older servers never send them and older workers ignore the field. */
+const DETAIL_COPY = {
+  en: {
+    not_started: ["Could not start", "A message or routine could not start. Open the chat for details."],
+    helper_failed: ["Part of the work failed", "A helper or teammate could not finish. Open the chat for details."],
+    usage_limit: ["Usage limit reached", "Your Mico stopped at a usage limit. Open the chat for details."],
+    sign_in: ["Provider sign-in needed", "Your Mico needs you to sign in to its provider again or reconnect it."],
+  },
+  es: {
+    not_started: ["No se pudo empezar", "Un mensaje o una rutina no pudo empezar. Abre el chat para ver por qué."],
+    helper_failed: ["Falló una parte del trabajo", "Un ayudante o un compañero no pudo terminar. Abre el chat para ver qué ha pasado."],
+    usage_limit: ["Límite de uso alcanzado", "Tu Mico se ha detenido por un límite de uso. Abre el chat para ver los detalles."],
+    sign_in: ["Hay que conectar el proveedor", "Tu Mico necesita que vuelvas a iniciar sesión en su proveedor o lo conectes de nuevo."],
+  },
+} as const;
+
 /** Independent of the shell cache/update protocol. No remote URL is accepted from a push. */
 type PushPayload = {
   version: 1;
@@ -28,6 +44,8 @@ type PushPayload = {
   title: string;
   body: string;
   kind?: keyof typeof NOTICE_COPY.en;
+  /** A refined failure kind; an unknown one falls back to the kind's copy. */
+  detail?: keyof typeof DETAIL_COPY.en;
   preview?: boolean;
   avatar?: string;
   avatarArt?: string;
@@ -51,6 +69,8 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
   };
   if (p.avatar && Object.hasOwn(legacy, p.avatar)) p.avatar = legacy[p.avatar];
   if (p.avatarArt && Object.hasOwn(legacy, p.avatarArt)) p.avatarArt = legacy[p.avatarArt];
+  // A newer server may refine kinds this worker does not know yet; it keeps the base copy.
+  if (p.detail !== undefined && (typeof p.detail !== "string" || !Object.hasOwn(DETAIL_COPY.en, p.detail))) delete p.detail;
   if (
     p.version !== 1 ||
     ![p.accountId, p.botId, p.threadId, p.spaceId].every(
@@ -77,7 +97,9 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
 
 export function pushNotification(p: PushPayload, scopeUrl: string, language: string) {
   const spanish = /^es(?:-|$)/i.test(language);
-  const copy = NOTICE_COPY[spanish ? "es" : "en"][p.kind ?? "completion"];
+  const copy = p.detail
+    ? DETAIL_COPY[spanish ? "es" : "en"][p.detail]
+    : NOTICE_COPY[spanish ? "es" : "en"][p.kind ?? "completion"];
   const art = p.avatarArt ?? p.avatar;
   const avatar = p.preview && art && NOTIFICATION_AVATARS.has(art) ? art : undefined;
   return {
@@ -88,7 +110,8 @@ export function pushNotification(p: PushPayload, scopeUrl: string, language: str
       badge: new URL("mycellios/notification-badge.png", scopeUrl).href,
       icon: new URL(`mycellios/notification-micos/${avatar ?? "mushroom"}.png`, scopeUrl).href,
       actions: [{ action: "open-chat", title: spanish ? "Abrir chat" : "Open chat" }],
-      data: { url: pushChatUrl(p, scopeUrl), pushAccountId: p.accountId, botId: p.botId },
+      // noticeId lets an answer on another device close exactly this notice.
+      data: { url: pushChatUrl(p, scopeUrl), pushAccountId: p.accountId, botId: p.botId, noticeId: p.id },
     },
   };
 }
@@ -103,6 +126,16 @@ export function pushChatUrl(
   url.searchParams.set("noticeSpace", p.spaceId);
   if (!p.groupId && p.taskThreadId) url.searchParams.set("task", p.taskThreadId);
   return url.href;
+}
+
+/** A request answered on another device: close its notice without showing anything. */
+type DismissPayload = { version: 2; type: "dismiss"; id: string; accountId: string; notice: string; threadId: string; expiresAt: number };
+export function parseDismissPayload(value: unknown, now = Date.now()): DismissPayload | null {
+  if (!value || typeof value !== "object") return null;
+  const p = value as DismissPayload;
+  return p.version === 2 && p.type === "dismiss" && [p.accountId, p.threadId].every((v) => typeof v === "string" && ID.test(v)) &&
+    typeof p.notice === "string" && p.notice.length > 0 && p.notice.length <= 400 && typeof p.id === "string" && p.id.length <= 420 &&
+    Number.isFinite(p.expiresAt) && p.expiresAt > now && p.expiresAt <= now + 360_000 ? p : null;
 }
 
 type DeviceNotificationPreferences = { enabled?: boolean; preview?: boolean; sound?: boolean; mutedUntil?: number; attentionOnly?: boolean };
@@ -179,6 +212,14 @@ export function installPushWorker(scope: ServiceWorkerGlobalScope) {
       try {
         value = event.data?.json();
       } catch {
+        return;
+      }
+      const dismissal = parseDismissPayload(value);
+      if (dismissal) {
+        if ((await getAccount()) !== dismissal.accountId) return;
+        for (const notice of await scope.registration.getNotifications({ tag: `mycellios:${dismissal.threadId}` })) {
+          if (notice.data?.noticeId === dismissal.notice) notice.close();
+        }
         return;
       }
       const p = parsePushPayload(value);

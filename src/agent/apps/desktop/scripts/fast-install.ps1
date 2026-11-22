@@ -83,7 +83,12 @@ function Restore-Previous {
  $script:state.phase='restored';Save-State
 }
 
-function Restore-InterruptedExtraction([string]$version) {
+function Read-Manifest {
+ try{return Get-Content -LiteralPath (Join-Path $installationPath 'resources\desktop-build.json') -Raw|ConvertFrom-Json}catch{return $null}
+}
+# An interrupted extraction leaves a partial new version in place, so the receipt
+# is matched by installation and backup scope, not by the version it targeted.
+function Restore-InterruptedExtraction {
  if(!(Test-Path -LiteralPath $backupRoot -PathType Container) -or
     ((Get-Item -LiteralPath $backupRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){return}
  $receipts=@(foreach($folder in Get-ChildItem -LiteralPath $backupRoot -Directory){
@@ -93,7 +98,7 @@ function Restore-InterruptedExtraction([string]$version) {
   if(!(Test-Path -LiteralPath $file -PathType Leaf)){continue}
   try{$saved=Get-Content -LiteralPath $file -Raw -Encoding UTF8|ConvertFrom-Json}catch{continue}
   if($saved.schema -eq 'mycellios-fast-install/1' -and $saved.phase -eq 'prepared' -and
-     $saved.target -eq $version -and $saved.installation -eq $installationPath -and
+     $saved.installation -eq $installationPath -and
      $saved.backup -eq (Join-Path $folder.FullName 'installation')){$saved}
  })
  if($receipts.Count -eq 0){return}
@@ -138,19 +143,19 @@ try {
   $oldExe=Join-Path $installationPath $exeName
   if(!(Test-Path -LiteralPath $oldExe)){Save-State;exit 0}
   if((Get-Item -LiteralPath $oldExe).VersionInfo.ProductName -ne 'Mycellios Desktop'){throw 'Installed product identity differs'}
-  $manifest=Get-Content -LiteralPath (Join-Path $installationPath 'resources\desktop-build.json') -Raw|ConvertFrom-Json
-  if($manifest.schema -ne 'mycellios-desktop-build/1' -or $manifest.platform -ne 'windows-x64' -or $manifest.version -notmatch '^\d+\.\d+\.\d+$'){throw 'Installed build identity differs'}
   if([IO.Path]::GetFileName($Uninstaller) -ne $Uninstaller -or $Uninstaller -ne 'Uninstall Mycellios Desktop.exe'){throw 'Installed uninstaller differs'}
   foreach($key in @($InstallRegistryKey,$UninstallRegistryKey)){
    if($key -notmatch '^Software\\(?:Microsoft\\Windows\\CurrentVersion\\Uninstall\\)?\{?[0-9a-fA-F-]{36}\}?$'){throw 'Installation registration scope differs'}
   }
   $fresh=$script:state
   $uninstallPath=Join-Path $installationPath $Uninstaller
-  if(!(Test-Path -LiteralPath $uninstallPath -PathType Leaf)){
-   Restore-InterruptedExtraction $manifest.version
+  if(!(Test-Path -LiteralPath $uninstallPath -PathType Leaf) -or !(Read-Manifest)){
+   Restore-InterruptedExtraction
    if(!(Test-Path -LiteralPath $uninstallPath -PathType Leaf)){throw 'Installed uninstaller differs'}
    $script:state=$fresh
   }
+  $manifest=Get-Content -LiteralPath (Join-Path $installationPath 'resources\desktop-build.json') -Raw|ConvertFrom-Json
+  if($manifest.schema -ne 'mycellios-desktop-build/1' -or $manifest.platform -ne 'windows-x64' -or $manifest.version -notmatch '^\d+\.\d+\.\d+$'){throw 'Installed build identity differs'}
   $folder=Join-Path $backupRoot ([Guid]::NewGuid().ToString())
   New-Item -ItemType Directory -Path $folder -Force|Out-Null
   $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value

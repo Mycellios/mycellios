@@ -6920,3 +6920,47 @@ msgstr "Impossible de marquer tous les chats comme lus. Réessayez."
 #: src/pages/Shell.tsx
 msgid "Could not mark the chats as read. Try again."
 msgstr "Impossible de marquer les chats comme lus. Réessayez."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause for…"
+msgstr "Mettre en pause pendant…"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until you turn them back on."
+msgstr "Jusqu’à ce que vous les réactiviez."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until {time}."
+msgstr "Jusqu’à {time}."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Replies in task conversations"
+msgstr "Réponses dans les conversations de tâche"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Alert when a Mico finishes or fails in one of its own task conversations. Questions and approvals always alert; routines follow their own setting."
+msgstr "Alerter quand un Mico termine ou échoue dans l’une de ses conversations de tâche. Les questions et approbations alertent toujours ; les routines suivent leur propre réglage."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 15 minutes"
+msgstr "Pendant 15 minutes"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 1 hour"
+msgstr "Pendant 1 heure"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 3 hours"
+msgstr "Pendant 3 heures"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 8 hours"
+msgstr "Pendant 8 heures"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "For 24 hours"
+msgstr "Pendant 24 heures"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Until I turn it back on"
+msgstr "Jusqu’à ce que je les réactive"

@@ -236,6 +236,7 @@ model User {
   webPushSettings WebPushSettings?
   webPushDevices WebPushDevice[]
   webPushPresence WebPushPresence[]
+  notificationRequests NotificationRequest[]
 }
 
 /// A row with no answers means the user skipped the survey.
@@ -313,6 +314,19 @@ model Account {
 
   @@index([userId])
   @@map("account")
+}
+
+/// One place taken from the deployment's invitation link (SIGNUP_INVITE_CODE). System-only.
+/// No foreign key: the place is claimed while signup may still hold the user row uncommitted,
+/// and a deleted account keeps its place so a batch never admits more than its limit.
+model SignupInviteRedemption {
+  userId    String   @id
+  /// SHA-256 of the invitation code, never the code itself.
+  inviteId  String
+  createdAt DateTime @default(now())
+
+  @@index([inviteId])
+  @@map("signup_invite_redemptions")
 }
 
 model Verification {
@@ -2488,8 +2502,26 @@ model WebPushDelivery {
   leaseUntil DateTime? @db.Timestamptz(6)
   attempts Int @default(0)
   finishedAt DateTime? @db.Timestamptz(6)
+  /// Set when the push service accepted the notice; dismissals go only to these devices.
+  sentAt DateTime? @db.Timestamptz(6)
   @@unique([deviceId, eventKey])
   @@map("web_push_deliveries")
+}
+/// A question or takeover notice that reached a channel; resolved once the run stops waiting on it.
+model NotificationRequest {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId String
+  botId String
+  threadId String
+  runId String
+  eventId String
+  kind String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  resolvedAt DateTime? @db.Timestamptz(6)
+  @@unique([runId, eventId])
+  @@map("notification_requests")
 }
 
 // Durable admission/receipt record: a submitted review is only reconciled, never replayed.

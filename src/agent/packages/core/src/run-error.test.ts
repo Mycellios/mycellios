@@ -10,6 +10,7 @@ import {
   MODEL_CONTEXT_TOO_SMALL_ERROR,
   MODEL_OUTPUT_CUT_ERROR,
   MODEL_OUTPUT_LIMIT_ERROR,
+  runErrorNotice,
   MODEL_REQUIRED_SEND_ERROR,
   modelFallbackFailure,
   normalizeRunError,
@@ -882,4 +883,17 @@ describe("the one action that fixes a failed run", () => {
       });
     },
   );
+});
+
+describe("runErrorNotice", () => {
+  it("tells a sign-in and a usage limit apart from an ordinary failure", () => {
+    expect(runErrorNotice("The native agent account has reached its usage limit. Check its plan or wait for the allowance to reset.")).toBe("usage_limit");
+    expect(runErrorNotice("The native agent needs you to sign in again. Check its account connection.")).toBe("sign_in");
+    expect(runErrorNotice("The ChatGPT account changed during sign-in refresh. Connect the provider again.")).toBe("sign_in");
+    expect(runErrorNotice('401 {"error":{"message":"Invalid API key","type":"authentication_error"}}')).toBe("sign_in");
+    expect(runErrorNotice('402 {"error":{"message":"Insufficient credits"}}')).toBe("usage_limit");
+    expect(runErrorNotice('429 {"error":{"message":"Rate limit reached for requests"}}')).toBe("failure");
+    expect(runErrorNotice("Bot has no computer")).toBe("failure");
+    expect(runErrorNotice(null)).toBe("failure");
+  });
 });

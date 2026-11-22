@@ -255,6 +255,26 @@ rules as password signup. Signing in with a code to an existing unverified accou
 account's password, SSO links and sessions, since nothing proved they belonged to the mailbox
 owner. This is what stops someone who registered another person's address from keeping access.
 
+### Closed beta invitation link
+
+To open registration to a limited number of people without collecting their addresses first,
+set an unguessable code and a number of places:
+
+```env
+SIGNUP_INVITE_CODE=<24 to 128 letters, digits, '-' or '_'>   # e.g. openssl rand -hex 24
+SIGNUP_INVITE_LIMIT=10
+```
+
+Share `https://<web origin>/api/invite/<code>`. The link stores the code in an HttpOnly cookie
+for two days and opens sign-in. A new account, whether it comes from password signup, an emailed
+code or SSO, then also needs that cookie and a free place: places are claimed under a database
+lock when the account's workspace is first created, so concurrent signups never exceed the limit.
+Once every place is taken, signup answers "Registration is closed". Existing accounts are not
+affected, and `SIGNUPS_ENABLED`/`SIGNUP_ALLOWLIST` still apply. A wrong code answers like any
+missing page. Changing the code starts a new batch of places; a place stays taken if its account
+is later deleted. Register in the same browser that opened the link: a confirmation link opened
+in another browser lacks the cookie.
+
 Allowlisted signup requires mailbox verification and email delivery, including the first account.
 Without email delivery, use the server-side account bootstrap described below; public signup never marks an address verified or assigns server permissions.
 

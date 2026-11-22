@@ -6,6 +6,9 @@ import {
   completionNotificationPreview,
   DELEGATED_EMPTY_NOTICE,
   emptyDelegatedToolTurnShouldFail,
+  failureNotice,
+  groupWorkEndedWithUnread,
+  helperFailedNotice,
   isExactNoResponse,
   longWorkProgressGuidance,
   mayOpenModelStream,
@@ -16,6 +19,7 @@ import {
   runIdentityInstruction,
   runPromotesMidTurnNarration,
   runReplyGuidance,
+  runSendsCompletionNotification,
   runSendsFinishNotification,
   secretAskNotification,
   stripNoResponseReply,
@@ -659,5 +663,44 @@ describe("stripStrayNoResponse for runs that must reply", () => {
   ])("leaves %j unchanged", (text) => {
     const blocks = text ? [{ kind: "text" as const, text }] : [];
     expect(stripStrayNoResponse(text, blocks)).toEqual({ assembled: text, blocks });
+  });
+});
+
+describe("notification kinds", () => {
+  it("keeps teammate-started completions quiet but lets their failures notify", () => {
+    expect(runSendsCompletionNotification("bot_message")).toBe(false);
+    expect(runSendsCompletionNotification("delegated_task")).toBe(false);
+    expect(runSendsFinishNotification("bot_message")).toBe(true);
+    expect(runSendsCompletionNotification("user")).toBe(true);
+    // A task report relays a Mico-started task through the main chat's normal completion.
+    expect(runSendsCompletionNotification("task_report")).toBe(true);
+    expect(runSendsCompletionNotification("agent_task")).toBe(false);
+  });
+  it("names what a failed run needs: a sign-in, a usage limit, a start or a look", () => {
+    expect(failureNotice("Research", "The native agent needs you to sign in again. Check its account connection."))
+      .toMatchObject({ kind: "sign_in", title: "Research needs you to reconnect its provider" });
+    expect(failureNotice("Research", '429 {"error":{"message":"You exceeded your current quota","type":"insufficient_quota"}}').kind)
+      .toBe("usage_limit");
+    expect(failureNotice("Research", "Bot has no computer", { kind: "not_started" }))
+      .toMatchObject({ kind: "not_started", title: "Research could not start", body: "Bot has no computer" });
+    expect(failureNotice("Research", "Model stream ended", { trigger: "bot_message" }).kind).toBe("helper_failed");
+    expect(failureNotice("Research", "Model stream ended", { trigger: "user" })).toMatchObject({ kind: "failure", title: "Research failed" });
+  });
+  it("keeps a failed helper's error and result out of its notice", () => {
+    expect(helperFailedNotice("Research", "Scraper", "bot", "thread")).toEqual({
+      kind: "helper_failed", title: "Research: Scraper failed", body: "Scraper could not finish its part.", botId: "bot", threadId: "thread",
+    });
+  });
+  it("lets only the group's last finished turn notify, and only with unread replies", async () => {
+    const prisma = (busy: number, later: number, unread: boolean) => ({
+      run: { count: async () => busy },
+      event: { findFirst: async () => ({ seq: 10 }), count: async () => later },
+      thread: { findUnique: async () => ({ unread }) },
+    }) as never;
+    const run = { id: "run", threadId: "group-thread" };
+    expect(await groupWorkEndedWithUnread(prisma(0, 0, true), run)).toBe(true);
+    expect(await groupWorkEndedWithUnread(prisma(1, 0, true), run)).toBe(false);
+    expect(await groupWorkEndedWithUnread(prisma(0, 1, true), run)).toBe(false);
+    expect(await groupWorkEndedWithUnread(prisma(0, 0, false), run)).toBe(false);
   });
 });

@@ -656,3 +656,21 @@ function asRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+
+const USAGE_LIMIT_KINDS = new Set<RunErrorKind>(["quota", "credit", "spending", "key"]);
+
+/**
+ * Which notice a failed run sends: a sign-in the person must redo, a usage or credit limit
+ * that stopped the turn, or an ordinary failure. Reads only the saved error, never prompts.
+ */
+export function runErrorNotice(details: string | null | undefined): "failure" | "usage_limit" | "sign_in" {
+  const trimmed = details?.trim();
+  if (!trimmed) return "failure";
+  // Fixed native-agent sentences (native-agent-errors.ts) and the refreshed-account refusal.
+  if (/^The native agent account has reached its usage limit\b/.test(trimmed)) return "usage_limit";
+  if (/^The native agent needs you to sign in again\b/.test(trimmed) || /\bConnect the provider again\.$/.test(trimmed))
+    return "sign_in";
+  const { kind } = normalizeRunError(trimmed);
+  if (kind === "auth") return "sign_in";
+  return kind && USAGE_LIMIT_KINDS.has(kind) ? "usage_limit" : "failure";
+}

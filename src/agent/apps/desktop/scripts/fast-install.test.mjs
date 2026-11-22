@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,link,copyFile,access,rm,readdir,unlink} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,link,copyFile,access,rm,readdir,unlink,cp} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
@@ -48,11 +48,19 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
     const args=['-Uninstaller','Uninstall Mycellios Desktop.exe','-InstallRegistryKey',keys[0],'-UninstallRegistryKey',keys[1]];
     invoke('prepare',[...args,'-TargetVersion','99.0.1'],interruptedJournal);
     const interrupted=JSON.parse((await readFile(interruptedJournal,'utf8')).replace(/^\uFEFF/,''));
-    // Extraction was interrupted after writing the binary and manifest but before registering the uninstaller.
+    // Extraction was interrupted after writing the binary, before its resources, manifest and uninstaller.
     await unlink(path.join(installation,'Uninstall Mycellios Desktop.exe'));
     await copyFile(source,target);
-    await mkdir(path.join(installation,'resources'));
-    await writeFile(path.join(installation,'resources/desktop-build.json'),JSON.stringify({schema:'mycellios-desktop-build/1',platform:'windows-x64',version:'99.0.1'}));
+    await writeFile(path.join(installation,'partial-new-version'),'partial');
+    // A second prepared receipt for the same installation makes recovery ambiguous: nothing moves.
+    const duplicate=path.join(path.dirname(interrupted.backup),'..',randomUUID());
+    await cp(path.dirname(interrupted.backup),duplicate,{recursive:true});
+    await writeFile(path.join(duplicate,'receipt.json'),JSON.stringify({...interrupted,backup:path.join(duplicate,'installation')}));
+    assert.throws(()=>invoke('prepare',[...args,'-TargetVersion','99.0.2'],retryJournal),/Interrupted installation recovery is ambiguous/);
+    await access(path.join(installation,'partial-new-version'));await access(path.join(interrupted.backup,'Mycellios Desktop.exe'));
+    await assert.rejects(access(retryJournal));
+    await rm(duplicate,{recursive:true,force:true});
+    // Retrying for a different version than the interrupted one recovers the single receipt.
     invoke('prepare',[...args,'-TargetVersion','99.0.2'],retryJournal);
     const recovered=JSON.parse((await readFile(path.join(path.dirname(interrupted.backup),'receipt.json'),'utf8')).replace(/^\uFEFF/,''));
     const retry=JSON.parse((await readFile(retryJournal,'utf8')).replace(/^\uFEFF/,''));

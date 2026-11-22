@@ -12,6 +12,7 @@ import {
   type PythonPipelineLaunchDescription,
 } from "../distribution/python-launcher.js";
 import { buildIsolatedProcessEnvironment } from "../distribution/process-environment.js";
+import { prepareRemoteNativeGgufProcess, type LlamaCppNodeRuntime } from "./native-gguf-stage-preparer.js";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const SHA256_IDENTITY = /^sha256:[0-9a-f]{64}$/;
@@ -60,6 +61,8 @@ export interface StageArtifactPreparationOptions {
    * default implementation is entirely in-process and never invokes Python.
    */
   nativePackageVerifier?: NativeGgufPackageVerifier;
+  /** This node's pinned llama.cpp build, needed only by llama.cpp GGUF routes. */
+  llamaCpp?: LlamaCppNodeRuntime;
   onProgress?: (event: {
     stageIndex: number;
     layerStart: number;
@@ -116,7 +119,27 @@ export async function prepareNodeStageArtifacts(
   let preparedModelIdentity: string | null = null;
   const result: PythonLaunchProcess[] = [];
   const verifiedLocal = new Map<string, StageArtifactCompilerResult>();
+  const nativeSource = description.configuration.nativeGgufSource;
   for (const process of local) {
+    if (nativeSource !== undefined) {
+      const range = { stageIndex: process.stageIndex, layerStart: process.layerStart, layerEnd: process.layerEnd };
+      options.onProgress?.({ ...range, state: "preparing" });
+      const prepared = await prepareRemoteNativeGgufProcess(description, process, {
+        source: nativeSource,
+        cacheDirectory: options.cacheDirectory,
+        ...(options.llamaCpp === undefined ? {} : { llamaCpp: options.llamaCpp }),
+        run: (args) => options.compilerRunner
+          ? options.compilerRunner(options.pythonExecutable, args)
+          : runCompiler(options.pythonExecutable, args, options),
+        verify: async (binding) => {
+          await (options.nativePackageVerifier ?? verifyNativeGgufStagePackage)(binding, options.signal);
+        },
+      });
+      options.onProgress?.({ ...range, state: "ready", packageId: prepared.result.packageId,
+        weightsSizeBytes: prepared.result.weightsSizeBytes });
+      result.push(prepared.process);
+      continue;
+    }
     if (process.kind !== "cell-member" && process.nativeGguf !== null) {
       await (options.nativePackageVerifier ?? verifyNativeGgufStagePackage)(
         structuredClone(process.nativeGguf),

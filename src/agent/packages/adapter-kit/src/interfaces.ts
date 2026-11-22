@@ -55,6 +55,7 @@ import type {
   MessagingPlatformDescriptor,
   MessagingSendRequest,
   MessagingSendResult,
+  NotificationDismissal,
   NotificationMessage,
   PageBrowserCommand,
   PageBrowserResult,
@@ -424,6 +425,8 @@ export interface NotificationProvider {
   deliver?(message: NotificationMessage, context: AdapterContext): Promise<"delivered" | "undeliverable">;
   describe(): AdapterDescriptor<{ push: boolean; email: boolean }>;
   send(message: NotificationMessage, context: AdapterContext): Promise<void>;
+  /** Closes an answered request's notice on devices that showed it; best effort, no new alert. */
+  dismiss?(request: NotificationDismissal): Promise<void>;
 }
 
 /** Outbound account and security email. Product code owns content; adapters own delivery. */

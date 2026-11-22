@@ -31,4 +31,24 @@ public class NotificationPolicyTest {
     Map<String,String> value=payload();value.put("botId","../settings");assertNull(NotificationPolicy.target(value,"owner",1000));
     value=payload();value.put("deliveryId","bad");assertNull(NotificationPolicy.target(value,"owner",1000));
   }
+  private Map<String,String> dismissal(){
+    Map<String,String> value=new HashMap<>();
+    value.put("version","1");value.put("type","dismiss");value.put("accountId","owner");value.put("deliveryId","b".repeat(64));
+    value.put("expiresAt","301000");value.put("threadId","thread");value.put("requestId","event-1");return value;
+  }
+  @Test public void closesOnlyOwnedAnsweredRequests(){
+    assertEquals("thread",NotificationPolicy.dismissal(dismissal(),"owner",1000));
+    assertNull(NotificationPolicy.dismissal(dismissal(),"other",1000));
+    assertNull(NotificationPolicy.dismissal(dismissal(),"owner",301000));
+    Map<String,String> value=dismissal();value.put("requestId","../x");assertNull(NotificationPolicy.dismissal(value,"owner",1000));
+    value=dismissal();value.remove("type");assertNull(NotificationPolicy.dismissal(value,"owner",1000));
+    // A close never opens anything: it lacks the fields a shown notice needs.
+    assertNull(NotificationPolicy.target(dismissal(),"owner",1000));
+  }
+  @Test public void keepsAnIndefinitePauseAndBoundsTimedOnes(){
+    assertEquals(Long.MAX_VALUE,NotificationPolicy.pauseUntil(NotificationPolicy.PAUSED_UNTIL_RESUMED,1000));
+    assertEquals(1000+7*86400000L,NotificationPolicy.pauseUntil(1000+30*86400000L,1000));
+    assertEquals(5000,NotificationPolicy.pauseUntil(5000,1000));
+    assertEquals(0,NotificationPolicy.pauseUntil(-5,1000));
+  }
 }

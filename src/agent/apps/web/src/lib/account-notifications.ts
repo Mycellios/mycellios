@@ -1,4 +1,4 @@
-import { notificationAllowed, type NotificationSettings, type ProductEvent } from "@mycellios/contracts";
+import { notificationAllowed, type NotificationScope, type NotificationSettings, type ProductEvent } from "@mycellios/contracts";
 
 // Memory only, keyed by authenticated account. Never reuse another account's policy.
 const policies = new Map<string, NotificationSettings>();
@@ -12,6 +12,7 @@ export function accountNotificationAllowed(
   botId: string | null | undefined,
   event: Pick<ProductEvent, "type" | "payload">,
   now = Date.now(),
+  scope: NotificationScope = {},
 ) {
   const settings = policies.get(accountId);
   if (!settings) return false; // Do not bypass an unknown account opt-out while status loads.
@@ -19,5 +20,5 @@ export function accountNotificationAllowed(
   const kind = failedBlock || event.type === "run.failed" || event.type === "thread.subagent" && event.payload.status === "failed"
     ? "failure" : event.type === "computer.takeover.requested" ? "takeover"
     : ["thread.ask", "thread.choice", "run.waiting_input"].includes(event.type) ? "help" : "completion";
-  return notificationAllowed(settings, botId ?? "", kind, now);
+  return notificationAllowed(settings, botId ?? "", kind, now, scope);
 }
