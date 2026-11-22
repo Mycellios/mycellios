@@ -5,6 +5,7 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { readEnv } from "@mycellios/core/legacy-env";
 
 import { declaredVisionModelIds, inputModalities } from "./model-modalities.js";
 /**
@@ -31,7 +32,7 @@ const DEFAULT_CONTEXT_WINDOW = 32_768;
 const DEFAULT_MAX_TOKENS = 4_096;
 
 export function localBaseUrl(): string {
-  const value = process.env.RAKAZO_LOCAL_MODELS_URL?.trim() || DEFAULT_BASE_URL;
+  const value = readEnv("LOCAL_MODELS_URL")?.trim() || DEFAULT_BASE_URL;
   let url: URL;
   try {
     url = new URL(value);
@@ -63,7 +64,7 @@ function tokenLimit(name: string, fallback: number): number {
 
 /** Comma-separated model ids exactly as the local server names them. */
 function localModelIds(): string[] {
-  return (process.env.RAKAZO_LOCAL_MODELS ?? "")
+  return (readEnv("LOCAL_MODELS") ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
