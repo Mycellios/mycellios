@@ -155,6 +155,10 @@ export function mountDesktopRelay(
           broker.result(owner, value.deviceId, value.id, value.seq, value.data, value.done);
           return c.json({ ok: true });
         }
+        case "release":
+          // Quitting or restarting ends presence now; consent and preference stay.
+          broker.release(owner, parseDesktopPoll(input).deviceId);
+          return c.json({ ok: true });
         case "revoke":
           broker.revoke(owner, parseDesktopPoll(input).deviceId);
           if (!broker.hasAgentDevice(owner)) await deps.desktopExecution?.(session.actor, false);

@@ -3,6 +3,8 @@ import { getLogger } from "@mycellios/logging";
 import { ComputerUpdatingError } from "./computer-errors.js";
 import { desktopFailureCode, desktopLegacyFailureCode, desktopDiagnosticMessage, desktopDiagnosticStage, desktopOperationId, parseDesktopDiagnostic, type DesktopFailureCode, type DesktopDiagnosticStage } from "@mycellios/contracts";
 
+const NOT_RECEIVED: ReadonlySet<DesktopFailureCode> = new Set(["desktop_disconnected", "relay_restarted"]);
+
 /** A complete native stream is required; EOF is never a successful run or callback. */
 export async function* desktopAgentFrames(response: Response, signal: AbortSignal, phase: "callback" | "run" = "run"): AsyncIterable<unknown> {
   const operationId = desktopOperationId(response.headers.get("x-mycellios-desktop-operation"));
@@ -17,7 +19,7 @@ export async function* desktopAgentFrames(response: Response, signal: AbortSigna
   if (!response.ok || !response.body) {
     const code = response.headers.get("x-mycellios-desktop-error");
     await response.body?.cancel();
-    if (code === "desktop_updating") throw new ComputerUpdatingError(false);
+    if (code === "desktop_updating" || (phase === "run" && code === "desktop_disconnected")) throw new ComputerUpdatingError(false);
     throw failure(desktopFailureCode(code) ?? "relay_stream_failure", "dispatch");
   }
   getLogger().info("desktop.relay.stream_started", { "desktop.phase": phase, "desktop.operation.id": operationId });
@@ -43,6 +45,9 @@ export async function* desktopAgentFrames(response: Response, signal: AbortSigna
         if (frame.error) {
           if (frame.code === "desktop_updating") throw new ComputerUpdatingError(frame.dispatched !== false);
           const reason = desktopFailureCode(frame.code) ?? (frame.code === "desktop_session_missing" ? "native_session_missing" : desktopLegacyFailureCode(frame.error));
+          // The PC went away before it received this start: nothing ran there, so
+          // the run waits for it like a restart instead of reporting an uncertain result.
+          if (phase === "run" && frame.dispatched === false && NOT_RECEIVED.has(reason)) throw new ComputerUpdatingError(false);
           throw failure(reason, desktopDiagnosticStage(frame.stage) ?? "native_stream", frame.operationId);
         }
         if (frame.done === true) { done = true; continue; }

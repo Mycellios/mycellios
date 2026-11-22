@@ -149,6 +149,20 @@ export class DesktopRelayBroker {
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Local computer access was revoked.");
     }
   }
+  /**
+   * The PC is quitting or restarting: end its presence now instead of after the
+   * lease expires, so no new work waits for a poll that will never come. Unlike
+   * revoke, this keeps the owner's consent and execution preference.
+   */
+  release(owner: DesktopExecutorOwner, deviceId: string) {
+    const accountKey = this.accountKey(owner, deviceId);
+    const account = this.accounts.get(accountKey);
+    if (account && sameOwner(account, owner)) this.accounts.delete(accountKey);
+    for (const [id, binding] of this.bindings) if (sameOwner(owner, binding) && binding.deviceId === deviceId) {
+      this.bindings.delete(id);
+      for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Desktop disconnected. Check results before retrying.");
+    }
+  }
   ownedBindings(owner: DesktopExecutorOwner, deviceId: string) {
     return [...this.bindings.values()].filter(binding => sameOwner(owner, binding) && binding.deviceId === deviceId).map(binding => binding.botId);
   }
@@ -299,6 +313,16 @@ export class DesktopRelayBroker {
     // All messages passed by the broker are static and contain no request data.
     this.logFailure(op, message);
     op.closed = true; op.dispose(); this.operations.delete(op.id);
+    // A start the PC never received may be dispatched again once it reconnects.
+    if (!op.claimed && op.request.method === "agentRun" && op.runId) {
+      const runKey = key(op.binding, `${op.binding.botId}:${op.runId}`);
+      const run = this.runs.get(runKey), segment = op.request.segmentId ?? "initial";
+      if (run?.agentSessions && run.agentSessions[segment] === op.request.sessionId) {
+        const agentSessions = { ...run.agentSessions };
+        delete agentSessions[segment];
+        this.runs.set(runKey, { ...run, agentSessions });
+      }
+    }
     this.wake(op.binding, op.binding.deviceId);
     try { op.controller.enqueue(new TextEncoder().encode(JSON.stringify({ error: message, code: desktopLegacyFailureCode(message), operationId: op.id, dispatched: op.claimed }) + "\n")); op.controller.close(); } catch { /* consumer already gone */ }
   }

@@ -55,6 +55,19 @@ it("resumes an approved tool through the real native host once without replaying
   } finally { await host.close(); await rm(profile, { recursive: true, force: true }); }
 });
 
+it("pauses for the PC instead of reporting an uncertain run when the start never reached it", async () => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const onComputerUpdate = vi.fn();
+  const runtime = new DesktopAgentRuntime({ fallback, select: async () => ({ available: true, preferred: true }),
+    transport: async () => new Response(JSON.stringify({ error: "Desktop disconnected. Check results before retrying.", code: "desktop_disconnected", dispatched: false }) + "\n") });
+  const failure = await (async () => { for await (const _ of runtime.run(request(), { ...context, onComputerUpdate })) {} })()
+    .then(() => { throw new Error("Expected the run to pause"); }, (e: unknown) => e as Error);
+  expect(failure.name).toBe("ComputerUpdatingError");
+  expect(isUncertainDesktopRun(failure.message)).toBe(false);
+  expect(onComputerUpdate).toHaveBeenCalledWith(false);
+  expect(fallback.run).not.toHaveBeenCalled();
+});
+
 it("runs the engine on Desktop while awaiting account callbacks, checkpoints and nested shell observations", async () => {
   const observed: string[] = [];
   const engine: AgentRuntime = { describe, abort: vi.fn(), async *run(input) {

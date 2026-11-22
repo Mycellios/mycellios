@@ -1825,6 +1825,10 @@
   from execution slots. Claim each operation once; report only delivered IDs as
   active. Preserve owner/generation fencing, queued cancellation and distinct
   queue-pressure/disconnection errors without automatic command replay.
+  Quitting or update restarts call the `release` action, ending presence at once
+  while keeping consent and the execution preference (unlike `revoke`). A start the
+  PC never claimed requeues the run as not dispatched and frees its segment; a
+  claimed start stays uncertain. Verify the broker, stream, runtime and API relay tests.
 
 - Desktop diagnostics reuse the relay and native lifecycle hooks. Keep fixed
   failure codes, phase/stage and operation UUIDs through the transport and safe
