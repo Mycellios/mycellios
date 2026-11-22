@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Workflow, WorkflowExecution, WorkflowGraph, WorkflowNode } from "@rakazo/contracts";
-import { workflowPlan } from "@rakazo/contracts";
-import { userFacingLabel } from "@rakazo/core";
+import type { Workflow, WorkflowExecution, WorkflowGraph, WorkflowNode } from "@mycellios/contracts";
+import { workflowPlan } from "@mycellios/contracts";
+import { userFacingLabel } from "@mycellios/core";
 import {
   Button,
   Dialog,
@@ -12,7 +12,7 @@ import {
   NativeSelect,
   NativeSelectOption,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useEffect, useId, useRef, useState } from "react";
 import { useSpaceRpc } from "../lib/space-rpc";
 

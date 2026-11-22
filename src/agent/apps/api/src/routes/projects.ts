@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import { createRepos, isOwnedRoutineThread } from "@rakazo/db";
-import { isMicoTaskThread, nativeWorkProjectSession } from "@rakazo/core";
+import { createRepos, isOwnedRoutineThread } from "@mycellios/db";
+import { isMicoTaskThread, nativeWorkProjectSession } from "@mycellios/core";
 import type { RouterContext } from "./context.js";
 
 /** Metadata never grants filesystem access. Every query retains both ownership fences. */

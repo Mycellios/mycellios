@@ -1,7 +1,7 @@
 import { hostedAntseedGateway } from "../../lib/hosted-antseed-gateway";
 import { compatibleRoleCatalogKey } from "./use-compatible-role-catalog";
 import { useLingui } from "@lingui/react/macro";
-import type { Me, ModelHeaderRow, SettingsScope, ThinkingLevel } from "@rakazo/contracts";
+import type { Me, ModelHeaderRow, SettingsScope, ThinkingLevel } from "@mycellios/contracts";
 import {
   ANTSEED_PROVIDER_ID,
   CLOUDFLARE_AI_GATEWAY_PROVIDER_ID,
@@ -21,7 +21,7 @@ import {
   parseModelMaxImagesPerPrompt,
   parseModelMaxTokens,
   savedCompatibleEndpointMatches,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   COMPATIBLE_THINKING_LEVELS,
   clampCatalogThinkingLevel,
@@ -31,7 +31,7 @@ import {
   pickCatalogModelId,
   popularModelProvidersFirst,
   savedCompatibleModelIds,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCopyText } from "../../lib/copy-text";

@@ -1,11 +1,11 @@
-import { reconcileLocalMemoryReviews } from "@rakazo/adapters";
-import { modelsDevCatalog, tailnetServiceFromEnv } from "@rakazo/adapters";
-import { reconcileTaskReminders, WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
+import { reconcileLocalMemoryReviews } from "@mycellios/adapters";
+import { modelsDevCatalog, tailnetServiceFromEnv } from "@mycellios/adapters";
+import { reconcileTaskReminders, WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
-import type { JobPublisher, JobWorkerHost } from "@rakazo/adapter-kit";
-import { ComposioConnector, IntegrationProviderSettings } from "@rakazo/adapters";
-import { phoneCallSettings } from "@rakazo/core";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+import type { JobPublisher, JobWorkerHost } from "@mycellios/adapter-kit";
+import { ComposioConnector, IntegrationProviderSettings } from "@mycellios/adapters";
+import { phoneCallSettings } from "@mycellios/core";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { desktopRelayKey, desktopAgentSelection, desktopRelayTransport } from "../../../packages/adapters/src/desktop-relay.js";
 import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { startWorkerHealth } from "./health.js";
@@ -70,13 +70,13 @@ import {
   shutdownPiTelemetry,
   withRunWorker,
   withSecretPersistence,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import {
   resolveEncryptionKey,
   resolveScreenProxySecret,
   resolveSupervisorToken,
   uploadSizeFromEnv,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   createBoardEvents,
   createWebPresence,
@@ -92,10 +92,10 @@ import {
   runAsSystem,
   securityEventRetentionDays,
   verifyContentKeys,
-} from "@rakazo/db";
-import { SERVICE_NAMES } from "@rakazo/logging";
-import { createRootLogger } from "@rakazo/logging/axiom";
-import { MarkdownMemoryStore } from "@rakazo/memory";
+} from "@mycellios/db";
+import { SERVICE_NAMES } from "@mycellios/logging";
+import { createRootLogger } from "@mycellios/logging/axiom";
+import { MarkdownMemoryStore } from "@mycellios/memory";
 
 const logger = createRootLogger(SERVICE_NAMES.worker);
 

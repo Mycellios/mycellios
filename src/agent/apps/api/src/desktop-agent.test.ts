@@ -5,7 +5,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { Hono } from "hono";
 import { expect, it, vi } from "vitest";
-import type { AdapterContext, AgentRunRequest } from "@rakazo/adapter-kit";
+import type { AdapterContext, AgentRunRequest } from "@mycellios/adapter-kit";
 import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { createDesktopAgentEngine } from "../../../packages/adapters/src/desktop-agent-engine.js";
 import { desktopRelayKey, signDesktopRelay } from "../../../packages/adapters/src/desktop-relay.js";

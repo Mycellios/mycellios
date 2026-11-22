@@ -1,10 +1,10 @@
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { parseArgs } from "node:util";
-import { EncryptedSecretStore, LocalArtifactStore, upgradeLegacySecrets } from "@rakazo/adapters";
-import { resolveContentEncryption, resolveEncryptionKey } from "@rakazo/core";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
-import type { ContentMigrationMode } from "@rakazo/db";
+import { EncryptedSecretStore, LocalArtifactStore, upgradeLegacySecrets } from "@mycellios/adapters";
+import { resolveContentEncryption, resolveEncryptionKey } from "@mycellios/core";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
+import type { ContentMigrationMode } from "@mycellios/db";
 import {
   contentEncryptionStatus,
   createDb,
@@ -13,7 +13,7 @@ import {
   rewrapSpaceKeys,
   rotateSpaceDataKeys,
   runAsSystem,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import { createSecretMigrationRepository } from "../secret-migration.js";
 
 loadRootEnv();

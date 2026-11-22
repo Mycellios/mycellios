@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import type { VoiceDeps } from "./voice.js";
 import { transcribeVoice } from "./voice.js";
 

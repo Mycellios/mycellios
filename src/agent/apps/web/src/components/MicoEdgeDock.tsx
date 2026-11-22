@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
-import { BotAvatar, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import { BotAvatar, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { Check, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";

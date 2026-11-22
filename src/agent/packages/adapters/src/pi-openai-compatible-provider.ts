@@ -13,7 +13,7 @@ import {
   DEFAULT_MODEL_CONTEXT_WINDOW,
   DEFAULT_MODEL_MAX_TOKENS,
   parseModelHeaders,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { Agent } from "undici";
 import { declaredVisionModelIds, inputModalities } from "./model-modalities.js";
 import { createMycelliosChatFetch } from "./mycellios-chat.js";

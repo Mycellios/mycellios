@@ -1,10 +1,10 @@
 import { MenuView } from "@expo/ui/community/menu";
-import type { BillingStatus } from "@rakazo/contracts";
+import type { BillingStatus } from "@mycellios/contracts";
 import {
   DEFAULT_MONTHLY_CREDIT_AMOUNT,
   MODEL_CREDIT_AMOUNTS,
   ModelCreditAmountSchema,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, AppState, Linking, ScrollView } from "react-native";

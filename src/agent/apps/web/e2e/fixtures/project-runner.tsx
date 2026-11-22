@@ -1,6 +1,6 @@
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
-import type { ProjectRunState, RakazoDesktop } from "@rakazo/contracts";
+import type { ProjectRunState, RakazoDesktop } from "@mycellios/contracts";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ReviewWorkspaceProvider, useReviewWorkspace } from "../../src/lib/review-workspace";

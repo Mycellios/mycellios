@@ -1,7 +1,7 @@
-import type { AgentToolExecutionResult } from "@rakazo/adapter-kit";
-import { ModelOutputError } from "@rakazo/adapter-kit";
-import { FLEET_WRITE_TOOL_NAMES } from "@rakazo/contracts";
-import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/core";
+import type { AgentToolExecutionResult } from "@mycellios/adapter-kit";
+import { ModelOutputError } from "@mycellios/adapter-kit";
+import { FLEET_WRITE_TOOL_NAMES } from "@mycellios/contracts";
+import { APPROVED_ACTION_NOT_RUN_ERROR } from "@mycellios/core";
 import { argumentGiven } from "./update-bot-patch.js";
 
 export type ApprovalPausedToolResult = AgentToolExecutionResult & { terminate: true };

@@ -6,8 +6,8 @@ import { MicoTaskTabs } from "../../src/components/MicoTaskTabs";
 import { MicoWorkMenu } from "../../src/components/MicoWorkMenu";
 import { WorkflowWorkspace } from "../../src/pages/WorkflowWorkspace";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
-import { Button } from "@rakazo/ui-web";
-import type { Workflow, WorkflowExecution } from "@rakazo/contracts";
+import { Button } from "@mycellios/ui-web";
+import type { Workflow, WorkflowExecution } from "@mycellios/contracts";
 import type { RpcClient } from "../../src/lib/rpc";
 import "../../src/styles.css";
 

@@ -6,8 +6,8 @@ The Agent under `src/agent` incorporates Rakazo, originally published at
 https://github.com/elie222/rakazo, based on revision
 `2150350db0c90a99871884c1ad8ebdf6ee6156d5`, with Mycellios adaptations.
 Its Apache-2.0 license and upstream copyright notices remain in that directory.
-Internal `@rakazo` package names are retained for compatibility, not as a separate
-publication destination. The npm migration is not yet release-qualified.
+Its internal npm packages use the `@mycellios` scope; they are not published to a
+registry. The npm migration is not yet release-qualified.
 
 Unless a file states otherwise, Mycellios source code is licensed under the
 PolyForm Shield License 1.0.0 (`LICENSE`). Revisions published before
@@ -131,5 +131,5 @@ separately into per-device app data; they do not replace the stable application.
 Mycellios avatars adapt the eye geometry, felt pads and pure idle gaze/blink math from
 NorbertBodziony/bloub 0.6.4, revision 7983de0bb7e868ac84881581eaa8c2e1f459dd30.
 Copyright (c) 2026 Jérémy Perret, MIT License. Full notice:
-`src/agent/packages/core/assets/Bloub-LICENSE.txt`. No SolidJS runtime or OpenBot
+`src/agent/packages/core/assets/Bloub-LICENSE.txt`. No SolidJS runtime or reference app
 application code is included. The mycelium body artwork is generated for Mycellios.

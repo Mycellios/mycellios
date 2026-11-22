@@ -1,5 +1,5 @@
-import { MICO_AVATAR_SHAPES, micoAvatarDefaultFinish, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
-import type { BotColorDef, CompactMicoArt } from "@rakazo/core";
+import { MICO_AVATAR_SHAPES, micoAvatarDefaultFinish, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@mycellios/contracts";
+import type { BotColorDef, CompactMicoArt } from "@mycellios/core";
 import {
   ACTIVE_RUN_STATUSES,
   avatarIdentitySeed,
@@ -25,8 +25,8 @@ import {
   SHIPPED_BOT_AVATAR_SHAPES,
   SHIPPED_BOT_AVATAR_VIEWBOX,
   shippedBotAvatarShapePath,
-} from "@rakazo/core";
-import { tokens } from "@rakazo/ui-tokens";
+} from "@mycellios/core";
+import { tokens } from "@mycellios/ui-tokens";
 import type { CSSProperties } from "react";
 import { memo, useEffect, useId, useMemo, useRef, useSyncExternalStore } from "react";
 import { useMyceliumEyes } from "./mycelium-eye-motion.js";
@@ -615,7 +615,7 @@ export function Wordmark({ className }: { className?: string }) {
         <span className="h-4 w-[7px] rounded-full bg-primary" />
       </div>
       <span className="font-[Aeonik,ui-sans-serif] text-[28px] tracking-tight text-foreground">
-        Rakazo
+        Mycellios
       </span>
     </div>
   );

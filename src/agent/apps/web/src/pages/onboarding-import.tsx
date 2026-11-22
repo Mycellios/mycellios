@@ -1,4 +1,4 @@
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { useRef } from "react";
 import { importAsFirstBot } from "../lib/first-bot-import";
 import { rpc } from "../lib/rpc";

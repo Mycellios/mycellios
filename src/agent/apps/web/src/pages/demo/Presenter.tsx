@@ -1,7 +1,7 @@
-import { MICO_PRIMARY_AVATAR } from "@rakazo/contracts";
+import { MICO_PRIMARY_AVATAR } from "@mycellios/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { BotAvatar, Button } from "@rakazo/ui-web";
+import { BotAvatar, Button } from "@mycellios/ui-web";
 import { Check, Copy, LoaderCircle, ScanLine } from "lucide-react";
 import { demoApi, type EventDemoNetwork } from "../../lib/event-demo";
 import { ServerLinkCode } from "../../components/ServerLinkCode";

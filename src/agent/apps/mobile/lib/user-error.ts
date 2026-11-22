@@ -1,12 +1,12 @@
-import { isVoiceAccountErrorCode } from "@rakazo/contracts";
-import type { CredentialField } from "@rakazo/core";
+import { isVoiceAccountErrorCode } from "@mycellios/contracts";
+import type { CredentialField } from "@mycellios/core";
 import {
   authErrorMessage,
   isServerUnreachable,
   isUnreachableStatus,
   MAX_PASSWORD_LENGTH,
   userErrorMessage,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { t } from "./i18n";
 
 /** Text for a failure: human messages pass through; network and implementation detail become copy. */

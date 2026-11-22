@@ -1,4 +1,4 @@
-import { typeScale } from "@rakazo/ui-tokens";
+import { typeScale } from "@mycellios/ui-tokens";
 import type { ReactNode } from "react";
 import { Children, Fragment, isValidElement } from "react";
 import type { PressableProps } from "react-native";

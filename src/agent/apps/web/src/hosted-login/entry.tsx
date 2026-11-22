@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { OAuthConsent } from "./OAuthConsent";
 import { applyHostedChrome } from "./hosted-chrome";
-import "@rakazo/ui-tokens/css";
+import "@mycellios/ui-tokens/css";
 import "../typography.css";
 import "./login.css";
 

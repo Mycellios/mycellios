@@ -1,6 +1,6 @@
-import { runFailureError } from "@rakazo/core";
+import { runFailureError } from "@mycellios/core";
 import { ORPCError } from "@orpc/server";
-import { createRepos } from "@rakazo/db";
+import { createRepos } from "@mycellios/db";
 import { resolveThreadTarget } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
 import { projectRoutes } from "./projects.js";

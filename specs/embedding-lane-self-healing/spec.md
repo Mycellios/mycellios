@@ -91,7 +91,7 @@ detected VRAM (`src/node/main.ts`), so it is not a cause.
 - Rebooted the MSI GE60 through Jarvis Local Node after confirming 36 days of
   console inactivity.
 - 2026-11-21: operator access to the HP, MSI GE60 and MRPUCCHI now goes
-  through NetBird SSH (JWT, `daniel-native-ssh` policy), not Jarvis.
+  through NetBird SSH (JWT, the owner's native SSH policy), not Jarvis.
   The MSI rejoined NetBird as a new peer; it was moved back to its previous
   address `100.102.242.239` and groups, and the duplicate peer was removed.
 - On the MSI: moved the empty lock aside

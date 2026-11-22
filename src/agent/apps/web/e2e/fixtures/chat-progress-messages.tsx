@@ -1,5 +1,5 @@
 import { I18nProvider } from "@lingui/react";
-import type { ProductEvent, ThreadMessage } from "@rakazo/contracts";
+import type { ProductEvent, ThreadMessage } from "@mycellios/contracts";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { bootstrapI18n, i18n } from "../../src/lib/i18n";

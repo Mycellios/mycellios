@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { activeBotId, captureScreenshot, clickAndWaitForRpc, completeOnboarding, rpc, showFocusCard, signup } from "./helpers";
 
 /** Onboarding shows the model step only while the account needs a model; tests decide when. */
@@ -21,7 +21,7 @@ async function controlNeedsModel(page: Page, { survey = false } = {}) {
 
 test("a new user can start from an imported agent instead of Mico", async ({ page }, testInfo) => {
   const model = await controlNeedsModel(page, { survey: true });
-  await signup(page, `onboarding-import-${Date.now()}@rakazo.test`, "password12", "Importer");
+  await signup(page, `onboarding-import-${Date.now()}@mycellios.test`, "password12", "Importer");
   await expect(page.getByRole("heading", { name: "Welcome to Mycellios" })).toBeVisible({
     timeout: 20_000,
   });
@@ -110,7 +110,7 @@ test("a new user can start from an imported agent instead of Mico", async ({ pag
 
 test("a new user can create the first Mico without importing", async ({ page }, testInfo) => {
   const model = await controlNeedsModel(page);
-  await signup(page, `onboarding-no-import-${Date.now()}@rakazo.test`, "password12", "Plain");
+  await signup(page, `onboarding-no-import-${Date.now()}@mycellios.test`, "password12", "Plain");
   await expect(page.getByRole("heading", { name: "Set up your assistant" })).toBeVisible({
     timeout: 20_000,
   });
@@ -140,7 +140,7 @@ test("with a model already provided, import is offered before the first bot is m
       json: { json: { ...body.json, needsModel: false, needsSignupSurvey: true } },
     });
   });
-  await signup(page, `onboarding-import-ready-${Date.now()}@rakazo.test`, "password12", "Ready");
+  await signup(page, `onboarding-import-ready-${Date.now()}@mycellios.test`, "password12", "Ready");
   await expect(page.getByRole("heading", { name: "Welcome to Mycellios" })).toBeVisible({
     timeout: 20_000,
   });
@@ -184,7 +184,7 @@ test("with a model already provided, an import that finds a first bot already ma
   });
   await signup(
     page,
-    `onboarding-import-raced-ready-${Date.now()}@rakazo.test`,
+    `onboarding-import-raced-ready-${Date.now()}@mycellios.test`,
     "password12",
     "Raced",
   );
@@ -231,7 +231,7 @@ test("with a model already provided, continuing past import opens first-Mico cre
       json: { json: { ...body.json, needsModel: false, needsSignupSurvey: true } },
     });
   });
-  await signup(page, `onboarding-no-import-ready-${Date.now()}@rakazo.test`, "password12", "Plain");
+  await signup(page, `onboarding-no-import-ready-${Date.now()}@mycellios.test`, "password12", "Plain");
   await expect(page.getByRole("heading", { name: "Welcome to Mycellios" })).toBeVisible({
     timeout: 20_000,
   });
@@ -258,7 +258,7 @@ test("an existing focus card still offers import into a new bot", async ({
   page,
 }, testInfo) => {
   await noOnboardingSteps(page);
-  await signup(page, `onboarding-import-chief-${Date.now()}@rakazo.test`, "password12", "Host");
+  await signup(page, `onboarding-import-chief-${Date.now()}@mycellios.test`, "password12", "Host");
   await completeOnboarding(page);
   await showFocusCard(page);
   await expect(page.getByRole("combobox", { name: "Message Mico" })).toBeVisible({
@@ -303,7 +303,7 @@ test("ignoring the import on an existing focus card leaves the Mico intact", asy
   await noOnboardingSteps(page);
   await signup(
     page,
-    `onboarding-import-chief-skip-${Date.now()}@rakazo.test`,
+    `onboarding-import-chief-skip-${Date.now()}@mycellios.test`,
     "password12",
     "Skip",
   );

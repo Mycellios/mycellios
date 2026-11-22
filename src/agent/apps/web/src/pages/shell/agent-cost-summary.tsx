@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { formatTaskCostAmount } from "@rakazo/core";
+import { formatTaskCostAmount } from "@mycellios/core";
 import { useEffect, useState } from "react";
 import { rpc } from "../../lib/rpc";
 

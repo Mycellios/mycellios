@@ -1,4 +1,4 @@
-import type { MessageBlock } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
 
 /** The fields peer exchanges read, so web and mobile message shapes both fit. */
 type PeerSource = { id: string; createdAt: string; blocks: readonly MessageBlock[] };

@@ -1,9 +1,9 @@
-import type { AuthCapabilities } from "@rakazo/contracts";
-import { authCapabilitiesSchema, legacyAuthCapabilitiesSchema } from "@rakazo/contracts";
-import { ResponseBodyTooLargeError, readBoundedJsonResponse } from "@rakazo/core";
+import type { AuthCapabilities } from "@mycellios/contracts";
+import { authCapabilitiesSchema, legacyAuthCapabilitiesSchema } from "@mycellios/contracts";
+import { ResponseBodyTooLargeError, readBoundedJsonResponse } from "@mycellios/core";
 import { appPath } from "./app-path";
 
-export type { AuthCapabilities } from "@rakazo/contracts";
+export type { AuthCapabilities } from "@mycellios/contracts";
 
 const TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 64 * 1024;

@@ -1,7 +1,7 @@
 # App icon source
 
 `mycellios-mark.svg` is the editable vector source for Mycellios app icons.
-Run `pnpm --filter @rakazo/ui-tokens export:brand` to regenerate the PWA,
+Run `pnpm --filter @mycellios/ui-tokens export:brand` to regenerate the PWA,
 desktop and mobile assets using the shared forest/paper palette.
 
 The legacy `Rakazo.icon` source remains upstream material; Mycellios native

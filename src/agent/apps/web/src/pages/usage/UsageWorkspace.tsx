@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { TOKENS_PER_TRIAL_SPORE, type Bot, type Space, type UsageDashboard, type UsageDashboardTotals } from "@rakazo/contracts";
+import { TOKENS_PER_TRIAL_SPORE, type Bot, type Space, type UsageDashboard, type UsageDashboardTotals } from "@mycellios/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { NativeSelectOption, NativeSelect,
   BotAvatar,
@@ -8,7 +8,7 @@ import { NativeSelectOption, NativeSelect,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   ArrowLeft,
   ArrowRight,

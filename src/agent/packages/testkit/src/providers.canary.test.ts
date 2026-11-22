@@ -6,10 +6,10 @@ import {
   CreateOSSandboxProvider,
   E2BSandboxProvider,
   PiAgentRuntime,
-} from "@rakazo/adapters";
-import type { RunStatus } from "@rakazo/contracts";
-import { isTerminal } from "@rakazo/core";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+} from "@mycellios/adapters";
+import type { RunStatus } from "@mycellios/contracts";
+import { isTerminal } from "@mycellios/core";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { afterAll, describe, expect, it } from "vitest";
 import { sessionCookieHeader } from "./index.js";
 
@@ -222,7 +222,7 @@ describePiApp("live OpenRouter product journey", () => {
     });
     stop = handles.stop;
     const stamp = Date.now();
-    const email = `pi-${stamp}@rakazo.test`;
+    const email = `pi-${stamp}@mycellios.test`;
     const signup = await handles.app.request("/api/auth/sign-up/email", {
       method: "POST",
       headers: { "content-type": "application/json", origin: "http://127.0.0.1:5173" },

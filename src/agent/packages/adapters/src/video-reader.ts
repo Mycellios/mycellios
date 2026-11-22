@@ -14,7 +14,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentToolExecutionResult } from "@rakazo/adapter-kit";
+import type { AgentToolExecutionResult } from "@mycellios/adapter-kit";
 import { isCloudMetadataAddress, isPrivateAddress } from "./network-address.js";
 
 /**

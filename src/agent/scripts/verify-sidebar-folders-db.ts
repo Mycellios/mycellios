@@ -10,7 +10,7 @@ import EmbeddedPostgres from "embedded-postgres";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createRepos } = await import("@rakazo/db");
+const { createDb, asSystem, runAsTenant, createRepos } = await import("@mycellios/db");
 const server = createServer();
 await new Promise<void>(resolve => server.listen(0,"127.0.0.1",resolve));
 const port=(server.address() as {port:number}).port;

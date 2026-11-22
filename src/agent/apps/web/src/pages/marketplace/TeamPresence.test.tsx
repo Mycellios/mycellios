@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import type { HostedWebTeamMember } from "@rakazo/contracts";
+import type { HostedWebTeamMember } from "@mycellios/contracts";
 import { act, createRef } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   BotAvatar: () => <i data-avatar="" />,
   parseBotAvatar: (color: string) => ({ color: color.split("::")[0], isImage: false }),
 }));

@@ -1,7 +1,7 @@
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { PortableFile, SandboxProvider } from "@rakazo/adapter-kit";
+import type { PortableFile, SandboxProvider } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeBoatProvider as fakeBoat } from "./boat-sandbox.test-support.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";

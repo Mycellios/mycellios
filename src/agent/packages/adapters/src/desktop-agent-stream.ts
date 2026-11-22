@@ -1,7 +1,7 @@
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
-import { getLogger } from "@rakazo/logging";
+import { getLogger } from "@mycellios/logging";
 import { ComputerUpdatingError } from "./computer-errors.js";
-import { desktopFailureCode, desktopLegacyFailureCode, desktopDiagnosticMessage, desktopDiagnosticStage, desktopOperationId, parseDesktopDiagnostic, type DesktopFailureCode, type DesktopDiagnosticStage } from "@rakazo/contracts";
+import { desktopFailureCode, desktopLegacyFailureCode, desktopDiagnosticMessage, desktopDiagnosticStage, desktopOperationId, parseDesktopDiagnostic, type DesktopFailureCode, type DesktopDiagnosticStage } from "@mycellios/contracts";
 
 /** A complete native stream is required; EOF is never a successful run or callback. */
 export async function* desktopAgentFrames(response: Response, signal: AbortSignal, phase: "callback" | "run" = "run"): AsyncIterable<unknown> {

@@ -1,7 +1,7 @@
 import { getGeneralPreferences } from "../../lib/general-preferences";
-import { botColors } from "@rakazo/ui-tokens";
+import { botColors } from "@mycellios/ui-tokens";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { Textarea,
   BotAvatar,
   Button,
@@ -9,7 +9,7 @@ import { Textarea,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type DictationSnapshot, dictation } from "../../lib/dictation";

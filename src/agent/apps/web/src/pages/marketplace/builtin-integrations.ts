@@ -1,7 +1,7 @@
-import type { ConnectionCatalogItem, McpServer } from "@rakazo/contracts";
+import type { ConnectionCatalogItem, McpServer } from "@mycellios/contracts";
 export type BuiltinIntegration = { slug: string; name: string; endpoint: string; logo: string; auth: "oauth" | "key" };
-// Public provider metadata from OpenBot's plugin catalog (2026-11-10).
-// https://github.com/nightly-labs/openbot/tree/main/marketplace/plugin-catalog
+// Public provider metadata from the reference app's plugin catalog (2026-11-10).
+// (reference source)
 // GitHub and remote Figma use their vendors' documented endpoints.
 export const BUILTIN_INTEGRATIONS: readonly BuiltinIntegration[] = [
   {

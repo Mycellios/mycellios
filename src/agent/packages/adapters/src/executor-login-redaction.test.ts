@@ -1,6 +1,6 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
-import type { ComputerRef } from "@rakazo/adapter-kit";
-import { encodeLoginSecret } from "@rakazo/contracts";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
+import type { ComputerRef } from "@mycellios/adapter-kit";
+import { encodeLoginSecret } from "@mycellios/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { createRunExecutor } from "./executor.js";
@@ -291,8 +291,8 @@ function withEmptyModels<T extends object>(prisma: T): T {
 
 // These executor fixtures isolate post-admission behavior. Real concurrent SQL
 // admission is exercised by scripts/verify-workspace-sync-db.ts.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

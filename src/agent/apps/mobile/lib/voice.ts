@@ -1,5 +1,5 @@
-import type { SettingsScope } from "@rakazo/contracts";
-import { ensureAiDataConsent, readBoundedResponseBytes, toUtterances } from "@rakazo/core";
+import type { SettingsScope } from "@mycellios/contracts";
+import { ensureAiDataConsent, readBoundedResponseBytes, toUtterances } from "@mycellios/core";
 import { File, Paths } from "expo-file-system";
 import type * as ExpoSpeech from "expo-speech";
 import { Platform } from "react-native";

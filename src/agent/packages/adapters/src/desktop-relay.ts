@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import type { AdapterContext } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
-import { desktopLegacyFailureCode } from "@rakazo/contracts";
+import type { AdapterContext } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
+import { desktopLegacyFailureCode } from "@mycellios/contracts";
 import type { DesktopExecutorBinding, DesktopExecutorOwner, DesktopExecutorPoll } from "../../../../contracts/desktop-executor.js";
 import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, type HostComputerRequest } from "./host-computer-protocol.js";
 

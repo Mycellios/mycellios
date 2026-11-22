@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { ModelCredential } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import type { ModelCredential } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { Network, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";

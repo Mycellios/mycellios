@@ -1,4 +1,4 @@
-import { FIRST_MICO_SPAWN_KEY, type RakazoDesktop } from "@rakazo/contracts";
+import { FIRST_MICO_SPAWN_KEY, type RakazoDesktop } from "@mycellios/contracts";
 import { beforeEach, expect, it, vi } from "vitest";
 import { desktopBridge } from "../../lib/desktop";
 import { createOnboardingTeam, type OnboardingTeamMember } from "./create-onboarding-team";

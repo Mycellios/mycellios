@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import type { ThreadScrollState } from "@rakazo/core";
+import type { ThreadScrollState } from "@mycellios/core";
 import {
   foldPeerReplies,
   jumpTargetId,
   openThreadWindow,
   withLiveStreamingProgress,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { act, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import ts from "typescript";

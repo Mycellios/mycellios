@@ -1,5 +1,5 @@
-import type { Actor, BotSection } from "@rakazo/contracts";
-import { assertSidebarFolderParent } from "@rakazo/core";
+import type { Actor, BotSection } from "@mycellios/contracts";
+import { assertSidebarFolderParent } from "@mycellios/core";
 import type { PrismaClient } from "./client.js";
 import { BotSectionNameConflictError, IsolationError } from "./scope.js";
 import { lockSpaceForContentCreation } from "./spaces.js";

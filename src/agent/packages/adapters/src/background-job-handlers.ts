@@ -1,5 +1,5 @@
 import { reviewLocalMemory } from "./local-memory-review.js";
-import type { MemoryStore } from "@rakazo/adapter-kit";
+import type { MemoryStore } from "@mycellios/adapter-kit";
 import type { WebPushService } from "./web-push.js";
 import type {
   AgentHomeStore,
@@ -11,11 +11,11 @@ import type {
   MessagingSurface,
   SandboxProvider,
   SecretStore,
-} from "@rakazo/adapter-kit";
-import { messagingDeliverJob } from "@rakazo/adapter-kit";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { runAsSystem, runAsTenant } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { messagingDeliverJob } from "@mycellios/adapter-kit";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
+import { runAsSystem, runAsTenant } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { settleCallRequest } from "./call-request.js";
 import { autoStartPlan } from "./plan-autostart.js";
 import type { CloudAgentConnection } from "./cloud-agent-factory.js";

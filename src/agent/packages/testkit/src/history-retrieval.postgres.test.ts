@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ComposioConnector, FakeComposioClient } from "@rakazo/adapters";
+import { ComposioConnector, FakeComposioClient } from "@mycellios/adapters";
 import { describe, expect, it } from "vitest";
 import { discardBotIntroRun } from "./discard-bot-intro.js";
 import { sessionCookieHeader } from "./index.js";
@@ -189,7 +189,7 @@ describe.skipIf(!enabled)("history retrieval through executor", () => {
           method: "POST",
           headers: { "content-type": "application/json", origin },
           body: JSON.stringify({
-            email: `history-${randomUUID()}@rakazo.test`,
+            email: `history-${randomUUID()}@mycellios.test`,
             password: "password12",
             name: "History fixture",
           }),

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { Laptop, Pause, Play, Smartphone, Tablet } from "lucide-react";
-import { BotAvatar, Button } from "@rakazo/ui-web";
-import { MICO_PRIMARY_AVATAR } from "@rakazo/contracts";
+import { BotAvatar, Button } from "@mycellios/ui-web";
+import { MICO_PRIMARY_AVATAR } from "@mycellios/contracts";
 import type { EventDemoNetwork } from "../../lib/event-demo";
 import { myceliumLayout, myceliumSeed } from "./mycelium-layout";
 

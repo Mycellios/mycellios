@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
-import { BotAvatar, Button } from "@rakazo/ui-web";
+import { MICO_AVATAR_SHAPES, micoAvatarValue } from "@mycellios/contracts";
+import { BotAvatar, Button } from "@mycellios/ui-web";
 import { useId } from "react";
 
 type SuggestedMico = { name: string; purpose: string; look: string };

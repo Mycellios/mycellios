@@ -9,7 +9,7 @@ import {
   DialogTitle,
   Input,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {

@@ -39,7 +39,7 @@
   "components": {
     "installed": [],
     "preferredPrimitives": [
-      "@rakazo/ui-web"
+      "@mycellios/ui-web"
     ],
     "patterns": [
       "Shared Hifa Store card for browser tools, Desktop apps and published community apps."

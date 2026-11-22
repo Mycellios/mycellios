@@ -1,4 +1,4 @@
-import type { TaskCost } from "@rakazo/contracts";
+import type { TaskCost } from "@mycellios/contracts";
 import { useEffect, useState } from "react";
 import { rpc } from "./api";
 

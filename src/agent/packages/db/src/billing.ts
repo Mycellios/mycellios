@@ -1,4 +1,4 @@
-import type { BillingSubscriptionSnapshot } from "@rakazo/adapter-kit";
+import type { BillingSubscriptionSnapshot } from "@mycellios/adapter-kit";
 import type { BillingAccount, PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
 

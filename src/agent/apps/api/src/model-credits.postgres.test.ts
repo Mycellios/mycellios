@@ -1,7 +1,7 @@
-import { BillingEmulator } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { asSystem, billingAccountForOrganization, createDb } from "@rakazo/db";
+import { BillingEmulator } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { asSystem, billingAccountForOrganization, createDb } from "@mycellios/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createBillingService } from "./billing.js";
 
@@ -15,7 +15,7 @@ dbTests("model credit billing service", () => {
   const actor: Actor = {
     userId,
     spaceId,
-    email: `credit-${stamp}@rakazo.test`,
+    email: `credit-${stamp}@mycellios.test`,
     isDeploymentOwner: false,
   };
   const provider = new BillingEmulator({ modelCredits: true, namespace: `credits-${stamp}` });

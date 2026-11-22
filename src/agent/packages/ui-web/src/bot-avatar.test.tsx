@@ -1,5 +1,5 @@
-import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
+import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {

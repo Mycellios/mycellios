@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { TooltipProvider } from "@rakazo/ui-web";
+import { TooltipProvider } from "@mycellios/ui-web";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MOBILE_INSTALL_URL, MobileInstallOffer, mobileInstallUrl } from "./MobileInstallOffer";
 

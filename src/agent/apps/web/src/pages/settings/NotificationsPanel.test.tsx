@@ -13,7 +13,7 @@ vi.mock("../../lib/browser-notifications", () => ({ requestBrowserNotificationPe
 vi.mock("./SoundSettings", () => ({ SoundSettings: () => <div>Sound controls</div> }));
 vi.mock("@lingui/react/macro", () => ({ Trans: ({ children }: { children: ReactNode }) => children,
   useLingui: () => ({ t: (s: TemplateStringsArray, ...v: unknown[]) => s.reduce((out, part, i) => out + part + (v[i] ?? ""), "") }) }));
-vi.mock("@rakazo/ui-web", async importOriginal => ({ ...(await importOriginal<typeof import("@rakazo/ui-web")>()),
+vi.mock("@mycellios/ui-web", async importOriginal => ({ ...(await importOriginal<typeof import("@mycellios/ui-web")>()),
   OptionSelect: ({ value, options, onValueChange, disabled, "aria-label": label }: { value: string; options: { value: string; label: string }[]; onValueChange: (value: string) => void; disabled?: boolean; "aria-label"?: string }) =>
     <select aria-label={label} disabled={disabled} value={value} onChange={event => onValueChange(event.target.value)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
 }));

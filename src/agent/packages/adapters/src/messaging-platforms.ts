@@ -6,9 +6,9 @@ import {
 } from "@chat-adapter/telegram";
 import { createWhatsAppAdapter, splitMessage, WhatsAppApiError } from "@chat-adapter/whatsapp";
 import type { HttpInstance } from "@larksuiteoapi/node-sdk";
-import type { MessagingInboundMessage, MessagingOutboundStatus } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
-import { productAppUrl } from "@rakazo/contracts";
+import type { MessagingInboundMessage, MessagingOutboundStatus } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
+import { productAppUrl } from "@mycellios/contracts";
 import type { Adapter } from "chat";
 import { convertEmojiPlaceholders, markdownToPlainText } from "chat";
 import { createSendblueAdapter } from "chat-adapter-sendblue";
@@ -87,7 +87,7 @@ const TELEGRAM_NAMED_TOKEN = /^TELEGRAM_BOT_TOKEN_([A-Z0-9]+)$/;
 /**
  * Extra Telegram bots from TELEGRAM_BOT_TOKEN_<NAME> plus
  * TELEGRAM_WEBHOOK_SECRET_TOKEN_<NAME>. Each is its own Telegram bot (own
- * token, own getUpdates slot), so one person can link a different Rakazo bot
+ * token, own getUpdates slot), so one person can link a different Mycellios bot
  * — typically one per space — to each. <NAME> is letters and digits only and
  * becomes the provider id `telegram-<name>` (lowercased), which also names
  * its webhook route. A name with no secret is skipped, like the default bot.

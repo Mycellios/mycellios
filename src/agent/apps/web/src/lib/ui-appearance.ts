@@ -1,5 +1,5 @@
-import { MICO_AVATAR_SHAPES, withMicoAvatarShape } from "@rakazo/contracts";
-import { BotAvatar } from "@rakazo/ui-web";
+import { MICO_AVATAR_SHAPES, withMicoAvatarShape } from "@mycellios/contracts";
+import { BotAvatar } from "@mycellios/ui-web";
 import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
@@ -10,7 +10,7 @@ import {
   resolveAppearance,
   resolveAppearancePreference,
   webTokensForAppearance,
-} from "@rakazo/ui-tokens";
+} from "@mycellios/ui-tokens";
 
 export type { AppearancePreference, ResolvedAppearance };
 

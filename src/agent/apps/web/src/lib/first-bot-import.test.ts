@@ -1,4 +1,4 @@
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { importAsFirstBot } from "./first-bot-import";
 

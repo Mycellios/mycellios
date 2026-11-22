@@ -1,6 +1,6 @@
 import { Trans } from "@lingui/react/macro";
-import { productBrand } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import { productBrand } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { Link, useNavigate } from "react-router-dom";
 import { BrandLaunch } from "../components/BrandLaunch";
 import { appPath } from "../lib/app-path";

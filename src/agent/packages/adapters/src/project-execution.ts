@@ -1,5 +1,5 @@
-import type { SandboxProvider } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { SandboxProvider } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 
 /** Only an owned project AND its current native binding can acquire a task-scoped lease.
  * The existing lease table still serializes each conversation; other conversations

@@ -159,7 +159,7 @@ describe("Antseed Radar snapshot interpretation", () => {
     expect(ANTSEED_RADAR_HTML).toContain("https://network.antseed.com/stats");
     expect(ANTSEED_RADAR_HTML).toContain("Herramienta comunitaria independiente");
     expect(ANTSEED_RADAR_HTML).not.toMatch(
-      /localStorage|document\.cookie|\/chat\/completions|eval\(|Daniel|api[_-]?key/i,
+      /localStorage|document\.cookie|\/chat\/completions|eval\(|api[_-]?key/i,
     );
     const script = ANTSEED_RADAR_HTML.match(/<script>([\s\S]+)<\/script>/)?.[1];
     expect(script).toBeTruthy();

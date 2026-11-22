@@ -5,7 +5,7 @@ import { _electron as electron, expect, test } from "@playwright/test";
 const styles = readFileSync(path.resolve(import.meta.dirname, "../../web/src/styles.css"), "utf8");
 const fixture = `<!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><title>Rakazo window drag</title><style>${styles}
+  <head><meta charset="utf-8"><title>Mycellios window drag</title><style>${styles}
     #panel-close { position: fixed; top: 0; right: 0; }
   </style></head>
   <body>

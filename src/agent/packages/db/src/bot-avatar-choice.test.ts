@@ -1,10 +1,10 @@
-import { BOT_COLORS, MICO_AVATAR_PALETTES, MICO_AVATAR_DEFAULT_SHAPES, MICO_PRIMARY_AVATAR, micoAvatarValue } from "@rakazo/contracts";
+import { BOT_COLORS, MICO_AVATAR_PALETTES, MICO_AVATAR_DEFAULT_SHAPES, MICO_PRIMARY_AVATAR, micoAvatarValue } from "@mycellios/contracts";
 import {
   ORGANIC_AVATAR_FAMILY_COUNT,
   ORGANIC_AVATAR_HEART_FAMILY,
   organicAvatarFamily,
   organicAvatarLook,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { describe, expect, it } from "vitest";
 import { BOT_ID_ATTEMPTS, chooseBotAvatar, chooseMicoAvatar, pickLeastUsed } from "./bot-avatar-choice.js";
 

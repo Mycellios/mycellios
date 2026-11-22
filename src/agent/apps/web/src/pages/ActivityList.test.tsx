@@ -17,10 +17,10 @@ vi.mock("@lingui/react/macro", () => {
   const t = (parts: TemplateStringsArray) => parts.join("");
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
-vi.mock("@rakazo/ui-web", async (importOriginal) => {
+vi.mock("@mycellios/ui-web", async (importOriginal) => {
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return {
-    ...await importOriginal<typeof import("@rakazo/ui-web")>(),
+    ...await importOriginal<typeof import("@mycellios/ui-web")>(),
     Button: (props: ComponentProps<"button">) => <button type="button" {...props} />,
     Collapsible: Container,
     CollapsibleContent: Container,

@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { AgentRunRequest, AgentRuntime } from "@rakazo/adapter-kit";
+import type { AgentRunRequest, AgentRuntime } from "@mycellios/adapter-kit";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDesktopAgentEngine } from "./desktop-agent-engine.js";
 

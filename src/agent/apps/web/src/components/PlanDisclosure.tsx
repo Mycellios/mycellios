@@ -1,10 +1,10 @@
 import { Trans } from "@lingui/react/macro";
-import type { MessageBlock } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@rakazo/ui-web/components/ui/collapsible";
+} from "@mycellios/ui-web/components/ui/collapsible";
 import { Check, ChevronRight, Circle, LoaderCircle } from "lucide-react";
 
 type PlanBlock = Extract<MessageBlock, { kind: "plan" }>;

@@ -1,4 +1,4 @@
-import type { AccountPlanLimit, PlanLimitWindow } from "@rakazo/contracts";
+import type { AccountPlanLimit, PlanLimitWindow } from "@mycellios/contracts";
 
 // Read-only fixed vendor endpoints. Never send a subscription bearer to a
 // user-supplied compatible endpoint, follow redirects, or spend reset credits.

@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Routine, RoutineCalendar, RoutineCalendarEntry, Space } from "@rakazo/contracts";
+import type { Bot, Routine, RoutineCalendar, RoutineCalendarEntry, Space } from "@mycellios/contracts";
 import {
   BotAvatar,
   Button,
@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   ArrowLeft,
   ArrowRight,
@@ -50,7 +50,7 @@ export function ScheduleWorkspace({
   onSpace,
   onExit,
   onOpenRoutine,
-  onOpenBot,
+  onShowBot,
   onCreateRoutine,
 }: {
   client: RpcClient;
@@ -61,7 +61,7 @@ export function ScheduleWorkspace({
   onSpace: (id: string, path: string) => void;
   onExit: () => void;
   onOpenRoutine: (routine: Routine) => void;
-  onOpenBot: (id: string) => void;
+  onShowBot: (id: string) => void;
   onCreateRoutine: (id: string) => void;
 }) {
   const { t, i18n } = useLingui();
@@ -258,7 +258,7 @@ export function ScheduleWorkspace({
           size="icon-sm"
           variant="ghost"
           aria-label={t`Open Mico ${bot?.name ?? ""}`}
-          onClick={() => onOpenBot(routine.botId)}
+          onClick={() => onShowBot(routine.botId)}
         >
           <BotAvatar identity={routine.botId} color={bot?.color ?? "#9B5CF6"} size={21} />
         </Button>

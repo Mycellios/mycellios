@@ -2,8 +2,8 @@
 
 import { i18n } from "@lingui/core";
 import { ORPCError } from "@orpc/client";
-import type { Bot } from "@rakazo/contracts";
-import type * as UiWeb from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import type * as UiWeb from "@mycellios/ui-web";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
@@ -35,7 +35,7 @@ vi.mock("@lingui/react/macro", () => {
     parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`, "");
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
-vi.mock("@rakazo/ui-web", async (importOriginal) => ({
+vi.mock("@mycellios/ui-web", async (importOriginal) => ({
   ...(await importOriginal<typeof UiWeb>()),
   Button: ({
     variant: _variant,

@@ -1,5 +1,5 @@
 import { unlink, writeFile } from "node:fs/promises";
-import { getLogger, logSinkHealth } from "@rakazo/logging";
+import { getLogger, logSinkHealth } from "@mycellios/logging";
 
 export const WORKER_HEALTH_FILE = process.env.RAKAZO_WORKER_HEALTH_FILE ?? "/tmp/rakazo-worker-health.json";
 

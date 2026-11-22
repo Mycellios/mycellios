@@ -1,6 +1,6 @@
 /**
  * Exact-match file editing, matching the tool Claude Code (and therefore
- * OpenBot) gives its agent. A small change must not require reading and
+ * The reference app) gives its agent. A small change must not require reading and
  * rewriting a whole file: the model quotes the block it already saw and the
  * server applies only that replacement.
  */

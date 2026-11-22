@@ -4,8 +4,8 @@ import type {
   Bot,
   ExternalConversation,
   SpaceNavigation,
-} from "@rakazo/contracts";
-import type { ListenMode } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { ListenMode } from "@mycellios/core";
 import {
   AUTOMATED_SENDER_MODES,
   ambientValue,
@@ -14,7 +14,7 @@ import {
   senderPolicy,
   withRollupHours,
   withSenderMode,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";

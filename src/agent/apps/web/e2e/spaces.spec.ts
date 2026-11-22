@@ -5,7 +5,7 @@ test("the only space is named in the sidebar and chat creation requires approval
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `spaces-${stamp}@rakazo.test`, "password12", "Space Owner");
+  await signup(page, `spaces-${stamp}@mycellios.test`, "password12", "Space Owner");
   await completeOnboarding(page);
 
   const sidebar = page.locator("aside").first();
@@ -87,7 +87,7 @@ test("a new space offers first Mico creation, is renamed in its settings, and is
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `spaces-delete-${stamp}@rakazo.test`, "password12", "Space Owner");
+  await signup(page, `spaces-delete-${stamp}@mycellios.test`, "password12", "Space Owner");
   await completeOnboarding(page);
 
   const sidebar = page.locator("aside").first();
@@ -147,7 +147,7 @@ test("a new space offers first Mico creation, is renamed in its settings, and is
 
 test("deleting the last bot in a space stays in the app after first use", async ({ page }) => {
   const stamp = Date.now();
-  await signup(page, `spaces-empty-${stamp}@rakazo.test`, "password12", "Space Owner");
+  await signup(page, `spaces-empty-${stamp}@mycellios.test`, "password12", "Space Owner");
   await completeOnboarding(page);
   const [chief] = await rpc<Array<{ id: string }>>(page, "bots/list", {});
   expect(chief).toBeTruthy();
@@ -199,7 +199,7 @@ test("a space's menu opens its settings in place, and settings can switch space"
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `spaces-settings-${stamp}@rakazo.test`, "password12", "Space Owner");
+  await signup(page, `spaces-settings-${stamp}@mycellios.test`, "password12", "Space Owner");
   await completeOnboarding(page);
 
   const sidebar = page.locator("aside").first();

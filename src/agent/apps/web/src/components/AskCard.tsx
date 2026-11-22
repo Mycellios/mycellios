@@ -1,10 +1,10 @@
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { ThreadMessage } from "@rakazo/contracts";
-import { BOT_INSTRUCTIONS_MAX_LENGTH, commandVariableName } from "@rakazo/contracts";
-import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@rakazo/core";
-import { Button, Input, Textarea } from "@rakazo/ui-web";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import type { ThreadMessage } from "@mycellios/contracts";
+import { BOT_INSTRUCTIONS_MAX_LENGTH, commandVariableName } from "@mycellios/contracts";
+import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@mycellios/core";
+import { Button, Input, Textarea } from "@mycellios/ui-web";
 import { useState } from "react";
 import { rpc } from "../lib/rpc";
 import { PlanCard } from "./PlanCard";

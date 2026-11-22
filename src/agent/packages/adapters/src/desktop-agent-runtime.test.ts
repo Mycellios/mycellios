@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@rakazo/adapter-kit";
-import { isUncertainDesktopRun } from "@rakazo/core";
+import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@mycellios/adapter-kit";
+import { isUncertainDesktopRun } from "@mycellios/core";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { startHostComputerServer } from "./host-computer-server.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";

@@ -21,7 +21,7 @@ vi.mock("../lib/query", () => ({
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((s, part, i) => `${s}${i ? values[i - 1] : ""}${part}`, "") }),
 }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({ variant: _, size: __, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => <button {...props} />,
   Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div role="dialog">{children}</div> : null),
   DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,

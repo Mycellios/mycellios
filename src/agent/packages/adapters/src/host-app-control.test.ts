@@ -1,7 +1,7 @@
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ComputerRef } from "@rakazo/adapter-kit";
+import type { ComputerRef } from "@mycellios/adapter-kit";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { startHostComputerServer } from "./host-computer-server.js";

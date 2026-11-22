@@ -141,7 +141,7 @@ describe("voiceForBot", () => {
         { identifier: "kathy", language: "en-US" },
         { identifier: "samantha", language: "en-US" },
         { identifier: "karen", language: "en-AU" },
-        { identifier: "daniel", language: "en-GB" },
+        { identifier: "arthur", language: "en-GB" },
         { identifier: "moira", language: "en-IE" },
         { identifier: "rishi", language: "en-IN" },
         { identifier: "tessa", language: "en-ZA", quality: "Enhanced" },

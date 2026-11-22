@@ -1,7 +1,7 @@
 /**
  * The plan card: before a long task a Mico shows a one-line acknowledgement and up to four steps,
  * and waits for Start, an alternative or Cancel. When nobody answers within the wait, the server
- * presses Start. The behavior follows OpenBot's acknowledgement card (a behavior reference only);
+ * presses Start. The behavior follows the reference app's acknowledgement card (a behavior reference only);
  * these names and texts are our own.
  */
 export const PLAN_CARD_TOOL = "acknowledge_request";

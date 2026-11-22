@@ -1,8 +1,8 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
-import type { AgentRunRequest, ComputerRef } from "@rakazo/adapter-kit";
-import { SandboxRateLimitError } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
+import type { AgentRunRequest, ComputerRef } from "@mycellios/adapter-kit";
+import { SandboxRateLimitError } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { createRunExecutor } from "./executor.js";
@@ -692,8 +692,8 @@ it('fails a repeated-call loop rather than recording the unfinished task as comp
 
 // These executor fixtures isolate post-admission behavior. Real concurrent SQL
 // admission is exercised by scripts/verify-workspace-sync-db.ts.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

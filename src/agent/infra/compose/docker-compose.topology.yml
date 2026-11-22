@@ -30,7 +30,7 @@ services:
 
   supervisor:
     image: ${TOPOLOGY_APP_IMAGE:-rakazo/app:topology}
-    command: ["npm", "run", "start", "--workspace", "@rakazo/sandbox-supervisor"]
+    command: ["npm", "run", "start", "--workspace", "@mycellios/sandbox-supervisor"]
     user: root
     environment:
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}

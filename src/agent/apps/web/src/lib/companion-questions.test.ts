@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { DesktopQuestionAnswerSchema, desktopQuestionAnswerText, type ThreadSnapshot } from "@rakazo/contracts";
+import { DesktopQuestionAnswerSchema, desktopQuestionAnswerText, type ThreadSnapshot } from "@mycellios/contracts";
 import { companionQuestions } from "./companion-questions";
 const ask = { kind: "ask", text: "Where?", status: "pending", actions: [{ id: "a", label: "Paris" }, { id: "b", label: "London" }] };
 const fixture = (block: object = ask, status = "waiting_input") => ({ botId: "bot", messages: [{ id: "message", runId: "run", blocks: [block] }], run: { id: "run", status } }) as unknown as ThreadSnapshot;

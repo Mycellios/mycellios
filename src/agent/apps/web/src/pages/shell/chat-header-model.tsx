@@ -1,8 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
-import { ThinkingLevelSchema, isMycelliosBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
-import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@rakazo/core";
-import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@rakazo/ui-web";
+import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@mycellios/contracts";
+import { ThinkingLevelSchema, isMycelliosBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
+import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@mycellios/core";
+import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Cpu } from "lucide-react";
 import { useId, useRef, useState } from "react";

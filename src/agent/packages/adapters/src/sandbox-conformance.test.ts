@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ComputerRef, ProcessEvent, SandboxProvider } from "@rakazo/adapter-kit";
+import type { ComputerRef, ProcessEvent, SandboxProvider } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
 import { fakeBoatProvider as fakeBoat } from "./boat-sandbox.test-support.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";

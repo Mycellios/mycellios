@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { MessagingChannelMembership, MessagingInstallationsStatus } from "@rakazo/contracts";
-import { isRetryableError, messagingConnectOptions } from "@rakazo/core";
+import type { MessagingChannelMembership, MessagingInstallationsStatus } from "@mycellios/contracts";
+import { isRetryableError, messagingConnectOptions } from "@mycellios/core";
 import {
   Button,
   Dialog,
@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
   NativeSelect,
   NativeSelectOption,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import type { ReactNode } from "react";

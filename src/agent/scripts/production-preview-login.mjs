@@ -1,7 +1,8 @@
 // Local transport adaptation only. Production still validates OAuth state/PKCE.
 const site='https://www.mycellios.com';
 const callback=site+'/agent/api/auth/callback/oidc';
-const identity='https://supabase-mycellios.nodecodex.io';
+// The operator pins the expected identity origin; it is not published here.
+const identity=process.env.MYCELLIOS_PREVIEW_IDENTITY_URL||'';
 const scopes=new Set(['openid','email','profile']);
 const pending=new Map();
 const freshAuthorizations=new Map();
@@ -46,6 +47,7 @@ async function getJson(url,options={}) {
 }
 async function publicSettings() {
   const config=await getJson(site+'/public/v1/auth-config');
+  if(!identity)throw new Error('Set MYCELLIOS_PREVIEW_IDENTITY_URL');
   if(!config.enabled || config.url!==identity || typeof config.anonKey!=='string')throw new Error('Identity configuration changed');
   const html=await (await fetch(site+'/oauth/consent',{signal:AbortSignal.timeout(10000)})).text();
   const script=html.match(/src="(\/oauth\/consent-assets\/login-[\w-]+\.js)"/);

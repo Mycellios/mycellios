@@ -1,11 +1,11 @@
 import { createBotFolderRepos } from "./bot-folders.js";
-import type { Actor, Bot, BotSection, MessageBlock, SpaceBot } from "@rakazo/contracts";
+import type { Actor, Bot, BotSection, MessageBlock, SpaceBot } from "@mycellios/contracts";
 import {
   DEFAULT_COMPUTER_MODE,
   canonicalPiProviderId,
   InstructionVersionSchema,
   initialBotMemory,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   BACKGROUND_RUN_TRIGGERS,
   displayName,
@@ -13,7 +13,7 @@ import {
   phoneCallSettings,
   ringingCall,
   userVisibleMessages,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { chooseBotAvatar, chooseMicoAvatar } from "./bot-avatar-choice.js";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";

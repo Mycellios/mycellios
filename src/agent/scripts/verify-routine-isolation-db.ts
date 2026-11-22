@@ -11,7 +11,7 @@ import EmbeddedPostgres from "embedded-postgres";
 // A fresh loopback cluster and synthetic accounts only. No existing database, models or keys.
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, createThreadEvents, ensureRoutineThread, isOwnedRoutineThread, routineDeliveryRouting, claimMicoRun, controlWorkTree, workStatus, isOwnedWorkflowThread, stopWorkflowExecution } = await import("@rakazo/db");
+const { createDb, asSystem, createThreadEvents, ensureRoutineThread, isOwnedRoutineThread, routineDeliveryRouting, claimMicoRun, controlWorkTree, workStatus, isOwnedWorkflowThread, stopWorkflowExecution } = await import("@mycellios/db");
 const { createWorkflowExecution, reconcileWorkflowExecutions } = await import("../packages/adapters/src/workflows.js");
 const { executeWorkflowTool } = await import("../packages/adapters/src/workflow-tools.js");
 const { acquireComputerExecutionLease, releaseComputerExecutionLease } = await import("../packages/adapters/src/computer-lifecycle.js");

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MICO_PRIMARY_AVATAR, productBrand } from "@rakazo/contracts";
+import { MICO_PRIMARY_AVATAR, productBrand } from "@mycellios/contracts";
 import { captureScreenshot, rpc, signup } from "./helpers";
 
 test("onboarding skips model connect when a default model is already available", async ({
@@ -30,7 +30,7 @@ test("onboarding skips model connect when a default model is already available",
   const stamp = Date.now();
   await signup(
     page,
-    `model-auto-skip-${stamp}@rakazo.test`,
+    `model-auto-skip-${stamp}@mycellios.test`,
     "password12",
     `Model auto skip ${stamp}`,
   );

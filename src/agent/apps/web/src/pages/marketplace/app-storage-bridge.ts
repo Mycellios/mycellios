@@ -1,4 +1,4 @@
-import { HOSTED_WEB_FILE_DEFAULTS, HostedWebDataKey } from "@rakazo/contracts";
+import { HOSTED_WEB_FILE_DEFAULTS, HostedWebDataKey } from "@mycellios/contracts";
 import { type RefObject, useEffect, useRef } from "react";
 import * as z from "zod";
 import type { createSpaceRpc } from "../../lib/rpc";

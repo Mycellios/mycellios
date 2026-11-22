@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { PreviewBounds, ProjectBrowserState } from "@rakazo/contracts";
+import type { PreviewBounds, ProjectBrowserState } from "@mycellios/contracts";
 import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
 import { ipcMain, session, WebContentsView } from "electron";
 

@@ -1,4 +1,4 @@
-import type { ThreadSnapshot } from "@rakazo/contracts";
+import type { ThreadSnapshot } from "@mycellios/contracts";
 import { expect, it, vi } from "vitest";
 import { canRetryThreadRun, retryOriginalThreadRun } from "./retry-thread-run";
 

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { VideoEditor } from "./VideoEditor";
-import type { VideoEditBridge, VideoEditProject } from "@rakazo/contracts";
+import type { VideoEditBridge, VideoEditProject } from "@mycellios/contracts";
 let root: ReturnType<typeof createRoot> | undefined, node: HTMLDivElement;
 afterEach(()=>{if(root)act(()=>root!.unmount());root=undefined;node?.remove();});
 async function mount(bridge?: VideoEditBridge) {

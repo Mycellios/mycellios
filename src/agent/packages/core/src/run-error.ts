@@ -1,4 +1,4 @@
-import { COMPUTER_RATE_LIMIT_ERROR, desktopDiagnosticRunId, parseDesktopDiagnostic } from "@rakazo/contracts";
+import { COMPUTER_RATE_LIMIT_ERROR, desktopDiagnosticRunId, parseDesktopDiagnostic } from "@mycellios/contracts";
 import { stuckWorkStatusMessages } from "./stuck-work.js";
 import { isTechnicalErrorMessage } from "./user-error.js";
 
@@ -37,7 +37,7 @@ export const MISSING_MODEL_RUN_ERROR = "Connect a model in Settings before runni
 export const HOSTED_MODEL_CREDITS_REQUIRED_ERROR =
   "Connect your own API key in Models or choose Mycellios credits in Billing.";
 const LEGACY_HOSTED_MODEL_CREDITS_ERROR =
-  "Connect your own API key in Models or choose Rakazo credits in Billing.";
+  "Connect your own API key in Models or choose Mycellios credits in Billing.";
 
 /** The API rejects a send with this message until the user can reach a model. */
 export const MODEL_REQUIRED_SEND_ERROR = "Connect a model to start a run.";

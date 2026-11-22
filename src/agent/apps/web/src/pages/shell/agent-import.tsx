@@ -8,13 +8,13 @@ import type {
   AgentImportWarning,
   Bot,
   ComputerMode,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
-} from "@rakazo/contracts";
-import type { AgentImportReader } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { AgentImportReader } from "@mycellios/core";
 import {
   AGENT_IMPORT_ARCHIVE_LIMITS,
   AGENT_IMPORT_NOT_FOUND,
@@ -27,7 +27,7 @@ import {
   hasAgentImportSecrets,
   looksLikeCredential,
   openAgentImportArchive,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   Button,
   Checkbox,
@@ -38,12 +38,12 @@ import {
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@rakazo/ui-web/components/ui/collapsible";
+} from "@mycellios/ui-web/components/ui/collapsible";
 import { ArrowLeft, ChevronDown, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";

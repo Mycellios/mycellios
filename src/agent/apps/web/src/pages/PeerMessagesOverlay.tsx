@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import { loadPeerHistory, peerConversations } from "@rakazo/core";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import { loadPeerHistory, peerConversations } from "@mycellios/core";
 import {
   BotAvatar,
   Button,
@@ -9,7 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   Spinner,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useSpaceQueries } from "../lib/query";

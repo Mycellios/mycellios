@@ -4,7 +4,7 @@ import { startContributionGrowth, stopContributionGrowth } from "../lib/contribu
 /// <reference types="@webgpu/types" />
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { LoaderCircle, Pause, Play } from "lucide-react";
 import { authClient } from "../lib/auth";
 import { rpc } from "../lib/rpc";

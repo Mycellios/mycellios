@@ -24,9 +24,9 @@ import { LocalScriptsHost, type ScriptSession } from "./local-scripts.js";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { localResourcePaths } from "./local-resource-paths.js";
-import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
-import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
-import { videoStudioEnabled } from "@rakazo/contracts";
+import { nativeEnvironment } from "@mycellios/adapters/native-agent-process";
+import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@mycellios/contracts";
+import { videoStudioEnabled } from "@mycellios/contracts";
 import type { Session } from "electron";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, safeStorage, session, shell, utilityProcess } from "electron";
 import { startDesktopDiagnostics, recordDesktopDiagnostic, desktopDiagnosticsText, desktopExceptionFields, type DesktopDiagnostics } from "./diagnostics.js";
@@ -44,8 +44,8 @@ import { createSystemNotifications } from "./system-notifications.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
-import { createDesktopAgentEngine } from "@rakazo/adapters/desktop-agent-engine";
-import { appControlBinary } from "@rakazo/adapters/host-computer-server";
+import { createDesktopAgentEngine } from "@mycellios/adapters/desktop-agent-engine";
+import { appControlBinary } from "@mycellios/adapters/host-computer-server";
 import { startDesktopExecutor } from "./executor-startup.js";
 import { ContributionRuntime, mayManageContribution } from "./contribution-runtime.js";
 import { DesktopRelayClient } from "./desktop-relay.js";
@@ -264,7 +264,7 @@ let projectRunner: ReturnType<typeof installProjectRunner> | undefined;
 let contributionRuntime: ContributionRuntime;
 let requestingComputerAccess = false;
 /**
- * OpenBot's model: closing the window quits, unless the user explicitly chose to
+ * The reference app's model: closing the window quits, unless the user explicitly chose to
  * keep the app running in the background. The preference is native and local.
  */
 let keepRunningInBackground = false;

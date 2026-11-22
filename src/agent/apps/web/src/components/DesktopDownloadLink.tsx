@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { productBrand } from "@rakazo/contracts";
-import { buttonVariants } from "@rakazo/ui-web";
+import { productBrand } from "@mycellios/contracts";
+import { buttonVariants } from "@mycellios/ui-web";
 import { Download } from "lucide-react";
 import { desktopBridge } from "../lib/desktop";
 

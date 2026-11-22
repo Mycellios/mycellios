@@ -1,4 +1,4 @@
-import type { ConnectorTool } from "@rakazo/adapter-kit";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
 import { lazyCatalogTools, loadCatalogEntry, searchCatalog } from "./lazy-tool-catalog.js";
 
 export const RUNTIME_TOOL_SEARCH = "__agent_search_tools";
@@ -6,7 +6,7 @@ export const RUNTIME_TOOL_LOAD = "__agent_load_tool";
 export const RUNTIME_TOOL_GUIDANCE =
   "All authorized tools remain available. If a tool is not currently listed, find it with __agent_search_tools, then activate it with __agent_load_tool before calling it. Loading a tool does not grant permission or execute it.";
 
-/** Everyday tools stay visible without a discovery round trip, like OpenBot's core set. */
+/** Everyday tools stay visible without a discovery round trip, like the reference app's core set. */
 const CORE_TOOL_NAMES = new Set([
   "acknowledge_request",
   "ask_user",

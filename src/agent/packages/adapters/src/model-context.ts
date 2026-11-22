@@ -1,6 +1,6 @@
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import { collapseSystemMessages, normalizeContext } from "@earendil-works/pi-ai";
-import { isOpenAiCompatibleProvider } from "@rakazo/contracts";
+import { isOpenAiCompatibleProvider } from "@mycellios/contracts";
 import type { ContextBudget } from "./context-selection.js";
 import { ContextBudgetError, estimateContextTokens } from "./context-selection.js";
 

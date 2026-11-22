@@ -8,7 +8,7 @@ Web. The marketing site uses the existing React/Vite application and shared prod
 
 ## Product Purpose
 
-Mycellios is an independent distributed inference runtime. Mycellios Agent is its separate conversation workspace. The network is the main subject of the landing; Agent must remain easy to open. Daniel confirmed this priority on 2026-10-25.
+Mycellios is an independent distributed inference runtime. Mycellios Agent is its separate conversation workspace. The network is the main subject of the landing; Agent must remain easy to open. The owner confirmed this priority on 2026-10-25.
 
 ## Users
 
@@ -22,7 +22,7 @@ The site provides entry points for people using Agent, developers inspecting the
 
 Preserve the Mycellios name, organic mark, mushroom/mycelium identity, Agent typography, warm paper and restrained moss palette. Primary controls remain flat and use the shared UI kit. Keep the current landing recoverable and available for comparison. Do not change the panel or Agent application as a side effect of this landing redesign.
 
-For the current landing, follow the supplied Compute, Antseed and Rakazo references in composition and product presentation as well as palette. Daniel rejected the decorative assemblage direction; its earlier selection is historical, not current approval. Keep the network first and Agent easy to open.
+For the current landing, follow the supplied Compute and Antseed references in composition and product presentation as well as palette. The owner rejected the decorative assemblage direction; its earlier selection is historical, not current approval. Keep the network first and Agent easy to open.
 
 ## Evidence on Hand
 

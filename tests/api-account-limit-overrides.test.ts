@@ -39,7 +39,7 @@ describe("per-account API limit overrides", () => {
     const read = fileAccountLimitOverrides(path, () => clock);
     expect(read()).toEqual({});
     await writeFile(path, JSON.stringify({ schema: "mycellios-api-account-limits/1", accounts: { [USER]: {
-      maxConcurrent: 16, requestsPerMinute: 600, approvedBy: "Daniel", approvedAt: "2026-11-21T12:00:00Z", reason: "Speakr without queues" } } }));
+      maxConcurrent: 16, requestsPerMinute: 600, approvedBy: "operator", approvedAt: "2026-11-21T12:00:00Z", reason: "Speakr without queues" } } }));
     clock += 10_000;
     expect(read()).toEqual({ [USER]: { maxConcurrent: 16, requestsPerMinute: 600 } });
     await writeFile(path, "{not json");

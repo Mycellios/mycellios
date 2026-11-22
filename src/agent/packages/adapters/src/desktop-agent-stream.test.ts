@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
-import { desktopLegacyFailureCode, parseDesktopDiagnostic } from "@rakazo/contracts";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
+import { desktopLegacyFailureCode, parseDesktopDiagnostic } from "@mycellios/contracts";
 import { desktopAgentFrames } from "./desktop-agent-stream.js";
 const id = "12345678-1234-4321-8765-123456789abc";
 const collect = async (response: Response, signal = new AbortController().signal) => {

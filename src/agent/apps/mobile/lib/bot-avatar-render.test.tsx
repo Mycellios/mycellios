@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
-import { avatarIdentitySeed, compactMicoArt, micoAvatarArt } from "@rakazo/core";
+import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@mycellios/contracts";
+import { avatarIdentitySeed, compactMicoArt, micoAvatarArt } from "@mycellios/core";
 import type { ReactNode } from "react";
 import { act, createElement } from "react";
 import type { Root } from "react-dom/client";

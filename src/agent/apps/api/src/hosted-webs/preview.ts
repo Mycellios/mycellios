@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Actor, HostedWebBundle } from "@rakazo/contracts";
+import type { Actor, HostedWebBundle } from "@mycellios/contracts";
 import { admitStaticBundle } from "./bundle.js";
 
 // Short-lived read capabilities, never account/session tokens. Memory stays bounded.

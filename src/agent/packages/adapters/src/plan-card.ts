@@ -1,5 +1,5 @@
-import type { ConnectorTool } from "@rakazo/adapter-kit";
-import { PLAN_ALTERNATIVE, PLAN_CANCEL, PLAN_CARD_TOOL, PLAN_START } from "@rakazo/core";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
+import { PLAN_ALTERNATIVE, PLAN_CANCEL, PLAN_CARD_TOOL, PLAN_START } from "@mycellios/core";
 import { z } from "zod";
 
 const PlanCardArgs = z.object({

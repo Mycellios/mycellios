@@ -7,7 +7,7 @@ import { QuestionnaireCard } from "./QuestionnaireCard";
 import type { AskBlock } from "./AskCard";
 vi.mock("@lingui/react/macro", () => ({ Trans: ({ children }: { children: ReactNode }) => children,
   useLingui: () => ({ t: (parts: TemplateStringsArray) => parts.join("") }) }));
-vi.mock("@rakazo/chat-ui/web", () => ({ ChatMarkdown: ({ children }: { children: ReactNode }) => <span>{children}</span> }));
+vi.mock("@mycellios/chat-ui/web", () => ({ ChatMarkdown: ({ children }: { children: ReactNode }) => <span>{children}</span> }));
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.useFakeTimers(); host = document.createElement("div"); document.body.append(host); root = createRoot(host); });

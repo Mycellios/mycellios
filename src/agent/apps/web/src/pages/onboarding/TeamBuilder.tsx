@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Disclosure, Textarea } from "@rakazo/ui-web";
+import { Button, Disclosure, Textarea } from "@mycellios/ui-web";
 import { useEffect, useRef, useState } from "react";
 import { draftOnboardingTeam, type OnboardingTeamMember } from "./create-onboarding-team";
 import {

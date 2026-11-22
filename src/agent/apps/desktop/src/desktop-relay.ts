@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { recordDesktopDiagnostic, desktopExceptionFields } from "./diagnostics.js";
-import type { DesktopFailureCode } from "@rakazo/contracts";
+import type { DesktopFailureCode } from "@mycellios/contracts";
 import type { UpdateResumeBinding } from "./update-resume.js";
 import type {
   DesktopExecutorOperation,

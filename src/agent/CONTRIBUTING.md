@@ -1,6 +1,6 @@
-# Contributing to Rakazo
+# Contributing to Mycellios
 
-Thanks for helping improve Rakazo. Keep changes focused and testable.
+Thanks for helping improve Mycellios. Keep changes focused and testable.
 
 ## Run locally
 
@@ -32,11 +32,11 @@ If a browser tool is unavailable, report the limitation instead of repeating
 the same timed-out request. Record omitted checks as omitted.
 
 This follows the development/release separation visible in
-[OpenBot's dev service runner](https://github.com/nightly-labs/openbot/blob/main/scripts/dev-services.ts)
+the reference app's dev service runner
 (`electron-vite dev --watch`) and
-[its build/package scripts](https://github.com/nightly-labs/openbot/blob/main/package.json).
+its build/package scripts.
 Mycellios keeps its existing npm, React, Vite and permission boundaries; no
-OpenBot implementation is vendored. Fast preview is not release qualification.
+reference app implementation is vendored. Fast preview is not release qualification.
 
 ## Available checks (run only when affected)
 
@@ -66,9 +66,9 @@ live canaries explicitly enabled with `VERIFY_PROVIDERS` also opt into loading i
 
 The web and Electron-hosted UI use Lingui catalogs. To add a locale, register it in
 `apps/web/lingui.config.ts`, `apps/web/src/lib/ui-locale.ts`, and
-`apps/web/src/lib/i18n.ts`, then run `npm run intl:extract --workspace @rakazo/web`, fill the new
+`apps/web/src/lib/i18n.ts`, then run `npm run intl:extract --workspace @mycellios/web`, fill the new
 `apps/web/src/locales/<locale>/messages.po` catalog, and validate it with
-`npm run intl:compile --workspace @rakazo/web`. Keep message IDs, placeholders, JSX markers, and
+`npm run intl:compile --workspace @mycellios/web`. Keep message IDs, placeholders, JSX markers, and
 ICU plural branches intact; do not commit generated `*.js`/`*.mjs` catalog files.
 
 Expo mobile has its own catalog and locale registry. Add the locale to

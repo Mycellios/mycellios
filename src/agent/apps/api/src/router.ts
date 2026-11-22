@@ -1,4 +1,4 @@
-import type { WebPushService } from "@rakazo/adapters";
+import type { WebPushService } from "@mycellios/adapters";
 import type {
   AgentHomeStore,
   AgentRuntime,
@@ -9,7 +9,7 @@ import type {
   ProductAnalytics,
   SandboxProvider,
   SecretStore,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import type {
   CloudAgentConnection,
   CodexLiveCatalog,
@@ -28,9 +28,9 @@ import type {
   RemoteConnectorDependencies,
   TicketChangeNotifier,
   verifyModelServesAgents,
-} from "@rakazo/adapters";
-import type { Auth } from "@rakazo/auth";
-import type { BoardEvents, PrismaClient, ThreadEvents, WebPresence } from "@rakazo/db";
+} from "@mycellios/adapters";
+import type { Auth } from "@mycellios/auth";
+import type { BoardEvents, PrismaClient, ThreadEvents, WebPresence } from "@mycellios/db";
 import type { BillingService } from "./billing.js";
 import { accountRoutes } from "./routes/account.js";
 import { referralRoutes } from "./routes/referrals.js";
@@ -113,7 +113,7 @@ export interface RouterDeps {
   integrationSettings?: IntegrationProviderSettings;
   composio?: ComposioProvider;
   mcpOAuth?: McpOAuthBroker;
-  tailnets?: import("@rakazo/adapters").TailnetService;
+  tailnets?: import("@mycellios/adapters").TailnetService;
   /**
    * The API process's MCP connector, used to launch/list an MCP server once so its health
    * is visible (`mcp.servers.test` and the probe after create/update/OAuth). Without it

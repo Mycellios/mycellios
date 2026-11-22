@@ -1,6 +1,6 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import type { StuckWorkStatus } from "@rakazo/core";
-import { ACTIVE_RUN_STATUSES, stuckWorkExpiredNonce, stuckWorkStatusMessage } from "@rakazo/core";
+import type { MessageBlock } from "@mycellios/contracts";
+import type { StuckWorkStatus } from "@mycellios/core";
+import { ACTIVE_RUN_STATUSES, stuckWorkExpiredNonce, stuckWorkStatusMessage } from "@mycellios/core";
 import type { Prisma } from "./client.js";
 import { expireComputerExecutionLeases } from "./computers.js";
 import {

@@ -3,7 +3,7 @@ import type {
   CacheCapabilities as ConnectionCacheCapabilities,
   ConnectionCatalogItem,
   SandboxKind,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 
 export interface AdapterContext {
   operationId: string;

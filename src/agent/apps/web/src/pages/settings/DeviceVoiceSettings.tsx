@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { LocalVoiceModelKind } from "@rakazo/contracts";
-import { Button, Label, OptionSelect, Switch } from "@rakazo/ui-web";
+import type { LocalVoiceModelKind } from "@mycellios/contracts";
+import { Button, Label, OptionSelect, Switch } from "@mycellios/ui-web";
 import { useEffect, useId, useRef, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";

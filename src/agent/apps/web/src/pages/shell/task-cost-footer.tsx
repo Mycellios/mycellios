@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { TaskCost } from "@rakazo/contracts";
-import { formatTaskCostAmount } from "@rakazo/core";
+import type { TaskCost } from "@mycellios/contracts";
+import { formatTaskCostAmount } from "@mycellios/core";
 
 export function TaskCostFooter({ cost }: { cost: TaskCost }) {
   const { t, i18n } = useLingui();

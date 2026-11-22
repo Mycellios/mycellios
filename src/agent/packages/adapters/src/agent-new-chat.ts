@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { effectiveMicoSettings } from "@rakazo/contracts";
-import { resetThreadContext, ThreadContextBusyError, type PrismaClient } from "@rakazo/db";
-import type { ConnectorTool } from "@rakazo/adapter-kit";
+import { effectiveMicoSettings } from "@mycellios/contracts";
+import { resetThreadContext, ThreadContextBusyError, type PrismaClient } from "@mycellios/db";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
 
 export const AgentChatNotes = z.object({ notes: z.string().trim().min(20).max(12000) }).strict();
 export const agentNewChatTool: ConnectorTool = {

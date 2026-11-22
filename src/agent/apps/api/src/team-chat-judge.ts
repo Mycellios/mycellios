@@ -5,7 +5,7 @@ import type {
   ModelCredentialFailedState,
   ModelCredentialRetireReason,
   SecretStore,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   deploymentModelRole,
   formatCurrentTimeInstruction,
@@ -17,11 +17,11 @@ import {
   secretValuesToRedact,
   serializeModelSecret,
   toOAuthCredential,
-} from "@rakazo/adapters";
-import { redactSecrets } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
-import { findModelCredential, recordUsage, retireModelCredential } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapters";
+import { redactSecrets } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
+import { findModelCredential, recordUsage, retireModelCredential } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 
 const MAX_RULES_CHARS = 4_000;
 const MAX_MESSAGES = 20;

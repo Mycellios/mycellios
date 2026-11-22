@@ -78,7 +78,7 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
-- GitHub owner `Mycellios` is a personal account, outside the Nodecodex enterprise
+- GitHub owner `Mycellios` is a personal account, outside the enterprise
   organization installer. Verify the existing `gh` identity and repository write
   permission for delivery; an `/orgs/Mycellios/installation` 404 is not evidence
   that this account lacks access. Never print credentials or change auth profiles.
@@ -206,7 +206,7 @@ These rules apply to the complete repository.
   introduction, a large computing-fabric illustration and API/device entry points
   in the network chapter. `NetworkPrint` applies a bounded WebGL print treatment
   with a plain image fallback and reduced-motion support. It follows the supplied
-  Compute/Antseed/Rakazo references with Geist and the shared UI kit. Keep the
+  Compute/Antseed references with Geist and the shared UI kit. Keep the
   artwork centered in normal document flow, without scroll-driven panning or
   scaling; connection content follows below it. Its artwork and Agent workspace
   are concepts and local examples, never telemetry or real tool execution.
@@ -310,6 +310,13 @@ These rules apply to the complete repository.
   pattern; require an exact revision target/tagref and verified asset digests
   before publishing or resuming. Check scripts/publish-installer-release.test.mjs.
 - Preserve unrelated worktree changes.
+- `scripts/verify-private-terms.mjs` (always run by CI) rejects private names of
+  people, companies and retired or third-party products in tracked contents and
+  paths. Terms are stored only as hashes: add one with `--hash`, never in plain
+  text. Legacy runtime identifiers frozen per file in
+  `scripts/private-terms-baseline.json` may only decrease; run `--update` after
+  removing some. Required upstream license attribution stays in `src/agent/NOTICE`,
+  `src/agent/LICENSE` and `THIRD_PARTY.md`.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   current-source Desktop builds, source provenance, hash-pinned runtime pairing
   and unsigned-preview update policy. Qualify packaging and launch on macOS;

@@ -1,4 +1,4 @@
-import type { ConnectionIdentity } from "@rakazo/contracts";
+import type { ConnectionIdentity } from "@mycellios/contracts";
 import type {
   AdapterContext,
   AdapterDescriptor,

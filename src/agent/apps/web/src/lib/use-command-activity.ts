@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ComputerCommand } from "@rakazo/contracts";
-import { observeToolEvent, observedTools, type ToolObservation } from "@rakazo/core";
+import type { ComputerCommand } from "@mycellios/contracts";
+import { observeToolEvent, observedTools, type ToolObservation } from "@mycellios/core";
 import { useSpaceRpc } from "./space-rpc";
 const computerTools = new Set(["shell", "write_file", "edit_file", "attach_file", "open_path", "launch_app"]);
 

@@ -5,19 +5,19 @@ import type {
   MessagingOutboundAttachment,
   MessagingOutboundStatus,
   MessagingSurface,
-} from "@rakazo/adapter-kit";
-import { messagingDeliverJob, runContinueJob } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { botMessageHopExhausted, nextBotMessageHop } from "@rakazo/core";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { messagingDeliverJob, runContinueJob } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { botMessageHopExhausted, nextBotMessageHop } from "@mycellios/core";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
 import {
   appendEventInTransaction,
   CrossSpaceCommunicationBlockedError,
   createThreadMessageInTransaction,
   crossSpaceCommunicationAllowed,
   runAsSystem,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { MessagingSendError } from "./chat-sdk-surface.js";
 import { splitOutboundBody } from "./messaging-platforms.js";
 import { mirrorWhatsAppDeviceRun } from "./whatsapp-device-delivery.js";

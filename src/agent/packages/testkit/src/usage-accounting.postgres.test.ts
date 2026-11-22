@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ComposioConnector, FakeComposioClient } from "@rakazo/adapters";
-import { recordUsage, runAsSystem } from "@rakazo/db";
+import { ComposioConnector, FakeComposioClient } from "@mycellios/adapters";
+import { recordUsage, runAsSystem } from "@mycellios/db";
 import { describe, expect, it } from "vitest";
 import { runAutoReviewJudge } from "../../adapters/src/auto-review.js";
 import { compactHistory } from "../../adapters/src/history-compaction.js";
@@ -106,7 +106,7 @@ describe.skipIf(!enabled)("persisted Pi usage accounting", () => {
         method: "POST",
         headers: { "content-type": "application/json", origin },
         body: JSON.stringify({
-          email: `usage-${randomUUID()}@rakazo.test`,
+          email: `usage-${randomUUID()}@mycellios.test`,
           password: "password12",
           name: "Usage fixture",
         }),

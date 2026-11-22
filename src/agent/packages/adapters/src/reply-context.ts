@@ -1,7 +1,7 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { truncateReplyQuote } from "@rakazo/contracts";
-import { blocksToAgentHistoryText, messageReaction } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+import type { MessageBlock } from "@mycellios/contracts";
+import { truncateReplyQuote } from "@mycellios/contracts";
+import { blocksToAgentHistoryText, messageReaction } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
 
 type QuotedMessage = {
   id: string;

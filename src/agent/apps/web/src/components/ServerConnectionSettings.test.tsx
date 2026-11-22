@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const f=vi.hoisted(()=>({notificationScopes:[] as string[]}));
 vi.mock("../pages/settings/NotificationsPanel",()=>({NotificationsPanel:({scope}:{scope:string})=>{f.notificationScopes.push(scope);return <div>Account notifications</div>;}}));
 vi.mock("@lingui/react/macro",()=>({useLingui:()=>({t:(s:TemplateStringsArray)=>s.join("")})}));
-vi.mock("@rakazo/ui-web",()=>({
+vi.mock("@mycellios/ui-web",()=>({
  Dialog:({children}:{children:ReactNode})=><div>{children}</div>,DialogTitle:({children}:{children:ReactNode})=><h2>{children}</h2>,DialogContent:({children}:{children:ReactNode})=><div role="dialog">{children}</div>,
  Button:({children,type,disabled,onClick,"aria-label":label}:ComponentProps<"button">)=><button type={type} disabled={disabled} onClick={onClick} aria-label={label}>{children}</button>,Input:(p:ComponentProps<"input">)=><input {...p}/>
 }));

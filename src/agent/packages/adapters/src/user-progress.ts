@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { isToolActivityBlock, isUserProgressClientNonce, USER_PROGRESS_CLIENT_NONCE_PREFIX } from "@rakazo/core";
+import type { MessageBlock } from "@mycellios/contracts";
+import { isToolActivityBlock, isUserProgressClientNonce, USER_PROGRESS_CLIENT_NONCE_PREFIX } from "@mycellios/core";
 
 /**
  * Keep mid-turn progress beats short; prefer a few high-signal updates. Mid-turn

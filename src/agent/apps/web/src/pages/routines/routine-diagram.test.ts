@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Routine, RoutineRun } from "@rakazo/contracts";
+import type { Routine, RoutineRun } from "@mycellios/contracts";
 import { fitDiagram, MAX_SCALE, MIN_SCALE, nodePoint, ownedRoutines, readPositions, routineCanRun, zoomDiagram } from "./routine-diagram";
 
 afterEach(() => vi.unstubAllGlobals());

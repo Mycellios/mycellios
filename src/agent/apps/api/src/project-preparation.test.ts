@@ -1,6 +1,6 @@
-import type { Actor } from "@rakazo/contracts";
-import type { JobPublisher } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { JobPublisher } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import { expect, it, vi } from "vitest";
 import { ownedProjectPreparation, prepareProject, projectPreparationNonce, projectPreparationStatus } from "./project-preparation.js";
 import type { ThreadTarget } from "./thread-target.js";

@@ -1,4 +1,4 @@
-import { MAX_ENABLED_MODEL_IDS, type ModelCredential } from "@rakazo/contracts";
+import { MAX_ENABLED_MODEL_IDS, type ModelCredential } from "@mycellios/contracts";
 import type { RpcClient } from "../../lib/rpc";
 
 export function savedModelIds(connection: ModelCredential) {

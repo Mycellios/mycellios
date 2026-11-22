@@ -1,6 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { getLogger } from "@rakazo/logging";
-import { parseDesktopDiagnostic } from "@rakazo/contracts";
+import { getLogger } from "@mycellios/logging";
+import { parseDesktopDiagnostic } from "@mycellios/contracts";
 
 /** How long a callback waits for a free slot when the PC's queue is full. */
 const BUSY_DISPATCH_WAIT_MS = 120_000;

@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { userFacingLabel } from "@rakazo/core";
+import { userFacingLabel } from "@mycellios/core";
 
 export function spaceLabel(name: string | null | undefined): string {
   return userFacingLabel({ name }, t`Space`);

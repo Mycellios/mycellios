@@ -1,5 +1,5 @@
-import type { ThreadMessage } from "@rakazo/contracts";
-import type { ThreadItem } from "@rakazo/core";
+import type { ThreadMessage } from "@mycellios/contracts";
+import type { ThreadItem } from "@mycellios/core";
 import { expect, it } from "vitest";
 import { peerExchanges } from "./peer-exchange-groups";
 

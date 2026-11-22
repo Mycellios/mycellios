@@ -95,7 +95,7 @@ describe("Kokoro over the real Mycellios worker protocol", () => {
   });
   it.skipIf(!process.env.MYCELLIOS_KOKORO_REAL_URL)("delivers actual Kokoro WAV through an authenticated worker session", async () => {
     const { address } = await network([process.env.MYCELLIOS_KOKORO_REAL_URL!]);
-    const response = await speak(address, "Hola Daniel. Esta voz se genera en Mycellios.");
+    const response = await speak(address, "Hola Alex. Esta voz se genera en Mycellios.");
     const body = await response.json() as { choices: Array<{ message: { content: string } }>; usage: { prompt_tokens: number; completion_tokens: number } };
     expect(response.status, JSON.stringify(body)).toBe(200);
     const speech = JSON.parse(body.choices[0]!.message.content);

@@ -1,6 +1,6 @@
 import { Plural, Trans } from "@lingui/react/macro";
-import type { McpServerHealth } from "@rakazo/contracts";
-import { Disclosure } from "@rakazo/ui-web";
+import type { McpServerHealth } from "@mycellios/contracts";
+import { Disclosure } from "@mycellios/ui-web";
 import { CircleCheck, CircleDashed, LoaderCircle, TriangleAlert } from "lucide-react";
 import { formatRelativeTime } from "../lib/relative-time";
 

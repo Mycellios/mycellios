@@ -29,7 +29,7 @@ try {
   const entry = path.join(temp, 'fixture.mjs');
   const source = `
     import {app,BrowserWindow,ipcMain} from 'electron';
-    import {DEFAULT_DESKTOP_COMPANIONS} from '@rakazo/contracts';
+    import {DEFAULT_DESKTOP_COMPANIONS} from '@mycellios/contracts';
     import {installDesktopCompanions} from ${JSON.stringify(path.join(desktop,'src/desktop-companions.ts'))};
     import {browserWindowOptions} from ${JSON.stringify(path.join(desktop,'src/window-options.ts'))};
     app.setPath('userData',${JSON.stringify(path.join(temp,'profile'))});

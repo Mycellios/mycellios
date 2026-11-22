@@ -10,8 +10,8 @@ import {
   micoAvatarValue,
   withMicoAvatarPalette,
   withMicoAvatarShape,
-} from "@rakazo/contracts";
-import { currentMicoAvatarValue } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { currentMicoAvatarValue } from "@mycellios/core";
 import {
   BotAvatar,
   BotShapePreview,
@@ -28,8 +28,8 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@rakazo/ui-web";
-import { Button } from "@rakazo/ui-web/components/ui/button";
+} from "@mycellios/ui-web";
+import { Button } from "@mycellios/ui-web/components/ui/button";
 import { Check, ChevronDown, Pencil, Upload, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent } from "react";
 import { useRef, useState } from "react";

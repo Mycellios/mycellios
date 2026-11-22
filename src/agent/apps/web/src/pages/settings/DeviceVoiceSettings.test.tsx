@@ -3,7 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ i18n: { locale: "es" }, t: (s: TemplateStringsArray, ...v: unknown[]) => s.reduce((out, part, i) => out + part + (v[i] ?? ""), "") }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({ variant: _variant, size: _size, ...p }: React.ComponentProps<"button"> & { variant?: string; size?: string }) => <button {...p} />,
   Label: (p: React.ComponentProps<"label">) => <label {...p} />,
   Switch: () => <span />,

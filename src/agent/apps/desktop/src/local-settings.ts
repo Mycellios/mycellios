@@ -1,7 +1,7 @@
 import {
   LOCAL_COMPUTER_HOST_PATH,
   LOCAL_SETTINGS_TOKEN_HEADER,
-} from "@rakazo/contracts/local-settings";
+} from "@mycellios/contracts/local-settings";
 import { isLoopbackHost } from "./setup-config.js";
 
 /** Called by native main only after the local host permission flow. Never exposes the token. */

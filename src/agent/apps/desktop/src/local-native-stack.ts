@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
-import type { DesktopLocalStackState } from "@rakazo/contracts";
+import type { DesktopLocalStackState } from "@mycellios/contracts";
 import {
   allocateLoopbackPort,
   initialStackState,

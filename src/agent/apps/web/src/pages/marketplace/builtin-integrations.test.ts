@@ -1,4 +1,4 @@
-import type { McpServer } from "@rakazo/contracts";
+import type { McpServer } from "@mycellios/contracts";
 import { expect, it } from "vitest";
 import { BUILTIN_INTEGRATIONS, integrationCatalog } from "./builtin-integrations";
 it("provides a local catalog when no managed provider is configured", () => {

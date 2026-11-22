@@ -5,12 +5,12 @@ import type {
   VoiceCredential,
   VoiceInfo,
   VoiceStatus,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   DEFAULT_COMPATIBLE_STT_MODEL,
   DEFAULT_COMPATIBLE_TTS_MODEL,
   OPENAI_COMPATIBLE_PROVIDER_ID,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   Button,
   Dialog,
@@ -23,7 +23,7 @@ import {
   NativeSelect,
   NativeSelectOption,
   Spinner,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";

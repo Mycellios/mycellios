@@ -1,4 +1,4 @@
-import { getLogger } from "@rakazo/logging";
+import { getLogger } from "@mycellios/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OAuthMaterial } from "./mcp-oauth.js";
 import {

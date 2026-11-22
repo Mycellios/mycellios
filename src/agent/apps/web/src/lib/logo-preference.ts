@@ -1,4 +1,4 @@
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 import { appPath } from "./app-path";
 import { desktopBridge } from "./desktop";
 import { getGeneralPreferences } from "./general-preferences";

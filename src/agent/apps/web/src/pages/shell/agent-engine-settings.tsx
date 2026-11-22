@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
-import { Spinner } from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import { Spinner } from "@mycellios/ui-web";
 import { useEffect, useState } from "react";
 import { ChoiceList, ChoiceRow } from "../onboarding/onboarding-ui";
 import { useSpaceRpc } from "../../lib/space-rpc";

@@ -35,9 +35,9 @@ import type {
   ThreadMessage,
   ThreadSnapshot,
   VoiceStatus,
-} from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT, attachmentMaxBytes, attachmentSizeLabel, FIRST_MICO_SPAWN_KEY, MICO_PRIMARY_AVATAR, NativeBotEngineSchema, videoStudioEnabled } from "@rakazo/contracts";
-import type { AgentImportReader, ComposerMention, ReadBoundary } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { ATTACHMENT_MAX_COUNT, attachmentMaxBytes, attachmentSizeLabel, FIRST_MICO_SPAWN_KEY, MICO_PRIMARY_AVATAR, NativeBotEngineSchema, videoStudioEnabled } from "@mycellios/contracts";
+import type { AgentImportReader, ComposerMention, ReadBoundary } from "@mycellios/core";
 import {
   accountDisplay,
   answerableAskMessageIds,
@@ -67,8 +67,8 @@ import {
   speechFromBlocks,
   waitForScreenPage,
   withLiveStreamingProgress,
-} from "@rakazo/core";
-import type { GroupAvatarMember } from "@rakazo/ui-web";
+} from "@mycellios/core";
+import type { GroupAvatarMember } from "@mycellios/ui-web";
 import {
   BotAvatar,
   Button,
@@ -84,8 +84,8 @@ import {
   Sidebar,
   Spinner,
   toast,
-} from "@rakazo/ui-web";
-import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
+} from "@mycellios/ui-web";
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -2671,7 +2671,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     initiallyScrolledThread.current = snapshot.threadId;
   }, [active, groupId, inGroup, snapshot?.botId, snapshot?.groupId, snapshot?.threadId]);
 
-  const openBot = useCallback((id: string) => navigate(`/app/${id}`), [navigate]);
+  const showBot = useCallback((id: string) => navigate(`/app/${id}`), [navigate]);
   const loadOlder = useCallback(() => loadOlderMessagesRef.current(), []);
   const jumpToReplyMessage = useCallback((replyId: string) => {
     const messageId = jumpTargetId(transcriptRef.current, replyId);
@@ -3833,7 +3833,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   }
   const firstMicoSetup = initialBotsLoaded && Boolean(bootstrapMe) &&
     bots.length === 0 && groups.length === 0 && archivedBots.length === 0 && archivedGroups.length === 0;
-  function openBotImport(fromDialog: boolean) {
+  function showBotImport(fromDialog: boolean) {
     setCreateBotOpen(false);
     setDroppedAgent(null);
     setImportFromDialog(fromDialog);
@@ -4348,7 +4348,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           />
         ) : null}
         <CallReturnBar />
-        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onWhatsAppLink={()=>setOverlay({kind:"messaging"})} onOpenBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onOpenBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} onOpenConversation={item => navigate(`/app/${encodeURIComponent(item.botId)}?task=${encodeURIComponent(item.threadId)}`)} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowsAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}><WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /></WorkflowsAvailability> : routineView ? <RoutinesAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}>{active && !inGroup ? <RoutineWorkspace
+        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onWhatsAppLink={()=>setOverlay({kind:"messaging"})} onShowBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onShowBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} onOpenConversation={item => navigate(`/app/${encodeURIComponent(item.botId)}?task=${encodeURIComponent(item.threadId)}`)} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowsAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}><WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /></WorkflowsAvailability> : routineView ? <RoutinesAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}>{active && !inGroup ? <RoutineWorkspace
           key={JSON.stringify([userId, currentSpaceId, active.id])}
           bot={active}
           client={rpc}
@@ -4432,7 +4432,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               inline
               me={firstMicoEngine ? null : bootstrapMe}
               onCreate={(input) => createBot(input, true)}
-              onImport={() => openBotImport(false)}
+              onImport={() => showBotImport(false)}
             />
           ) : !active && !activeGroup && initialBotsLoaded ? (
             <div className="grid flex-1 place-items-center">
@@ -4482,7 +4482,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   : undefined
               }
               onLoadOlder={loadOlder}
-              onOpenBot={openBot}
+              onShowBot={showBot}
               onAnswer={answerMessage}
               onReply={(message) => {
                 setReplyTarget(message);
@@ -4754,7 +4754,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 }}
                 onRecoveryDismissed={releaseComputerRecovery}
                 onOpenComputerSettings={() => openSettings("computer")}
-                onOpenBotSettings={() => setPanel("settings")}
+                onShowBotSettings={() => setPanel("settings")}
                 onOpen={() => void openComputer()}
                 routines={activeRoutines}
                 runningRoutineId={
@@ -4772,9 +4772,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 bots={bots}
                 onCancel={() => setPanel(null)}
                 onCreate={(input) => createGroup(input)}
-                onOpenBot={(botId) => {
+                onShowBot={(botId) => {
                   setPanel(null);
-                  openBot(botId);
+                  showBot(botId);
                 }}
               />
             ) : null}
@@ -4801,7 +4801,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   await refreshBots().catch(() => undefined);
                 }}
                 onClose={() => setPanel(null)}
-                onOpenBot={openBot}
+                onShowBot={showBot}
                 covered={computerOpen}
               />
             ) : null}
@@ -5057,7 +5057,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             me={firstMicoSetup && firstMicoEngine ? null : bootstrapMe}
             onCancel={() => setCreateBotOpen(false)}
             onCreate={(input) => createBot(input, firstMicoSetup)}
-            onImport={() => openBotImport(true)}
+            onImport={() => showBotImport(true)}
           />
         ) : null}
 

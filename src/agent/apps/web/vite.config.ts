@@ -8,18 +8,18 @@ import net from "node:net";
 import path from "node:path";
 import tls from "node:tls";
 import { lingui } from "@lingui/vite-plugin";
-import type { DesktopStackProbeResponse } from "@rakazo/contracts";
-import { buildIdAt } from "@rakazo/contracts/client-build";
+import type { DesktopStackProbeResponse } from "@mycellios/contracts";
+import { buildIdAt } from "@mycellios/contracts/client-build";
 import {
   appContentSecurityPolicy,
   CSP_REPORTING_ENDPOINTS,
   contentSecurityPolicyFor,
   parseContentSecuritySources,
-} from "@rakazo/contracts/content-security-policy";
+} from "@mycellios/contracts/content-security-policy";
 import {
   safeScreenProxyResponseHeaders,
   stripSensitiveHandshakeHeaders,
-} from "@rakazo/core/node/screen-proxy-response";
+} from "@mycellios/core/node/screen-proxy-response";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";

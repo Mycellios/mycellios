@@ -8,13 +8,13 @@ import {
   micoAvatarShape,
   micoAvatarValue,
   parseBotAvatarValue,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   ORGANIC_AVATAR_HEART_FAMILY,
   ORGANIC_AVATAR_LOOKS,
   organicAvatarFamily,
   organicAvatarLook,
-} from "@rakazo/core";
+} from "@mycellios/core";
 
 /** A uniform number in [0, 1). */
 export type Random = () => number;

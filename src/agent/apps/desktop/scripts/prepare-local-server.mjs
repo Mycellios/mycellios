@@ -57,7 +57,7 @@ if (!process.argv.includes("--bundle-only")) {
       }
     }
     const selected = new Set();
-    const pending = ["@rakazo/api"];
+    const pending = ["@mycellios/api"];
     while (pending.length) {
       const name = pending.pop();
       if (selected.has(name)) continue;
@@ -86,7 +86,7 @@ if (!process.argv.includes("--bundle-only")) {
     const npm = args => execFileSync(process.execPath, [npmCli, ...args], {cwd:staging, stdio:"inherit", env:{...process.env, NODE_ENV:"production"}});
     npm(["install", "--package-lock-only", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund"]);
     npm(["ci", "--omit=dev", "--no-audit", "--no-fund"]);
-    npm(["run", "generate", "--workspace", "@rakazo/db"]);
+    npm(["run", "generate", "--workspace", "@mycellios/db"]);
     // Keep the relocatable hoisted production tree together with its workspace links.
     await cp(staging, target, {recursive:true, dereference:true});
   } finally {
@@ -102,7 +102,7 @@ await build({
   alias: {
     ...await workspaceAliases(root),
     // Its client was generated from this release's schema inside the production tree.
-    '@rakazo/db': path.join(target, 'packages/db/src/index.ts'),
+    '@mycellios/db': path.join(target, 'packages/db/src/index.ts'),
   },
   platform: "node",
   format: "esm",
@@ -123,16 +123,16 @@ await build({
             args.kind === "entry-point" ||
             path.isAbsolute(args.path) ||
             args.path.startsWith("node:") ||
-            args.path.startsWith("@rakazo/")
+            args.path.startsWith("@mycellios/")
           )
             return undefined;
           let owner = path.dirname(args.importer);
           while (owner.startsWith(root)) {
             try {
               const pkg = JSON.parse(await readFile(path.join(owner, "package.json"), "utf8"));
-              if (pkg.name?.startsWith("@rakazo/")) {
+              if (pkg.name?.startsWith("@mycellios/")) {
                 const location =
-                  pkg.name === "@rakazo/api" ? target : path.join(target, "node_modules", pkg.name);
+                  pkg.name === "@mycellios/api" ? target : path.join(target, "node_modules", pkg.name);
                 const resolved = await builder.resolve(args.path, {
                   resolveDir: await realpath(location),
                   kind: args.kind,

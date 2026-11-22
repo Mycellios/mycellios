@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTitle,
   PopoverTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { ListTodo } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcClient } from "../lib/rpc";

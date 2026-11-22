@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { IntegrationCatalogResult } from "@rakazo/contracts";
-import { Button, Disclosure, Input } from "@rakazo/ui-web";
+import type { IntegrationCatalogResult } from "@mycellios/contracts";
+import { Button, Disclosure, Input } from "@mycellios/ui-web";
 import { useState } from "react";
 import { newClientId } from "../../lib/client-id";
 import { connectMcpOauth } from "../../lib/mcp-connect";

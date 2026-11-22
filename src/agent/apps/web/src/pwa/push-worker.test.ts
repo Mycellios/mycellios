@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { MICO_AVATAR_SHAPES } from "@rakazo/contracts";
+import { MICO_AVATAR_SHAPES } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import { parsePushPayload, pushChatUrl, pushNotification } from "./push-worker.js";
 import { notificationTarget } from "./notification-target.js";

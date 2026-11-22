@@ -1,14 +1,14 @@
 import type { MenuAction } from "@expo/ui/community/menu";
 import { MenuView } from "@expo/ui/community/menu";
-import type { AgentSkillCatalogEntry } from "@rakazo/contracts";
-import type { buildComposerMentionOptions, ComposerMention, SlashActionId } from "@rakazo/core";
+import type { AgentSkillCatalogEntry } from "@mycellios/contracts";
+import type { buildComposerMentionOptions, ComposerMention, SlashActionId } from "@mycellios/core";
 import {
   mentionChipKey,
   SLASH_ACTIONS,
   serializeComposerPrompt,
   truncateSlashDescription,
-} from "@rakazo/core";
-import { MAX_FONT_SCALE } from "@rakazo/ui-tokens";
+} from "@mycellios/core";
+import { MAX_FONT_SCALE } from "@mycellios/ui-tokens";
 import type { Ref } from "react";
 import { useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { ViewStyle } from "react-native";

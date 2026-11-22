@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AgentSkill, AgentSkillCatalogEntry, Bot } from "@rakazo/contracts";
+import type { AgentSkill, AgentSkillCatalogEntry, Bot } from "@mycellios/contracts";
 import {
   Button,
   Dialog,
@@ -10,7 +10,7 @@ import {
   NativeSelect,
   NativeSelectOption,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,

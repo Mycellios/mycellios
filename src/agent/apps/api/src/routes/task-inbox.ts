@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import type { Actor, InboxTask } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES, MODEL_REQUIRED_SEND_ERROR } from "@rakazo/core";
-import { AnswerTooLongError, IsolationError } from "@rakazo/db";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import type { Actor, InboxTask } from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES, MODEL_REQUIRED_SEND_ERROR } from "@mycellios/core";
+import { AnswerTooLongError, IsolationError } from "@mycellios/db";
 import { assertTeachingSendAllowed } from "../taught-skills.js";
 import { loadMessagePage } from "../thread-message-pages.js";
 import {

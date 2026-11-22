@@ -4,7 +4,7 @@ import { liveModelCatalogEnabled } from "./pi-live-cache.js";
  * models.dev: the public catalog of every provider's models, with release dates, families,
  * limits, prices and capabilities. Pi's bundled registry is generated from the same source, so
  * reading it at run time keeps the model list current between Mycellios releases, as an
- * auto-updated Pi or OpenCode keeps OpenBot's list current. Only data is read; nothing runs.
+ * auto-updated Pi or OpenCode keeps the reference app's list current. Only data is read; nothing runs.
  */
 export const MODELS_DEV_ENDPOINT = "https://models.dev/api.json";
 

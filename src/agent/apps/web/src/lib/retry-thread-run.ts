@@ -1,5 +1,5 @@
-import type { ThreadSnapshot } from "@rakazo/contracts";
-import { isUncertainDesktopRun } from "@rakazo/core";
+import type { ThreadSnapshot } from "@mycellios/contracts";
+import { isUncertainDesktopRun } from "@mycellios/core";
 import { isUnsafeRunRetry } from "./retry-error";
 
 /** The API remains authoritative about recorded effects and original-message ownership. */

@@ -1,4 +1,4 @@
-import type { UsageDashboard, UsageDashboardTotals } from "@rakazo/contracts";
+import type { UsageDashboard, UsageDashboardTotals } from "@mycellios/contracts";
 export const profileTotals = (tokens = 0): UsageDashboardTotals => ({ calls: tokens ? 1 : 0, pricedCalls: tokens ? 1 : 0, estimatedCalls: 0, pendingCalls: 0, incompleteCalls: 0,
   knownUsd: 0, confirmedUsd: 0, estimatedUsd: 0, costUsd: 0, input: tokens, output: 0, cacheRead: 0, cacheWrite: 0, tokens, processed: tokens, knownTokens: tokens, knownProcessed: tokens });
 export function profileReport(): UsageDashboard {

@@ -12,7 +12,7 @@ import {
   retryDelayMs,
   speechLocaleTag,
   spokenMemory,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import type { AudioRecorder } from "expo-audio";
 import { File } from "expo-file-system";
 import { useSyncExternalStore } from "react";

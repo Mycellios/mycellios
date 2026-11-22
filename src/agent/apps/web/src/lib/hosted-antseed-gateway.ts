@@ -1,4 +1,4 @@
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 
 /** A first-party preset, never a credential or an override of a saved connection. */
 export function hostedAntseedGateway(

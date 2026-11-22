@@ -1,10 +1,10 @@
-import type { AgentImportReader } from "@rakazo/core";
+import type { AgentImportReader } from "@mycellios/core";
 import {
   AGENT_IMPORT_ARCHIVE_LIMITS,
   agentImportFolder,
   isAgentHome,
   openAgentImportArchive,
-} from "@rakazo/core";
+} from "@mycellios/core";
 
 export type CapturedDrop = { entries: FileSystemEntry[]; files: readonly File[] };
 

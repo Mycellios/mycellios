@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { buildComposerMentionOptions } from "@rakazo/core";
-import { MAX_FONT_SCALE } from "@rakazo/ui-tokens";
+import { buildComposerMentionOptions } from "@mycellios/core";
+import { MAX_FONT_SCALE } from "@mycellios/ui-tokens";
 import type { ComponentProps, ReactNode, Ref } from "react";
 import { act, createElement, createRef } from "react";
 import type { Root } from "react-dom/client";

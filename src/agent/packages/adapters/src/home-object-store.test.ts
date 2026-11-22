@@ -2,8 +2,8 @@ import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { PrismaClient, SpaceKeyRecord, SpaceKeyStore } from "@rakazo/db";
-import { ContentDecryptionError, ContentKeyRing, LocalKeyProvider } from "@rakazo/db";
+import type { PrismaClient, SpaceKeyRecord, SpaceKeyStore } from "@mycellios/db";
+import { ContentDecryptionError, ContentKeyRing, LocalKeyProvider } from "@mycellios/db";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocalAgentHomeStore } from "./home.js";
 import {

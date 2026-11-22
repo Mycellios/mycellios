@@ -1,10 +1,10 @@
-import type { JobPublisher, NotificationProvider } from "@rakazo/adapter-kit";
-import { messagingDeliverJob, routineWakeupJob, runContinueJob } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { stuckWorkStatusMessages } from "@rakazo/core";
-import type { Pool, PrismaClient, ThreadEvents } from "@rakazo/db";
-import { reconcileComputerRuns } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+import type { JobPublisher, NotificationProvider } from "@mycellios/adapter-kit";
+import { messagingDeliverJob, routineWakeupJob, runContinueJob } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { stuckWorkStatusMessages } from "@mycellios/core";
+import type { Pool, PrismaClient, ThreadEvents } from "@mycellios/db";
+import { reconcileComputerRuns } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
 import { reconcileCallRequests } from "./call-request.js";
@@ -13,9 +13,9 @@ import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
 import { isUserProgressClientNonce } from "./user-progress.js";
-import { reconcileWork } from "@rakazo/db";
+import { reconcileWork } from "@mycellios/db";
 import { reconcileWorkflowExecutions } from "./workflows.js";
-import type { SandboxProvider } from "@rakazo/adapter-kit";
+import type { SandboxProvider } from "@mycellios/adapter-kit";
 import { reconcileWorkStops } from "./work-stop-reconciler.js";
 
 const DEFAULT_INTERVAL_MS = 30_000;
@@ -27,7 +27,7 @@ const CONTROL_LOOKAHEAD_MS = 60_000;
  * finishing a failed attempt holds it for seconds before Graphile unlocks it.
  */
 const ABANDONED_QUEUED_LOCK_MS = 5 * 60_000;
-// Two keys give Rakazo's lock a namespace without relying on a hash that might collide
+// Two keys give Mycellios's lock a namespace without relying on a hash that might collide
 // with an application using the one-key advisory-lock API.
 const RECONCILIATION_LOCK_NAMESPACE = 1_380_019_075;
 const RECONCILIATION_LOCK_ID = 1;

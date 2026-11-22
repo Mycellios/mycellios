@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import type { ThreadMessage, ThreadSnapshot } from "@rakazo/contracts";
+import type { ThreadMessage, ThreadSnapshot } from "@mycellios/contracts";
 import {
   callClientNonce,
   INTERIM_BARGE_IN_MS,
@@ -11,7 +11,7 @@ import {
   speechFromBlocks,
   spokenDecision,
   spokenMemory,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { useSyncExternalStore } from "react";
 import { pickUp } from "./call-pickup.js";
 import { dictation } from "./dictation.js";

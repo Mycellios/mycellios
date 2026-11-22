@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import type { ProcessEvent } from "@rakazo/adapter-kit";
+import type { ProcessEvent } from "@mycellios/adapter-kit";
 import { redactShellStreams } from "./agent-environment.js";
 
 const MAX_OUTPUT = 64 * 1024;

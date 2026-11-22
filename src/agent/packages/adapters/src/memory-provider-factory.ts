@@ -1,6 +1,6 @@
-import type { DurableMemoryScope, SecretStore, SemanticMemoryProvider } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+import type { DurableMemoryScope, SecretStore, SemanticMemoryProvider } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import {
   createHonchoProvider,
   HONCHO_PROVIDER_ID,

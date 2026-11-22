@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Disclosure, NativeSelect, NativeSelectOption } from "@rakazo/ui-web";
+import { Button, Disclosure, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useEffect, useId, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 import { useSpaceRpc } from "../lib/space-rpc";

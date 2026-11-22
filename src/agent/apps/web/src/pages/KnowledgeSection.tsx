@@ -1,9 +1,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ORPCError } from "@orpc/client";
-import type { AgentSkill, AgentSkillCatalogEntry, MemoryDocument } from "@rakazo/contracts";
-import { isDeletableMemoryDocument, isEmptyBotMemory } from "@rakazo/contracts";
-import { Badge, Button, Skeleton, Textarea } from "@rakazo/ui-web";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@rakazo/ui-web/components/ui/tooltip";
+import type { AgentSkill, AgentSkillCatalogEntry, MemoryDocument } from "@mycellios/contracts";
+import { isDeletableMemoryDocument, isEmptyBotMemory } from "@mycellios/contracts";
+import { Badge, Button, Skeleton, Textarea } from "@mycellios/ui-web";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@mycellios/ui-web/components/ui/tooltip";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Plus, Pin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

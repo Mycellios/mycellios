@@ -1,6 +1,6 @@
 import { StoreAppHeader } from "./StoreAppHeader";
-import type { Bot, HostedWebCard, HostedWebDraft } from "@rakazo/contracts";
-import { Button, Input, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
+import type { Bot, HostedWebCard, HostedWebDraft } from "@mycellios/contracts";
+import { Button, Input, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@mycellios/ui-web";
 import {
   ArrowUpRight,
   Code2,
@@ -45,7 +45,7 @@ export function HostedWebs({
   bots,
   onOpenStudio,
   activeBotId,
-  onOpenBot,
+  onShowBot,
   onCreateBot,
 }: {
   scope: string;
@@ -53,7 +53,7 @@ export function HostedWebs({
   bots: Bot[];
   activeBotId?: string;
   onOpenStudio?: () => void;
-  onOpenBot: (id: string) => void;
+  onShowBot: (id: string) => void;
   onCreateBot: () => void;
 }) {
   // Pin every async operation to the Space that mounted this workspace.
@@ -215,7 +215,7 @@ export function HostedWebs({
         key={draft.id}
         initial={draft}
         bots={bots}
-        onOpenBot={onOpenBot}
+        onShowBot={onShowBot}
         onCreateBot={onCreateBot}
         spaceId={spaceId ?? selectedSpaceId()}
         client={client}

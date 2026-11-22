@@ -10,7 +10,7 @@ import EmbeddedPostgres from "embedded-postgres";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun } = await import("@rakazo/db");
+const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun } = await import("@mycellios/db");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");

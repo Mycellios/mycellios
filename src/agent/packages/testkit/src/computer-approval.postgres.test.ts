@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ComposioConnector, FakeComposioClient, FakeSandboxProvider } from "@rakazo/adapters";
+import { ComposioConnector, FakeComposioClient, FakeSandboxProvider } from "@mycellios/adapters";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { discardBotIntroRun } from "./discard-bot-intro.js";
 import { sessionCookieHeader } from "./index.js";
@@ -99,7 +99,7 @@ describe.skipIf(!databaseAvailable)("offline Pi computer approval", () => {
           method: "POST",
           headers: { "content-type": "application/json", origin: fixtureOrigin },
           body: JSON.stringify({
-            email: `computer-approval-${randomUUID()}@rakazo.test`,
+            email: `computer-approval-${randomUUID()}@mycellios.test`,
             password: "password12",
             name: "Computer approval fixture",
           }),

@@ -81,6 +81,7 @@
     "verify:component-boundaries": "tsx scripts/verify-component-boundaries.ts",
     "verify:architecture": "tsx scripts/verify-architecture.ts",
     "verify:structure": "node scripts/verify-repository-structure.mjs",
+    "verify:private-terms": "node scripts/verify-private-terms.mjs",
     "verify:docs": "node scripts/verify-documentation.mjs",
     "verify:format": "node scripts/verify-text-format.mjs",
     "verify:bundle": "node scripts/verify-web-bundle-budget.mjs",

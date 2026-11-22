@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
-import { HostedWebSlug } from "@rakazo/contracts";
-import { listHostedWebs, type PrismaClient, publishedHostedWeb, runAsSystem } from "@rakazo/db";
+import { HostedWebSlug } from "@mycellios/contracts";
+import { listHostedWebs, type PrismaClient, publishedHostedWeb, runAsSystem } from "@mycellios/db";
 import { type Context, Hono } from "hono";
 import {
   admitStaticBundle,

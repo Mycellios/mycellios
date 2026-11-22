@@ -1,4 +1,4 @@
-import { sandboxCommandTimeoutMs } from "@rakazo/core";
+import { sandboxCommandTimeoutMs } from "@mycellios/core";
 
 export const SEARCH_COMMAND_TIMEOUT_MS = 45_000;
 export const MAX_SEARCH_COMMAND_TIMEOUT_MS = 180_000;

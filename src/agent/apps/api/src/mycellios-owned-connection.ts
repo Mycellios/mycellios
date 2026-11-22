@@ -1,7 +1,7 @@
-import type { SecretStore } from "@rakazo/adapter-kit";
-import { parseModelSecret } from "@rakazo/adapters";
-import { isMycelliosBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
-import { newestModelCredentialOrder, type PrismaClient } from "@rakazo/db";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import { parseModelSecret } from "@mycellios/adapters";
+import { isMycelliosBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
+import { newestModelCredentialOrder, type PrismaClient } from "@mycellios/db";
 
 export async function ownedMycelliosConnection(
   { prisma, secrets }: { prisma: PrismaClient; secrets: SecretStore },

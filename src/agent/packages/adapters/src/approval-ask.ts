@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { BOT_INSTRUCTIONS_MAX_LENGTH } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
+import { BOT_INSTRUCTIONS_MAX_LENGTH } from "@mycellios/contracts";
 import {
   CARD_TITLE_ESCAPED_CHARACTERS,
   composioBatchActions,
@@ -8,8 +8,8 @@ import {
   redactSecrets,
   sanitizeMessagingLabel,
   toolRequiresExplicitApproval,
-} from "@rakazo/core";
-import { isSiteFetchTool, urlSite } from "@rakazo/core/egress";
+} from "@mycellios/core";
+import { isSiteFetchTool, urlSite } from "@mycellios/core/egress";
 
 export const MAX_APPROVAL_SUMMARY_LENGTH = 500;
 export const MAX_APPROVAL_DETAIL_LENGTH = 4_000;

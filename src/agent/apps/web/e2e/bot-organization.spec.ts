@@ -10,7 +10,7 @@ import {
 
 test("pinned bots and sidebar sections persist", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `bot-organize-${stamp}@rakazo.test`, "password12", "Test User");
+  await signup(page, `bot-organize-${stamp}@mycellios.test`, "password12", "Test User");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -69,7 +69,7 @@ test("pinned bots and sidebar sections persist", async ({ page }, testInfo) => {
 });
 
 test("deleting a section keeps its bots and groups", async ({ page }, testInfo) => {
-  await signup(page, `section-delete-${Date.now()}@rakazo.test`, "password12", "Section Delete");
+  await signup(page, `section-delete-${Date.now()}@mycellios.test`, "password12", "Section Delete");
   await completeOnboarding(page);
   const chiefId = activeBotId(page);
   const alpha = await rpc<{ id: string }>(page, "bots/create", {
@@ -111,7 +111,7 @@ test("deleting a section keeps its bots and groups", async ({ page }, testInfo) 
 });
 
 test("an empty section can be deleted after its last bot leaves", async ({ page }, testInfo) => {
-  await signup(page, `empty-section-${Date.now()}@rakazo.test`, "password12", "Empty Section");
+  await signup(page, `empty-section-${Date.now()}@mycellios.test`, "password12", "Empty Section");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   const section = await rpc<{ id: string }>(page, "botSections/create", {
@@ -135,7 +135,7 @@ test("an empty section can be deleted after its last bot leaves", async ({ page 
 
 test("bots can be reordered by drag or keyboard and keep that order", async ({ page }) => {
   const stamp = Date.now();
-  await signup(page, `bot-reorder-${stamp}@rakazo.test`, "password12", "Bot Order");
+  await signup(page, `bot-reorder-${stamp}@mycellios.test`, "password12", "Bot Order");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -250,7 +250,7 @@ test("bots can be reordered by drag or keyboard and keep that order", async ({ p
 
 test("chat composer controls are vertically centered", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `composer-layout-${stamp}@rakazo.test`, "password12", "Composer Layout");
+  await signup(page, `composer-layout-${stamp}@mycellios.test`, "password12", "Composer Layout");
   await completeOnboarding(page);
 
   const bar = page.getByTestId("composer-bar");
@@ -321,7 +321,7 @@ test("chat composer controls are vertically centered", async ({ page }, testInfo
 
 test("group chats share every context-menu action", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `group-organize-${stamp}@rakazo.test`, "password12", "Group Menu");
+  await signup(page, `group-organize-${stamp}@mycellios.test`, "password12", "Group Menu");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -420,7 +420,7 @@ test("group chats share every context-menu action", async ({ page }, testInfo) =
 test("built-in sidebar headings follow the language without renaming custom sections", async ({
   page,
 }, testInfo) => {
-  await signup(page, `section-locale-${Date.now()}@rakazo.test`, "password12", "Locale QA");
+  await signup(page, `section-locale-${Date.now()}@mycellios.test`, "password12", "Locale QA");
   await completeOnboarding(page);
   const sidebar = page.locator("aside").first();
   const bot = sidebar.getByRole("button", { name: /^Chief/ });

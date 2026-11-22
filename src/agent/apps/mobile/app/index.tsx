@@ -1,8 +1,8 @@
 import { MenuView } from "@expo/ui/community/menu";
-import type { RunActivityRow, SpaceBot, SpaceGroup } from "@rakazo/contracts";
-import { DEFAULT_COMPUTER_MODE, normalizeCreateBotProfile } from "@rakazo/contracts";
-import { accountDisplay, isRetryableError, isRunWaitingOnUser, isRunWorking } from "@rakazo/core";
-import { botColors, fontWeight, typeScale } from "@rakazo/ui-tokens";
+import type { RunActivityRow, SpaceBot, SpaceGroup } from "@mycellios/contracts";
+import { DEFAULT_COMPUTER_MODE, normalizeCreateBotProfile } from "@mycellios/contracts";
+import { accountDisplay, isRetryableError, isRunWaitingOnUser, isRunWorking } from "@mycellios/core";
+import { botColors, fontWeight, typeScale } from "@mycellios/ui-tokens";
 import type { Href } from "expo-router";
 import {
   Redirect,
@@ -951,7 +951,7 @@ function Home({ embedded, onSelectSpace }: InboxPaneProps & { embedded: boolean 
     locale,
   ]);
 
-  const openBot = useCallback(
+  const showBot = useCallback(
     (bot: MobileBot | SpaceBot) => {
       if (spaceActionRef.current.busy || spaceActionRef.current.recoveryId) return;
       void openMobileSpace(bot.spaceId, () =>
@@ -1254,7 +1254,7 @@ function Home({ embedded, onSelectSpace }: InboxPaneProps & { embedded: boolean 
         <AvatarRow id={inboxItemKey(item)}>
           <PinnedTiles
             chats={item.chats}
-            onOpenBot={openBot}
+            onShowBot={showBot}
             onOpenGroup={openGroup}
             onLongPressBot={organizeBot}
             onLongPressGroup={organizeGroup}
@@ -1389,7 +1389,7 @@ function Home({ embedded, onSelectSpace }: InboxPaneProps & { embedded: boolean 
         <BotRow
           bot={item.bot}
           day={day}
-          onPress={openBot}
+          onPress={showBot}
           onLongPress={!SWIPE_ROWS ? organizeBot : undefined}
           onAction={SWIPE_ROWS && item.bot.spaceId === me?.spaceId ? botAction : undefined}
           sections={botSections}
@@ -1408,7 +1408,7 @@ function Home({ embedded, onSelectSpace }: InboxPaneProps & { embedded: boolean 
       editSectionFromMenu,
       groupAction,
       me?.spaceId,
-      openBot,
+      showBot,
       openGroup,
       organizeBot,
       organizeFromMenu,
@@ -1891,7 +1891,7 @@ function SectionChevron({ collapsed }: { collapsed: boolean }) {
 /** Android pinned chats open with a tap and organize with a long press. */
 const PinnedTiles = memo(function PinnedTiles({
   chats,
-  onOpenBot,
+  onShowBot,
   onOpenGroup,
   onLongPressBot,
   onLongPressGroup,
@@ -1899,7 +1899,7 @@ const PinnedTiles = memo(function PinnedTiles({
   onGroupAction,
 }: {
   chats: PinnedChat[];
-  onOpenBot: (bot: MobileBot | SpaceBot) => void;
+  onShowBot: (bot: MobileBot | SpaceBot) => void;
   onOpenGroup: (group: MobileGroup | SpaceGroup) => void;
   onLongPressBot: (bot: MobileBot | SpaceBot) => void;
   onLongPressGroup: (group: MobileGroup | SpaceGroup) => void;
@@ -1940,7 +1940,7 @@ const PinnedTiles = memo(function PinnedTiles({
               const action = actions.find((item) => item === event.nativeEvent.actionName);
               if (action) runAction(action);
             }}
-            onPress={() => (chat.kind === "bot" ? onOpenBot(chat.bot) : onOpenGroup(chat.group))}
+            onPress={() => (chat.kind === "bot" ? onShowBot(chat.bot) : onOpenGroup(chat.group))}
             onLongPress={organize}
             style={({ pressed }) => [
               styles.pinnedTile,

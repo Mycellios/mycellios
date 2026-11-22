@@ -13,9 +13,9 @@ import {
   expect,
   type Page,
 } from "@playwright/test";
-import { abortableDelay } from "@rakazo/core";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
-import { createThreadMessage, type PrismaClient } from "@rakazo/db";
+import { abortableDelay } from "@mycellios/core";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
+import { createThreadMessage, type PrismaClient } from "@mycellios/db";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import type { createApp } from "../../../../apps/api/src/app.ts";
 import {
@@ -187,12 +187,12 @@ function performanceEnvironment(databaseUrl: string): NodeJS.ProcessEnv {
 }
 
 function buildProductionArtifacts(env: NodeJS.ProcessEnv) {
-  run("pnpm", ["--filter", "@rakazo/desktop", "pack:dir"], env);
+  run("pnpm", ["--filter", "@mycellios/desktop", "pack:dir"], env);
 }
 
 function migrateDatabase(env: NodeJS.ProcessEnv) {
-  run("pnpm", ["--filter", "@rakazo/db", "generate"], env);
-  run("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"], env);
+  run("pnpm", ["--filter", "@mycellios/db", "generate"], env);
+  run("pnpm", ["--filter", "@mycellios/db", "exec", "prisma", "migrate", "deploy"], env);
 }
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv) {
@@ -204,7 +204,7 @@ function startPreview(env: NodeJS.ProcessEnv) {
     "pnpm",
     [
       "--filter",
-      "@rakazo/web",
+      "@mycellios/web",
       "exec",
       "vite",
       "preview",
@@ -259,7 +259,7 @@ async function prepareAuthenticatedProfile(benchmark: BenchmarkContext, profile:
     const stamp = Date.now();
     await page.goto(`${webOrigin}/sign-up`);
     await page.getByPlaceholder("Your name").fill("Benchmark User");
-    await page.getByPlaceholder("Your email address").fill(`benchmark-${stamp}@rakazo.test`);
+    await page.getByPlaceholder("Your email address").fill(`benchmark-${stamp}@mycellios.test`);
     await page.getByPlaceholder("Password").fill("password12");
     await page.getByRole("button", { name: "Create account" }).click();
     await page
@@ -813,7 +813,7 @@ function roundedSummary(values: number[]): NumericSummary {
 
 function renderMarkdown(report: PerformanceReport) {
   const summary = report.summary;
-  return `# Rakazo desktop performance — ${report.label}
+  return `# Mycellios desktop performance — ${report.label}
 
 - Commit: \`${report.environment.gitSha.slice(0, 12)}\`
 - Platform: ${report.environment.platform}/${report.environment.arch}

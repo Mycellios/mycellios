@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join(""), i18n: { locale: "en" } }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   BotAvatar: () => <span/>, Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
   DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>, DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <button>{children}</button>, DropdownMenuItem: ({ children, onClick }: { children: ReactNode; onClick: () => void }) => <button onClick={onClick}>{children}</button>,

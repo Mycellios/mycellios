@@ -1,4 +1,4 @@
-import type { ImageAspectRatio } from "@rakazo/contracts";
+import type { ImageAspectRatio } from "@mycellios/contracts";
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 const MAX_SIDE = 65_535;

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { resolvePersonaColorDef, shouldShowBotSenderName } from "@rakazo/core";
-import { botColors, darkTokens, fontWeight, typeScale } from "@rakazo/ui-tokens";
+import { resolvePersonaColorDef, shouldShowBotSenderName } from "@mycellios/core";
+import { botColors, darkTokens, fontWeight, typeScale } from "@mycellios/ui-tokens";
 import React, { useEffect, useRef, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";

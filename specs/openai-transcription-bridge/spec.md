@@ -39,7 +39,7 @@ coordinator release.
   sends that many segments at once; keep it within the account's concurrency.
   The defaults (`off`, 1) keep the serial, ungrouped behavior. With a single
   Whisper replica, `fallback` sends every segment after the first to the
-  provider, so enable it only with Daniel's chosen policy.
+  provider, so enable it only with the owner's chosen policy.
 
 ## Deployment
 

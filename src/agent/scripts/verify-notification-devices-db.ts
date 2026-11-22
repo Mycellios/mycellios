@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
-import { createDb, runAsSystem } from "@rakazo/db";
+import { createDb, runAsSystem } from "@mycellios/db";
 import webpush from "web-push";
 import { WebPushService } from "../packages/adapters/src/web-push.js";
 import { mkdtemp, readFile } from "node:fs/promises";

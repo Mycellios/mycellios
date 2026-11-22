@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import { fontWeight, typeScale } from "@rakazo/ui-tokens";
+import { fontWeight, typeScale } from "@mycellios/ui-tokens";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import * as React from "react";
 import { act, useLayoutEffect } from "react";
@@ -54,7 +54,7 @@ it.each([false, true])(
     };
     // Run the real Home header effect on mount, including its embedded guard.
     const headerStart = source.indexOf("  useLayoutEffect(() => {\n    if (!nativeHeader)");
-    const header = source.slice(headerStart, source.indexOf("  const openBot =", headerStart));
+    const header = source.slice(headerStart, source.indexOf("  const showBot =", headerStart));
     const nativeHeader = source.match(/ {2}const nativeHeader = .*;/)![0];
     const HomeSession = evaluate(
       `return function HomeSession({ embedded = false }) {

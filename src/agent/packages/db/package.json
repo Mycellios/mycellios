@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/db",
+  "name": "@mycellios/db",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -18,12 +18,12 @@
     "test": "vitest run --root ../.. packages/db/src"
   },
   "dependencies": {
-    "@rakazo/adapter-kit": "*",
+    "@mycellios/adapter-kit": "*",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
-    "@rakazo/contracts": "*",
-    "@rakazo/core": "*",
-    "@rakazo/logging": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/core": "*",
+    "@mycellios/logging": "*",
     "pg": "8.23.1",
     "dotenv": "17.4.2"
   },

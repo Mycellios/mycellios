@@ -1,4 +1,4 @@
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 
 /** Service-owned origins; saved credentials must not widen this trust boundary. */
 export const MYCELLIOS_API_HOSTS = productBrand.apiHosts;

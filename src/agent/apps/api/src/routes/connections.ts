@@ -1,20 +1,20 @@
 import { ORPCError } from "@orpc/server";
-import type { AdapterContext, ConnectorCatalogItem } from "@rakazo/adapter-kit";
+import type { AdapterContext, ConnectorCatalogItem } from "@mycellios/adapter-kit";
 import {
   pickReusableConnection,
   planLiveConnectionSync,
   prepareManagedConnectorForTransaction,
   sanitizeComposioError,
-} from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { Prisma, PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { Prisma, PrismaClient } from "@mycellios/db";
 import {
   IsolationError,
   ProviderTransactionBusyError,
   recordSecurityEvent,
   runProviderTransaction,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { connectionAccountDetails } from "../connection-account-details.js";
 import { connectionCreatedEvent } from "../security-audit.js";
 import type { RouterContext } from "./context.js";

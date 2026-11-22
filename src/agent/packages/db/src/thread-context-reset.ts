@@ -1,10 +1,10 @@
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import type { Prisma, PrismaClient } from "./client.js";
 import { IsolationError } from "./scope.js";
 import { createThreadMessageInTransaction } from "./messages.js";
 import { appendEventInTransaction } from "./events.js";
 import { withTransactionRetry } from "./transaction-retry.js";
-import { effectiveMicoSettings } from "@rakazo/contracts";
+import { effectiveMicoSettings } from "@mycellios/contracts";
 import { Prisma as PrismaValues } from "./client.js";
 
 export class ThreadContextBusyError extends Error {

@@ -9,7 +9,7 @@ test("focus choice suggests apps and preserves a completed connection", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `onboarding-${stamp}@rakazo.test`, "password12", "Robin");
+  await signup(page, `onboarding-${stamp}@mycellios.test`, "password12", "Robin");
   await completeOnboarding(page);
   await showFocusCard(page);
 
@@ -81,7 +81,7 @@ test("focus choice suggests apps and preserves a completed connection", async ({
 
 test("focus choice follows Simplified Chinese UI locale", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `onboarding-zh-cn-${stamp}@rakazo.test`, "password12", "Robin");
+  await signup(page, `onboarding-zh-cn-${stamp}@mycellios.test`, "password12", "Robin");
   await completeOnboarding(page);
   await showFocusCard(page);
 
@@ -106,7 +106,7 @@ test("focus choice follows Simplified Chinese UI locale", async ({ page }, testI
 });
 
 test("choice refresh failures leave options available for retry", async ({ page }) => {
-  await signup(page, `choice-refresh-${Date.now()}@rakazo.test`, "password12", "Choice Retry");
+  await signup(page, `choice-refresh-${Date.now()}@mycellios.test`, "password12", "Choice Retry");
   await completeOnboarding(page);
   await showFocusCard(page);
   const choice = page.getByRole("button", { name: /Day-to-day work/ });

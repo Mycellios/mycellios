@@ -1,4 +1,4 @@
-import type { SearchHit } from "@rakazo/contracts";
+import type { SearchHit } from "@mycellios/contracts";
 
 const URL_PATTERN = /https?:\/\/[^\s<>"'\]]+/gi;
 

@@ -1,16 +1,16 @@
 import { randomInt } from "node:crypto";
-import type { JobPublisher, MessagingInboundAttachment } from "@rakazo/adapter-kit";
-import { runContinueJob } from "@rakazo/adapter-kit";
-import { WHATSAPP_DEVICE_NONCE_PREFIX } from "@rakazo/adapters";
-import type { Actor, MessageBlock } from "@rakazo/contracts";
+import type { JobPublisher, MessagingInboundAttachment } from "@mycellios/adapter-kit";
+import { runContinueJob } from "@mycellios/adapter-kit";
+import { WHATSAPP_DEVICE_NONCE_PREFIX } from "@mycellios/adapters";
+import type { Actor, MessageBlock } from "@mycellios/contracts";
 import {
   messageBlockForArtifact,
   promptTextForAttachments,
   sanitizeMessagingLabel,
-} from "@rakazo/core";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { runAsSystem, runAsTenant } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/core";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
+import { runAsSystem, runAsTenant } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { Hono } from "hono";
 import {
   bareWhatsAppJid,

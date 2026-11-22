@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { useState } from "react";
 import { requestBrowserNotificationPermission } from "../lib/browser-notifications";
 import { notificationPreferences } from "../lib/notification-preferences";

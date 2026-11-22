@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ANTSEED_PROVIDER_ID, MAX_MODEL_CONNECTION_LABEL, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
-import { matchesSearchQuery } from "@rakazo/core";
+import { ANTSEED_PROVIDER_ID, MAX_MODEL_CONNECTION_LABEL, OPENAI_COMPATIBLE_PROVIDER_ID } from "@mycellios/contracts";
+import { matchesSearchQuery } from "@mycellios/core";
 import {
   Button,
   Command,
@@ -13,7 +13,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { ArrowLeft, ChevronRight, Network, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { ProviderLogo } from "../../components/ProviderLogo";
 import type { ReactNode, Ref } from "react";

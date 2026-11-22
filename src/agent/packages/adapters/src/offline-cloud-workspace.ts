@@ -1,5 +1,5 @@
-import type { AdapterContext, SandboxProvider } from "@rakazo/adapter-kit";
-import { nativeWorkProjectSession } from "@rakazo/core";
+import type { AdapterContext, SandboxProvider } from "@mycellios/adapter-kit";
+import { nativeWorkProjectSession } from "@mycellios/core";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
@@ -9,7 +9,7 @@ import {
   parseComputerMode,
   type PrismaClient,
   withTransactionRetry,
-} from "@rakazo/db";
+} from "@mycellios/db";
 
 /** Shown in the chat when a This PC Mico's new message runs on the server instead. */
 export const OFFLINE_CLOUD_NOTICE =

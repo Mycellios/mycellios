@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import EmbeddedPostgres from "embedded-postgres";
-import { createDb, asSystem, isOwnedWorkflowThread } from "@rakazo/db";
+import { createDb, asSystem, isOwnedWorkflowThread } from "@mycellios/db";
 
 // Fresh synthetic loopback database only; never load existing accounts or .env.
 process.env.RAKAZO_PROJECT_LOCAL = "1";

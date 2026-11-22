@@ -135,7 +135,7 @@ advertising a complete contribute-and-spend experience.
 
 For isolated first-connection browser tests, set `AGENT_CONNECTED_E2E=1` and
 `PLAYWRIGHT_BASE_URL` to the private development origin, then run
-`pnpm --filter @rakazo/web e2e mycellios-onboarding.spec.ts --workers=1`.
+`pnpm --filter @mycellios/web e2e mycellios-onboarding.spec.ts --workers=1`.
 The optional real model-discovery case requires `AGENT_E2E_API_KEY_FILE` pointing
 to a private development account key file. Never use a production key, enable
 traces/videos for that case, or include the key file in delivery artifacts.

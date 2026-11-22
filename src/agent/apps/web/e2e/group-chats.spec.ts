@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { GROUP_NAME_MAX_LENGTH } from "@rakazo/contracts";
+import { GROUP_NAME_MAX_LENGTH } from "@mycellios/contracts";
 import {
   captureScreenshot,
   completeOnboarding,
@@ -15,7 +15,7 @@ async function createBot(page: Page, name: string) {
 
 test("create group from + and see two bots in one transcript", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `group-${stamp}@rakazo.test`, "password12", "Group E2E");
+  await signup(page, `group-${stamp}@mycellios.test`, "password12", "Group E2E");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -289,7 +289,7 @@ test("group names stop at the length limit when creating and renaming", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `group-limit-${stamp}@rakazo.test`, "password12", "Group E2E");
+  await signup(page, `group-limit-${stamp}@mycellios.test`, "password12", "Group E2E");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

@@ -43,7 +43,7 @@ process.env.ANALYTICS_PROVIDER = "none";
 // without runAsTenant/runAsSystem returns nothing there, as in production, so
 // fail the suite on it instead. Loaded only then: other tests need no database.
 if (process.env.VERIFY_DATABASE) {
-  const { drainUnscopedDatabaseAccess } = await import("@rakazo/db");
+  const { drainUnscopedDatabaseAccess } = await import("@mycellios/db");
   afterAll(() => {
     const sites = drainUnscopedDatabaseAccess();
     if (sites.length) {

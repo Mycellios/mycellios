@@ -13,15 +13,15 @@ import type {
   RunStatus,
   Space,
   SpaceNavigation,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   accountSecuritySchema,
   authCapabilitiesSchema,
   CLIENT_UPDATE_REQUIRED_STATUS,
   legacyAccountSecurity,
   legacyAuthCapabilitiesSchema,
-} from "@rakazo/contracts";
-import type { ThreadHistory } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { ThreadHistory } from "@mycellios/core";
 import {
   aiConsentTarget,
   aiDataUsesForProcedure,
@@ -50,8 +50,8 @@ import {
   takeLiveMessage,
   updateCloudAgentMessages,
   upsertMessageById,
-} from "@rakazo/core";
-import { clientCorrelationHeaders, responseCorrelation } from "@rakazo/logging/monitoring";
+} from "@mycellios/core";
+import { clientCorrelationHeaders, responseCorrelation } from "@mycellios/logging/monitoring";
 import * as SecureStore from "expo-secure-store";
 import { promptAiConsent } from "./ai-consent";
 import type { EndpointResult } from "./endpoint";

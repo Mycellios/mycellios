@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Textarea } from "@rakazo/ui-web";
+import { Button, Textarea } from "@mycellios/ui-web";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { dictation } from "../../lib/dictation";
 import { newClientId } from "../../lib/client-id";

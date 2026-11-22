@@ -1,6 +1,6 @@
 import {Trans, useLingui} from "@lingui/react/macro";
-import type {RakazoDesktop} from "@rakazo/contracts";
-import {Button} from "@rakazo/ui-web";
+import type {RakazoDesktop} from "@mycellios/contracts";
+import {Button} from "@mycellios/ui-web";
 import {Code2, LoaderCircle, Square, Terminal} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {connectThisComputer, desktopBridge} from "../lib/desktop";

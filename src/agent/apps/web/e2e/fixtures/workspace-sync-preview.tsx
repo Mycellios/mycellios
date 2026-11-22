@@ -4,8 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import type { Bot, Routine, Space, Workflow } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import type { Bot, Routine, Space, Workflow } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { createSpaceRpc } from "../../src/lib/rpc";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
 import { QueryUserProvider } from "../../src/lib/query";
@@ -74,10 +74,10 @@ function Preview() {
         onSettings={exit} onModels={exit} onWhatsNew={exit}/>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         <nav className="flex shrink-0 flex-wrap gap-1 p-1 md:hidden" aria-label="Fixture pages">{["tasks", "routines", "workflows", "schedule", "usage", "marketplace"].map(name => <Button key={name} variant="ghost" size="sm" onClick={() => setPage(name)}>{name}</Button>)}</nav>
-        {page === "marketplace" ? <MarketplaceWorkspace tab={tab} onTab={setTab} scope={scope} bots={bots} activeBotId={bots[0]!.id} onExit={exit} onMcp={exit} onCreated={() => {}} onOpenBot={exit} onBotsChanged={async () => {}} onCreateBot={exit}/> :
+        {page === "marketplace" ? <MarketplaceWorkspace tab={tab} onTab={setTab} scope={scope} bots={bots} activeBotId={bots[0]!.id} onExit={exit} onMcp={exit} onCreated={() => {}} onShowBot={exit} onBotsChanged={async () => {}} onCreateBot={exit}/> :
         page === "routines" ? <RoutineWorkspace bot={bots[0]!} scope={scope} client={client} selectedId={routineId} onSelect={selectRoutine} onEdit={() => {}} onAsk={exit} onExit={exit} onNavigation={exit} editorOpen={false} messages={[]}/> :
         page === "workflows" ? <WorkflowWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onNavigation={exit}/> :
-        page === "schedule" ? <ScheduleWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onOpenRoutine={() => setPage("routines")} onOpenBot={exit} onCreateRoutine={() => setPage("routines")}/> :
+        page === "schedule" ? <ScheduleWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onOpenRoutine={() => setPage("routines")} onShowBot={exit} onCreateRoutine={() => setPage("routines")}/> :
         page === "usage" ? <UsageWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onPreferences={exit}/> :
         <TasksWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} initialBotId={bots[0]!.id} selectedId={taskId} onSelect={selectTask} onExit={exit} agentsOpen={agentsOpen} onToggleAgents={() => setAgentsOpen(value => !value)}/>}
       </main>

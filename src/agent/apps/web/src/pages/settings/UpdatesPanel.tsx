@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
-import type { DesktopUpdatePreferences } from "@rakazo/contracts";
-import { compareBuilds, isBuildId } from "@rakazo/contracts/client-build";
-import { Button, Label, Switch } from "@rakazo/ui-web";
+import type { DesktopUpdatePreferences } from "@mycellios/contracts";
+import { compareBuilds, isBuildId } from "@mycellios/contracts/client-build";
+import { Button, Label, Switch } from "@mycellios/ui-web";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { DesktopUpdateSection, useDesktopUpdateSettings } from "../../components/DesktopUpdates";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";

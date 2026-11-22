@@ -6,7 +6,7 @@ import type {
   ComputerMode,
   ModelCatalogEntry,
   ThinkingLevel,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   BOT_COMPUTER_MODES,
   BOT_DESCRIPTION_MAX_LENGTH,
@@ -14,7 +14,7 @@ import {
   BOT_TITLE_MAX_LENGTH,
   BUILTIN_TOOL_NAMES,
   isBuiltinToolName,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   chatModelChoices,
   connectedModelChoices,
@@ -22,7 +22,7 @@ import {
   modelOptionKey,
   parseModelOptionKey,
   resolveSelectableModelId,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   Button,
   Input,
@@ -31,7 +31,7 @@ import {
   Switch,
   Textarea,
   Toggle,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, CalendarClock, ChevronRight, Download, FileText, Folder, Gauge, Monitor, Puzzle, Settings, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -47,7 +47,7 @@ import { AgentImportUndo } from "./agent-import-undo";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
 import { BotCredentialsSection } from "./bot-credentials";
 import { ChatModelPicker } from "./chat-model-picker";
-import { isMycelliosBaseUrl, MAX_ENABLED_MODEL_IDS } from "@rakazo/contracts";
+import { isMycelliosBaseUrl, MAX_ENABLED_MODEL_IDS } from "@mycellios/contracts";
 import { useCompatibleRoleCatalog } from "../model-settings/use-compatible-role-catalog";
 import { useSpaceRpc } from "../../lib/space-rpc";
 

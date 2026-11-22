@@ -1,6 +1,6 @@
-import type { AppBootstrap } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_BYTES, attachmentMaxBytes } from "@rakazo/contracts";
-import { displayIdentityResult } from "@rakazo/core";
+import type { AppBootstrap } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_BYTES, attachmentMaxBytes } from "@mycellios/contracts";
+import { displayIdentityResult } from "@mycellios/core";
 import { appRoute } from "./app-path";
 import { initialBootstrapTarget } from "./bootstrap-target";
 import { identityLabels } from "./identity-display";

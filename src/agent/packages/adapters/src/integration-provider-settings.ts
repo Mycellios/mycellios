@@ -3,14 +3,14 @@ import type {
   ConnectorCall,
   ManagedConnectorProvider,
   SecretStore,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   type IntegrationProviderConfig,
   IntegrationProviderConfigSchema,
   type IntegrationProviderId,
   IntegrationProviderIdSchema,
-} from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { ComposioConnector } from "./composio-connector.js";
 import { credentialDigest } from "./credential-digest.js";
 import { PipedreamConnector } from "./pipedream-connector.js";

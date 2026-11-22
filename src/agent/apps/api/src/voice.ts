@@ -1,7 +1,7 @@
 import { renderNetworkTranscription } from "./mycellios-network-transcription.js";
 import { ORPCError } from "@orpc/server";
-import type { AdapterContext, SecretStore } from "@rakazo/adapter-kit";
-import { VoiceAccountError } from "@rakazo/adapter-kit";
+import type { AdapterContext, SecretStore } from "@mycellios/adapter-kit";
+import { VoiceAccountError } from "@mycellios/adapter-kit";
 import {
   createVoiceProvider,
   isFishSpeechModelId,
@@ -14,16 +14,16 @@ import {
   openAiCompatibleVoiceServer,
   serializeOpenAiCompatibleVoiceSecret,
   voiceCatalogEntry,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import type {
   Actor,
   SettingsScope,
   VoiceAccountErrorCode,
   VoiceCredential,
   VoiceStatus,
-} from "@rakazo/contracts";
-import { isNetworkVoiceErrorCode, SettingsScopeSchema } from "@rakazo/contracts";
-import { toUtterances } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { isNetworkVoiceErrorCode, SettingsScopeSchema } from "@mycellios/contracts";
+import { toUtterances } from "@mycellios/core";
 import {
   deleteUnreferencedCredentialSecret,
   findDefaultVoiceCredential,
@@ -39,8 +39,8 @@ import {
   saveVoicePreference,
   selectVoicePreference,
   voicePreferenceTarget,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { Context, Hono } from "hono";
 import { readBoundedBody } from "./http-body.js";
 import { renderNetworkSpeech } from "./mycellios-network-speech.js";

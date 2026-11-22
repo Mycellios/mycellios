@@ -20,14 +20,14 @@ export const MAC_WINDOW_BUTTON_INSET = { x: 12, y: 19 } as const;
 function windowChrome(platform: NodeJS.Platform) {
   const mac = platform === "darwin";
   return {
-    // Keep in sync with webDarkTokens.background from @rakazo/ui-tokens (asserted in tests).
+    // Keep in sync with webDarkTokens.background from @mycellios/ui-tokens (asserted in tests).
     // Do not import that package here: desktop packs compiled JS only and ui-tokens is a
     // TypeScript source / devDependency.
     backgroundColor: "#202023",
     show: true,
     autoHideMenuBar: true,
     // Windows and Linux use the standard OS title bar, above the page.
-    // macOS hides it and draws the window buttons over the page, as OpenBot does.
+    // macOS hides it and draws the window buttons over the page, as the reference app does.
     frame: true,
     titleBarStyle: mac ? ("hidden" as const) : undefined,
     trafficLightPosition: mac ? MAC_WINDOW_BUTTON_INSET : undefined,

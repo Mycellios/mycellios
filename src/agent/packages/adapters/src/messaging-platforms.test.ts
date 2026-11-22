@@ -1,6 +1,6 @@
 import { WhatsAppApiError } from "@chat-adapter/whatsapp";
-import type { AdapterContext } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
+import type { AdapterContext } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
 import { describe, expect, it, vi } from "vitest";
 import { ChatSdkMessagingSurface } from "./chat-sdk-surface.js";
 import { Domain } from "./lark/thread-id.js";

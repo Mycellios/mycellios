@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import type { ArtifactStore } from "@rakazo/adapter-kit";
-import { type Actor, HOSTED_WEB_FILE_DEFAULTS } from "@rakazo/contracts";
-import { type PrismaClient, runAsSystem, runAsTenant } from "@rakazo/db";
+import type { ArtifactStore } from "@mycellios/adapter-kit";
+import { type Actor, HOSTED_WEB_FILE_DEFAULTS } from "@mycellios/contracts";
+import { type PrismaClient, runAsSystem, runAsTenant } from "@mycellios/db";
 import { type AppTarget, requireAppCapability } from "./data.js";
 
 export type HostedWebFilesConfig = {

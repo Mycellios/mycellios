@@ -1,5 +1,5 @@
-import { CLIENT_IP_HEADER } from "@rakazo/auth";
-import { getLogContext, runWithLogContext } from "@rakazo/logging";
+import { CLIENT_IP_HEADER } from "@mycellios/auth";
+import { getLogContext, runWithLogContext } from "@mycellios/logging";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import {

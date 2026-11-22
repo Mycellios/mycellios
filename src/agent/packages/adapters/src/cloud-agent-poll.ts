@@ -3,16 +3,16 @@ import type {
   AdapterContext,
   BackgroundJobPayloads,
   CloudAgentSnapshot,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   CloudAgentRequestRejected,
   CloudAgentRetryLater,
   runContinueJob,
-} from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { cloudAgentHttpsUrl } from "@rakazo/core";
-import { appendEventInTransaction, type CloudAgent, Prisma } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { cloudAgentHttpsUrl } from "@mycellios/core";
+import { appendEventInTransaction, type CloudAgent, Prisma } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { cloudAgentsEnabled } from "./cloud-agent-factory.js";
 import { type CloudAgentDeps, cloudAgentBlock, enqueueCloudAgent } from "./cloud-agent-service.js";
 import { cloudAgentLaunchSchema, cloudAgentPromptSchema } from "./cloud-agent-tools.js";

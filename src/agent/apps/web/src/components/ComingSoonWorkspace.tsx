@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { ArrowLeft, Menu, type LucideIcon } from "lucide-react";
 import { desktopDragClass } from "../lib/desktop";
 

@@ -1,9 +1,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ChatMarkdown, LinkifiedText, withBlockMentions } from "@rakazo/chat-ui/web";
-import type { MessageReaction, ThreadMessage } from "@rakazo/contracts";
-import type { ChildBotBlock } from "@rakazo/core";
-import { isPeerReceiptBlocks, isSecretAskBlock, isToolActivityBlock } from "@rakazo/core";
-import { BotAvatar, Button, cn, resolvePersonaColorDef } from "@rakazo/ui-web";
+import { ChatMarkdown, LinkifiedText, withBlockMentions } from "@mycellios/chat-ui/web";
+import type { MessageReaction, ThreadMessage } from "@mycellios/contracts";
+import type { ChildBotBlock } from "@mycellios/core";
+import { isPeerReceiptBlocks, isSecretAskBlock, isToolActivityBlock } from "@mycellios/core";
+import { BotAvatar, Button, cn, resolvePersonaColorDef } from "@mycellios/ui-web";
 import { UserRound } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
@@ -54,7 +54,7 @@ export const MessageView = memo(function MessageView({
   message,
   mentions,
   onAnswer,
-  onOpenBot,
+  onShowBot,
   onOpenPeerMessages,
   peerReplies,
   onTogglePeerReplies,
@@ -90,7 +90,7 @@ export const MessageView = memo(function MessageView({
     username?: string,
     dismiss?: boolean,
   ) => Promise<void>;
-  onOpenBot: (botId: string) => void;
+  onShowBot: (botId: string) => void;
   onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string }) => void;
   /** Set on a received marker whose peer run has folded replies. */
   peerReplies?: "collapsed" | "expanded";
@@ -149,9 +149,9 @@ export const MessageView = memo(function MessageView({
   const renderMention = useCallback((id: string) => {
     const block = mentions?.find((bot) => bot.botId === id);
     return block ? (
-      <BotMention block={block} color={peerBot(id)?.color} onOpenBot={onOpenBot} />
+      <BotMention block={block} color={peerBot(id)?.color} onShowBot={onShowBot} />
     ) : undefined;
-  }, [mentions, onOpenBot, peerBot]);
+  }, [mentions, onShowBot, peerBot]);
 
   const replyBotId = message.replyPreview?.botId ?? replyParent?.botId;
   const speakerBot = message.botId ? peerBot?.(message.botId) : undefined;
@@ -433,7 +433,7 @@ export const MessageView = memo(function MessageView({
                 <BotMention
                   block={block}
                   color={peerBot(block.botId)?.color}
-                  onOpenBot={onOpenBot}
+                  onShowBot={onShowBot}
                 />
                 {block.status === "created" ? null : (
                   <span className="text-muted-foreground">
@@ -678,11 +678,11 @@ export const MessageView = memo(function MessageView({
 function BotMention({
   block,
   color,
-  onOpenBot,
+  onShowBot,
 }: {
   block: ChildBotBlock;
   color: string | undefined;
-  onOpenBot: (botId: string) => void;
+  onShowBot: (botId: string) => void;
 }) {
   const live = block.status === "created" && color;
   const name = (
@@ -706,7 +706,7 @@ function BotMention({
     <button
       type="button"
       data-testid="bot-mention"
-      onClick={() => onOpenBot(block.botId)}
+      onClick={() => onShowBot(block.botId)}
       className="-mx-1 inline-flex items-baseline gap-1.5 rounded-md px-1 transition-colors hover:bg-accent"
     >
       <span className="self-center">

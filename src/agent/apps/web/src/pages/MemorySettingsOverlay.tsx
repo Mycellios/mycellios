@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { SpaceMemoryConfig } from "@rakazo/contracts";
+import type { SpaceMemoryConfig } from "@mycellios/contracts";
 import {
   Button,
   Dialog,
@@ -11,7 +11,7 @@ import {
   OptionSelect,
   Spinner,
   Toggle,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { XIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { SettingsLabel } from "../components/SettingsRows";

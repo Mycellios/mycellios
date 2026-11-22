@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@mycellios/ui-web";
 import { AudioLines, Ellipsis, FolderOpen, Globe, Monitor, Settings, X } from "lucide-react";
 import type { ReactNode } from "react";
 export function WorkAreaHeader({active,onBrowser,onComputer,onFiles,onSettings,onComputerSettings,onVoice,onClose,maintenance}: {

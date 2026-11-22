@@ -2,8 +2,8 @@ import { responseLanguageInstruction } from "../response-language.js";
 import { initialComputerAssignmentFilter } from "../initial-computer-assignment.js";
 import { randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
-import type { getBotSecretMetadata } from "@rakazo/adapters";
+import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
+import type { getBotSecretMetadata } from "@mycellios/adapters";
 import {
   archiveBot,
   BotBrowserBusyError,
@@ -21,11 +21,11 @@ import {
   storeBotSecret,
   toComputerRef,
   validateBotModelChange,
-} from "@rakazo/adapters";
-import type { Actor, Bot, BotSecretMetadata, CreateBotInput } from "@rakazo/contracts";
-import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName, SidebarFolderError } from "@rakazo/core";
-import { Prisma } from "@rakazo/db";
+} from "@mycellios/adapters";
+import type { Actor, Bot, BotSecretMetadata, CreateBotInput } from "@mycellios/contracts";
+import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName, SidebarFolderError } from "@mycellios/core";
+import { Prisma } from "@mycellios/db";
 import {
   BotSectionNameConflictError,
   botProfileLabelsChanged,
@@ -38,8 +38,8 @@ import {
   recordComputerRunEnd,
   restoreBotUnderComputerQuota,
   SpaceDeletionInProgressError,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import type { AgentImportServices } from "../agent-import.js";
 import {
   agentImportInfo,

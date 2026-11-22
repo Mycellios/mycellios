@@ -3,8 +3,8 @@ import type {
   Connection,
   ConnectionCatalogItem,
   McpServer,
-} from "@rakazo/contracts";
-import { CONNECTION_LABEL_MAX_LENGTH } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import { CONNECTION_LABEL_MAX_LENGTH } from "@mycellios/contracts";
 import {
   buildFeaturedConnectorTiles,
   CONNECTION_CATALOG_PAGE_SIZE,
@@ -15,7 +15,7 @@ import {
   filterConnectionCatalogItems,
   humanizeToolName,
   isCatalogItemConnected,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {

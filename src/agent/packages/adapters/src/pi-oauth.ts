@@ -10,14 +10,14 @@ import type {
   ModelCredentialFailedState,
   ModelCredentialRetireReason,
   SecretStore,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import type {
   ModelContextLimits,
   ModelOAuthBegin,
   ModelOAuthSignInMode,
   SettingsScope,
   ThinkingLevel,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   canonicalPiProviderId,
   MAX_MODEL_CONTEXT_WINDOW,
@@ -25,10 +25,10 @@ import {
   ModelContextLimitsSchema,
   parseModelHeaders,
   ThinkingLevelSchema,
-} from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { runAsSystem, runAsTenant } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { runAsSystem, runAsTenant } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { createManualAnthropicOAuthLogin } from "./pi-anthropic-oauth.js";
 
 export const CHATGPT_OAUTH_PROVIDER = "openai-codex";

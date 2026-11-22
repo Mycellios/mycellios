@@ -12,7 +12,7 @@ vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
   t: (s: TemplateStringsArray, ...v: unknown[]) => s.reduce((out, part, i) => out + part + (v[i] ?? ""), ""),
   i18n: { locale: "en" },
 }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({ variant, size, ...props }: any) => <button {...props} />,
   Dialog: ({ open, children }: any) => open ? <div role="dialog">{children}</div> : null,
   DialogContent: ({ children }: any) => <div>{children}</div>,

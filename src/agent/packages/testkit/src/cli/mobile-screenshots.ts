@@ -10,8 +10,8 @@ import {
   FakeComposioClient,
   PipedreamConnector,
   ThirdPartyConnectorEmulator,
-} from "@rakazo/adapters";
-import { createThreadMessage, type PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapters";
+import { createThreadMessage, type PrismaClient } from "@mycellios/db";
 import { sessionCookieHeader } from "../index.js";
 import { runProcess } from "./process.js";
 
@@ -46,7 +46,7 @@ async function main() {
   await mkdir(REPORT_DIR, { recursive: true });
   await mkdir(DATA_DIR, { recursive: true });
 
-  execFileSync("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"], {
+  execFileSync("pnpm", ["--filter", "@mycellios/db", "exec", "prisma", "migrate", "deploy"], {
     cwd: path.join(ROOT, "packages", "db"),
     env: process.env,
     stdio: "inherit",

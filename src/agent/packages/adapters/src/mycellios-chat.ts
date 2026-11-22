@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readBoundedResponseBytes } from "@rakazo/core";
+import { readBoundedResponseBytes } from "@mycellios/core";
 import { z } from "zod";
 import { mycelliosApiBaseUrl } from "./mycellios-api.js";
 import { MODEL_STREAM_IDLE_TIMEOUT_MS, MODEL_STREAM_TIMEOUT_MS } from "./pi-runtime-limits.js";

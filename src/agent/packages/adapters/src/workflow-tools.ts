@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import type { ConnectorTool } from "@rakazo/adapter-kit";
-import { WorkflowGraphSchema, workflowPlan } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
+import { WorkflowGraphSchema, workflowPlan } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { z } from "zod";
 import {
   createWorkflowExecution,
@@ -11,7 +11,7 @@ import {
   workflowExecutionDto,
   type WorkflowRow,
 } from "./workflows.js";
-import { nextCronDate } from "@rakazo/core";
+import { nextCronDate } from "@mycellios/core";
 
 export const WORKFLOW_TOOL_NAMES = ["list_workflows", "save_workflow", "run_workflow"] as const;
 const saveInput = z.object({

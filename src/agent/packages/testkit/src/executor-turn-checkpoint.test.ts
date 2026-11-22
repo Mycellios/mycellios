@@ -1,7 +1,7 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
 import { ComputerUpdatingError } from "../../adapters/src/computer-errors.js";
-import type { AdapterContext, AgentRunModel } from "@rakazo/adapter-kit";
-import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/core";
+import type { AdapterContext, AgentRunModel } from "@mycellios/adapter-kit";
+import { APPROVED_ACTION_NOT_RUN_ERROR } from "@mycellios/core";
 import { describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycle from "../../adapters/src/computer-lifecycle.js";
 import { createRunExecutor } from "../../adapters/src/executor.js";
@@ -902,8 +902,8 @@ describe("executor paused transcript", () => {
 
 // These executor fixtures isolate post-admission behavior. Real concurrent SQL
 // admission is exercised by scripts/verify-workspace-sync-db.ts.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

@@ -12,8 +12,8 @@ import type {
   SandboxProvider,
   ScreenRequest,
   TerminalRequest,
-} from "@rakazo/adapter-kit";
-import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
+} from "@mycellios/adapter-kit";
+import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import type { ConnectOptions, SandboxStatus } from "railway";
 import {
   RailwayGraphQLError,
@@ -542,7 +542,7 @@ export class RailwaySandboxProvider implements SandboxProvider {
 
 /**
  * Railway destroys an idle sandbox, so it must outlast the checkpointing idle sleep. When no
- * finite timeout can, Railway never idles it out and Rakazo's own idle sleep stops it.
+ * finite timeout can, Railway never idles it out and Mycellios's own idle sleep stops it.
  */
 function railwayIdleTimeoutMinutes() {
   if (!computerIdleSleepEnabled()) return 0;

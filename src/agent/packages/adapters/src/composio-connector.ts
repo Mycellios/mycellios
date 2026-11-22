@@ -9,9 +9,9 @@ import type {
   ConnectorProvider,
   ConnectorTool,
   ManagedConnectorProvider,
-} from "@rakazo/adapter-kit";
-import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@mycellios/contracts";
+import { getLogger } from "@mycellios/logging";
 import {
   composioToolkitDirectory,
   createToolkitDirectoryCache,

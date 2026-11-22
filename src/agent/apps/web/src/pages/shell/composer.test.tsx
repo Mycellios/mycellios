@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { i18n } from "@lingui/core";
-import type { AgentSkillCatalogEntry, Bot, ThreadMessage } from "@rakazo/contracts";
-import type { ComposerMention } from "@rakazo/core";
-import { MODEL_REQUIRED_SEND_ERROR } from "@rakazo/core";
+import type { AgentSkillCatalogEntry, Bot, ThreadMessage } from "@mycellios/contracts";
+import type { ComposerMention } from "@mycellios/core";
+import { MODEL_REQUIRED_SEND_ERROR } from "@mycellios/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { act, createRef } from "react";

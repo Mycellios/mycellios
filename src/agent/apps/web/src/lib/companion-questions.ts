@@ -1,5 +1,5 @@
-import type { DesktopQuestionPrompt, ThreadSnapshot } from "@rakazo/contracts";
-import { answerableAskMessageIds, isSecretAskBlock } from "@rakazo/core";
+import type { DesktopQuestionPrompt, ThreadSnapshot } from "@mycellios/contracts";
+import { answerableAskMessageIds, isSecretAskBlock } from "@mycellios/core";
 
 /** Never export credentials or approval cards to the OS question surface. */
 export function companionQuestions(botId: string, snapshot: ThreadSnapshot): DesktopQuestionPrompt[] {

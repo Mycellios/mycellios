@@ -4,9 +4,9 @@ import {
   SandboxRateLimitError,
   SandboxUnavailableError,
   VoiceAccountError,
-} from "@rakazo/adapter-kit";
-import { IsolationError } from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { IsolationError } from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import { handleRpcError, logUnexpectedRpcError } from "./app.js";
 

@@ -1,8 +1,8 @@
 import { routineThreadPath } from "../../lib/routine-thread-path";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Routine, RoutineRun, ThreadMessage } from "@rakazo/contracts";
-import { isOneShotRoutineCrons } from "@rakazo/core";
-import { BotAvatar, Button, NativeSelect, NativeSelectOption, Spinner } from "@rakazo/ui-web";
+import type { Bot, Routine, RoutineRun, ThreadMessage } from "@mycellios/contracts";
+import { isOneShotRoutineCrons } from "@mycellios/core";
+import { BotAvatar, Button, NativeSelect, NativeSelectOption, Spinner } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";

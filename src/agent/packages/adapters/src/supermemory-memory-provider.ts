@@ -7,7 +7,7 @@ import type {
   SemanticMemoryResponse,
   SemanticMemoryResult,
   SemanticMemorySaveRequest,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   assertLocalServiceBaseUrlSync,
   LocalServiceHost,

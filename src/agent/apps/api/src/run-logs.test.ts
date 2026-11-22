@@ -1,6 +1,6 @@
-import type { Actor } from "@rakazo/contracts";
-import { RunLogsInputSchema, RunLogsOutputSchema } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import { RunLogsInputSchema, RunLogsOutputSchema } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { listRunLogs, runLogIssue } from "./run-logs.js";
 

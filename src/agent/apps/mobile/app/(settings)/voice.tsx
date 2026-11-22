@@ -2,7 +2,7 @@ import {
   DEFAULT_COMPATIBLE_STT_MODEL,
   DEFAULT_COMPATIBLE_TTS_MODEL,
   OPENAI_COMPATIBLE_PROVIDER_ID,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { isCancelledError } from "@tanstack/react-query";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";

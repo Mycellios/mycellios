@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { matchesSearchQuery } from "@rakazo/core";
-import { Button, Input } from "@rakazo/ui-web";
+import { matchesSearchQuery } from "@mycellios/core";
+import { Button, Input } from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

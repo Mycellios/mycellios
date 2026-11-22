@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import {
   BotAvatar,
   Command,
@@ -8,7 +8,7 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { FolderPlus, Info, Lock, Plus, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
@@ -16,14 +16,14 @@ import { IconTooltip } from "../../components/IconTooltip";
 export function BotCreatePicker({
   bots,
   onCreateBot,
-  onOpenBot,
+  onShowBot,
   onCreateGroup,
   onCreateSpace,
   onCreateFolder,
 }: {
   bots: Bot[];
   onCreateBot: () => void;
-  onOpenBot: (botId: string) => void;
+  onShowBot: (botId: string) => void;
   onCreateGroup: () => void;
   onCreateSpace: () => void;
   onCreateFolder?: () => void;
@@ -118,7 +118,7 @@ export function BotCreatePicker({
                 key={bot.id}
                 value={bot.id}
                 data-testid={`picker-bot-${bot.id}`}
-                onSelect={() => onOpenBot(bot.id)}
+                onSelect={() => onShowBot(bot.id)}
                 className="gap-2"
               >
                 <BotAvatar color={bot.color} identity={bot.id} size={22} status={bot.status} />

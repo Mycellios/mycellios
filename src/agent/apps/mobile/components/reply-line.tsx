@@ -1,6 +1,6 @@
-import type { ReplyPreview } from "@rakazo/contracts";
-import { replyLabel } from "@rakazo/core";
-import { typeScale } from "@rakazo/ui-tokens";
+import type { ReplyPreview } from "@mycellios/contracts";
+import { replyLabel } from "@mycellios/core";
+import { typeScale } from "@mycellios/ui-tokens";
 import { Pressable, Text } from "react-native";
 import { mobileTokens } from "../lib/appearance";
 import type { MobileArtifactTarget } from "../lib/artifact-open";

@@ -5,7 +5,7 @@ import { agentWorkspace } from "./development-copy.js";
 export const DEVELOPMENT_CHECKOUT_FILE = "development-checkout.json";
 
 /**
- * Like `bun run dev` in an OpenBot worktree: an owner-chosen git checkout runs
+ * Like `bun run dev` in the reference app's worktree: an owner-chosen git checkout runs
  * in place with the dependencies it already has, instead of a fresh copy of the
  * bundled source that must install everything again. The owner names it in
  * `development-checkout.json` ({"schema":"mycellios-development-checkout/1","path":"..."}).

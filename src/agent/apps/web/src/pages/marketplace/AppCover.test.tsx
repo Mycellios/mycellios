@@ -2,7 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 import { afterEach, expect, it, vi } from "vitest";
 import { AppCover,AppCoverEditor } from "./AppCover";
 

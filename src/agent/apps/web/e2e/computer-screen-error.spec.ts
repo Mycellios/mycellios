@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { activeBotId, captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
 
 test("screen connection failures stay visible and can be retried", async ({ page }, testInfo) => {
-  await signup(page, `screen-error-${Date.now()}@rakazo.test`, "password12", "Screen Error");
+  await signup(page, `screen-error-${Date.now()}@mycellios.test`, "password12", "Screen Error");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   await rpc(page, "computer/boot", { botId });
@@ -65,7 +65,7 @@ test("screen connection failures stay visible and can be retried", async ({ page
 test("a framed screen that fails to connect says so and can be retried", async ({
   page,
 }, testInfo) => {
-  await signup(page, `screen-frame-${Date.now()}@rakazo.test`, "password12", "Screen Frame");
+  await signup(page, `screen-frame-${Date.now()}@mycellios.test`, "password12", "Screen Frame");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   await rpc(page, "computer/boot", { botId });
@@ -113,7 +113,7 @@ test("a framed screen that fails to connect says so and can be retried", async (
 });
 
 test("a framed screen the proxy refuses shows the proxy's reason", async ({ page }, testInfo) => {
-  await signup(page, `screen-refused-${Date.now()}@rakazo.test`, "password12", "Screen Refused");
+  await signup(page, `screen-refused-${Date.now()}@mycellios.test`, "password12", "Screen Refused");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   await rpc(page, "computer/boot", { botId });
@@ -142,7 +142,7 @@ test("a framed screen the proxy refuses shows the proxy's reason", async ({ page
 });
 
 test("a framed screen that drops after connecting loads again by itself once", async ({ page }) => {
-  await signup(page, `screen-drop-${Date.now()}@rakazo.test`, "password12", "Screen Drop");
+  await signup(page, `screen-drop-${Date.now()}@mycellios.test`, "password12", "Screen Drop");
   await completeOnboarding(page);
   const botId = activeBotId(page);
   await rpc(page, "computer/boot", { botId });
@@ -224,7 +224,7 @@ for (const moved of [false, true]) {
       ? "a reconnected screen leaves the keyboard in the chat box the user moved to"
       : "a reconnected screen that had the keyboard gets it back",
     async ({ page }) => {
-      await signup(page, `screen-focus-${Date.now()}@rakazo.test`, "password12", "Screen Focus");
+      await signup(page, `screen-focus-${Date.now()}@mycellios.test`, "password12", "Screen Focus");
       await completeOnboarding(page);
       const botId = activeBotId(page);
       await rpc(page, "computer/boot", { botId });

@@ -8,9 +8,9 @@ import type {
   VoiceSynthesizeRequest,
   VoiceTranscribeRequest,
   VoiceVerifyResult,
-} from "@rakazo/adapter-kit";
-import { VoiceAccountError } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { VoiceAccountError } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
 import {
   readVoiceAudio,
   readVoiceJson,
@@ -62,7 +62,7 @@ export class FishAudioVoiceProvider implements VoiceProvider {
     });
   }
 
-  /** Return user-owned then bounded public Fish Audio voices as Rakazo choices. */
+  /** Return user-owned then bounded public Fish Audio voices as Mycellios choices. */
   async listVoices(apiKey: string, context: AdapterContext): Promise<VoiceInfo[]> {
     const signal = voiceDeadline(context.signal, LIST_VOICES_DEADLINE_MS);
     const listContext = { ...context, signal };
@@ -78,7 +78,7 @@ export class FishAudioVoiceProvider implements VoiceProvider {
     });
   }
 
-  /** Synthesize one Rakazo utterance as bounded MP3 audio. */
+  /** Synthesize one Mycellios utterance as bounded MP3 audio. */
   async synthesize(request: VoiceSynthesizeRequest, context: AdapterContext): Promise<SpeechClip> {
     const signal = voiceDeadline(request.signal ?? context.signal, 60_000);
     const model = resolveFishSpeechModel(request.model);

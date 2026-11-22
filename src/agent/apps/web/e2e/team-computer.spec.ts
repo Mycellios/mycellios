@@ -19,7 +19,7 @@ test("Team Computer gives bots a home folder plus shared space while Private sta
   const sharedMarker = `shared-${stamp}`;
   const privateMarker = `private-${stamp}`;
 
-  await signup(page, `team-computer-${stamp}@rakazo.test`, "password12", "Team Computer");
+  await signup(page, `team-computer-${stamp}@mycellios.test`, "password12", "Team Computer");
   await completeOnboarding(page);
   const chiefId = activeBotId(page);
 
@@ -89,12 +89,12 @@ test("user control leaves another Team bot's screen available", async ({ page },
   const stamp = Date.now();
   const marker = `after-release-${stamp}`;
 
-  await signup(page, `team-control-${stamp}@rakazo.test`, "password12", "Team Control");
+  await signup(page, `team-control-${stamp}@mycellios.test`, "password12", "Team Control");
   await completeOnboarding(page);
   const chiefId = activeBotId(page);
   const workerId = await createBot(page, "Worker", "team");
 
-  await openBot(page, "Chief");
+  await showBot(page, "Chief");
   await page.getByRole("button", { name: "Agent computer", exact: true }).click();
   await page.getByTestId("computer-preview").hover();
   await page.getByTestId("computer-preview-open").click();
@@ -106,7 +106,7 @@ test("user control leaves another Team bot's screen available", async ({ page },
   await expect(page.getByText("You have control", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close computer" }).click();
 
-  await openBot(page, "Worker");
+  await showBot(page, "Worker");
   const workerRunId = await sendMessage(
     page,
     `write a file in your home called notes/result.txt that says ${marker}`,
@@ -137,7 +137,7 @@ test("user control leaves another Team bot's screen available", async ({ page },
 test("opening and releasing the computer keep a view-only stream; a failed release can be retried", async ({
   page,
 }, testInfo) => {
-  await signup(page, `view-only-${Date.now()}@rakazo.test`, "password12", "Computer");
+  await signup(page, `view-only-${Date.now()}@mycellios.test`, "password12", "Computer");
   await completeOnboarding(page);
   let takeovers = 0;
   page.on("request", (request) => {
@@ -203,7 +203,7 @@ test("an active Team bot must be stopped before user takeover", async ({ page },
 
   await signup(
     page,
-    `active-team-control-${stamp}@rakazo.test`,
+    `active-team-control-${stamp}@mycellios.test`,
     "password12",
     "Active Team Control",
   );
@@ -312,7 +312,7 @@ async function setComputerMode(
     .toBe(mode);
 }
 
-async function openBot(page: Page, name: string) {
+async function showBot(page: Page, name: string) {
   await page
     .getByRole("complementary")
     .getByRole("button", { name: new RegExp(`^${name}`) })

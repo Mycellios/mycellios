@@ -49,7 +49,7 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm run db:generate
           npm exec -- vitest run apps/web/src/lib/android-host.test.ts apps/web/src/pages/shell/reviewed-voice.test.tsx apps/web/src/pages/shell/use-android-shortcut.test.tsx --maxWorkers=2
-          APP_BASE_PATH=/agent/ npm run build --workspace @rakazo/web
+          APP_BASE_PATH=/agent/ npm run build --workspace @mycellios/web
           cd ../..
           node scripts/prepare-android-web.mjs "$RUNNER_TEMP/android-release"
       # Only downloaded Maven/Google dependencies are cached; the Gradle

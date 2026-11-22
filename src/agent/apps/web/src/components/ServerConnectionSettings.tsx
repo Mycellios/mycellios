@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Dialog, DialogContent, DialogTitle, Input } from "@rakazo/ui-web";
+import { Button, Dialog, DialogContent, DialogTitle, Input } from "@mycellios/ui-web";
 import { Bell, Plug, Settings, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NotificationsPanel } from "../pages/settings/NotificationsPanel";

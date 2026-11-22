@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, OptionSelect } from "@rakazo/ui-web";
+import { Button, OptionSelect } from "@mycellios/ui-web";
 import { Volume2 } from "lucide-react";
 import { useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";

@@ -13,7 +13,7 @@ vi.mock("../lib/client-update", () => {
 });
 vi.mock("../lib/desktop", () => ({ desktopBridge: () => mock.desktop ? {} : null }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: mock.t }), Trans: ({children}: any) => children }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({children, ...props}: any) => <button {...props}>{children}</button>,
 }));
 import { WebUpdates } from "./WebUpdates";

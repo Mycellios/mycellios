@@ -1,4 +1,4 @@
-import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
+import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@mycellios/contracts";
 
 /** Copy each client supplies in its own language. */
 export type UserErrorCopy = { fallback: string; offline: string; integrationSetup?: string };

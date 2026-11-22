@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { isToolActivityBlock } from "@rakazo/core";
+import type { MessageBlock } from "@mycellios/contracts";
+import { isToolActivityBlock } from "@mycellios/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { builtinAgentTools } from "./builtin-tools.js";
 import { longWorkProgressGuidance } from "./executor.js";

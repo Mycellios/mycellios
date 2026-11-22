@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Routine } from "@rakazo/contracts";
+import type { Routine } from "@mycellios/contracts";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";

@@ -1,7 +1,7 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import { ANTSEED_PROVIDER_ID, isMycelliosBaseUrl, isOllamaCloudBaseUrl } from "@rakazo/contracts";
-import { Button, Disclosure, Input } from "@rakazo/ui-web";
-import { useSettingsSectionsVisible } from "@rakazo/ui-web/components/ui/disclosure";
+import { ANTSEED_PROVIDER_ID, isMycelliosBaseUrl, isOllamaCloudBaseUrl } from "@mycellios/contracts";
+import { Button, Disclosure, Input } from "@mycellios/ui-web";
+import { useSettingsSectionsVisible } from "@mycellios/ui-web/components/ui/disclosure";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import {

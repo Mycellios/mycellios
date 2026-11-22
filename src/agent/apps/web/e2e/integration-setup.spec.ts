@@ -6,7 +6,7 @@ test("integration setup failures show actionable copy without provider details",
 }, testInfo) => {
   await signup(
     page,
-    `integration-auth-${Date.now()}@rakazo.test`,
+    `integration-auth-${Date.now()}@mycellios.test`,
     "password12",
     "Integration Auth",
   );
@@ -78,7 +78,7 @@ test("integration setup failures show actionable copy without provider details",
 test("signup never grants server authority and settings contain only account controls", async ({
   page,
 }, testInfo) => {
-  await signup(page, `ordinary-account-${Date.now()}@rakazo.test`, "password12", "Test Account");
+  await signup(page, `ordinary-account-${Date.now()}@mycellios.test`, "password12", "Test Account");
   await completeOnboarding(page);
   const me = await page.request.post("/rpc/me", { data: { json: null } });
   expect((await me.json()).json.isDeploymentOwner).toBe(false);
@@ -100,7 +100,7 @@ test("signup never grants server authority and settings contain only account con
 test("ordinary accounts can add personal MCP connections without server setup", async ({
   page,
 }, testInfo) => {
-  await signup(page, `personal-mcp-${Date.now()}@rakazo.test`, "password12", "Personal MCP");
+  await signup(page, `personal-mcp-${Date.now()}@mycellios.test`, "password12", "Personal MCP");
   await completeOnboarding(page);
   await page.goto("/integrations/setup");
   await expect(page.getByRole("heading", { name: "Add MCP server" })).toBeVisible();

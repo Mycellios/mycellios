@@ -64,14 +64,14 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm run db:generate
           node --test apps/desktop/scripts/contribution-component.test.mjs apps/desktop/scripts/macos-installer.test.mjs apps/desktop/scripts/macos-sign-walk.test.mjs apps/desktop/scripts/standalone-installer-config.test.mjs apps/desktop/scripts/node-runtime-license.test.mjs apps/desktop/scripts/compact-resources.test.mjs apps/desktop/scripts/release-continuity.test.mjs
-          npm run build --workspace @rakazo/web -- --desktop
-          npm run build --workspace @rakazo/desktop
-          npm run build:local-server --workspace @rakazo/desktop
+          npm run build --workspace @mycellios/web -- --desktop
+          npm run build --workspace @mycellios/desktop
+          npm run build:local-server --workspace @mycellios/desktop
           node node_modules/electron/install.js
           if [ '${{ matrix.arch }}' = arm64 ]; then
-            npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch arm64 --runtime "$RUNNER_TEMP/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$RUNNER_TEMP/desktop-release"
+            npm exec --workspace @mycellios/desktop -- node scripts/package-macos.mjs --arch arm64 --runtime "$RUNNER_TEMP/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$RUNNER_TEMP/desktop-release"
           else
-            npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch x64 --out "$RUNNER_TEMP/desktop-release"
+            npm exec --workspace @mycellios/desktop -- node scripts/package-macos.mjs --arch x64 --out "$RUNNER_TEMP/desktop-release"
           fi
           node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/${{ matrix.app_dir }}/Mycellios Desktop.app/Contents/Resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/${{ matrix.app_dir }}/Mycellios Desktop.app/Contents/Resources/web"
       - name: Qualify packaged launch and the distributed DMG signature

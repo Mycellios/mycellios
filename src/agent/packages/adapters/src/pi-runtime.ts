@@ -40,7 +40,7 @@ import type {
   AgentUsage,
   ConnectorTool,
   ModelCallObserver,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   DEFAULT_CONTEXT_STRATEGY,
   isRetryableProviderUnavailable,
@@ -48,7 +48,7 @@ import {
   ModelAccountError,
   ModelOutputError,
   TransientModelError,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
   ComputerModeSchema,
@@ -56,8 +56,8 @@ import {
   FLEET_TOOL_NAMES,
   isOpenAiCompatibleProvider,
   usableModelId,
-} from "@rakazo/contracts";
-import type { ModelBackupOutcome } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { ModelBackupOutcome } from "@mycellios/core";
 import {
   abortableDelay,
   MISSING_TOOL_FINAL_RESPONSE_ERROR,
@@ -67,8 +67,8 @@ import {
   normalizeRunError,
   parseModelFallbackFailure,
   retryDelayMs,
-} from "@rakazo/core";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/core";
+import { getLogger } from "@mycellios/logging";
 import { isToolPauseResult, uncertainEffectResult } from "./approval-effect.js";
 import { automated, withAutomatedLabels } from "./automated-messages.js";
 import { connectionIdArgument, credentialArgument } from "./bot-secrets.js";
@@ -202,7 +202,7 @@ const MODEL_PROVIDER_RETRY_DELAYS_MS = [2_000, 8_000, 20_000] as const;
 // instead of taking another assistant turn. A bounded internal follow-up keeps
 // that provider quirk from making a long task look complete after one step.
 const MAX_SILENT_TOOL_CONTINUATIONS = 3;
-// OpenBot exposes a compact core tool set. Above this many schemas, page the
+// The reference app exposes a compact core tool set. Above this many schemas, page the
 // rest behind search/load even when the context window would fit them, so a
 // simple chat turn does not re-send every connector schema on every request.
 const DEFAULT_MAX_EAGER_TOOL_SCHEMAS = 24;
@@ -248,7 +248,7 @@ export const SILENT_ALLOWED_TOOL_CONTINUATION_PROMPT = automated(
 // Shown as a failed-run error, not an assistant message. Asking the user to
 // continue stores that sentence as the reply, and the next "continue" runs
 // tools and misses a final answer again.
-export { MISSING_TOOL_FINAL_RESPONSE_ERROR } from "@rakazo/core";
+export { MISSING_TOOL_FINAL_RESPONSE_ERROR } from "@mycellios/core";
 
 // Reasoning-capable models must not start at "off": for OpenRouter, pi-ai maps
 // that to reasoning.effort "none", which 400s on endpoints that mandate
@@ -286,7 +286,7 @@ export interface PiAgentRuntimeOptions {
   modelCallObserver?: ModelCallObserver;
   /**
    * Tool schemas kept available without a discovery round trip. Above this,
-   * the rest page behind search/load like OpenBot's connector catalog. Defaults
+   * the rest page behind search/load like the reference app's connector catalog. Defaults
    * to PI_MAX_EAGER_TOOL_SCHEMAS or the built-in compact core.
    */
   maxEagerToolSchemas?: number;
@@ -1227,7 +1227,7 @@ export class PiAgentRuntime implements AgentRuntime {
                   0,
                 ),
             });
-            // OpenBot pattern: repeat the natural style's first line in front of each user turn.
+            // The reference app pattern: repeat the natural style's first line in front of each user turn.
             const reminder = request.allowSilentEmpty || request.script
               || request.usageOperationKind === "compaction" ? null : turnStyleReminder(systemPrompt);
             await agent.prompt(reminder ? `${reminder}\n\n${initialPrompt}` : initialPrompt, images?.length ? images : undefined);

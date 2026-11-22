@@ -1,6 +1,6 @@
 name: Deploy through Nucleus
 
-# Production deploys go only through Nucleus (nodecodex-org/nucleus,
+# Production deploys go only through Nucleus (the private Nucleus repository,
 # specs/mycellios-continuous-deploy). For each push to main this workflow builds the
 # commit's images on GitHub-hosted runners, waits until that exact commit's CI summary
 # succeeds, then asks Nucleus to deploy it with a GitHub OIDC token. Nucleus verifies the

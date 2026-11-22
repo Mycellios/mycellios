@@ -1,7 +1,7 @@
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { productBrand } from "@rakazo/contracts";
-import { signupRequiresEmailVerification } from "@rakazo/core";
+import { productBrand } from "@mycellios/contracts";
+import { signupRequiresEmailVerification } from "@mycellios/core";
 
 export function isRealSandboxProvider(provider = process.env.SANDBOX_PROVIDER) {
   return provider === "e2b" || provider === "daytona" || provider === "boat";

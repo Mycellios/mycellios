@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { InboxTask } from "@rakazo/contracts";
+import type { InboxTask } from "@mycellios/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

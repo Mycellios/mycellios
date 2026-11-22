@@ -8,7 +8,7 @@ vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (p: TemplateStrin
 vi.mock("./MobileSessions", () => ({ MobileSessions: ({ onAddPhone, permanentLink }: any) => <><button onClick={onAddPhone}>Add phone</button>{permanentLink}</> }));
 vi.mock("../../components/MobileInstallOffer", () => ({ mobileInstallUrl: () => mock.url, MobileInstallOffer: ({ open }: any) => open ? <p>Install guide</p> : null }));
 vi.mock("../../components/ServerLinkCode", () => ({ ServerLinkCode: ({ url }: any) => <a data-testid="qr">{url}</a> }));
-vi.mock("@rakazo/ui-web", () => {
+vi.mock("@mycellios/ui-web", () => {
   const Wrapper = ({ children }: { children: ReactNode }) => <div>{children}</div>;
   return { Button: ({ variant, ...props }: any) => <button {...props} />, Dialog: ({ open, children }: any) => open ? <div role="dialog">{children}</div> : null,
     DialogContent: Wrapper, DialogDescription: Wrapper, DialogHeader: Wrapper, DialogTitle: Wrapper };

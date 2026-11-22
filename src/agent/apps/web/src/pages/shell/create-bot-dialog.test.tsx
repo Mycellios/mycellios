@@ -5,7 +5,7 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 import type { CreateBotDialogInput } from "./create-bot-dialog";
 
 vi.mock("@lingui/react/macro", () => {

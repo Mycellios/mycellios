@@ -1,8 +1,8 @@
 import {expect,it,vi} from 'vitest';
-import type {Actor} from '@rakazo/contracts';
+import type {Actor} from '@mycellios/contracts';
 const control=vi.hoisted(()=>vi.fn());
-vi.mock('@rakazo/db',async original=>({...await original<object>(),controlWorkTree:control}));
-vi.mock('@rakazo/adapters',async original=>({...await original<object>(),reconcileWorkStops:vi.fn(async()=>undefined)}));
+vi.mock('@mycellios/db',async original=>({...await original<object>(),controlWorkTree:control}));
+vi.mock('@mycellios/adapters',async original=>({...await original<object>(),reconcileWorkStops:vi.fn(async()=>undefined)}));
 import {stopWorkForThread} from './work-controls.js';
 it('composer Stop finds a waiting coordinator even when its provider turn already completed',async()=>{
   let active=true;control.mockImplementation(async()=>{active=false;return {};});

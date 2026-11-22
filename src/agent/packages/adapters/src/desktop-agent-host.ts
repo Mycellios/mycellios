@@ -1,7 +1,7 @@
-import type { AdapterContext, AgentRunRequest, AgentRuntime } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
+import type { AdapterContext, AgentRunRequest, AgentRuntime } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
 import { NativeEventQueue } from "./native-agent-process.js";
-import { desktopDiagnosticMessage } from "@rakazo/contracts";
+import { desktopDiagnosticMessage } from "@mycellios/contracts";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import type { AgentRpcMessage, AgentWire } from "./desktop-agent-rpc.js";
 

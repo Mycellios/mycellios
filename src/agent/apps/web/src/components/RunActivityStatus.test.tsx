@@ -2,15 +2,15 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Run } from "@rakazo/contracts";
-vi.mock("@rakazo/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => false }));
+import type { Run } from "@mycellios/contracts";
+vi.mock("@mycellios/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => false }));
 vi.mock("../lib/space-rpc", () => ({
   useSpaceRpc: () => ({ computer: { commands: async () => [] } }),
 }));
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (s: TemplateStringsArray, ...values: unknown[]) => s.reduce((text, part, index) => text + part + (values[index] ?? ""), ""), i18n: { locale: "en" } }),
 }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   GroupAvatar: () => <span aria-hidden="true" />,
   Button: ({ children, onClick }: { children: React.ReactNode; onClick: () => void }) => (
     <button type="button" onClick={onClick}>
@@ -53,7 +53,7 @@ afterEach(() => {
   if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
   else Reflect.deleteProperty(document, "hidden");
 });
-function mount(value: Run, missingComputer = false, messages: import("@rakazo/contracts").ThreadMessage[] = []) {
+function mount(value: Run, missingComputer = false, messages: import("@mycellios/contracts").ThreadMessage[] = []) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.useFakeTimers();
   vi.setSystemTime(now);
@@ -190,7 +190,7 @@ it("old API snapshots never claim confirmed worker health", () => {
 it("shows real tool activity without claiming the worker is connected or opening diagnostics", () => {
   const message = { id: "progress:run", runId: "run", threadId: "thread", seq: 1,
     role: "bot", createdAt: at(-1), blocks: [{ kind: "steps", steps: [{ label: "List files", count: 1 }] }],
-  } as import("@rakazo/contracts").ThreadMessage;
+  } as import("@mycellios/contracts").ThreadMessage;
   mount({ ...run, leaseExpiresAt: undefined, observedAt: undefined }, false, [message]);
   expect(node.querySelector('ol[aria-label="Task activity"]')?.textContent).toContain("List files");
   expect(node.querySelector("[role=status]")?.textContent).toBe("Status not confirmed");
@@ -201,7 +201,7 @@ it("shows real tool activity without claiming the worker is connected or opening
 it("does not show activity from another run or completed history", () => {
   const message = { id: "progress:other", runId: "other", threadId: "thread", seq: 1,
     role: "bot", createdAt: at(-1), blocks: [{ kind: "steps", steps: [{ label: "Shell", count: 1 }] }],
-  } as import("@rakazo/contracts").ThreadMessage;
+  } as import("@mycellios/contracts").ThreadMessage;
   mount(run, false, [message]);
   expect(node.querySelector("[data-testid=latest-run-activity]")).toBeNull();
 });
@@ -258,7 +258,7 @@ it("shows the command, its output and elapsed time while the run is active", () 
         ],
       },
     ],
-  } as import("@rakazo/contracts").ThreadMessage;
+  } as import("@mycellios/contracts").ThreadMessage;
   mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
   const status = node.querySelector("[role=status]")?.textContent ?? "";
   const timeline = node.querySelector('ol[aria-label="Task activity"]')?.textContent ?? "";
@@ -285,7 +285,7 @@ it("keeps different file steps separate", () => {
         { label: "Reading src/b.ts", count: 1 },
       ],
     }],
-  } as import("@rakazo/contracts").ThreadMessage;
+  } as import("@mycellios/contracts").ThreadMessage;
   mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
   const timeline = node.querySelector('ol[aria-label="Task activity"]')?.textContent ?? "";
   expect(timeline).toContain("Reading src/a.ts");
@@ -304,7 +304,7 @@ it("summarizes a write tool without exposing its path or input", () => {
   const message = { id: "progress:run", runId: "run", threadId: "thread", seq: 2,
     role: "bot", createdAt: at(0), blocks: [{ kind: "steps", steps: [{ label: "write_file /private/a.ts", count: 1 }],
       tools: [{ id: "write-1", name: "write_file", outcome: "running", updatedAt: at(0), detail: "/private/a.ts" }] }],
-  } as import("@rakazo/contracts").ThreadMessage;
+  } as import("@mycellios/contracts").ThreadMessage;
   mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
   expect(node.querySelector("[role=status]")?.textContent).toContain("Updating files");
   expect(node.querySelector("summary")?.textContent).not.toContain("/private");

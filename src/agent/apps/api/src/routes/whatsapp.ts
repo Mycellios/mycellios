@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import type { WhatsAppLink, WhatsAppSender } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { WhatsAppLink, WhatsAppSender } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import {
   isWhatsAppGroupJid,
   normalizeWhatsAppPhone,

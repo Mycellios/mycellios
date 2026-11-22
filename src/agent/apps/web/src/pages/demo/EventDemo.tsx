@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { PageLoading } from "../../components/PageLoading";
 import { demoApi } from "../../lib/event-demo";
 import { saveEventAgentContext, type EventAgentContext } from "../../lib/event-demo-agent";

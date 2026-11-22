@@ -1,8 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, InboxTask, Space } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_BYTES } from "@rakazo/contracts";
-import { validateAttachmentMimeType } from "@rakazo/core";
-import { botColors } from "@rakazo/ui-tokens";
+import type { Bot, InboxTask, Space } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_BYTES } from "@mycellios/contracts";
+import { validateAttachmentMimeType } from "@mycellios/core";
+import { botColors } from "@mycellios/ui-tokens";
 import {
   BotAvatar,
   Button,
@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   ArrowLeft,
   ArrowRight,

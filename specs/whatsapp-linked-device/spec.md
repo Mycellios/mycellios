@@ -22,8 +22,8 @@ device (like WhatsApp Web), and talk to a chosen Mico from WhatsApp:
 - 👀 on the triggering message when it is accepted; ✅ when the answer was sent,
   ❌ when the run failed.
 
-This mirrors the behaviour OpenBot published for its WhatsApp connector. No
-OpenBot code is used: OpenBot is PolyForm Noncommercial; this implementation is
+This mirrors the behaviour the reference app published for its WhatsApp connector. No
+reference app code is used: the reference app is PolyForm Noncommercial; this implementation is
 written independently.
 
 ## Risk and licensing

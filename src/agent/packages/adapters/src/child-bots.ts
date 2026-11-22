@@ -5,15 +5,15 @@ import type {
   ComputerRef,
   JobPublisher,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
-import { routineJobKey, runContinueJob, runJobKey } from "@rakazo/adapter-kit";
-import type { Actor, Bot, ComputerMode } from "@rakazo/contracts";
+} from "@mycellios/adapter-kit";
+import { routineJobKey, runContinueJob, runJobKey } from "@mycellios/adapter-kit";
+import type { Actor, Bot, ComputerMode } from "@mycellios/contracts";
 import {
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
   GROUP_MEMBER_MIN,
-} from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
 import {
   cancelRunsInTransaction,
   clearEndedRunState,
@@ -26,8 +26,8 @@ import {
   type PrismaClient,
   recordComputerRunEnd,
   withTransactionRetry,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { BrowserStoppedReleaseError } from "./computer-screens.js";
 import { toComputerRef } from "./computer-support.js";
 import {

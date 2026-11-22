@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { InboxTask } from "@rakazo/contracts";
-import { Button, Input } from "@rakazo/ui-web";
+import type { InboxTask } from "@mycellios/contracts";
+import { Button, Input } from "@mycellios/ui-web";
 import { Bell, Pin, PinOff, X } from "lucide-react";
 import { useState } from "react";
 import type { RpcClient } from "../../lib/rpc";

@@ -1,7 +1,7 @@
-import { botColors } from "@rakazo/ui-tokens";
+import { botColors } from "@mycellios/ui-tokens";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
-import { BotAvatar } from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import { BotAvatar } from "@mycellios/ui-web";
 import { CircleCheck, CircleDashed, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 

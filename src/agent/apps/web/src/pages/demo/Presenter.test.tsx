@@ -5,7 +5,7 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 const f = vi.hoisted(() => ({ network: vi.fn() }));
 vi.mock("../../lib/event-demo", () => ({ demoApi: () => ({ network: f.network }) }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
-vi.mock("@rakazo/ui-web", () => ({ BotAvatar: () => <span />, Button: (props: any) => <button {...props} /> }));
+vi.mock("@mycellios/ui-web", () => ({ BotAvatar: () => <span />, Button: (props: any) => <button {...props} /> }));
 vi.mock("../../components/ServerLinkCode", () => ({ ServerLinkCode: () => <span>QR</span> }));
 import { DemoPresenter } from "./Presenter";
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>;

@@ -18,17 +18,17 @@ import type {
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import { SecretStoreUnavailableError } from "@rakazo/adapter-kit";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
 import {
   isLocalMcpHost,
   mcpOAuthEnvReferences,
   parseMcpOAuthAuthorizationParams,
-} from "@rakazo/contracts";
-import { readBoundedResponseBytes } from "@rakazo/core";
-import type { Prisma, PrismaClient } from "@rakazo/db";
-import { runAsSystem } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/contracts";
+import { readBoundedResponseBytes } from "@mycellios/core";
+import type { Prisma, PrismaClient } from "@mycellios/db";
+import { runAsSystem } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { sanitizeConnectorError } from "./connector-safety.js";
 import { secureFetch, validateUrl, withEndpointOriginFallback } from "./mcp-transport.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";

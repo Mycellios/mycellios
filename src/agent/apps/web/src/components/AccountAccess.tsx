@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AccountSecurity } from "@rakazo/contracts";
-import { Button, Input, Label } from "@rakazo/ui-web";
+import type { AccountSecurity } from "@mycellios/contracts";
+import { Button, Input, Label } from "@mycellios/ui-web";
 import { useEffect, useState } from "react";
 import { fetchAccountSecurity, requestAccountDeletionCode } from "../lib/account-security";
 import { appPath } from "../lib/app-path";

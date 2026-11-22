@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { AgentQuestion } from "@rakazo/contracts";
-import { Button, Input } from "@rakazo/ui-web";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import type { AgentQuestion } from "@mycellios/contracts";
+import { Button, Input } from "@mycellios/ui-web";
 import { MessageCircleQuestion, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AskBlock } from "./AskCard";

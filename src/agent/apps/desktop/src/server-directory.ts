@@ -1,4 +1,4 @@
-import type { DesktopSetup } from "@rakazo/contracts";
+import type { DesktopSetup } from "@mycellios/contracts";
 import { normalizeServerUrl, parseSetupInput } from "./setup-config.js";
 export type ServerEntry = DesktopSetup & { name: string; color?: string };
 export class ServerDirectory {

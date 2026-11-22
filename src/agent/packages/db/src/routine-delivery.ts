@@ -1,4 +1,4 @@
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import type { PrismaClient } from "./client.js";
 import { IsolationError } from "./scope.js";
 

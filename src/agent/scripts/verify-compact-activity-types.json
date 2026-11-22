@@ -13,10 +13,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "@rakazo/contracts": [
+      "@mycellios/contracts": [
         "../packages/contracts/src/index.ts"
       ],
-      "@rakazo/core/run-health": [
+      "@mycellios/core/run-health": [
         "../packages/core/src/run-health.ts"
       ]
     },

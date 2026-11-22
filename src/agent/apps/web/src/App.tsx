@@ -5,10 +5,10 @@ import { getGeneralPreferences, useGeneralPreferences } from "./lib/general-pref
 import { analyticsInstallationId } from "./lib/analytics-installation";
 import { StartupScreen } from "./components/StartupScreen";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { LinkFavicons } from "@rakazo/chat-ui/web";
-import { LinkFaviconsContext, RemoteImagesContext } from "@rakazo/chat-ui/web";
-import { analyticsScreen } from "@rakazo/core";
-import { Button } from "@rakazo/ui-web";
+import type { LinkFavicons } from "@mycellios/chat-ui/web";
+import { LinkFaviconsContext, RemoteImagesContext } from "@mycellios/chat-ui/web";
+import { analyticsScreen } from "@mycellios/core";
+import { Button } from "@mycellios/ui-web";
 import {
   Suspense,
   useEffect,

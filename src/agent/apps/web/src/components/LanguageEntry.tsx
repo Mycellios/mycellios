@@ -2,7 +2,7 @@ import { eventDemoRoute } from "../lib/event-demo";
 import { eventAgentContext } from "../lib/event-demo-agent";
 import { appRoute } from "../lib/app-path";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Field, FieldLabel, OptionSelect } from "@rakazo/ui-web";
+import { Button, Field, FieldLabel, OptionSelect } from "@mycellios/ui-web";
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 import { setUiLocale } from "../lib/i18n";

@@ -1,4 +1,4 @@
-import { UsageDashboardInputSchema } from "@rakazo/contracts";
+import { UsageDashboardInputSchema } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import { emptyUsageTotals, mergeUsageTotals, normalizeUsageBucket } from "./usage-dashboard.js";
 

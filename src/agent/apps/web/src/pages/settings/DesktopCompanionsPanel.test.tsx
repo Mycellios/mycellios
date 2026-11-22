@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { DEFAULT_DESKTOP_COMPANIONS } from "@rakazo/contracts";
+import { DEFAULT_DESKTOP_COMPANIONS } from "@mycellios/contracts";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ bridge: undefined as any, save: vi.fn() }));
 vi.mock("../../lib/desktop", () => ({ desktopBridge: () => mock.bridge }));

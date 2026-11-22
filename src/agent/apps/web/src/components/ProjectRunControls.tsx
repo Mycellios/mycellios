@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { ProjectRunState } from "@rakazo/contracts";
-import { Button, NativeSelect, NativeSelectOption } from "@rakazo/ui-web";
+import type { ProjectRunState } from "@mycellios/contracts";
+import { Button, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { Play, Square, Terminal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";

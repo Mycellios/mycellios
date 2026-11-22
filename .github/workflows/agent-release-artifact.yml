@@ -56,9 +56,9 @@ jobs:
         working-directory: src/agent
         run: |
           npm run db:generate
-          npm run build --workspace @rakazo/api --workspace @rakazo/worker
+          npm run build --workspace @mycellios/api --workspace @mycellios/worker
           node scripts/verify-server-startup.mjs
-          APP_BASE_PATH=/agent/ npm run build --workspace @rakazo/web
+          APP_BASE_PATH=/agent/ npm run build --workspace @mycellios/web
       - name: Seal immutable outputs and migration inputs
         run: |
           mkdir -p release-artifact

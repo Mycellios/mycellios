@@ -1,6 +1,6 @@
-import type { ChildBotBlock } from "@rakazo/core";
-import { resolvePersonaColorDef } from "@rakazo/core";
-import type { ColorTokens } from "@rakazo/ui-tokens";
+import type { ChildBotBlock } from "@mycellios/core";
+import { resolvePersonaColorDef } from "@mycellios/core";
+import type { ColorTokens } from "@mycellios/ui-tokens";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { MessageMentionsContext } from "../lib/message-mentions";
@@ -14,18 +14,18 @@ export function BotMention({
   block,
   color,
   tokens,
-  onOpenBot,
+  onShowBot,
 }: {
   block: ChildBotBlock;
   color: string | undefined;
   tokens: ColorTokens;
-  onOpenBot: (botId: string, name: string) => void;
+  onShowBot: (botId: string, name: string) => void;
 }) {
   const live = block.status === "created" && color;
   return (
     <Text
       accessibilityRole={live ? "link" : undefined}
-      onPress={live ? () => onOpenBot(block.botId, block.name) : undefined}
+      onPress={live ? () => onShowBot(block.botId, block.name) : undefined}
       style={{
         color: live ? resolvePersonaColorDef(block.botId, color).light : tokens.foreground,
         fontWeight: "500",
@@ -54,19 +54,19 @@ export function MessageMentions({
   mentions,
   colorOf,
   tokens,
-  onOpenBot,
+  onShowBot,
   children,
 }: {
   mentions: readonly ChildBotBlock[];
   colorOf: (botId: string) => string | undefined;
   tokens: ColorTokens;
-  onOpenBot: (botId: string, name: string) => void;
+  onShowBot: (botId: string, name: string) => void;
   children: ReactNode;
 }) {
   const render = (id: string) => {
     const block = mentions.find((mention) => mention.botId === id);
     return block ? (
-      <BotMention block={block} color={colorOf(id)} tokens={tokens} onOpenBot={onOpenBot} />
+      <BotMention block={block} color={colorOf(id)} tokens={tokens} onShowBot={onShowBot} />
     ) : undefined;
   };
   return (

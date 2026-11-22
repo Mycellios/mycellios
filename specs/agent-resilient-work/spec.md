@@ -1,7 +1,7 @@
 # Durable Mico work and native command recovery
 
 Integrated release candidate; deployment and installer promotion require their own receipts.
-OpenBot d3ec956 is a behavior reference, not imported code. Its current noncommercial
+The reference app d3ec956 is a behavior reference, not imported code. Its current noncommercial
 implementation is not vendored or relicensed into Mycellios.
 
 ## Ownership and lifecycle

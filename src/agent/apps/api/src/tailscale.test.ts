@@ -1,11 +1,11 @@
 import { createRouterClient } from "@orpc/server";
-import { TailnetService } from "@rakazo/adapters";
-import type { PrismaClient } from "@rakazo/db";
-import type * as Db from "@rakazo/db";
+import { TailnetService } from "@mycellios/adapters";
+import type { PrismaClient } from "@mycellios/db";
+import type * as Db from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { createRouter, type RouterDeps } from "./router.js";
 
-vi.mock("@rakazo/db", async original => ({ ...await original<typeof Db>(), recordSecurityEvent: vi.fn(async () => {}) }));
+vi.mock("@mycellios/db", async original => ({ ...await original<typeof Db>(), recordSecurityEvent: vi.fn(async () => {}) }));
 
 function setup() {
   const actor = { spaceId: "space-a", userId: "user-a", email: "synthetic@example.invalid", isDeploymentOwner: false };

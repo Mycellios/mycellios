@@ -19,7 +19,6 @@ Each public page below has a Markdown version linked beside it. Spanish guides a
 - [Compare AI agent apps | Mycellios](https://www.mycellios.com/compare): Compare Mycellios with other agent apps, with original guidance and current product sources. [Markdown](https://www.mycellios.com/compare.md).
 - [Mycellios Stats — network observations](https://www.mycellios.com/stats): Inspect observed node capacity, models, jobs and persisted history from Mycellios's public coordinator. [Markdown](https://www.mycellios.com/stats.md).
 - [Changelog & release notes | Mycellios](https://www.mycellios.com/changelog): Follow Mycellios Desktop and Agent updates, with dated release notes, improvements, fixes and links to the original publications. [Markdown](https://www.mycellios.com/changelog.md).
-- [Mycellios vs OpenBot](https://www.mycellios.com/compare/openbot): Compare agent workflows, deployment and costs. Original guidance with links to OpenBot's product sources. [Markdown](https://www.mycellios.com/compare/openbot.md).
 - [Mycellios vs Grok Bot](https://www.mycellios.com/compare/grok-bot): Compare agent workflows, deployment and costs. Original guidance with links to Grok Bot's product sources. [Markdown](https://www.mycellios.com/compare/grok-bot.md).
 - [Mycellios vs Hermes Agent](https://www.mycellios.com/compare/hermes-agent): Compare agent workflows, deployment and costs. Original guidance with links to Hermes Agent's product sources. [Markdown](https://www.mycellios.com/compare/hermes-agent.md).
 - [Mycellios vs Muse](https://www.mycellios.com/compare/muse): Compare agent workflows, deployment and costs. Original guidance with links to Muse's product sources. [Markdown](https://www.mycellios.com/compare/muse.md).
@@ -173,7 +172,6 @@ Compare how they run, what they connect to and how you pay. Start with your own 
 
 ## Links
 
-- [Mycellios vs OpenBot](https://www.mycellios.com/compare/openbot)
 - [Mycellios vs Grok Bot](https://www.mycellios.com/compare/grok-bot)
 - [Mycellios vs Hermes Agent](https://www.mycellios.com/compare/hermes-agent)
 - [Mycellios vs Muse](https://www.mycellios.com/compare/muse)
@@ -222,36 +220,6 @@ Browse new features, improvements and fixes, with original publication sources a
 - [Mycellios Journal](https://www.mycellios.com/blog)
 
 Source: https://www.mycellios.com/changelog
-
----
-
-# Mycellios vs OpenBot
-
-A local-first workspace for persistent AI teammates.
-
-Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
-
-## Where OpenBot fits
-
-OpenBot keeps agent workspaces and conversations across provider changes and supports agent collaboration.
-
-Its desktop app uses supported subscriptions, API keys or your own model server; mobile clients connect to your computer.
-
-You want a desktop-centered team of agents using existing model connections.
-
-## What to check before choosing
-
-Which provider plan covers your tasks, and where should your team server and computer tools run?
-
-Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
-
-## Links
-
-- [OpenBot: official product source](https://openbot.run/)
-- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
-- [All comparisons](https://www.mycellios.com/compare)
-
-Source: https://www.mycellios.com/compare/openbot
 
 ---
 
@@ -595,7 +563,6 @@ Compare model choice, deployment, permissions, total cost and the work you can e
 
 ## Links
 
-- [Mycellios vs OpenBot](https://www.mycellios.com/compare/openbot)
 - [Mycellios vs Grok Bot](https://www.mycellios.com/compare/grok-bot)
 - [Mycellios vs Hermes Agent](https://www.mycellios.com/compare/hermes-agent)
 - [Mycellios vs Muse](https://www.mycellios.com/compare/muse)

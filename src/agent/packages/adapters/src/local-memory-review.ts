@@ -1,9 +1,9 @@
 import {createHash,randomUUID} from "node:crypto";
-import type {AgentRunModel,JobPublisher,MemoryStore} from "@rakazo/adapter-kit";
-import {memoryReviewJob} from "@rakazo/adapter-kit";
-import {DEFAULT_MEMORY_REVIEW_POLICY,LocalMemoryReviewPolicy,type MessageBlock} from "@rakazo/contracts";
-import {blocksToAgentHistoryText,redactSecrets,readBoundedJsonResponse} from "@rakazo/core";
-import {Prisma,withTransactionRetry,type PrismaClient} from "@rakazo/db";
+import type {AgentRunModel,JobPublisher,MemoryStore} from "@mycellios/adapter-kit";
+import {memoryReviewJob} from "@mycellios/adapter-kit";
+import {DEFAULT_MEMORY_REVIEW_POLICY,LocalMemoryReviewPolicy,type MessageBlock} from "@mycellios/contracts";
+import {blocksToAgentHistoryText,redactSecrets,readBoundedJsonResponse} from "@mycellios/core";
+import {Prisma,withTransactionRetry,type PrismaClient} from "@mycellios/db";
 import {z} from "zod";
 
 export const REVIEW_IDLE_MS=15*60_000;
@@ -136,7 +136,7 @@ export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:stri
 
 /** A named system read only recovers queued intents; execution still enters the owner's tenant. */
 export async function reconcileLocalMemoryReviews(prisma:PrismaClient,jobs:JobPublisher){
- const {runAsSystem}=await import("@rakazo/db");
+ const {runAsSystem}=await import("@mycellios/db");
  const rows=await runAsSystem("recover durable local memory review intents",()=>prisma.localMemoryReview.findMany({where:{status:{in:["reserved","submitted","pending","ready"]},updatedAt:{lt:new Date(Date.now()-REVIEW_IDLE_MS)}},take:50,orderBy:{updatedAt:"asc"},select:{threadId:true}}));
  for(const row of rows)await jobs.enqueue(memoryReviewJob(row.threadId));
 }

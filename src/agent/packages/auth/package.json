@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/auth",
+  "name": "@mycellios/auth",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -17,11 +17,11 @@
   "dependencies": {
     "@better-auth/expo": "1.7.12",
     "@better-auth/passkey": "1.7.12",
-    "@rakazo/adapter-kit": "*",
-    "@rakazo/contracts": "*",
-    "@rakazo/core": "*",
-    "@rakazo/db": "*",
-    "@rakazo/ui-tokens": "*",
+    "@mycellios/adapter-kit": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/core": "*",
+    "@mycellios/db": "*",
+    "@mycellios/ui-tokens": "*",
     "better-auth": "1.7.12",
     "react": "19.2.3",
     "react-dom": "19.2.3",

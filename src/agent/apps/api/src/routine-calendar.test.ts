@@ -1,6 +1,6 @@
-import type { Actor, Routine } from "@rakazo/contracts";
-import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor, Routine } from "@mycellios/contracts";
+import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { plannedRoutineEntries, routineCalendar } from "./routine-calendar.js";
 

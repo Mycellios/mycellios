@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import type { ArtifactStore } from "@rakazo/adapter-kit";
-import type { Actor, ArtifactShare } from "@rakazo/contracts";
-import { IsolationError, type PrismaClient, sharedArtifactByToken } from "@rakazo/db";
+import type { ArtifactStore } from "@mycellios/adapter-kit";
+import type { Actor, ArtifactShare } from "@mycellios/contracts";
+import { IsolationError, type PrismaClient, sharedArtifactByToken } from "@mycellios/db";
 import { Hono } from "hono";
 
 /**

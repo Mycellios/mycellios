@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PrismaClient } from "@rakazo/db";
+import type { PrismaClient } from "@mycellios/db";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { mountDesktopWhatsApp, WHATSAPP_CLAIM_TIMEOUT_MS } from "./desktop-whatsapp.js";

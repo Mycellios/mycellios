@@ -1,6 +1,6 @@
-import type { JobPublisher, MessagingSurface, SecretStore } from "@rakazo/adapter-kit";
-import { productAppUrl } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { JobPublisher, MessagingSurface, SecretStore } from "@mycellios/adapter-kit";
+import { productAppUrl } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { InstalledMessagingSurface } from "./installed-messaging-surface.js";
 import { MessagingInstallations } from "./messaging-installations.js";
 import { SlackInstallProvider } from "./slack-install-provider.js";

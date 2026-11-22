@@ -1,4 +1,4 @@
-import type { UsageDashboard } from "@rakazo/contracts";
+import type { UsageDashboard } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import {
   chartSeries,

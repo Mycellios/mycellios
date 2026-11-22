@@ -59,6 +59,7 @@ test('installer publishing changes execute real signing, catalog and recovery bo
 test('documentation requires no dependency installation', () => {
   const plan = planChecks(['docs/DEVELOPMENT.md', 'AGENTS.md']);
   assert.ok(plan.some(c => c.label === 'CI policy tests'));
+  assert.ok(plan.some(c => c.label === 'private terms' && c.bin === 'node'));
   assert.ok(!plan.some(c => c.bin === 'npm'));
 });
 test('CSS and translations use the presentation-only fast route', () => {

@@ -1,4 +1,4 @@
-import type { TelegramBotCredentials } from "@rakazo/adapters";
+import type { TelegramBotCredentials } from "@mycellios/adapters";
 import { networkSpeechIdentityIds } from "./network-speech-placement.js";
 import {
   boatApiKeyFromEnv,
@@ -9,9 +9,9 @@ import {
   resolveSandboxProvider,
   secretStoreOptionsFromEnv,
   telegramBotsFromEnv,
-} from "@rakazo/adapters";
-import type { OidcConfig } from "@rakazo/auth";
-import type { MinimumClientBuilds } from "@rakazo/contracts";
+} from "@mycellios/adapters";
+import type { OidcConfig } from "@mycellios/auth";
+import type { MinimumClientBuilds } from "@mycellios/contracts";
 import {
   DEFAULT_MODEL_CONTEXT_WINDOW,
   DEFAULT_MODEL_MAX_TOKENS,
@@ -19,7 +19,7 @@ import {
   MAX_MODEL_CONTEXT_WINDOW,
   MAX_MODEL_MAX_TOKENS,
   parseMinimumClientBuilds,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   phoneCallSettings,
   resolveAuthSecret,
@@ -28,10 +28,10 @@ import {
   resolveScreenProxySecret,
   resolveSupervisorToken,
   uploadSizeFromEnv,
-} from "@rakazo/core";
-import { monitoringPseudonymSecret } from "@rakazo/logging";
+} from "@mycellios/core";
+import { monitoringPseudonymSecret } from "@mycellios/logging";
 
-export { resolveCloudAgentProvider, resolveSandboxProvider } from "@rakazo/adapters";
+export { resolveCloudAgentProvider, resolveSandboxProvider } from "@mycellios/adapters";
 
 export interface AppEnv {
   /** Optional composition-root policy; ordinary deployments keep the auth default. */

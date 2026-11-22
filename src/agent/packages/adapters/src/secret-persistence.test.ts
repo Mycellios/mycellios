@@ -1,8 +1,8 @@
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { AdapterContext } from "@rakazo/adapter-kit";
-import { BOT_SECRET_VALUE_MAX_LENGTH } from "@rakazo/contracts";
-import type { Prisma, PrismaClient } from "@rakazo/db";
-import { withTransactionRetry } from "@rakazo/db";
+import type { AdapterContext } from "@mycellios/adapter-kit";
+import { BOT_SECRET_VALUE_MAX_LENGTH } from "@mycellios/contracts";
+import type { Prisma, PrismaClient } from "@mycellios/db";
+import { withTransactionRetry } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { InfisicalSecretStore } from "./infisical-secret-store.js";
 import { McpConnector } from "./mcp-connector.js";

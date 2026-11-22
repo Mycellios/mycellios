@@ -1,6 +1,6 @@
 import { RPCHandler } from "@orpc/server/fetch";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { createRouter, type RouterDeps } from "./router.js";
 
@@ -279,7 +279,7 @@ function messagingDeps(
   const actor = {
     spaceId: "ws-1",
     userId: "user-1",
-    email: "user@rakazo.test",
+    email: "user@mycellios.test",
     isDeploymentOwner: false,
   } satisfies Actor;
   return {

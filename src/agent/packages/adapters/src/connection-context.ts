@@ -1,4 +1,4 @@
-import type { AdapterContext } from "@rakazo/adapter-kit";
+import type { AdapterContext } from "@mycellios/adapter-kit";
 
 export function selectRunConnections<
   T extends { connectorId: string; provider: string; status: string },

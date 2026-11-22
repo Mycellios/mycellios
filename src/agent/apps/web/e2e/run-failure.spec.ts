@@ -25,7 +25,7 @@ function seenRunErrorCount(page: Page) {
 
 test("a failed run is visible once without returning after reload", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `run-failure-${stamp}@rakazo.test`, "password12", "Run Failure");
+  await signup(page, `run-failure-${stamp}@mycellios.test`, "password12", "Run Failure");
   await completeOnboarding(page);
 
   // "fail this run" makes the scripted runtime throw, so the run fails the same way a
@@ -70,7 +70,7 @@ test("a failed run is visible once without returning after reload", async ({ pag
 
 test("a covered run error is not remembered until it is presented", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `covered-run-failure-${stamp}@rakazo.test`, "password12", "Covered Failure");
+  await signup(page, `covered-run-failure-${stamp}@mycellios.test`, "password12", "Covered Failure");
   await completeOnboarding(page);
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -140,7 +140,7 @@ test("a covered run error is not remembered until it is presented", async ({ pag
 });
 
 test("an overloaded provider is named instead of a generic error", async ({ page }, testInfo) => {
-  await signup(page, `overloaded-run-${Date.now()}@rakazo.test`, "password12", "Overloaded Run");
+  await signup(page, `overloaded-run-${Date.now()}@mycellios.test`, "password12", "Overloaded Run");
   await completeOnboarding(page);
 
   await page.getByPlaceholder(/^Message /).fill("fail this run as overloaded");
@@ -159,7 +159,7 @@ test("an overloaded provider is named instead of a generic error", async ({ page
 test("a model too small for required instructions offers a model change", async ({
   page,
 }, testInfo) => {
-  await signup(page, `context-run-${Date.now()}@rakazo.test`, "password12", "Context Run");
+  await signup(page, `context-run-${Date.now()}@mycellios.test`, "password12", "Context Run");
   await completeOnboarding(page);
   await page.getByPlaceholder(/^Message /).fill("fail this run with fixed context");
   await page.getByRole("button", { name: "Send" }).click();
@@ -175,7 +175,7 @@ test("a model too small for required instructions offers a model change", async 
 });
 
 test("a provider out of credits offers another model", async ({ page }, testInfo) => {
-  await signup(page, `credits-run-${Date.now()}@rakazo.test`, "password12", "Credits Run");
+  await signup(page, `credits-run-${Date.now()}@mycellios.test`, "password12", "Credits Run");
   await completeOnboarding(page);
   await page.getByPlaceholder(/^Message /).fill("fail this run out of credits");
   await page.getByRole("button", { name: "Send" }).click();
@@ -193,7 +193,7 @@ test("a provider out of credits offers another model", async ({ page }, testInfo
 });
 
 test("a rejected key opens the model connections", async ({ page }, testInfo) => {
-  await signup(page, `rejected-key-${Date.now()}@rakazo.test`, "password12", "Rejected Key");
+  await signup(page, `rejected-key-${Date.now()}@mycellios.test`, "password12", "Rejected Key");
   await completeOnboarding(page);
   await page.getByPlaceholder(/^Message /).fill("fail this run with a rejected key");
   await page.getByRole("button", { name: "Send" }).click();
@@ -211,7 +211,7 @@ test("a rejected key opens the model connections", async ({ page }, testInfo) =>
 });
 
 test("an approved action the model did not run says so", async ({ page }, testInfo) => {
-  await signup(page, `unrun-approval-${Date.now()}@rakazo.test`, "password12", "Unrun Approval");
+  await signup(page, `unrun-approval-${Date.now()}@mycellios.test`, "password12", "Unrun Approval");
   await completeOnboarding(page);
   await page.getByPlaceholder(/^Message /).fill("fail this run with an unrun approval");
   await page.getByRole("button", { name: "Send" }).click();
@@ -225,7 +225,7 @@ test("an approved action the model did not run says so", async ({ page }, testIn
 });
 
 test("a failed run explains that backup models also failed", async ({ page }, testInfo) => {
-  await signup(page, `backup-failure-${Date.now()}@rakazo.test`, "password12", "Backup Failure");
+  await signup(page, `backup-failure-${Date.now()}@mycellios.test`, "password12", "Backup Failure");
   await completeOnboarding(page);
   await page.getByPlaceholder(/^Message /).fill("fail this run with exhausted backups");
   await page.getByRole("button", { name: "Send" }).click();
@@ -241,7 +241,7 @@ test("a failed run explains that backup models also failed", async ({ page }, te
 });
 
 test("an unreachable provider is named instead of a generic error", async ({ page }, testInfo) => {
-  await signup(page, `unreachable-${Date.now()}@rakazo.test`, "password12", "Unreachable");
+  await signup(page, `unreachable-${Date.now()}@mycellios.test`, "password12", "Unreachable");
   await completeOnboarding(page);
   await page.getByPlaceholder(/^Message /).fill("fail this run with an unreachable provider");
   await page.getByRole("button", { name: "Send" }).click();

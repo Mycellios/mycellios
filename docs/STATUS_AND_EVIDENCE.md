@@ -349,9 +349,9 @@ retained for rollback. No live model latency or installed Desktop acceptance is
 claimed by this delivery.
 
 The review compared [Rakazo conversation synchronization](https://github.com/elie222/rakazo/tree/v0.9.0/apps/web/src/pages/shell)
-and [OpenBot conversation UI](https://github.com/nightly-labs/openbot/tree/v0.67.1/packages/ui/src/features/conversation).
+and the reference app's conversation UI.
 The implementation uses existing Mycellios components without a new dependency,
-copied OpenBot implementation or an artificial typewriter backlog. See
+copied reference app implementation or an artificial typewriter backlog. See
 `specs/chat-fluidity/spec.md` and `scripts/verify-chat-fluidity.mjs` in the Agent workspace.
 
 ## Connector and approval hardening — upstream review, 2026-11-11
@@ -376,9 +376,9 @@ schemas. They do not qualify a live provider login or installed Desktop update.
 Remote typing, integration and publication need their own exact-revision evidence;
 full suites remain paused. These independently implemented changes were selected
 after reviewing [Rakazo 0.9.0](https://github.com/elie222/rakazo/releases/tag/v0.9.0)
-and [OpenBot 0.67.1](https://github.com/nightly-labs/openbot/releases/tag/v0.67.1).
+and the reference app (0.67.1).
 Existing ZIP import already accepts missing Unix file types while rejecting links
-and devices; no OpenBot implementation was copied.
+and devices; no reference app implementation was copied.
 
 Publication is independently recorded for main
 `02daa6c03690843fd519f47e9b62e6e8d1f689e7` (PR #222), source tree
@@ -699,11 +699,11 @@ it does not silently load the primary chat. Real phone and installed-app validat
 have not run. Native executable discovery and safe provider refusal classification
 have focused local tests; missing provider usage remains unknown.
 
-The OpenBot v0.61.0 review covers all 119 supplied changelog entries against main
+The reference app v0.61.0 review covers all 119 supplied changelog entries against main
 `dd91e477`. The baseline comparison found 14 present, 55 partial, 17 absent, 21
 not applicable and 12 in other work in progress. Those counts do not include this
-uncommitted candidate and do not mean complete OpenBot parity. Workflows and live
-voice work owned by other agents were preserved. OpenBot's PolyForm Noncommercial
+uncommitted candidate and do not mean complete reference app parity. Workflows and live
+voice work owned by other agents were preserved. The reference app's PolyForm Noncommercial
 source was read as reference; this candidate contains independent implementations.
 No new candidate, migration or installer has been published or deployed.
 
@@ -744,7 +744,7 @@ disconnect does not relaunch the command. Recorded results can be read after rec
 host restart; a crashed host without an exit leaves an unknown outcome, never success.
 Windows execution retains owned Job Objects, explicit cancellation and bounded deadlines.
 This does not promise process survival through a PC reboot or automatic resolution of
-every uncertain external effect. OpenBot d3ec956 is a behavior reference, not imported code.
+every uncertain external effect. The reference app d3ec956 is a behavior reference, not imported code.
 
 Local qualification: 518 focused tests in 25 files pass; Prisma generation, incremental
 adapter/API/worker typechecks and real API/worker/Desktop bundles pass. Synthetic local
@@ -1867,7 +1867,7 @@ was changed by this candidate. The earlier installed Play/Stop build is unchange
   new technical prompt, narration or final response. The prior historical prompt
   remains. Sidebar preview text stayed conversational; its timestamp advanced.
 - This checkout still cannot start: incompatible linked dependencies fail Vite's
-  `@rakazo/core/screen-reconnect` resolution. The agent correctly left configuration
+  `@mycellios/core/screen-reconnect` resolution. The agent correctly left configuration
   unprepared and reported the reason in folded Browser logs. This is a verified
   quiet preparation flow, not a claim of service readiness. Stable app remains
   open; no unrelated listeners were stopped and no external browser was opened.
@@ -2015,7 +2015,7 @@ the recorded local reliability patches. This does not imply those patches were
 committed, pushed or merged.
 
 An earlier SDK observation paused advertising with a Base mainnet balance of
-0.000038496637378844 ETH, below its 0.00005 ETH floor. Daniel subsequently funded
+0.000038496637378844 ETH, below its 0.00005 ETH floor. The operator subsequently funded
 the wallet. Jarvis's recovery evidence at 18:43 UTC records the SDK reporting
 0.002168874558129165 ETH and advertising resumed. The previous funding request
 is obsolete; no additional transfer is requested. This intervention performed
@@ -2144,7 +2144,7 @@ Marketplace and continuous-voice entry remain separate capability-gated work.
 The original development checkout and its unrelated changes were preserved.
 
 Incremental web typing and 249 focused tests passed on the integrated source on
-Daniel's PC. The constrained compiler also passed those checks and built web
+the maintainer's PC. The constrained compiler also passed those checks and built web
 `20261105033045`. Its sealed artifact SHA256 is
 `db33e917ff2f60807a09c0b7840e58cb0871a124f8ead3cdbc88118fd1a1ab7b`.
 The previous canonical settings browser scenario passed, but the integrated
@@ -2175,7 +2175,7 @@ Versions are immutable, project versions remain pinned, actions are declared
 contracts and both execution targets require independent future qualification.
 
 The 51 affected tests, three scoped authoring checks and an incremental typecheck of the Apps contracts, public
-exports, CLI and tests passed on Daniel's PC in an isolated checkout. Tests cover
+exports, CLI and tests passed on the maintainer's PC in an isolated checkout. Tests cover
 unsafe definitions, cycles, typed references, altered assets, path traversal,
 symlink escape, bounded reads and immutable-version CLI behavior. The broader
 contracts check encountered its existing credit-units.test.ts extension error;
@@ -2214,7 +2214,7 @@ and did not access production. Full suites, authenticated provider execution,
 installer packaging and production promotion were NOT RUN for this change.
 The changes are local on `codex/mico-workflow-concurrency-20261105`, based on
 main `6420234`; no commit, push, shared migration or deployment is implied.
-Evidence is retained in `outputs/mico-workflows-acceptance-20261105/` in Daniel's
+Evidence is retained in `outputs/mico-workflows-acceptance-20261105/` in the maintainer's
 workspace. Other agents' original checkouts and changes were retained.
 
 
@@ -2344,7 +2344,7 @@ not run or claimed; the demo remains synthesized media.
 
 The notification candidate is isolated on feat/native-push-20261112, based on main e3984781c622b9959f56c5037b9b161047c1addb. No release, production migration, installer update or mobile distribution has been performed. The earlier offline results below predate the new native Android transport and do not qualify that candidate.
 
-- Reviewed nightly-labs/openbot at cf722a157dccbaa8ba18e0f49444eb07ce7e92d0: native desktop retention/clicks and OS settings, account/agent levels, APNs/FCM mobile registrations and foreground policy. Mycellios reuses its existing Electron, Web Push and Expo adapters; this is not a claim of identical sealed mobile transport or cross-device delivery acknowledgement.
+- Reviewed the reference app at cf722a157dccbaa8ba18e0f49444eb07ce7e92d0: native desktop retention/clicks and OS settings, account/agent levels, APNs/FCM mobile registrations and foreground policy. Mycellios reuses its existing Electron, Web Push and Expo adapters; this is not a claim of identical sealed mobile transport or cross-device delivery acknowledgement.
 - Added bounded native-main Desktop delivery, internal-chat click validation, account/window cleanup, fixed OS settings links and the stable Windows installer identity. Older Desktop builds keep browser delivery. Native binaries were not rebuilt or physically qualified.
 - Web enrollment now checks the real subscription and VAPID identity, reconciles periodically, falls back to local delivery after failures, rotates unowned subscriptions and supplies expected account identity. Account filtering and preview privacy now apply to native mobile as well as Web Push.
 - The additive mobile_push_devices migration preserves legacy rows and supports up to 20 encrypted mobile registrations per account. Unsubscribe revokes only the current session. API and worker must be released together. The developer database has not been migrated or restarted for this task.
@@ -2354,7 +2354,7 @@ The notification candidate is isolated on feat/native-push-20261112, based on ma
 - The local browser shows the new Spanish notification settings and accepted a synthetic test request; that is not proof of an OS banner or phone delivery. Local VAPID background push is not configured. No phone was connected through ADB. macOS/Linux/iOS/Android physical delivery remains unverified.
 - The candidate adds direct Firebase HTTP v1/data-only push to the distributable Android WebView host, separate from Expo. Native account/epoch checks, fixed-origin session registration, background Application initialization, session renewal, OS permission/settings, persistent deduplication and internal chat destinations are implemented. New FCM tokens never enter legacy Expo rows or the renderer bridge. Added OAuth/transport, account/project admission, database transport ownership and plain-Java payload/navigation tests are pending execution. Firebase provisioning, production secrets, migration, durable signing and actual delivery are separate release gates.
 
-Evidence: outputs/notifications-openbot in the task workspace. No subscription endpoints, bearer tokens or notification content were logged as evidence.
+Evidence: outputs/notifications-reference in the task workspace. No subscription endpoints, bearer tokens or notification content were logged as evidence.
 
 ## Local Desktop approval continuation qualification
 
@@ -2601,7 +2601,7 @@ layout continuity, authenticated notification reads and adding/removing a loopba
 connection without opening it. Authoritative wallet balance remained unchanged.
 The design detector returned no findings for the reviewed components.
 
-These controls do not implement OpenBot's complete shared server administration.
+These controls do not implement the reference app's complete shared server administration.
 Vault, server members/roles, administrative audit, shared identity/defaults,
 transfer, browser profiles and hosted-server lifecycle need their own authorized
 backend and product scope. Existing account/Space tools are not relabelled as
@@ -2701,7 +2701,7 @@ remain manual-install releases; ad-hoc Mac integrity is not notarization.
 
 ## Concise conversational replies — 2026-11-17 (not deployed)
 
-Reviewed OpenBot's current `src/backend/agent/developer-instructions.ts`: result
+Reviewed the reference app's current `src/backend/agent/developer-instructions.ts`: result
 first, brief default, internal coordination kept out of ordinary user replies.
 Mycellios already had short-answer guidance but left a recognized style block
 buried in the instruction body. The shared native/Pi preparation now refreshes
@@ -2714,5 +2714,5 @@ post-generation rewrite was added.
 
 Remote validation passed: 10 style/Mico preference tests, 37 native/append-only
 runtime tests and incremental adapter types. These are synthetic regressions;
-no real DeepSeek/OpenBot output comparison or paid model call was run. Full
+no real DeepSeek/reference app output comparison or paid model call was run. Full
 suites and deployment were not run. Existing referral changes remain preserved.

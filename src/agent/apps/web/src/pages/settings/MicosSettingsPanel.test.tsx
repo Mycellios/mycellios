@@ -2,7 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray, ...v: unknown[]) => s.reduce((out, part, i) => out + part + (v[i] ?? ""), "") }) }));
 vi.mock("./DeviceVoiceSettings", () => ({ DeviceVoiceSettings: () => null }));
 vi.mock("./MobileSessions", () => ({ MobileSessions: () => null }));
@@ -10,8 +10,8 @@ vi.mock("../../components/ServerLinkCode", () => ({ ServerLinkCode: () => null }
 vi.mock("../../components/MobileInstallOffer", () => ({ MobileInstallOffer: () => null, mobileInstallUrl: () => "" }));
 vi.mock("./MicoBehaviorSettings", () => ({ MicoBehaviorSettings: () => null }));
 vi.mock("../SkillLibrarySettings", () => ({ SkillLibrarySettings: () => null }));
-vi.mock("@rakazo/ui-web/components/ui/disclosure", () => ({ Disclosure: ({ summary, children, alwaysVisible }: { summary: string; children: ReactNode; alwaysVisible?: boolean }) => alwaysVisible ? <section><h3>{summary}</h3>{children}</section> : <details><summary>{summary}</summary>{children}</details> }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web/components/ui/disclosure", () => ({ Disclosure: ({ summary, children, alwaysVisible }: { summary: string; children: ReactNode; alwaysVisible?: boolean }) => alwaysVisible ? <section><h3>{summary}</h3>{children}</section> : <details><summary>{summary}</summary>{children}</details> }));
+vi.mock("@mycellios/ui-web", () => ({
   BotAvatar: () => <span />,
   Input: (p: React.ComponentProps<"input">) => <input {...p} />,
   Button: ({ variant: _v, size: _s, ...p }: React.ComponentProps<"button"> & { variant?: string; size?: string }) => <button {...p} />,

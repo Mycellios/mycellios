@@ -1,7 +1,7 @@
-import type { Artifact, ArtifactWithContent, Bot, AppCoverWrite } from "@rakazo/contracts";
-import { APP_COVER_MAX_BYTES } from "@rakazo/contracts";
+import type { Artifact, ArtifactWithContent, Bot, AppCoverWrite } from "@mycellios/contracts";
+import { APP_COVER_MAX_BYTES } from "@mycellios/contracts";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, NativeSelect,
-  NativeSelectOption, Textarea, Tabs, TabsList, TabsTrigger, TabsContent } from "@rakazo/ui-web";
+  NativeSelectOption, Textarea, Tabs, TabsList, TabsTrigger, TabsContent } from "@mycellios/ui-web";
 import { Sparkles, Upload } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";

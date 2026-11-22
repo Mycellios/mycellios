@@ -1,5 +1,5 @@
-import type { Bot } from "@rakazo/contracts";
-import { agentImportErrorReason } from "@rakazo/contracts";
+import type { Bot } from "@mycellios/contracts";
+import { agentImportErrorReason } from "@mycellios/contracts";
 
 type FirstBot = { id: string };
 type ImportCreateRequest = { spawnKey?: string } & Record<string, unknown>;

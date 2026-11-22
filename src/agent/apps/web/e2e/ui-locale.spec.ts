@@ -5,7 +5,7 @@ test("account settings language picker includes Hebrew and mirrors the UI right-
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `ui-locale-he-${stamp}@rakazo.test`, "password12", "Locale QA");
+  await signup(page, `ui-locale-he-${stamp}@mycellios.test`, "password12", "Locale QA");
   await completeOnboarding(page, testInfo);
 
   const settings = await openUserSettings(page);

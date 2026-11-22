@@ -779,7 +779,7 @@ function injectNovncStorageShim(html, { viewOnly = false } = {}) {
     } catch {}
   });
   let last = "";
-  // Pages that never set noVNC's classes (older Rakazo embed images) still build their viewer
+  // Pages that never set noVNC's classes (older Mycellios embed images) still build their viewer
   // canvas, which is as far as they can be followed.
   let classed = false;
   const sync = () => {
@@ -1083,7 +1083,7 @@ function rakazoPwa(buildId, base = "/") {
       buildStart() {
         this.emitFile({
           type: "chunk",
-          id: fileURLToPath(new URL("./sw.ts", "file:///C:/Users/Daniel/Documents/GPU%20Distribuida/outputs/mycellios-agent-canonical-20261029/src/agent/apps/web/src/pwa/plugin.ts")),
+          id: fileURLToPath(new URL("./src/pwa/sw.ts", import.meta.url)),
           fileName: SERVICE_WORKER_FILE
         });
       },

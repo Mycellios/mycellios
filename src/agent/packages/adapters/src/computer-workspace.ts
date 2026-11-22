@@ -8,12 +8,12 @@ import type {
   PortableFile,
   SandboxProvider,
   WorkspaceDirectoryRequest,
-} from "@rakazo/adapter-kit";
-import type { ComputerMode } from "@rakazo/contracts";
-import { parseScreenLeaseId } from "@rakazo/core";
-import { browserProfilePathForScreen } from "@rakazo/core/node/desktop-runtime";
-import type { PrismaClient } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import type { ComputerMode } from "@mycellios/contracts";
+import { parseScreenLeaseId } from "@mycellios/core";
+import { browserProfilePathForScreen } from "@mycellios/core/node/desktop-runtime";
+import type { PrismaClient } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { isWorkspaceTransferExcluded } from "./workspace-transfer.js";
 import { normalizeWorkspacePath, teamBotWorkspaceDirectory } from "./computer-support.js";
 import { LocalAgentHomeStore } from "./home.js";

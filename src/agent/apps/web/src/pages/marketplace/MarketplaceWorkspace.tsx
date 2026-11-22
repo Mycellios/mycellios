@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { useId, useState } from "react";
 import {
   Blocks,
@@ -35,7 +35,7 @@ export function MarketplaceWorkspace(props: {
   onMcp: () => void;
   onWhatsAppLink?: () => void;
   onCreated: (bot: Bot) => void;
-  onOpenBot: (id: string) => void;
+  onShowBot: (id: string) => void;
   onBotsChanged: () => Promise<void>;
   onCreateBot: () => void;
   onOpenStudio?: () => void;
@@ -127,7 +127,7 @@ export function MarketplaceWorkspace(props: {
               bots={props.bots}
               activeBotId={props.activeBotId}
               onOpenStudio={props.onOpenStudio}
-              onOpenBot={props.onOpenBot}
+              onShowBot={props.onShowBot}
               onCreateBot={props.onCreateBot}
             />
           ) : props.tab === "apps" ? (
@@ -143,7 +143,7 @@ export function MarketplaceWorkspace(props: {
               bots={props.bots}
               scope={props.scope}
               onCreated={props.onCreated}
-              onOpen={props.onOpenBot}
+              onOpen={props.onShowBot}
               onChanged={props.onBotsChanged}
               onCreate={props.onCreateBot}
             />

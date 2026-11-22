@@ -1,4 +1,4 @@
-import { shellQuote } from "@rakazo/core/node/desktop-runtime";
+import { shellQuote } from "@mycellios/core/node/desktop-runtime";
 
 // Runs inside the existing computer/run marker wrapper. The child inherits that
 // marker, so ordinary Stop/revocation still finds it, including across sessions.

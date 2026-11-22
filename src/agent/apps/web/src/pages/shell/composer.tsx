@@ -3,8 +3,8 @@ import { NewChatControl } from "../../components/composer/NewChatControl";
 import { isAndroidHost } from "../../lib/android-host";
 import { useSpaceRpc, useBoundTaskThreadScope } from "../../lib/space-rpc";
 import { useLingui } from "@lingui/react/macro";
-import { ATTACHMENT_MAX_COUNT, isAttachmentAudioMimeType, type AgentSkillCatalogEntry, type ThreadMessage } from "@rakazo/contracts";
-import type { AgentImportReader, ComposerMention, SlashActionId } from "@rakazo/core";
+import { ATTACHMENT_MAX_COUNT, isAttachmentAudioMimeType, type AgentSkillCatalogEntry, type ThreadMessage } from "@mycellios/contracts";
+import type { AgentImportReader, ComposerMention, SlashActionId } from "@mycellios/core";
 import {
   clampMentionHighlightIndex,
   mentionChipKey,
@@ -13,9 +13,9 @@ import {
   SLASH_ACTIONS,
   serializeComposerPrompt,
   truncateSlashDescription,
-} from "@rakazo/core";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
-import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
+} from "@mycellios/core";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@mycellios/ui-web";
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
 import { ArrowUp, AudioLines, Box, File as FileIcon, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, Trash2, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";

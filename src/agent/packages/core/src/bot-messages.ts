@@ -2,7 +2,7 @@ import {
   BOT_DESCRIPTION_MAX_LENGTH,
   type BotMessageIntent,
   type MessageBlock,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { escapePromptData } from "./prompt-data.js";
 
 export const BOT_MESSAGE_MAX_LENGTH = 8_000;
@@ -174,7 +174,7 @@ export const DELEGATED_RESULT_FORMAT =
  * higher-priority instructions.
  *
  * Delegated work answers in a fixed short form and the requester retells only the outcome, the
- * behavior OpenBot uses between teammates (a behavior reference only; this wording is our own).
+ * behavior the reference app uses between teammates (a behavior reference only; this wording is our own).
  */
 export function buildBotMessageWakePrompt(args: {
   from: BotAddress;

@@ -39,7 +39,7 @@ describe("worker view of a request", () => {
     model: "distributed-small",
     messages: [
       { role: "system", content: "Be brief." },
-      { role: "user", content: "hello", name: "Daniel" },
+      { role: "user", content: "hello", name: "Alex" },
     ],
     session_id: "support-conversation-1234",
     preferred_region: "es-mad",
@@ -60,7 +60,7 @@ describe("worker view of a request", () => {
     ]);
     expect(view.seed).toBe(42);
     expect(view.temperature).toBe(0.2);
-    expect(request.messages[1]).toHaveProperty("name", "Daniel");
+    expect(request.messages[1]).toHaveProperty("name", "Alex");
     expect(request.privacy).toBeDefined();
   });
 
@@ -108,7 +108,7 @@ describe("lease offers carry only the worker view", () => {
     service = await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 30_000);
     const handle = await service.submit({
       model: "distributed-small",
-      messages: [{ role: "user", content: "private note", name: "Daniel" }],
+      messages: [{ role: "user", content: "private note", name: "Alex" }],
       session_id: "conversation-of-account-42",
       privacy: { trust: "trusted-only", boundary: "trusted-edges" },
     });
@@ -117,7 +117,7 @@ describe("lease offers carry only the worker view", () => {
       const payload = offer!.payload as JobPayload;
       const serialized = JSON.stringify(payload);
       expect(serialized).not.toContain("conversation-of-account-42");
-      expect(serialized).not.toContain("Daniel");
+      expect(serialized).not.toContain("Alex");
       expect(payload.request).not.toHaveProperty("privacy");
       expect(payload.request.session_id).toMatch(/^s_/);
       expect(payload.request.messages).toEqual([{ role: "user", content: "private note" }]);

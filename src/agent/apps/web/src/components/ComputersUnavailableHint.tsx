@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Spinner } from "@rakazo/ui-web";
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
+import { Button, Spinner } from "@mycellios/ui-web";
+import { Disclosure } from "@mycellios/ui-web/components/ui/disclosure";
 import { useEffect, useRef, useState } from "react";
 import type { SandboxAvailabilityPhase } from "../lib/computer-sandbox";
 import {

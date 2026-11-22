@@ -1,13 +1,13 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
-import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import type { AppendEventInput, Prisma } from "@rakazo/db";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
+import type { AgentRunRequest, AgentRuntimeEvent } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import type { AppendEventInput, Prisma } from "@mycellios/db";
 import {
   appendEventInTransaction,
   createThreadMessageInTransaction,
   partialReplyClientNonce,
   RunHistoryWriteError,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
 import { PARTIAL_REPLY_NOTE } from "./automated-messages.js";
 import { loadBotMessageContext, returnBotMessageOutcome } from "./bot-messages.js";
@@ -944,8 +944,8 @@ describe("long user work publishes visible progress before finishing", () => {
 
 // These executor fixtures isolate post-admission behavior. Real concurrent SQL
 // admission is exercised by scripts/verify-workspace-sync-db.ts.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

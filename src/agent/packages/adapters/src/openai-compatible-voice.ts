@@ -8,12 +8,12 @@ import type {
   VoiceSynthesizeRequest,
   VoiceTranscribeRequest,
   VoiceVerifyResult,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   DEFAULT_COMPATIBLE_STT_MODEL,
   DEFAULT_COMPATIBLE_TTS_MODEL,
   OPENAI_COMPATIBLE_PROVIDER_ID,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   assertAllowedOpenAiCompatibleUrl,
   assertHttpsForKeyedOpenAiCompatibleUrl,

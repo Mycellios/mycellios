@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import type { AdapterContext, SandboxProvider } from "@rakazo/adapter-kit";
-import { computerControlExpireJobKey } from "@rakazo/adapter-kit";
-import type { ComputerExecutionLease } from "@rakazo/adapters";
+import type { AdapterContext, SandboxProvider } from "@mycellios/adapter-kit";
+import { computerControlExpireJobKey } from "@mycellios/adapter-kit";
+import type { ComputerExecutionLease } from "@mycellios/adapters";
 import {
   acquireComputerExecutionLease,
   applyTeachingDesktopInput,
@@ -34,18 +34,18 @@ import {
   takeoverLeaseMs,
   toComputerRef,
   touchRunningComputer,
-} from "@rakazo/adapters";
-import type { Actor, ComputerReleaseReason, ComputerStatus } from "@rakazo/contracts";
+} from "@mycellios/adapters";
+import type { Actor, ComputerReleaseReason, ComputerStatus } from "@mycellios/contracts";
 import {
   attachmentMaxBytes,
   attachmentSizeLabel,
   ComputerCommandSchema,
   foldComputerCommands,
-} from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
-import type { ComputerRunEnd, PrismaClient } from "@rakazo/db";
-import { createRepos, IsolationError, parseComputerMode, recordComputerRunEnd } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
+import type { ComputerRunEnd, PrismaClient } from "@mycellios/db";
+import { createRepos, IsolationError, parseComputerMode, recordComputerRunEnd } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import {
   executionBlocksUserTakeover,
   resolveBusyBotName,

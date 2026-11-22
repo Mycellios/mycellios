@@ -1,4 +1,4 @@
-import type { SearchHit } from "@rakazo/contracts";
+import type { SearchHit } from "@mycellios/contracts";
 import { useEffect, useState } from "react";
 import { querySpaceSearch } from "./search";
 

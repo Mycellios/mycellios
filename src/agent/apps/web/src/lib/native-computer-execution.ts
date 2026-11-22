@@ -1,4 +1,4 @@
-import type { RakazoDesktop } from "@rakazo/contracts";
+import type { RakazoDesktop } from "@mycellios/contracts";
 
 type Computer = NonNullable<RakazoDesktop["computer"]>;
 type Fetch = typeof globalThis.fetch;

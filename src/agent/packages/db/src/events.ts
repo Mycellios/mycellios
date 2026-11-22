@@ -1,5 +1,5 @@
-import type { ProductAnalytics, RealtimeFanout } from "@rakazo/adapter-kit";
-import type { BotSecretDestination, MessageBlock, ProductEvent } from "@rakazo/contracts";
+import type { ProductAnalytics, RealtimeFanout } from "@mycellios/adapter-kit";
+import type { BotSecretDestination, MessageBlock, ProductEvent } from "@mycellios/contracts";
 import {
   AnalyticsTrigger,
   BOT_INSTRUCTIONS_MAX_LENGTH,
@@ -7,7 +7,7 @@ import {
   encodeLoginSecret,
   LoginSecretValue,
   MessageBlock as MessageBlockSchema,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
   blocksToAgentHistoryText,
@@ -25,10 +25,10 @@ import {
   resolveAskChoice,
   STEERING_CONTINUATION_PROMPT,
   sanitizeJsonValue,
-} from "@rakazo/core";
-import { isSiteFetchTool, urlSite } from "@rakazo/core/egress";
-import { approvalEffectKey } from "@rakazo/core/node/approval-effect-key";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/core";
+import { isSiteFetchTool, urlSite } from "@mycellios/core/egress";
+import { approvalEffectKey } from "@mycellios/core/node/approval-effect-key";
+import { getLogger } from "@mycellios/logging";
 import { saveApprovalRule } from "./approval-settings.js";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import { Prisma, type PrismaClient } from "./client.js";

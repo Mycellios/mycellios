@@ -6,8 +6,8 @@ import type {
   Routine,
   RoutineWatch,
   RoutineWatchInput,
-} from "@rakazo/contracts";
-import { ROUTINE_WATCH_DEFAULT_MINUTES, ROUTINE_WATCH_MIN_MINUTES } from "@rakazo/contracts";
+} from "@mycellios/contracts";
+import { ROUTINE_WATCH_DEFAULT_MINUTES, ROUTINE_WATCH_MIN_MINUTES } from "@mycellios/contracts";
 import {
   type CronFreq,
   type CronPreset,
@@ -17,7 +17,7 @@ import {
   formatCron,
   isOneShotRoutineCrons,
   presetFromCron,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   Button,
   DropdownMenu,
@@ -35,7 +35,7 @@ import {
   PopoverTrigger,
   Switch,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   ChevronLeft,
   Clock,

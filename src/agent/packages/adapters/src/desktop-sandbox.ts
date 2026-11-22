@@ -29,8 +29,8 @@ import type {
   ScreenRequest,
   ScreenSession,
   WorkspaceDirectoryRequest,
-} from "@rakazo/adapter-kit";
-import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
+} from "@mycellios/adapter-kit";
+import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { SearchProgressClock } from "./search-progress.js";
 import {
   applyPlaceholderAction,

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it } from "vitest";
-import type { AdapterContext } from "@rakazo/adapter-kit";
+import type { AdapterContext } from "@mycellios/adapter-kit";
 import { DesktopRelayBroker } from "../../../packages/adapters/src/desktop-relay.js";
 import { HostComputerSandbox } from "../../../packages/adapters/src/host-computer-sandbox.js";
 import { startHostComputerServer } from "../../../packages/adapters/src/host-computer-server.js";

@@ -1,9 +1,9 @@
-import { VoiceAccountError } from "@rakazo/adapter-kit";
-import * as adapters from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import * as db from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+import { VoiceAccountError } from "@mycellios/adapter-kit";
+import * as adapters from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import * as db from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { Hono } from "hono";
 import { ORPCError } from "@orpc/server";
 import { afterEach, describe, expect, it, vi } from "vitest";

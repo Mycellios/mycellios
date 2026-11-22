@@ -1,4 +1,4 @@
-import { productAppUrl } from "@rakazo/contracts";
+import { productAppUrl } from "@mycellios/contracts";
 
 export type NotificationRoute =
   | {

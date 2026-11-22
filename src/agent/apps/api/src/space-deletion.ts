@@ -4,10 +4,10 @@ import type {
   ArtifactStore,
   JobPublisher,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
-import { destroyBot, removeAgentHome, toComputerRef } from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { destroyBot, removeAgentHome, toComputerRef } from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import {
   claimSpaceDeletionForMember,
   deleteClaimedSpaceForMember,
@@ -18,9 +18,9 @@ import {
   renewSpaceDeletionClaim,
   SPACE_DELETION_CLAIM_TIMEOUT_MS,
   SpaceDeletionInProgressError,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import { sweepHostedWebFiles } from "./hosted-webs/files.js";
-import { getLogger } from "@rakazo/logging";
+import { getLogger } from "@mycellios/logging";
 
 /** Bound for one bot or sandbox teardown. Providers may ignore the abort signal,
  * so without a deadline a hung destroy would keep the deletion claim renewed

@@ -1,8 +1,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
-  Input, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+  Input, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ChevronDown, MessageCircle, MessageCirclePlus, Pencil, Plus, X } from "lucide-react";
-import { isRetryableError } from "@rakazo/core";
+import { isRetryableError } from "@mycellios/core";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 import { queryClient } from "../lib/query";

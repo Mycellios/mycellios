@@ -1,5 +1,5 @@
 import { createRouterClient } from "@orpc/server";
-import { serializeModelSecret } from "@rakazo/adapters";
+import { serializeModelSecret } from "@mycellios/adapters";
 import { afterEach, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";

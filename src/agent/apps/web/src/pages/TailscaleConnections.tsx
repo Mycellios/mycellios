@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { TailnetConnection } from "@rakazo/contracts";
-import { Button, Field, FieldLabel, Input, Toggle } from "@rakazo/ui-web";
+import type { TailnetConnection } from "@mycellios/contracts";
+import { Button, Field, FieldLabel, Input, Toggle } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useSpaceQueries } from "../lib/query";

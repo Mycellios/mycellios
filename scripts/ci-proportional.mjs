@@ -59,6 +59,8 @@ export function planChecks(files, availableAgentTests) {
   const agentScriptTests = [];
   const add = (cwd, bin, args, label) => commands.push({ cwd, bin, args, label });
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
+  // Private names (people, companies, retired products) never return; see the script.
+  add('.', 'node', ['scripts/verify-private-terms.mjs'], 'private terms');
   if (files.some(f => installerPython.has(f))) {
     add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'deploy/installers', '-p', 'test_*.py'], 'installer promotion ownership, signing and recovery boundaries');
     add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...installerPython], 'installer publisher Python syntax');
@@ -117,7 +119,7 @@ export function planChecks(files, availableAgentTests) {
   if (agent) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
     for (const file of agentScriptTests) add('.', 'node', ['--test',file], `test: ${file}`);
-    add('src/agent', 'npm', ['run', 'generate', '--workspace', '@rakazo/db'], 'Prisma client generation (no database connection)');
+    add('src/agent', 'npm', ['run', 'generate', '--workspace', '@mycellios/db'], 'Prisma client generation (no database connection)');
     const shared = agentShared;
     for (const app of ['web', 'api', 'worker', 'desktop']) {
       if (shared || files.some(f => f.startsWith(`src/agent/apps/${app}/`))) add('src/agent', 'node', ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', '--tsBuildInfoFile', `../../.ci/agent-${app}.tsbuildinfo`, '-p', `apps/${app}/tsconfig.json`], `Agent ${app} types`);

@@ -5,8 +5,8 @@ import {
   type Group,
   type GroupMember,
   type SpaceGroup,
-} from "@rakazo/contracts";
-import { displayName } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { displayName } from "@mycellios/core";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import type { Prisma, PrismaClient } from "./client.js";
 import { expireComputerExecutionLeases, restoreBotUnderComputerQuota } from "./computers.js";

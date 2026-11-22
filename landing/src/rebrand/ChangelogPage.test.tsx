@@ -42,10 +42,8 @@ describe("Mycellios release history", () => {
     }
     expect(html).toContain("Coming soon");
     expect(html).toContain("when published");
-    // The shared footer intentionally links to the researched OpenBot comparison.
-    const releaseContent = html.slice(html.indexOf('<main'), html.indexOf('<footer'));
-    expect(releaseContent).not.toMatch(/openbot\.run/i);
-    expect(html).toContain('href="/compare/openbot"');
+    // The shared footer intentionally links to the researched comparisons.
+    expect(html).toContain('href="/compare/openclaw"');
     expect(html).not.toContain("mobile release");
   });
 });

@@ -1,6 +1,6 @@
 import { createCipheriv, createHash } from "node:crypto";
 import type { HttpInstance } from "@larksuiteoapi/node-sdk";
-import type { AdapterContext, MessagingInboundEvent } from "@rakazo/adapter-kit";
+import type { AdapterContext, MessagingInboundEvent } from "@mycellios/adapter-kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatSdkMessagingSurface } from "./chat-sdk-surface.js";
 import { LazyLarkAdapter } from "./lark/lazy-adapter.js";
@@ -68,7 +68,7 @@ function message(chatType = "p2p", sender = "ou-test") {
 }
 
 function webhook(body: unknown, headers: Record<string, string> = {}) {
-  return new Request("https://rakazo.test/api/v1/messaging/webhook/lark", {
+  return new Request("https://mycellios.test/api/v1/messaging/webhook/lark", {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
@@ -90,7 +90,7 @@ function encryptedWebhook(payload: unknown, validSignature = true, pretty = fals
   const signature = createHash("sha256")
     .update(timestamp + nonce + encryptKey + body)
     .digest("hex");
-  return new Request("https://rakazo.test/api/v1/messaging/webhook/lark", {
+  return new Request("https://mycellios.test/api/v1/messaging/webhook/lark", {
     method: "POST",
     headers: {
       "content-type": "application/json",

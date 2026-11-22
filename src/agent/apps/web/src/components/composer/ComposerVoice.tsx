@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { isAttachmentAudioMimeType } from "@rakazo/contracts";
-import { Button, Spinner } from "@rakazo/ui-web";
+import { isAttachmentAudioMimeType } from "@mycellios/contracts";
+import { Button, Spinner } from "@mycellios/ui-web";
 import { Check, Mic, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isAndroidHost } from "../../lib/android-host";

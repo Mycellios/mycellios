@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
-import type { Routine } from "@rakazo/contracts";
-import { formatCron, isOneShotRoutineCron, presetFromCron } from "@rakazo/core";
+import type { Routine } from "@mycellios/contracts";
+import { formatCron, isOneShotRoutineCron, presetFromCron } from "@mycellios/core";
 import { describeCronPresetLocalized } from "../RoutineSchedule";
 
 /** Read the saved trigger, including a one-shot's real date in its own time zone. */

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 const source = readFileSync(new URL("../app/thread.tsx", import.meta.url), "utf8");
 const handler = source.slice(
   source.indexOf("  const answerMessage = useCallback("),
-  source.indexOf("  const openBot = useCallback("),
+  source.indexOf("  const showBot = useCallback("),
 );
 
 function setup(refresh: () => Promise<void>) {

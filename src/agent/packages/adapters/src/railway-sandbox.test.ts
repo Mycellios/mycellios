@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { ComputerRef, ProcessEvent } from "@rakazo/adapter-kit";
+import type { ComputerRef, ProcessEvent } from "@mycellios/adapter-kit";
 import type { RailwayGraphQLErrorItem, SandboxInfo } from "railway";
 import {
   RailwayGraphQLError,

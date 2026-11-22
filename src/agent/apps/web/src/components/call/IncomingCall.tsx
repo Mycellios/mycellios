@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
-import { BotAvatar, Button, defaultBotAvatarValue } from "@rakazo/ui-web";
+import type { Bot } from "@mycellios/contracts";
+import { BotAvatar, Button, defaultBotAvatarValue } from "@mycellios/ui-web";
 import { Phone, PhoneOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { startCall, useCallSession } from "../../lib/call-session";

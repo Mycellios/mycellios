@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import type { Bot, ComputerMode, ComputerStatus } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import type { Bot, ComputerMode, ComputerStatus } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { messages as spanish } from "../../src/locales/es/messages.po";

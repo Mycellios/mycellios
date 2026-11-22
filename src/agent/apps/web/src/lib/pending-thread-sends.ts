@@ -1,4 +1,4 @@
-import type { ProductEvent, ThreadSnapshot } from "@rakazo/contracts";
+import type { ProductEvent, ThreadSnapshot } from "@mycellios/contracts";
 
 export type PendingThreadSend = {
   scope: string;

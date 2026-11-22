@@ -2,8 +2,8 @@ import { eventDemoAgentKey } from "../../../../core/event-demo-agent-ticket.js";
 import { EventDemoAgent, DEMO_AGENT_HEADER } from "./event-demo-agent.js";
 import { hostedWebHttp } from "./hosted-webs/http.js";
 import { artifactShareHttp } from "./artifact-shares.js";
-import { modelsDevCatalog, tailnetServiceFromEnv } from "@rakazo/adapters";
-import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
+import { modelsDevCatalog, tailnetServiceFromEnv } from "@mycellios/adapters";
+import { WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import type {
@@ -19,17 +19,17 @@ import type {
   RealtimeFanout,
   SandboxProvider,
   TransactionalEmailProvider,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import {
   SandboxRateLimitError,
   SandboxUnavailableError,
   VoiceAccountError,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import type {
   ComposioProvider,
   ConnectorRegistry,
   RemoteConnectorDependencies,
-} from "@rakazo/adapters";
+} from "@mycellios/adapters";
 import {
   applyMessagingOutboundStatus,
   ChatSdkMessagingSurface,
@@ -90,12 +90,12 @@ import {
   toTeamChatInbound,
   verifyModelServesAgents,
   withSecretPersistence,
-} from "@rakazo/adapters";
-import { createAuth, isBlockedAuthPath, loopbackTwinOrigins } from "@rakazo/auth";
-import type { Actor, AuthCapabilities } from "@rakazo/contracts";
-import { productAppUrl, SERVER_BUILD_HEADER } from "@rakazo/contracts";
-import { signupPolicyFromEnv } from "@rakazo/core";
-import type { Pool, PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapters";
+import { createAuth, isBlockedAuthPath, loopbackTwinOrigins } from "@mycellios/auth";
+import type { Actor, AuthCapabilities } from "@mycellios/contracts";
+import { productAppUrl, SERVER_BUILD_HEADER } from "@mycellios/contracts";
+import { signupPolicyFromEnv } from "@mycellios/core";
+import type { Pool, PrismaClient } from "@mycellios/db";
 import {
   createBoardEvents,
   createWebPresence,
@@ -116,17 +116,17 @@ import {
   runAsTenant,
   securityEventRetentionDays,
   verifyContentKeys,
-} from "@rakazo/db";
-import type { Logger } from "@rakazo/logging";
+} from "@mycellios/db";
+import type { Logger } from "@mycellios/logging";
 import {
   createServiceLogger,
   enrichLogContext,
   getLogger,
   installLogger,
   SERVICE_NAMES,
-} from "@rakazo/logging";
-import { requestLogging } from "@rakazo/logging/hono";
-import { MarkdownMemoryStore } from "@rakazo/memory";
+} from "@mycellios/logging";
+import { requestLogging } from "@mycellios/logging/hono";
+import { MarkdownMemoryStore } from "@mycellios/memory";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { desktopRelayKey } from "../../../packages/adapters/src/desktop-relay.js";

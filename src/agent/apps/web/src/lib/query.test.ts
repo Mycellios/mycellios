@@ -1,5 +1,5 @@
 import { QueryObserver } from "@tanstack/react-query";
-import type { AppBootstrap } from "@rakazo/contracts";
+import type { AppBootstrap } from "@mycellios/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./rpc", () => {

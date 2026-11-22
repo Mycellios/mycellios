@@ -1,4 +1,4 @@
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import "./store-app-header.css";

@@ -1,4 +1,4 @@
-import type { SandboxProvider } from "@rakazo/adapter-kit";
+import type { SandboxProvider } from "@mycellios/adapter-kit";
 import { BoatSandboxProvider } from "./boat-sandbox.js";
 import { CreateOSSandboxProvider } from "./createos-sandbox.js";
 import { DaytonaSandboxProvider } from "./daytona-sandbox.js";

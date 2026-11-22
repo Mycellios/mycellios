@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { AgentContextStrategy, CacheCapabilities } from "@rakazo/adapter-kit";
-import { MODEL_CONTEXT_TOO_SMALL_ERROR } from "@rakazo/core";
+import type { AgentContextStrategy, CacheCapabilities } from "@mycellios/adapter-kit";
+import { MODEL_CONTEXT_TOO_SMALL_ERROR } from "@mycellios/core";
 
 export type ContextStrategy = AgentContextStrategy;
 export interface ContextMessage {

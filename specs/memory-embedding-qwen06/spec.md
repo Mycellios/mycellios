@@ -85,7 +85,7 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
 - `python/distributed_runtime/qwen06_embedding_forwarder.py`: the failover entry.
 - Tests: `python/tests/test_qwen06_embedding_service.py` and
   `python/tests/test_qwen06_embedding_forwarder.py`.
-- Jarvis side: nodecodex-org/jarvis PR #451, which adds migration 0232, the
+- Jarvis side: the private Jarvis repository, PR #451, which adds migration 0232, the
   client, the resumable backfill and the search switch.
 
 ## Operations
@@ -151,7 +151,7 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   (`config.json.before-macbook-20261121`) and running
   `launchctl bootout gui/$(id -u)/io.mycellios.qwen06`.
 
-- On 2026-11-22 Daniel's PC (Radeon 890M) joined as a regular replica on
+- On 2026-11-22 the maintainer's PC (Radeon 890M) joined as a regular replica on
   DirectML (weight 1). It runs `device: "directml"` in float32 with
   1024-token micro-batches: float16 on DirectML gave a minimum cosine of 0.987
   against CPU fp32, and larger micro-batches or the fused SDPA kernel fail on
@@ -161,7 +161,7 @@ exceeded. When that happens, the forwarder fails over to the CPU replica.
   check above now rejects such output. It runs from `%USERPROFILE%/Mycellios/qwen06`
   (Python 3.12 venv: torch 2.4.1, torch-directml 0.2.5.dev240914,
   transformers 4.57.1) at below-normal priority, started from the user's
-  Startup folder, so it serves only while Daniel is logged in. Its peer is in
+  Startup folder, so it serves only while its owner is logged in. Its peer is in
   `mycellios-embedding-replicas`; Windows Firewall already admits the
   NetBird interface. Roll back with the forwarder's
   `config.json.before-pcdani-20261122` and by deleting the Startup entry.

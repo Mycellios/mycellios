@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { Check, Link2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { developerContextLink, type DeveloperChatContext } from "../lib/developer-context-link";

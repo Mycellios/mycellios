@@ -1,10 +1,10 @@
-import type { ModelCatalogEntry } from "@rakazo/contracts";
+import type { ModelCatalogEntry } from "@mycellios/contracts";
 import {
   canonicalPiProviderId,
   normalizeOpenAiCompatibleBaseUrl,
   selectCompatibleModelCredential,
   withConnectionName,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { matchesSearchQuery } from "./search.js";
 
 /** Effort choices an OpenAI-compatible endpoint stores when reasoning is enabled. */

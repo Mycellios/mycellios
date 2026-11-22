@@ -1,6 +1,6 @@
-import type { ProductEvent, Run, ThreadMessage, ThreadSnapshot } from "@rakazo/contracts";
-import { foldPeerReplies } from "@rakazo/core";
-import { DEFAULT_BOT_AVATAR_COLOR } from "@rakazo/ui-web";
+import type { ProductEvent, Run, ThreadMessage, ThreadSnapshot } from "@mycellios/contracts";
+import { foldPeerReplies } from "@mycellios/core";
+import { DEFAULT_BOT_AVATAR_COLOR } from "@mycellios/ui-web";
 import type { ReactNode } from "react";
 import { useMemo, useRef } from "react";
 import { reduceThreadSnapshot } from "../../src/lib/thread-events";
@@ -91,7 +91,7 @@ export function FixtureTranscript({
         activeRun={activeRun}
         workingBots={running ? [BOT] : []}
         onLoadOlder={noop}
-        onOpenBot={noop}
+        onShowBot={noop}
         onAnswer={resolved}
         onReply={noop}
         onMarkUnread={noop}

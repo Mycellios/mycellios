@@ -5,7 +5,7 @@ import {
   HostedWebBundle,
   HOSTED_WEB_COVER_FILES,
   type HostedWebCapability,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 
 const TYPES: Record<string, string> = {
   html: "text/html; charset=utf-8",

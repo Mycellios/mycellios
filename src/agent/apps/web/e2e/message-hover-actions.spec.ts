@@ -72,7 +72,7 @@ test("message hover shows beside-bubble actions; reply links to parent", async (
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `hover-actions-${stamp}@rakazo.test`, "password12", "Hover Actions");
+  await signup(page, `hover-actions-${stamp}@mycellios.test`, "password12", "Hover Actions");
   await completeOnboarding(page);
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 
@@ -297,7 +297,7 @@ test("a message with an attachment centers hover actions on its text bubble", as
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `hover-attach-${stamp}@rakazo.test`, "password12", "Hover Attach");
+  await signup(page, `hover-attach-${stamp}@mycellios.test`, "password12", "Hover Attach");
   await completeOnboarding(page);
   const composer = page.getByRole("combobox", { name: /^Message/ });
   await expect(composer).toBeVisible();
@@ -341,7 +341,7 @@ test("a message with an attachment centers hover actions on its text bubble", as
 
 test("reply preview jumps to parent outside the loaded page", async ({ page }) => {
   const stamp = Date.now();
-  await signup(page, `hover-page-${stamp}@rakazo.test`, "password12", "Hover Page");
+  await signup(page, `hover-page-${stamp}@mycellios.test`, "password12", "Hover Page");
   await completeOnboarding(page);
 
   const parentText = `page-parent-${stamp}`;
@@ -464,7 +464,7 @@ test.describe("touch message actions", () => {
   });
 
   test("touch actions can react and reply to a saved message", async ({ page }) => {
-    await signup(page, `touch-actions-${Date.now()}@rakazo.test`, "password12", "Touch Actions");
+    await signup(page, `touch-actions-${Date.now()}@mycellios.test`, "password12", "Touch Actions");
     await completeOnboarding(page);
     await showFocusCard(page);
     await page.getByRole("button", { name: /Day-to-day work/ }).click();
@@ -482,7 +482,7 @@ test.describe("touch message actions", () => {
 });
 
 test("a reaction receipt refreshes live work and exposes Stop", async ({ page }, testInfo) => {
-  await signup(page, `reaction-work-${Date.now()}@rakazo.test`, "password12", "Reaction Work");
+  await signup(page, `reaction-work-${Date.now()}@mycellios.test`, "password12", "Reaction Work");
   await completeOnboarding(page);
   await showFocusCard(page);
   await expect(page.getByText("What do you want me on first?", { exact: true })).toBeVisible({

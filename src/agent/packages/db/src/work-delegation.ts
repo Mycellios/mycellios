@@ -1,4 +1,4 @@
-import { ACTIVE_RUN_STATUSES, DELEGATED_RESULT_FORMAT, isMicoTaskThread, normalizeWorkResources, workResourcesConflict } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, DELEGATED_RESULT_FORMAT, isMicoTaskThread, normalizeWorkResources, workResourcesConflict } from "@mycellios/core";
 import type { PrismaClient, Prisma } from "./client.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";

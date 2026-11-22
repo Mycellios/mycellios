@@ -348,7 +348,7 @@ concurrency) and joins texts in order. On `dispersion_exhausted` it applies
 `DISPERSION_POLICY`:
 
 - `fallback` (proposed default): that chunk goes to the configured fallback
-  provider (Groq today), which Daniel accepts seeing content;
+  provider (Groq today), which the owner accepts seeing content;
 - `fail`: the transcription fails.
 
 There is no policy that reuses a node.
@@ -357,7 +357,7 @@ There is no policy that reuses a node.
 one chunk to the network and 24 to the fallback. Dispersion only becomes cheap
 once several nodes host Whisper; on-demand replica placement
 (`specs/on-demand-replica-placement/spec.md`) and CPU replicas on laptops are
-the route to that. Daniel decides the default before the bridge is deployed.
+the route to that. The owner decides the default before the bridge is deployed.
 
 Speed: with N replicas a recording finishes in about 1/N of the serial time.
 
@@ -513,18 +513,18 @@ Mico names and instructions stay: they are the content the user chose.
 
 - A node must hold a bond before receiving work. To avoid an upfront payment,
   the bond fills from the node's own earnings, which are held until it is
-  complete. Decided by Daniel on 2026-11-21: 10 Credits per node.
+  complete. Decided by the owner on 2026-11-21: 10 Credits per node.
 - A confirmed tripwire hit slashes the bond on top of the expulsion above.
 - Deferred until node payouts are enabled: today node earnings are internal
   and `payout_enabled` is false, so a bond would hold value nobody can
-  withdraw. It touches the ledger: isolated PostgreSQL tests and Daniel's
+  withdraw. It touches the ledger: isolated PostgreSQL tests and the owner's
   approval before production.
 
 **Sybil resistance.**
 
 - Each node will need its own bond, so N nodes cost N bonds.
 - Dispersion excludes by owner and network prefix, not only by worker.
-- At most 5 active nodes per owner account (decided by Daniel on 2026-11-21),
+- At most 5 active nodes per owner account (decided by the owner on 2026-11-21),
   enforced at enrollment and transfer once `MYCELLIOS_NODE_OWNER_LIMIT=5` is
   set. `MYCELLIOS_NODE_OWNER_LIMIT_OVERRIDES=account=limit,...` raises it for
   operator accounts, whose replicas enroll the same way; set both together.
@@ -533,7 +533,7 @@ Mico names and instructions stay: they are the content the user chose.
   `MYCELLIOS_CELL_ADMISSION=enrolled` admits only enrolled cells, cells the
   operator starts with the network token and cells admitted before. It stays
   `open` by default because public cells are an existing, tested way to join;
-  closing it is Daniel's decision.
+  closing it is the owner's decision.
 
 Node operators' terms must forbid keeping or using content and disclose that
 bait traffic exists.
@@ -554,7 +554,7 @@ bait traffic exists.
 
 Each phase is a normal PR. Merging to `main` deploys the coordinator through
 Nucleus, and worker changes reach PCs with the next Desktop release, so no PR
-that changes behavior for users is merged without Daniel's explicit OK.
+that changes behavior for users is merged without the owner's explicit OK.
 
 1. **Worker view, F0 and content-free failures** (D1, D7 F0 fix, first part
    of D6). Coordinator and worker. Highest protection for the lowest risk.
@@ -563,7 +563,7 @@ that changes behavior for users is merged without Daniel's explicit OK.
 3. **Dispersion groups** (D3). Coordinator first, then the bridge. The bridge
    and parallel chunks are owned operationally by the session "Mycellios:
    huellas Qwen sin redistribución"; coordinate with it before deploying.
-   Speakr must keep working: deploy only with Daniel's chosen policy.
+   Speakr must keep working: deploy only with the owner's chosen policy.
 4. **Sealed leases** (D4), negotiated per connection.
 5. **Remaining hardening** (D6): content-free worker failures shipped in phase
    1, Kokoro stdout in phase 5; source-bound engines wait for their next

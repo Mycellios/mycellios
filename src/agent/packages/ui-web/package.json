@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/ui-web",
+  "name": "@mycellios/ui-web",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
-    "@rakazo/contracts": "*",
-    "@rakazo/core": "*",
-    "@rakazo/ui-tokens": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/core": "*",
+    "@mycellios/ui-tokens": "*",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",

@@ -1,4 +1,4 @@
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 
 type HostSessionOptions = {
   hostname: string;

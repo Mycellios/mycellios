@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@rakazo/ui-web";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@mycellios/ui-web";
 import { CircleAlert, CircleCheck, Hand, LoaderCircle, MessageCircleQuestion } from "lucide-react";
 import type { ReactElement } from "react";
 import { rosterWorkStatusLabel } from "../lib/roster-status";

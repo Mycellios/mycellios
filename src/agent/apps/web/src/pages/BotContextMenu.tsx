@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import { sidebarFolderTree } from "@rakazo/core";
-import type { Bot, BotSection } from "@rakazo/contracts";
+import { sidebarFolderTree } from "@mycellios/core";
+import type { Bot, BotSection } from "@mycellios/contracts";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -8,7 +8,7 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   Archive,
   Bell,

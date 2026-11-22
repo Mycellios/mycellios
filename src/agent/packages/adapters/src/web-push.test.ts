@@ -3,7 +3,7 @@ import {
   NotificationSettingsSchema,
   notificationAllowed,
   WebPushSubscriptionSchema,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import {
   notificationChannels,
   privateNotification,
@@ -15,7 +15,7 @@ import type {
   AdapterContext,
   NotificationMessage,
   NotificationProvider,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import webpush from "web-push";
 
 const message: NotificationMessage = {

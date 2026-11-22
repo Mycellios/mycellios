@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import { normalizeRunError } from "@rakazo/core";
+import { normalizeRunError } from "@mycellios/core";
 import * as Clipboard from "expo-clipboard";
 import type { ReactNode } from "react";
 import { act, createElement } from "react";

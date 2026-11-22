@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { productBrand } from "@rakazo/contracts";
+import { productBrand } from "@mycellios/contracts";
 import {
   Button,
   Dialog,
@@ -14,7 +14,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import {
   ArrowUpRight,
   BookOpen,

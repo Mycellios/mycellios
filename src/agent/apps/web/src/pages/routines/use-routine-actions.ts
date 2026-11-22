@@ -1,4 +1,4 @@
-import type { Routine } from "@rakazo/contracts";
+import type { Routine } from "@mycellios/contracts";
 import { useEffect, useRef, useState } from "react";
 import { newClientId } from "../../lib/client-id";
 import type { RpcClient } from "../../lib/rpc";

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const fixtures = vi.hoisted(() => ({ allowed: true, read: vi.fn(), access: vi.fn() }));
-vi.mock("@rakazo/adapters", () => ({
+vi.mock("@mycellios/adapters", () => ({
   nativeHostAccess: (...args: unknown[]) => { fixtures.access(...args); return fixtures.allowed; },
   discoverNativeCodexQuota: () => fixtures.read(),
   canInstallNativeOpenCode: vi.fn(), discoverNativeCodexModels: vi.fn(), discoverNativeEngines: vi.fn(), installManagedOpenCode: vi.fn(), reconcileWorkStops: vi.fn(),

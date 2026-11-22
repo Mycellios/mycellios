@@ -1,8 +1,8 @@
-import type { AdapterContext, ManagedConnectorProvider } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
-import { appConnectCard, matchAppCatalog, matchesAppConnection } from "@rakazo/core";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { appendEventInTransaction, createThreadMessageInTransaction } from "@rakazo/db";
+import type { AdapterContext, ManagedConnectorProvider } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
+import { appConnectCard, matchAppCatalog, matchesAppConnection } from "@mycellios/core";
+import type { PrismaClient, ThreadEvents } from "@mycellios/db";
+import { appendEventInTransaction, createThreadMessageInTransaction } from "@mycellios/db";
 
 const RECENT_MESSAGES = 50;
 

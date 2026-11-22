@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/worker",
+  "name": "@mycellios/worker",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -11,12 +11,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@rakazo/adapter-kit": "*",
-    "@rakazo/adapters": "*",
-    "@rakazo/core": "*",
-    "@rakazo/db": "*",
-    "@rakazo/logging": "*",
-    "@rakazo/memory": "*"
+    "@mycellios/adapter-kit": "*",
+    "@mycellios/adapters": "*",
+    "@mycellios/core": "*",
+    "@mycellios/db": "*",
+    "@mycellios/logging": "*",
+    "@mycellios/memory": "*"
   },
   "devDependencies": {
     "typescript": "7.0.2",

@@ -1,10 +1,10 @@
-import { readBoundedJsonResponse,readBoundedResponseBytes } from "@rakazo/core";
+import { readBoundedJsonResponse,readBoundedResponseBytes } from "@mycellios/core";
 import { createModelPlanLimits } from "../model-plan-limits.js";
 import { discoverLocalModels } from "../local-model-discovery.js";
-import { nativeHostAccess } from "@rakazo/adapters";
+import { nativeHostAccess } from "@mycellios/adapters";
 import { ORPCError } from "@orpc/server";
 import { contributionAccount } from "../contribution-account.js";
-import { SecretStoreUnavailableError } from "@rakazo/adapter-kit";
+import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
 import {
   listPiCatalog,
   modelCredentialDto,
@@ -21,8 +21,8 @@ import {
   storedOpenAiCompatibleProbeHeaders,
   storedOpenAiCompatibleProbeKey,
   UNAVAILABLE_MODEL_FOR_AUTH_MESSAGE,
-} from "@rakazo/adapters";
-import type { Actor, ThinkingLevel } from "@rakazo/contracts";
+} from "@mycellios/adapters";
+import type { Actor, ThinkingLevel } from "@mycellios/contracts";
 import {
   ANTSEED_PROVIDER_ID,
   backupChoiceKey,
@@ -32,9 +32,9 @@ import {
   OPENAI_COMPATIBLE_PROVIDER_ID,
   productBrand,
   usableModelId,
-} from "@rakazo/contracts";
-import { clampCatalogThinkingLevel } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+} from "@mycellios/contracts";
+import { clampCatalogThinkingLevel } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
 import {
   appliedModelRole,
   comparePreferenceOrder,
@@ -50,7 +50,7 @@ import {
   saveModelPreference,
   updateModelRole,
   writeModelRole,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import { mayUsePrivateEndpoint } from "../mcp-servers.js";
 import {
   modelConnectionTarget,

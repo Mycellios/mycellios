@@ -1,11 +1,11 @@
-import type { SecurityEvent, SecurityEventMetadata, SecurityEventType } from "@rakazo/contracts";
-import { SECURITY_EVENT_TYPES, SecurityEventTypeSchema } from "@rakazo/contracts";
-import { getLogContext, getLogger, redactBindings } from "@rakazo/logging";
+import type { SecurityEvent, SecurityEventMetadata, SecurityEventType } from "@mycellios/contracts";
+import { SECURITY_EVENT_TYPES, SecurityEventTypeSchema } from "@mycellios/contracts";
+import { getLogContext, getLogger, redactBindings } from "@mycellios/logging";
 import type { PrismaClient } from "./client.js";
 import { parsePositiveInteger } from "./client.js";
 import { runAsSystem } from "./row-security.js";
 
-export type { SecurityEventType } from "@rakazo/contracts";
+export type { SecurityEventType } from "@mycellios/contracts";
 
 type SecurityEventDb = Pick<PrismaClient, "securityEvent">;
 

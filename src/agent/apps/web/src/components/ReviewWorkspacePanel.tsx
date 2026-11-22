@@ -1,8 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { ProjectBrowserState } from "@rakazo/contracts";
-import { Button, buttonVariants, Input, Spinner } from "@rakazo/ui-web";
-import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import type { ProjectBrowserState } from "@mycellios/contracts";
+import { Button, buttonVariants, Input, Spinner } from "@mycellios/ui-web";
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
 import {
   ArrowLeft,
   ArrowRight,

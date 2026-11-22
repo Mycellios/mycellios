@@ -1,4 +1,4 @@
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
 import type { PrismaClient, Prisma } from "./client.js";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import { appendEventInTransaction } from "./events.js";

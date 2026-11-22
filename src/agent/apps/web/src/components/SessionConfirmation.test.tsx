@@ -12,7 +12,7 @@ vi.mock("../lib/account-security", () => ({ fetchAccountSecurity: async () => ({
 vi.mock("../lib/sso-flow", () => ({ runSsoFlow: (begin: any) => begin(true, (url: string) => url) }));
 vi.mock("./PasskeySignIn", () => ({ PasskeySignIn: () => null }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@mycellios/ui-web", () => ({
   Button: ({ variant, size, ...props }: any) => <button {...props} />,
   Input: (props: any) => <input {...props} />, Label: (props: any) => <label {...props} />,
   Dialog: ({ open, children }: any) => open ? <div role="dialog">{children}</div> : null,

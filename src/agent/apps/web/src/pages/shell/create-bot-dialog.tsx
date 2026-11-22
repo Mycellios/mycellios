@@ -4,9 +4,9 @@ import {
   BOT_NAME_MAX_LENGTH,
   normalizeCreateBotProfile,
   productBrand,
-} from "@rakazo/contracts";
-import type { CreateBotInput, Me, ModelCatalogEntry, ModelCredential } from "@rakazo/contracts";
-import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey } from "@rakazo/core";
+} from "@mycellios/contracts";
+import type { CreateBotInput, Me, ModelCatalogEntry, ModelCredential } from "@mycellios/contracts";
+import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey } from "@mycellios/core";
 import {
   BotAvatar,
   Button,
@@ -19,7 +19,7 @@ import {
   Input,
   OptionSelect,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useRef, useState } from "react";
 import { AuthMushroom } from "../../components/AuthMushroom";

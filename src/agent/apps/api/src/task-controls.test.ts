@@ -1,4 +1,4 @@
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTaskControls } from "./task-controls.js";
 

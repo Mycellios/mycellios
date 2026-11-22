@@ -4,9 +4,9 @@ import type {
   ActionAutoReviewSettings,
   ApprovalMode,
   SettingsScope,
-} from "@rakazo/contracts";
-import { humanizeToolName } from "@rakazo/core";
-import { Button, ToggleGroup, ToggleGroupItem } from "@rakazo/ui-web";
+} from "@mycellios/contracts";
+import { humanizeToolName } from "@mycellios/core";
+import { Button, ToggleGroup, ToggleGroupItem } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useSpaceQueries, writeSaved } from "../lib/query";

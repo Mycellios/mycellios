@@ -1,4 +1,4 @@
-import { rankLocalMemories, localMemorySnippet } from "@rakazo/core";
+import { rankLocalMemories, localMemorySnippet } from "@mycellios/core";
 import type {
   AdapterContext,
   MemoryCommitRequest,
@@ -11,10 +11,10 @@ import type {
   MemorySnapshot,
   MemoryStore,
   PortableFile,
-} from "@rakazo/adapter-kit";
-import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
-import { Prisma, withTransactionRetry } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { MEMORY_REVISION_CONFLICT_ERROR } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
+import { Prisma, withTransactionRetry } from "@mycellios/db";
 
 export class MarkdownMemoryStore implements MemoryStore {
   constructor(private readonly prisma: PrismaClient) {}

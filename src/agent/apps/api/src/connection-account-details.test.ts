@@ -1,5 +1,5 @@
-import type { AdapterContext, ManagedConnectorProvider } from "@rakazo/adapter-kit";
-import type { PrismaClient } from "@rakazo/db";
+import type { AdapterContext, ManagedConnectorProvider } from "@mycellios/adapter-kit";
+import type { PrismaClient } from "@mycellios/db";
 import { expect, it, vi } from "vitest";
 import { connectionAccountDetails } from "./connection-account-details.js";
 

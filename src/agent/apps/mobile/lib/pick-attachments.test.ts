@@ -1,5 +1,5 @@
-import { attachmentMaxBytes } from "@rakazo/contracts";
-import { inferAttachmentMimeType } from "@rakazo/core";
+import { attachmentMaxBytes } from "@mycellios/contracts";
+import { inferAttachmentMimeType } from "@mycellios/core";
 import { describe, expect, it } from "vitest";
 import { filterPickedAttachments } from "./pick-attachments-filter.js";
 

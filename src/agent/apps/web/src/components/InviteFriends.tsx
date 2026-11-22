@@ -1,4 +1,4 @@
-import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
+import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@mycellios/contracts";
 import {
   BotAvatar,
   Button,
@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
   Input,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { Check, Copy, Gift } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSpaceRpc } from "../lib/space-rpc";

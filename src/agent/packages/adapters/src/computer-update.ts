@@ -1,9 +1,9 @@
-import type { AdapterContext } from "@rakazo/adapter-kit";
-import { computerControlExpireJobKey } from "@rakazo/adapter-kit";
-import { type ComputerUpdate, ComputerUpdateSchema } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
-import { parseComputerMode, type Prisma, type PrismaClient, type ThreadEvents } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+import type { AdapterContext } from "@mycellios/adapter-kit";
+import { computerControlExpireJobKey } from "@mycellios/adapter-kit";
+import { type ComputerUpdate, ComputerUpdateSchema } from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES } from "@mycellios/core";
+import { parseComputerMode, type Prisma, type PrismaClient, type ThreadEvents } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import {
   enqueueTakeoverContinuation,
   isIdleOwnComputerTakeover,

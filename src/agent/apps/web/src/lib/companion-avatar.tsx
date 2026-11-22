@@ -1,4 +1,4 @@
-import { BotAvatar } from "@rakazo/ui-web";
+import { BotAvatar } from "@mycellios/ui-web";
 import { companionImageUrl } from "./companion-image-url.js";
 const cache = new Map<string, Promise<string | undefined>>();
 const assets = new Map<string, Promise<string>>();

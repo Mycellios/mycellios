@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
-import type { SecretStore } from "@rakazo/adapter-kit";
-import type { ThinkingLevel } from "@rakazo/contracts";
-import { canonicalPiProviderId, isOpenAiCompatibleProvider } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { SecretStore } from "@mycellios/adapter-kit";
+import type { ThinkingLevel } from "@mycellios/contracts";
+import { canonicalPiProviderId, isOpenAiCompatibleProvider } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import type { ModelsDevSnapshot } from "./models-dev.js";
 import type { ModelCredentialAuthKind } from "./pi-catalog-availability.js";
 import { LiveCatalogCache, liveModelCatalogEnabled } from "./pi-live-cache.js";

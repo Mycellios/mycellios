@@ -1,9 +1,9 @@
 import { routineThreadPath } from "../lib/routine-thread-path";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { RoutineHistory } from "@rakazo/contracts";
+import type { RoutineHistory } from "@mycellios/contracts";
 import type { RpcClient } from "../lib/rpc";
-import { isRetryableError, normalizeRunError } from "@rakazo/core";
-import { Button, Collapsible, CollapsibleContent, Spinner } from "@rakazo/ui-web";
+import { isRetryableError, normalizeRunError } from "@mycellios/core";
+import { Button, Collapsible, CollapsibleContent, Spinner } from "@mycellios/ui-web";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";

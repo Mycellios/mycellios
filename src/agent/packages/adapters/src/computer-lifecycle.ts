@@ -6,10 +6,10 @@ import type {
   ComputerRef,
   JobPublisher,
   SandboxProvider,
-} from "@rakazo/adapter-kit";
-import { computerControlExpireJobKey } from "@rakazo/adapter-kit";
-import type { ComputerUpdate } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES, parseScreenLeaseId, screenLeaseId } from "@rakazo/core";
+} from "@mycellios/adapter-kit";
+import { computerControlExpireJobKey } from "@mycellios/adapter-kit";
+import type { ComputerUpdate } from "@mycellios/contracts";
+import { ACTIVE_RUN_STATUSES, parseScreenLeaseId, screenLeaseId } from "@mycellios/core";
 import {
   expireComputerExecutionLeases,
   type PrismaClient,
@@ -17,8 +17,8 @@ import {
   recordComputerRunEnd,
   recordComputerRunStart,
   type ThreadEvents,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import {
   clearInactiveUserComputerControl,
   expireComputerControl,

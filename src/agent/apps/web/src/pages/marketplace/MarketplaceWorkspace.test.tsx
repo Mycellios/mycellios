@@ -14,7 +14,7 @@ import type {MarketplaceTab} from "./catalog";
 const onTab=vi.fn();
 let root:ReturnType<typeof createRoot>|undefined,host:HTMLDivElement;
 afterEach(()=>{if(root)act(()=>root!.unmount());root=undefined;host?.remove();localStorage.clear();vi.restoreAllMocks();vi.clearAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs();});
-async function mount(storeAvailable=true,tab:MarketplaceTab="mycellios-apps"){vi.stubEnv("VITE_MYCELLIOS_HIFA_STORE",storeAvailable?"true":"false");vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);host=document.createElement("div");document.body.append(host);root=createRoot(host);await act(async()=>root!.render(<MarketplaceWorkspace tab={tab} onTab={onTab} scope="owner-space" bots={[]} onExit={()=>{}} onMcp={()=>{}} onCreated={()=>{}} onOpenBot={()=>{}} onBotsChanged={async()=>{}} onCreateBot={()=>{}}/>));}
+async function mount(storeAvailable=true,tab:MarketplaceTab="mycellios-apps"){vi.stubEnv("VITE_MYCELLIOS_HIFA_STORE",storeAvailable?"true":"false");vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);host=document.createElement("div");document.body.append(host);root=createRoot(host);await act(async()=>root!.render(<MarketplaceWorkspace tab={tab} onTab={onTab} scope="owner-space" bots={[]} onExit={()=>{}} onMcp={()=>{}} onCreated={()=>{}} onShowBot={()=>{}} onBotsChanged={async()=>{}} onCreateBot={()=>{}}/>));}
 const toggle=()=>host.querySelector<HTMLButtonElement>("button[aria-controls]")!;
 it("frees the entire menu without unmounting the app, losing its draft or moving keyboard focus",async()=>{
  await mount();const draft=host.querySelector("textarea")!;draft.value="Still editing";toggle().focus();

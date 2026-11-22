@@ -1,8 +1,8 @@
 import { getGeneralPreferences, useGeneralPreferences } from "../../lib/general-preferences";
-import type { LocalVoiceStatus } from "@rakazo/contracts";
+import type { LocalVoiceStatus } from "@mycellios/contracts";
 import { useLingui } from "@lingui/react/macro";
-import { isEchoOfSpeech, isRunWorking, isSecretAskBlock, normalizeRunError, speakable, speechFromBlocks, toUtterances } from "@rakazo/core";
-import { BotAvatar, Button } from "@rakazo/ui-web";
+import { isEchoOfSpeech, isRunWorking, isSecretAskBlock, normalizeRunError, speakable, speechFromBlocks, toUtterances } from "@mycellios/core";
+import { BotAvatar, Button } from "@mycellios/ui-web";
 import { Mic, MicOff, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { dictation, webSpeechAvailable } from "../../lib/dictation";

@@ -14,7 +14,7 @@
   .rk-chat-control:active:not(:disabled) { transform: none; }
 }
 
-/* OpenBot's settings rhythm, using the Mycellios semantic surfaces. */
+/* The reference app's settings rhythm, using the Mycellios semantic surfaces. */
 .rk-general-settings { max-width: 760px; margin-inline: auto; }
 .rk-general-settings section > div { background: var(--muted); border: 0; padding-inline: 16px; }
 .rk-general-settings .rk-settings-row { padding: 14px 0; }
@@ -46,7 +46,7 @@
   .rk-settings-swatches button { width: 36px; height: 36px; }
 }
 @media (prefers-reduced-motion: reduce) { .rk-settings-swatches button { transition: none; } }
-@import "@rakazo/ui-web/styles.css";
+@import "@mycellios/ui-web/styles.css";
 @import "./typography.css";
 
 @theme {
@@ -293,7 +293,7 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   }
   [data-workspace-chrome="compact"] [data-slot="sidebar-container"] { inset-inline-start: var(--rk-rail-width, 52px); }
   /* macOS draws its window buttons over the top of the rail (MAC_WINDOW_BUTTON_INSET in
-     apps/desktop/src/window-options.ts), so the rail is wide enough to hold them, as in OpenBot. */
+     apps/desktop/src/window-options.ts), so the rail is wide enough to hold them, as in the reference app. */
   [data-window-buttons="darwin"] { --rk-rail-width: 72px; }
 }
 /* Below 768px the rail is hidden, so a top row that starts at the window edge clears the macOS

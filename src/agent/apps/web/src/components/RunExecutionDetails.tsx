@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Run, TaskCost } from "@rakazo/contracts";
+import type { Run, TaskCost } from "@mycellios/contracts";
 import { useEffect, useState } from "react";
 import { TaskCostFooter } from "../pages/shell/task-cost-footer";
 

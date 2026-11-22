@@ -1,7 +1,7 @@
-import type { Actor, MessageBlock } from "@rakazo/contracts";
-import { QUEUE_HOLDING_RUN_STATUSES } from "@rakazo/core";
-import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
-import { appendEventInTransaction, IsolationError, withTransactionRetry } from "@rakazo/db";
+import type { Actor, MessageBlock } from "@mycellios/contracts";
+import { QUEUE_HOLDING_RUN_STATUSES } from "@mycellios/core";
+import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
+import { appendEventInTransaction, IsolationError, withTransactionRetry } from "@mycellios/db";
 import { requireBotThread } from "./bot-thread.js";
 
 /** Dependencies for resolving pending MCP approval cards in a bot's threads. */

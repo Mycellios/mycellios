@@ -1,5 +1,5 @@
-import type { AdapterContext, ConnectorCall } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
+import type { AdapterContext, ConnectorCall } from "@mycellios/adapter-kit";
+import type { MessageBlock } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import type { Evidence } from "./cases.js";
 import { EvalServices } from "./services.js";

@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/desktop",
+  "name": "@mycellios/desktop",
   "productName": "Mycellios Desktop",
   "version": "0.9.1",
   "author": {
@@ -9,21 +9,21 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "pack:windows:unified": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-windows.mjs",
+    "pack:windows:unified": "npm run build --workspace @mycellios/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-windows.mjs",
     "dev": "npm run build && electron .",
     "build": "npm run check && node scripts/build.mjs",
     "build:local-server": "node scripts/prepare-local-server.mjs",
-    "pack": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --mac --win --linux",
-    "pack:dir": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --dir",
+    "pack": "npm run build --workspace @mycellios/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --mac --win --linux",
+    "pack:dir": "npm run build --workspace @mycellios/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --dir",
     "check": "tsc --noEmit --incremental --tsBuildInfoFile dist/desktop.tsbuildinfo -p tsconfig.json",
     "test": "vitest run --root ../.. apps/desktop/src",
     "test:e2e": "npm run build && playwright test --config e2e/playwright.config.ts",
-    "release": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --publish never",
-    "pack:linux:unified": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-linux.mjs"
+    "release": "npm run build --workspace @mycellios/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --publish never",
+    "pack:linux:unified": "npm run build --workspace @mycellios/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-linux.mjs"
   },
   "dependencies": {
-    "@rakazo/contracts": "*",
-    "@rakazo/logging": "*",
+    "@mycellios/contracts": "*",
+    "@mycellios/logging": "*",
     "@sentry/electron": "8.3.0",
     "electron-updater": "6.8.11",
     "koffi": "3.3.4",
@@ -32,8 +32,8 @@
   "devDependencies": {
     "@electron/asar": "3.4.1",
     "@playwright/test": "1.64.1",
-    "@rakazo/adapters": "*",
-    "@rakazo/ui-tokens": "*",
+    "@mycellios/adapters": "*",
+    "@mycellios/ui-tokens": "*",
     "agent-desktop": "1.3.1",
     "baileys": "7.0.0-rc14",
     "electron": "45.0.0",

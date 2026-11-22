@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
-import type { TransactionalEmail, TransactionalEmailProvider } from "@rakazo/adapter-kit";
+import type { TransactionalEmail, TransactionalEmailProvider } from "@mycellios/adapter-kit";
 
 interface ResendEmailConfig {
   apiKey: string;

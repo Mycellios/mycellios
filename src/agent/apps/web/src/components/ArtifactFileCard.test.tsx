@@ -21,7 +21,7 @@ vi.mock("@lingui/react/macro", () => {
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
 vi.mock("./PdfViewer", () => ({ PdfViewer: () => null }));
-vi.mock("@rakazo/chat-ui/web", () => ({ ChatMarkdown: () => null }));
+vi.mock("@mycellios/chat-ui/web", () => ({ ChatMarkdown: () => null }));
 
 import { ArtifactFileCard } from "./ArtifactFileCard";
 

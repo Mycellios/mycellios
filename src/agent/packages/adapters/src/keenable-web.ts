@@ -5,7 +5,7 @@ import type {
   WebProvider,
   WebSearchHit,
   WebSearchRequest,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import { z } from "zod";
 import { combineSignals } from "./connector-safety.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";

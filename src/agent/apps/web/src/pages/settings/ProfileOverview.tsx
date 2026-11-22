@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, UsageDashboard } from "@rakazo/contracts";
-import { BotAvatar, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@rakazo/ui-web";
+import type { Bot, UsageDashboard } from "@mycellios/contracts";
+import { BotAvatar, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@mycellios/ui-web";
 import { Download, Pencil, Share2 } from "lucide-react";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import type { RpcClient } from "../../lib/rpc";

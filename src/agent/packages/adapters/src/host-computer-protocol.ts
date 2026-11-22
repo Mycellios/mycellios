@@ -1,4 +1,4 @@
-import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
+import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
 import { appControlRequest } from "./app-control.js";
 

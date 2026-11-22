@@ -7,7 +7,7 @@ import {
   micoAvatarDetails,
   micoAvatarValue,
   parseBotAvatarValue,
-} from "@rakazo/contracts";
+} from "@mycellios/contracts";
 import { avatarIdentitySeed } from "./avatar-shape.js";
 import { contrastRatio, resolvePersonaColorDef } from "./bot-avatar-colors.js";
 

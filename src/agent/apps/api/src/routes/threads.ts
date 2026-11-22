@@ -1,16 +1,16 @@
-import { resetThreadContext, ThreadContextBusyError } from "@rakazo/db";
+import { resetThreadContext, ThreadContextBusyError } from "@mycellios/db";
 import { answerSideQuestion } from "../side-question.js";
 import { messagePinRoutes } from "./message-pins.js";
 import { ORPCError } from "@orpc/server";
-import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
-import { settleCallRequest } from "@rakazo/adapters";
-import type { ProductEvent } from "@rakazo/contracts";
+import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
+import { settleCallRequest } from "@mycellios/adapters";
+import type { ProductEvent } from "@mycellios/contracts";
 import {
   CALL_CLIENT_NONCE_PREFIX,
   callClientNonce,
   MODEL_REQUIRED_SEND_ERROR,
   QUEUE_HOLDING_RUN_STATUSES,
-} from "@rakazo/core";
+} from "@mycellios/core";
 import {
   AnswerTooLongError,
   appendEventInTransaction,
@@ -19,8 +19,8 @@ import {
   IsolationError,
   lockOwnedGroup,
   touchGroupUpdatedAt,
-} from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import {
   ownedProjectPreparation,
   prepareProject,

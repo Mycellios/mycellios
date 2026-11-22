@@ -1,5 +1,5 @@
 import type { ConnectedAccountStatus } from "@composio/core";
-import type { AdapterContext, ConnectorEvent } from "@rakazo/adapter-kit";
+import type { AdapterContext, ConnectorEvent } from "@mycellios/adapter-kit";
 import { describe, expect, it } from "vitest";
 import { ComposioConnector, createConnectorStack } from "./composio-connector.js";
 import { FakeComposioClient } from "./composio-fake.js";

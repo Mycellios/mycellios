@@ -1,5 +1,5 @@
 import { i18n } from "@lingui/core";
-import type { Routine } from "@rakazo/contracts";
+import type { Routine } from "@mycellios/contracts";
 import { expect, it, vi } from "vitest";
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ i18n }), Trans: () => null }));
 import { routineDiagramSummary } from "./routine-summary";

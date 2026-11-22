@@ -1,21 +1,21 @@
 import { normalizeContext } from "@earendil-works/pi-ai";
-import type { MessageBlock } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
 import {
   CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE,
   CLOUDFLARE_WORKERS_AI_PROVIDER_ID,
   cloudflareModelConfigMessage,
   FLEET_TOOL_NAMES,
-} from "@rakazo/contracts";
-import { ONCE_ROUTINE_CRON } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
-import { RunHistoryWriteError } from "@rakazo/db";
-import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
+} from "@mycellios/contracts";
+import { ONCE_ROUTINE_CRON } from "@mycellios/core";
+import type { PrismaClient } from "@mycellios/db";
+import { RunHistoryWriteError } from "@mycellios/db";
+import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { describe, expect, it, vi } from "vitest";
 
 // Thread allocation has PostgreSQL acceptance coverage in verify-routine-isolation-db.ts.
 // These scheduling fixtures exercise the committed target and publishing lifecycle.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   // Atomic cross-worker admission is exercised by the isolated PostgreSQL fixture.
   claimMicoRun: vi.fn(async (prisma: PrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<PrismaClient["run"]["updateMany"]>[0])),

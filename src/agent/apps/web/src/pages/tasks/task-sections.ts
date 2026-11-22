@@ -1,4 +1,4 @@
-import type { InboxTask } from "@rakazo/contracts";
+import type { InboxTask } from "@mycellios/contracts";
 export type TaskSection = "pinned" | "needsYou" | "newReplies" | "working" | "waiting" | "pending" | "archived";
 export const TASK_SECTIONS: TaskSection[] = [
   "pinned",

@@ -1,6 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { isCloudMetadataHost, isLocalMcpHost } from "@rakazo/contracts";
+import { isCloudMetadataHost, isLocalMcpHost } from "@mycellios/contracts";
 import type { ResolvedAddress, ResolveHostname } from "./network-address.js";
 import {
   egressRefused,

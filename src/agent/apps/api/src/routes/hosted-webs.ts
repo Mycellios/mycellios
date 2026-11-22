@@ -4,7 +4,7 @@ import { createWebPreview } from "../hosted-webs/preview.js";
 import { hostedWebDataService } from "../hosted-webs/data.js";
 import { hostedWebFilesConfig, hostedWebFilesService } from "../hosted-webs/files.js";
 import { hostedWebService } from "../hosted-webs/service.js";
-import type { HostedWebPresence } from "@rakazo/contracts";
+import type { HostedWebPresence } from "@mycellios/contracts";
 import type { RouterContext } from "./context.js";
 import { HEARTBEAT_MS, SESSION_RECHECK_MS } from "./shared.js";
 

@@ -1,4 +1,4 @@
-import type { DesktopUpdatePreferences, DesktopUpdateState } from "@rakazo/contracts";
+import type { DesktopUpdatePreferences, DesktopUpdateState } from "@mycellios/contracts";
 
 type Ports = {
   packaged: boolean; allowed: boolean;

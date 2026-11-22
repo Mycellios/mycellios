@@ -1,6 +1,6 @@
-import type { ConnectorTool } from "@rakazo/adapter-kit";
-import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/core";
-import { approvalEffectKey } from "@rakazo/core/node/approval-effect-key";
+import type { ConnectorTool } from "@mycellios/adapter-kit";
+import { APPROVED_ACTION_NOT_RUN_ERROR } from "@mycellios/core";
+import { approvalEffectKey } from "@mycellios/core/node/approval-effect-key";
 import { describe, expect, it } from "vitest";
 import {
   approvalReplayResourceError,

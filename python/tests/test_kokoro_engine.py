@@ -22,7 +22,7 @@ class KokoroEngineTests(unittest.TestCase):
 
     def test_serializes_valid_bounded_pcm_and_measures_only_input(self):
         engine = self.engine()
-        result = engine.synthesize("Hola Daniel")
+        result = engine.synthesize("Hola Alex")
         import json
         speech = json.loads(result["content"])
         raw = base64.b64decode(speech["audio"]["data"], validate=True)

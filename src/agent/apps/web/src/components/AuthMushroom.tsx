@@ -1,5 +1,5 @@
-import { MICO_PRIMARY_AVATAR, micoAvatarValue } from "@rakazo/contracts";
-import { BotAvatar } from "@rakazo/ui-web";
+import { MICO_PRIMARY_AVATAR, micoAvatarValue } from "@mycellios/contracts";
+import { BotAvatar } from "@mycellios/ui-web";
 
 /** Non-loading brand artwork shares the actual Mico renderer and collection. */
 export function AuthMushroom({ variant = "mushroom" }: { variant?: "mycelium" | "mushroom" }) {

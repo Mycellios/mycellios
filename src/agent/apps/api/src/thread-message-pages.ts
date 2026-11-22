@@ -1,5 +1,5 @@
-import type { MessageBlock, ThreadMessage, ThreadMessagePage } from "@rakazo/contracts";
-import { MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
+import type { MessageBlock, ThreadMessage, ThreadMessagePage } from "@mycellios/contracts";
+import { MessageBlock as MessageBlockSchema } from "@mycellios/contracts";
 import {
   BACKGROUND_RUN_TRIGGERS,
   callIdFromClientNonce,
@@ -7,9 +7,9 @@ import {
   isBackgroundRunTrigger,
   isPeerReceiptBlocks,
   isUserProgressClientNonce,
-} from "@rakazo/core";
-import { messageReplyPreview } from "@rakazo/core/message-quote";
-import type { Prisma, PrismaClient } from "@rakazo/db";
+} from "@mycellios/core";
+import { messageReplyPreview } from "@mycellios/core/message-quote";
+import type { Prisma, PrismaClient } from "@mycellios/db";
 
 type MessageDb = PrismaClient | Prisma.TransactionClient;
 

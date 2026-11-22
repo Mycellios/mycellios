@@ -41,7 +41,7 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           npm run db:generate
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run build --workspace @rakazo/desktop
+          npm run build --workspace @mycellios/desktop
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node apps/desktop/scripts/verify-floating-chats.mjs floating-chat-proof
           if($LASTEXITCODE){exit $LASTEXITCODE}

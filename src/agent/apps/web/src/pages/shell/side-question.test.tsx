@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import type { RpcClient } from "../../lib/rpc";
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (parts: TemplateStringsArray,...values:unknown[]) => parts.reduce((s,part,i)=>s+part+(values[i]??""),""), i18n:{locale:"en"} }) }));
-vi.mock("@rakazo/chat-ui/web", () => ({ ChatMarkdown: ({children}:{children:string}) => <div>{children}</div> }));
+vi.mock("@mycellios/chat-ui/web", () => ({ ChatMarkdown: ({children}:{children:string}) => <div>{children}</div> }));
 import { SideQuestion } from "./side-question";
 const available=vi.fn(), ask=vi.fn(), close=vi.fn();
 const rpc={threads:{sideQuestionAvailable:available,sideQuestion:ask}} as unknown as RpcClient;

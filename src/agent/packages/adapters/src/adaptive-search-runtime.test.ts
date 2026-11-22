@@ -5,7 +5,7 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { dockerAdaptiveSearchCommand } from "./docker-search-budget.js";
-import { shellQuote } from "@rakazo/core/node/desktop-runtime";
+import { shellQuote } from "@mycellios/core/node/desktop-runtime";
 const context = { runId: "adaptive-search", userId: "fixture", spaceId: "fixture", operationId: "fixture", traceId: "fixture", signal: new AbortController().signal };
 it("extends one real native search while an unrelated command remains intact", async () => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "adaptive-search-")));

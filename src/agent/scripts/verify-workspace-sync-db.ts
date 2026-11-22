@@ -10,12 +10,12 @@ import EmbeddedPostgres from "embedded-postgres";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun, Prisma } = await import("@rakazo/db");
+const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun, Prisma } = await import("@mycellios/db");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
 const { commitBotUpdate } = await import("../packages/db/src/bot-update.js");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
 const { botsRoutes } = await import("../apps/api/src/routes/bots.js");
-const { CreateBotInput } = await import("@rakazo/contracts");
+const { CreateBotInput } = await import("@mycellios/contracts");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
 const { routineCalendar } = await import("../apps/api/src/routine-calendar.js");
 const { sporeRewards, usageDashboard } = await import("../apps/api/src/usage-dashboard.js");

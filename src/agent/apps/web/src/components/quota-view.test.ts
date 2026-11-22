@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { AccountPlanLimit } from "@rakazo/contracts";
+import type { AccountPlanLimit } from "@mycellios/contracts";
 import { expect, it } from "vitest";
 import {
   freshQuota,

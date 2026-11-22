@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { SquareTerminal } from "lucide-react";
 import type { ReactNode } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";

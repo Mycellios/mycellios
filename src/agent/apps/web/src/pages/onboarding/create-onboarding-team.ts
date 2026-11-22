@@ -1,4 +1,4 @@
-import type { CreateBotInput } from "@rakazo/contracts";
+import type { CreateBotInput } from "@mycellios/contracts";
 import { defaultComputerMode, desktopBridge } from "../../lib/desktop";
 import {
   memberInstructions,

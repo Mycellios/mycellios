@@ -1,6 +1,6 @@
 import { isAndroidHost } from "../lib/android-host";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@rakazo/ui-web";
+import { Button } from "@mycellios/ui-web";
 import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { clientUpdates } from "../lib/client-update";

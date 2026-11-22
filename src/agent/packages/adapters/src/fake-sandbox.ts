@@ -12,8 +12,8 @@ import type {
   ScreenRequest,
   ScreenSession,
   TerminalRequest,
-} from "@rakazo/adapter-kit";
-import { canReleaseScreenLease, canTakeScreenLease } from "@rakazo/core";
+} from "@mycellios/adapter-kit";
+import { canReleaseScreenLease, canTakeScreenLease } from "@mycellios/core";
 import { ComputerScreenUnavailableError, screenSessionKey } from "./computer-screens.js";
 import {
   applyPlaceholderAction,

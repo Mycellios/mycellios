@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@rakazo/ui-web";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@mycellios/ui-web";
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { authClient } from "../../lib/auth";

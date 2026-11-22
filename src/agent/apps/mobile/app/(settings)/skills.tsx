@@ -1,4 +1,4 @@
-import type { AgentSkill, AgentSkillCatalogEntry } from "@rakazo/contracts";
+import type { AgentSkill, AgentSkillCatalogEntry } from "@mycellios/contracts";
 import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";

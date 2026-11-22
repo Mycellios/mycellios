@@ -1,4 +1,4 @@
-import { avatarIdentitySeed, myceliumEyeFrame } from "@rakazo/core";
+import { avatarIdentitySeed, myceliumEyeFrame } from "@mycellios/core";
 import { useEffect, useRef, type RefObject } from "react";
 
 // One capped clock for all visible characters. Frames only update SVG attributes;

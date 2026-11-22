@@ -5,9 +5,9 @@ import {
   hasHostedModelCredits,
   isAutoReviewCheckerConfigured,
   PushSessionEndedError,
-} from "@rakazo/adapters";
-import type { ActionApprovalRule, Actor, Me, SettingsScope } from "@rakazo/contracts";
-import { approvalModeFromPreference, approvalPreferenceFromMode } from "@rakazo/core";
+} from "@mycellios/adapters";
+import type { ActionApprovalRule, Actor, Me, SettingsScope } from "@mycellios/contracts";
+import { approvalModeFromPreference, approvalPreferenceFromMode } from "@mycellios/core";
 import {
   findAutoReviewPreference,
   findDefaultVoiceCredential,
@@ -23,7 +23,7 @@ import {
   saveAutoReviewPreference,
   selectVoicePreference,
   voicePreferenceTarget,
-} from "@rakazo/db";
+} from "@mycellios/db";
 import { aiConsentStatus, allowAiConsent } from "../ai-consent.js";
 import type { BillingService } from "../billing.js";
 import type { RouterDeps } from "../router.js";

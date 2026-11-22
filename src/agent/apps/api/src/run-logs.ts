@@ -1,6 +1,6 @@
-import type { Actor, RunLogIssue, RunLogRow, RunLogsInput, RunLogsOutput } from "@rakazo/contracts";
-import { RunLogsInputSchema } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor, RunLogIssue, RunLogRow, RunLogsInput, RunLogsOutput } from "@mycellios/contracts";
+import { RunLogsInputSchema } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 
 const EXECUTING = new Set(["queued", "leased", "running"]);
 

@@ -1,7 +1,7 @@
 import { getHeapStatistics } from "node:v8";
-import type { BackgroundJobExecution } from "@rakazo/adapter-kit";
-import { ATTACHMENT_MAX_BYTES } from "@rakazo/contracts";
-import { getLogger } from "@rakazo/logging";
+import type { BackgroundJobExecution } from "@mycellios/adapter-kit";
+import { ATTACHMENT_MAX_BYTES } from "@mycellios/contracts";
+import { getLogger } from "@mycellios/logging";
 
 function admissionMemory(activeRuns: number) {
   // One incoming run needs room for an attachment and its decoding/copying.

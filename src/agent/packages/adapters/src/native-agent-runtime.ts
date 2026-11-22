@@ -15,7 +15,7 @@ import type {
   AgentRuntimeEvent,
   AgentToolResultContent,
   ConnectorTool,
-} from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
 import { WorkContinuation, withWorkContinuation, workContinuationEnabled } from "./work-continuation.js";
 import { nativeAgentProtocolError } from "./native-agent-errors.js";
 import { deliverFinishedShells } from "./shell-command-stream.js";

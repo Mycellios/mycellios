@@ -3,8 +3,8 @@ import {
   isOllamaCloudBaseUrl,
   OLLAMA_CLOUD_BASE_URL,
   OPENAI_COMPATIBLE_PROVIDER_ID,
-} from "@rakazo/contracts";
-import { popularModelProvidersFirst } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { popularModelProvidersFirst } from "@mycellios/core";
 import { isCancelledError, useQuery } from "@tanstack/react-query";
 import type { Href } from "expo-router";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";

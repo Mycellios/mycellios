@@ -20,7 +20,7 @@ test("onboarding preflight stays on the connection being tested", async ({ page 
   });
 
   const stamp = Date.now();
-  await signup(page, `preflight-${stamp}@rakazo.test`, "password12", `Preflight ${stamp}`);
+  await signup(page, `preflight-${stamp}@mycellios.test`, "password12", `Preflight ${stamp}`);
   await expect(page.getByRole("heading", { name: "Connect a model" })).toBeVisible({
     timeout: 20_000,
   });
@@ -84,7 +84,7 @@ test("settings preflight distinguishes a stored API key from sign-in", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `preflight-settings-${stamp}@rakazo.test`, "password12", `Settings ${stamp}`);
+  await signup(page, `preflight-settings-${stamp}@mycellios.test`, "password12", `Settings ${stamp}`);
   await completeOnboarding(page);
   await openUserSettings(page, "models");
 

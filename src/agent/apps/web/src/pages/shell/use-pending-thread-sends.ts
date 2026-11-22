@@ -1,4 +1,4 @@
-import type { ProductEvent, ThreadSnapshot } from "@rakazo/contracts";
+import type { ProductEvent, ThreadSnapshot } from "@mycellios/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type PendingThreadSend,

@@ -1,4 +1,4 @@
-import type { BackgroundJob, JobPublisher } from "@rakazo/adapter-kit";
+import type { BackgroundJob, JobPublisher } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
 import { createRunExecutor, deferFutureRoutine } from "./executor.js";
 

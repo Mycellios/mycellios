@@ -1,4 +1,4 @@
-- Model lists follow upstream releases at run time, as OpenBot's auto-updated engines
+- Model lists follow upstream releases at run time, as the reference app's auto-updated engines
   do (behavior reference only; its code is PolyForm Noncommercial and not copied).
   `models-dev.ts` reads the public models.dev catalog as data only (bounded, cached,
   last-good copy, off with RAKAZO_LIVE_MODEL_CATALOG=off) and adds agent-ready models
@@ -51,7 +51,7 @@
 
 # AGENTS.md
 
-- Team app builds follow OpenBot's bot-crew preview (behavior reference only, no
+- Team app builds follow the reference app's bot-crew preview (behavior reference only, no
   copied code) through specs/mico-team-build/spec.md. Presence is transient: the
   worker publishes it on the realtime fanout only after an authorized app_read/
   app_write commits, never content, never from clients or models; webs.presence
@@ -85,7 +85,7 @@
   host-app-control, executor-readonly-approval and windows-installer tests; unit
   fixtures do not qualify a real installed Desktop session.
 
-- read_video follows OpenBot's video reading (behavior reference only; its code is
+- read_video follows the reference app's video reading (behavior reference only; its code is
   PolyForm Noncommercial and not copied). `packages/adapters/src/video-reader.ts` runs
   in the worker: a pinned yt-dlp verified by SHA-256 before use, site extractors only
   (`default,-generic`), a public-address check before any command, 500 MB/720p and
@@ -210,7 +210,7 @@
   visible; never enforce brevity by truncating replies or lowering output limits.
   Check the focused conversation-style/Mico behavior tests and provider delivery
   fixtures; a fake provider verifies delivery, not a live model's compliance.
-- Mico replies follow OpenBot's natural/classic behavior. OpenBot is PolyForm
+- Mico replies follow the reference app's natural/classic behavior. The reference app is PolyForm
   Noncommercial: use it as a behavior reference only and write every prompt, label
   and line of code in our own words. Pi repeats the natural first-line rule as a
   `<mycellios_turn_style>` block before each user turn (not for scripts, silent runs
@@ -973,13 +973,13 @@
 
 - First-party Mycellios sign-in uses the normal same-window OIDC redirect on web
   and Desktop. Windows and Linux use the standard native OS title bar, the same
-  way OpenBot does: the BrowserWindow keeps `frame: true` and does not set
+  way the reference app does: the BrowserWindow keeps `frame: true` and does not set
   `titleBarStyle` or `titleBarOverlay`. Caption controls sit in that bar above
   the page. Do not install a host caption strip, a transparent overlay, or page
   padding and drag regions that reserve space for those controls.
   macOS uses `titleBarStyle: "hidden"` with the traffic lights over the page at
   MAC_WINDOW_BUTTON_INSET, inside the 72px macOS page rail and centred on the
-  51px top row, as in OpenBot; drag regions exist only on that platform. Each
+  51px top row, as in the reference app; drag regions exist only on that platform. Each
   top row drags the window as a whole: mark only its controls no-drag, never a
   wrapper that spans the row. The legacy nativeWindowFrame
   capability means controls are host-owned; hide duplicate in-page controls only
@@ -1170,7 +1170,7 @@
   paths live in `packages/contracts/src/product-brand.ts`; semantic forest/paper
   colors remain in `packages/ui-tokens/src/index.ts`. Web overrides must not
   replace the shared forest/paper surfaces with upstream monochrome colors. Generate its CSS with
-  `npm run generate --workspace @rakazo/ui-tokens`. Preserve upstream license notices
+  `npm run generate --workspace @mycellios/ui-tokens`. Preserve upstream license notices
   and internal storage/protocol identifiers when changing visible branding.
   Declare the startup Geist font in `apps/web/package.json`; ship its OFL notice
   under `apps/web/public/licenses/` rather than relying on a sibling clone cache.
@@ -1178,7 +1178,7 @@
   `apps/web/src/typography.css`; keep serif display overrides out of these surfaces.
   Hosted identity builds self-host font assets and require same-origin font CSP.
   App icons derive from `packages/ui-tokens/assets/mycellios-mark.svg` via
-  `npm run export:brand --workspace @rakazo/ui-tokens`. Keep separate opaque maskable/iOS
+  `npm run export:brand --workspace @mycellios/ui-tokens`. Keep separate opaque maskable/iOS
   and transparent adaptive/notification outputs; Windows ICO includes small native frames.
 - Preserve the separate contribution and paid-model ledgers; product naming does not merge or revalue them. Paid top-ups use the shared integer conversion in `credit-units.ts` (10 USD = 10 Credits). Mico/Micos names the user agents; Spore is the official token name, with existing launch gates unchanged.
   Trial Spore in Usage is off-chain and has no monetary value. Derive it from the
@@ -1331,7 +1331,7 @@
   Keep authorized memory and user-clarification schemas in the initial catalog;
   basic interactions should not require discovering their own core tools.
 - Micos created in Desktop default to This PC (`dedicated`), each in its own
-  native folder, as OpenBot's agents work on the owner's computer (behavior
+  native folder, as the reference app's agents work on the owner's computer (behavior
   reference only); local-access consent is still requested before binding.
   Elsewhere, new ordinary Micos use `isolated` server computers with distinct account/Space/
   Mico home keys. Keep Team sharing and explicit This PC (`dedicated`) unchanged,
@@ -1426,7 +1426,7 @@
   First-party onboarding starts with the signed-in Mycellios account and owned
   contribution credits; AntSeed remains an explicit alternative requiring the user's
   own key. Never fall back to another payer or provider when native credit access fails.
-  Empty accounts see one OpenBot-style first-run choice (FirstRunChoice): free
+  Empty accounts see one reference-style first-run choice (FirstRunChoice): free
   models (recommended) connect Mycellios and make a zero-priced managed AntSeed
   route (`mycellios/managed/*`, external processing; see lib/free-models.ts) the
   main role when one exists. Free models come only through AntSeed: never offer a
@@ -1502,7 +1502,7 @@
   the transcription and sending the draft as separate actions in the composer.
 
 - This is a public repository: assume all tracked content and diffs are public. Never commit secrets, `.env` files, private URLs, personal/customer data, or real production data; use fake placeholders. Review `git status` and the staged diff before committing, and never force-add ignored files. If private data appears, stop and alert the maintainer.
-- Rakazo is one product across web, Electron desktop, and Expo mobile; Electron hosts the web UI. Put shared behavior, contracts, API logic, and reusable UI in packages. Keep only genuinely native navigation, storage, permissions, and interactions platform-specific. Core workflows must cover every applicable surface or degrade safely for an explicit reason.
+- Mycellios is one product across web, Electron desktop, and Expo mobile; Electron hosts the web UI. Put shared behavior, contracts, API logic, and reusable UI in packages. Keep only genuinely native navigation, storage, permissions, and interactions platform-specific. Core workflows must cover every applicable surface or degrade safely for an explicit reason.
 - No hosted vendor is required to run the core product. Keep LLMs, sandboxes, memory, voice, integrations, and future external services optional and behind provider-neutral interfaces. Vendor SDKs, configuration, and translation belong only in adapters and composition roots. New providers must reuse shared contracts and deterministic offline conformance tests.
 - Keep UI and copy minimal. Show advanced capability progressively and only when it becomes relevant; do not add explainer text that repeats the interface. Frontends express intent and render state; the backend owns orchestration, authorization, validation, retries, recovery, and provider translation. Give controls concise accessible names when needed.
 - User-clicked chat links in web, PWA and Desktop open directly without a confirmation
@@ -1515,13 +1515,13 @@
 - Production deploys run the previous and new API side by side for a few seconds after migrations apply, so every migration must keep working with the previous release's code: add tables and columns first, and drop or rename only in a later deploy once nothing reads them.
 - Treat auth, secret handling, sandbox boundaries, host commands, and integrations as security-sensitive. Keep tests deterministic and offline by default.
 - Judge natural-language meaning and factual claims with an LLM and an explicit, versioned rubric calibrated against reviewed examples; do not grade free-form prose with keyword lists, regexes, or exact wording. Keep deterministic assertions for observable effects and structured output contracts. Keep judge calls opt-in and provider-neutral, report their cost separately, and treat judge errors as unqualified results rather than passes.
-- The desktop Playwright suite (`npm run test:e2e --workspace @rakazo/desktop`) opens real Electron windows and steals focus on macOS. Do not run it on a maintainer's machine as routine verification; run the unit tests locally and let CI's virtual-display job run the e2e on push.
+- The desktop Playwright suite (`npm run test:e2e --workspace @mycellios/desktop`) opens real Electron windows and steals focus on macOS. Do not run it on a maintainer's machine as routine verification; run the unit tests locally and let CI's virtual-display job run the e2e on push.
 - Marketing pages (the Astro site in `apps/www`) don't get tests. Check those changes visually and with a build, not with unit or E2E tests.
 - After creating a pull request, stay with it until CI and automated review bots have finished; passing checks alone do not mean the review is complete. Follow `.agents/skills/pr-watch/SKILL.md`: run its `pr-digest --watch` helper as a single backgrounded call that blocks until a new review comment or check failure arrives or the checks on the current head commit are terminal, then act on the verdict it prints and watch again. Do not poll in the foreground on a timer, which mostly buys repeated snapshots of an unchanged PR and dies at the tool timeout. Address every actionable issue, push the fixes, and repeat until no actionable feedback remains. Do not merge while review bots are still pending or review issues remain unresolved.
 - PR descriptions say why the change exists, what changed, and how it was tested. Write Why as the product reason (what was wrong and what this changes); never "Elie wants" or a third-person briefing of a named person; the maintainer is the author.
 - Commit messages, PR descriptions, issues, and review replies are public too. Describe test results in words instead of pasting tool output. Never include business metrics such as analytics, traffic, click-through, conversion, signup, revenue, or star-growth numbers; give the product reason in words, even when data motivated the change. Never include anything that identifies a person, machine, or account: local paths, usernames, hostnames, signing identities, legal entity names, Apple Team IDs, API key IDs, issuer or tenant IDs, account emails, or the accounts, machines, and files that secret values came from. Naming the secrets a workflow reads is fine; use placeholders when a value must be shown.
 - For UI changes, link the CI E2E screenshot that shows the change on the PR; add the web test that opens that screen if it is missing. For native-only mobile UI that CI cannot capture, say so in the PR instead of linking an unrelated web screenshot.
-- UI system. Colors live in `@rakazo/ui-tokens` as semantic tokens (background, card, muted, border, primary, destructive, ...) with one TypeScript source that generates `tokens.css`; never hardcode a product hex or use `[var(--â€¦)]` arbitrary values. Web and Electron use shadcn/ui on Base UI, vendored into `packages/ui-web` via `npm exec -- shadcn add` from the official registry only (third-party registries are a supply-chain risk); reuse those components before writing chrome by hand, and reuse `apps/web/src/components/ai/` for AI moments (loading, shimmer, success). The app is monochrome: primary is ink, status colors are destructive/success/warning, bots carry the only identity color. Mobile is native-first: Expo Router, Expo UI, native sheets, menus, alerts and pickers wherever one exists; custom surfaces (thread, composer, avatars, cards) use plain StyleSheet with the shared tokens through `apps/mobile/lib/appearance`, and system chrome stays PlatformColor via `lib/native`. Mobile may diverge from web when the native pattern is better.
+- UI system. Colors live in `@mycellios/ui-tokens` as semantic tokens (background, card, muted, border, primary, destructive, ...) with one TypeScript source that generates `tokens.css`; never hardcode a product hex or use `[var(--â€¦)]` arbitrary values. Web and Electron use shadcn/ui on Base UI, vendored into `packages/ui-web` via `npm exec -- shadcn add` from the official registry only (third-party registries are a supply-chain risk); reuse those components before writing chrome by hand, and reuse `apps/web/src/components/ai/` for AI moments (loading, shimmer, success). The app is monochrome: primary is ink, status colors are destructive/success/warning, bots carry the only identity color. Mobile is native-first: Expo Router, Expo UI, native sheets, menus, alerts and pickers wherever one exists; custom surfaces (thread, composer, avatars, cards) use plain StyleSheet with the shared tokens through `apps/mobile/lib/appearance`, and system chrome stays PlatformColor via `lib/native`. Mobile may diverge from web when the native pattern is better.
 - On mobile, use built-in native iOS controls (@expo/ui SwiftUI and Liquid Glass, native header items, context menus, alerts, pickers, and switches) wherever possible instead of custom React Native pills or buttons.
 
 - This Agent is now maintained inside Mycellios/mycellios under src/agent. The
@@ -1530,7 +1530,7 @@
   Keep this workspace's package-lock.json and install its own dependencies with
   npm; never junction node_modules to a sibling checkout. First-party packages
   must resolve to this checkout. Run frontend commands in apps/web (or with
-  --workspace @rakazo/web) so Lingui finds its configuration. Do not validate or
+  --workspace @mycellios/web) so Lingui finds its configuration. Do not validate or
   launch while another install is replacing this checkout's dependencies.
   Compose application, supervisor and updater images use the canonical repository
   as their build context so shared native contracts remain available. They install
@@ -1581,7 +1581,7 @@
   mobile layout. Verify mobile-sidebar-swipe.spec.ts.
   On desktop, keep search visible below the expanded sidebar header. The search
   icon in the collapsed sidebar expands it and focuses the same field.
-  The desktop rail footer follows OpenBot, top to bottom: usage, Hifa Store,
+  The desktop rail footer follows the reference app, top to bottom: usage, Hifa Store,
   Help, Settings and the server menu last. It has no account avatar or app
   marks; sign-out lives in Settings > Profile, integrations in Hifa Store, and
   the account footer remains in the mobile navigation. Place credits and compute
@@ -1610,7 +1610,7 @@
   beforePack continuity gate: web, native host and local backend must have fresh
   release-inputs.json receipts matching the current sources, version and bundles.
   Build the local backend separately with `npm run build:local-server --workspace
-  @rakazo/desktop`; invoke it through npm so its locked toolchain is inherited.
+  @mycellios/desktop`; invoke it through npm so its locked toolchain is inherited.
   Do not copy installed repairs or older candidate dist files into a new release.
   Keep com.mycellios.agent.desktop and the Mycellios Agent userData path stable;
   preserve profile/workspaces, account permission and existing projects on upgrade.
@@ -1934,14 +1934,14 @@
   download links in update settings, not stacked beneath the sidebar action.
   Preserve native draft/call/work guards and explicit install consent; waiting
   for those guards must not cover the chat with a full-screen update dialog.
-  The one exception is a server-required release, as in OpenBot (behavior reference
+  The one exception is a server-required release, as in the reference app (behavior reference
   only): MYCELLIOS_DESKTOP_MINIMUM_VERSION reaches Desktop through the public auth
   capabilities, reread every six hours. Below it, DesktopRequiredUpdate covers the
   app with the same guarded download/restart actions and a one-hour Not now; it
   never installs on its own. A missing or unreachable minimum requires nothing.
   Verify DesktopUpdates and API env tests.
 
-- A PC workspace belongs to that PC, as OpenBot keeps a workspace on its own host
+- A PC workspace belongs to that PC, as the reference app keeps a workspace on its own host
   (behavior reference only, no copied code). Provisioning seeds the saved server copy
   only into a workspace the PC has just created (ref.fresh); never overwrite files on
   the PC. Transfers in both directions leave out `isWorkspaceTransferExcluded` paths

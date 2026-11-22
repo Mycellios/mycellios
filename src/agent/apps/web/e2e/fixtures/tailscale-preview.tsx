@@ -3,7 +3,7 @@ import { I18nProvider } from "@lingui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
-import type { TailnetConnection } from "@rakazo/contracts";
+import type { TailnetConnection } from "@mycellios/contracts";
 import type { RpcClient } from "../../src/lib/rpc";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
 import { TailscaleConnections } from "../../src/pages/TailscaleConnections";

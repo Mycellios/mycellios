@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { BotAvatar, Button, Dialog, DialogContent, DialogTitle, DialogDescription, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { BotAvatar, Button, Dialog, DialogContent, DialogTitle, DialogDescription, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@mycellios/ui-web";
 import { MoreHorizontal, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
 import { useBoundTaskThreadScope, useSpaceRpc } from "../../lib/space-rpc";

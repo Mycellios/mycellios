@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
-import { loadRootEnv } from "@rakazo/core/node/load-root-env";
+import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { computerTestSandbox } from "../computer-test-config.js";
 import { FLOWS } from "../flows/index.js";
@@ -106,13 +106,13 @@ async function main() {
         .digest("hex");
       const stamp = path.resolve("packages/db/src/generated/prisma/.flows-schema-hash");
       if (existsSync(stamp) && readFileSync(stamp, "utf8") === schema) return;
-      execFileSync("pnpm", ["--filter", "@rakazo/db", "generate"], {
+      execFileSync("pnpm", ["--filter", "@mycellios/db", "generate"], {
         stdio: "pipe",
         timeout: 300_000,
       });
       writeFileSync(stamp, schema);
     });
-    execFileSync("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"], {
+    execFileSync("pnpm", ["--filter", "@mycellios/db", "exec", "prisma", "migrate", "deploy"], {
       stdio: "pipe",
       timeout: 600_000,
     });

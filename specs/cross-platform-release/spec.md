@@ -40,7 +40,7 @@ never the Android private key or password. The existing key stays on its origina
 host. Install the reviewed publisher, service and timer after qualification; keep
 the previous service/config and all installer/certificate identities for rollback.
 
-Reference flow inspected: https://github.com/nightly-labs/openbot/blob/main/.github/workflows/release.yml
+Reference flow inspected: (reference source)
 uses native platform jobs, validation before publication and a serialized release
 queue. Mycellios retains its current unsigned-preview installation policy.
 

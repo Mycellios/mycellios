@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from "node:fs";
-import { fontWeight, typeScale } from "@rakazo/ui-tokens";
+import { fontWeight, typeScale } from "@mycellios/ui-tokens";
 import type { ReactNode } from "react";
 import * as React from "react";
 import { act, useCallback, useEffect, useRef, useState } from "react";
@@ -323,7 +323,7 @@ describe("thread menu archive notifications", () => {
       "Alert",
       compile(`
         const readOnly = false, botId = "bot-b", displayName = "Bot";
-        const t = text => text, openBotComputer = () => {}, clearConversation = () => {};
+        const t = text => text, showBotComputer = () => {}, clearConversation = () => {};
         const router = { push() {} }, errorText = () => "failure";
         ${actionsSource}
         return botActions;

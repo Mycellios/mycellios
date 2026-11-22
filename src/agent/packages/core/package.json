@@ -1,5 +1,5 @@
 {
-  "name": "@rakazo/core",
+  "name": "@mycellios/core",
   "version": "0.1.0",
   "license": "Apache-2.0 AND LicenseRef-PolyForm-Shield-1.0.0",
   "type": "module",
@@ -73,7 +73,7 @@
   },
   "dependencies": {
     "@observablehq/plot": "0.6.17",
-    "@rakazo/contracts": "*",
+    "@mycellios/contracts": "*",
     "croner": "10.0.1",
     "d3-dsv": "3.0.1",
     "dotenv": "17.4.2",

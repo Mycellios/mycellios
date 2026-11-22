@@ -1,4 +1,4 @@
-import type { RoutineRun } from "@rakazo/contracts";
+import type { RoutineRun } from "@mycellios/contracts";
 
 /** Older history remains linked to the original chat; private work carries its exact target. */
 export function routineThreadPath(run: Pick<RoutineRun, "botId" | "groupId" | "messageId" | "taskThreadId">): string | null {

@@ -1,6 +1,6 @@
 import { RPCHandler } from "@orpc/server/fetch";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -13,7 +13,7 @@ type Row = Record<string, unknown>;
 const actor = {
   spaceId: "space-1",
   userId: "user-1",
-  email: "user@rakazo.test",
+  email: "user@mycellios.test",
   isDeploymentOwner: true,
 } satisfies Actor;
 

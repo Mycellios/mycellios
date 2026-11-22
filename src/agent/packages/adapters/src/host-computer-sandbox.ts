@@ -8,9 +8,9 @@ import type {
   ProcessEvent,
   SandboxProvider,
   WorkspaceDirectoryRequest,
-} from "@rakazo/adapter-kit";
-import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
+import { getLogger } from "@mycellios/logging";
 import { describeDesktopSandbox } from "./desktop-sandbox.js";
 import { projectLeaseOwner } from "./project-execution.js";
 import type {

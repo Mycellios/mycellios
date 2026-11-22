@@ -1,4 +1,4 @@
-import { getLogger } from "@rakazo/logging";
+import { getLogger } from "@mycellios/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { McpConnector } from "./mcp-connector.js";
 import { mcpLaunchSecrets } from "./mcp-launch-secrets.js";

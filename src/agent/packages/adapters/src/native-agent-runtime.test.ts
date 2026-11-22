@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
+import type { AgentRunRequest, AgentRuntimeEvent } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { builtinAgentTools } from "./builtin-tools.js";
 import { approvalPausedToolResult } from "./approval-effect.js";

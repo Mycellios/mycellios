@@ -1,5 +1,5 @@
-import type { Actor } from "@rakazo/contracts";
-import type { createDb } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { createDb } from "@mycellios/db";
 
 /** Materialize navigation metadata only; never send, resume or create a Run.
  * Existing inbox entries own their read/archive state and are never replaced.

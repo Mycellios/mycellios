@@ -1,5 +1,5 @@
-import type { SpaceBot, SpaceGroup } from "@rakazo/contracts";
-import { groupBotsForSidebar } from "@rakazo/core";
+import type { SpaceBot, SpaceGroup } from "@mycellios/contracts";
+import { groupBotsForSidebar } from "@mycellios/core";
 import type { MobileBot, MobileGroup, MobileSpace } from "./api";
 import { adoptDeletedSpaceFallback, rpc, selectedSpaceId, selectSpace } from "./api";
 import { t } from "./i18n";

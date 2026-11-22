@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
 import type { ThreadTarget } from "./thread-target.js";
 import { retryThreadRun } from "./retry-thread-run.js";
-import { desktopDiagnosticMessage } from "@rakazo/contracts";
+import { desktopDiagnosticMessage } from "@mycellios/contracts";
 
 const actor = { userId: "owner", spaceId: "space" } as Actor;
 const target = { kind: "bot", botId: "bot", threadId: "thread" } as ThreadTarget;

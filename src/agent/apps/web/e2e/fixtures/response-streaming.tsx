@@ -1,6 +1,6 @@
 import { I18nProvider } from "@lingui/react";
-import type { ProductEvent } from "@rakazo/contracts";
-import { withLiveStreamingProgress } from "@rakazo/core";
+import type { ProductEvent } from "@mycellios/contracts";
+import { withLiveStreamingProgress } from "@mycellios/core";
 import { createRoot } from "react-dom/client";
 import { bootstrapI18n, i18n } from "../../src/lib/i18n";
 import { setResponseStreamingPreference } from "../../src/lib/response-streaming";

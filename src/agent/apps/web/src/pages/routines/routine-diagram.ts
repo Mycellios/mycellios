@@ -1,4 +1,4 @@
-import type { Routine, RoutineRun } from "@rakazo/contracts";
+import type { Routine, RoutineRun } from "@mycellios/contracts";
 
 export type Point = { x: number; y: number };
 export type DiagramView = Point & { scale: number };

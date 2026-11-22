@@ -1,7 +1,7 @@
-import { ChatMarkdown } from "@rakazo/chat-ui/native";
-import type { PeerConversation } from "@rakazo/core";
-import { displayName, loadPeerHistory, peerConversations } from "@rakazo/core";
-import { typeScale } from "@rakazo/ui-tokens";
+import { ChatMarkdown } from "@mycellios/chat-ui/native";
+import type { PeerConversation } from "@mycellios/core";
+import { displayName, loadPeerHistory, peerConversations } from "@mycellios/core";
+import { typeScale } from "@mycellios/ui-tokens";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";

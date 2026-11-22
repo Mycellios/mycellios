@@ -1,5 +1,5 @@
-import type { MessageBlock } from "@rakazo/contracts";
-import { ReplyPreviewSchema } from "@rakazo/contracts";
+import type { MessageBlock } from "@mycellios/contracts";
+import { ReplyPreviewSchema } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import { replyAttachment, replyLabel, replyLineText, replyMetadata } from "./message-replies.js";
 

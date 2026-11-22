@@ -4,9 +4,9 @@ import type {
   BrowserActStep,
   BrowserProvider,
   ComputerRef,
-} from "@rakazo/adapter-kit";
-import { MAX_BROWSER_UPLOAD_FILES } from "@rakazo/adapter-kit";
-import { getLogger } from "@rakazo/logging";
+} from "@mycellios/adapter-kit";
+import { MAX_BROWSER_UPLOAD_FILES } from "@mycellios/adapter-kit";
+import { getLogger } from "@mycellios/logging";
 import type { LoginField } from "./bot-secrets.js";
 import { redactConnectorPayload } from "./connector-safety.js";
 

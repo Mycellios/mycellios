@@ -8,7 +8,7 @@ import path from "node:path";
 import {promisify} from "node:util";
 import EmbeddedPostgres from "embedded-postgres";
 process.env.RAKAZO_PROJECT_LOCAL="1";process.env.CONTENT_ENCRYPTION="off";
-const {createDb,asSystem,runAsTenant,listMessagePins,setMessagePin}=await import("@rakazo/db");
+const {createDb,asSystem,runAsTenant,listMessagePins,setMessagePin}=await import("@mycellios/db");
 const {messagePinRoutes}=await import("../apps/api/src/routes/message-pins.js");
 const socket=createServer();await new Promise<void>(resolve=>socket.listen(0,"127.0.0.1",resolve));
 const port=(socket.address() as {port:number}).port;await new Promise<void>(resolve=>socket.close(()=>resolve()));

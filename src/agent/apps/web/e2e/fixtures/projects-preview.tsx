@@ -2,7 +2,7 @@ import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { ProjectSummary } from "@rakazo/contracts";
+import type { ProjectSummary } from "@mycellios/contracts";
 import type { RpcClient } from "../../src/lib/rpc";
 import { SidebarProjects } from "../../src/components/SidebarProjects";
 import { LocalProject } from "../../src/components/LocalProject";

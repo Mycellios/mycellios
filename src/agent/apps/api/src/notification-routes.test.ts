@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createRouterClient } from "@orpc/server";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { createRouter } from "./router.js";
 import type { RouterDeps } from "./router.js";

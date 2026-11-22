@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Workflow, WorkflowExecution } from "@rakazo/contracts";
+import type { Workflow, WorkflowExecution } from "@mycellios/contracts";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";

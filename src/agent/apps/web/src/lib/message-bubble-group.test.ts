@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ThreadMessage } from "@rakazo/contracts";
+import type { ThreadMessage } from "@mycellios/contracts";
 import { joinMessageBubbles } from "./message-bubble-group";
 const message = (extra: Partial<ThreadMessage> = {}): ThreadMessage => ({id:"a",threadId:"thread",seq:1,role:"bot",botId:"mico",createdAt:"2026-11-11T12:00:00Z",blocks:[{kind:"text",text:"Hello"}],...extra});
 describe("message bubble groups", () => {

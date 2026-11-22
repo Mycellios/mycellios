@@ -5,7 +5,7 @@ test("renders masked secret card and saves without putting the value in chat", a
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `secret-card-${stamp}@rakazo.test`, "password12", "Secret Card");
+  await signup(page, `secret-card-${stamp}@mycellios.test`, "password12", "Secret Card");
   await completeOnboarding(page);
 
   const botId = activeBotId(page);
@@ -134,7 +134,7 @@ test("dismisses a secret card, resumes the bot and frees the composer", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `secret-dismiss-${stamp}@rakazo.test`, "password12", "Secret Dismiss");
+  await signup(page, `secret-dismiss-${stamp}@mycellios.test`, "password12", "Secret Dismiss");
   await completeOnboarding(page);
 
   const botId = activeBotId(page);

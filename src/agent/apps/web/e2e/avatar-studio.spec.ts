@@ -3,7 +3,7 @@ import { captureScreenshot, completeOnboarding, signup } from "./helpers";
 
 test("bot settings save the avatar shape and palette across reloads", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `avatar-studio-${stamp}@rakazo.test`, "password12", "Avatar Studio");
+  await signup(page, `avatar-studio-${stamp}@mycellios.test`, "password12", "Avatar Studio");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);

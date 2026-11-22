@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ProcessEvent } from "@rakazo/adapter-kit";
+import type { ProcessEvent } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as processTree from "./desktop-process-tree.js";
 import { assertHostCommandsAllowed, DesktopSandboxProvider } from "./desktop-sandbox.js";

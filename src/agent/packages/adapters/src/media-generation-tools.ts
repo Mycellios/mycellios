@@ -3,11 +3,11 @@ import type {
   GeneratedMedia,
   MediaGenerationProvider,
   MediaVideoJob,
-} from "@rakazo/adapter-kit";
-import { MediaGenerationError } from "@rakazo/adapter-kit";
-import type { ImageAspectRatio, MessageBlock } from "@rakazo/contracts";
-import { messageBlockForArtifact } from "@rakazo/core";
-import type { ExternalEffect, PrismaClient } from "@rakazo/db";
+} from "@mycellios/adapter-kit";
+import { MediaGenerationError } from "@mycellios/adapter-kit";
+import type { ImageAspectRatio, MessageBlock } from "@mycellios/contracts";
+import { messageBlockForArtifact } from "@mycellios/core";
+import type { ExternalEffect, PrismaClient } from "@mycellios/db";
 import { z } from "zod";
 import { imageAspectRatioOf, pngPixelSize } from "./image-generation-card.js";
 import {

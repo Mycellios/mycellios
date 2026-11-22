@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { useEffect, useState } from "react";
-import { BotAvatar } from "@rakazo/ui-web";
+import { BotAvatar } from "@mycellios/ui-web";
 import { companionAvatar } from "../../src/lib/companion-avatar";
 import "../../src/styles.css";
 

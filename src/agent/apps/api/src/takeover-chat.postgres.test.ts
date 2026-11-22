@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { RPCHandler } from "@orpc/server/fetch";
-import type { AgentRunRequest, JobPublisher } from "@rakazo/adapter-kit";
+import type { AgentRunRequest, JobPublisher } from "@mycellios/adapter-kit";
 import {
   createRunExecutor,
   EncryptedSecretStore,
@@ -10,11 +10,11 @@ import {
   FakeSandboxProvider,
   LocalAgentHomeStore,
   ScriptedAgentRuntime,
-} from "@rakazo/adapters";
-import type { Actor } from "@rakazo/contracts";
-import type { PrismaClient } from "@rakazo/db";
-import { asSystem, createDb, createThreadEvents, runAsSystem, runAsTenant } from "@rakazo/db";
-import { MarkdownMemoryStore } from "@rakazo/memory";
+} from "@mycellios/adapters";
+import type { Actor } from "@mycellios/contracts";
+import type { PrismaClient } from "@mycellios/db";
+import { asSystem, createDb, createThreadEvents, runAsSystem, runAsTenant } from "@mycellios/db";
+import { MarkdownMemoryStore } from "@mycellios/memory";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";

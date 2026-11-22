@@ -1,15 +1,15 @@
-import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
+import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
 import type {
   AgentRunRequest,
   MemoryCommitRequest,
   MemoryReadRequest,
   MemorySnapshot,
-} from "@rakazo/adapter-kit";
-import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
+} from "@mycellios/adapter-kit";
+import { MEMORY_REVISION_CONFLICT_ERROR } from "@mycellios/adapter-kit";
 import {
   legacyScopedToolEffectIdempotencyKey,
   toolEffectIdempotencyKey,
-} from "@rakazo/core/node/approval-effect-key";
+} from "@mycellios/core/node/approval-effect-key";
 import { describe, expect, it, vi } from "vitest";
 import type * as AutoReviewModule from "./auto-review.js";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
@@ -838,8 +838,8 @@ describe("mutating tool effect idempotency keys", () => {
 
 // These executor fixtures isolate post-admission behavior. Real concurrent SQL
 // admission is exercised by scripts/verify-workspace-sync-db.ts.
-vi.mock("@rakazo/db", async (load) => ({
-  ...await load<typeof import("@rakazo/db")>(),
+vi.mock("@mycellios/db", async (load) => ({
+  ...await load<typeof import("@mycellios/db")>(),
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));

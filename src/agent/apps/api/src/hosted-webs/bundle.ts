@@ -1,1 +1,1 @@
-export * from "@rakazo/core/node/hosted-web-bundle";
+export * from "@mycellios/core/node/hosted-web-bundle";

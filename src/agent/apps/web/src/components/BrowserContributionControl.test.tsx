@@ -7,7 +7,7 @@ vi.mock("../lib/browser-contribution-availability",()=>({browserContributionAvai
 vi.mock("../lib/rpc",()=>({rpc:{models:{browserContributionLink:f.bind}}}));
 vi.mock("../lib/auth",()=>({authClient:{useSession:()=>({data:{user:{id:f.owner}}})}}));
 vi.mock("@lingui/react/macro",()=>({useLingui:()=>({t:(s:TemplateStringsArray)=>s.join("")})}));
-vi.mock("@rakazo/ui-web",()=>({Button:(props:any)=><button {...props}/> }));
+vi.mock("@mycellios/ui-web",()=>({Button:(props:any)=><button {...props}/> }));
 vi.mock("../../../../../mobile/runtime",()=>({getMobileWorkerAccountProof:()=>({workerId:"32cb4b44-cd2e-45d5-966e-b876f4c4dba0",token:"test-worker-proof"}),initializeMobileWorker:f.init,startMobileWorker:f.start,stopMobileWorker:f.stop,getMobileWorkerSnapshot:()=>f.snapshot,subscribeMobileWorker:(fn:any)=>{f.listener=fn;fn(f.snapshot);return f.unsubscribe;}}));
 import { BrowserContributionControl } from "./BrowserContributionControl";
 let root:ReturnType<typeof createRoot>,host:HTMLDivElement;

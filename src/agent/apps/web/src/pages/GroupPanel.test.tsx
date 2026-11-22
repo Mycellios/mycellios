@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import type { Bot, Group } from "@rakazo/contracts";
-import type * as UiWeb from "@rakazo/ui-web";
+import type { Bot, Group } from "@mycellios/contracts";
+import type * as UiWeb from "@mycellios/ui-web";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -15,7 +15,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 // The alert dialog's Cancel closes it through onOpenChange, as Base UI does.
 let dismissDialog: (() => void) | undefined;
-vi.mock("@rakazo/ui-web", async (importOriginal) => {
+vi.mock("@mycellios/ui-web", async (importOriginal) => {
   const { Checkbox } = await importOriginal<typeof UiWeb>();
   return {
     Checkbox,
@@ -124,7 +124,7 @@ async function render(
     covered?: boolean;
     instance?: string;
     bots?: ComponentProps<typeof GroupSettings>["bots"];
-    onOpenBot?: (botId: string) => void;
+    onShowBot?: (botId: string) => void;
   } = {},
 ) {
   const onRemove = vi.fn(options.onRemove ?? (async () => undefined));
@@ -138,7 +138,7 @@ async function render(
         onSave={options.onSave ?? (async () => undefined)}
         onRemove={onRemove}
         onClose={onClose}
-        onOpenBot={options.onOpenBot}
+        onShowBot={options.onShowBot}
         covered={options.covered}
       />,
     );
@@ -329,15 +329,15 @@ describe("GroupSettings", () => {
   });
 
   it("opens the bot profile from the name and keeps unchecked members listed", async () => {
-    const onOpenBot = vi.fn();
-    await render({ onOpenBot });
+    const onShowBot = vi.fn();
+    await render({ onShowBot });
     await act(async () => {
       [...container.querySelectorAll("button")]
         .find((el) => el.textContent === "Researcher")!
         .click();
       await Promise.resolve();
     });
-    expect(onOpenBot).toHaveBeenCalledWith("bot-1");
+    expect(onShowBot).toHaveBeenCalledWith("bot-1");
     await act(async () => {
       container
         .querySelector<HTMLElement>('[role="checkbox"][aria-label^="Remove Researcher"]')!

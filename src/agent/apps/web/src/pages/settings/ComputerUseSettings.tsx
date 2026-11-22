@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Switch } from "@rakazo/ui-web";
+import { Button, Switch } from "@mycellios/ui-web";
 import { CircleAlert, CircleCheck, LoaderCircle, MousePointer2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ComputersUnavailableHint } from "../../components/ComputersUnavailableHint";

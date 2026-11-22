@@ -1,4 +1,4 @@
-import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN } from "@rakazo/contracts";
+import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN } from "@mycellios/contracts";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { MobileBot } from "../lib/api";
@@ -12,7 +12,7 @@ export function BotMemberPicker({
   bots,
   selected,
   onChange,
-  onOpenBot,
+  onShowBot,
   disabled = false,
   initiallyExpanded = false,
 }: {
@@ -20,7 +20,7 @@ export function BotMemberPicker({
   selected: string[];
   onChange: (botIds: string[]) => void;
   /** Makes each bot's avatar and name open that bot; the switch still edits membership. */
-  onOpenBot?: (bot: MobileBot) => void;
+  onShowBot?: (bot: MobileBot) => void;
   disabled?: boolean;
   initiallyExpanded?: boolean;
 }) {
@@ -85,12 +85,12 @@ export function BotMemberPicker({
           );
           return (
             <View key={bot.id} style={styles.row}>
-              {onOpenBot ? (
+              {onShowBot ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={bot.name}
                   disabled={disabled}
-                  onPress={() => onOpenBot(bot)}
+                  onPress={() => onShowBot(bot)}
                   style={({ pressed }) => [styles.identity, { opacity: pressed ? 0.6 : 1 }]}
                 >
                   {identity}

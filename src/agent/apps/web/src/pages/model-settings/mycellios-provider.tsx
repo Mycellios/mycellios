@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { ModelCredential } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import type { ModelCredential } from "@mycellios/contracts";
+import { Button } from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { appPath } from "../../lib/app-path";

@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { AppMarkStack, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import { AppMarkStack, Button, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import {
   Archive,
   Download,

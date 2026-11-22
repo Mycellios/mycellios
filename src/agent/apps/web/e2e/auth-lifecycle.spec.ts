@@ -123,7 +123,7 @@ test("logout protects bot deep links and sign-in restores the session", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
-  const email = `auth-lifecycle-${stamp}@rakazo.test`;
+  const email = `auth-lifecycle-${stamp}@mycellios.test`;
   const password = "password12";
   const userName = "Auth Lifecycle";
 
@@ -247,7 +247,7 @@ test("logout protects bot deep links and sign-in restores the session", async ({
 
 test("changes and recovers an email password", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  const email = `password-recovery-${stamp}@rakazo.test`;
+  const email = `password-recovery-${stamp}@mycellios.test`;
   const originalPassword = "password12";
   const changedPassword = "changed-password12";
   const resetPassword = "reset-password12";
@@ -362,7 +362,7 @@ test("changes and recovers an email password", async ({ page }, testInfo) => {
 test("password-off account settings hide password changes and retain password deletion", async ({
   page,
 }, testInfo) => {
-  await signup(page, `password-off-${Date.now()}@rakazo.test`, "password12", "Password Off");
+  await signup(page, `password-off-${Date.now()}@mycellios.test`, "password12", "Password Off");
   await completeOnboarding(page);
   await page.waitForURL(/\/app\/[^/]+$/);
   await page.route("**/api/auth/account-security", (route) =>

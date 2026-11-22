@@ -1,14 +1,14 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { Bot, Ticket, TicketPriority, TicketStatus } from "@rakazo/contracts";
+import { ChatMarkdown } from "@mycellios/chat-ui/web";
+import type { Bot, Ticket, TicketPriority, TicketStatus } from "@mycellios/contracts";
 import {
   TICKET_COMMENT_MAX_LENGTH,
   TICKET_DESCRIPTION_MAX_LENGTH,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
   TICKET_TITLE_MAX_LENGTH,
-} from "@rakazo/contracts";
-import { isRetryableError, retryDelayMs } from "@rakazo/core";
+} from "@mycellios/contracts";
+import { isRetryableError, retryDelayMs } from "@mycellios/core";
 import {
   Button,
   buttonVariants,
@@ -20,7 +20,7 @@ import {
   NativeSelect,
   NativeSelectOption,
   Textarea,
-} from "@rakazo/ui-web";
+} from "@mycellios/ui-web";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useId, useState } from "react";

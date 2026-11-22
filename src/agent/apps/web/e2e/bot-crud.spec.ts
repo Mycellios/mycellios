@@ -11,7 +11,7 @@ import {
 
 test("bot creation, editing, and deletion persist", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  await signup(page, `bot-crud-${stamp}@rakazo.test`, "password12", "Bot CRUD");
+  await signup(page, `bot-crud-${stamp}@mycellios.test`, "password12", "Bot CRUD");
   await completeOnboarding(page);
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
@@ -256,7 +256,7 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
 test("bot management switch persists with its subtitle", async ({ page }, testInfo) => {
   await signup(
     page,
-    `bot-management-${Date.now()}@rakazo.test`,
+    `bot-management-${Date.now()}@mycellios.test`,
     "password12",
     "Manage the bots it creates",
   );

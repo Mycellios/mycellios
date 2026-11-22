@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Actor } from "@rakazo/contracts";
-import { getLogger } from "@rakazo/logging";
+import type { Actor } from "@mycellios/contracts";
+import { getLogger } from "@mycellios/logging";
 import type { Hono } from "hono";
 import {
   parseDesktopBinding,
