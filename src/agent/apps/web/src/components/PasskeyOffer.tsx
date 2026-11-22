@@ -4,6 +4,7 @@ import { Button } from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authClient } from "../lib/auth";
+import { readStorage } from "../lib/legacy-storage";
 import {
   passkeyErrorText,
   passkeysChanged,
@@ -13,7 +14,7 @@ import {
 
 function readDismissed(key: string): boolean {
   try {
-    return window.localStorage.getItem(key) !== null;
+    return readStorage(window.localStorage, key) !== null;
   } catch {
     return false;
   }

@@ -4,6 +4,7 @@ import {
   RESPONSE_STREAMING_STORAGE_KEY,
   responseStreamingEnabled,
 } from "@mycellios/core";
+import { readStorage } from "./legacy-storage";
 
 export type { ResponseStreamingPreference };
 
@@ -26,7 +27,7 @@ function getLocalStorage(): Pick<Storage, "getItem" | "setItem"> | null {
 function readStored(storage: Pick<Storage, "getItem"> | null | undefined): string | null {
   if (!storage) return null;
   try {
-    return storage.getItem(RESPONSE_STREAMING_STORAGE_KEY);
+    return readStorage(storage, RESPONSE_STREAMING_STORAGE_KEY);
   } catch {
     return null;
   }

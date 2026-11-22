@@ -4,7 +4,7 @@ import {
   RESPONSE_STREAMING_STORAGE_KEY,
   responseStreamingEnabled,
 } from "@mycellios/core";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 
 export type { ResponseStreamingPreference };
 

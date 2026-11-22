@@ -16,6 +16,14 @@ export function legacyStorageKey(key: string): string {
 }
 
 /**
+ * Reads `key`, then its legacy spelling. For keys renamed after the one-time copy ran,
+ * whose legacy values that copy has already passed over.
+ */
+export function readStorage(storage: Pick<Storage, "getItem">, key: string): string | null {
+  return storage.getItem(key) ?? storage.getItem(legacyStorageKey(key));
+}
+
+/**
  * Marks a completed copy. Without it, a value the app later removes (a sent draft, a
  * signed-out Space) would be copied back from its legacy key on the next start.
  */
