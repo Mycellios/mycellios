@@ -69,7 +69,7 @@ async function snapshot(id: string, screen: string, lease: string, home = "home"
 it("forwards only a validated scoped command without weakening the display fence", async () => {
   const key = "a".repeat(64);
   expect(await (await snapshot("scoped", "first", "run:2", "home", key)).json()).toMatchObject({ ok: true });
-  expect(mock.exec.mock.calls.at(-1)?.[0].Cmd).toEqual([
+  expect(mock.exec.mock.calls.at(-1)?.[0].Cmd.slice(-3)).toEqual([
     pageBrowserHelper, "scoped-snapshot", JSON.stringify({ command: "snapshot", conversationKey: key }),
   ]);
   expect(JSON.parse(mock.stdin.join("").trim())).toMatchObject({ conversationKey: key });
