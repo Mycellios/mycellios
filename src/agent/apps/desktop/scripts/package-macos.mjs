@@ -20,5 +20,15 @@ const development=await stageDevelopmentResources(root);
 const compact=await stageCompactResources(root,development,output);
 const config=await prepareMacInstaller({separateRuntime:!process.argv.includes('--bundle-runtime'),desktopRoot:root,runtimePkg,runtimeSha256,arch,output,version,development,compact});
 const configFile=await writeStandaloneInstallerConfig(root,config,output,'macos-installer-config.json');
-await build({targets:Platform.MAC.createTarget(['dmg','zip'],arch==='arm64'?Arch.arm64:Arch.x64),projectDir:root,config:configFile,publish:'never'});
+// Hosted Intel runners sometimes keep dmgbuild's scratch image busy for a moment
+// (`hdiutil: couldn't eject ... Resource busy`). Rebuild only for that error.
+const DMG_DETACH_BUSY=/Unable to detach device cleanly|couldn't eject .*Resource busy/;
+for(let attempt=1;;attempt++){
+ try{await build({targets:Platform.MAC.createTarget(['dmg','zip'],arch==='arm64'?Arch.arm64:Arch.x64),projectDir:root,config:configFile,publish:'never'});break;}
+ catch(error){
+  if(attempt>=3||!DMG_DETACH_BUSY.test(String(error?.message??error)))throw error;
+  console.warn(`DMG scratch volume was busy; rebuilding (attempt ${attempt+1} of 3)`);
+  await new Promise(resolve=>setTimeout(resolve,15000*attempt));
+ }
+}
 await verifyCompactServer(path.join(output,arch==='arm64'?'mac-arm64':'mac','Mycellios Desktop.app/Contents/Resources/local-server'));
