@@ -110,6 +110,18 @@ describe("MicoFolders", () => {
     expect(folders.existing(key("c"))).toBe(path.join(visibleRoot, "Fine"));
     expect(folders.resolve(key("a"), "Fine")).not.toBe(path.join(visibleRoot, "Fine"));
   });
+
+  it("lists the keys of homes that exist on this PC, visible first and bounded", async () => {
+    expect(create().keys(10)).toEqual([]);
+    const folders = create();
+    await mkdir(folders.resolve(key("visible"), "Writer"), { recursive: true });
+    folders.resolve(key("not-created"), "Planner");
+    await mkdir(path.join(hiddenRoot, key("private")), { recursive: true });
+    await mkdir(path.join(hiddenRoot, "not-a-key"), { recursive: true });
+    await writeFile(path.join(hiddenRoot, key("file")), "not a home");
+    expect(create().keys(10)).toEqual([key("visible"), key("private")]);
+    expect(create().keys(1)).toEqual([key("visible")]);
+  });
 });
 
 describe("visible This PC folders over the host transport", () => {
@@ -158,6 +170,9 @@ describe("visible This PC folders over the host transport", () => {
     expect(server.micoFolder("mico-1")).toBe(path.join(micoFolders, "Writer"));
     expect(server.workspace("mico-1")).toBe(path.join(micoFolders, "Writer"));
     expect(server.micoFolder("mico-2")).toBeUndefined();
+    // Only keys leave the PC, so the server can route this Mico back here.
+    expect(server.workspaceKeys()).toContain(key("mico-1"));
+    expect(server.workspaceKeys()).not.toContain(key("mico-2"));
   });
 
   it("keeps a Mico that already has a private home in it", async () => {

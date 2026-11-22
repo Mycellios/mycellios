@@ -11,6 +11,7 @@ import {
   withTransactionRetry,
 } from "@mycellios/db";
 import { DesktopUnreachableError } from "./computer-errors.js";
+import { nativeHostAccess } from "./native-agent-runtime.js";
 
 /** Shown in the chat when a This PC Mico's new message runs on the server instead. */
 export const OFFLINE_CLOUD_NOTICE =
@@ -26,6 +27,8 @@ export async function selectOfflineCloudWorkspace(
   run: Run,
   assignment: Assignment,
   lease: { workerId: string; fence: number },
+  /** The Mico's engine and the server data folder holding the operator's native-agent grants. */
+  native: { agentEngine?: string | null; dataDir?: string } = {},
 ) {
   const { spaceId, userId, botId } = run;
   if (run.cloudComputerId) {
@@ -38,18 +41,27 @@ export async function selectOfflineCloudWorkspace(
   if (!sandbox?.provisionKind || run.startedAt || run.checkpoint || (assignment && assignment.kind !== "desktop")) return;
   const provider = sandbox.describe().id;
   if (provider === "none" || provider === "desktop") return;
+  // A native engine runs on the server only with the operator's grant for this user and
+  // Space. Without it the turn keeps the PC's offline message instead of failing there.
+  if (native.agentEngine && native.agentEngine !== "pi" &&
+    !(await nativeHostAccess(native.dataDir, { userId, spaceId }).catch(() => false))) return;
   const signal = AbortSignal.timeout(5_000);
   const context: AdapterContext = {
     operationId: run.id, traceId: run.id, runId: run.id, spaceId, userId, botId, signal,
   };
-  const kind = await sandbox.provisionKind(context).catch((error: unknown) => {
+  // Only a PC that is really offline moves the turn. A PC that is online without this
+  // Mico (several PCs, none clearly its own) is the owner's choice, not an outage.
+  const presence = await (sandbox.hostPresence
+    ? sandbox.hostPresence(context)
+    : sandbox.provisionKind(context).then((kind) => kind !== provider ? "connected" : "offline")
+  ).catch((error: unknown) => {
     // Running out of time is no answer: the PC may be online, so this message must not move
     // to a server workspace. The caller retries it as a setup failure.
     throw signal.aborted && !(error instanceof DesktopUnreachableError)
       ? new DesktopUnreachableError({ cause: error })
       : error;
   });
-  if (kind !== provider) return;
+  if (presence !== "offline") return;
 
   const [thread, task] = await Promise.all([
     prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),

@@ -3864,6 +3864,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
       }
       const cloudSelection = await selectOfflineCloudWorkspace(
         deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
+        { agentEngine: leaseTarget.agentEngine, dataDir: deps.dataDir },
       ).catch((error: unknown) => {
         if (error instanceof ComputerLimitError || error instanceof DesktopUnreachableError) return error;
         throw error;

@@ -47,7 +47,8 @@ export function verifyDesktopRelay(secret: string, timestamp: string, body: stri
 
 /** A single API instance owns the volatile relay. A restart fails work; it never replays it. */
 export class DesktopRelayBroker {
-  private accounts = new Map<string, DesktopExecutorOwner & {deviceId:string; generation:string; seen:number; agentExecution?:1}>();
+  /** `workspaces`: SHA-256 keys of the Mico folders this PC reported; absent from older Desktops. */
+  private accounts = new Map<string, DesktopExecutorOwner & {deviceId:string; generation:string; seen:number; agentExecution?:1; workspaces?: ReadonlySet<string>}>();
   private bindings = new Map<string, Binding>();
   private operations = new Map<string, Operation>();
   private runs = new Map<string, { generation: string; until: number; agentSessions?: Record<string, string> }>();
@@ -79,7 +80,7 @@ export class DesktopRelayBroker {
   private accountKey(scope: {userId:string;spaceId:string;sessionId:string}, deviceId: string) {
     return JSON.stringify([scope.userId, scope.spaceId, deviceId, scope.sessionId]);
   }
-  register(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string;agentExecution?:1}) {
+  register(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string;agentExecution?:1;workspaces?:readonly string[]}) {
     this.expire();
     for (const prior of [...this.accounts.values()]) {
       if (prior.userId !== owner.userId || prior.spaceId !== owner.spaceId || prior.deviceId !== input.deviceId) continue;
@@ -99,7 +100,24 @@ export class DesktopRelayBroker {
     if (!devices.has(input.deviceId) && devices.size >= 8) throw new Error("Desktop relay is busy");
     const samePc = !!current && current.generation === input.generation;
     const agentExecution = input.agentExecution ?? (samePc ? current.agentExecution : undefined);
-    this.accounts.set(id,{...owner,deviceId:input.deviceId,generation:input.generation,...(agentExecution ? {agentExecution} : {}),seen:this.now()});
+    const workspaces = input.workspaces ? new Set(input.workspaces) : samePc ? current.workspaces : undefined;
+    this.accounts.set(id,{...owner,deviceId:input.deviceId,generation:input.generation,...(agentExecution ? {agentExecution} : {}),...(workspaces ? {workspaces} : {}),seen:this.now()});
+  }
+  private liveAccounts(scope: {userId:string;spaceId:string}) {
+    return [...this.accounts.values()].filter(account => account.userId === scope.userId && account.spaceId === scope.spaceId);
+  }
+  /**
+   * The PC that runs a Mico nobody connected explicitly. One online PC takes every
+   * Mico, as before. With several, only the one PC reporting this Mico's folder
+   * may take it: none or several leave it unresolved, never guessed.
+   */
+  private owningAccount(scope: {userId:string;spaceId:string}, botId: string) {
+    const live = this.liveAccounts(scope);
+    if (live.length === 1) return live[0];
+    const folder = createHash("sha256").update(botId).digest("hex");
+    const holders = live.filter(account => account.workspaces?.has(folder));
+    if (new Set(holders.map(account => account.deviceId)).size !== 1) return undefined;
+    return holders.reduce((newest, account) => account.seen > newest.seen ? account : newest);
   }
   needsExecutionPreference(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string}) {
     const account = this.accounts.get(this.accountKey(owner, input.deviceId));
@@ -109,9 +127,16 @@ export class DesktopRelayBroker {
   connectAccountBot(scope: {userId:string;spaceId:string}, botId: string) {
     this.expire();
     if (this.bindings.has(key(scope,botId))) return;
-    const live = [...this.accounts.values()].filter(account => account.userId === scope.userId && account.spaceId === scope.spaceId);
-    const account = live.length === 1 ? live[0] : undefined;
+    const account = this.owningAccount(scope, botId);
     if (account) this.bind(account,{deviceId:account.deviceId,generation:account.generation,botId});
+  }
+  /**
+   * A PC of this account and Space is online, but none could take this Mico.
+   * That is a choice for the owner to make, not an offline PC.
+   */
+  unresolved(scope: { userId: string; spaceId: string }, botId: string) {
+    this.expire();
+    return !this.bindings.has(key(scope, botId)) && this.liveAccounts(scope).length > 0;
   }
   bind(owner: DesktopExecutorOwner, input: DesktopExecutorBinding) {
     this.expire();
@@ -141,7 +166,7 @@ export class DesktopRelayBroker {
     return !!account && account.agentExecution === 1 && account.deviceId === binding.deviceId && account.generation === binding.generation && sameOwner(account, binding);
   }
   hasAgentDevice(scope: { userId: string; spaceId: string }) {
-    return [...this.accounts.values()].some(account => account.userId === scope.userId && account.spaceId === scope.spaceId && account.agentExecution === 1);
+    return this.liveAccounts(scope).some(account => account.agentExecution === 1);
   }
   revoke(owner: DesktopExecutorOwner, deviceId: string) {
     const accountKey=this.accountKey(owner, deviceId);
@@ -374,20 +399,32 @@ async function probeDesktopRelay(url: string, secret: string, context: AdapterCo
   if (response.status === 409 || response.status === 429 || response.status >= 500) throw new DesktopUnreachableError();
   return state;
 }
-export function desktopRelayAvailable(url: string, secret: string) {
-  return async (context?: AdapterContext) => {
-    if (!context?.botId) return false;
-    const state = await probeDesktopRelay(url, secret, context) as { available?: boolean } | null;
-    return state?.available === true;
+/**
+ * connected: a PC holds this Mico. unresolved: a PC of the account and Space is
+ * online but none could take this Mico (an older API never reports it). offline: the
+ * relay answered that no PC holds it. A relay that gives no answer throws
+ * DesktopUnreachableError (see probeDesktopRelay): it is never "offline".
+ */
+export type DesktopPresence = "connected" | "unresolved" | "offline";
+export function desktopRelayPresence(url: string, secret: string) {
+  return async (context?: AdapterContext): Promise<DesktopPresence> => {
+    if (!context?.botId) return "offline";
+    const state = await probeDesktopRelay(url, secret, context) as { available?: unknown; unresolved?: unknown } | null;
+    return state?.available === true ? "connected" : state?.unresolved === true ? "unresolved" : "offline";
   };
 }
+/** Whether a PC holds this Mico now; a relay that gives no answer still throws. */
+export function desktopRelayAvailable(url: string, secret: string) {
+  const presence = desktopRelayPresence(url, secret);
+  return async (context?: AdapterContext) => await presence(context) === "connected";
+}
 export function desktopAgentSelection(url: string, secret: string) {
-  return async (context: AdapterContext): Promise<{ available: boolean; preferred: boolean }> => {
+  return async (context: AdapterContext): Promise<{ available: boolean; preferred: boolean; unresolved?: boolean }> => {
     if (!context.botId) throw Error("Desktop execution requires an owned Mico");
-    const state = await probeDesktopRelay(url, secret, context, { agentExecution: 1 }) as { available?: unknown; preferred?: unknown; agentExecution?: unknown } | null;
+    const state = await probeDesktopRelay(url, secret, context, { agentExecution: 1 }) as { available?: unknown; preferred?: unknown; agentExecution?: unknown; unresolved?: unknown } | null;
     if (!state) throw Error("Desktop execution admission could not be checked");
     if (state.agentExecution !== 1 || typeof state.available !== "boolean" || typeof state.preferred !== "boolean") throw Error("Desktop execution protocol unavailable");
-    return { available: state.available, preferred: state.preferred };
+    return { available: state.available, preferred: state.preferred, ...(state.unresolved === true ? { unresolved: true } : {}) };
   };
 }
 export { hostComputerRequest };

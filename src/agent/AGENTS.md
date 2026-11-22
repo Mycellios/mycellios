@@ -752,6 +752,13 @@
   Verify desktop-agent runtime/engine and relay tests, host consent/native runtime,
   and scripts/verify-desktop-execution-db.ts against isolated PostgreSQL. Physical
   installed-Desktop/mobile acceptance is separate from fixtures and builds.
+- With several Desktops online in one account/Space, an unbound Mico goes only to
+  the one PC whose account registration reports its folder key (SHA-256 of the bot
+  id, sent after the server's `ownership: 1`); none or several is `unresolved`, never
+  guessed or offline. One online PC still takes every Mico; explicit binds win. The
+  offline cloud workspace needs a really offline PC, and for native engines the
+  server's nativeHostAccess grant (specs/desktop-mico-ownership/spec.md). Verify
+  relay broker/API/client, mico-folders, offline-cloud-workspace and runtime tests.
 
 - The installed PWA Voice shortcut uses ?dictate=1 and the existing scoped chat
   recorder. Consume each request once; start only in a visible standalone app

@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopUnreachableError } from "./computer-errors.js";
-import { DesktopRelayBroker, desktopAgentSelection, desktopRelayAvailable, desktopRelayKey, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
+import { DesktopRelayBroker, desktopAgentSelection, desktopRelayAvailable, desktopRelayKey, desktopRelayPresence, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
 const owner = { userId: "user", spaceId: "space", sessionId: "session" };
 const binding = { deviceId: "device", botId: "bot", generation: "generation" };
 const context = () => ({ userId: "user", spaceId: "space", botId: "bot", operationId: "op", traceId: "trace", signal: new AbortController().signal });
@@ -397,4 +398,86 @@ describe("Desktop availability checks", () => {
     expect(cancelled).not.toBeInstanceOf(DesktopUnreachableError);
     expect(cancelled).toMatchObject({ name: "AbortError" });
   });
+});
+
+const folder = (botId: string) => createHash("sha256").update(botId).digest("hex");
+
+it("routes each Mico to the one online PC that holds its folder and never guesses the rest", () => {
+  broker = new DesktopRelayBroker();
+  const mac = { ...owner, sessionId: "mac-session" };
+  broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen", agentExecution: 1, workspaces: [folder("writer"), folder("shared")] });
+  broker.register(mac, { deviceId: "mac-pc", generation: "mac-gen", agentExecution: 1, workspaces: [folder("planner"), folder("shared")] });
+  for (const bot of ["writer", "planner", "shared", "never-ran"]) broker.connectAccountBot(owner, bot);
+  expect(broker.poll(owner, "windows-pc").bindings?.map(item => item.botId)).toEqual(["writer"]);
+  expect(broker.poll(mac, "mac-pc").bindings?.map(item => item.botId)).toEqual(["planner"]);
+  expect(broker.agentAvailable(owner, "writer")).toBe(true);
+  expect(broker.agentAvailable(owner, "planner")).toBe(true);
+  for (const bot of ["shared", "never-ran"]) {
+    expect(broker.available(owner, bot)).toBe(false);
+    expect(broker.unresolved(owner, bot)).toBe(true);
+  }
+  expect(broker.unresolved(owner, "writer")).toBe(false);
+  expect(broker.unresolved({ ...owner, userId: "other" }, "shared")).toBe(false);
+  // Sending from Desktop binds explicitly, which settles the choice on that PC.
+  broker.bind(mac, { deviceId: "mac-pc", generation: "mac-gen", botId: "shared" });
+  expect(broker.agentAvailable(owner, "shared")).toBe(true);
+  expect(broker.unresolved(owner, "shared")).toBe(false);
+  // A PC that reports a Mico later does not take it from the PC already running it.
+  broker.register(mac, { deviceId: "mac-pc", generation: "mac-gen", agentExecution: 1, workspaces: [folder("planner"), folder("shared"), folder("writer")] });
+  broker.connectAccountBot(owner, "writer");
+  expect(broker.ownedBindings(owner, "windows-pc")).toEqual(["writer"]);
+});
+
+it("keeps one online PC taking every Mico and leaves older Desktops unresolved, not offline", () => {
+  let now = 0;
+  broker = new DesktopRelayBroker(() => now);
+  const mac = { ...owner, sessionId: "mac-session" };
+  // Desktop 0.16/0.17 sends no folder report.
+  broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen", agentExecution: 1 });
+  broker.register(mac, { deviceId: "mac-pc", generation: "mac-gen", agentExecution: 1 });
+  broker.connectAccountBot(owner, "bot");
+  expect(broker.available(owner, "bot")).toBe(false);
+  expect(broker.unresolved(owner, "bot")).toBe(true);
+  now = 60_000;
+  broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen", agentExecution: 1, workspaces: [] });
+  now = 100_000; // The Mac stopped polling and its presence lapsed.
+  expect(broker.unresolved(owner, "bot")).toBe(true);
+  broker.connectAccountBot(owner, "bot");
+  expect(broker.agentAvailable(owner, "bot")).toBe(true);
+  now = 200_000; // No PC left: offline, which is not unresolved.
+  expect(broker.available(owner, "bot")).toBe(false);
+  expect(broker.unresolved(owner, "bot")).toBe(false);
+});
+
+it("keeps a PC's folder report across registrations that omit it, but not across a new generation", () => {
+  broker = new DesktopRelayBroker();
+  const mac = { ...owner, sessionId: "mac-session" };
+  broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen", workspaces: [folder("bot")] });
+  broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen" });
+  broker.register(mac, { deviceId: "mac-pc", generation: "mac-gen" });
+  broker.connectAccountBot(owner, "bot");
+  expect(broker.ownedBindings(owner, "windows-pc")).toEqual(["bot"]);
+  broker.revokeBot(owner, "bot");
+  broker.register(owner, { deviceId: "windows-pc", generation: "restarted-gen" });
+  broker.connectAccountBot(owner, "bot");
+  expect(broker.unresolved(owner, "bot")).toBe(true);
+});
+
+it("reads an unresolved Mico as an online PC, and an older API as before", async () => {
+  const replies: unknown[] = [{ available: true }, { available: false, unresolved: true }, { available: false }];
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(replies.shift()));
+  try {
+    const presence = desktopRelayPresence("https://relay.invalid/api/desktop-relay/internal", "relay-key");
+    expect(await presence(context())).toBe("connected");
+    expect(await presence(context())).toBe("unresolved");
+    expect(await presence(context())).toBe("offline");
+    fetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    expect(await presence(context())).toBe("offline");
+    expect(await presence({ ...context(), botId: undefined })).toBe("offline");
+    const select = desktopAgentSelection("https://relay.invalid/api/desktop-relay/internal", "relay-key");
+    fetch.mockResolvedValueOnce(Response.json({ agentExecution: 1, available: false, preferred: true, unresolved: true }));
+    expect(await select(context())).toEqual({ available: false, preferred: true, unresolved: true });
+    fetch.mockResolvedValueOnce(Response.json({ agentExecution: 1, available: false, preferred: true }));
+    expect(await select(context())).toEqual({ available: false, preferred: true });
+  } finally { fetch.mockRestore(); }
 });

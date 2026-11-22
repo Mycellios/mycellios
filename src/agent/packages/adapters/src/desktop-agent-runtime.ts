@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@mycellios/adapter-kit";
-import { DESKTOP_RUN_INTERRUPTED_ERROR, isUncertainDesktopRun } from "@mycellios/core";
+import { DESKTOP_OWNER_UNRESOLVED_ERROR, DESKTOP_RUN_INTERRUPTED_ERROR, isUncertainDesktopRun } from "@mycellios/core";
 import { getLogger } from "@mycellios/logging";
 import { sendWhenPcHasRoom } from "./desktop-callback-wait.js";
 import { DesktopAgentRpc, type AgentRpcMessage } from "./desktop-agent-rpc.js";
@@ -124,7 +124,8 @@ export class DesktopAgentRuntime implements AgentRuntime {
   private active = new Map<string, AbortController>();
   constructor(private readonly options: {
     fallback: AgentRuntime;
-    select(context: AdapterContext): Promise<{ available: boolean; preferred: boolean }>;
+    /** unresolved: a PC of the account is online but none holds this Mico alone. */
+    select(context: AdapterContext): Promise<{ available: boolean; preferred: boolean; unresolved?: boolean }>;
     transport(request: HostComputerRequest, context: AdapterContext): Promise<Response>;
   }) {}
   describe() { return this.options.fallback.describe(); }
@@ -147,6 +148,9 @@ export class DesktopAgentRuntime implements AgentRuntime {
     }
     const route = await this.options.select(context);
     if (!route.available) {
+      // Online PCs that cannot tell which one owns this Mico are not an offline PC:
+      // never guess one and never move the turn to the server.
+      if (route.unresolved) throw Error(DESKTOP_OWNER_UNRESOLVED_ERROR);
       // The executor also supplies resumeToolResult on fresh turns. Only an
       // actual checkpoint or project binding requires the original Desktop.
       if (route.preferred && (context.projectSessionId || request.resumeFromCheckpoint || request.turnCheckpoint)) {
