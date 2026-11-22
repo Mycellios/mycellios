@@ -380,10 +380,43 @@ describe("stages built by each node from a pinned GGUF", () => {
     )).toThrow("llama_cpp_build_is_invalid");
   });
 
-  it("fails closed without a local llama.cpp build or when the package names another model", async () => {
+  it("installs the pinned llama.cpp build on demand before building the stage", async () => {
+    const cacheDirectory = temporaryDirectory();
+    const fetch = fetchRunner();
+    const runner = vi.fn(async (executable: string, args: readonly string[]) => {
+      if (!args.includes("distributed_runtime.llama_cpp_install")) return fetch(executable, args);
+      const cache = flagValue(args, "--cache");
+      return JSON.stringify({ build: llamaCpp.build, buildDirectory: join(cache, llamaCpp.build), gpuOffload: false });
+    });
+    const prepared = await prepareNodeStageArtifacts(sourceDescription(), {
+      nodeId: "node-b", pythonExecutable: "python", cacheDirectory, compilerRunner: runner,
+      nativePackageVerifier: async () => undefined,
+    });
+    expect(runner.mock.calls[0]![1]).toEqual(["-u", "-m", "distributed_runtime.llama_cpp_install",
+      "--cache", join(cacheDirectory, "llama-cpp-builds")]);
+    expect(runner).toHaveBeenCalledTimes(2);
+    const args = prepared[0]!.command.args;
+    expect(flagValue(args, "--llama-cpp-build-dir")).toBe(join(cacheDirectory, "llama-cpp-builds", llamaCpp.build));
+    expect(flagValue(args, "--llama-cpp-build")).toBe(llamaCpp.build);
+    expect(flagValue(args, "--llama-cpp-gpu-layers")).toBe("0");
+  });
+
+  it("fails closed when llama.cpp cannot be installed or names a path outside its cache", async () => {
+    const answer = (value: unknown) => vi.fn(async () => {
+      if (value instanceof Error) throw value;
+      return JSON.stringify(value);
+    });
     await expect(prepareNodeStageArtifacts(sourceDescription(), {
-      nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(), compilerRunner: fetchRunner(),
-    })).rejects.toThrow("native_gguf_llama_cpp_runtime_unavailable");
+      nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(),
+      compilerRunner: answer(new Error("stage_artifact_preparation_failed:llama_cpp_build_unavailable_for_platform:linux-aarch64")),
+    })).rejects.toThrow("native_gguf_llama_cpp_runtime_unavailable:stage_artifact_preparation_failed:llama_cpp_build_unavailable_for_platform");
+    await expect(prepareNodeStageArtifacts(sourceDescription(), {
+      nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(),
+      compilerRunner: answer({ build: llamaCpp.build, buildDirectory: "C:\\elsewhere", gpuOffload: true }),
+    })).rejects.toThrow("native_gguf_llama_cpp_installer_returned_invalid_result");
+  });
+
+  it("fails closed when the package names another model", async () => {
     await expect(prepareNodeStageArtifacts(sourceDescription("torch"), {
       nodeId: "node-b", pythonExecutable: "python", cacheDirectory: temporaryDirectory(),
       compilerRunner: fetchRunner({ modelIdentity: `sha256:${"8".repeat(64)}` }),

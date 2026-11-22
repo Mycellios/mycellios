@@ -12,7 +12,11 @@ import {
   type PythonPipelineLaunchDescription,
 } from "../distribution/python-launcher.js";
 import { buildIsolatedProcessEnvironment } from "../distribution/process-environment.js";
-import { prepareRemoteNativeGgufProcess, type LlamaCppNodeRuntime } from "./native-gguf-stage-preparer.js";
+import {
+  installLlamaCppRuntime,
+  prepareRemoteNativeGgufProcess,
+  type LlamaCppNodeRuntime,
+} from "./native-gguf-stage-preparer.js";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const SHA256_IDENTITY = /^sha256:[0-9a-f]{64}$/;
@@ -61,7 +65,10 @@ export interface StageArtifactPreparationOptions {
    * default implementation is entirely in-process and never invokes Python.
    */
   nativePackageVerifier?: NativeGgufPackageVerifier;
-  /** This node's pinned llama.cpp build, needed only by llama.cpp GGUF routes. */
+  /**
+   * This node's pinned llama.cpp build. When absent, a llama.cpp GGUF route
+   * installs the pinned build for this platform into the cache directory.
+   */
   llamaCpp?: LlamaCppNodeRuntime;
   onProgress?: (event: {
     stageIndex: number;
@@ -120,6 +127,12 @@ export async function prepareNodeStageArtifacts(
   const result: PythonLaunchProcess[] = [];
   const verifiedLocal = new Map<string, StageArtifactCompilerResult>();
   const nativeSource = description.configuration.nativeGgufSource;
+  const runPython = (args: string[]) => options.compilerRunner
+    ? options.compilerRunner(options.pythonExecutable, args)
+    : runCompiler(options.pythonExecutable, args, options);
+  // The first llama.cpp route installs this node's pinned build on demand.
+  const llamaCpp = options.llamaCpp
+    ?? (nativeSource?.executor === "llama-cpp" ? await installLlamaCppRuntime(runPython, options.cacheDirectory) : undefined);
   for (const process of local) {
     if (nativeSource !== undefined) {
       const range = { stageIndex: process.stageIndex, layerStart: process.layerStart, layerEnd: process.layerEnd };
@@ -127,10 +140,8 @@ export async function prepareNodeStageArtifacts(
       const prepared = await prepareRemoteNativeGgufProcess(description, process, {
         source: nativeSource,
         cacheDirectory: options.cacheDirectory,
-        ...(options.llamaCpp === undefined ? {} : { llamaCpp: options.llamaCpp }),
-        run: (args) => options.compilerRunner
-          ? options.compilerRunner(options.pythonExecutable, args)
-          : runCompiler(options.pythonExecutable, args, options),
+        ...(llamaCpp === undefined ? {} : { llamaCpp }),
+        run: runPython,
         verify: async (binding) => {
           await (options.nativePackageVerifier ?? verifyNativeGgufStagePackage)(binding, options.signal);
         },

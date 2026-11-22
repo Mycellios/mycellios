@@ -40,6 +40,35 @@ export interface RemoteNativeGgufPreparation {
 const SHA256 = /^[0-9a-f]{64}$/;
 
 /**
+ * Install (or reuse) the pinned llama.cpp build for this platform under the
+ * node's cache. The installer verifies the official archive and every library
+ * against their pinned hashes before the directory is ever used.
+ */
+export async function installLlamaCppRuntime(
+  run: (args: string[]) => Promise<string>,
+  cacheDirectory: string,
+): Promise<LlamaCppNodeRuntime> {
+  const cache = resolve(cacheDirectory, "llama-cpp-builds");
+  let value: unknown;
+  try {
+    value = JSON.parse(await run(["-u", "-m", "distributed_runtime.llama_cpp_install", "--cache", cache]));
+  } catch (error) {
+    throw new Error(`native_gguf_llama_cpp_runtime_unavailable:${error instanceof Error ? error.message : "unknown"}`);
+  }
+  const result = value as Record<string, unknown> | null;
+  if (
+    !result
+    || !isLlamaCppBuild(result.build)
+    || typeof result.buildDirectory !== "string"
+    || resolve(result.buildDirectory) !== resolve(cache, result.build)
+    || typeof result.gpuOffload !== "boolean"
+  ) {
+    throw new Error("native_gguf_llama_cpp_installer_returned_invalid_result");
+  }
+  return { buildDirectory: resolve(result.buildDirectory), build: result.build, gpuOffload: result.gpuOffload };
+}
+
+/**
  * Build (or reuse) this node's package for one stage from the pinned GGUF and
  * return the local command that runs it. The package is fetched by tensor,
  * each tensor checked against the pinned manifest, and the result checked
