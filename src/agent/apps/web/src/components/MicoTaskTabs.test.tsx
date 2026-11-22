@@ -178,13 +178,10 @@ describe("Mico task navigation", () => {
     await act(async () => release());
     await flush();
     expect(Array.from(host.querySelectorAll("[data-thread-tab]")).map(tab => tab.getAttribute("data-thread-tab"))).toEqual(["a", "a2", "b"]);
-    await act(() => button("Conversations", host).click());
-    const row = Array.from(picker().querySelectorAll("button")).find(item => item.textContent?.startsWith("Trip budget #2"))!;
-    expect(row.querySelector("[data-thread-kind]")).toBeNull();
-    expect(picker().querySelectorAll('button[aria-label="Rename conversation"]').length).toBe(3);
+    // Like the person's own conversations it takes a title of theirs (F2) and carries no kind label.
+    expect(tabButton(host, "a2").getAttribute("aria-keyshortcuts")).toContain("F2");
+    expect(host.querySelector('[data-thread-tab="a2"] [data-thread-kind]')).toBeNull();
     expect(select).not.toHaveBeenCalled();
-    await act(() => button("Conversations", host).click());
-    await flush();
   });
 
   it("closes the view of a conversation archived elsewhere and brings its tab back on restore", async () => {
