@@ -213,14 +213,14 @@
 :root[data-mycellios-design="agent"] .rb-page .rb-hero-prompt button { background: var(--agent-primary) !important; color: var(--agent-on-primary) !important; }
 
 /* Overview statistics: muted labels, flat status fills and the primary bar color. */
-:root[data-mycellios-design="agent"] .public-panel :is(.overview-status, .overview-kpis dt, .overview-kpi-hint, .overview-kpi-value small, .overview-card > header .ui-text, .overview-card > footer, .overview-chart-axis, .overview-chart-max, .overview-outcome-legend, .overview-table th, .overview-cell-name small) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.overview-status, .overview-kpis dt, .overview-kpi-hint, .overview-kpi-value small, .overview-card > header .ui-text, .overview-card > footer, .overview-chart-axis, .overview-chart-max, .overview-chart-legend, .overview-table th, .overview-cell-name small) { color: var(--agent-muted) !important; }
 :root[data-mycellios-design="agent"] .public-panel .overview-kpis > div { background: var(--agent-card) !important; }
 :root[data-mycellios-design="agent"] .public-panel .overview-chart-tooltip { background: var(--agent-popover) !important; color: var(--agent-fg) !important; }
-:root[data-mycellios-design="agent"] .public-panel .overview-outcome-completed { background: var(--agent-success) !important; }
-:root[data-mycellios-design="agent"] .public-panel .overview-outcome-failed { background: var(--agent-danger) !important; }
-:root[data-mycellios-design="agent"] .public-panel .overview-outcome-running { background: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel .overview-legend-completed { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .public-panel .overview-legend-failed { background: var(--agent-danger) !important; }
 :root[data-mycellios-design="agent"] .public-panel .overview-chart-bar { fill: var(--agent-primary); }
 :root[data-mycellios-design="agent"] .public-panel .overview-chart-bar.active { fill: var(--agent-fg); }
+:root[data-mycellios-design="agent"] .public-panel .overview-chart-bar.failed { fill: var(--agent-danger); }
 :root[data-mycellios-design="agent"] .public-panel .overview-status > i { background: currentColor !important; }
 :root[data-mycellios-design="agent"] .public-panel .overview-status.fresh > i { color: var(--agent-success) !important; }
 :root[data-mycellios-design="agent"] .public-panel .overview-status:is(.stale, .degraded) { color: var(--agent-warning) !important; }

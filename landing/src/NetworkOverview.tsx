@@ -5,14 +5,12 @@ import {
   MODEL_STATE_LABELS,
   WORKER_STATUS_LABELS,
   deviceRows,
-  hourlyCompletedTasks,
+  hourlyTasks,
   modelRows,
   onlineGpuCapacity,
-  recentTaskOutcome,
   type DeviceRow,
   type HourlyActivity,
   type ModelServiceState,
-  type RecentOutcome,
   type StatsHistorySample,
   type StatsSnapshot,
 } from "./overview-stats";
@@ -105,8 +103,7 @@ export function Overview({ snapshot, connectionError, onAddDevice, loadHistory =
   const models = useMemo(() => modelRows(snapshot), [snapshot]);
   const devices = useMemo(() => deviceRows(snapshot.workers), [snapshot.workers]);
   const gpu = useMemo(() => onlineGpuCapacity(snapshot.workers), [snapshot.workers]);
-  const activity = useMemo(() => history ? hourlyCompletedTasks(history, now) : null, [history, now]);
-  const outcome = useMemo(() => recentTaskOutcome(snapshot.jobs), [snapshot.jobs]);
+  const activity = useMemo(() => history ? hourlyTasks(history, now) : null, [history, now]);
   const serving = models.filter((model) => model.state === "serving").length;
   const preparing = models.filter((model) => model.state === "preparing").length;
 
@@ -141,7 +138,7 @@ export function Overview({ snapshot, connectionError, onAddDevice, loadHistory =
           <dd className="overview-kpi-hint">{completedHint(activity)}</dd>
         </div>
       </dl>
-      <ActivityCard activity={activity} error={historyError} onRetry={() => setAttempt((value) => value + 1)} outcome={outcome} now={now} />
+      <ActivityCard activity={activity} error={historyError} onRetry={() => setAttempt((value) => value + 1)} />
       <ModelsCard models={models} />
       <DevicesCard devices={devices} now={now} />
     </>}
@@ -156,20 +153,20 @@ function completedHint(activity: HourlyActivity | null): string {
     : `${amount} desde las ${hourFormat.format(activity.coverageStart)}.`;
 }
 
-function ActivityCard({ activity, error, onRetry, outcome, now }: { activity: HourlyActivity | null; error: boolean; onRetry: () => void; outcome: RecentOutcome; now: number }) {
+function ActivityCard({ activity, error, onRetry }: { activity: HourlyActivity | null; error: boolean; onRetry: () => void }) {
   return <UiCard className="overview-card overview-activity">
     <header>
       <UiHeading as="h2">Actividad de las últimas 24 horas</UiHeading>
-      <UiText>Tareas completadas por hora.</UiText>
+      <UiText>Tareas completadas y fallidas por hora.</UiText>
     </header>
     {activity ? <HourlyChart activity={activity} />
       : error ? <div className="overview-card-state" role="alert"><UiText>No se ha podido cargar la actividad.</UiText><UiButton variant="secondary" size="sm" onClick={onRetry}>Reintentar</UiButton></div>
       : <div className="overview-card-state" role="status"><UiText>Cargando actividad…</UiText></div>}
-    <OutcomeBar outcome={outcome} now={now} />
   </UiCard>;
 }
 
 const CHART = { width: 720, height: 168, top: 12, bottom: 136, left: 4, right: 716 };
+const NO_DATA = "sin datos";
 
 function barPath(x: number, width: number, top: number, bottom: number): string {
   const height = bottom - top;
@@ -178,68 +175,73 @@ function barPath(x: number, width: number, top: number, bottom: number): string 
   return `M${x} ${bottom}V${top + radius}Q${x} ${top} ${x + radius} ${top}H${x + width - radius}Q${x + width} ${top} ${x + width} ${top + radius}V${bottom}Z`;
 }
 
+function failedText(value: number | null): string {
+  return value === null ? `fallidas: ${NO_DATA}` : `${numbers.format(value)} fallidas`;
+}
+
+/** Plain-language summary of the chart, also used as its accessible name. */
+export function activitySummary(activity: HourlyActivity): string {
+  const hourLabel = (start: number) => hourFormat.format(start);
+  const busiest = activity.hours.reduce((best, hour) => hour.completed > best.completed ? hour : best, activity.hours[0]!);
+  const completed = activity.completed > 0
+    ? `${numbers.format(activity.completed)} tareas completadas en las últimas 24 horas. La hora con más actividad empezó a las ${hourLabel(busiest.start)}, con ${numbers.format(busiest.completed)} tareas.`
+    : "No se han completado tareas en las últimas 24 horas.";
+  const failed = activity.failedCoverageStart === null
+    ? "Todavía no hay datos de tareas fallidas por hora."
+    : activity.failedFullDay
+      ? `${numbers.format(activity.failed)} tareas fallidas en las últimas 24 horas.`
+      : `${numbers.format(activity.failed)} tareas fallidas desde las ${hourLabel(activity.failedCoverageStart)}; antes, sin datos.`;
+  return `${completed} ${failed}`;
+}
+
 export function HourlyChart({ activity }: { activity: HourlyActivity }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const tableId = useId();
-  const maximum = Math.max(1, ...activity.hours.map((hour) => hour.completed));
+  const maximum = Math.max(1, ...activity.hours.map((hour) => Math.max(hour.completed, hour.failed ?? 0)));
   const slot = (CHART.right - CHART.left) / activity.hours.length;
-  const barWidth = Math.max(2, slot - 4);
+  const barWidth = Math.max(2, (slot - 6) / 2);
   const y = (value: number) => CHART.bottom - (value / maximum) * (CHART.bottom - CHART.top);
-  const busiest = activity.hours.reduce((best, hour) => hour.completed > best.completed ? hour : best, activity.hours[0]!);
   const hourLabel = (start: number) => hourFormat.format(start);
-  const summary = activity.completed > 0
-    ? `${numbers.format(activity.completed)} tareas completadas en las últimas 24 horas. La hora con más actividad empezó a las ${hourLabel(busiest.start)}, con ${numbers.format(busiest.completed)} tareas.`
-    : "No se han completado tareas en las últimas 24 horas.";
+  const summary = activitySummary(activity);
   const tooltip = hovered === null ? null : activity.hours[hovered]!;
   const leave = useCallback(() => setHovered(null), []);
+  const failedLegend = activity.failedCoverageStart === null
+    ? NO_DATA
+    : activity.failedFullDay ? numbers.format(activity.failed) : `${numbers.format(activity.failed)} desde las ${hourLabel(activity.failedCoverageStart)}`;
   return <figure className="overview-chart">
     <div className="overview-chart-plot" onMouseLeave={leave}>
       <svg viewBox={`0 0 ${CHART.width} ${CHART.height}`} role="img" aria-label={summary} aria-describedby={tableId} preserveAspectRatio="none">
         <line className="overview-chart-baseline" x1={CHART.left} x2={CHART.right} y1={CHART.bottom} y2={CHART.bottom} />
         <line className="overview-chart-grid" x1={CHART.left} x2={CHART.right} y1={CHART.top} y2={CHART.top} />
         {activity.hours.map((hour, index) => {
-          const x = CHART.left + index * slot + (slot - barWidth) / 2;
+          const x = CHART.left + index * slot + (slot - barWidth * 2 - 2) / 2;
+          const active = hovered === index ? " active" : "";
           return <g key={hour.start}>
-            <path className={`overview-chart-bar${hovered === index ? " active" : ""}`} d={barPath(x, barWidth, y(hour.completed), CHART.bottom)} />
+            <path className={`overview-chart-bar${active}`} d={barPath(x, barWidth, y(hour.completed), CHART.bottom)} />
+            {hour.failed !== null && <path className={`overview-chart-bar failed${active}`} d={barPath(x + barWidth + 2, barWidth, y(hour.failed), CHART.bottom)} />}
             <rect className="overview-chart-hit" x={CHART.left + index * slot} y={0} width={slot} height={CHART.bottom} onMouseEnter={() => setHovered(index)}>
-              <title>{`${hourLabel(hour.start)}: ${numbers.format(hour.completed)} tareas completadas`}</title>
+              <title>{`${hourLabel(hour.start)}: ${numbers.format(hour.completed)} completadas, ${failedText(hour.failed)}`}</title>
             </rect>
           </g>;
         })}
       </svg>
       <span className="overview-chart-max" aria-hidden="true">{numbers.format(maximum)}</span>
-      {tooltip && <span className="overview-chart-tooltip" aria-hidden="true" style={{ left: `${((hovered! + 0.5) / activity.hours.length) * 100}%` }}><strong>{numbers.format(tooltip.completed)}</strong> tareas · {hourLabel(tooltip.start)}</span>}
+      {tooltip && <span className="overview-chart-tooltip" aria-hidden="true" style={{ left: `${((hovered! + 0.5) / activity.hours.length) * 100}%` }}><strong>{numbers.format(tooltip.completed)}</strong> completadas · {tooltip.failed === null ? `fallidas: ${NO_DATA}` : <><strong>{numbers.format(tooltip.failed)}</strong> fallidas</>} · {hourLabel(tooltip.start)}</span>}
     </div>
     <div className="overview-chart-axis" aria-hidden="true">
       {activity.hours.filter((_, index) => index % 6 === 0).map((hour) => <span key={hour.start}>{hourLabel(hour.start)}</span>)}
       <span>Ahora</span>
     </div>
+    <ul className="overview-chart-legend" aria-hidden="true">
+      <li><i className="overview-legend-completed" />Completadas <strong>{numbers.format(activity.completed)}</strong></li>
+      <li><i className="overview-legend-failed" />Fallidas <strong>{failedLegend}</strong></li>
+    </ul>
     <figcaption className="sr-only">{summary}</figcaption>
     <UiTable id={tableId} className="sr-only">
-      <UiTableHead><UiTableRow><UiTableHeader>Hora</UiTableHeader><UiTableHeader>Tareas completadas</UiTableHeader></UiTableRow></UiTableHead>
-      <UiTableBody>{activity.hours.map((hour) => <UiTableRow key={hour.start}><UiTableCell>{hourLabel(hour.start)}</UiTableCell><UiTableCell>{numbers.format(hour.completed)}</UiTableCell></UiTableRow>)}</UiTableBody>
+      <UiTableHead><UiTableRow><UiTableHeader>Hora</UiTableHeader><UiTableHeader>Tareas completadas</UiTableHeader><UiTableHeader>Tareas fallidas</UiTableHeader></UiTableRow></UiTableHead>
+      <UiTableBody>{activity.hours.map((hour) => <UiTableRow key={hour.start}><UiTableCell>{hourLabel(hour.start)}</UiTableCell><UiTableCell>{numbers.format(hour.completed)}</UiTableCell><UiTableCell>{hour.failed === null ? NO_DATA : numbers.format(hour.failed)}</UiTableCell></UiTableRow>)}</UiTableBody>
     </UiTable>
   </figure>;
-}
-
-export function OutcomeBar({ outcome, now }: { outcome: RecentOutcome; now: number }) {
-  if (outcome.total === 0) return <div className="overview-outcome"><UiText>Todavía no hay tareas recientes.</UiText></div>;
-  const parts = [
-    { key: "completed", label: "Completadas", value: outcome.completed },
-    { key: "failed", label: "Fallidas", value: outcome.failed },
-    { key: "running", label: "En curso", value: outcome.inProgress },
-  ].filter((part) => part.value > 0);
-  const span = outcome.since === null ? "" : ` (${sinceText(outcome.since, now).replace(/^hace /, "últimos ")})`;
-  const description = parts.map((part) => `${numbers.format(part.value)} ${part.label.toLowerCase()}`).join(", ");
-  return <div className="overview-outcome">
-    <UiHeading as="h3">Cómo terminaron las últimas {numbers.format(outcome.total)} tareas{span}</UiHeading>
-    <div className="overview-outcome-bar" role="img" aria-label={`Últimas ${outcome.total} tareas: ${description}.`}>
-      {parts.map((part) => <span key={part.key} className={`overview-outcome-${part.key}`} style={{ flexGrow: part.value }} title={`${part.label}: ${numbers.format(part.value)}`} />)}
-    </div>
-    <ul className="overview-outcome-legend">
-      {parts.map((part) => <li key={part.key}><i className={`overview-outcome-${part.key}`} aria-hidden="true" />{part.label} <strong>{numbers.format(part.value)}</strong></li>)}
-    </ul>
-  </div>;
 }
 
 function ModelsCard({ models }: { models: ReturnType<typeof modelRows> }) {

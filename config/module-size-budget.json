@@ -12,7 +12,7 @@
     "python/distributed_runtime/resident_expert_rpc.py": { "ceiling": 2640, "target": 2500, "owner": "python-runtime" },
     "python/distributed_runtime/routing_aware_placement.py": { "ceiling": 2027, "target": 1950, "owner": "python-runtime" },
     "python/distributed_runtime/stage.py": { "ceiling": 3034, "target": 2900, "owner": "python-runtime" },
-    "src/coordinator/server.ts": { "ceiling": 6063, "target": 5900, "owner": "coordinator" },
+    "src/coordinator/server.ts": { "ceiling": 6018, "target": 5900, "owner": "coordinator" },
     "src/coordinator/worker-hub.ts": { "ceiling": 2723, "target": 2600, "owner": "coordinator" },
     "src/distribution/launch-agent-rpc.ts": { "ceiling": 2790, "target": 2650, "owner": "distribution" },
     "src/distribution/python-launcher.ts": { "ceiling": 3561, "target": 3400, "owner": "distribution" },

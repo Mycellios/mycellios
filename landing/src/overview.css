@@ -35,6 +35,7 @@
 .public-panel .overview-chart svg { display: block; width: 100%; height: 168px; overflow: visible; }
 .public-panel .overview-chart-bar { fill: var(--accent, var(--text-primary)); }
 .public-panel .overview-chart-bar.active { fill: var(--text-primary); }
+.public-panel .overview-chart-bar.failed { fill: var(--danger); }
 .public-panel .overview-chart-hit { fill: transparent; }
 .public-panel .overview-chart-baseline { stroke: var(--border-subtle); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .public-panel .overview-chart-grid { stroke: var(--border-subtle); stroke-width: 1; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
@@ -43,18 +44,12 @@
 .public-panel .overview-chart-tooltip strong { color: var(--text-primary); font-weight: 500; }
 .public-panel .overview-chart-axis { display: flex; justify-content: space-between; margin-top: 8px; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
 
-.public-panel .overview-outcome { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
-.public-panel .overview-outcome h3 { margin: 0; font-size: 13px; font-weight: 500; }
-.public-panel .overview-outcome .ui-text { margin: 0; color: var(--text-secondary); font-size: 13px; }
-.public-panel .overview-outcome-bar { display: flex; gap: 2px; height: 10px; overflow: hidden; border-radius: 4px; }
-.public-panel .overview-outcome-bar > span { flex-basis: 0; min-width: 3px; }
-.public-panel .overview-outcome-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; padding: 0; list-style: none; color: var(--text-secondary); font-size: 12px; }
-.public-panel .overview-outcome-legend li { display: inline-flex; align-items: center; gap: 6px; }
-.public-panel .overview-outcome-legend strong { color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
-.public-panel .overview-outcome-legend i { width: 8px; height: 8px; border-radius: 2px; }
-.public-panel .overview-outcome-completed { background: var(--success); }
-.public-panel .overview-outcome-failed { background: var(--danger); }
-.public-panel .overview-outcome-running { background: var(--text-secondary); }
+.public-panel .overview-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 12px 0 0; padding: 0; list-style: none; color: var(--text-secondary); font-size: 12px; }
+.public-panel .overview-chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.public-panel .overview-chart-legend strong { color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
+.public-panel .overview-chart-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.public-panel .overview-legend-completed { background: var(--accent, var(--text-primary)); }
+.public-panel .overview-legend-failed { background: var(--danger); }
 
 .public-panel .overview-table-scroll { overflow-x: auto; min-width: 0; margin-inline: -8px; padding-inline: 8px; }
 .public-panel .overview-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13px; }
