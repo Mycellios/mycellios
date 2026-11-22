@@ -7060,3 +7060,27 @@ msgstr "Wachten annuleren"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Wacht op een gebeurtenis"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "Aftakken naar een nieuw gesprek"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Wacht tot de huidige beurt klaar is om dit gesprek af te takken."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "Het gesprek kon niet worden afgetakt. Probeer het opnieuw."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Afgetakt van een verwijderd gesprek"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Afgetakt van {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Openen waar deze aftakking begon"
