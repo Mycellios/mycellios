@@ -299,6 +299,7 @@ function fixture({
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     thread: {
+      findFirst: vi.fn(async () => null),
       findUniqueOrThrow: vi.fn(async () => ({ id: run.threadId, groupId: null })),
       update: vi.fn(async () => ({ nextMessageSeq: 2, nextEventSeq: 2 })),
     },

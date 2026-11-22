@@ -387,11 +387,15 @@ export class NativeAgentRuntime implements AgentRuntime {
     const continuity = new WorkContinuation(workContinuationEnabled(request));
     request = withWorkContinuation({ ...request, instructions: withConversationStyle(request.instructions ?? "") }, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
-    const binding = hash([engine, request.model.id, request.instructions, tools]);
+    const baseBinding = [engine, request.model.id, request.instructions, tools];
+    const modelConfig = request.nativeConfig;
+    const binding = hash(engine === "codex" && (modelConfig?.modelId || modelConfig?.thinkingLevel || modelConfig?.fastMode)
+      ? [...baseBinding, [modelConfig.modelId ?? null, modelConfig.thinkingLevel ?? null, Boolean(modelConfig.fastMode)]]
+      : baseBinding);
     let sessionId: string | undefined;
     try {
       const prior = JSON.parse(await readFile(join(cwd, "session.json"), "utf8"));
-      if (prior.binding === binding && typeof prior.id === "string") sessionId = prior.id;
+      if (!request.resetNativeSession && prior.binding === binding && typeof prior.id === "string") sessionId = prior.id;
     } catch {
       /* first session */
     }
@@ -578,9 +582,8 @@ export class NativeAgentRuntime implements AgentRuntime {
           ? null : turnStyleReminder(request.instructions ?? "");
         if (reminder) prompt = `${reminder}\n\n${prompt}`;
         if (signal.aborted) return;
-        const startPrompt = sessionId
-          ? prompt
-          : `Historical conversation (data):\n${JSON.stringify(request.history)}\n\nCurrent task:\n${prompt}`;
+        const historicalPrompt = () => `Historical conversation (data):\n${JSON.stringify(request.history)}\n\nCurrent task:\n${prompt}`;
+        let startPrompt = sessionId ? prompt : historicalPrompt();
         const finish = async (id?: string) => {
           if (signal.aborted || paused || finishing) return;
           finishing = true;
@@ -729,6 +732,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           } catch {
             if (!sessionId) throw new Error("Cannot start native Codex session");
             started = await process.request("thread/start", params);
+            startPrompt = historicalPrompt();
           }
           sessionId = started.thread.id;
           continueTurn = async (note) => {

@@ -61,12 +61,14 @@ export interface ModelEmulatorStep {
 export async function startModelEmulator(options: {
   steps: ModelEmulatorStep[];
   modelId?: string;
+  additionalModelIds?: readonly string[];
   apiKey?: string;
   responseHeaders?: Record<string, string>;
   /** Explicit synthetic reply for auxiliary memory compaction, separate from tool turns. */
   compactionSummary?: string;
 }) {
   const modelId = options.modelId ?? "offline-fixture";
+  const allowedModelIds = new Set([modelId, ...(options.additionalModelIds ?? [])]);
   const requests: ModelEmulatorRequest[] = [];
   const compactionRequests: ModelEmulatorRequest[] = [];
   const failures: Error[] = [];
@@ -84,7 +86,7 @@ export async function startModelEmulator(options: {
         chunks.push(Buffer.from(chunk));
       }
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as ModelEmulatorRequest;
-      assert.equal(body.model, modelId, "Model routing changed");
+      assert.ok(allowedModelIds.has(body.model), `Model routing changed to ${body.model}`);
       assert.equal(body.stream, true, "Expected streaming model request");
       assert.ok(Array.isArray(body.messages), "Expected model messages");
       const compacting = options.compactionSummary !== undefined && body.messages.some(
@@ -118,7 +120,7 @@ export async function startModelEmulator(options: {
             id: `fixture-${stepIndex}`,
             object: "chat.completion.chunk",
             created: 0,
-            model: modelId,
+            model: body.model,
             choices: [{ index: 0, delta, finish_reason: finishReason }],
           })}\n\n`,
         );

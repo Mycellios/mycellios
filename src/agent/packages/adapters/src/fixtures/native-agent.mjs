@@ -42,6 +42,8 @@ lines.on("line", (line) => {
       else if (message.method === "thread/start" || message.method === "thread/resume")
         reply(message, { thread: { id: "fixture-thread" } });
       else if (message.method === "turn/start") {
+        const input = message.params.input?.[0]?.text;
+        if (logIndex >= 0 && input?.includes("fixture history marker")) appendFileSync(process.argv[logIndex + 1], "history handoff\n");
         if (process.argv.includes("--fixture-fast") && (message.params.model !== "fixture-model" || message.params.effort !== "medium" || message.params.serviceTier !== "priority")) throw new Error("Fast settings were not forwarded");
         reply(message, { turn: { id: "fixture-turn" } });
         if (process.argv.includes("--fixture-hang")) return;

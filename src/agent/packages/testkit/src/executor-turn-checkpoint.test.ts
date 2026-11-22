@@ -39,6 +39,20 @@ function fixture(
     routineId: null,
     leaseFence: 0,
     checkpoint: null,
+    modelExecution: null as unknown,
+  };
+  const botSettings = {
+    agentEngine: "pi",
+    modelProvider: model.provider,
+    modelId: model.id,
+    thinkingLevel: null,
+  };
+  const credential = {
+    id: "fixture-credential",
+    provider: model.provider,
+    defaultModel: model.id,
+    secretId: "fixture-key",
+    userPreferences: [],
   };
   const task = { id: run.taskId, prompt: "Read evidence then complete the fixture." };
   const effects: Record<string, unknown>[] = [];
@@ -100,8 +114,7 @@ function fixture(
           name: "Fixture",
           title: "Fixture",
           description: "Fixture",
-          modelProvider: model.provider,
-          modelId: model.id,
+          ...botSettings,
           computerId: "fixture-computer",
           computerSwitching: false,
           memoryScope: null,
@@ -121,6 +134,7 @@ function fixture(
         count: async () => 2,
       },
       thread: {
+        findFirst: async () => null,
         update: async () => ({ nextEventSeq: 1, nextMessageSeq: 1 }),
         findUniqueOrThrow: async () => ({
           id: run.threadId,
@@ -138,14 +152,8 @@ function fixture(
       },
       userModelCredential: {
         ...empty,
-        findMany: async () => [
-          {
-            id: "fixture-credential",
-            provider: model.provider,
-            defaultModel: model.id,
-            secretId: "fixture-key",
-          },
-        ],
+        findMany: async () => [credential],
+        findFirst: async ({ where }: { where: { id?: string } }) => where.id === credential.id ? credential : null,
       },
       secret: {
         ...empty,
@@ -289,6 +297,7 @@ function fixture(
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
     executor,
+    botSettings,
     run,
     task,
     effects,
@@ -301,6 +310,45 @@ function fixture(
 }
 
 describe("executor paused transcript", () => {
+  it("keeps the original model through approval and uses the saved change on the next turn", async () => {
+    const model = await startModelEmulator({
+      modelId: "original-model",
+      additionalModelIds: ["next-model"],
+      steps: [
+        { expect: request => { expect(request.model).toBe("original-model"); },
+          response: { type: "tool", id: "pending", name: "fixture_write", arguments: { content: "approved later" } } },
+        { expect: request => { expect(request.model).toBe("original-model"); },
+          response: { type: "text", text: "Original turn completed." } },
+        { expect: request => { expect(request.model).toBe("next-model"); },
+          response: { type: "text", text: "Next turn completed." } },
+      ],
+    });
+    try {
+      const state = fixture(model.model);
+      state.run.trigger = "user";
+      await state.executor.continueRun(state.run.id, "fixture-worker");
+      expect(state.run.status).toBe("waiting_input");
+      expect(state.run.modelExecution).toMatchObject({ agentEngine: "pi", modelId: "original-model", credentialId: "fixture-credential" });
+
+      state.botSettings.agentEngine = "codex";
+      state.botSettings.modelId = "next-model";
+      for (const effect of state.effects) if (effect.status === "intended") effect.status = "approved";
+      state.run.status = "queued";
+      await state.executor.continueRun(state.run.id, "fixture-worker");
+      expect(state.run.status).toBe("completed");
+      expect(state.writes).toHaveBeenCalledOnce();
+
+      state.botSettings.agentEngine = "pi";
+      Object.assign(state.run, { id: "fixture-next-run", status: "queued", modelExecution: null });
+      state.task.prompt = "Start a separate next turn.";
+      await state.executor.continueRun(state.run.id, "fixture-worker");
+      model.assertComplete();
+      expect(state.run.modelExecution).toMatchObject({ agentEngine: "pi", modelId: "next-model" });
+    } finally {
+      await model.close();
+    }
+  });
+
   it.each(["allow", "deny"])(
     "%s keeps checkpoint storage separate from action effects",
     async (answer) => {
