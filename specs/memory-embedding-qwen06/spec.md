@@ -65,6 +65,11 @@ requests, port 18496 for the replica group only).
   vectors. A replica refuses to return any vector whose length is not 1
   (500 `invalid_model_output`), so a faulted backend cannot write all-zero
   vectors into the index.
+- A backend failure while embedding (for example a DirectML device fault,
+  whose localized message once surfaced as a text-decoding error) answers 500
+  `backend_failed`, never 400: clients treat 400 as a bad input. The replica
+  then drops the model and reloads it on its next reconcile (about 9 s),
+  reporting `reloading` meanwhile.
 - Errors: 401, 400, 413, and 503 `no_replica_available`.
 - `GET /health` (no auth) reports `ready`, `state`, model, revision and
   device.

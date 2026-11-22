@@ -78,6 +78,49 @@ class ReplicaTests(unittest.TestCase):
                 replica.embed(["x"])
             self.assertEqual((raised.exception.status, raised.exception.code), (500, "invalid_model_output"))
 
+    def test_a_faulted_backend_answers_500_and_reloads_instead_of_blaming_the_input(self):
+        # DirectML reports device faults with localized text, which once surfaced
+        # as UnicodeDecodeError (a ValueError) and was answered 400 invalid_request.
+        loaded = []
+
+        def load():
+            embedder = FakeEmbedder()
+            if not loaded:
+                def broken(texts, before_batch=None):
+                    raise UnicodeDecodeError("utf-8", b"\xe1", 0, 1, "invalid continuation byte")
+                embedder.embed = broken
+            loaded.append(embedder)
+            return embedder
+
+        replica = service.Replica({**CONFIG, "device": "cpu"}, load=load)
+        replica.reconcile()
+        with self.assertRaises(service.ServiceError) as raised:
+            replica.embed(["canción"])
+        self.assertEqual((raised.exception.status, raised.exception.code), (500, "backend_failed"))
+        self.assertTrue(loaded[0].closed)
+        self.assertEqual(replica.state, "reloading")
+        replica.reconcile()
+        self.assertEqual(replica.state, "ready")
+        self.assertEqual(len(replica.embed(["canción"])[0]), 1)
+
+    def test_zero_vectors_also_reload_the_backend(self):
+        loaded = []
+
+        def load():
+            embedder = FakeEmbedder()
+            if not loaded:
+                embedder.embed = lambda texts, before_batch=None: ([[0.0] * service.DIMENSIONS for _ in texts], 1)
+            loaded.append(embedder)
+            return embedder
+
+        replica = service.Replica({**CONFIG, "device": "cpu"}, load=load)
+        replica.reconcile()
+        with self.assertRaises(service.ServiceError):
+            replica.embed(["x"])
+        replica.reconcile()
+        self.assertEqual(len(loaded), 2)
+        self.assertEqual(len(replica.embed(["x"])[0]), 1)
+
     def test_unit_vectors_pass_the_norm_check(self):
         third = 1 / 3 ** 0.5
         self.assertTrue(service.is_unit_vector([third] * 3 + [0.0] * (service.DIMENSIONS - 3)))
