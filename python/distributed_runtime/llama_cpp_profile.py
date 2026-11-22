@@ -172,7 +172,8 @@ def profile_stage(runner, kv_per_token: int, args: argparse.Namespace) -> dict[s
         },
         "exactness": {
             "runtimeAbi": runner.info.get("runtime_abi"),
-            "backend": "vulkan" if runner.config.gpu_layers > 0 else "cpu",
+            "backend": runner.info.get("backend", "cpu"),
+            "gpuDevices": [str(device[1]) for device in runner.info.get("gpu_devices", [])],
             "batchClasses": runner.info.get("batch_classes", []),
             "exactMicroBatchSizes": exact_sizes,
             # A wave is exact only when the self-test found a class with more than one size.

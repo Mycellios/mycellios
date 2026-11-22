@@ -92,41 +92,21 @@ export async function prepareRemoteNativeGgufProcess(
   ) {
     throw new Error("native_gguf_source_requires_global_model_coordinates");
   }
-  const range = `${process.layerStart}:${process.layerEnd}:${process.totalLayers}`;
-  const destination = resolve(
-    preparation.cacheDirectory,
-    "native-gguf-stages",
-    createHash("sha256")
-      .update("mycellios-native-gguf-stage-cache/1\0")
-      .update(`${source.tensorManifestId}\0${range}\0${model.canonicalSource}\0${model.canonicalRevision ?? ""}`)
-      .digest("hex"),
-  );
-  const args = [
-    "-u", "-m", "distributed_runtime.native_gguf_remote", "fetch-stage",
-    "--url", source.artifactUrl,
-    "--manifest-url", source.tensorManifestUrl,
-    "--manifest-id", source.tensorManifestId,
-    "--destination", destination,
-    "--layer-start", String(process.layerStart),
-    "--layer-end", String(process.layerEnd),
-    "--model-source", model.canonicalSource,
-    ...(model.canonicalRevision === null ? [] : ["--model-revision", model.canonicalRevision]),
-    "--reuse-verified",
-  ];
-  const result = parseRemoteStageResult(await preparation.run(args));
-  if (
-    result.layerStart !== process.layerStart
-    || result.layerEnd !== process.layerEnd
-    || result.totalLayers !== process.totalLayers
-  ) {
+  const result = await fetchNativeGgufStage(preparation.run, {
+    source,
+    cacheDirectory: preparation.cacheDirectory,
+    layerStart: process.layerStart,
+    layerEnd: process.layerEnd,
+    modelSource: model.canonicalSource,
+    modelRevision: model.canonicalRevision,
+  });
+  if (result.totalLayers !== process.totalLayers) {
     throw new Error("native_gguf_source_returned_wrong_range");
   }
   if (result.modelIdentity !== model.artifactIdentity) {
     throw new Error("native_gguf_source_returned_wrong_model_identity");
   }
-  if (resolve(result.destination) !== destination) {
-    throw new Error("native_gguf_source_returned_wrong_destination");
-  }
+  const destination = result.destination;
   const binding: PythonNativeGgufStageConfiguration = {
     packagePath: destination,
     packageId: result.packageId,
@@ -162,6 +142,52 @@ export async function prepareRemoteNativeGgufProcess(
     process: { ...process, nativeGguf: binding, command: { ...process.command, args: command } } as PythonLaunchProcess,
     result,
   };
+}
+
+/**
+ * Build or reuse one range's package from the pinned GGUF in the node cache.
+ * Routes and engine probes share the cache, so a probe's package is the one
+ * the route later runs.
+ */
+export async function fetchNativeGgufStage(
+  run: (args: string[]) => Promise<string>,
+  input: {
+    source: Pick<PythonNativeGgufSourceConfiguration, "artifactUrl" | "tensorManifestUrl" | "tensorManifestId">;
+    cacheDirectory: string;
+    layerStart: number;
+    layerEnd: number;
+    modelSource: string;
+    modelRevision: string | null;
+  },
+): Promise<RemoteNativeGgufStageResult> {
+  const { source } = input;
+  const destination = resolve(
+    input.cacheDirectory,
+    "native-gguf-stages",
+    createHash("sha256")
+      .update("mycellios-native-gguf-stage-cache/2\0")
+      .update(`${source.tensorManifestId}\0${input.layerStart}:${input.layerEnd}\0${input.modelSource}\0${input.modelRevision ?? ""}`)
+      .digest("hex"),
+  );
+  const result = parseRemoteStageResult(await run([
+    "-u", "-m", "distributed_runtime.native_gguf_remote", "fetch-stage",
+    "--url", source.artifactUrl,
+    "--manifest-url", source.tensorManifestUrl,
+    "--manifest-id", source.tensorManifestId,
+    "--destination", destination,
+    "--layer-start", String(input.layerStart),
+    "--layer-end", String(input.layerEnd),
+    "--model-source", input.modelSource,
+    ...(input.modelRevision === null ? [] : ["--model-revision", input.modelRevision]),
+    "--reuse-verified",
+  ]));
+  if (result.layerStart !== input.layerStart || result.layerEnd !== input.layerEnd) {
+    throw new Error("native_gguf_source_returned_wrong_range");
+  }
+  if (resolve(result.destination) !== destination) {
+    throw new Error("native_gguf_source_returned_wrong_destination");
+  }
+  return { ...result, destination };
 }
 
 const LOCAL_FLAGS = [

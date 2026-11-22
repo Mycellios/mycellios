@@ -180,6 +180,56 @@ describe("engine activation authority", () => {
     expect(plans.every((plan) => plan.request.expectedKvBytesPerToken === 1_024)).toBe(true);
   });
 
+  it("challenges llama.cpp stages on Vulkan or the CPU with the route's pinned GGUF", () => {
+    const manifestId = "9".repeat(64);
+    const base = authority();
+    const target = (backend: "vulkan" | "cpu") => ({ ...base.descriptor.targets[0]!, platform: "win32" as const,
+      backend, runtimeAbi: "llama.cpp-b12613-win-vulkan-x64", quantizations: ["Q4_K_M"] });
+    const descriptor = { ...base.descriptor, targets: [target("vulkan"), target("cpu")],
+      model: { ...base.descriptor.model, manifestDigest: `sha256:${manifestId}` as typeof artifact } };
+    const pin = { format: "gguf" as const, url: "https://huggingface.co/org/model-GGUF/resolve/0123/model.gguf",
+      sha256: "8".repeat(64), sizeBytes: 1_000_000, tensorManifestUrl: "https://models.example/model.tensors.json",
+      tensorManifestId: manifestId, executor: "llama-cpp" as const };
+    const llama = {
+      ...base, descriptor, artifact: pin,
+      certification: sealEngineCertification({ ...base.certification,
+        descriptorDigest: sha256CanonicalEvidence(descriptor), artifactManifestDigest: `sha256:${manifestId}`,
+        targets: descriptor.targets, hardwareClasses: ["nvidia-test-gpu", "cpu"] }),
+      probe: { ...base.probe, kind: "llama-cpp-gguf-v1" as const, quantization: "Q4_K_M" },
+    };
+    const route = result();
+    route.profile.source = { ...route.profile.source, format: "gguf", snapshotCommit: null,
+      revision: null, artifactIdentity: digest("c"), canonicalSource: "hf://Qwen/Qwen3-Test" };
+    (route as unknown as { launch: unknown }).launch = { launchId: "activation-1",
+      configuration: { nativeGgufSource: { tensorManifestId: manifestId, executor: "llama-cpp" } } };
+    const cpuOnly = worker("worker-b", "node-b", 1);
+    cpuOnly.capabilities.gpus = [];
+    const now = Date.parse("2026-08-10T12:00:00Z");
+
+    const plans = buildEngineRuntimeActivationPlans(llama, "qwen-public", "activation-1", "reservation-1",
+      route, [worker("worker-a", "node-a", 0), cpuOnly], now);
+    expect(plans.map((plan) => [plan.request.probeKind, plan.request.backend])).toEqual([
+      ["llama-cpp-gguf-v1", "vulkan"], ["llama-cpp-gguf-v1", "cpu"]]);
+    expect(plans[0]!.request.gguf).toEqual({ artifactUrl: pin.url, artifactSha256: pin.sha256,
+      artifactSizeBytes: pin.sizeBytes, tensorManifestUrl: pin.tensorManifestUrl,
+      tensorManifestId: manifestId, modelSource: "hf://Qwen/Qwen3-Test" });
+    expect(plans[0]!.request.runtimeAbi).toBe("llama.cpp-b12613-win-vulkan-x64");
+
+    // The route must run the certified GGUF with llama.cpp, and a CPU stage needs the "cpu" class.
+    const other = structuredClone(route) as unknown as { launch: { configuration: { nativeGgufSource: { tensorManifestId: string } } } };
+    other.launch.configuration.nativeGgufSource.tensorManifestId = "7".repeat(64);
+    expect(() => buildEngineRuntimeActivationPlans(llama, "qwen-public", "activation-1", "reservation-1",
+      other as unknown as AutoDistributionRunResult, [worker("worker-a", "node-a", 0), cpuOnly], now))
+      .toThrow("engine_activation_authority_model_binding_is_invalid");
+    const gpuOnly = { ...llama, certification: sealEngineCertification({ ...llama.certification,
+      hardwareClasses: ["nvidia-test-gpu"] }) };
+    expect(() => buildEngineRuntimeActivationPlans(gpuOnly, "qwen-public", "activation-1", "reservation-1",
+      route, [worker("worker-a", "node-a", 0), cpuOnly], now)).toThrow("engine_activation_hardware_is_not_certified:node-b");
+    // A llama.cpp probe without a llama.cpp artifact cannot be configured.
+    expect(() => engineActivationAuthoritySchema.parse({ ...llama, artifact: { ...pin, executor: "torch" } }))
+      .toThrow("engine_activation_authority_llama_cpp_probe_requires_llama_cpp_artifact");
+  });
+
   it("fails closed without exact verified stage evidence", () => {
     const missing = worker("worker-a", "node-a", 0);
     delete missing.capabilities.distributedExecutor!.performanceEvidence;

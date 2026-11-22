@@ -39,7 +39,7 @@ export const engineActivationAuthoritySchema = z.object({
     executor: z.enum(["torch", "llama-cpp"]),
   }).strict().optional(),
   probe: z.object({
-    kind: z.literal("qwen3-dense-v1"),
+    kind: z.enum(["qwen3-dense-v1", "llama-cpp-gguf-v1"]),
     quantization: z.string().trim().min(1).max(64),
     attentionHeads: z.number().int().positive().max(100_000),
     kvHeads: z.number().int().positive().max(100_000),
@@ -84,6 +84,14 @@ export const engineActivationAuthoritySchema = z.object({
       path: ["artifact", "tensorManifestId"],
     });
   }
+  // A llama.cpp probe measures the pinned GGUF the route itself runs.
+  if (authority.probe.kind === "llama-cpp-gguf-v1" && authority.artifact?.executor !== "llama-cpp") {
+    context.addIssue({
+      code: "custom",
+      message: "engine_activation_authority_llama_cpp_probe_requires_llama_cpp_artifact",
+      path: ["probe", "kind"],
+    });
+  }
   if (authority.certification.status !== "certified") {
     context.addIssue({
       code: "custom",
@@ -122,9 +130,18 @@ export function buildEngineRuntimeActivationPlans(
     || Date.parse(authority.certification.validFrom) > now
     || Date.parse(authority.certification.expiresAt) <= now
   ) throw new Error("engine_activation_authority_certification_is_not_current");
+  const llamaCpp = authority.probe.kind === "llama-cpp-gguf-v1";
+  // A GGUF route's weights are named by its tensor manifest, not by a Hub
+  // snapshot: bind the route's source to the certified artifact instead.
+  const modelBound = llamaCpp
+    ? result.profile.source.format === "gguf"
+      && result.profile.source.canonicalRevision === authority.descriptor.model.revision
+      && result.launch.configuration.nativeGgufSource?.tensorManifestId === authority.artifact?.tensorManifestId
+      && result.launch.configuration.nativeGgufSource?.executor === "llama-cpp"
+    : authority.descriptor.model.revision === result.profile.source.snapshotCommit
+      && authority.descriptor.model.manifestDigest === result.profile.source.artifactIdentity;
   if (
-    authority.descriptor.model.revision !== result.profile.source.snapshotCommit
-    || authority.descriptor.model.manifestDigest !== result.profile.source.artifactIdentity
+    !modelBound
     || authority.descriptor.model.modelId !== result.profile.source.model
     || result.manifest.hiddenSize
       !== authority.probe.attentionHeads * authority.probe.headDim
@@ -153,7 +170,12 @@ export function buildEngineRuntimeActivationPlans(
       if (!worker || !executor || !performance || !physical) {
         throw new Error(`engine_activation_stage_evidence_is_missing:${member.nodeId}:${stage.index}`);
       }
-      const backend = performance.profile.backend;
+      // llama.cpp offloads to any GPU through Vulkan and otherwise runs on the
+      // CPU; the probe reports the backend it really used and must match.
+      const backend = llamaCpp
+        ? worker.capabilities.gpus.length > 0
+          && authority.descriptor.targets.some((candidate) => candidate.backend === "vulkan") ? "vulkan" : "cpu"
+        : performance.profile.backend;
       const contextTokens = result.request.workload.contextTokens;
       const target = authority.descriptor.targets.find((candidate) =>
         candidate.backend === backend
@@ -172,7 +194,9 @@ export function buildEngineRuntimeActivationPlans(
       if (!target || !certifiedTarget) {
         throw new Error(`engine_activation_certified_target_is_missing:${member.nodeId}`);
       }
-      const hardwareClasses = worker.capabilities.gpus.map((gpu) =>
+      // A CPU stage is certified as the "cpu" class: llama.cpp picks its
+      // instruction-set kernels at load and the self-test measures exactness.
+      const hardwareClasses = backend === "cpu" && llamaCpp ? ["cpu"] : worker.capabilities.gpus.map((gpu) =>
         `${gpu.vendor}-${gpu.model}`.toLowerCase().replace(/[^a-z0-9._:-]+/g, "-")
           .replace(/^-+|-+$/g, "").slice(0, 256)
       );
@@ -199,6 +223,15 @@ export function buildEngineRuntimeActivationPlans(
         evidence: { routeManifestDigest, canaryEvidenceId },
         request: {
           probeKind: authority.probe.kind,
+          ...(llamaCpp && authority.artifact ? { gguf: {
+            artifactUrl: authority.artifact.url,
+            artifactSha256: authority.artifact.sha256,
+            artifactSizeBytes: authority.artifact.sizeBytes,
+            tensorManifestUrl: authority.artifact.tensorManifestUrl,
+            tensorManifestId: authority.artifact.tensorManifestId,
+            // The same coordinates the route's packages carry (native-gguf-model.ts).
+            modelSource: result.profile.source.canonicalSource,
+          } } : {}),
           descriptorDigest,
           certificationId: authority.certification.certificationId,
           artifactManifestDigest: authority.certification.artifactManifestDigest,
