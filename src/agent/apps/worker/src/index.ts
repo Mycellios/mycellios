@@ -78,6 +78,7 @@ import {
   uploadSizeFromEnv,
 } from "@mycellios/core";
 import {
+  assertDatabaseSchemaCurrent,
   createBoardEvents,
   createWebPresence,
   createDb,
@@ -120,6 +121,9 @@ async function main() {
   });
   const { pool } = created;
   let { prisma } = created;
+  // Jobs on a database missing this build's migrations would fail one by one;
+  // stop here so the release rolls back instead.
+  await assertDatabaseSchemaCurrent(prisma);
   const rowSecurity = rowSecurityWarning(await describeRowSecurity(prisma));
   if (rowSecurity) logger.warn(rowSecurity);
   const realtime = new PostgresRealtimeFanout({

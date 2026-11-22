@@ -14,6 +14,7 @@ import {
   runAsSystem,
   runAsTenant,
 } from "./row-security.js";
+import { missingDatabaseSchema } from "./schema-compatibility.js";
 
 // Needs DATABASE_URL as the runtime login and DATABASE_MIGRATION_URL as the
 // owner, as `pnpm test:integration` provides after `pnpm db:migrate`.
@@ -266,6 +267,10 @@ describePostgres("row-level security (PostgreSQL)", () => {
         credentials: credentials.map((row) => row.userId),
       }),
     );
+
+  it("lets the runtime login see every table and column the client uses", async () => {
+    await expect(missingDatabaseSchema(db)).resolves.toEqual([]);
+  });
 
   it("connects as a login that cannot bypass the policies", async () => {
     await expect(describeRowSecurity(db)).resolves.toMatchObject({ enforced: true });
