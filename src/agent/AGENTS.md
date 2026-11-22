@@ -683,8 +683,9 @@
   files or scanning the profile in between: the NSIS fast-install journal keeps
   and restores the previous installation, and the installer never writes userData.
   Never force-stop another process, use Restart Manager shutdown or clear user data.
-  Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
-  actual Windows PowerShell encoding in manual-update-helper tests. Start the
+  Read PowerShell progress receipts as UTF-8 with an optional BOM. Replace the
+  complete receipt and retry briefly on Windows sharing violations; exercise
+  concurrent reads and the encoding in manual-update-helper tests. Start the
   worker through a hidden non-detached launcher so it survives Desktop's exit.
   Canonicalize owned file paths before Windows process identity checks, including
   8.3 TEMP aliases. Retain process handles before waiting or reading exit codes.

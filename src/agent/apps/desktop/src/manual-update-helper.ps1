@@ -77,7 +77,30 @@ $updateLock=$null
 $canReopen=$false
 $verifiedVersion=$null
 $window=$null
-function Progress([string]$value){$script:phase=$value;$receipt=@{phase=$value;atUtc=(Get-Date).ToUniversalTime().ToString('o');pid=$PID};$receipt|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8;$receipt|ConvertTo-Json -Compress|Add-Content -LiteralPath (Join-Path $job 'progress-history.jsonl') -Encoding UTF8}
+function Progress([string]$value){
+ $script:phase=$value
+ $receipt=@{phase=$value;atUtc=(Get-Date).ToUniversalTime().ToString('o');pid=$PID}
+ $progress=Join-Path $job 'progress.json'
+ $temporary=$progress+'.tmp'
+ $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8
+ # Desktop polls this file while the worker starts. Replace the complete receipt
+ # and allow short-lived Windows file handles to close before retrying.
+ for($attempt=0;;$attempt++){
+  try {
+   if([IO.File]::Exists($progress)){
+    [IO.File]::Replace($temporary,$progress,[NullString]::Value)
+   }else{
+    [IO.File]::Move($temporary,$progress)
+   }
+   break
+  } catch {
+   $errorCode=$_.Exception.GetBaseException().HResult -band 0xffff
+   if($attempt -ge 40 -or $errorCode -notin @(32,33)){throw}
+   Start-Sleep -Milliseconds 50
+  }
+ }
+ $receipt|ConvertTo-Json -Compress|Add-Content -LiteralPath (Join-Path $job 'progress-history.jsonl') -Encoding UTF8
+}
 function Write-Result($receipt){
  $temporary=$result+'.tmp'
  $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8

@@ -20,21 +20,62 @@ it("does not acknowledge malformed or unrelated receipts", () => {
   expect(() => manualUpdatePhase("\uFEFF{partial")).toThrow();
 });
 
-it.runIf(process.platform === "win32")("reads the actual Windows PowerShell receipt encoding", async () => {
+it.runIf(process.platform === "win32")("publishes a complete Windows progress receipt after a reader releases it", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-receipt-"));
   try {
     const receipt = path.join(directory, "progress.json");
+    const helper = path.join(import.meta.dirname, "manual-update-helper.ps1");
     const script = path.join(directory, "write.ps1");
-    await writeFile(script, "$ErrorActionPreference='Stop'\n@{phase='waiting-for-app'}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $PSScriptRoot 'progress.json') -Encoding UTF8");
-    await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", script], { windowsHide: true, timeout: 30_000 });
+    await writeFile(script, `param([string]$Helper)
+$ErrorActionPreference='Stop'
+$job=$PSScriptRoot
+$path=Join-Path $job 'progress.json'
+$tokens=$null
+$issues=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($Helper,[ref]$tokens,[ref]$issues)
+if($issues.Count){throw ($issues.Message -join '; ')}
+$progressFunction=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Progress'},$false)
+. ([ScriptBlock]::Create($progressFunction.Extent.Text))
+Progress 'preflight'
+$reader=Start-Job -ArgumentList $path -ScriptBlock {
+  param($path)
+  $handle=[IO.File]::Open($path,'Open','Read','Read')
+  try {
+    Write-Output 'locked'
+    $deadline=(Get-Date).AddSeconds(10)
+    while(![IO.File]::Exists($path+'.tmp')){
+      if((Get-Date) -gt $deadline){throw 'The writer did not stage the receipt'}
+      Start-Sleep -Milliseconds 10
+    }
+    Start-Sleep -Milliseconds 200
+    $contents=(New-Object IO.StreamReader($handle)).ReadToEnd() | ConvertFrom-Json
+    if($contents.phase -ne 'preflight'){throw 'The open reader observed a different receipt'}
+  } finally {$handle.Dispose()}
+}
+try {
+  $deadline=(Get-Date).AddSeconds(10)
+  while((Receive-Job $reader) -ne 'locked'){
+    if((Get-Date) -gt $deadline){throw 'The reader did not lock the receipt'}
+    Start-Sleep -Milliseconds 25
+  }
+  Progress 'waiting-for-app'
+  if(!(Wait-Job $reader -Timeout 10) -or $reader.State -ne 'Completed'){throw 'The reader failed'}
+  Receive-Job $reader
+} finally {Remove-Job $reader -Force}
+`);
+    await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", script, helper], {
+      windowsHide: true, timeout: 30_000,
+    });
     const bytes = await readFile(receipt);
     expect([...bytes.subarray(0, 3)]).toEqual([239, 187, 191]);
     expect(() => JSON.parse(bytes.toString("utf8"))).toThrow();
     expect(manualUpdatePhase(bytes.toString("utf8"))).toBe("waiting-for-app");
+    const history = await readFile(path.join(directory, "progress-history.jsonl"), "utf8");
+    expect(history.trim().split(/\r?\n/).map(manualUpdatePhase)).toEqual(["preflight", "waiting-for-app"]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
-});
+}, 35_000);
 
 it.runIf(process.platform === "win32")("parses the real helper and requires the app to exit normally", async () => {
   const source = path.join(import.meta.dirname, "manual-update-helper.ps1");
