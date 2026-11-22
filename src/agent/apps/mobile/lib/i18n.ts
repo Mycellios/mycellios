@@ -84,7 +84,7 @@ export async function bootstrapI18n(): Promise<UiLocale> {
   let stored: string | null = null;
   let deviceLanguage: string | null = readDeviceLanguage();
   try {
-    const SecureStore = await import("expo-secure-store");
+    const SecureStore = await import("./secure-store");
     stored = await SecureStore.getItemAsync(UI_LOCALE_STORAGE_KEY);
   } catch {
     stored = null;
@@ -108,7 +108,7 @@ export async function bootstrapI18n(): Promise<UiLocale> {
 
 export async function persistUiLocale(locale: UiLocale): Promise<void> {
   try {
-    const SecureStore = await import("expo-secure-store");
+    const SecureStore = await import("./secure-store");
     await SecureStore.setItemAsync(UI_LOCALE_STORAGE_KEY, locale);
   } catch {
     // Ignore SecureStore failures; in-memory locale still applies.

@@ -1,7 +1,7 @@
 import type { AuthCapabilities } from "@mycellios/contracts";
 import { hostMatchesPasskeyRpId, passkeyOfferDismissedKey, shouldOfferPasskey } from "@mycellios/core";
 import Constants from "expo-constants";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { Alert, Platform } from "react-native";
 import type * as NativePasskeys from "react-native-passkeys";
 import {
