@@ -6992,3 +6992,71 @@ msgstr "Je Micos kunnen aan meerdere taken tegelijk werken."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Hun antwoorden blijven hier tot je ze archiveert."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Openstaande wachtacties"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "Wacht tot {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "Wacht op de volgende run van {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Wacht op de volgende run van een routine"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Wacht tot een run klaar is"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Gewekt"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "Verzoek wordt voortgezet"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "Wacht"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "Deze wachtactie is al gewekt en is dus niet geannuleerd. Het verzoek gaat door."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "De wachtactie kon niet worden geannuleerd. Probeer het opnieuw."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Tijdslimiet: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "Verzoek tonen"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Opgeslagen notitie"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Oorspronkelijk verzoek"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "Annuleren…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Wachten annuleren"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "Wacht op een gebeurtenis"

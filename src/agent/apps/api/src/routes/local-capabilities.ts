@@ -5,7 +5,7 @@ import {
 } from "@mycellios/adapters";
 import { createTaskControls } from "../task-controls.js";
 import { createAcpRegistry } from "../acp-registry.js";
-import { controlWorkTree, workStatus, IsolationError } from "@mycellios/db";
+import { closeEventWait, controlWorkTree, listEventWaits, workStatus, IsolationError } from "@mycellios/db";
 import type { RouterContext } from "./context.js";
 
 export function localCapabilityRoutes({ authed, deps }: RouterContext) {
@@ -80,6 +80,22 @@ export function localCapabilityRoutes({ authed, deps }: RouterContext) {
         // completion, so an HTTP response or API restart cannot certify/lose Stop.
         void reconcileWorkStops(deps,context.actor).catch(()=>undefined);
         return {...result,stopping:result.paused};
+      }),
+      waits: authed.tasks.waits.handler(async ({ context, input }) => {
+        const actor = context.actor;
+        // The conversation must be this Mico's main chat or one of its own side conversations.
+        const thread = await deps.prisma.thread.findFirst({ where: { id: input.threadId, spaceId: actor.spaceId, userId: actor.userId,
+          OR: [{ botId: input.botId }, { taskBotId: input.botId }] }, select: { id: true } });
+        if (!thread) throw new IsolationError();
+        const waits = await listEventWaits(deps.prisma, { spaceId: actor.spaceId, userId: actor.userId, botId: input.botId }, { threadIds: [thread.id] });
+        return waits.map(({ closedAt: _closedAt, closedBy: _closedBy, thread: _thread, ...wait }) => wait);
+      }),
+      cancelWait: authed.tasks.cancelWait.handler(async ({ context, input }) => {
+        const { spaceId, userId } = context.actor;
+        const result = await closeEventWait(deps.prisma, { spaceId, userId }, { waitId: input.waitId, by: "person" });
+        // The teardown outbox finishes the cancellation; this only starts it sooner.
+        if (result.cancelled) void reconcileWorkStops(deps, context.actor).catch(() => undefined);
+        return { waitId: result.waitId, closed: result.closed, alreadyClosed: result.alreadyClosed, status: result.status };
       }),
       get: authed.tasks.get.handler(({ context, input }) =>
         createTaskControls(deps).get(context.actor, input.runId),

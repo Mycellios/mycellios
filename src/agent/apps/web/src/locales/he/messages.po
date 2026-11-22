@@ -6991,3 +6991,71 @@ msgstr "ה־Micos שלך יכולים לעבוד על כמה משימות בבת
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "התשובות שלהם נשארות כאן עד שמעבירים אותן לארכיון."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "המתנות פתוחות"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "ממתין עד {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "ממתין להרצה הבאה של {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "ממתין להרצה הבאה של רוטינה"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "ממתין לסיום הרצה"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "התעורר"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "ממשיך בבקשה"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "ממתין"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "ההמתנה הזו כבר התעוררה, ולכן לא בוטלה. הבקשה שלה ממשיכה."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "לא ניתן היה לבטל את ההמתנה. נסה שוב."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "מגבלת זמן: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "הצג את הבקשה"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "הערה שמורה"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "הבקשה המקורית"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "מבטל…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "בטל את ההמתנה"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "ממתין לאירוע"

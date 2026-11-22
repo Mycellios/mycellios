@@ -6992,3 +6992,71 @@ msgstr "Deine Micos können an mehreren Aufgaben gleichzeitig arbeiten."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Ihre Antworten bleiben hier, bis du sie archivierst."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Offene Wartevorgänge"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "Wartet bis {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "Wartet auf den nächsten Lauf von {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Wartet auf den nächsten Lauf einer Routine"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Wartet auf das Ende eines Laufs"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Aufgewacht"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "Setzt die Anfrage fort"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "Wartet"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "Dieser Wartevorgang ist schon aufgewacht und wurde daher nicht abgebrochen. Seine Anfrage läuft weiter."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "Der Wartevorgang konnte nicht abgebrochen werden. Bitte erneut versuchen."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Zeitlimit: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "Anfrage anzeigen"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Gespeicherte Notiz"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Ursprüngliche Anfrage"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "Wird abgebrochen…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Warten abbrechen"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "Wartet auf ein Ereignis"

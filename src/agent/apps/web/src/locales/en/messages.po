@@ -14054,3 +14054,67 @@ msgstr "Your Micos can work on several tasks at once."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Their answers stay here until you archive them."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Open waits"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "Waits until {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "Waits for the next run of {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Waits for the next run of a routine"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Waits for a run to finish"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Woke"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "Continuing the request"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "This wait already woke, so it was not cancelled. Its request goes on."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "The wait could not be cancelled. Try again."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Times out {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "Show the request"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Saved note"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Original request"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "Cancelling…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Cancel the wait"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "Waiting for an event"

@@ -6992,3 +6992,71 @@ msgstr "Ваши Mico могут работать над несколькими 
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Их ответы остаются здесь, пока вы их не архивируете."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Открытые ожидания"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "Ждёт до {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "Ждёт следующего запуска {routine}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Ждёт следующего запуска задачи"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Ждёт завершения запуска"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Проснулось"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "Продолжает запрос"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "Ожидание"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "Это ожидание уже проснулось, поэтому его не отменили. Запрос продолжается."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "Не удалось отменить ожидание. Попробуйте ещё раз."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Лимит времени: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "Показать запрос"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Сохранённая заметка"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Исходный запрос"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "Отмена…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Отменить ожидание"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "Ждёт события"

@@ -109,9 +109,20 @@
   scheduler, credentials or model polling is involved. Apply the additive
   `20261116150000_event_wait_delegation_state` migration before enabling waits;
   it extends the existing delegation-state CHECK without changing older states.
-  Inspect through
+  A wait wakes its request once, in its conversation (reopened if archived), and
+  that turn gets the original request and the saved note as data. The conversation
+  shows an "Open waits" card (waiting, paused, woke, continuing; Show the request;
+  Cancel the wait) and the Conversations pane marks it. closeEventWait serves the
+  card and close_wait under the same lock: it reuses the tree cancellation, ends a
+  parked request with nothing else pending without a turn, and never reports a
+  woken wait as cancelled. list_waits/close_wait reach only the Mico's own waits
+  (other conversations only where its history reaches) and are idempotent. Archive
+  keeps a request parked only on waits; Stop cancels it. Long-job guidance (check
+  within ~15 minutes in the turn, otherwise a wait; never sleep loops or provider
+  schedulers) goes with await_event. Inspect through
   `work_status`; validate with `scripts/verify-autonomy-waits-db.ts` on its fresh
-  disposable loopback cluster and the event-waits/work-continuation tests.
+  disposable loopback cluster, the event-waits/work-continuation, OpenWaits and
+  executor-agent-tasks tests and `node scripts/verify-mico-tasks-ui.mjs`.
 - Fresh routine sessions receive only a bounded, redacted historical handoff from
   their owned routine thread. Respect its first readable sequence, omit system
   messages and unrelated chats, and treat history as data rather than approval.
@@ -500,8 +511,8 @@
   transcript-autoload and thread-target tests.
   Edit inline: Enter/blur saves and Escape cancels; retain failed edits for retry.
   Lifecycle (thread-lifecycle in core/db, side-threads.ts in the API): archive from
-  a tab, Tasks or the phone stops first (queued messages, runs, delegated work),
-  retries for up to 15 s under the thread lock sends take, then archives or explains
+  a tab, Tasks or the phone stops first (queued messages, runs, delegated work; a
+  request parked only on await_event waits stays parked), retries for up to 15 s under the thread lock sends take, then archives or explains
   that the conversation still works; restore undoes a pending delete before it
   reopens an archive. Delete (conversations the person started, not app threads)
   is refused while any run or delegated work is unfinished, hides the thread with

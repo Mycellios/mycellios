@@ -105,6 +105,18 @@ it('allows durable silent task returns but stops while delegated work waits and 
  expect(restored.next('Event received')).toContain('2/8');
  restored.stop();expect(restored.next('NO_RESPONSE')).toBeUndefined();
 });
+it('keeps working after list_waits or close_wait: only a saved wait parks the request',async()=>{
+ const state=new WorkContinuation();
+ const executeTool=vi.fn(async(name:string)=>name==='list_waits'?{waits:[{waitId:'w',status:'waiting'}]}:{ok:true,waitId:'w',closed:true,cancelled:true});
+ const request={instructions:'Existing scope',tools:['list_waits','close_wait'].map(name=>({name,description:'fixture',inputSchema:{type:'object'}})),
+  saveWorkState:async()=>{},executeTool} as unknown as AgentRunRequest;
+ const wrapped=withWorkContinuation(request,state);
+ await wrapped.executeTool!(WORK_PLAN_TOOL,plan('running'),'plan');
+ await wrapped.executeTool!('list_waits',{},'list');
+ await wrapped.executeTool!('close_wait',{wait_id:'w'},'close');
+ expect(executeTool).toHaveBeenCalledTimes(2);
+ expect(state.next('Working')).toContain('Pending steps');
+});
 it('changes strategy before executing a fourth identical no-progress action, but permits changing results',async()=>{
  const executeTool=vi.fn(async()=>({code:1}));
  const request={instructions:'Original scope',tools:[{name:'shell',description:'fixture',inputSchema:{type:'object'}}],executeTool} as unknown as AgentRunRequest;

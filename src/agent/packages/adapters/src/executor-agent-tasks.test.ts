@@ -3,6 +3,7 @@ import { runContinueJob } from "@mycellios/adapter-kit";
 import {
   AGENT_TASK_SURFACE_ERROR,
   AGENT_TASK_WAIT_REFUSAL,
+  EVENT_WAIT_GUIDANCE,
   HISTORY_ACROSS_GUIDANCE,
   HISTORY_CONVERSATION_NOT_AVAILABLE_ERROR,
   PIN_MESSAGE_GUIDANCE,
@@ -46,6 +47,8 @@ async function turn(
     trigger?: string;
     calls?: Array<{ name: string; args: Record<string, unknown> }>;
     taskReport?: { runId: string; threadId: string; seq: number };
+    /** Rows the wait list reads. */
+    waits?: unknown[];
   } = {},
 ) {
   const run = {
@@ -140,7 +143,10 @@ async function turn(
       findUnique: vi.fn(async () => null),
       findFirst: vi.fn(async () => null),
     },
-    task: { findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt: "Do the work" })) },
+    task: {
+      findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt: "Do the work" })),
+      findMany: vi.fn(async () => options.waits ?? []),
+    },
     computer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     connection: { findMany: vi.fn(async () => []) },
     userModelPreference: { findFirst: vi.fn(async () => null) },
@@ -158,7 +164,7 @@ async function turn(
     botSkillPin: { findMany: vi.fn(async () => []) },
     scratchpadItem: { findMany: vi.fn(async () => []) },
     externalEffect: { findMany: vi.fn(async () => []) },
-    routine: { findFirst: vi.fn(async () => null) },
+    routine: { findFirst: vi.fn(async () => null), findMany: vi.fn(async () => [{ id: "routine-1", name: "Nightly report" }]) },
     computerExecutionLease: {
       updateManyAndReturn: vi.fn(async () => [{ fence: 1 }]),
       updateMany: vi.fn(async () => ({ count: 1 })),
@@ -203,7 +209,7 @@ async function turn(
   await executor.continueRun(run.id, "worker-1");
   expect(runtimeRun).toHaveBeenCalled();
   const toolNames = (offered?.tools ?? []).map((tool) => tool.name);
-  return { offered: offered!, toolNames, results, enqueue, finalizeRun };
+  return { offered: offered!, toolNames, results, enqueue, finalizeRun, prisma };
 }
 
 describe("tasks a Mico opens itself", () => {
@@ -265,5 +271,46 @@ describe("tasks a Mico opens itself", () => {
       taskReport: { runId: "report-run", threadId: "main", seq: 4 },
     });
     expect(enqueue).toHaveBeenCalledWith(runContinueJob("report-run"));
+  });
+
+  it("offers list_waits and close_wait with the long-job guidance wherever await_event is offered", async () => {
+    const person = { ...AGENT_TASK, id: "person-thread", startedBy: "user", taskKey: "mico-task:bot-1:person" };
+    for (const thread of [MAIN, person]) {
+      const { toolNames, offered } = await turn(thread);
+      expect(toolNames).toEqual(expect.arrayContaining(["await_event", "list_waits", "close_wait"]));
+      expect(offered.instructions).toContain(EVENT_WAIT_GUIDANCE);
+    }
+    const { toolNames, offered, results } = await turn(AGENT_TASK, {
+      trigger: "agent_task",
+      calls: [{ name: "list_waits", args: {} }, { name: "close_wait", args: { wait_id: "wait-1" } }],
+    });
+    expect(toolNames).not.toContain("list_waits");
+    expect(toolNames).not.toContain("close_wait");
+    expect(offered.instructions).not.toContain(EVENT_WAIT_GUIDANCE);
+    expect(results).toEqual([
+      expect.objectContaining({ error: AGENT_TASK_WAIT_REFUSAL }),
+      expect.objectContaining({ error: AGENT_TASK_WAIT_REFUSAL }),
+    ]);
+  });
+
+  it("lists the Mico's own waits across its conversations from the main chat, without the parked request text", async () => {
+    const plan = { version: 1, kind: "event-wait", openedAt: "2026-11-22T10:00:00.000Z", expiresAt: "2026-11-23T10:00:00.000Z", routineId: "routine-1" };
+    const row = (id: string, threadId: string, botId: string | null) => ({
+      id, threadId, prompt: `Note for ${id}`, workPlan: plan, delegationState: "waiting_event", paused: false, returnedToParentAt: null,
+      workParent: { prompt: "Summarise the report", delegationState: "waiting", paused: false },
+      thread: { title: threadId === "main" ? null : "Report", botId, archivedAt: null },
+    });
+    const main = await turn(MAIN, { calls: [{ name: "list_waits", args: {} }], waits: [row("wait-main", "main", "bot-1"), row("wait-side", "side", null)] });
+    const where = (call: unknown) => (call as [{ where: Record<string, unknown> }])[0].where;
+    const reads = (main.prisma.task.findMany as ReturnType<typeof vi.fn>).mock.calls.map(where)
+      .filter(filter => filter.delegationKey);
+    expect(reads).toEqual([expect.objectContaining({ spaceId: "space-1", userId: "user-1", botId: "bot-1", delegationKey: { startsWith: "event-wait:" } })]);
+    expect(reads[0]).not.toHaveProperty("threadId");
+    expect(main.results[0]).toEqual(expect.objectContaining({ waits: [
+      expect.objectContaining({ waitId: "wait-main", status: "waiting", note: "Note for wait-main", conversation: { current: true },
+        waitsFor: { routineId: "routine-1", routineName: "Nightly report" } }),
+      expect.objectContaining({ waitId: "wait-side", conversation: { taskId: "side", title: "Report" } }),
+    ] }));
+    expect(JSON.stringify(main.results[0])).not.toContain("Summarise the report");
   });
 });

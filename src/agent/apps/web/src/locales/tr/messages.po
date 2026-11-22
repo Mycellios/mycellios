@@ -6991,3 +6991,71 @@ msgstr "Mico'larınız aynı anda birkaç görev üzerinde çalışabilir."
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "Yanıtları siz arşivleyene kadar burada kalır."
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "Açık beklemeler"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "{time} saatine kadar bekliyor"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "{routine} için sonraki çalışmayı bekliyor"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "Bir rutinin sonraki çalışmasını bekliyor"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "Bir çalışmanın bitmesini bekliyor"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "Uyandı"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "İstek sürdürülüyor"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "Bekliyor"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "Bu bekleme zaten uyandı, bu yüzden iptal edilmedi. İsteği devam ediyor."
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "Bekleme iptal edilemedi. Tekrar deneyin."
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "Zaman sınırı: {expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "İsteği göster"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "Kaydedilen not"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "Asıl istek"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "İptal ediliyor…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "Beklemeyi iptal et"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "Bir olay bekleniyor"

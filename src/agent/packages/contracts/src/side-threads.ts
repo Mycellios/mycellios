@@ -37,6 +37,8 @@ export const SideThreadSchema = z.object({
   updatedAt: IsoDate.optional(),
   /** A reply the person has not read yet. */
   unread: z.boolean().optional(),
+  /** Waits (await_event) its Mico parked here that have not woken yet. */
+  openWaits: z.number().int().nonnegative().optional(),
 });
 export type SideThread = z.infer<typeof SideThreadSchema>;
 

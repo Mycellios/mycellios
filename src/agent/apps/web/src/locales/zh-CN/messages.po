@@ -6991,3 +6991,71 @@ msgstr "你的 Mico 可以同时处理多个任务。"
 #: src/pages/tasks/TaskEmpty.tsx
 msgid "Their answers stay here until you archive them."
 msgstr "答案会一直留在这里，直到你将其归档。"
+
+#: src/components/OpenWaits.tsx
+msgid "Open waits"
+msgstr "未结束的等待"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits until {time}"
+msgstr "等待至 {time}"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of {routine}"
+msgstr "等待 {routine} 的下一次运行"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for the next run of a routine"
+msgstr "等待某个例行任务的下一次运行"
+
+#: src/components/OpenWaits.tsx
+msgid "Waits for a run to finish"
+msgstr "等待一次运行结束"
+
+#: src/components/OpenWaits.tsx
+msgid "Woke"
+msgstr "已唤醒"
+
+#: src/components/OpenWaits.tsx
+msgid "Continuing the request"
+msgstr "正在继续请求"
+
+#: src/components/OpenWaits.tsx
+msgid "Waiting"
+msgstr "等待中"
+
+#: src/components/OpenWaits.tsx
+msgid "This wait already woke, so it was not cancelled. Its request goes on."
+msgstr "此等待已被唤醒，因此未被取消。它的请求会继续。"
+
+#: src/components/OpenWaits.tsx
+msgid "The wait could not be cancelled. Try again."
+msgstr "无法取消等待。请重试。"
+
+#: src/components/OpenWaits.tsx
+msgid "Times out {expires}"
+msgstr "时限：{expires}"
+
+#: src/components/OpenWaits.tsx
+msgid "Show the request"
+msgstr "显示请求"
+
+#: src/components/OpenWaits.tsx
+msgid "Saved note"
+msgstr "已保存的备注"
+
+#: src/components/OpenWaits.tsx
+msgid "Original request"
+msgstr "原始请求"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancelling…"
+msgstr "正在取消…"
+
+#: src/components/OpenWaits.tsx
+msgid "Cancel the wait"
+msgstr "取消等待"
+
+#: src/components/ConversationsPane.tsx
+msgid "Waiting for an event"
+msgstr "正在等待事件"
