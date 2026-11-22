@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { useLingui } from "@lingui/react/macro";
 import type { SpaceSetting } from "@mycellios/contracts";
 import { Button } from "@mycellios/ui-web";
@@ -105,7 +106,7 @@ export function SpaceSettingOverrides({
           {t`Retry`}
         </Button>
       </div>
-    ) : null;
+    ) : <LoadingSkeleton layout="settings" />;
   }
   const customized = overrides.data;
 

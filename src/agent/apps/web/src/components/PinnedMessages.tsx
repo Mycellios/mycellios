@@ -93,14 +93,14 @@ export function PinnedMessagesButton({state,onJump,mico}:{state:ReturnType<typeo
         <Button size="sm" variant={view==="here"?"secondary":"ghost"} aria-pressed={view==="here"} className="h-7 flex-1 px-2 text-xs" onClick={()=>setView("here")}><Trans>This conversation</Trans></Button>
         <Button size="sm" variant={view==="all"?"secondary":"ghost"} aria-pressed={view==="all"} className="h-7 min-w-0 flex-1 truncate px-2 text-xs" onClick={()=>setView("all")}>{t`All of ${name}'s conversations`}</Button>
       </fieldset>:null}
-      {all?(micoPins.query.isPending?<p role="status" className="px-3 py-3 text-sm text-muted-foreground"><Trans>Loading…</Trans></p>
+      {all?(micoPins.query.isPending?<LoadingSkeleton rows={2} className="px-3 py-3" />
       :micoPins.query.isError?<div role="alert" className="space-y-2 px-3 py-3 text-sm"><p><Trans>Could not load pinned messages.</Trans></p><Button size="sm" variant="ghost" onClick={()=>void micoPins.query.refetch()}><Trans>Retry</Trans></Button></div>
       :micoPins.query.data.pins.length===0?<p className="px-3 py-3 text-sm leading-relaxed text-muted-foreground">{t`No pinned messages in ${name}'s conversations yet.`}</p>
       :<>{micoPins.query.data.pins.map(pin=><PinRow key={`${pin.threadId}:${pin.messageId}`} pin={pin} label={conversationLabel(pin)}
           unpinDisabled={micoPins.unpin.isPending} onUnpin={()=>micoPins.unpin.mutate(pin)}
           onOpen={()=>{setOpen(false);if(pin.threadId===mico!.threadId) onJump(pin.messageId); else mico!.onOpen(pin);}} />)}
         {micoPins.query.data.pins.length>=200?<p className="px-3 py-2 text-xs text-muted-foreground"><Trans>Showing the newest 200 pins.</Trans></p>:null}</>)
-      :state.query.isPending?<p role="status" className="px-3 py-3 text-sm text-muted-foreground"><Trans>Loading…</Trans></p>
+      :state.query.isPending?<LoadingSkeleton rows={2} className="px-3 py-3" />
       :state.query.isError?<div role="alert" className="space-y-2 px-3 py-3 text-sm"><p><Trans>Could not load pinned messages.</Trans></p><Button size="sm" variant="ghost" onClick={()=>void state.query.refetch()}><Trans>Retry</Trans></Button></div>
       :state.pins.length===0?<p className="px-3 py-3 text-sm leading-relaxed text-muted-foreground"><Trans>Pin a message from its menu to find it here.</Trans></p>
       :state.pins.map(pin=><PinRow key={pin.messageId} pin={pin} unpinDisabled={state.actions.busy}
@@ -108,3 +108,4 @@ export function PinnedMessagesButton({state,onJump,mico}:{state:ReturnType<typeo
     </PopoverContent>
   </Popover>;
 }
+import { LoadingSkeleton } from "./LoadingSkeleton";
