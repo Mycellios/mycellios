@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ENGINE_ACTIVATION_AUTHORITY_SCHEMA,
   buildEngineRuntimeActivationPlans,
+  recordEngineRuntimeActivationPlans,
   engineActivationAuthoritySchema,
 } from "../src/coordinator/engine-activation-authority.js";
 import {
@@ -145,5 +146,77 @@ describe("engine activation authority", () => {
       result(), [missing, worker("worker-b", "node-b", 1)],
       Date.parse("2026-08-10T12:00:00Z")))
       .toThrow("engine_activation_stage_evidence_is_missing:node-a:0");
+  });
+
+  describe("recording plans for a committed activation", () => {
+    const now = Date.parse("2026-08-10T12:00:00Z");
+    const activated = () => ({ ...result(), launch: { launchId: "launch-7" } }) as unknown as AutoDistributionRunResult;
+    const workers = () => [worker("worker-a", "node-a", 0), worker("worker-b", "node-b", 1)];
+    function store() {
+      const calls: Array<[string, ...unknown[]]> = [];
+      return {
+        calls,
+        async replaceEngineRuntimeActivationPlans(modelId: string, activationId: string, values: readonly unknown[]) {
+          calls.push(["replace", modelId, activationId, values]);
+          return values;
+        },
+        async removeEngineRuntimeActivationPlans(modelId: string) {
+          calls.push(["remove", modelId]);
+          return 0;
+        },
+      };
+    }
+
+    it("stores one challenge per stage member, bound to the route and launch", async () => {
+      const target = store();
+      const outcome = await recordEngineRuntimeActivationPlans({
+        authority: authority(), modelId: "qwen-public", routeReservationId: "reservation-1",
+        result: activated(), workers: workers(), store: target, now,
+      });
+
+      expect(outcome).toEqual({ status: "recorded", plans: 2 });
+      expect(target.calls).toHaveLength(1);
+      const [kind, modelId, activationId, values] = target.calls[0]!;
+      expect([kind, modelId, activationId]).toEqual(["replace", "qwen-public", "launch-7"]);
+      const plans = values as Array<{ workerId: string; routeReservationId: string; activationId: string }>;
+      expect(plans.map((plan) => plan.workerId)).toEqual(["worker-a", "worker-b"]);
+      expect(plans.every((plan) => plan.routeReservationId === "reservation-1" && plan.activationId === "launch-7"))
+        .toBe(true);
+    });
+
+    it("clears stale plans instead of failing a serving route whose evidence does not bind", async () => {
+      const target = store();
+      const uncertified = workers();
+      uncertified[0]!.capabilities.gpus[0]!.model = "Other GPU";
+      const outcome = await recordEngineRuntimeActivationPlans({
+        authority: authority(), modelId: "qwen-public", routeReservationId: "reservation-1",
+        result: activated(), workers: uncertified, store: target, now,
+      });
+
+      expect(outcome).toEqual({ status: "skipped", reason: "engine_activation_hardware_is_not_certified:node-a" });
+      expect(target.calls).toEqual([["remove", "qwen-public"]]);
+    });
+
+    it("clears plans when the activation has no committed route reservation", async () => {
+      const target = store();
+      const outcome = await recordEngineRuntimeActivationPlans({
+        authority: authority(), modelId: "qwen-public", routeReservationId: null,
+        result: activated(), workers: workers(), store: target, now,
+      });
+
+      expect(outcome).toEqual({ status: "skipped", reason: "engine_activation_route_reservation_is_missing" });
+      expect(target.calls).toEqual([["remove", "qwen-public"]]);
+    });
+
+    it("reports an expired certification without storing plans", async () => {
+      const target = store();
+      const outcome = await recordEngineRuntimeActivationPlans({
+        authority: authority(), modelId: "qwen-public", routeReservationId: "reservation-1",
+        result: activated(), workers: workers(), store: target, now: Date.parse("2026-10-01T00:00:00Z"),
+      });
+
+      expect(outcome).toEqual({ status: "skipped", reason: "engine_activation_authority_certification_is_not_current" });
+      expect(target.calls).toEqual([["remove", "qwen-public"]]);
+    });
   });
 });
