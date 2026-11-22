@@ -14118,3 +14118,27 @@ msgstr "Cancel the wait"
 #: src/components/ConversationsPane.tsx
 msgid "Waiting for an event"
 msgstr "Waiting for an event"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Branch in new conversation"
+msgstr "Branch in new conversation"
+
+#: src/pages/shell/message-hover-actions.tsx
+msgid "Wait until the current turn ends to branch this conversation."
+msgstr "Wait until the current turn ends to branch this conversation."
+
+#: src/pages/Shell.tsx
+msgid "Could not branch the conversation. Try again."
+msgstr "Could not branch the conversation. Try again."
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from a deleted conversation"
+msgstr "Branched from a deleted conversation"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Branched from {name}"
+msgstr "Branched from {name}"
+
+#: src/components/BranchOriginDivider.tsx
+msgid "Open where this branch started"
+msgstr "Open where this branch started"

@@ -605,6 +605,25 @@
   db events/messages, message-view and peer-exchange-groups tests and
   `node --import tsx scripts/verify-agent-tasks-db.ts`; fakes do not qualify a live model.
 
+- "Branch in new conversation" (specs/conversation-branching/spec.md; behavior reference only)
+  sits in the More menu of the last Mico message of each finished turn, main chat or side
+  conversation, on desktop/web only (not phones, groups, projects or floating chats); disabled
+  while a turn runs, which the server also refuses. development.branch is idempotent by
+  requestId (taskKey mico-task:<bot>:branch:<id>, the existing unique key) and copies under the
+  source's thread lock the visible messages of that turn's context up to its run's end (newest
+  1,000) with new ids, a branch_origin system divider, files as new artifacts and storage
+  objects (nonce branch-copy:<branch>:<source>, skipped by version lookups) and the compacted
+  summary only when it ends inside the copy. Never runs, usage, costs, effects, events,
+  reactions, pins, read marks or queued messages. Encrypted content is read and written again
+  through the client (same Space key, new row binding); never copy ciphertext with raw SQL.
+  Title "{title} #N" or the person's last message, startedBy branch, titleSource auto, read to
+  the end; the tab opens right after its source and the divider links back, or says the source
+  was deleted (branchedFrom* are SET NULL). The first turn gets BRANCH_HANDOFF_NOTE (files were
+  not rolled back). No conversation limit. Deleting a branch removes its copies; deleting the
+  source never touches a branch. Verify core/web conversation-branch, message-view,
+  MicoTaskTabs and development-conversations tests,
+  `node --import tsx scripts/verify-conversation-branch-db.ts` and verify-mico-tasks-ui.mjs.
+
 - New chat is distinct from Clear: retain messages with a context_reset divider,
   advance Thread.contextStartSeq, invalidate local summaries/checkpoints and rotate
   the native session binding while keeping the same workspace and Mico settings.
@@ -1865,7 +1884,9 @@
   active. Preserve owner/generation fencing, queued cancellation and distinct
   queue-pressure/disconnection errors without automatic command replay.
   Quitting or update restarts call the `release` action, ending presence at once
-  while keeping consent and the execution preference (unlike `revoke`). A start the
+  while keeping consent and the execution preference (unlike `revoke`). Wait at
+  most two seconds for pending notices before closing the windows. An offline
+  profile skips the relay wait. A start the
   PC never claimed requeues the run as not dispatched and frees its segment; a
   claimed start stays uncertain. Verify the broker, stream, runtime and API relay tests.
 
