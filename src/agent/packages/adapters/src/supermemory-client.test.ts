@@ -311,7 +311,7 @@ describe("deleteSupermemoryContainer", () => {
 
     expect(result).toEqual({ ok: true });
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("http://localhost:6767/v3/container-tags/rakazo%3Abot-123");
+    expect(url).toBe("http://localhost:6767/v3/container-tags/mycellios%3Abot-123");
     expect(init.method).toBe("DELETE");
     expect(init.redirect).toBe("error");
     vi.unstubAllGlobals();
