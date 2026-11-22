@@ -721,6 +721,7 @@ export const RU_MESSAGES: Record<string, string> = {
   Submit: "Отправить",
   "Take control": "Взять управление",
   "Tap + to create a bot": "Нажмите +, чтобы создать бота",
+  "This PC": "Этот ПК",
   Team: "Команда",
   "Team Computer": "Командный компьютер",
   "That doesn’t look like a URL": "Это не похоже на URL",

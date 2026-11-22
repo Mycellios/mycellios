@@ -802,7 +802,7 @@ describe("bot settings device voice menu", () => {
     );
     expect(mocks.rpc).toHaveBeenCalledWith("bots/setComputer", {
       botId: "bot-fixture",
-      mode: "dedicated",
+      mode: "isolated",
     });
     expect(mocks.rpc).toHaveBeenCalledWith(
       "bots/update",

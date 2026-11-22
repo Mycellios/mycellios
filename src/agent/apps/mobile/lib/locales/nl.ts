@@ -748,6 +748,7 @@ export const NL_MESSAGES: Record<string, string> = {
   "Update computer": "Computer bijwerken",
   "Updating…": "Bezig met bijwerken…",
   Private: "Privé",
+  "This PC": "Deze pc",
   Team: "Team",
   "Continue in Background": "Doorgaan op de achtergrond",
   "Could not complete action": "Actie voltooien mislukt",

@@ -932,6 +932,7 @@ it("adds a bot made from the inbox's Create menu to the inbox roster before open
     spaceActionRef: { current: { busy: false, recoveryId: null } },
     rpc,
     normalizeCreateBotProfile: (profile: unknown) => profile,
+    DEFAULT_COMPUTER_MODE: "isolated",
     refreshBots: async () => undefined,
     allowFocusPrompt: () => undefined,
     scheduleFocusPrompt: () => undefined,

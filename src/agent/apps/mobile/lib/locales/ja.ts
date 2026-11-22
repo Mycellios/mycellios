@@ -739,6 +739,7 @@ export const JA_MESSAGES: Record<string, string> = {
   "Update computer": "コンピューターを更新",
   "Updating…": "更新中…",
   Private: "プライベート",
+  "This PC": "このPC",
   Team: "チーム",
   "Continue in Background": "バックグラウンドで続行",
   "Could not complete action": "操作を完了できませんでした",
