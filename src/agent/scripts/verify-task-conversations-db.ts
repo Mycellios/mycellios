@@ -18,7 +18,7 @@ const sql = db.getPgClient();
 try {
  await db.initialise(); await db.start(); await sql.connect(); connected = true;
  await sql.query(`CREATE TABLE bots(id text PRIMARY KEY,"spaceId" text,"archivedAt" timestamptz);
- CREATE TABLE threads(id text PRIMARY KEY,"spaceId" text,"userId" text,"taskBotId" text,"botId" text,"groupId" text,"projectKey" text,"taskKey" text,title text,"lastReadSeq" int DEFAULT -1,"createdAt" timestamptz DEFAULT now());
+ CREATE TABLE threads(id text PRIMARY KEY,"spaceId" text,"userId" text,"taskBotId" text,"botId" text,"groupId" text,"projectKey" text,"taskKey" text,title text,"lastReadSeq" int DEFAULT -1,"createdAt" timestamptz DEFAULT now(),"archivedAt" timestamptz,"deleteAfter" timestamptz);
  CREATE TABLE task_inbox(id text PRIMARY KEY,"spaceId" text,"userId" text,"botId" text,"threadId" text UNIQUE,"clientNonce" text,title text,"readSeq" int DEFAULT -1,"createdAt" timestamptz DEFAULT now(),"archivedAt" timestamptz,"reminderClaimedAt" timestamptz,UNIQUE("spaceId","userId","clientNonce"));
  INSERT INTO bots VALUES ('a','s',NULL),('b','s',NULL),('foreign','other',NULL),('archived','s',now());`);
  const add = async(id:string,bot='a',owner='u',space='s',key='mico:'+bot,task='mico-task:'+bot+':'+id) => sql.query('INSERT INTO threads(id,"spaceId","userId","taskBotId","projectKey","taskKey",title) VALUES($1,$2,$3,$4,$5,$6,$1)',[id,space,owner,bot,key,task]);
@@ -45,19 +45,26 @@ try {
  assert.equal(preserved.readSeq,7); assert.ok(preserved.archivedAt);
  await discoverTaskConversations(adapter,{...actor,userId:'other'});
  assert.equal((await sql.query(`SELECT count(*)::int AS n FROM task_inbox WHERE "userId"='other'`)).rows[0].n,1);
- // Sending from a Mico tab restores an archived conversation, only for its own owner and Space.
- const kuma = async() => (await sql.query(`SELECT "readSeq","archivedAt" FROM task_inbox WHERE "threadId"='kuma'`)).rows[0];
+ // A conversation being deleted is never brought into Tasks.
+ await add('deleting'); await sql.query(`UPDATE threads SET "deleteAfter"=now() WHERE id='deleting'`);
+ await discoverTaskConversations(adapter,actor); assert.deepEqual(await ids(),['budget','kuma','other-owner','project']);
+ await sql.query(`UPDATE threads SET "archivedAt"='2026-11-01' WHERE id='kuma'`);
+ // Sending from a Mico tab restores an archived conversation (thread and Tasks mirror), only for its own owner and Space.
+ const kuma = async() => (await sql.query(`SELECT i."readSeq",i."archivedAt",t."archivedAt" AS "threadArchivedAt" FROM task_inbox i JOIN threads t ON t.id=i."threadId" WHERE i."threadId"='kuma'`)).rows[0];
  assert.equal(await restoreArchivedTaskOnSend(adapter,{...actor,userId:'other'},'kuma'),0);
  assert.equal(await restoreArchivedTaskOnSend(adapter,{...actor,spaceId:'other'},'kuma'),0);
- assert.ok((await kuma()).archivedAt);
+ assert.ok((await kuma()).archivedAt); assert.ok((await kuma()).threadArchivedAt);
  assert.equal(await restoreArchivedTaskOnSend(adapter,actor,'kuma'),1);
- assert.equal((await kuma()).archivedAt,null); assert.equal((await kuma()).readSeq,7);
+ assert.equal((await kuma()).archivedAt,null); assert.equal((await kuma()).threadArchivedAt,null); assert.equal((await kuma()).readSeq,7);
  assert.equal(await restoreArchivedTaskOnSend(adapter,actor,'kuma'),0);
+ // A conversation being deleted refuses the send instead of reopening.
+ await assert.rejects(restoreArchivedTaskOnSend(adapter,actor,'deleting'),(error:any)=>error.code==='deleting');
  // An archive that holds the thread lock first is undone once the send's restore gets the lock.
  const archiver = db.getPgClient(); await archiver.connect();
  try {
    await archiver.query('BEGIN');
    await archiver.query(`SELECT id FROM threads WHERE id='kuma' FOR UPDATE`);
+   await archiver.query(`UPDATE threads SET "archivedAt"=now() WHERE id='kuma'`);
    await archiver.query(`UPDATE task_inbox SET "archivedAt"=now() WHERE "threadId"='kuma'`);
    let settled = false;
    const restored = restoreArchivedTaskOnSend(adapter,actor,'kuma').then(count => { settled = true; return count; });
@@ -73,7 +80,7 @@ try {
  assert.equal((await sql.query('SELECT count(*)::int AS n FROM task_inbox')).rows[0].n,200);
  await discoverTaskConversations(adapter,{...actor,userId:'bulk'});
  assert.equal((await sql.query('SELECT count(*)::int AS n FROM task_inbox')).rows[0].n,205);
- const result={passed:true,checks:['all Micos and project conversations','owner and Space isolation','archived/wrong-Space Micos excluded','main/routine/workflow/interrupted starts excluded','idempotent discovery','read/archive state preserved','send restores an archived conversation for its owner and Space only','restore waits for and undoes an archive holding the thread lock','bounded 200-row batches'],productionAccess:false,runsStarted:0};
+ const result={passed:true,checks:['all Micos and project conversations','owner and Space isolation','archived/wrong-Space Micos excluded','main/routine/workflow/interrupted starts excluded','idempotent discovery','read/archive state preserved','send restores an archived conversation (thread and Tasks mirror) for its owner and Space only','a deleting conversation refuses the send and is never discovered','restore waits for and undoes an archive holding the thread lock','bounded 200-row batches'],productionAccess:false,runsStarted:0};
  await writeFile(path.join(directory,'result.json'),JSON.stringify(result,null,2));
  console.log(JSON.stringify(result));
 } finally {if(connected)await sql.end();await db.stop();}

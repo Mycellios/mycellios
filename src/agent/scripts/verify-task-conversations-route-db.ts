@@ -87,7 +87,7 @@ try {
   assert.equal(target.threadId, first.threadId);
   assert.equal("projectSessionId" in target, false);
   checks.push("real starts retain nonce identity and create independent normal Mico task conversations");
-  const development = Object.fromEntries(["open", "rename", "list", "status", "projects", "saveProject", "projectTask", "primaryRun"].map(name => [name, handler]));
+  const development = Object.fromEntries(["open", "rename", "list", "status", "projects", "saveProject", "projectTask", "primaryRun", "archive", "restore", "remove"].map(name => [name, handler]));
   const dev = developmentRoutes({ deps, authed: { development } } as never).development as unknown as Record<string, (v: unknown) => Promise<any>>;
   const tabs = await runAsTenant(actor, () => dev.list!({ context: { actor }, input: { botId: bot.id } }));
   assert.equal(tabs.length, 2);
@@ -105,14 +105,23 @@ try {
   assert.equal((await call('list')).length, 3);
   await call('archive', {id:imported.id,archived:true});
   assert.ok((await call('list')).find((item:any)=>item.id===imported.id).archivedAt);
+  assert.ok((await system.thread.findUniqueOrThrow({where:{id:opened.threadId}})).archivedAt);
   await call('archive', {id:imported.id,archived:false});
+  assert.equal((await system.thread.findUniqueOrThrow({where:{id:opened.threadId}})).archivedAt, null);
+  // Archive from Tasks stops a running task first instead of refusing it.
+  await call('archive', {id:first.id,archived:true});
+  assert.equal(await system.run.count({ where: { threadId: first.threadId, status: { in: ['queued','leased','running','waiting_input','waiting_takeover'] } } }), 0);
+  assert.ok((await call('list')).find((item:any)=>item.id===first.id).archivedAt);
+  // Writing from Tasks restores it in the same transaction, keeping history.
+  await call('send', {id:first.id,text:'Synthetic follow-up from Tasks',clientNonce:randomUUID()});
+  assert.equal((await call('list')).find((item:any)=>item.id===first.id).archivedAt, null);
   assert.equal((await call('read',{id:imported.id})).thread.threadId,opened.threadId);
   assert.equal((await call('list',{}, {...actor,userId:'foreign'})).length,0);
   await assert.rejects(call('read',{id:imported.id},{...actor,userId:'foreign'}));
   await assert.rejects(call('archive',{id:imported.id,archived:true},{...actor,spaceId:'foreign'}));
   await system.thread.update({where:{id:opened.threadId},data:{title:'Kuma migration'}});
   assert.equal((await call('list')).find((item:any)=>item.id===imported.id).title,'Kuma migration');
-  checks.push('real route discovery, empty conversation, idempotence, same-thread resume, archive/restore, live title and owner/Space isolation without inference');
+  checks.push('real route discovery, empty conversation, idempotence, same-thread resume, archive/restore on the thread, archive stopping work, send restoring from Tasks, live title and owner/Space isolation without inference');
   await call('followUp',{id:imported.id,pinned:true,remindAt:new Date(Date.now()+60000).toISOString()});
   const followed=(await call('list')).find((item:any)=>item.id===imported.id);
   assert.equal(followed.pinned,true);assert.ok(followed.remindAt);

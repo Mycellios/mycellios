@@ -125,6 +125,8 @@ export function createJobReconciler(
     reconcileHomeStorage?: () => Promise<void>;
     reconcileTaskReminders?: () => Promise<void>;
     reconcileLocalMemoryReviews?: () => Promise<void>;
+    /** Finishes conversation deletes whose job was lost. */
+    reconcileThreadDeletions?: () => Promise<void>;
   },
   options: { intervalMs?: number; batchSize?: number } = {},
 ) {
@@ -161,6 +163,7 @@ export function createJobReconciler(
           deps.reconcileHomeStorage,
           deps.reconcileTaskReminders,
           deps.reconcileLocalMemoryReviews,
+          deps.reconcileThreadDeletions,
         ].map(async (reconcile) => reconcile?.()),
       );
       for (const result of auxiliary) {

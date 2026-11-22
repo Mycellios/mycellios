@@ -7,6 +7,7 @@ import {
   messagingDeliverJob,
   parseBackgroundJob,
   routineRetryJob,
+  threadDeleteJob,
 } from "./background-jobs.js";
 import type { BackgroundJobHandlers } from "./types.js";
 
@@ -22,10 +23,13 @@ function handlers(): BackgroundJobHandlers {
     "call.expire": vi.fn(async () => undefined),
     "plan.autostart": vi.fn(async () => undefined),
     "history.compact": vi.fn(async () => undefined),
+    "memory.review": vi.fn(async () => undefined),
+    "thread.delete": vi.fn(async () => undefined),
     "messaging.deliver": vi.fn(async () => undefined),
     "messaging.credential-cleanup": vi.fn(async () => undefined),
     "cloud_agent.poll": vi.fn(async () => undefined),
     "push.receipt": vi.fn(async () => undefined),
+    "webpush.deliver": vi.fn(async () => undefined),
   };
 }
 
@@ -116,5 +120,21 @@ describe("historyCompactJob", () => {
 
   it("keys different threads differently", () => {
     expect(historyCompactJobKey("thread-1")).not.toBe(historyCompactJobKey("thread-2"));
+  });
+});
+
+describe("threadDeleteJob", () => {
+  it("keeps one pending removal per thread, available once the undo window has passed", async () => {
+    const at = new Date("2026-11-22T10:00:11Z");
+    expect(threadDeleteJob("thread-1", at)).toEqual({
+      name: "thread.delete",
+      payload: { threadId: "thread-1" },
+      availableAt: at,
+      replaceKey: "thread.delete:thread-1",
+    });
+    const all = handlers();
+    await dispatchBackgroundJob(all, "thread.delete", { threadId: "thread-1" });
+    expect(all["thread.delete"]).toHaveBeenCalledWith({ threadId: "thread-1" });
+    expect(() => parseBackgroundJob("thread.delete", { threadId: "" })).toThrow();
   });
 });

@@ -69,3 +69,27 @@ recorded in the canonical status document when achieved.
 - Optional one-shot reminders persist as UTC instants; date entry uses device local time. The existing worker reconciler claims bounded due batches and uses the existing privacy-aware native/Web Push channels, with explicit task-thread links. No inference or billing is performed. A due marker remains until dismissed or rescheduled; absent/disabled delivery does not consume the reminder.
 - Archive cancels reminders and unpins. Cancellation/rescheduling invalidates pending Web Push delivery. A worker crash can retry an expired claim; native network acceptance is at-least-once across a crash, while the Web Push outbox deduplicates device/reminder/date.
 - Local qualification uses the additive migration and scripts/verify-task-conversations-route-db.ts with real SQL/RLS, synthetic notification transport, scoped UI tests and browser checks. Physical OS delivery requires a configured recipient and is a separate qualification.
+
+### Conversation lifecycle
+
+- The thread is the single source of a side conversation's lifecycle: `archivedAt`,
+  `titleSource` (auto/agent/user), `startedBy` (user/agent/routine/branch/delegation,
+  labels only), the last finished turn's `outcome` (completed/failed/interrupted) and
+  `lastError` (2000 characters), `deleteAfter`, and reserved branch references. The
+  live state (running/queued/waiting/idle/closed) is derived from runs, never stored.
+  The additive `20261122120000_thread_lifecycle` migration copies the Tasks archive
+  mark and backfills openers and outcomes; `task_inbox.archivedAt` stays as a mirror.
+- Archive from a Mico tab, Tasks or the phone stops queued messages, runs and delegated
+  work first, waits up to 15 seconds, then archives under the thread lock that sends
+  take, or explains that the conversation still works. Writing in an archived
+  conversation from a tab or from Tasks restores it in the same transaction.
+- Delete applies to conversations the person started, never while work is unfinished.
+  It hides the conversation for a 6-second undo window, then the worker removes it with
+  its own outputs and session files; uploads and outputs shown elsewhere stay. The main
+  chat is never archived or deleted. There is no open-conversation limit and nothing is
+  archived automatically.
+- Titles come from the first non-empty line of the first message (120 characters) or
+  its first file name; a title the person sets is never replaced automatically.
+- Local qualification: `scripts/verify-thread-lifecycle-db.ts` on disposable loopback
+  PostgreSQL (real migration on legacy rows, archive/restore, delete/undo/removal and
+  lock races), plus the task conversation, title, pin, routine and work verifiers.

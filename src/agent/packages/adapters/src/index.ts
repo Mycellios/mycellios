@@ -133,6 +133,7 @@ export * from "./pi-oauth.js";
 export * from "./pi-openai-compatible-provider.js";
 export * from "./pi-runtime.js";
 export * from "./pi-session.js";
+export { purgeDeletedThread, reconcileThreadDeletions } from "./thread-deletion.js";
 export { shutdownPiTelemetry } from "./pi-telemetry.js";
 export * from "./pipedream-connector.js";
 export * from "./product-analytics.js";

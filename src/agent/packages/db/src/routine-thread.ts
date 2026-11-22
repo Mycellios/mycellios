@@ -23,7 +23,7 @@ export async function ensureRoutineThread(prisma: PrismaClient, actor: Pick<Acto
     }
     const key = `routine:${routine.id}`;
     const thread = await tx.thread.create({
-      data: { ...scope, taskBotId: routine.botId, projectKey: key, taskKey: key, title: routine.name.slice(0, 100) },
+      data: { ...scope, taskBotId: routine.botId, projectKey: key, taskKey: key, title: routine.name.slice(0, 100), titleSource: "auto", startedBy: "routine" },
     });
     if (thread.taskBotId !== routine.botId || thread.projectKey !== key || thread.botId || thread.groupId || thread.externalConversationId)
       throw new IsolationError("The routine conversation identity is already in use");

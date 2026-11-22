@@ -18,7 +18,8 @@ export async function reconcileTaskReminders(deps: {
       WHERE i.id IN (SELECT c.id FROM task_inbox c
         JOIN bots b ON b.id=c."botId" AND b."spaceId"=c."spaceId" AND b."archivedAt" IS NULL
         JOIN threads t ON t.id=c."threadId" AND t."spaceId"=c."spaceId" AND t."userId"=c."userId" AND t."taskBotId"=c."botId"
-        WHERE c."archivedAt" IS NULL AND c."remindAt"<=${now} AND c."reminderNotifiedAt" IS NULL
+        WHERE c."archivedAt" IS NULL AND t."archivedAt" IS NULL AND t."deleteAfter" IS NULL
+          AND c."remindAt"<=${now} AND c."reminderNotifiedAt" IS NULL
           AND (c."reminderClaimedAt" IS NULL OR c."reminderClaimedAt"<${new Date(now.getTime()-300000)})
           AND EXISTS (SELECT 1 FROM space_members m WHERE m."spaceId"=c."spaceId" AND m."userId"=c."userId")
         ORDER BY c."remindAt",c.id LIMIT 100 FOR UPDATE OF c SKIP LOCKED)
@@ -26,7 +27,8 @@ export async function reconcileTaskReminders(deps: {
     for (const row of rows) {
       try {
         // Cancellation/rescheduling between claim and dispatch must not send an old reminder.
-        const current = await deps.prisma.inboxTask.findFirst({where:{id:row.id,archivedAt:null,remindAt:row.remindAt,reminderClaimedAt:now}});
+        // The thread holds the archive; the inbox mark is a mirror that keeps the due index small.
+        const current = await deps.prisma.inboxTask.findFirst({where:{id:row.id,thread:{archivedAt:null,deleteAfter:null},remindAt:row.remindAt,reminderClaimedAt:now}});
         if (!current) continue;
         const context = {userId:row.userId,spaceId:row.spaceId,operationId:`task-reminder:${row.id}:${row.remindAt.toISOString()}`,traceId:row.id,signal:AbortSignal.timeout(20000)};
         const message = {kind:"takeover" as const,title:"Mycellios · Reminder",body:row.title,botId:row.botId,threadId:row.threadId,taskThreadId:row.threadId,taskReminder:{id:row.id,at:row.remindAt.toISOString()}};

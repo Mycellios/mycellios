@@ -10,6 +10,7 @@ import {
 } from "./events.js";
 import { createThreadMessageInTransaction } from "./messages.js";
 import { clearEndedRunState } from "./run-secrets.js";
+import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
 
 export interface ExpireStuckRunInput {
   runId: string;
@@ -59,6 +60,11 @@ export async function expireStuckRun(
   });
   if (cancelled.count !== 1) return null;
   await clearEndedRunState(tx, [input.runId]);
+  await recordThreadTurnOutcome(tx, {
+    threadId: input.threadId,
+    runIds: [input.runId],
+    outcome: "interrupted",
+  });
 
   await tx.attempt.updateMany({
     where: {

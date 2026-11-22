@@ -16,11 +16,11 @@ function transaction() {
 }
 
 describe("createThreadMessageInTransaction", () => {
-  it("names an untitled Mico conversation from its first message in the same transaction", async () => {
+  it("names an untitled Mico conversation from the first line of its first message in the same transaction", async () => {
     const tx=transaction();
     tx.thread.update.mockResolvedValue({nextMessageSeq:1,title:null,taskBotId:"mico",projectKey:"mico:mico",taskKey:"mico-task:mico:one"} as never);
-    await createThreadMessageInTransaction(tx as unknown as Prisma.TransactionClient,{threadId:"task",role:"user",blocks:[{kind:"text",text:"  Preparar\n  mi presupuesto  "}]});
-    expect(tx.thread.updateMany).toHaveBeenCalledWith({where:{id:"task",title:null},data:{title:"Preparar mi presupuesto"}});
+    await createThreadMessageInTransaction(tx as unknown as Prisma.TransactionClient,{threadId:"task",role:"user",blocks:[{kind:"text",text:"\n  Preparar   mi presupuesto  \n  con detalle"}]});
+    expect(tx.thread.updateMany).toHaveBeenCalledWith({where:{id:"task",title:null},data:{title:"Preparar mi presupuesto",titleSource:"auto"}});
     expect(tx.thread.updateMany.mock.invocationCallOrder[0]).toBeLessThan(tx.message.create.mock.invocationCallOrder[0]!);
   });
 
@@ -38,11 +38,18 @@ describe("createThreadMessageInTransaction", () => {
   it("bounds Unicode titles and names attachment-only conversations without a model",async () => {
     const tx=transaction();
     tx.thread.update.mockResolvedValue({nextMessageSeq:1,title:null,taskBotId:"mico",projectKey:"mico:mico",taskKey:"mico-task:mico:one"} as never);
-    await createThreadMessageInTransaction(tx as unknown as Prisma.TransactionClient,{threadId:"task",role:"user",blocks:[{kind:"text",text:"🍄".repeat(100)}]});
+    await createThreadMessageInTransaction(tx as unknown as Prisma.TransactionClient,{threadId:"task",role:"user",blocks:[{kind:"text",text:"🍄".repeat(200)}]});
     const title=tx.thread.updateMany.mock.calls[0]![0].data.title;
-    expect(Array.from(title)).toHaveLength(80); expect(title.endsWith("…")).toBe(true);
+    expect(Array.from(title)).toHaveLength(120); expect(title.endsWith("…")).toBe(true);
     await createThreadMessageInTransaction(tx as unknown as Prisma.TransactionClient,{threadId:"task",role:"user",blocks:[{kind:"file",name:"Presupuesto.pdf",artifactId:"file",mimeType:"application/pdf",size:12}]});
-    expect(tx.thread.updateMany).toHaveBeenLastCalledWith({where:{id:"task",title:null},data:{title:"Presupuesto.pdf"}});
+    expect(tx.thread.updateMany).toHaveBeenLastCalledWith({where:{id:"task",title:null},data:{title:"Presupuesto.pdf",titleSource:"auto"}});
+  });
+  it("refuses new history in a conversation that is being deleted, before writing the message", async () => {
+    const tx=transaction();
+    tx.thread.update.mockResolvedValue({nextMessageSeq:3,title:"Plan",taskBotId:"mico",projectKey:"mico:mico",taskKey:"mico-task:mico:one",deleteAfter:new Date()} as never);
+    await expect(createThreadMessageInTransaction(tx as unknown as Prisma.TransactionClient,{threadId:"task",role:"user",blocks:[{kind:"text",text:"Hola"}]}))
+      .rejects.toMatchObject({name:"ThreadLifecycleError",code:"deleting"});
+    expect(tx.message.create).not.toHaveBeenCalled();
   });
   it("allows an automated bot message to opt out of unread without changing the default", async () => {
     const silent = transaction();

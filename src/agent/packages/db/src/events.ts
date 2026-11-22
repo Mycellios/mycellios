@@ -48,6 +48,7 @@ import { deleteRunSecretsInTransaction } from "./run-secrets.js";
 import { isRunResponse, readRunTimingFields } from "./run-timing.js";
 import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
+import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -1661,6 +1662,13 @@ async function finalizeRunOnce(
       },
     });
     if (terminal.count !== 1) return null;
+    // The conversation keeps how this turn ended, under the thread lock taken above.
+    await recordThreadTurnOutcome(tx, {
+      threadId: input.threadId,
+      runIds: [input.runId],
+      outcome: input.outcome,
+      error: input.outcome === "failed" ? input.error : null,
+    });
     await tx.externalEffect.deleteMany({
       where: {
         runId: input.runId,

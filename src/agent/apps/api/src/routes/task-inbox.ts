@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob } from "@mycellios/adapter-kit";
 import type { Actor, InboxTask } from "@mycellios/contracts";
-import { ACTIVE_RUN_STATUSES, MODEL_REQUIRED_SEND_ERROR } from "@mycellios/core";
-import { AnswerTooLongError, IsolationError } from "@mycellios/db";
+import { automaticThreadTitle, MODEL_REQUIRED_SEND_ERROR, THREAD_OUTCOMES } from "@mycellios/core";
+import { AnswerTooLongError, IsolationError, reopenSideThreadForSend } from "@mycellios/db";
+import { archiveSideThread, restoreSideThread } from "../side-threads.js";
 import { assertTeachingSendAllowed } from "../taught-skills.js";
 import { loadMessagePage } from "../thread-message-pages.js";
 import {
@@ -28,16 +29,23 @@ type Row = {
   readSeq: number;
   pinned?: boolean;
   remindAt?: Date | null;
+  /** The thread's archive mark; the inbox column is only a mirror kept for older code. */
   archivedAt: Date | null;
+  outcome?: string | null;
+  lastError?: string | null;
   createdAt: Date;
   clientNonce: string;
 };
 export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
+  /** Conversations being deleted are hidden from Tasks until they are restored or removed. */
   async function owned(actor: Actor, id: string) {
     const row = (
       await deps.prisma.$queryRaw<
         Row[]
-      >`SELECT * FROM task_inbox WHERE id=${id} AND "spaceId"=${actor.spaceId} AND "userId"=${actor.userId}`
+      >`SELECT i.id,i."botId",i."threadId",i.title,i."readSeq",i.pinned,i."remindAt",i."createdAt",i."clientNonce",
+          t."archivedAt",t.outcome,t."lastError"
+        FROM task_inbox i JOIN threads t ON t.id=i."threadId" AND t."spaceId"=i."spaceId" AND t."userId"=i."userId"
+        WHERE i.id=${id} AND i."spaceId"=${actor.spaceId} AND i."userId"=${actor.userId} AND t."deleteAfter" IS NULL`
     )[0];
     if (!row) throw new IsolationError();
     return row;
@@ -95,6 +103,8 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
       pinned: row.pinned ?? false,
       remindAt: row.remindAt?.toISOString() ?? null,
       archivedAt: row.archivedAt?.toISOString() ?? null,
+      outcome: THREAD_OUTCOMES.find((outcome) => outcome === row.outcome) ?? null,
+      lastError: row.lastError ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: (run?.updatedAt ?? row.createdAt).toISOString(),
     };
@@ -105,8 +115,6 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
     input: { text: string; clientNonce: string; artifactIds?: string[] },
     locale?: string,
   ) {
-    if (row.archivedAt)
-      throw new ORPCError("CONFLICT", { message: "Restore the task before sending a message." });
     const target = await targetFor(actor, row);
     await admitMicoTaskComputer(deps.sandbox, actor, target);
     await assertTeachingSendAllowed(deps.prisma, actor.spaceId, row.botId);
@@ -118,11 +126,11 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
     return sendThreadMessage(deps, actor, target, { ...input, responseLocale: locale },
       runId => releaseComputerControl(deps, actor, row.botId, "done", runId),
       async tx => {
-        // Use the archive action's exact lock inside the send transaction.
-        await tx.$queryRaw`SELECT id FROM threads WHERE id=${row.threadId} FOR UPDATE`;
+        // Under the archive action's exact lock: writing in an archived conversation brings it
+        // back, in this same transaction, with its history and read state.
+        await reopenSideThreadForSend(tx, actor, row.threadId);
         const current = await tx.inboxTask.findFirst({ where: { id: row.id, threadId: row.threadId, userId: actor.userId, spaceId: actor.spaceId } });
         if (!current) throw new IsolationError();
-        if (current.archivedAt) throw new ORPCError("CONFLICT", { message: "Restore the task before sending a message." });
       },
     );
   }
@@ -140,7 +148,7 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
             bot: { archivedAt: null, spaceId: context.actor.spaceId },
-            thread: { userId: context.actor.userId, spaceId: context.actor.spaceId },
+            thread: { userId: context.actor.userId, spaceId: context.actor.spaceId, deleteAfter: null },
           },
           orderBy: [{pinned:"desc"},{createdAt:"desc"}],
           take: 200,
@@ -149,6 +157,9 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
               select: {
                 title: true,
                 lastReadSeq: true,
+                archivedAt: true,
+                outcome: true,
+                lastError: true,
                 runs: {
                   orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                   take: 1,
@@ -173,7 +184,8 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
         // An interrupted initial send is not a claimed queued task. It remains recoverable by its nonce.
         const items = await Promise.all(
           rows.map((row) =>
-            dto({ ...row, title: row.thread.title ?? row.title, readSeq: Math.max(row.readSeq, row.thread.lastReadSeq) }, {
+            dto({ ...row, title: row.thread.title ?? row.title, readSeq: Math.max(row.readSeq, row.thread.lastReadSeq),
+              archivedAt: row.thread.archivedAt, outcome: row.thread.outcome, lastError: row.thread.lastError }, {
               run: row.thread.runs[0] ?? null,
               message: row.thread.messages[0] ?? null,
               event: row.thread.events[0] ?? null,
@@ -215,7 +227,9 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
                 taskBotId: input.botId,
                 projectKey: `mico:${input.botId}`,
                 taskKey: `mico-task:${input.botId}:inbox:${input.clientNonce}`,
-                title: input.text.replace(/\s+/g, " ").slice(0, 160),
+                title: automaticThreadTitle([{ kind: "text", text: input.text }]) ?? input.text.replace(/\s+/g, " ").slice(0, 120),
+                titleSource: "auto",
+                startedBy: "user",
               },
             });
             return (
@@ -266,9 +280,9 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
         if (remindAt && (remindAt.getTime() <= Date.now() || remindAt.getTime() > Date.now()+366*86400000))
           throw new ORPCError("BAD_REQUEST",{message:"Choose a future reminder within the next year."});
         await deps.prisma.$transaction(async tx => {
-          await tx.$queryRaw`SELECT id FROM threads WHERE id=${row.threadId} FOR UPDATE`;
-          const current = await tx.inboxTask.findFirstOrThrow({where:{id:row.id,userId:context.actor.userId,spaceId:context.actor.spaceId}});
-          if(current.archivedAt && (input.pinned===true || remindAt))
+          const [thread] = await tx.$queryRaw<Array<{archivedAt:Date|null}>>`SELECT "archivedAt" FROM threads WHERE id=${row.threadId} FOR UPDATE`;
+          await tx.inboxTask.findFirstOrThrow({where:{id:row.id,userId:context.actor.userId,spaceId:context.actor.spaceId}});
+          if(thread?.archivedAt && (input.pinned===true || remindAt))
             throw new ORPCError("CONFLICT",{message:"Restore the task before setting follow-up."});
           await tx.inboxTask.update({where:{id:row.id},data:{
             ...(input.pinned!==undefined?{pinned:input.pinned}:{}),
@@ -279,17 +293,10 @@ export function taskInboxRoutes({ deps, repos, authed }: RouterContext) {
       }),
       archive: authed.taskInbox.archive.handler(async ({ context, input }) => {
         const row = await owned(context.actor, input.id);
-        await deps.prisma.$transaction(async (tx) => {
-          await tx.$queryRaw`SELECT id FROM threads WHERE id=${row.threadId} FOR UPDATE`;
-          if (
-            input.archived &&
-            (await tx.run.count({
-              where: { threadId: row.threadId, status: { in: [...ACTIVE_RUN_STATUSES] } },
-            }))
-          )
-            throw new ORPCError("CONFLICT", { message: "Stop the task before archiving it." });
-          await tx.$executeRaw`UPDATE task_inbox SET "archivedAt"=${input.archived ? new Date() : null}, pinned=CASE WHEN ${input.archived} THEN false ELSE pinned END, "remindAt"=CASE WHEN ${input.archived} THEN NULL ELSE "remindAt" END, "reminderClaimedAt"=NULL WHERE id=${row.id} AND "spaceId"=${context.actor.spaceId} AND "userId"=${context.actor.userId}`;
-        });
+        const target = await targetFor(context.actor, row);
+        // The same archive as a Mico tab: stop the conversation first, then archive the thread.
+        if (input.archived) await archiveSideThread(deps, context.actor, target);
+        else await restoreSideThread(deps, context.actor, target);
         return { ok: true as const };
       }),
       stop: authed.taskInbox.stop.handler(async ({ context, input }) => {

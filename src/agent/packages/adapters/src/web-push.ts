@@ -253,7 +253,7 @@ export class WebPushService {
     return system(async () => {
       const reminder = message.taskReminder ? await this.db.inboxTask.findFirst({
         where:{id:message.taskReminder.id,userId:context.userId,spaceId:context.spaceId,botId:message.botId,threadId:message.threadId,
-          archivedAt:null,remindAt:new Date(message.taskReminder.at),bot:{archivedAt:null},
+          thread:{archivedAt:null,deleteAfter:null},remindAt:new Date(message.taskReminder.at),bot:{archivedAt:null},
           space:{memberships:{some:{userId:context.userId}}}},
         select:{bot:{select:{name:true,color:true}},thread:{select:{group:{select:{name:true}}}}},
       }) : null;
@@ -442,7 +442,7 @@ export class WebPushService {
     if(row.runId.startsWith("task-reminder:")) {
       return Boolean(await this.db.inboxTask.findFirst({where:{
         id:row.runId.slice("task-reminder:".length),userId:device.userId,spaceId:row.spaceId,botId:row.botId,
-        archivedAt:null,remindAt:new Date(row.eventId),bot:{archivedAt:null},
+        thread:{archivedAt:null,deleteAfter:null},remindAt:new Date(row.eventId),bot:{archivedAt:null},
         space:{memberships:{some:{userId:device.userId}}},
       },select:{id:true}}));
     }

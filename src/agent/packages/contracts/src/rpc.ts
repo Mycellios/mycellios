@@ -27,6 +27,7 @@ import { WhatsAppLinkSchema, WhatsAppSenderAddInput, WhatsAppSenderSchema } from
 import * as z from "zod";
 import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
+import { SideThreadSchema, SideThreadTargetSchema } from "./side-threads.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
@@ -570,10 +571,16 @@ export const appContract = {
     projectTask: oc.input(z.object({ botId: Id, taskThreadId: Id })).output(z.object({ projectId: ProjectId, name: ProjectName, userId: Id, spaceId: Id }).nullable()),
     status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
     open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240).optional()})).output(z.object({threadId:Id})),
-    rename: oc.input(z.object({botId:Id,taskThreadId:Id,title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id,title:z.string()})),
-    /** `kind` names what started the thread and `archived` mirrors the Tasks inbox; older servers omit both. */
-    list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string(),
-      kind:z.enum(["conversation","routine","workflow","delegation","project","other"]).optional(),archived:z.boolean().optional()}))),
+    /** The server checks the title (1-120 characters, one line) and explains a refusal. */
+    rename: oc.input(z.object({botId:Id,taskThreadId:Id,title:z.string().max(1000)})).output(z.object({threadId:Id,title:z.string()})),
+    /** Lifecycle fields come from the thread; older servers omit them. */
+    list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(SideThreadSchema)),
+    /** Stops the conversation (queued messages, runs, delegated work), then archives it. */
+    archive: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),archivedAt:IsoDate})),
+    /** Undoes a pending delete, or else reopens an archived conversation. */
+    restore: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),restored:z.enum(["delete","archive","none"])})),
+    /** Hides the conversation and removes it after `deleteAfter` unless it is restored first. */
+    remove: oc.input(SideThreadTargetSchema).output(z.object({ok:z.literal(true),deleteAfter:IsoDate})),
   },
   threads: {
     pinned: oc.input(threadTarget).output(z.object({threadId:Id,pins:z.array(z.object({messageId:Id,seq:z.number().int().nonnegative(),role:z.enum(["user","bot"]),preview:z.string().max(800),createdAt:z.string(),pinnedAt:z.string()}))})),

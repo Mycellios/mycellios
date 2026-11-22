@@ -111,7 +111,8 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       pending = true;
       try {
         const rows = await rpc.development.list({ botId });
-        if (active) { writeTabs(() => rows.filter(row => !row.projectKey?.startsWith("project:"))); setLoadFailed(false); }
+        // A conversation being deleted stays hidden until it is restored or removed.
+        if (active) { writeTabs(() => rows.filter(row => !row.projectKey?.startsWith("project:") && !row.deleteAfter)); setLoadFailed(false); }
       } catch (cause) { refused = !isRetryableError(cause); if (active) setLoadFailed(true); }
       finally { pending = false; }
     };
@@ -188,7 +189,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
 
   function titleEditor() {
     return <Input ref={renameInput} autoFocus aria-label={t`Conversation title`}
-      value={name} maxLength={240} readOnly={renameBusy} aria-busy={renameBusy}
+      value={name} maxLength={120} readOnly={renameBusy} aria-busy={renameBusy}
       aria-invalid={Boolean(renameError)} className="h-7 min-w-0 flex-1 rounded-md border-0 bg-background px-2 text-sm shadow-none"
       onFocus={event => event.currentTarget.select()}
       onChange={event => { setName(event.target.value); setRenameError(""); }}

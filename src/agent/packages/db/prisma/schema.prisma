@@ -918,6 +918,26 @@ model Thread {
   projectKey String?
   taskKey String?
   title String?
+  /// Conversation lifecycle; the main chat, groups and external chats keep these null.
+  /// Archive lives here (task_inbox.archivedAt is only a mirror kept for rollback).
+  archivedAt DateTime?
+  /// auto (first message), agent or user. A user title is never replaced automatically.
+  titleSource String?
+  /// user, agent, routine, branch or delegation; labels only, never access.
+  startedBy String?
+  startedByRunId String?
+  startedByRun Run? @relation("ThreadStartedByRun", fields: [startedByRunId], references: [id], onDelete: SetNull)
+  /// How the last finished turn ended: completed, failed or interrupted.
+  outcome String?
+  /// The last turn's failure, at most 2000 characters; the next turn clears it.
+  lastError String?
+  /// A pending delete: hidden until then, recoverable before it, removed by the worker after it.
+  deleteAfter DateTime?
+  branchedFromThreadId String?
+  branchedFromThread Thread? @relation("ThreadBranches", fields: [branchedFromThreadId], references: [id], onDelete: SetNull)
+  branches Thread[] @relation("ThreadBranches")
+  branchedFromMessageId String?
+  branchedFromMessage Message? @relation("ThreadBranchSource", fields: [branchedFromMessageId], references: [id], onDelete: SetNull)
   id                          String     @id @default(cuid())
   spaceId                     String
   space                       Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
@@ -949,6 +969,11 @@ model Thread {
   @@index([spaceId])
   @@unique([spaceId, userId, taskKey])
   @@index([taskBotId, projectKey])
+  @@index([taskBotId, archivedAt])
+  @@index([deleteAfter])
+  @@index([startedByRunId])
+  @@index([branchedFromThreadId])
+  @@index([branchedFromMessageId])
   @@unique([id,spaceId,userId],map:"memory_thread_identity_scope_key")
   @@map("threads")
 }
@@ -970,6 +995,7 @@ model MessagePin {
 
 model Message {
   pins MessagePin[]
+  branchThreads Thread[] @relation("ThreadBranchSource")
   id               String    @id @default(cuid())
   threadId         String
   thread           Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -1068,6 +1094,7 @@ model Run {
   bot                  Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   threadId             String
   thread               Thread            @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  startedThreads       Thread[]          @relation("ThreadStartedByRun")
   /// An offline turn stays with its own server workspace across retries.
   cloudComputerId      String?
   cloudComputer        Computer?         @relation("CloudComputerRuns", fields: [cloudComputerId], references: [id], onDelete: SetNull)

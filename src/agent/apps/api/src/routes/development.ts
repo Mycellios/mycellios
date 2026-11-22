@@ -1,7 +1,7 @@
-import { runFailureError, taskThreadKind } from "@mycellios/core";
+import { parseThreadTitle, runFailureError } from "@mycellios/core";
 import { ORPCError } from "@orpc/server";
-import { createRepos } from "@mycellios/db";
-import { getLogger } from "@mycellios/logging";
+import { createRepos, listSideThreads } from "@mycellios/db";
+import { archiveSideThread, deleteSideThread, restoreSideThread, sideThreadRow } from "../side-threads.js";
 import { resolveThreadTarget } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
 import { projectRoutes } from "./projects.js";
@@ -75,6 +75,8 @@ export function developmentRoutes(ctx: RouterContext) {
             projectKey: input.projectKey,
             taskKey: input.taskKey,
             title: input.title ?? null,
+            titleSource: input.title ? "user" : null,
+            startedBy: "user",
           },
           update: {},
         });
@@ -86,50 +88,45 @@ export function developmentRoutes(ctx: RouterContext) {
       }),
       rename: authed.development.rename.handler(async ({ context, input }) => {
         const actor = context.actor;
+        const parsed = parseThreadTitle(input.title);
+        if (!parsed.ok) throw new ORPCError("BAD_REQUEST", { message: parsed.error });
         await createRepos(deps.prisma).getBot(actor, input.botId);
+        // A title the person sets is theirs: automatic titles never replace it.
         const result = await deps.prisma.thread.updateMany({
           where: {
             id: input.taskThreadId, userId: actor.userId, spaceId: actor.spaceId,
             taskBotId: input.botId, projectKey: `mico:${input.botId}`,
-            taskKey: { startsWith: `mico-task:${input.botId}:` },
+            taskKey: { startsWith: `mico-task:${input.botId}:` }, deleteAfter: null,
           },
-          data: { title: input.title },
+          data: { title: parsed.title, titleSource: "user" },
         });
         if (!result.count) throw new ORPCError("NOT_FOUND");
-        return { threadId: input.taskThreadId, title: input.title };
+        return { threadId: input.taskThreadId, title: parsed.title };
       }),
       list: authed.development.list.handler(async ({ context, input }) => {
         const actor = context.actor;
         await createRepos(deps.prisma).getBot(actor, input.botId);
-        const rows = await deps.prisma.thread.findMany({
-          where: {
-            spaceId: actor.spaceId,
-            userId: actor.userId,
-            taskBotId: input.botId,
-            ...(input.projectKey ? { projectKey: input.projectKey } : {}),
-          },
-          orderBy: { createdAt: "desc" },
-          take: 1000,
-        });
-        // Archive lives in the Tasks inbox. Without it the picker still lists every thread.
-        const archived = rows.length
-          ? await deps.prisma.inboxTask.findMany({
-              where: { threadId: { in: rows.map((row) => row.id) }, userId: actor.userId, spaceId: actor.spaceId, archivedAt: { not: null } },
-              select: { threadId: true },
-            }).catch((error: unknown) => {
-              getLogger().warn("conversation picker archive state unavailable", { error: String(error) });
-              return [];
-            })
-          : [];
-        const archivedIds = new Set(archived.map((row) => row.threadId));
-        return rows.map((row) => ({
-          threadId: row.id,
-          projectKey: row.projectKey!,
-          taskKey: row.taskKey!,
-          title: row.title ?? "",
-          kind: taskThreadKind(row),
-          archived: archivedIds.has(row.id),
-        }));
+        // Archive, outcome and title source live on the thread; state comes from its runs.
+        const rows = await listSideThreads(deps.prisma, actor, { botId: input.botId, projectKey: input.projectKey });
+        return rows.map(sideThreadRow);
+      }),
+      archive: authed.development.archive.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
+        const { archivedAt } = await archiveSideThread(deps, context.actor, target);
+        return { ok: true as const, archivedAt: archivedAt.toISOString() };
+      }),
+      restore: authed.development.restore.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
+        const { restored } = await restoreSideThread(deps, context.actor, target);
+        return { ok: true as const, restored };
+      }),
+      remove: authed.development.remove.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
+        const { deleteAfter } = await deleteSideThread(deps, context.actor, target);
+        return { ok: true as const, deleteAfter: deleteAfter.toISOString() };
       }),
     },
   };

@@ -431,25 +431,48 @@
   Size the visible tab subset to the measured available width, always keeping
   the active conversation readable. Overflow stays in the picker; never close
   or delete history to make it fit. Keep New conversation first in that picker.
-  development.list returns each thread's server-derived kind and its Tasks inbox
-  archive state: the picker marks routine, workflow and delegated threads with a
-  short label, lists archived conversations last under Archived, and offers rename
+  development.list returns each thread's server-derived kind plus its lifecycle from
+  the thread itself (archivedAt, deleteAfter, a run-derived state running/queued/
+  waiting/idle/closed, outcome, lastError, titleSource, startedBy, updatedAt): the
+  picker marks routine, workflow and delegated threads with a short label, lists
+  archived conversations last under Archived, hides deleting ones, and offers rename
   only for ordinary conversations. A task tab marks its own thread read once that
   task's snapshot has loaded (never on hover) and never clears the main chat's dot.
   search_history/read_history read the run's own thread, including a Mico's side
   thread, under the same owner/Space/unarchived-Mico fence; results stay untrusted.
   The + opens an untitled conversation directly. Its first committed user message
-  supplies a bounded title in the same transaction, without a model request;
-  later messages preserve it. Manual rename is owner/Space/Mico-scoped and remains
-  available by clicking the selected title, from a tab's context menu or the picker.
+  supplies the title in the same transaction, without a model request: its first
+  non-empty line (else the first file name), at most 120 characters ending in "…",
+  titleSource auto; later messages preserve it. Manual rename is owner/Space/Mico-
+  scoped, accepts 1-120 characters on one line without control characters (the
+  server explains a refusal) and sets titleSource user, which no automatic title
+  replaces. Rename stays available by clicking the selected title, from a tab's
+  context menu or the picker.
   Edit inline: Enter/blur saves and Escape cancels; retain failed edits for retry.
+  Lifecycle (thread-lifecycle in core/db, side-threads.ts in the API): archive from
+  a tab, Tasks or the phone stops first (queued messages, runs, delegated work),
+  retries for up to 15 s under the thread lock sends take, then archives or explains
+  that the conversation still works; restore undoes a pending delete before it
+  reopens an archive. Delete (conversations the person started, not app threads)
+  is refused while any run or delegated work is unfinished, hides the thread with
+  deleteAfter = now + 6 s (undo = restore), refuses writes meanwhile, and the
+  thread.delete job or the reconciler removes it 5 s after: Mico outputs made only
+  there, Pi/native session files, then the thread row, whose cascade takes messages,
+  steering, runs, pins, Tasks entry and task notes. Uploads and outputs shown in other
+  conversations stay. The main chat is never archived or deleted (also a DB CHECK).
+  No open-conversation limit and nothing is archived automatically. finalizeRun,
+  stopThreadRuns and expireStuckRun record outcome/lastError (2000 characters, never
+  from background runs); the person's next message clears them.
   Before task navigation, prime the destination's account/Space-scoped shell metadata
   and only its own cached transcript. Keep immutable RPC/draft isolation, tab titles
   and open-tab state across the scoped remount without a whole-page loading frame.
   Verify MicoTaskTabs, query cache isolation, auto-read,
-  development-conversations, DB messages and history-retrieval(.postgres) tests plus
+  development-conversations, side-threads, thread-deletion, core thread-lifecycle,
+  DB messages and history-retrieval(.postgres) tests plus
   `node --import tsx scripts/verify-conversation-titles-db.ts` for atomicity/isolation,
-  verify-task-conversations(-route)-db.ts and `node scripts/verify-mico-tasks-ui.mjs`.
+  `node --import tsx scripts/verify-thread-lifecycle-db.ts` (migration backfill, archive,
+  delete/undo/purge, lock races), verify-task-conversations(-route)-db.ts and
+  `node scripts/verify-mico-tasks-ui.mjs`.
   The Mico name returns to the main chat; do not duplicate it with a General tab. Closing a
   tab never deletes its history. Keep Create Mico separate from these actions.
   Reset context is a confirmed secondary action for the main chat only; never
@@ -614,9 +637,11 @@
   Inbox entries refer to ordinary Mico task threads through taskBotId and the
   mico-task key namespace, never a parallel execution engine. Keep ?task= for
   owned task conversations and ?inbox= for the inbox selection. Archive and sends
-  share the exact thread lock; uncertain sends retain their original nonce. A send
-  from a Mico tab restores an archived conversation inside that same transaction,
-  keeping history and read state; the inbox send still asks for Restore first.
+  share the exact thread lock; uncertain sends retain their original nonce. Archive
+  lives on threads.archivedAt; task_inbox.archivedAt is only a mirror written for
+  rollback and the reminder index. A send from a Mico tab or from Tasks restores an
+  archived conversation inside that same transaction, keeping history and read
+  state; a conversation being deleted refuses it and stays out of Tasks.
   Discover existing named task conversations into inbox metadata in bounded,
   owner/Space-scoped batches without starting Runs or replacing archive/read state.
   Exclude routine/workflow/main threads and interrupted inbox starts. Completed

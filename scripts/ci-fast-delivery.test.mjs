@@ -192,6 +192,13 @@ test('conversation follow-up retains an isolated real database and delivery gate
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-task-conversations-route-db.ts')));
 });
 
+test('conversation lifecycle changes qualify their migration, archive and delete on a real isolated database',()=>{
+ for (const file of ['src/agent/packages/db/src/thread-lifecycle.ts','src/agent/apps/api/src/side-threads.ts','src/agent/packages/adapters/src/thread-deletion.ts','src/agent/packages/db/prisma/migrations/20261122120000_thread_lifecycle/migration.sql']) {
+  assert.ok(planChecks([file],[]).some(c=>c.args.includes('scripts/verify-thread-lifecycle-db.ts')), file);
+ }
+ assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-thread-lifecycle-db.ts')));
+});
+
 test('event waits qualify the deployed CHECK upgrade and automatic return on a real isolated database',()=>{
  for (const file of ['src/agent/packages/db/src/event-waits.ts','src/agent/packages/db/src/work-delegation.ts','src/agent/scripts/verify-autonomy-waits-db.ts','src/agent/packages/db/prisma/migrations/20261116150000_event_wait_delegation_state/migration.sql']) {
   const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts'));

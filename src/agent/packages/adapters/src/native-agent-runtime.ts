@@ -32,6 +32,7 @@ import {
 import { nativeCodexModels, codexTurnSettings } from "./native-codex-settings.js";
 
 type Engine = "codex" | "claude" | "acp" | "opencode";
+const NATIVE_ENGINES: readonly Engine[] = ["codex", "claude", "acp", "opencode"];
 type NativeConfig = Partial<Record<Engine, NativeCommand>>;
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -39,6 +40,28 @@ const object = (value: unknown): Record<string, unknown> =>
     : {};
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+/** The private folder one native engine keeps for one conversation, including its session. */
+function nativeConversationFolder(
+  dataDir: string,
+  scope: { spaceId: string; userId: string; botId: string; threadId: string },
+  engine: Engine,
+) {
+  return join(dataDir, "native-agents", hash([scope.spaceId, scope.userId, scope.botId, scope.threadId, engine]));
+}
+
+/** Removes every native engine's session folder for a deleted conversation. */
+export async function removeNativeThreadSessions(
+  dataDir: string | undefined,
+  scope: { spaceId: string; userId: string; botId: string; threadId: string },
+) {
+  if (!dataDir) return;
+  await Promise.all(
+    NATIVE_ENGINES.map((engine) =>
+      rm(nativeConversationFolder(dataDir, scope, engine), { recursive: true, force: true }),
+    ),
+  );
+}
 
 export function nativeToolContent(value: unknown): AgentToolResultContent[] {
   const record = object(value);
@@ -348,8 +371,11 @@ export class NativeAgentRuntime implements AgentRuntime {
       );
     if (!nativeCommandAvailable(command))
       throw new Error("The configured native agent executable is unavailable. Correct its path or remove the override.");
-    const scope = hash([context.spaceId, context.userId, request.botId, request.threadId, engine]);
-    const cwd = join(this.options.dataDir, "native-agents", scope);
+    const cwd = nativeConversationFolder(
+      this.options.dataDir,
+      { spaceId: context.spaceId, userId: context.userId, botId: request.botId, threadId: request.threadId },
+      engine,
+    );
     await mkdir(cwd, { recursive: true, mode: 0o700 });
     const controller = new AbortController();
     const signal = context.signal

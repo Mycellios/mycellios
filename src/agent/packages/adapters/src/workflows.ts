@@ -202,6 +202,8 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
               projectKey: `workflow:${row.workflowId}`,
               taskKey: key,
               title: node.title || "Workflow task",
+              titleSource: "auto",
+              startedBy: "routine",
             },
           });
           const task = await tx.task.create({
