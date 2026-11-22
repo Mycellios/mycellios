@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  addressedGroupBotIds,
+  groupContinuePrompt,
+  groupLeadBotId,
   hasMentionToken,
   inferHandoffTargetBotId,
   inferHandoffTargetName,
+  isContinueRequest,
   resolveGroupTargetBotIds,
 } from "./group-mentions.js";
 
@@ -117,5 +121,51 @@ describe("inferHandoffTargetBotId", () => {
         { id: "research", name: "Research Writer" },
       ]),
     ).toBe("research");
+  });
+});
+
+describe("group lead routing", () => {
+  it("sends a message that names nobody to the chosen lead", () => {
+    expect(resolveGroupTargetBotIds({ text: "plan the launch", members, leadBotId: "c" })).toEqual(["c"]);
+  });
+
+  it("keeps explicit mentions ahead of the lead", () => {
+    expect(resolveGroupTargetBotIds({ text: "@BotB plan it", members, leadBotId: "c" })).toEqual(["b"]);
+    expect(resolveGroupTargetBotIds({ text: "plan it", members, explicitMentions: ["a"], leadBotId: "c" })).toEqual([
+      "a",
+    ]);
+  });
+
+  it("treats a message that opens with a member's name as addressed to it", () => {
+    expect(resolveGroupTargetBotIds({ text: "Writer, draft the intro", members, leadBotId: "a" })).toEqual(["c"]);
+    expect(resolveGroupTargetBotIds({ text: "writer: draft the intro", members, leadBotId: "a" })).toEqual(["c"]);
+    expect(addressedGroupBotIds({ text: "The writer drafts later", members })).toEqual([]);
+  });
+
+  it("falls back to the first member when the lead left the group", () => {
+    expect(groupLeadBotId(members, "gone")).toBe("a");
+    expect(groupLeadBotId(members, null)).toBe("a");
+    expect(groupLeadBotId([], "a")).toBeUndefined();
+  });
+});
+
+describe("continue requests", () => {
+  it("recognises short requests to go on", () => {
+    for (const text of ["continue", "Keep going!", "  go on ", "Sigue", "continúa, por favor", "resume."]) {
+      expect(isContinueRequest(text)).toBe(true);
+    }
+  });
+
+  it("leaves real requests alone", () => {
+    for (const text of ["", "continue with the second chapter and add charts", "go on holiday", "stop"]) {
+      expect(isContinueRequest(text)).toBe(false);
+    }
+  });
+
+  it("repeats the earlier request and asks not to start over", () => {
+    const prompt = groupContinuePrompt("Write the Q3 summary");
+    expect(prompt).toContain("<earlier_request>\nWrite the Q3 summary\n</earlier_request>");
+    expect(prompt).toContain("do not start over");
+    expect(groupContinuePrompt("")).not.toContain("<earlier_request>");
   });
 });

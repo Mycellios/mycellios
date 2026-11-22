@@ -248,6 +248,8 @@ import { ConversationsPane, waitingConversations } from "../components/Conversat
 import { SideConversationView } from "../components/SideConversationView";
 import { MirroredRequests } from "../components/MirroredRequests";
 import { OpenWaits } from "../components/OpenWaits";
+import { AwaitingReplies } from "../components/AwaitingReplies";
+import { SendToGroupContext } from "../components/SendToGroup";
 import { closeBeside, openBeside, pruneBeside, showBeside, updateBeside, useBeside } from "../lib/conversation-pane";
 import { micoConversationScope } from "../lib/sidebar-conversations";
 import { SidebarViewMenu } from "./shell/sidebar-view-menu";
@@ -2863,6 +2865,29 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const openWaits = useMemo(() => waitsBotId && waitsThreadId
     ? <OpenWaits rpc={rpc} botId={waitsBotId} threadId={waitsThreadId} refreshKey={waitsRefresh} /> : null,
   [rpc, waitsBotId, waitsThreadId, waitsRefresh]);
+  // "Send to group" on a message of a Mico chat opens the group with that text in its composer.
+  const sendToGroup = useMemo(() => {
+    if (inGroup || !active || floatingChat) return null;
+    const targets = groups
+      .filter((group) => !group.archivedAt)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((group) => ({ id: group.id, name: group.name }));
+    if (!targets.length) return null;
+    return {
+      groups: targets,
+      send: (groupId: string, text: string) => {
+        writeComposerDraft(`group:${groupId}`, text);
+        navigate(`/app/g/${encodeURIComponent(groupId)}`);
+      },
+    };
+  }, [inGroup, active, floatingChat, groups, navigate]);
+  // Teammates the Mico's requests still wait on, above the main chat's composer.
+  const lastMessageId = activeSnapshot?.messages.at(-1)?.id ?? "";
+  const awaitingRefresh = `${waitsRefresh}:${lastMessageId}`;
+  const reassignBots = useMemo(() => bots.filter((bot) => !bot.archivedAt).map((bot) => ({ id: bot.id, name: bot.name })), [bots]);
+  const awaitingReplies = useMemo(() => mirrorBotId
+    ? <AwaitingReplies rpc={rpc} botId={mirrorBotId} bots={reassignBots} refreshKey={awaitingRefresh} /> : null,
+  [rpc, mirrorBotId, reassignBots, awaitingRefresh]);
   const transcriptFooter = useMemo(() => mirrorBotId ? <>
     {conversationFailure}
     {openWaits}
@@ -3424,7 +3449,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     [voiceStatus?.ready],
   );
 
-  async function createGroup(input: { name: string; botIds: string[] }) {
+  async function createGroup(input: { name: string; botIds: string[]; purpose?: string; leadBotId?: string }) {
     const group = await rpc.groups.create(input);
     setGroups((current) =>
       current.some((item) => item.id === group.id) ? current : [group, ...current],
@@ -4868,7 +4893,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               </div>
             ) : <PageLoading layout="chat" className="flex-1" />
           ) : (
-            <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><Transcript
+            <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><SendToGroupContext.Provider value={sendToGroup}><Transcript
               headerTabs={false}
               banner={conversationBanner}
               footer={transcriptFooter}
@@ -4977,7 +5002,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                   setSearchParams(next);
                 }
               }}
-            /></MessagePinsContext.Provider></ResponseStyleContext.Provider>
+            /></SendToGroupContext.Provider></MessagePinsContext.Provider></ResponseStyleContext.Provider>
           )}
         </div>
         {active || activeGroup ? (
@@ -4991,6 +5016,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 <Trans>Teaching in progress. Stop teaching before sending a new message.</Trans>
               </div>
             ) : null}
+            {awaitingReplies ? <div className="px-3 md:px-[max(1.5rem,calc((100%_-_60rem)/2))]">{awaitingReplies}</div> : null}
             <Composer
               key={inGroup ? `group:${groupId}` : `bot:${active?.id}`}
               draftKey={(floatingChat ? "floating:" : "") + (inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : newConversation ? `bot:${active?.id}:new-conversation` : `bot:${active?.id}`)}

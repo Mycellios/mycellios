@@ -458,6 +458,7 @@ model Member {
 }
 
 model Space {
+  botMessageRequests BotMessageRequest[]
   localMemoryReviews LocalMemoryReview[] @relation("ReviewSpace")
   messagePins MessagePin[]
   hostedWebs HostedWeb[]
@@ -754,6 +755,9 @@ model WorkflowExecution {
 }
 
 model Bot {
+  ledGroups ChatGroup[] @relation("ChatGroupLead")
+  sentBotMessageRequests BotMessageRequest[] @relation("BotMessageRequestSender")
+  botMessageRecipients BotMessageRecipient[] @relation("BotMessageRecipientBot")
   messagePins MessagePin[] @relation("MessagePinAuthor")
   localMemoryReviews LocalMemoryReview[] @relation("ReviewBot")
   hostedWebAgents HostedWebAgent[]
@@ -886,13 +890,72 @@ model ChatGroup {
   archivedAt DateTime?
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
+  /// What the group is for; members read it before each turn. Null when unset.
+  purpose    String?
+  /// The member that takes messages addressed to nobody; null falls back to the first member.
+  leadBotId  String?
+  leadBot    Bot?              @relation("ChatGroupLead", fields: [leadBotId], references: [id], onDelete: SetNull)
   members    ChatGroupMember[]
   thread     Thread?
   artifacts  Artifact[]
 
   @@index([spaceId, userId, archivedAt, pinned, updatedAt])
   @@index([sectionId])
+  @@index([leadBotId])
   @@map("chat_groups")
+}
+
+/// A Mico's message_bot request, or a send_to_group brief, that waits for answers from other
+/// Micos. Ids and states only: what was said stays in the (encrypted) messages.
+model BotMessageRequest {
+  id               String    @id @default(cuid())
+  spaceId          String
+  space            Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId           String
+  senderBotId      String
+  senderBot        Bot       @relation("BotMessageRequestSender", fields: [senderBotId], references: [id], onDelete: Cascade)
+  /// The sender's main chat: answers land there and the resume turn runs there.
+  senderThreadId   String
+  senderThread     Thread    @relation("BotMessageRequestThread", fields: [senderThreadId], references: [id], onDelete: Cascade)
+  /// The turn that sent it.
+  senderRunId      String?
+  /// A send_to_group request: the group the work runs in.
+  groupId          String?
+  /// The one turn that hands every answer back to the sender once all recipients settled.
+  resumeRunId      String?   @unique
+  settledAt        DateTime?
+  /// "Hide this list" on the settled request.
+  hiddenAt         DateTime?
+  createdAt        DateTime  @default(now())
+  recipients       BotMessageRecipient[]
+
+  @@index([senderThreadId, createdAt])
+  @@index([spaceId, userId])
+  @@map("bot_message_requests")
+}
+
+/// One recipient of a BotMessageRequest and the turn that answers it.
+model BotMessageRecipient {
+  id              String            @id @default(cuid())
+  requestId       String
+  request         BotMessageRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  spaceId         String
+  userId          String
+  botId           String
+  bot             Bot               @relation("BotMessageRecipientBot", fields: [botId], references: [id], onDelete: Cascade)
+  /// Its turn for this request, in its own chat or (send_to_group) in the group.
+  runId           String?           @unique
+  run             Run?              @relation("BotMessageRecipientRun", fields: [runId], references: [id], onDelete: SetNull)
+  /// asked, replied, failed or stopped.
+  state           String            @default("asked")
+  /// The answer as delivered into the sender's chat.
+  answerMessageId String?
+  settledAt       DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@unique([requestId, botId])
+  @@index([state, createdAt])
+  @@map("bot_message_recipients")
 }
 
 model ChatGroupMember {
@@ -923,6 +986,7 @@ model DevelopmentProject {
 }
 
 model Thread {
+  botMessageRequests BotMessageRequest[] @relation("BotMessageRequestThread")
   taskMemories MemoryDocument[] @relation("TaskMemory")
   localMemoryReviews LocalMemoryReview[] @relation("ReviewThread")
   messagePins MessagePin[]
@@ -1107,6 +1171,7 @@ model Task {
 }
 
 model Run {
+  botMessageRecipient BotMessageRecipient? @relation("BotMessageRecipientRun")
   id                   String            @id @default(cuid())
   spaceId              String
   space                Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)

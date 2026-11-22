@@ -184,6 +184,8 @@ export function truncateReplyQuote(value: string): string {
 export const GROUP_MEMBER_MIN = 2;
 export const GROUP_MEMBER_MAX = 10;
 export const GROUP_NAME_MAX_LENGTH = 80;
+/** What a group is for, as its members read it before each turn. */
+export const GROUP_PURPOSE_MAX_LENGTH = 500;
 
 /** Preserve pick order and the group name limit without splitting a surrogate pair. */
 export function defaultGroupName(names: readonly string[]): string {
@@ -205,6 +207,10 @@ export const GroupSchema = z.object({
   unread: z.boolean(),
   updatedAt: z.string(),
   createdAt: z.string(),
+  /** What the group is for; empty when nobody set one. */
+  purpose: z.string().optional(),
+  /** The member that takes messages addressed to nobody; null falls back to the first member. */
+  leadBotId: Id.nullable().optional(),
 });
 export type Group = z.infer<typeof GroupSchema>;
 
@@ -214,10 +220,20 @@ const GroupBotIds = z
   .max(GROUP_MEMBER_MAX)
   .refine((ids) => new Set(ids).size === ids.length, { error: "botIds must be distinct" });
 
-export const CreateGroupInput = z.object({
-  name: z.string().trim().min(1).max(GROUP_NAME_MAX_LENGTH),
-  botIds: GroupBotIds,
-});
+const GroupPurpose = z.string().trim().max(GROUP_PURPOSE_MAX_LENGTH);
+
+export const CreateGroupInput = z
+  .object({
+    name: z.string().trim().min(1).max(GROUP_NAME_MAX_LENGTH),
+    botIds: GroupBotIds,
+    purpose: GroupPurpose.optional(),
+    /** One of botIds; without it the first member leads. */
+    leadBotId: Id.optional(),
+  })
+  .refine((input) => !input.leadBotId || input.botIds.includes(input.leadBotId), {
+    error: "The lead must be a member",
+    path: ["leadBotId"],
+  });
 export type CreateGroupInput = z.infer<typeof CreateGroupInput>;
 
 export const UpdateGroupInput = z.object({
@@ -228,6 +244,10 @@ export const UpdateGroupInput = z.object({
   expectedBotIds: z.array(Id).max(GROUP_MEMBER_MAX).optional(),
   pinned: z.boolean().optional(),
   sectionId: Id.nullable().optional(),
+  /** An empty purpose clears it. */
+  purpose: GroupPurpose.optional(),
+  /** A member after this update; null goes back to the first member. */
+  leadBotId: Id.nullable().optional(),
 });
 export type UpdateGroupInput = z.infer<typeof UpdateGroupInput>;
 

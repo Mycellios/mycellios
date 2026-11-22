@@ -1,7 +1,12 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot, Group } from "@mycellios/contracts";
-import { GROUP_MEMBER_MAX, GROUP_MEMBER_MIN, GROUP_NAME_MAX_LENGTH } from "@mycellios/contracts";
-import { BotAvatar, Button, Checkbox, Input } from "@mycellios/ui-web";
+import {
+  GROUP_MEMBER_MAX,
+  GROUP_MEMBER_MIN,
+  GROUP_NAME_MAX_LENGTH,
+  GROUP_PURPOSE_MAX_LENGTH,
+} from "@mycellios/contracts";
+import { BotAvatar, Button, Checkbox, Input, NativeSelect, Textarea } from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { errorText } from "../lib/user-error";
@@ -19,6 +24,74 @@ function sameMembers(left: readonly string[], right: readonly string[]) {
   if (left.length !== right.length) return false;
   const rightIds = new Set(right);
   return left.every((id) => rightIds.has(id));
+}
+
+/** The lead after an edit: the chosen one while it is still selected, else the first member. */
+function leadAmong(selected: readonly string[], lead: string | null | undefined): string | undefined {
+  return lead && selected.includes(lead) ? lead : selected[0];
+}
+
+/**
+ * What the group is for and which member takes messages that name nobody. The lead is the
+ * person's choice; routing never asks a model.
+ */
+function PurposeAndLead({
+  bots,
+  selected,
+  purpose,
+  onPurpose,
+  lead,
+  onLead,
+}: {
+  bots: Bot[];
+  selected: readonly string[];
+  purpose: string;
+  onPurpose: (value: string) => void;
+  lead: string | undefined;
+  onLead: (botId: string) => void;
+}) {
+  const { t } = useLingui();
+  const purposeId = useId();
+  const leadId = useId();
+  const members = selected
+    .map((id) => bots.find((bot) => bot.id === id))
+    .filter((bot): bot is Bot => Boolean(bot));
+  return (
+    <>
+      <label htmlFor={purposeId} className="mt-4 block text-sm text-muted-foreground">
+        <Trans>Purpose</Trans>
+        <Textarea
+          id={purposeId}
+          value={purpose}
+          onChange={(event) => onPurpose(event.target.value)}
+          placeholder={t`What is this group for?`}
+          maxLength={GROUP_PURPOSE_MAX_LENGTH}
+          rows={2}
+          className="mt-2"
+        />
+      </label>
+      {members.length ? (
+        <label htmlFor={leadId} className="mt-4 block text-sm text-muted-foreground">
+          <Trans>Lead</Trans>
+          <NativeSelect
+            id={leadId}
+            value={lead ?? ""}
+            onChange={(event) => onLead(event.target.value)}
+            className="mt-2 w-full"
+          >
+            {members.map((bot) => (
+              <option key={bot.id} value={bot.id}>
+                {bot.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <span className="mt-1 block text-xs">
+            <Trans>Takes the messages that name no member, and hands them on when another member fits better.</Trans>
+          </span>
+        </label>
+      ) : null}
+    </>
+  );
 }
 
 function MemberPicker({
@@ -142,13 +215,16 @@ export function CreateGroupForm({
 }: {
   bots: Bot[];
   onCancel: () => void;
-  onCreate: (input: { name: string; botIds: string[] }) => Promise<void>;
+  onCreate: (input: { name: string; botIds: string[]; purpose?: string; leadBotId?: string }) => Promise<void>;
   onShowBot?: (botId: string) => void;
 }) {
   const { t } = useLingui();
   const nameId = useId();
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [purpose, setPurpose] = useState("");
+  const [chosenLead, setChosenLead] = useState<string | undefined>();
+  const lead = leadAmong(selected, chosenLead);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -157,7 +233,12 @@ export function CreateGroupForm({
     setSubmitting(true);
     setError(null);
     try {
-      await onCreate({ name: name.trim(), botIds: selected });
+      await onCreate({
+        name: name.trim(),
+        botIds: selected,
+        ...(purpose.trim() ? { purpose: purpose.trim() } : {}),
+        ...(lead ? { leadBotId: lead } : {}),
+      });
     } catch (cause) {
       setError(errorText(cause, t`Could not create group`));
     } finally {
@@ -204,6 +285,14 @@ export function CreateGroupForm({
         onShowBot={onShowBot}
         initiallyExpanded
       />
+      <PurposeAndLead
+        bots={bots}
+        selected={selected}
+        purpose={purpose}
+        onPurpose={setPurpose}
+        lead={lead}
+        onLead={setChosenLead}
+      />
       <Button
         className="mt-5 w-full"
         disabled={submitting || !validSelection(name, selected)}
@@ -226,7 +315,12 @@ export function GroupSettings({
 }: {
   group: Group;
   bots: Bot[];
-  onSave: (input: { name?: string; botIds?: string[] }) => Promise<void>;
+  onSave: (input: {
+    name?: string;
+    botIds?: string[];
+    purpose?: string;
+    leadBotId?: string | null;
+  }) => Promise<void>;
   onRemove: () => Promise<void>;
   onClose: () => void;
   onShowBot?: (botId: string) => void;
@@ -237,6 +331,13 @@ export function GroupSettings({
   const nameId = useId();
   const [name, setName] = useState(group.name);
   const [selected, setSelected] = useState(group.members.map((member) => member.botId));
+  const [purpose, setPurpose] = useState(group.purpose ?? "");
+  const [chosenLead, setChosenLead] = useState<string | undefined>(group.leadBotId ?? undefined);
+  const lead = leadAmong(selected, chosenLead);
+  const savedLead = leadAmong(
+    group.members.map((member) => member.botId),
+    group.leadBotId,
+  );
   // The panel can open on a cached group. A refreshed one replaces whatever was not edited, so a
   // save does not send the cached name or members back as a change.
   const [shownGroup, setShownGroup] = useState(group);
@@ -247,6 +348,8 @@ export function GroupSettings({
     if (sameMembers(selected, shownMembers)) {
       setSelected(group.members.map((member) => member.botId));
     }
+    if (purpose === (shownGroup.purpose ?? "")) setPurpose(group.purpose ?? "");
+    if (chosenLead === (shownGroup.leadBotId ?? undefined)) setChosenLead(group.leadBotId ?? undefined);
   }
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -288,6 +391,8 @@ export function GroupSettings({
         )
           ? undefined
           : selected,
+        purpose: purpose.trim() !== (group.purpose ?? "") ? purpose.trim() : undefined,
+        leadBotId: lead !== savedLead ? (lead ?? null) : undefined,
       });
     } catch (cause) {
       setError(errorText(cause, t`Could not save group`));
@@ -332,6 +437,14 @@ export function GroupSettings({
         />
       </label>
       <MemberPicker bots={bots} selected={selected} onChange={setSelected} onShowBot={onShowBot} />
+      <PurposeAndLead
+        bots={bots}
+        selected={selected}
+        purpose={purpose}
+        onPurpose={setPurpose}
+        lead={lead}
+        onLead={setChosenLead}
+      />
       <Button
         className="mt-5 w-full"
         disabled={saving || !validSelection(name, selected)}

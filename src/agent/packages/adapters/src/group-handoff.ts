@@ -260,6 +260,7 @@ export async function loadGroupContext(
     group.name,
     group.members.map((member) => member.bot),
     self,
+    { purpose: group.purpose, leadBotId: group.leadBotId },
   );
 }
 
