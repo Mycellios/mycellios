@@ -2,22 +2,18 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
-[![GitHub stars](https://img.shields.io/github/stars/elie222/rakazo?labelColor=black&style=for-the-badge&color=2563EB)](https://github.com/elie222/rakazo/stargazers)
-[![Discord コミュニティに参加](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?labelColor=black&style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/RWwKa2Sn7h)
-[![App Store で iPhone 版をダウンロード](https://img.shields.io/badge/App%20Store-Download%20for%20iPhone-black?labelColor=black&style=for-the-badge&logo=apple&logoColor=white)](https://apps.apple.com/app/rakazo/id6801531099)
-[![Android APK をダウンロード](https://img.shields.io/badge/Android-Download%20APK-black?labelColor=black&style=for-the-badge&logo=android&logoColor=white)](https://github.com/elie222/rakazo/releases/download/android/rakazo.apk)
 
 ![Mycellios：本当に自分のものにできる AI チームメイト](./docs/readme-hero.png)
 
 Mycellios は、常駐型の AI チームメイトを持てるオープンソースの AI エージェントです。自分のマシンで動かせる
 セルフホスト型の AI アシスタントでもあります。Web 版、Electron デスクトップアプリ、
-[iPhone](https://apps.apple.com/app/rakazo/id6801531099) 版と [Android](https://github.com/elie222/rakazo/releases/download/android/rakazo.apk) 版で利用できます。
+iPhone 版と Android 版で利用できます。
 モデルやコンピューターのプロバイダーは自分で選べるほか、スタック全体をローカルで動かすこともできます。
 
 Grok Bot、Meta Muse、OpenAI Dots、Instinct、OpenClaw、Hermes Agent、Claude Duet の
 オープンソースかつセルフホスト可能な代替ツールです。
 
-Rakazo は現在ベータ版です。詳しくは [rakazo.com](https://rakazo.com) をご覧ください。
+Rakazo は現在ベータ版です。
 
 このドキュメントは[英語版 README](./README.md) の日本語訳です。リンク先のドキュメントは現在英語のみです。
 
@@ -107,8 +103,8 @@ Node.js 22.x 系の 22.22.2 以降、Node.js 24.x、または Node.js 26 以降�
 pnpm 9、Docker が必要です。Node.js 23.x と 25.x はサポートしていません。
 
 ```bash
-git clone https://github.com/elie222/rakazo.git
-cd rakazo
+git clone https://github.com/Mycellios/mycellios.git
+cd mycellios/src/agent
 cp .env.example .env
 ```
 
@@ -233,8 +229,6 @@ Português (Brasil)、简体中文、Español、Русский、Français、ע�
 Expo アプリには English、简体中文、Русский、Deutsch、Nederlands、日本語 のカタログが含まれ、
 **Account → Language**（アカウント → 言語）にこの 6 つが表示されます。保存された選択がない場合は、デバイスの言語または
 `EXPO_PUBLIC_DEFAULT_UI_LOCALE` が最初のカタログを決めます。
-マーケティング用ホームページ（`apps/www`）は、フッターの言語リンクから en/de/ko/zh/ja で表示できます（`/`、`/de/`、
-`/ko/`、`/zh/`、`/ja/`）。その他のマーケティングページは英語のままです。ロシア語のマーケティング用ホームページと、
 Electron ネイティブのセットアップ画面／メニューの翻訳は、今後の課題として残っています。
 
 ## 開発
@@ -270,13 +264,6 @@ pnpm test:e2e
 
 ## Mycellios と他製品の比較
 
-- [Grok Bot](https://rakazo.com/grok-bot-alternative/)
-- [Muse](https://rakazo.com/muse-alternative/)
-- [Dots](https://rakazo.com/dots-alternative/)
-- [Instinct](https://rakazo.com/instinct-alternative/)
-- [OpenClaw](https://rakazo.com/openclaw-alternative/)
-- [Hermes Agent](https://rakazo.com/hermes-alternative/)
-- [すべての比較](https://rakazo.com/alternatives/)
 
 ## コントリビュート
 
@@ -285,4 +272,3 @@ pnpm test:e2e
 
 Mycellios は [Apache License 2.0](./LICENSE) のもとでライセンスされています。
 
-質問やアイデアは [Mycellios Discord コミュニティ](https://discord.gg/RWwKa2Sn7h)でお気軽にどうぞ。
