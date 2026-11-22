@@ -571,7 +571,9 @@ export const appContract = {
     status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
     open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240).optional()})).output(z.object({threadId:Id})),
     rename: oc.input(z.object({botId:Id,taskThreadId:Id,title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id,title:z.string()})),
-    list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
+    /** `kind` names what started the thread and `archived` mirrors the Tasks inbox; older servers omit both. */
+    list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string(),
+      kind:z.enum(["conversation","routine","workflow","delegation","project","other"]).optional(),archived:z.boolean().optional()}))),
   },
   threads: {
     pinned: oc.input(threadTarget).output(z.object({threadId:Id,pins:z.array(z.object({messageId:Id,seq:z.number().int().nonnegative(),role:z.enum(["user","bot"]),preview:z.string().max(800),createdAt:z.string(),pinnedAt:z.string()}))})),

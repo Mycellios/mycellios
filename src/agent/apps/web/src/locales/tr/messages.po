@@ -6430,3 +6430,11 @@ msgstr "Asla"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "Eski modeller"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "Devredildi"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "Diğer"

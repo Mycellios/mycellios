@@ -60,13 +60,20 @@ const searchableText = Prisma.sql`jsonb_path_query_array(m.blocks,
   '$[*] ? (@.kind == "text" || @.kind == "channel_message" || @.kind == "bot_message_received" || @.kind == "bot_message_sent" || @.kind == "handoff").text')::text || jsonb_path_query_array(m.blocks, '$[*] ? (@.kind == "subagent").task')::text || jsonb_path_query_array(m.blocks, '$[*] ? (@.kind == "subagent").result')::text`;
 const columns = Prisma.sql`m.id, m.seq, m.role, m."runId", m."replyToMessageId", m."createdAt", m.blocks, m."threadId", t."groupId" AS "groupId"`;
 
+/**
+ * The run's own thread only: the Mico's main chat, one of its side threads (a task
+ * conversation, routine or delegated work, linked by taskBotId), or a group it belongs to.
+ * Owner, Space and an unarchived owned Mico fence every branch.
+ */
 function visible(scope: HistoryScope): Prisma.Sql {
   const channel = scope.channelId;
   return Prisma.sql`
     t.id = ${scope.threadId} AND t."spaceId" = ${scope.spaceId}
     AND m.seq >= t."contextStartSeq"
     AND t."userId" = ${scope.userId}
-    AND (t."botId" = ${scope.botId} OR (t."botId" IS NULL AND EXISTS (
+    AND (t."botId" = ${scope.botId}
+    OR (t."botId" IS NULL AND t."groupId" IS NULL AND t."taskBotId" = ${scope.botId})
+    OR (t."botId" IS NULL AND EXISTS (
       SELECT 1 FROM chat_groups g JOIN chat_group_members member ON member."groupId" = g.id
       WHERE g.id = t."groupId" AND g."spaceId" = ${scope.spaceId} AND g."userId" = ${scope.userId}
         AND g."archivedAt" IS NULL AND member."botId" = ${scope.botId}

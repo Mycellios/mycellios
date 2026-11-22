@@ -431,6 +431,13 @@
   Size the visible tab subset to the measured available width, always keeping
   the active conversation readable. Overflow stays in the picker; never close
   or delete history to make it fit. Keep New conversation first in that picker.
+  development.list returns each thread's server-derived kind and its Tasks inbox
+  archive state: the picker marks routine, workflow and delegated threads with a
+  short label, lists archived conversations last under Archived, and offers rename
+  only for ordinary conversations. A task tab marks its own thread read once that
+  task's snapshot has loaded (never on hover) and never clears the main chat's dot.
+  search_history/read_history read the run's own thread, including a Mico's side
+  thread, under the same owner/Space/unarchived-Mico fence; results stay untrusted.
   The + opens an untitled conversation directly. Its first committed user message
   supplies a bounded title in the same transaction, without a model request;
   later messages preserve it. Manual rename is owner/Space/Mico-scoped and remains
@@ -439,9 +446,10 @@
   Before task navigation, prime the destination's account/Space-scoped shell metadata
   and only its own cached transcript. Keep immutable RPC/draft isolation, tab titles
   and open-tab state across the scoped remount without a whole-page loading frame.
-  Verify MicoTaskTabs, query cache isolation,
-  development-conversations and DB messages tests plus
-  `node --import tsx scripts/verify-conversation-titles-db.ts` for atomicity/isolation.
+  Verify MicoTaskTabs, query cache isolation, auto-read,
+  development-conversations, DB messages and history-retrieval(.postgres) tests plus
+  `node --import tsx scripts/verify-conversation-titles-db.ts` for atomicity/isolation,
+  verify-task-conversations(-route)-db.ts and `node scripts/verify-mico-tasks-ui.mjs`.
   The Mico name returns to the main chat; do not duplicate it with a General tab. Closing a
   tab never deletes its history. Keep Create Mico separate from these actions.
   Reset context is a confirmed secondary action for the main chat only; never
@@ -606,7 +614,9 @@
   Inbox entries refer to ordinary Mico task threads through taskBotId and the
   mico-task key namespace, never a parallel execution engine. Keep ?task= for
   owned task conversations and ?inbox= for the inbox selection. Archive and sends
-  share the exact thread lock; uncertain sends retain their original nonce.
+  share the exact thread lock; uncertain sends retain their original nonce. A send
+  from a Mico tab restores an archived conversation inside that same transaction,
+  keeping history and read state; the inbox send still asks for Restore first.
   Discover existing named task conversations into inbox metadata in bounded,
   owner/Space-scoped batches without starting Runs or replacing archive/read state.
   Exclude routine/workflow/main threads and interrupted inbox starts. Completed

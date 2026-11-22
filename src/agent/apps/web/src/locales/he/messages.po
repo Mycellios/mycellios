@@ -6430,3 +6430,11 @@ msgstr "אף פעם"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "מודלים ישנים יותר"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "מואצל"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "אחר"

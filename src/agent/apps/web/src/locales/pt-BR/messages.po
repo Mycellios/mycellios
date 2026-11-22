@@ -6430,3 +6430,11 @@ msgstr "Nunca"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "Modelos anteriores"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "Delegado"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "Outro"

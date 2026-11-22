@@ -87,6 +87,32 @@ it("creates an untitled conversation without inventing a permanent title", async
   expect(f.prisma.thread.upsert).toHaveBeenCalledWith(expect.objectContaining({create:expect.objectContaining({title:null}),update:{}}));
 });
 
+it("labels each side thread's kind and marks the ones archived in this account's Tasks inbox", async () => {
+  const rows = [
+    { id: "chat", projectKey: "mico:mico", taskKey: "mico-task:mico:one", title: "Plan", taskBotId: "mico" },
+    { id: "daily", projectKey: "routine:r1", taskKey: "routine:r1", title: null, taskBotId: "mico" },
+    { id: "flow", projectKey: "workflow:f1", taskKey: "workflow:e1:mico", title: "Step", taskBotId: "mico" },
+    { id: "helper", projectKey: "work:root", taskKey: "delegation:k1", title: "Check", taskBotId: "mico" },
+    { id: "old", projectKey: "mico:mico", taskKey: "mico-task:mico:two", title: "Done", taskBotId: "mico" },
+  ];
+  const inboxTask = { findMany: vi.fn().mockResolvedValue([{ threadId: "old" }]) };
+  const prisma = { thread: { findMany: vi.fn().mockResolvedValue(rows) }, inboxTask };
+  const handler = { handler: (fn: unknown) => fn };
+  const routes = developmentRoutes({ deps: { prisma }, authed: { development: { open: handler, rename: handler, list: handler, status: handler, projects: handler, saveProject: handler, projectTask: handler, primaryRun: handler } } } as never);
+  const list = routes.development.list as unknown as (v: unknown) => Promise<Array<{ threadId: string; kind?: string; archived?: boolean }>>;
+  const listed = await list({ context: { actor }, input: { botId: "mico" } });
+  expect(listed.map(({ threadId, kind, archived }) => [threadId, kind, archived])).toEqual([
+    ["chat", "conversation", false], ["daily", "routine", false], ["flow", "workflow", false],
+    ["helper", "delegation", false], ["old", "conversation", true],
+  ]);
+  expect(inboxTask.findMany).toHaveBeenCalledWith({
+    where: { threadId: { in: rows.map((row) => row.id) }, userId: "owner", spaceId: "space", archivedAt: { not: null } },
+    select: { threadId: true },
+  });
+  inboxTask.findMany.mockRejectedValueOnce(new Error("relation \"task_inbox\" does not exist"));
+  expect((await list({ context: { actor }, input: { botId: "mico" } })).every((row) => row.archived === false)).toBe(true);
+});
+
 it("renames only a conversation owned by this account, Space and Mico", async () => {
   const f=fixture({});
   await expect(f.rename({context:{actor},input:{botId:"mico",taskThreadId:"task-thread",title:"Mi título"}})).resolves.toEqual({threadId:"task-thread",title:"Mi título"});

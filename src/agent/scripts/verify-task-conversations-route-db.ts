@@ -169,6 +169,26 @@ try {
   assert.equal(await web.enqueue(reminderMessage,{...reminderContext,userId:'foreign'}),0);
   checks.push('real encrypted Web Push outbox for run-free reminders, idempotence, privacy, exact-thread routing, revoked/cancelled delivery and account isolation with synthetic transport');
   checks.push('durable follow-up, owner isolation, future-date validation, pin-only preservation, archive clears reminders, concurrent at-most-one active dispatch, undeliverable retry and cancellation');
+  const { threadsRoutes } = await import("../apps/api/src/routes/threads.js");
+  const anyRoute = new Proxy({}, { get: () => new Proxy({}, { get: () => handler }) });
+  const threads = threadsRoutes({ deps, authed: anyRoute, callsEnabled: anyRoute } as never).threads as unknown as Record<string, (v: unknown) => Promise<any>>;
+  const tabSend = (scope: typeof actor, text: string) => runAsTenant(scope, () => threads.send!({ context: { actor: scope },
+    input: { botId: bot.id, taskThreadId: opened.threadId, text, clientNonce: randomUUID() } }));
+  await call('archive',{id:imported.id,archived:true});
+  const picker = await runAsTenant(actor, () => dev.list!({ context: { actor }, input: { botId: bot.id } }));
+  assert.deepEqual(picker.map((tab: any) => [tab.threadId === opened.threadId, tab.kind, tab.archived]).sort(),
+    [[false, 'conversation', false], [false, 'conversation', false], [true, 'conversation', true]]);
+  await assert.rejects(tabSend({ ...actor, userId: 'foreign' }, 'Synthetic foreign send'));
+  await assert.rejects(tabSend({ ...actor, spaceId: 'foreign' }, 'Synthetic foreign send'));
+  assert.ok((await call('list')).find((item:any)=>item.id===imported.id).archivedAt);
+  const kept = await system.message.count({ where: { threadId: opened.threadId } });
+  await tabSend(actor, 'Synthetic follow-up from the Mico tab');
+  assert.equal((await call('list')).find((item:any)=>item.id===imported.id).archivedAt, null);
+  assert.equal(await system.message.count({ where: { threadId: opened.threadId } }), kept + 1);
+  assert.equal(await system.message.count({ where: { threadId: bot.thread!.id } }), 0);
+  assert.equal((await runAsTenant(actor, () => dev.list!({ context: { actor }, input: { botId: bot.id } })))
+    .find((tab: any) => tab.threadId === opened.threadId).archived, false);
+  checks.push('real Mico tab send restores an archived conversation with its history; picker reports kind and archive; foreign owner/Space sends refused');
   const rls=database.getPgClient();await rls.connect();
   try {
     await rls.query('CREATE ROLE inbox_probe NOLOGIN');

@@ -1000,6 +1000,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const [readBoundary, setReadBoundary] = useState<ReadBoundary | null>(null);
   // A chat's markRead calls run one at a time so the request that opened it answers first.
   const [readInOrder] = useState(createChatQueues);
+  // A task tab's pinned client refuses writes until the task's own snapshot has loaded, so its
+  // automatic read waits for that load instead of failing silently on open.
+  const [taskThreadLoaded, setTaskThreadLoaded] = useState(!taskScope);
   const captureReadBoundary = useCallback((visit: number, seq: number | null) => {
     setReadBoundary((current) =>
       settleReadBoundary(current, readVisit.current.visit, { visit, seq }),
@@ -1129,10 +1132,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         !stillWanted || stillWanted() ? rpc.threads.markRead({ botId: id }) : Promise.resolve(null),
       );
       if (!answer) return undefined;
+      // A task tab's client reads that task; the Mico's main-chat dot is not this read's to clear.
+      if (taskScope?.botId === id) return answer.unreadAfterSeq;
       if (!manuallyUnread.current.has(id)) updateBotUnread(id, false);
       return answer.unreadAfterSeq;
     },
-    [readInOrder, updateBotUnread],
+    [readInOrder, taskScope, updateBotUnread],
   );
   const markBotUnread = useCallback(
     async (id: string, messageId?: string) => {
@@ -1755,7 +1760,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   ]);
 
   useEffect(() => {
-    if (!active) return;
+    // A task conversation is read once its own snapshot loads, like the main chat on open.
+    if (!active || !taskThreadLoaded) return;
     // Opening a bot clears the manual unread flag so it can auto-read again.
     manuallyUnread.current.delete(active.id);
     const markVisibleBotRead = () => {
@@ -1768,7 +1774,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       window.removeEventListener("focus", markVisibleBotRead);
       document.removeEventListener("visibilitychange", markVisibleBotRead);
     };
-  }, [active?.id, markBotReadIfVisible]);
+  }, [active?.id, markBotReadIfVisible, taskThreadLoaded]);
 
   useEffect(() => {
     if (!active) return;
@@ -1808,11 +1814,14 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         const primed = bootstrappedThread.current;
         bootstrappedThread.current = null;
         // Pending search jumps load the around-page separately; avoid replacing it with latest.
-        return primed?.botId === active.id
+        const initial = await (primed?.botId === active.id
           ? primed
           : pendingJump
             ? rpc.threads.get({ botId: active.id }, { signal: threadSnapshotSignal(abort.signal) })
-            : refreshThread(active.id, threadSnapshotSignal(abort.signal));
+            : refreshThread(active.id, threadSnapshotSignal(abort.signal)));
+        // The task's own snapshot came through this client, which now accepts its read.
+        if (taskScope && !abort.signal.aborted) setTaskThreadLoaded(true);
+        return initial;
       },
       loadHead: () =>
         rpc.threads.head({ botId: active.id }, { signal: threadSnapshotSignal(abort.signal) }),

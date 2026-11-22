@@ -6431,3 +6431,11 @@ msgstr "Nooit"
 #: src/pages/shell/chat-model-picker.tsx
 msgid "Older models"
 msgstr "Oudere modellen"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Delegated"
+msgstr "Gedelegeerd"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Other"
+msgstr "Overig"

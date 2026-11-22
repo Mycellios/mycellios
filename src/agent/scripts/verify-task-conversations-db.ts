@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
 import EmbeddedPostgres from "embedded-postgres";
-import { discoverTaskConversations } from "../apps/api/src/task-inbox-conversations.js";
+import { discoverTaskConversations, restoreArchivedTaskOnSend } from "../apps/api/src/task-inbox-conversations.js";
 
 const socket = createServer();
 await new Promise<void>(resolve => socket.listen(0,"127.0.0.1",resolve));
@@ -19,7 +19,7 @@ try {
  await db.initialise(); await db.start(); await sql.connect(); connected = true;
  await sql.query(`CREATE TABLE bots(id text PRIMARY KEY,"spaceId" text,"archivedAt" timestamptz);
  CREATE TABLE threads(id text PRIMARY KEY,"spaceId" text,"userId" text,"taskBotId" text,"botId" text,"groupId" text,"projectKey" text,"taskKey" text,title text,"lastReadSeq" int DEFAULT -1,"createdAt" timestamptz DEFAULT now());
- CREATE TABLE task_inbox(id text PRIMARY KEY,"spaceId" text,"userId" text,"botId" text,"threadId" text UNIQUE,"clientNonce" text,title text,"readSeq" int DEFAULT -1,"createdAt" timestamptz DEFAULT now(),"archivedAt" timestamptz,UNIQUE("spaceId","userId","clientNonce"));
+ CREATE TABLE task_inbox(id text PRIMARY KEY,"spaceId" text,"userId" text,"botId" text,"threadId" text UNIQUE,"clientNonce" text,title text,"readSeq" int DEFAULT -1,"createdAt" timestamptz DEFAULT now(),"archivedAt" timestamptz,"reminderClaimedAt" timestamptz,UNIQUE("spaceId","userId","clientNonce"));
  INSERT INTO bots VALUES ('a','s',NULL),('b','s',NULL),('foreign','other',NULL),('archived','s',now());`);
  const add = async(id:string,bot='a',owner='u',space='s',key='mico:'+bot,task='mico-task:'+bot+':'+id) => sql.query('INSERT INTO threads(id,"spaceId","userId","taskBotId","projectKey","taskKey",title) VALUES($1,$2,$3,$4,$5,$6,$1)',[id,space,owner,bot,key,task]);
  await add('kuma'); await add('budget','b'); await add('project','b','u','s','project:one','project:one:task');
@@ -29,10 +29,11 @@ try {
  await add('routine-key','a','u','s','mico:a','routine:one');
  await add('interrupted-start','a','u','s','mico:a','mico-task:a:inbox:nonce');
  await sql.query(`INSERT INTO threads(id,"spaceId","userId","botId",title) VALUES ('main','s','u','a','General')`);
- const adapter = { $executeRaw: async(strings:TemplateStringsArray,...values:unknown[]) => {
-   const query = strings.reduce((text,part,index)=>text+(index?'$'+index:'')+part,'');
-   return (await sql.query(query,values)).rowCount;
- }} as unknown as Parameters<typeof discoverTaskConversations>[0];
+ const text = (strings:TemplateStringsArray) => strings.reduce((query,part,index)=>query+(index?'$'+index:'')+part,'');
+ const adapter = {
+   $executeRaw: async(strings:TemplateStringsArray,...values:unknown[]) => (await sql.query(text(strings),values)).rowCount,
+   $queryRaw: async(strings:TemplateStringsArray,...values:unknown[]) => (await sql.query(text(strings),values)).rows,
+ } as unknown as Parameters<typeof restoreArchivedTaskOnSend>[0];
  const actor = {userId:'u',spaceId:'s'} as Parameters<typeof discoverTaskConversations>[1];
  await discoverTaskConversations(adapter,actor);
  const ids = async() => (await sql.query('SELECT "threadId" FROM task_inbox ORDER BY "threadId"')).rows.map(row=>row.threadId);
@@ -44,13 +45,35 @@ try {
  assert.equal(preserved.readSeq,7); assert.ok(preserved.archivedAt);
  await discoverTaskConversations(adapter,{...actor,userId:'other'});
  assert.equal((await sql.query(`SELECT count(*)::int AS n FROM task_inbox WHERE "userId"='other'`)).rows[0].n,1);
+ // Sending from a Mico tab restores an archived conversation, only for its own owner and Space.
+ const kuma = async() => (await sql.query(`SELECT "readSeq","archivedAt" FROM task_inbox WHERE "threadId"='kuma'`)).rows[0];
+ assert.equal(await restoreArchivedTaskOnSend(adapter,{...actor,userId:'other'},'kuma'),0);
+ assert.equal(await restoreArchivedTaskOnSend(adapter,{...actor,spaceId:'other'},'kuma'),0);
+ assert.ok((await kuma()).archivedAt);
+ assert.equal(await restoreArchivedTaskOnSend(adapter,actor,'kuma'),1);
+ assert.equal((await kuma()).archivedAt,null); assert.equal((await kuma()).readSeq,7);
+ assert.equal(await restoreArchivedTaskOnSend(adapter,actor,'kuma'),0);
+ // An archive that holds the thread lock first is undone once the send's restore gets the lock.
+ const archiver = db.getPgClient(); await archiver.connect();
+ try {
+   await archiver.query('BEGIN');
+   await archiver.query(`SELECT id FROM threads WHERE id='kuma' FOR UPDATE`);
+   await archiver.query(`UPDATE task_inbox SET "archivedAt"=now() WHERE "threadId"='kuma'`);
+   let settled = false;
+   const restored = restoreArchivedTaskOnSend(adapter,actor,'kuma').then(count => { settled = true; return count; });
+   await new Promise(resolve => setTimeout(resolve,300));
+   assert.equal(settled,false);
+   await archiver.query('COMMIT');
+   assert.equal(await restored,1);
+   assert.equal((await kuma()).archivedAt,null);
+ } finally { await archiver.end(); }
  await sql.query('TRUNCATE task_inbox');
  await sql.query(`INSERT INTO threads(id,"spaceId","userId","taskBotId",title) SELECT 'bulk-'||n,'s','bulk','a','Task '||n FROM generate_series(1,205)n`);
  await discoverTaskConversations(adapter,{...actor,userId:'bulk'});
  assert.equal((await sql.query('SELECT count(*)::int AS n FROM task_inbox')).rows[0].n,200);
  await discoverTaskConversations(adapter,{...actor,userId:'bulk'});
  assert.equal((await sql.query('SELECT count(*)::int AS n FROM task_inbox')).rows[0].n,205);
- const result={passed:true,checks:['all Micos and project conversations','owner and Space isolation','archived/wrong-Space Micos excluded','main/routine/workflow/interrupted starts excluded','idempotent discovery','read/archive state preserved','bounded 200-row batches'],productionAccess:false,runsStarted:0};
+ const result={passed:true,checks:['all Micos and project conversations','owner and Space isolation','archived/wrong-Space Micos excluded','main/routine/workflow/interrupted starts excluded','idempotent discovery','read/archive state preserved','send restores an archived conversation for its owner and Space only','restore waits for and undoes an archive holding the thread lock','bounded 200-row batches'],productionAccess:false,runsStarted:0};
  await writeFile(path.join(directory,'result.json'),JSON.stringify(result,null,2));
  console.log(JSON.stringify(result));
 } finally {if(connected)await sql.end();await db.stop();}

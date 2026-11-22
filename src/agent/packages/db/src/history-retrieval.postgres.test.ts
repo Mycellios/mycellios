@@ -24,7 +24,7 @@ postgres("history retrieval (PostgreSQL)", () => {
     prisma = new PrismaClient({ adapter: new PrismaPg(pool, { schema: "pg_temp" }) });
     await pool.query(`
       CREATE TEMP TABLE bots (id text PRIMARY KEY, "spaceId" text, "userId" text, "archivedAt" timestamptz);
-      CREATE TEMP TABLE threads (id text PRIMARY KEY, "spaceId" text, "userId" text, "botId" text, "groupId" text, "contextStartSeq" integer NOT NULL DEFAULT 0);
+      CREATE TEMP TABLE threads (id text PRIMARY KEY, "spaceId" text, "userId" text, "botId" text, "groupId" text, "contextStartSeq" integer NOT NULL DEFAULT 0, "taskBotId" text);
       CREATE TEMP TABLE chat_groups (id text PRIMARY KEY, "spaceId" text, "userId" text, "archivedAt" timestamptz);
       CREATE TEMP TABLE chat_group_members ("groupId" text, "botId" text);
       CREATE TEMP TABLE messages (id text PRIMARY KEY, "threadId" text, seq integer, role text, "runId" text,
@@ -323,6 +323,49 @@ postgres("history retrieval (PostgreSQL)", () => {
     ).toEqual([]);
     await pool.query("DELETE FROM messages WHERE id IN ('group-source','group-outcome')");
     expect((await readHistory(prisma, groupScope, { messageId: "group-source" })).runs).toEqual([]);
+  });
+  it("reads the Mico's own task conversation without crossing threads, Micos, owners or Spaces", async () => {
+    await pool.query(`INSERT INTO bots VALUES ('synthetic-task-outsider','synthetic-space','synthetic-user',NULL);
+      INSERT INTO threads (id,"spaceId","userId","botId","groupId","taskBotId") VALUES
+        ('synthetic-task','synthetic-space','synthetic-user',NULL,NULL,'synthetic-bot'),
+        ('synthetic-foreign-task','synthetic-space','synthetic-user',NULL,NULL,'synthetic-task-outsider');
+      INSERT INTO messages VALUES
+        ('task-source','synthetic-task',0,'user',NULL,NULL,now(),'[{"kind":"text","text":"kestrel migration plan"}]'),
+        ('task-result','synthetic-task',1,'bot','task-run',NULL,now(),'[{"kind":"text","text":"kestrel migration done"}]'),
+        ('foreign-task-source','synthetic-foreign-task',0,'user',NULL,NULL,now(),'[{"kind":"text","text":"kestrel private note"}]');
+      INSERT INTO runs VALUES ('task-run','synthetic-space','synthetic-user','synthetic-task','synthetic-bot','task-source','completed',now(),now());`);
+    const taskScope = { ...scope, threadId: "synthetic-task" };
+    const ids = (result: { messages: Array<{ messageId: string }> }) =>
+      result.messages.map((message) => message.messageId);
+    try {
+      expect(ids(await searchHistory(prisma, taskScope, { query: "kestrel" }))).toEqual([
+        "task-result",
+        "task-source",
+      ]);
+      const read = await readHistory(prisma, taskScope, { messageId: "task-source" });
+      expect(ids(read)).toEqual(["task-source", "task-result"]);
+      expect(read.untrusted).toBe(true);
+      expect(read.runs.map((run) => run.id)).toEqual(["task-run"]);
+      // The main chat's run and the task's run each see only their own thread.
+      expect(ids(await searchHistory(prisma, scope, { query: "kestrel" }))).toEqual([]);
+      expect(ids(await readHistory(prisma, scope, { messageId: "task-source" }))).toEqual([]);
+      expect(ids(await readHistory(prisma, taskScope, { messageId: "m-100" }))).toEqual([]);
+      // Another Mico, owner or Space never reads it, nor does this Mico read another Mico's task.
+      for (const outsider of [
+        { ...taskScope, botId: "synthetic-task-outsider" },
+        { ...taskScope, userId: "outsider-user" },
+        { ...taskScope, spaceId: "outsider-space" },
+        { ...scope, threadId: "synthetic-foreign-task" },
+      ]) {
+        expect(ids(await searchHistory(prisma, outsider, { query: "kestrel" }))).toEqual([]);
+        expect(ids(await readHistory(prisma, outsider, { messageId: "task-source" }))).toEqual([]);
+      }
+      await pool.query(`UPDATE bots SET "archivedAt"=now() WHERE id='synthetic-bot'`);
+      expect(ids(await searchHistory(prisma, taskScope, { query: "kestrel" }))).toEqual([]);
+    } finally {
+      await pool.query(`UPDATE bots SET "archivedAt"=NULL WHERE id='synthetic-bot';
+        DELETE FROM messages WHERE "threadId" IN ('synthetic-task','synthetic-foreign-task')`);
+    }
   });
   it("keeps complete JSON and pages all 50 linked runs, 100 artifacts and long original text", async () => {
     const original = `Original evidence\n${"長い\n".repeat(4000)}`;

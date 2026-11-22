@@ -142,6 +142,18 @@ describe("local history retrieval", () => {
     expect(sql(mock).sql).toContain('t."userId" =');
     expect(sql(mock).sql).toContain('t."botId" =');
   });
+  it("admits the Mico's own task conversation only through the run's thread and the same fences", async () => {
+    const { mock, prisma } = db();
+    mock.$queryRaw.mockResolvedValue([]);
+    await searchHistory(prisma, { ...scope, threadId: "task-thread" }, { query: "exports" });
+    const query = sql(mock);
+    expect(query.sql).toContain('t."taskBotId" =');
+    expect(query.sql).toContain('t."groupId" IS NULL');
+    expect(query.sql).toContain('b."archivedAt" IS NULL');
+    // Thread, Space, owner and Mico stay bound from the executor scope, never from tool input.
+    expect(query.values).toEqual(expect.arrayContaining(["task-thread", "space", "user", "bot"]));
+    expect(query.values).not.toContain("thread");
+  });
   it("reuses originals without inference and invalidates snapshots when content changes", async () => {
     const { mock, prisma } = db();
     mock.$queryRaw.mockResolvedValueOnce([row(1)]).mockResolvedValueOnce([row(1)]);
