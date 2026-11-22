@@ -146,6 +146,15 @@ it("refreshes a rejected command instead of replaying its effect", async () => {
     expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
   });
 });
+it("still pauses a running contributor after a rejected command", async () => {
+  f.status.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: null, rejected: true });
+  f.control.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: "pause", rejected: false });
+  await rendered(async host => {
+    expect(host.querySelector("button")!.textContent).toContain("Retry");
+    await act(async () => host.querySelector("button")!.click());
+    expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "pause" });
+  });
+});
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {
   f.native.mockResolvedValue({ supported: true, enrolled: false, installed: false, nodeId: null });
   f.enrollment.mockResolvedValue({ fixture: "grant" });

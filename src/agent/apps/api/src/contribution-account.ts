@@ -40,16 +40,20 @@ export function contributionAccount(token: string, transport: typeof fetch = fet
   return {
     async status(nodeId: string) {
       const node = await ownedNode(nodeId);
-      const command = node.commands[0];
+      // Only the latest Play/Pause command describes this control. A rejected
+      // update or limits command must not leave Pause stuck on an error.
+      const command = node.commands.find(item => item.type === "pause" || item.type === "resume");
+      const enabled = node.observed?.contributionEnabled ?? null;
       // ACK and telemetry travel separately. Do not turn a completed pause back
       // into a Play/Pause toggle from the snapshot captured before that ACK.
       const awaitingObservation = command?.state === "applied" && command.completedAt &&
         (!node.observed || (node.observed.observedAt && Date.parse(node.observed.observedAt) < Date.parse(command.completedAt))) &&
-        node.observed?.contributionEnabled !== (command.type === "resume");
+        enabled !== (command.type === "resume");
       return ContributionStateSchema.parse({
-        nodeId, connected: node.connected, enabled: node.observed?.contributionEnabled ?? null,
-        pending: command && (["queued", "delivered"].includes(command.state) || awaitingObservation) && ["pause", "resume"].includes(command.type) ? command.type : null,
-        rejected: command?.state === "rejected",
+        nodeId, connected: node.connected, enabled,
+        pending: command && (["queued", "delivered"].includes(command.state) || awaitingObservation) ? command.type : null,
+        // A rejected command whose intended state is already observed needs no retry.
+        rejected: command?.state === "rejected" && enabled !== (command.type === "resume"),
       });
     },
     async control(nodeId: string, action: "pause" | "resume") {

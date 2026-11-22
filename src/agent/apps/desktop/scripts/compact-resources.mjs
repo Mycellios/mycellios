@@ -40,7 +40,10 @@ function packageRoot(file) {
 }
 
 export async function compactPlan(source) {
-  const files = await filesIn(source);
+  // Test/build tools that production dependencies declare (better-auth -> vitest ->
+  // vite/rolldown/esbuild, @sentry/node -> bundler plugins -> oxc) are never loaded
+  // by the server; leave them out entirely, including their native binaries.
+  const files = (await filesIn(source)).filter(file => !developmentTool.test(file));
   const nativeFiles=[];
   for(const file of files)if(await nativeFile(source,file))nativeFiles.push(file);
   const nativeRoots = [...new Set(nativeFiles.map(packageRoot))]
@@ -50,11 +53,21 @@ export async function compactPlan(source) {
     file.startsWith('prisma/') || nativeRoots.some(p=>file===p || file.startsWith(p+'/'));
   // Third-party source maps only improve stack traces and are about a quarter of the
   // server's bytes. Keep our own bundle's map for diagnostics; nothing loads the rest.
-  const omitted = file => !external(file) && dependencySourceMap.test(file);
+  // Node never runs TypeScript inside node_modules, so dependency type declarations
+  // and .ts sources are dead weight too (typescript itself reads its lib .d.ts files).
+  const omitted = file => !external(file) && (dependencySourceMap.test(file) || dependencyTypeScript(file));
   const packed = files.filter(f=>!external(f) && !omitted(f));
   return {files,nativeRoots,packed,external,omitted};
 }
 const dependencySourceMap = /(^|\/)node_modules\/.+\.map$/;
+const developmentTool = /(^|\/)node_modules\/(?:vitest|@vitest\/[^/]+|vite|rolldown|@rolldown\/[^/]+|esbuild|@esbuild\/[^/]+|@sentry\/bundler-plugins|oxc-parser|@oxc-parser\/[^/]+)\//;
+function dependencyTypeScript(file) {
+  if (!/\.[cm]?ts$/.test(file)) return false;
+  const parts = file.split('/'), i = parts.lastIndexOf('node_modules');
+  if (i < 0 || !parts[i+1]) return false;
+  const name = parts[i+1].startsWith('@') ? parts.slice(i+1, i+3).join('/') : parts[i+1];
+  return !name.startsWith('@mycellios/') && name !== 'typescript';
+}
 
 export async function compactServer(source, target) {
   await mkdir(target, {recursive:true});
@@ -78,7 +91,8 @@ export async function compactServer(source, target) {
     digest.update(file+'\n').update(createHash('sha256').update(input).digest());
   }
   const receipt = {schema:'mycellios-compact-resources/1',sourceFiles:files.length,
-    packedFiles:packed.length,omittedSourceMaps:files.filter(omitted).length,
+    packedFiles:packed.length,omittedSourceMaps:files.filter(file=>omitted(file)&&dependencySourceMap.test(file)).length,
+    omittedTypeScript:files.filter(file=>omitted(file)&&dependencyTypeScript(file)).length,
     physicalFiles:files.filter(external).length+4,nativeRoots,
     preservedTreeSha256:digest.digest('hex')};
   await writeFile(path.join(target,'compact-resources.json'),JSON.stringify(receipt,null,2));

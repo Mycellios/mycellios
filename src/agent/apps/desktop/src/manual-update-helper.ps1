@@ -71,7 +71,6 @@ if($Launch){
  exit $worker.ExitCode
 }
 $result=Join-Path $job 'result.json'
-$backup=Join-Path $job 'backup'
 $phase='preflight'
 $installerLock=$null
 $updateLock=$null
@@ -86,7 +85,7 @@ function Write-Result($receipt){
 }
 function Pump-Window {if($window){[Windows.Forms.Application]::DoEvents()}}
 # The app has quit by now. Show progress at once instead of leaving the owner
-# with nothing on screen while the backup and installation run.
+# with nothing on screen while the installation runs.
 function Show-Status([string]$text){
  if(!$script:window){
   Add-Type -AssemblyName System.Windows.Forms
@@ -108,41 +107,10 @@ function Show-Status([string]$text){
  $script:label.Text=$text
  [Windows.Forms.Application]::DoEvents()
 }
-function Copy-Safe([string]$source,[string]$destination,[string[]]$exclude=@(),[string[]]$excludeFiles=@()){
- $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:10','/W:2','/NFL','/NDL','/NP','/NJH','/NJS',('/LOG+:'+(Join-Path $job 'copy.log')))
- if($exclude.Count){$arguments+=@('/XD');$arguments+=$exclude}
- if($excludeFiles.Count){$arguments+=@('/XF');$arguments+=$excludeFiles}
- # Run robocopy as a child so the progress window keeps answering while it copies.
- $start=New-Object Diagnostics.ProcessStartInfo
- $start.FileName=Join-Path $env:SystemRoot 'System32\robocopy.exe'
- $start.Arguments=($arguments|ForEach-Object {'"'+$_+'"'}) -join ' '
- $start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.WorkingDirectory=$env:TEMP
- $copy=[Diagnostics.Process]::Start($start)
- $null=$copy.Handle
- while(!$copy.WaitForExit(250)){Pump-Window}
- $copy.Refresh()
- if($copy.ExitCode -ge 8){throw 'Could not make a recoverable backup'}
-}
 function Get-Sha256([IO.Stream]$stream) {
  $algorithm=[Security.Cryptography.SHA256]::Create()
  try {return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}
  finally {$algorithm.Dispose()}
-}
-# Windows can keep a just-closed app's storage file open for a moment (for
-# example while an antivirus scan finishes). Wait briefly instead of failing
-# the update; a file that stays busy still stops it before installation.
-function Get-FileSha256([string]$file){
- $deadline=(Get-Date).AddSeconds(30)
- while($true){
-  try {$stream=[IO.File]::OpenRead($file)}
-  catch {
-   $cause=if($_.Exception.InnerException){$_.Exception.InnerException}else{$_.Exception}
-   if($cause -isnot [IO.IOException] -or $cause -is [IO.FileNotFoundException] -or $cause -is [IO.DirectoryNotFoundException] -or (Get-Date) -gt $deadline){throw}
-   Pump-Window;Start-Sleep -Milliseconds 500;continue
-  }
-  try {return Get-Sha256 $stream}
-  finally {$stream.Dispose()}
- }
 }
 function Installer-Valid {
  $file=Get-Item -LiteralPath $installer
@@ -151,18 +119,6 @@ function Installer-Valid {
  $digest=Get-Sha256 $installerLock
  $installerLock.Position=0
  if($digest -ne $config.sha256){throw 'Installer checksum changed'}
-}
-function Draft-Stores {
- $folders=@((Join-Path $profile 'Local Storage'),(Join-Path $profile 'Session Storage'),(Join-Path $profile 'IndexedDB'),(Join-Path $profile 'WebStorage'))
- if(Test-Path -LiteralPath (Join-Path $profile 'Partitions')){foreach($partition in Get-ChildItem -LiteralPath (Join-Path $profile 'Partitions') -Directory){foreach($name in @('Local Storage','Session Storage','IndexedDB','WebStorage')){$folders+=Join-Path $partition.FullName $name}}}
- $entries=@{}
- foreach($folder in $folders){
-  if(!(Test-Path -LiteralPath $folder)){continue}
-  foreach($file in Get-ChildItem -LiteralPath $folder -File -Recurse){
-   $entries[$file.FullName.Substring($profile.Length+1)]=Get-FileSha256 $file.FullName
-  }
- }
- return $entries
 }
 function Installed-Process {
  return ,@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -and ([MycelliosUpdatePath]::Canonical($_.ExecutablePath)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)})
@@ -238,24 +194,13 @@ try {
  $commit=Get-Content -LiteralPath (Join-Path $job 'commit.json') -Raw -Encoding UTF8|ConvertFrom-Json
  if($commit.approved -ne $true){throw 'The native install request was not committed'}
  $canReopen=$true
- Progress 'backing-up'
- Show-Status ('Preparando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
- foreach($location in @($installation,$profile)){
-  if((Get-PSDrive -Name ([IO.Path]::GetPathRoot($location).Substring(0,1))).Free -lt 6GB){throw 'Not enough free space for a recoverable update'}
- }
- if(Test-Path -LiteralPath $backup){throw 'A previous backup already exists for this request'}
- New-Item -ItemType Directory -Path $backup | Out-Null
- $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
- & icacls $backup '/inheritance:r' '/grant:r' "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' >> (Join-Path $job 'copy.log')
- if($LASTEXITCODE -ne 0){throw 'Could not protect the private backup'}
- Copy-Safe $installation (Join-Path $backup 'installation')
- $excluded=@('Cache','Code Cache','GPUCache','DawnGraphiteCache','DawnWebGPUCache','GPUPersistentCache','GrShaderCache','ShaderCache')
- # Workspaces and development source copies are never touched by the installer
- # and can be gigabytes; copying them only delays the update.
- $excluded+=@('updates','computers','development','local-data','local-web','apps-local-backups','upgrade-backups')|ForEach-Object {Join-Path $profile $_}
- Copy-Safe $profile (Join-Path $backup 'profile') $excluded @('Cookies','Cookies-journal')
- $drafts=Draft-Stores
- $drafts|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $backup 'draft-stores.json') -Encoding UTF8
+ # Quit, install and reopen, with no copies or profile scans in
+ # between. The NSIS fast-install journal keeps the previous installation (a
+ # same-volume rename) and restores it if setup fails or is cancelled; the
+ # installer never writes the profile.
+ Progress 'checking-storage'
+ Show-Status ('Instalando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
+ if((Get-PSDrive -Name ([IO.Path]::GetPathRoot($installation).Substring(0,1))).Free -lt 6GB){throw 'Not enough free space for a recoverable update'}
  Installer-Valid
  if((Installed-Process).Count){throw 'The previous application reopened before installation'}
  Progress 'starting-installer'
@@ -264,7 +209,6 @@ try {
  # File checks were approved before shutdown. Keep a responsive progress window
  # while the already-verified per-user installer runs and the app reopens.
  Progress 'preparing-installer-ui'
- Show-Status ('Instalando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
   $start=New-Object Diagnostics.ProcessStartInfo
   $start.FileName=$installer;$start.Arguments='/S';$start.WorkingDirectory=$env:TEMP
   # Attachment Services already enforced policy, scanning and any owner prompt;
@@ -289,19 +233,16 @@ try {
  if((Installed-Process).Count){throw 'Unexpected app startup during installation; saved state must be inspected'}
  $version=([Version](Get-Item -LiteralPath $executable).VersionInfo.ProductVersion).ToString(3)
  if($version -ne $config.version){throw 'Installed version does not match the verified release'}
- $after=Draft-Stores
- if($drafts.Count -ne $after.Count){throw 'Saved draft stores changed during installation'}
- foreach($entry in $drafts.GetEnumerator()){if($after[$entry.Key] -ne $entry.Value){throw 'Saved draft stores changed during installation'}}
  $verifiedVersion=$version
  Progress 'reopening'
  Reopen -Confirm
- Write-Result @{installed=$true;version=$version;draftStoresPreserved=$true;draftStoreFiles=$drafts.Count;backup=$backup;reopened=($config.reopen -ne $false)}
+ Write-Result @{installed=$true;version=$version;reopened=($config.reopen -ne $false)}
  exit 0
 } catch {
  $failedPhase=$phase
- if($phase -eq 'installing' -and (Test-Path -LiteralPath (Join-Path $backup 'installation')) -and !(Installed-Process).Count){
-  try {Copy-Safe (Join-Path $backup 'installation') $installation;Reopen}catch{}
- } elseif(!$verifiedVersion -and $canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
- Write-Result @{installed=($null -ne $verifiedVersion);version=$verifiedVersion;reopened=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}
+ # A failed or cancelled setup has already restored the previous installation
+ # through its own journal, so the previous app can reopen.
+ if(!$verifiedVersion -and $canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
+ Write-Result @{installed=($null -ne $verifiedVersion);version=$verifiedVersion;reopened=$false;phase=$failedPhase;error=$_.Exception.Message}
  exit 1
 } finally {if($window){$window.Close();$window.Dispose()};if($installerLock){$installerLock.Dispose()};if($updateLock){$updateLock.Dispose()}}

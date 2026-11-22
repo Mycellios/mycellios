@@ -64,6 +64,37 @@ test('real Windows Electron resolves ESM/CJS across native packages and its migr
   }finally{await rm(f.root,{recursive:true,force:true});}
 });
 
+test('leaves out dependency TypeScript and development tools but keeps what the server runs',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'mycellios-compact-slim-'));
+ try{
+  const source=path.join(root,'source'),target=path.join(root,'target');
+  const files={
+   'package.json':'{"name":"fixture"}',
+   'dist/desktop-local-entry.js':'export {};',
+   'node_modules/lib/index.js':'module.exports=1;',
+   'node_modules/lib/index.d.ts':'export {};',
+   'node_modules/lib/src/index.ts':'export {};',
+   'node_modules/lib/README.md':'Docs some packages read at run time',
+   'node_modules/typescript/lib/lib.es2024.d.ts':'interface TypeScriptReadsThis {}',
+   'node_modules/@mycellios/core/src/index.ts':'export {};',
+   'node_modules/vitest/index.js':'test tool',
+   'node_modules/@esbuild/win32-x64/esbuild.exe':Buffer.from([1]),
+   'node_modules/better-auth/node_modules/vite/index.js':'nested tool',
+  };
+  for(const [name,bytes] of Object.entries(files)){await mkdir(path.dirname(path.join(source,name)),{recursive:true});await writeFile(path.join(source,name),bytes);}
+  const receipt=await compactServer(source,target);
+  const packed=asar.listPackage(path.join(target,'runtime.asar')).map(p=>p.replaceAll('\\','/').replace(/^\//,''));
+  for(const kept of ['node_modules/lib/index.js','node_modules/lib/README.md','node_modules/typescript/lib/lib.es2024.d.ts','node_modules/@mycellios/core/src/index.ts'])
+   assert.ok(packed.includes(kept),kept);
+  for(const left of ['node_modules/lib/index.d.ts','node_modules/lib/src/index.ts','node_modules/vitest/index.js','node_modules/better-auth/node_modules/vite/index.js'])
+   assert.ok(!packed.includes(left),left);
+  assert.deepEqual(receipt.nativeRoots,[]);
+  await assert.rejects(access(path.join(target,'node_modules/@esbuild')));
+  assert.equal(receipt.omittedTypeScript,2);
+  assert.deepEqual(await verifyCompactServer(target),receipt);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
 test('extensionless Mach-O and ELF engines stay executable outside ASAR with their package metadata',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'mycellios-unix-compact-'));
  try{
