@@ -209,60 +209,66 @@ def parse_gguf(path_value: str | os.PathLike[str]) -> GgufDocument:
         raise FileNotFoundError(path)
     file_size = path.stat().st_size
     with path.open("rb") as stream:
-        reader = _Reader(stream, file_size)
-        if reader.read(4) != b"GGUF":
-            raise NativeGgufError("artifact is not GGUF")
-        version = reader.u32()
-        if version not in (2, 3):
-            raise NativeGgufError(f"unsupported GGUF version {version}")
-        tensor_count = reader.u64()
-        metadata_count = reader.u64()
-        if tensor_count > MAX_TENSORS:
-            raise NativeGgufError("GGUF tensor count is unreasonable")
-        if metadata_count > MAX_METADATA_ITEMS:
-            raise NativeGgufError("GGUF metadata count is unreasonable")
+        version, metadata, tensors, alignment, data_offset = parse_gguf_header(stream, file_size)
+    return GgufDocument(path, version, metadata, tensors, alignment, data_offset, _sha256_file(path))
 
-        metadata: list[GgufMetadata] = []
-        seen_metadata: set[str] = set()
-        for _ in range(metadata_count):
-            key = reader.string()
-            if not key or key in seen_metadata:
-                raise NativeGgufError("GGUF metadata keys must be non-empty and unique")
-            seen_metadata.add(key)
-            value_type = reader.u32()
-            metadata.append(
-                GgufMetadata(key, value_type, reader.metadata_value(value_type))
-            )
 
-        descriptors: list[tuple[str, tuple[int, ...], int, int]] = []
-        seen_tensors: set[str] = set()
-        for _ in range(tensor_count):
-            name = reader.string()
-            if not name or name in seen_tensors:
-                raise NativeGgufError("GGUF tensor names must be non-empty and unique")
-            seen_tensors.add(name)
-            dimension_count = reader.u32()
-            if not 1 <= dimension_count <= 4:
-                raise NativeGgufError(f"GGUF tensor {name!r} has invalid rank")
-            dimensions = tuple(reader.u64() for _ in range(dimension_count))
-            if any(value < 1 for value in dimensions):
-                raise NativeGgufError(f"GGUF tensor {name!r} has an empty dimension")
-            ggml_type = reader.u32()
-            relative_offset = reader.u64()
-            descriptors.append((name, dimensions, ggml_type, relative_offset))
+def parse_gguf_header(stream: BinaryIO, file_size: int) -> tuple[int, tuple[GgufMetadata, ...], tuple[GgufTensor, ...], int, int]:
+    """Parse a header for an artifact of ``file_size`` bytes; the stream may hold only the header."""
+    reader = _Reader(stream, file_size)
+    if reader.read(4) != b"GGUF":
+        raise NativeGgufError("artifact is not GGUF")
+    version = reader.u32()
+    if version not in (2, 3):
+        raise NativeGgufError(f"unsupported GGUF version {version}")
+    tensor_count = reader.u64()
+    metadata_count = reader.u64()
+    if tensor_count > MAX_TENSORS:
+        raise NativeGgufError("GGUF tensor count is unreasonable")
+    if metadata_count > MAX_METADATA_ITEMS:
+        raise NativeGgufError("GGUF metadata count is unreasonable")
 
-        metadata_values = {entry.key: entry.value for entry in metadata}
-        alignment_value = metadata_values.get("general.alignment", DEFAULT_ALIGNMENT)
-        if (
-            not isinstance(alignment_value, int)
-            or isinstance(alignment_value, bool)
-            or not _power_of_two(alignment_value)
-            or not 1 <= alignment_value <= 4096
-        ):
-            raise NativeGgufError("GGUF general.alignment is invalid")
-        data_offset = _align(reader.position, alignment_value)
-        if data_offset > file_size:
-            raise NativeGgufError("GGUF tensor data section is truncated")
+    metadata: list[GgufMetadata] = []
+    seen_metadata: set[str] = set()
+    for _ in range(metadata_count):
+        key = reader.string()
+        if not key or key in seen_metadata:
+            raise NativeGgufError("GGUF metadata keys must be non-empty and unique")
+        seen_metadata.add(key)
+        value_type = reader.u32()
+        metadata.append(
+            GgufMetadata(key, value_type, reader.metadata_value(value_type))
+        )
+
+    descriptors: list[tuple[str, tuple[int, ...], int, int]] = []
+    seen_tensors: set[str] = set()
+    for _ in range(tensor_count):
+        name = reader.string()
+        if not name or name in seen_tensors:
+            raise NativeGgufError("GGUF tensor names must be non-empty and unique")
+        seen_tensors.add(name)
+        dimension_count = reader.u32()
+        if not 1 <= dimension_count <= 4:
+            raise NativeGgufError(f"GGUF tensor {name!r} has invalid rank")
+        dimensions = tuple(reader.u64() for _ in range(dimension_count))
+        if any(value < 1 for value in dimensions):
+            raise NativeGgufError(f"GGUF tensor {name!r} has an empty dimension")
+        ggml_type = reader.u32()
+        relative_offset = reader.u64()
+        descriptors.append((name, dimensions, ggml_type, relative_offset))
+
+    metadata_values = {entry.key: entry.value for entry in metadata}
+    alignment_value = metadata_values.get("general.alignment", DEFAULT_ALIGNMENT)
+    if (
+        not isinstance(alignment_value, int)
+        or isinstance(alignment_value, bool)
+        or not _power_of_two(alignment_value)
+        or not 1 <= alignment_value <= 4096
+    ):
+        raise NativeGgufError("GGUF general.alignment is invalid")
+    data_offset = _align(reader.position, alignment_value)
+    if data_offset > file_size:
+        raise NativeGgufError("GGUF tensor data section is truncated")
 
     tensors: list[GgufTensor] = []
     occupied: list[tuple[int, int, str]] = []
@@ -292,15 +298,7 @@ def parse_gguf(path_value: str | os.PathLike[str]) -> GgufDocument:
                 f"GGUF tensors {left[2]!r} and {right[2]!r} overlap"
             )
 
-    return GgufDocument(
-        path=path,
-        version=version,
-        metadata=tuple(metadata),
-        tensors=tuple(tensors),
-        alignment=alignment_value,
-        data_offset=data_offset,
-        file_sha256=_sha256_file(path),
-    )
+    return version, tuple(metadata), tuple(tensors), alignment_value, data_offset
 
 
 def build_native_gguf_stage(
