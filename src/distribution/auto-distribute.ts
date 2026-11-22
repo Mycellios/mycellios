@@ -49,6 +49,7 @@ import type {
 } from "./types.js";
 import { UNMEASURED_RTT_MS } from "../core/rtt.js";
 import { browserLayerRuntimeEnvironment } from "./process-environment.js";
+import { NATIVE_GGUF_SOURCE_SCHEMA } from "./native-gguf-source.js";
 
 export const AUTO_DISTRIBUTE_SCHEMA = "gdlp-auto-distribute/1";
 export const MODEL_PROFILE_SCHEMA = "gdlp-model-profile/1";
@@ -200,6 +201,17 @@ export const autoDistributionConfigSchema = z
         pythonExecutable: z.string().min(1).max(4_096),
         stagePythonExecutable: z.string().min(1).max(4_096).optional(),
         stagePackageIdentities: z.record(z.string(),z.string().regex(/^sha256:[a-f0-9]{64}$/)).optional(),
+        // Pinned GGUF every node builds its stage from (native-gguf-source.ts);
+        // the launcher validates it again when it compiles the description.
+        nativeGgufSource: z.object({
+          schema: z.literal(NATIVE_GGUF_SOURCE_SCHEMA),
+          artifactUrl: z.string().url().max(2_048),
+          artifactSha256: z.string().regex(/^[0-9a-f]{64}$/),
+          artifactSizeBytes: z.number().int().positive().safe(),
+          tensorManifestUrl: z.string().url().max(2_048),
+          tensorManifestId: z.string().regex(/^[0-9a-f]{64}$/),
+          executor: z.enum(["torch", "llama-cpp"]),
+        }).strict().optional(),
         pythonPath: z.string().min(1).max(4_096).default("python"),
         hfHome: z.string().min(1).max(4_096).default("runtime/hf-cache"),
         apiEndpoint: endpointSchema,
@@ -445,7 +457,9 @@ export function compileAutoDistribution(
   if (phasePlans !== undefined && (!phasePlans.prefill || !phasePlans.decode)) {
     throw new Error("automatic_candidate_requires_both_phases");
   }
-  assertCompatibleProfile(profile);
+  const gguf = config.runtime.nativeGgufSource;
+  if (gguf === undefined) assertCompatibleProfile(profile);
+  else if (profile.source.format !== "gguf") throw new Error("native_gguf_source_requires_gguf_profile");
   const topology = runtimeTopology(config);
   const workload = distributionWorkload(config);
   const request: RuntimePlanRequest = {
@@ -472,7 +486,9 @@ export function compileAutoDistribution(
     returnBindHost: config.runtime.returnBindHost,
     runtimeModel: {
       source: config.model.source,
-      revision: profile.source.snapshotCommit ?? config.model.revision,
+      // A GGUF route's weights are pinned by its manifest; the root loads only
+      // its tokenizer from the source, so no Hub commit names the artifact.
+      revision: gguf ? null : profile.source.snapshotCommit ?? config.model.revision,
       snapshotIdentity,
       artifactIdentity: profile.source.artifactIdentity,
       canonicalSource: profile.source.canonicalSource,
@@ -480,6 +496,7 @@ export function compileAutoDistribution(
     },
     publicModelName: config.model.publicName,
     ...(config.runtime.stagePackageIdentities === undefined ? {} : {stagePackageIdentities: config.runtime.stagePackageIdentities}),
+    ...(gguf === undefined ? {} : { nativeGgufSource: structuredClone(gguf) }),
       pythonExecutable: config.runtime.stagePythonExecutable ?? absoluteFrom(cwd, config.runtime.pythonExecutable),
     threadsPerStage: config.runtime.threadsPerStage,
     ...normalizeTcpWritePolicy(config.runtime),

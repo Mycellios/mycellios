@@ -128,6 +128,7 @@ describe("engine activation authority", () => {
       sizeBytes: 1_055_609_536,
       tensorManifestUrl: "https://github.com/Mycellios/mycellios/releases/download/gguf-manifest/manifest.json",
       tensorManifestId: manifestId,
+      executor: "llama-cpp" as const,
     };
 
     expect(engineActivationAuthoritySchema.parse({ ...resealed, artifact: pin }).artifact).toEqual(pin);
@@ -140,6 +141,11 @@ describe("engine activation authority", () => {
     expect(() => engineActivationAuthoritySchema.parse({
       ...resealed, artifact: { ...pin, tensorManifestUrl: "http://example.com/manifest.json" },
     })).toThrow("gguf_tensor_manifest_url_must_use_https");
+    expect(() => engineActivationAuthoritySchema.parse({
+      ...resealed, artifact: { ...pin, executor: "ollama" },
+    })).toThrow();
+    const { executor: _executor, ...withoutExecutor } = pin;
+    expect(() => engineActivationAuthoritySchema.parse({ ...resealed, artifact: withoutExecutor })).toThrow();
     // Authorities without an artifact keep working unchanged.
     expect(engineActivationAuthoritySchema.parse(authority()).artifact).toBeUndefined();
   });
