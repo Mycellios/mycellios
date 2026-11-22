@@ -52,6 +52,13 @@ jobs:
           APP_BASE_PATH=/agent/ npm run build --workspace @rakazo/web
           cd ../..
           node scripts/prepare-android-web.mjs "$RUNNER_TEMP/android-release"
+      # Only downloaded Maven/Google dependencies are cached; the Gradle
+      # distribution stays hash-pinned below and the APK is always rebuilt.
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ~/.gradle/caches/modules-2
+          key: android-gradle-deps-${{ hashFiles('src/agent/apps/android/**/*.gradle', 'src/agent/apps/android/gradle.properties') }}
+          restore-keys: android-gradle-deps-
       - name: Build and test the native package without exporting its signing key
         run: |
           set -euo pipefail
@@ -62,7 +69,25 @@ jobs:
           mkdir -p src/agent/apps/android/app/src/main/res/drawable
           cp src/agent/apps/web/public/mycellios/app-icon-v2-512.png src/agent/apps/android/app/src/main/res/drawable/ic_mycellios.png
           cd src/agent/apps/android
-          "$RUNNER_TEMP/gradle/gradle-8.13/bin/gradle" testDebugUnitTest assembleRelease --no-daemon --max-workers=2
+          # Maven Central can answer 429/5xx transiently. Gradle retries each
+          # request itself; the whole invocation is repeated (at most 3 attempts)
+          # only when its log shows a repository transport failure. Any other
+          # failure, including tests, stays fatal on the first attempt.
+          gradle_log="$RUNNER_TEMP/android-gradle.log"
+          attempt=1
+          while true; do
+            if "$RUNNER_TEMP/gradle/gradle-8.13/bin/gradle" testDebugUnitTest assembleRelease --no-daemon --max-workers=2 \
+              -Dorg.gradle.internal.repository.max.retries=5 \
+              -Dorg.gradle.internal.repository.initial.backoff=2000 2>&1 | tee "$gradle_log"; then
+              break
+            fi
+            if [ "$attempt" -ge 3 ] || ! grep -Eq 'Received status code (429|5[0-9][0-9]) from server' "$gradle_log"; then
+              exit 1
+            fi
+            echo "::warning::Gradle repository transport failure on attempt $attempt; retrying"
+            sleep $((attempt * 30))
+            attempt=$((attempt + 1))
+          done
           cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/android-release/android-build-input.apk"
           aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
           "$aapt" dump badging "$RUNNER_TEMP/android-release/android-build-input.apk" > "$RUNNER_TEMP/android-release/apk-badging.txt"
