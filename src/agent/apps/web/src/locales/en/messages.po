@@ -14769,3 +14769,27 @@ msgstr "Last {limit} requests by model"
 #: src/pages/Shell.tsx
 msgid "Could not delete the message. Try again."
 msgstr "Could not delete the message. Try again."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Compact now"
+msgstr "Compact now"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Compact this conversation?"
+msgstr "Compact this conversation?"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Context compaction requested."
+msgstr "Context compaction requested."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Could not request compaction. Try again."
+msgstr "Could not request compaction. Try again."
+
+#: src/components/composer/NewChatControl.tsx
+msgid "Requesting…"
+msgstr "Requesting…"
+
+#: src/components/composer/NewChatControl.tsx
+msgid "There are no older messages to compact yet."
+msgstr "There are no older messages to compact yet."
