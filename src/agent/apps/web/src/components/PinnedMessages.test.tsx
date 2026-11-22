@@ -4,7 +4,7 @@ import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import type {RpcClient} from "../lib/rpc";
-vi.mock("@lingui/react/macro",()=>({Trans:({children}:{children:unknown})=>children,useLingui:()=>({t:(strings:TemplateStringsArray)=>strings.join(""),i18n:{locale:"en"}})}));
+vi.mock("@lingui/react/macro",()=>({Trans:({children}:{children:unknown})=>children,useLingui:()=>({t:(strings:TemplateStringsArray,...values:unknown[])=>strings.reduce((text,part,index)=>text+part+(index<values.length?String(values[index]):""),""),i18n:{locale:"en"}})}));
 vi.mock("../lib/general-preferences",()=>({useGeneralPreferences:()=>({compactMessageActions:true})}));
 import {MessagePinsContext,PinnedMessagesButton,useMessagePins} from "./PinnedMessages";
 import {MessageHoverActions} from "../pages/shell/message-hover-actions";
@@ -62,4 +62,59 @@ it("does not read pins before a conversation is available",async()=>{
   const host=document.createElement("div");document.body.append(host);const root=createRoot(host);roots.push(root);
   await act(()=>root.render(<QueryClientProvider client={client}><App/></QueryClientProvider>));
   expect(host.textContent).toBe("0");expect(list).not.toHaveBeenCalled();client.clear();
+});
+
+it("marks a pin the Mico made and lets the person remove it",async()=>{
+  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
+  let pins=[{...pin,pinnedByBotId:"mico",pinnedByName:"Nova"}];
+  const set=vi.fn(async()=>{pins=[];return {ok:true as const};});
+  const rpc={threads:{pinned:vi.fn(async()=>({threadId:"thread",pins})),setPin:set}} as unknown as RpcClient;
+  function App(){const state=useMessagePins(rpc,"owner-space",{botId:"mico"},"thread");return <PinnedMessagesButton state={state} onJump={vi.fn()}/>;}
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);roots.push(root);
+  await act(()=>root.render(<QueryClientProvider client={client}><App/></QueryClientProvider>));
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,10));});
+  await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="Pinned messages"]')!.click());
+  expect(document.querySelector('[data-testid="pinned-by-mico"]')?.textContent).toBe("Pinned by Nova");
+  await act(()=>document.querySelector<HTMLButtonElement>('button[aria-label="Unpin message"]')!.click());
+  expect(set).toHaveBeenCalledWith({botId:"mico",messageId:"message",pinned:false});
+  client.clear();
+});
+
+it("lists pins from all of the Mico's conversations, jumps in place or opens the other conversation",async()=>{
+  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
+  const here={...pin,messageId:"here",preview:"En esta conversación",threadId:"thread",taskThreadId:"thread",conversationTitle:"Borrador",archived:false};
+  const away={...pin,messageId:"away",preview:"Decisión del chat principal",threadId:"main",taskThreadId:null,conversationTitle:"",archived:false,pinnedByBotId:"mico",pinnedByName:"Nova"};
+  const archived={...pin,messageId:"old",preview:"Informe archivado",threadId:"old-thread",taskThreadId:"old-thread",conversationTitle:"",archived:true};
+  let all=[here,away,archived];
+  const micoList=vi.fn(async()=>({pins:all}));
+  const unpin=vi.fn(async()=>{all=all.filter(item=>item.messageId!=="away");return {ok:true as const};});
+  const rpc={threads:{pinned:vi.fn(async()=>({threadId:"thread",pins:[]})),setPin:vi.fn()},pins:{mico:micoList,unpin}} as unknown as RpcClient;
+  const jump=vi.fn(),open=vi.fn();
+  function App(){const state=useMessagePins(rpc,"owner-space",{botId:"mico",taskThreadId:"thread"},"thread");
+    return <PinnedMessagesButton state={state} onJump={jump} mico={{rpc,scope:"owner-space",botId:"mico",name:"Nova",threadId:"thread",onOpen:open}}/>;}
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);roots.push(root);
+  await act(()=>root.render(<QueryClientProvider client={client}><App/></QueryClientProvider>));
+  const openList=async()=>{await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="Pinned messages"]')!.click());};
+  await openList();
+  expect(micoList).not.toHaveBeenCalled();
+  await act(()=>buttons("All of Nova's conversations").click());
+  await vi.waitFor(async()=>{await act(async()=>{});expect(document.body.textContent).toContain("Informe archivado");});
+  expect(micoList).toHaveBeenCalledWith({botId:"mico"});
+  expect(document.body.textContent).toContain("Main chat");
+  expect(document.body.textContent).toContain("Untitled conversation (archived)");
+  expect(document.querySelectorAll('[data-testid="pinned-by-mico"]')).toHaveLength(1);
+  const row=(text:string)=>Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(b=>b.textContent?.includes(text))!;
+  await act(()=>row("En esta conversación").click());
+  expect(jump).toHaveBeenCalledWith("here");expect(open).not.toHaveBeenCalled();
+  await openList();
+  await vi.waitFor(async()=>{await act(async()=>{});expect(document.body.textContent).toContain("Informe archivado");});
+  await act(()=>row("Informe archivado").click());
+  expect(open).toHaveBeenCalledWith(archived);
+  await openList();
+  await vi.waitFor(async()=>{await act(async()=>{});expect(document.body.textContent).toContain("Decisión del chat principal");});
+  const unpinButtons=Array.from(document.querySelectorAll<HTMLButtonElement>('button[aria-label="Unpin message"]'));
+  await act(()=>unpinButtons[1]!.click());
+  expect(unpin).toHaveBeenCalledWith({botId:"mico",threadId:"main",messageId:"away"});
+  await vi.waitFor(async()=>{await act(async()=>{});expect(document.body.textContent).not.toContain("Decisión del chat principal");});
+  client.clear();
 });

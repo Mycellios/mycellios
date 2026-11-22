@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Prisma, PrismaClient } from "./client.js";
-import { historyMessageText, readHistory, searchHistory } from "./history-retrieval.js";
+import type { PrismaClient } from "./client.js";
+import { Prisma } from "./client.js";
+import {
+  historyMessageText,
+  listHistoryConversations,
+  readHistory,
+  searchHistory,
+  searchHistoryAcross,
+} from "./history-retrieval.js";
 
 const scope = { spaceId: "space", userId: "user", threadId: "thread", botId: "bot" };
 const row = (seq: number, text = "Use batch exports") => ({
@@ -20,8 +27,10 @@ function db() {
   };
   return { mock, prisma: mock as unknown as PrismaClient };
 }
+/** A query passed as a Prisma.Sql object or as a tagged template. */
 function sql(mock: ReturnType<typeof db>["mock"], call = 0) {
-  return mock.$queryRaw.mock.calls[call]![0] as Prisma.Sql;
+  const [first, ...values] = mock.$queryRaw.mock.calls[call]!;
+  return Array.isArray(first) ? Prisma.sql(first as unknown as TemplateStringsArray, ...values) : (first as Prisma.Sql);
 }
 describe("local history retrieval", () => {
   it("bounds search excerpts and pages by stable sequence", async () => {
@@ -49,7 +58,7 @@ describe("local history retrieval", () => {
     const historicalScope = { ...scope, searchBeforeSeq: 50 };
     const broad = await searchHistory(prisma, historicalScope, {
       query: " Aurora ",
-      limit: 20,
+      limit: 5,
       beforeSeq: 9999,
       after: "2026-01-01T00:00:00Z",
       before: "2026-01-02T00:00:00Z",
@@ -79,6 +88,16 @@ describe("local history retrieval", () => {
     expect(older.coverage.status).toBe("exhausted");
     expect(sql(mock, 2).values).toContain(3);
     expect(mock.$queryRaw).toHaveBeenCalledTimes(3);
+  });
+  it("returns five matches by default and at most ten, keeping a taskId in the continuation", async () => {
+    const { mock, prisma } = db();
+    mock.$queryRaw.mockResolvedValue(Array.from({ length: 12 }, (_, index) => row(30 - index)));
+    const capped = await searchHistory(prisma, scope, { query: "exports", limit: 20, taskId: "task-thread" });
+    expect(capped.messages).toHaveLength(10);
+    expect(capped.nextSearch).toEqual({ query: "exports", beforeSeq: 21, limit: 10, taskId: "task-thread" });
+    const standard = await searchHistory(prisma, scope, { query: "exports" });
+    expect(standard.messages).toHaveLength(5);
+    expect(standard.nextSearch).toEqual({ query: "exports", beforeSeq: 26, limit: 5 });
   });
   it("bounds Unicode search pages without discarding the continuation or original offsets", async () => {
     const { mock, prisma } = db();
@@ -196,5 +215,119 @@ describe("local history retrieval", () => {
     await expect(searchHistory(prisma, scope, { query: "x", beforeSeq: -1 })).rejects.toThrow();
     await expect(searchHistory(prisma, scope, { query: " " })).rejects.toThrow();
     expect(mock.$queryRaw).not.toHaveBeenCalled();
+  });
+});
+
+const conversation = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  botId: null,
+  taskBotId: "bot",
+  projectKey: "mico:bot",
+  taskKey: `mico-task:bot:${id}`,
+  title: `Title ${id}`,
+  startedBy: "user",
+  outcome: null,
+  archivedAt: null,
+  activityAt: new Date("2026-02-01T00:00:00Z"),
+  activityMs: Date.parse("2026-02-01T00:00:00Z"),
+  activeStatuses: null,
+  ...extra,
+});
+const latest = (threadId: string, role: string, text: string) => ({ ...row(1, text), id: `${threadId}-${role}`, threadId, role });
+
+describe("history across a Mico's conversations", () => {
+  const fence = { spaceId: "space", userId: "user", botId: "bot", currentThreadId: "side-a" };
+  it("lists the main chat and side conversations, open and archived, with previews and a cursor", async () => {
+    const { mock, prisma } = db();
+    mock.$queryRaw
+      .mockResolvedValueOnce([
+        conversation("main", { botId: "bot", taskBotId: null, projectKey: null, taskKey: null, title: null, startedBy: null, activeStatuses: ["running"] }),
+        conversation("side-a", { outcome: "completed" }),
+        conversation("routine-thread", { projectKey: "routine:r", taskKey: "routine:r", startedBy: "routine", archivedAt: new Date("2026-01-20T00:00:00Z") }),
+      ])
+      .mockResolvedValueOnce([
+        latest("main", "user", "Plan the launch"),
+        latest("main", "bot", "x".repeat(500)),
+        latest("side-a", "bot", "Draft ready"),
+      ]);
+    const result = await listHistoryConversations(prisma, fence, { limit: 2 });
+    expect(result.untrusted).toBe(true);
+    expect(result.conversations).toEqual([
+      expect.objectContaining({ taskId: "main", kind: "main", title: "Main chat", current: false, state: "running", startedBy: null, lastRequest: "Plan the launch" }),
+      expect.objectContaining({ taskId: "side-a", kind: "conversation", title: "Title side-a", current: true, archived: false, outcome: "completed", lastRequest: null, lastReply: "Draft ready" }),
+    ]);
+    expect(result.conversations[0]!.lastReply).toBe(`${"x".repeat(400)}…`);
+    expect(result.nextCursor).toBe(`${Date.parse("2026-02-01T00:00:00Z")}~side-a`);
+    const list = sql(mock);
+    for (const fenceSql of ['t."groupId" IS NULL', 't."externalConversationId" IS NULL', 't."deleteAfter" IS NULL', 't."taskBotId" =', 'b."archivedAt" IS NULL'])
+      expect(list.sql).toContain(fenceSql);
+    expect(list.values).toEqual(expect.arrayContaining(["space", "user", "bot", 3]));
+    // Previews come only from after the New chat boundary.
+    expect(sql(mock, 1).sql).toContain('u.seq >= t."contextStartSeq"');
+    expect(sql(mock, 1).sql).toContain('b.seq >= t."contextStartSeq"');
+  });
+  it("continues from a cursor, filters by activity and rejects a malformed cursor before reading", async () => {
+    const { mock, prisma } = db();
+    mock.$queryRaw.mockResolvedValueOnce([conversation("routine-thread", { projectKey: "routine:r", taskKey: "routine:r", startedBy: null, archivedAt: new Date(0) })]).mockResolvedValueOnce([]);
+    const result = await listHistoryConversations(prisma, fence, {
+      cursor: `${Date.parse("2026-02-01T00:00:00Z")}~side-a`,
+      after: "2026-01-01T00:00:00.000Z",
+    });
+    expect(result.conversations[0]).toMatchObject({ kind: "routine", archived: true, state: "closed", startedBy: "routine" });
+    expect(result.nextCursor).toBeNull();
+    expect(sql(mock).sql).toContain('extract(epoch FROM c."activityAt")');
+    expect(sql(mock).values).toContain("side-a");
+    await expect(listHistoryConversations(prisma, fence, { cursor: "nonsense" })).rejects.toThrow("Invalid history cursor");
+    expect(mock.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+  it("searches this conversation first, then the main chat and the newest side conversations, tagging each match", async () => {
+    const { mock, prisma } = db();
+    mock.$queryRaw
+      .mockResolvedValueOnce([
+        conversation("main", { botId: "bot", taskBotId: null, title: null }),
+        conversation("side-b"),
+      ])
+      .mockResolvedValueOnce([conversation("side-a")])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ ...row(7, "launch exports"), id: "main-7" }])
+      .mockResolvedValueOnce([{ ...row(3, "launch exports"), id: "side-b-3" }]);
+    const result = await searchHistoryAcross(
+      prisma,
+      { spaceId: "space", userId: "user", botId: "bot", threadId: "side-a", searchBeforeSeq: 40 },
+      { query: "exports" },
+    );
+    expect(result.messages.map(({ messageId, taskId, conversation }) => ({ messageId, taskId, conversation }))).toEqual([
+      { messageId: "main-7", taskId: "main", conversation: "Main chat" },
+      { messageId: "side-b-3", taskId: "side-b", conversation: "Title side-b" },
+    ]);
+    expect(result.conversations.map(({ taskId, current, status }) => ({ taskId, current, status }))).toEqual([
+      { taskId: "side-a", current: true, status: "exhausted" },
+      { taskId: "main", current: false, status: "exhausted" },
+      { taskId: "side-b", current: false, status: "exhausted" },
+    ]);
+    expect(result.coverage).toEqual({ scope: "this_and_recent_conversations", status: "exhausted" });
+    expect(result.untrusted).toBe(true);
+    // The current request's boundary applies to this conversation only.
+    expect(sql(mock, 2).values).toEqual(expect.arrayContaining(["side-a", 40]));
+    expect(sql(mock, 3).values).toContain("main");
+    expect(sql(mock, 3).values).not.toContain(40);
+    expect(sql(mock, 0).sql).toContain('t."deleteAfter" IS NULL');
+  });
+  it("stops at the limit, marks the rest unsearched and continues inside one conversation", async () => {
+    const { mock, prisma } = db();
+    mock.$queryRaw
+      .mockResolvedValueOnce([conversation("main", { botId: "bot", taskBotId: null }), conversation("side-b")])
+      .mockResolvedValueOnce([conversation("side-a")])
+      .mockResolvedValueOnce([row(9), row(8), row(7)]);
+    const result = await searchHistoryAcross(
+      prisma,
+      { spaceId: "space", userId: "user", botId: "bot", threadId: "side-a" },
+      { query: "exports", limit: 2 },
+    );
+    expect(result.messages.map((message) => message.taskId)).toEqual(["side-a", "side-a"]);
+    expect(result.conversations.map((item) => item.status)).toEqual(["partial", "not_searched", "not_searched"]);
+    expect(result.nextSearch).toEqual({ query: "exports", beforeSeq: 8, limit: 2, taskId: "side-a" });
+    expect(result.coverage.status).toBe("partial");
+    expect(mock.$queryRaw).toHaveBeenCalledTimes(3);
   });
 });

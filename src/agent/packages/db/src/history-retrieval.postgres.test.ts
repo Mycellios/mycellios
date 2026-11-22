@@ -5,7 +5,15 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "./client.js";
 import { PrismaClient } from "./client.js";
-import { readHistory, searchHistory } from "./history-retrieval.js";
+import {
+  isMicoConversation,
+  listHistoryConversations,
+  micoConversationOfMessage,
+  readHistory,
+  readHistoryPage,
+  searchHistory,
+  searchHistoryAcross,
+} from "./history-retrieval.js";
 
 // Temporary synthetic tables shadow product tables. Never inspect existing chat content.
 const enabled = process.env.VERIFY_DATABASE && process.env.DATABASE_URL;
@@ -104,7 +112,7 @@ postgres("history retrieval (PostgreSQL)", () => {
     const broad = await searchHistory(prisma, historicalScope, {
       query: " continuation ",
       beforeSeq: 999999,
-      limit: 20,
+      limit: 5,
       after: "2026-01-01T00:00:00Z",
       before: "2026-01-02T00:00:00Z",
     });
@@ -535,5 +543,74 @@ postgres("history retrieval (PostgreSQL)", () => {
       expect((await readHistory(prisma,scope,{messageId:"m-42"})).messages).toEqual([]);
     } finally { await pool.query('UPDATE threads SET "contextStartSeq"=0'); }
   });
+  it("lists and searches across the Mico's own conversations, each behind its own boundary and fence", async () => {
+    await pool.query(`
+      ALTER TABLE threads ADD COLUMN "externalConversationId" text, ADD COLUMN "deleteAfter" timestamptz,
+        ADD COLUMN "archivedAt" timestamptz, ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+        ADD COLUMN "projectKey" text, ADD COLUMN "taskKey" text, ADD COLUMN title text,
+        ADD COLUMN "startedBy" text, ADD COLUMN outcome text;
+      ALTER TABLE runs ADD COLUMN trigger text NOT NULL DEFAULT 'user';
+      DELETE FROM threads WHERE id IN ('synthetic-task','synthetic-foreign-task');
+      INSERT INTO bots VALUES ('synthetic-other-mico','synthetic-space','synthetic-user',NULL);
+      INSERT INTO threads (id,"spaceId","userId","botId","groupId","contextStartSeq","taskBotId","projectKey","taskKey",title,"startedBy","archivedAt","deleteAfter","externalConversationId") VALUES
+        ('across-open','synthetic-space','synthetic-user',NULL,NULL,0,'synthetic-bot','mico:synthetic-bot','mico-task:synthetic-bot:a','Launch plan','user',NULL,NULL,NULL),
+        ('across-archived','synthetic-space','synthetic-user',NULL,NULL,2,'synthetic-bot','routine:r','routine:r','Daily digest','routine','2026-03-01',NULL,NULL),
+        ('across-deleting','synthetic-space','synthetic-user',NULL,NULL,0,'synthetic-bot','mico:synthetic-bot','mico-task:synthetic-bot:d','Going away','user',NULL,'2026-12-01',NULL),
+        ('across-other-mico','synthetic-space','synthetic-user','synthetic-other-mico',NULL,0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
+        ('across-group','synthetic-space','synthetic-user',NULL,'synthetic-group',0,'synthetic-bot',NULL,NULL,NULL,NULL,NULL,NULL,NULL),
+        ('across-outside','synthetic-space','synthetic-user',NULL,NULL,0,'synthetic-bot',NULL,NULL,NULL,NULL,NULL,NULL,'outside-chat'),
+        ('across-foreign-owner','synthetic-space','someone-else',NULL,NULL,0,'synthetic-bot',NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+      INSERT INTO messages VALUES
+        ('open-1','across-open',0,'user',NULL,NULL,'2030-03-02T00:00:00Z','[{"kind":"text","text":"Prepare the heron checklist"}]'),
+        ('open-2','across-open',1,'bot',NULL,NULL,'2030-03-02T00:01:00Z','[{"kind":"text","text":"Heron checklist drafted"}]'),
+        ('archived-0','across-archived',0,'user',NULL,NULL,'2030-02-01T00:00:00Z','[{"kind":"text","text":"heron before the reset"}]'),
+        ('archived-3','across-archived',3,'bot',NULL,NULL,'2030-02-02T00:00:00Z','[{"kind":"text","text":"heron digest after the reset"}]'),
+        ('deleting-0','across-deleting',0,'user',NULL,NULL,'2030-04-01T00:00:00Z','[{"kind":"text","text":"heron deleting"}]'),
+        ('other-0','across-other-mico',0,'user',NULL,NULL,'2030-04-01T00:00:00Z','[{"kind":"text","text":"heron other mico"}]'),
+        ('group-0','across-group',0,'user',NULL,NULL,'2030-04-01T00:00:00Z','[{"kind":"text","text":"heron group"}]'),
+        ('outside-0','across-outside',0,'user',NULL,NULL,'2030-04-01T00:00:00Z','[{"kind":"text","text":"heron outside"}]'),
+        ('foreign-0','across-foreign-owner',0,'user',NULL,NULL,'2030-04-01T00:00:00Z','[{"kind":"text","text":"heron foreign"}]');
+      INSERT INTO runs (id,"spaceId","userId","threadId","botId","sourceMessageId",status,"createdAt",trigger) VALUES
+        ('across-running','synthetic-space','synthetic-user','across-open','synthetic-bot','open-1','running',now(),'user');`);
+    const fence = { spaceId: scope.spaceId, userId: scope.userId, botId: scope.botId };
+    const ids = (result: { messages: Array<{ messageId: string }> }) => result.messages.map((message) => message.messageId);
+    // The Mico's main chat and side conversations only: never another Mico, a group, an outside chat,
+    // another owner or a conversation being deleted.
+    for (const [threadId, own] of [
+      ["synthetic-thread", true], ["across-open", true], ["across-archived", true], ["across-deleting", false],
+      ["across-other-mico", false], ["across-group", false], ["across-outside", false], ["across-foreign-owner", false],
+    ] as const)
+      expect(await isMicoConversation(prisma, fence, threadId), threadId).toBe(own);
+    expect(await micoConversationOfMessage(prisma, fence, "open-2")).toBe("across-open");
+    expect(await micoConversationOfMessage(prisma, fence, "archived-0")).toBeNull();
+    expect(await micoConversationOfMessage(prisma, fence, "group-0")).toBeNull();
 
+    // Newest activity first; the side conversations here are dated after the main chat.
+    const first = await listHistoryConversations(prisma, { ...fence, currentThreadId: "across-open" }, { limit: 1 });
+    expect(first.conversations).toEqual([
+      expect.objectContaining({ taskId: "across-open", kind: "conversation", title: "Launch plan", current: true, state: "running", lastRequest: "Prepare the heron checklist", lastReply: "Heron checklist drafted" }),
+    ]);
+    const rest = await listHistoryConversations(prisma, { ...fence, currentThreadId: "across-open" }, { cursor: first.nextCursor! });
+    expect(rest.conversations).toEqual([
+      expect.objectContaining({ taskId: "across-archived", kind: "routine", archived: true, state: "closed", lastRequest: null, lastReply: "heron digest after the reset" }),
+      expect.objectContaining({ taskId: "synthetic-thread", kind: "main", title: "Main chat", current: false }),
+    ]);
+    expect(rest.nextCursor).toBeNull();
+    const recent = await listHistoryConversations(prisma, { ...fence, currentThreadId: "across-open" }, { after: "2030-03-01" });
+    expect(recent.conversations.map((item) => item.taskId)).toEqual(["across-open"]);
+
+    const across = await searchHistoryAcross(prisma, { ...scope, threadId: "across-archived" }, { query: "heron", limit: 10 });
+    expect(across.messages.map((message) => [message.messageId, message.taskId])).toEqual([
+      ["archived-3", "across-archived"],
+      ["open-2", "across-open"],
+      ["open-1", "across-open"],
+    ]);
+    expect(across.conversations.map((item) => [item.taskId, item.status])).toEqual([
+      ["across-archived", "exhausted"],
+      ["synthetic-thread", "exhausted"],
+      ["across-open", "exhausted"],
+    ]);
+    expect(across.coverage.status).toBe("exhausted");
+    expect(ids(await readHistoryPage(prisma, { ...scope, threadId: "across-archived" }, {}))).toEqual(["archived-3"]);
+  });
 });

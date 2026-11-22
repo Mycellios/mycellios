@@ -417,14 +417,21 @@
   Side-question generations are ephemeral: meter usage, but do not write a chat
   message or a Pi session transcript. Verify scoped pane/composer/API tests.
 
-- Pinned messages are personal per account/Space/exact thread. Store references,
-  not copied message text; preserve encrypted reads and transcript visibility.
-  Resolve the thread and message before writes. Header pins use existing jump
-  paging; message menus and touch actions share MessagePinsContext. Unpin never
-  deletes history or starts inference. Check message-pins API/UI tests and
-  `node --import tsx scripts/verify-message-pins-db.ts` for the real migration,
-  isolation, FK cleanup and concurrent limits; see specs/agent-message-pins/spec.md
-  at the repository root. Never activate its migration outside an authorized scope.
+- Pinned messages are personal per account/Space/exact thread, or pinned for that
+  person by their own Mico with pin_message in its own main chat or side conversation
+  (`pinnedByBotId`, shown as "Pinned by {Mico}"; never in groups or outside chats).
+  Mico pins count toward the same 100 per conversation under the same lock; the person
+  can unpin them or adopt them by pinning, and a Mico never unpins the person's pin.
+  Store references, not copied message text; preserve encrypted reads and transcript
+  visibility. Resolve the thread and message before writes. Header pins use existing
+  jump paging; message menus and touch actions share MessagePinsContext. The pins
+  popover (phone too) also lists all of a Mico's conversations (pins.mico, newest 200,
+  each with its conversation); opening another one restores it if archived, then jumps,
+  and says so when the message is gone. Unpin never deletes history or starts inference.
+  Check message-pins API/UI tests and `node --import tsx scripts/verify-message-pins-db.ts`
+  for the real migrations, isolation, Mico pins, the combined list, FK cleanup and
+  concurrent limits; see specs/agent-message-pins/spec.md at the repository root.
+  Never activate its migrations outside an authorized scope.
 
 - Mico task conversations use MicoTaskTabs: one Mico keeps independent named
   conversations behind the compact + action and the Conversations picker.
@@ -441,9 +448,18 @@
   hides deleting ones, and offers rename, archive and delete only for the person's
   conversations and the ones their Mico started. A task tab marks its own thread read once that
   task's snapshot has loaded (never on hover) and never clears the main chat's dot.
-  search_history/read_history read the run's own thread, including a Mico's side
-  thread, or by taskId (main chat or routine thread) a conversation the Mico opened,
-  under the same owner/Space/unarchived-Mico fence; results stay untrusted.
+  search_history/read_history (core history-access, adapters history-tools) read the
+  run's own thread. From the Mico's main chat or an ordinary side conversation they also
+  list its conversations without a query (main chat and side conversations, archived
+  too, never deleting ones; kind, state, outcome, request/reply previews, cursor),
+  search this conversation first, then the main chat and the 8 newest side ones (each
+  match tagged with taskId; 5 results, at most 10) and read any of them by taskId.
+  Routine threads read only tasks the Mico opened; delegated/project threads, groups,
+  outside chats, routines, webhooks and background work stay on their own thread. Same
+  owner/Space/unarchived-Mico fence and per-thread New chat boundary; results stay
+  untrusted. Sidebar search also returns side-conversation messages (opening ?task=)
+  with kind filters, and each chat has an in-chat search (threads.searchMessages); both
+  keep blind-index token matching for encrypted messages.
   The + (also Ctrl/Cmd+Shift+O, the picker and the Mico's sidebar menu) opens a draft
   tab (`?draft=1`, no thread): its composer keeps unsent text per Mico under
   `bot:<id>:new-conversation`, and its first message creates the conversation with the

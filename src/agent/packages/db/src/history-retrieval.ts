@@ -1,5 +1,17 @@
 import { createHash } from "node:crypto";
 import type { HistoryReadInput, HistorySearchInput } from "@mycellios/contracts";
+import {
+  ACTIVE_RUN_STATUSES,
+  BACKGROUND_RUN_TRIGGERS,
+  deriveThreadState,
+  HISTORY_REPLY_PREVIEW_CHARACTERS,
+  HISTORY_REQUEST_PREVIEW_CHARACTERS,
+  HISTORY_RESULT_LIMIT,
+  HISTORY_RESULT_MAX,
+  HISTORY_SIDE_CONVERSATIONS_SEARCHED,
+  taskThreadKind,
+  threadStartedByForKind,
+} from "@mycellios/core";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
 import { searchTerms } from "./content-crypto.js";
@@ -20,6 +32,7 @@ export interface HistoryScope {
 }
 interface HistoryRow {
   id: string;
+  threadId?: string;
   seq: number;
   role: string;
   runId: string | null;
@@ -153,16 +166,24 @@ function reference(row: HistoryRow, query = "", maxLength = 800, textOffset = 0)
   };
 }
 
-/** Blind-index (or full-text) search, descending sequence cursor, at most five excerpts. */
+function resultLimit(value: number | undefined) {
+  return Math.min(pageSize(value ?? HISTORY_RESULT_LIMIT), HISTORY_RESULT_MAX);
+}
+
+/**
+ * Blind-index (or full-text) search in one conversation, descending sequence cursor, five
+ * excerpts by default and at most ten. A taskId in the input is kept in nextSearch, so the
+ * continuation stays in that conversation.
+ */
 export async function searchHistory(
   prisma: PrismaClient,
   scope: HistoryScope,
   input: HistorySearchInput,
 ) {
-  const query = input.query.trim();
+  const query = input.query?.trim() ?? "";
   if (!query || query.length > 500)
     throw new Error("History query must contain 1 to 500 characters");
-  const limit = Math.min(pageSize(input.limit), 5);
+  const limit = resultLimit(input.limit);
   const before = date(input.before);
   const after = date(input.after);
   if (
@@ -239,7 +260,274 @@ export async function searchHistory(
             limit,
             ...(input.after !== undefined ? { after: input.after } : {}),
             ...(input.before !== undefined ? { before: input.before } : {}),
+            ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
           },
+  });
+}
+
+/** The Mico and owner a cross-conversation read is fenced to; only the executor supplies it. */
+export interface HistoryFence {
+  spaceId: string;
+  userId: string;
+  botId: string;
+}
+
+/**
+ * One of the Mico's own conversations: its main chat or one of its side conversations (opened
+ * by the person, by the Mico, a routine or delegated work), for this owner and Space, with an
+ * unarchived owned Mico. Groups, outside messaging chats and conversations being deleted are not.
+ */
+function micoConversation(fence: HistoryFence): Prisma.Sql {
+  return Prisma.sql`
+    t."spaceId" = ${fence.spaceId} AND t."userId" = ${fence.userId}
+    AND t."groupId" IS NULL AND t."externalConversationId" IS NULL AND t."deleteAfter" IS NULL
+    AND (t."botId" = ${fence.botId} OR (t."botId" IS NULL AND t."taskBotId" = ${fence.botId}))
+    AND EXISTS (SELECT 1 FROM bots b WHERE b.id = ${fence.botId}
+      AND b."spaceId" = ${fence.spaceId} AND b."userId" = ${fence.userId} AND b."archivedAt" IS NULL)`;
+}
+
+/** True when the thread is one of this Mico's own conversations (see micoConversation). */
+export async function isMicoConversation(
+  prisma: Pick<PrismaClient, "$queryRaw">,
+  fence: HistoryFence,
+  threadId: string,
+): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT t.id FROM threads t WHERE t.id = ${threadId} AND ${micoConversation(fence)}`;
+  return rows.length > 0;
+}
+
+/** The conversation a message of this Mico belongs to, when it is one of its own. */
+export async function micoConversationOfMessage(
+  prisma: Pick<PrismaClient, "$queryRaw">,
+  fence: HistoryFence,
+  messageId: string,
+): Promise<string | null> {
+  const [row] = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT t.id FROM messages m JOIN threads t ON t.id = m."threadId"
+    WHERE m.id = ${messageId} AND m.seq >= t."contextStartSeq" AND ${micoConversation(fence)}`;
+  return row?.id ?? null;
+}
+
+interface ConversationRow {
+  id: string;
+  botId: string | null;
+  taskBotId: string | null;
+  projectKey: string | null;
+  taskKey: string | null;
+  title: string | null;
+  startedBy: string | null;
+  outcome: string | null;
+  archivedAt: Date | null;
+  activityAt: Date;
+  /** activityAt in epoch milliseconds, computed by the database for the cursor. */
+  activityMs?: number;
+  activeStatuses: string[] | null;
+}
+
+const ACTIVE = Prisma.join([...ACTIVE_RUN_STATUSES]);
+const BACKGROUND = Prisma.join([...BACKGROUND_RUN_TRIGGERS]);
+const conversationColumns = Prisma.sql`t.id, t."botId", t."taskBotId", t."projectKey", t."taskKey", t.title,
+  t."startedBy", t.outcome, t."archivedAt",
+  GREATEST(t."createdAt", COALESCE(last."createdAt", t."createdAt")) AS "activityAt"`;
+const lastMessage = Prisma.sql`LEFT JOIN LATERAL (
+    SELECT "createdAt" FROM messages WHERE "threadId" = t.id ORDER BY seq DESC LIMIT 1
+  ) last ON true`;
+
+function conversationLabel(row: Pick<ConversationRow, "botId" | "taskBotId" | "projectKey" | "taskKey" | "title">) {
+  const kind = row.botId ? ("main" as const) : taskThreadKind(row);
+  return { kind, title: row.botId ? "Main chat" : row.title?.trim() || "Untitled conversation" };
+}
+
+// The cursor holds the last activity in epoch milliseconds as the database computes it, so
+// it compares the same way whatever the column type or the session time zone.
+function encodeCursor(row: ConversationRow) {
+  return `${row.activityMs ?? row.activityAt.getTime()}~${row.id}`;
+}
+function decodeCursor(cursor: string | undefined) {
+  if (cursor === undefined) return undefined;
+  const at = cursor.indexOf("~");
+  const ms = Number(cursor.slice(0, at));
+  const id = cursor.slice(at + 1);
+  if (at < 1 || !id || !Number.isSafeInteger(ms) || ms < 0) throw new Error("Invalid history cursor");
+  return { ms, id };
+}
+const activityMs = Prisma.sql`round(extract(epoch FROM c."activityAt") * 1000)::float8`;
+function preview(text: string, characters: number) {
+  const chars = Array.from(text.replace(/\s+/g, " ").trim());
+  return chars.length > characters ? `${chars.slice(0, characters).join("")}…` : chars.join("");
+}
+
+/**
+ * The Mico's main chat and its side conversations (open and archived), newest activity first,
+ * with kind, state, outcome and the latest request and reply after the New chat boundary.
+ * Five per page by default, at most ten; nextCursor continues the listing.
+ */
+export async function listHistoryConversations(
+  prisma: PrismaClient,
+  fence: HistoryFence & { currentThreadId: string },
+  input: Pick<HistorySearchInput, "after" | "cursor" | "limit">,
+) {
+  const limit = resultLimit(input.limit);
+  const after = date(input.after);
+  const cursor = decodeCursor(input.cursor);
+  const rows = await prisma.$queryRaw<ConversationRow[]>`
+    SELECT c.*, ${activityMs} AS "activityMs" FROM (
+      SELECT ${conversationColumns}, active.statuses AS "activeStatuses"
+      FROM threads t
+      ${lastMessage}
+      LEFT JOIN LATERAL (
+        SELECT array_agg(DISTINCT r.status) AS statuses FROM runs r
+        WHERE r."threadId" = t.id AND r.status IN (${ACTIVE})
+          AND (r."trigger" NOT IN (${BACKGROUND}) OR r.status IN ('waiting_input', 'waiting_takeover'))
+      ) active ON true
+      WHERE ${micoConversation(fence)}
+    ) c
+    WHERE true
+      ${after ? Prisma.sql`AND c."activityAt" >= ${after}` : Prisma.empty}
+      ${cursor ? Prisma.sql`AND (${activityMs}, c.id) < (${cursor.ms}::float8, ${cursor.id}::text)` : Prisma.empty}
+    ORDER BY c."activityAt" DESC, c.id DESC LIMIT ${limit + 1}`;
+  const page = rows.slice(0, limit);
+  const latest = page.length
+    ? await messageRows(
+        prisma,
+        Prisma.sql`
+    SELECT ${columns} FROM threads t
+    CROSS JOIN LATERAL (
+      (SELECT * FROM messages u WHERE u."threadId" = t.id AND u.role = 'user' AND u.seq >= t."contextStartSeq"
+        ORDER BY u.seq DESC LIMIT 1)
+      UNION ALL
+      (SELECT * FROM messages b WHERE b."threadId" = t.id AND b.role = 'bot' AND b.seq >= t."contextStartSeq"
+        ORDER BY b.seq DESC LIMIT 1)
+    ) m
+    WHERE t.id IN (${Prisma.join(page.map((row) => row.id))}) AND ${micoConversation(fence)}`,
+      )
+    : [];
+  const text = (threadId: string, role: string, characters: number) => {
+    const row = latest.find((message) => message.threadId === threadId && message.role === role);
+    const value = row ? historyMessageText(row.blocks) : "";
+    return value ? preview(value, characters) : null;
+  };
+  const conversations = page.map((row) => {
+    const { kind, title } = conversationLabel(row);
+    return {
+      taskId: row.id,
+      kind,
+      title,
+      current: row.id === fence.currentThreadId,
+      archived: Boolean(row.archivedAt),
+      state: deriveThreadState({ archivedAt: row.archivedAt, activeRunStatuses: row.activeStatuses ?? [] }),
+      outcome: row.outcome,
+      startedBy: kind === "main" ? null : (row.startedBy ?? threadStartedByForKind(kind)),
+      lastActivityAt: row.activityAt.toISOString(),
+      lastRequest: text(row.id, "user", HISTORY_REQUEST_PREVIEW_CHARACTERS),
+      lastReply: text(row.id, "bot", HISTORY_REPLY_PREVIEW_CHARACTERS),
+    };
+  });
+  const response = {
+    untrusted: true as const,
+    conversations,
+    nextCursor: rows.length > limit ? encodeCursor(page.at(-1)!) : null,
+  };
+  // Keep the page within the same budget as other history results.
+  while (Buffer.byteLength(JSON.stringify(response), "utf8") > MAX_RESPONSE_BYTES) {
+    const longest = conversations
+      .flatMap((item) => [
+        { item, field: "lastReply" as const },
+        { item, field: "lastRequest" as const },
+      ])
+      .reduce<{ item: (typeof conversations)[number]; field: "lastReply" | "lastRequest" } | undefined>(
+        (best, entry) =>
+          (entry.item[entry.field]?.length ?? 0) > (best ? (best.item[best.field]?.length ?? 0) : 0) ? entry : best,
+        undefined,
+      );
+    const value = longest?.item[longest.field];
+    if (!longest || !value || value.length < 2) throw new Error("History metadata exceeds response budget");
+    longest.item[longest.field] = `${Array.from(value).slice(0, Math.floor(Array.from(value).length / 2)).join("")}…`;
+  }
+  return response;
+}
+
+/**
+ * Searches this conversation first, then the Mico's main chat and its newest side conversations,
+ * and tags each match with its taskId. Five matches by default, at most ten. Each conversation
+ * keeps its own boundary; nextSearch continues the first conversation that has more matches.
+ */
+export async function searchHistoryAcross(
+  prisma: PrismaClient,
+  scope: HistoryScope,
+  input: HistorySearchInput,
+) {
+  const query = input.query?.trim() ?? "";
+  if (!query || query.length > 500)
+    throw new Error("History query must contain 1 to 500 characters");
+  const limit = resultLimit(input.limit);
+  const fence = { spaceId: scope.spaceId, userId: scope.userId, botId: scope.botId };
+  const others = await prisma.$queryRaw<ConversationRow[]>`
+    SELECT * FROM (
+      SELECT ${conversationColumns}, NULL AS "activeStatuses"
+      FROM threads t
+      ${lastMessage}
+      WHERE ${micoConversation(fence)} AND t.id <> ${scope.threadId}
+    ) c
+    ORDER BY (c."botId" IS NOT NULL) DESC, c."activityAt" DESC, c.id DESC
+    LIMIT ${HISTORY_SIDE_CONVERSATIONS_SEARCHED + 1}`;
+  const [current] = await prisma.$queryRaw<ConversationRow[]>`
+    SELECT ${conversationColumns}, NULL AS "activeStatuses"
+    FROM threads t ${lastMessage}
+    WHERE t.id = ${scope.threadId} AND ${micoConversation(fence)}`;
+  // A main chat is listed first among the others; keep at most eight side conversations.
+  const main = others.filter((row) => row.botId);
+  const sides = others.filter((row) => !row.botId).slice(0, HISTORY_SIDE_CONVERSATIONS_SEARCHED);
+  const targets = [...(current ? [current] : []), ...main, ...sides];
+  const messages: Array<ReturnType<typeof reference> & { taskId: string; conversation: string }> = [];
+  const conversations: Array<{
+    taskId: string;
+    kind: ReturnType<typeof conversationLabel>["kind"];
+    title: string;
+    current: boolean;
+    status: "exhausted" | "partial" | "not_searched";
+  }> = [];
+  let nextSearch: Record<string, unknown> | null = null;
+  for (const target of targets) {
+    const label = conversationLabel(target);
+    const isCurrent = target.id === scope.threadId;
+    const entry = { taskId: target.id, ...label, current: isCurrent };
+    if (messages.length >= limit) {
+      conversations.push({ ...entry, status: "not_searched" });
+      continue;
+    }
+    const result = await searchHistory(
+      prisma,
+      isCurrent ? scope : { spaceId: scope.spaceId, userId: scope.userId, botId: scope.botId, threadId: target.id },
+      {
+        query,
+        limit: limit - messages.length,
+        ...(input.after !== undefined ? { after: input.after } : {}),
+        ...(input.before !== undefined ? { before: input.before } : {}),
+        taskId: target.id,
+      },
+    );
+    for (const message of result.messages) messages.push({ ...message, taskId: target.id, conversation: label.title });
+    conversations.push({ ...entry, status: result.coverage.status });
+    if (!nextSearch && result.nextSearch) nextSearch = result.nextSearch;
+  }
+  // Older side conversations past the newest eight were not searched.
+  const moreConversations = others.filter((row) => !row.botId).length > HISTORY_SIDE_CONVERSATIONS_SEARCHED;
+  const exhausted = !moreConversations && conversations.every((item) => item.status === "exhausted");
+  return bounded({
+    untrusted: true as const,
+    query,
+    coverage: {
+      scope: "this_and_recent_conversations" as const,
+      status: exhausted ? ("exhausted" as const) : ("partial" as const),
+    },
+    messages,
+    conversations,
+    nextSearch,
+    ...(exhausted
+      ? {}
+      : { note: "Search one conversation with its taskId, or list older ones with search_history without a query." }),
   });
 }
 

@@ -13,6 +13,8 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "read_file",
   "read_history",
   "search_history",
+  // A pin the person sees and can remove; nothing leaves the account/Space.
+  "pin_message",
   "write_file",
   "edit_file",
   "shell",
@@ -212,6 +214,7 @@ const OWN_STATE_RESULT_TOOLS = new Set([
   "list_secrets",
   "message_task",
   "message_user",
+  "pin_message",
   "read_history",
   "recall_memory",
   "search_local_memory",

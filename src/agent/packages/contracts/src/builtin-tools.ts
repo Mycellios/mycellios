@@ -60,6 +60,7 @@ export const BUILTIN_TOOL_NAMES = [
   "cloud_agent_cancel",
   "search_history",
   "read_history",
+  "pin_message",
   "save_memory",
   "recall_memory",
   "search_local_memory",

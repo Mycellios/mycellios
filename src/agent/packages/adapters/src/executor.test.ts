@@ -6,7 +6,7 @@ import {
   cloudflareModelConfigMessage,
   FLEET_TOOL_NAMES,
 } from "@mycellios/contracts";
-import { ONCE_ROUTINE_CRON } from "@mycellios/core";
+import { HISTORY_ACROSS_GUIDANCE, ONCE_ROUTINE_CRON, PIN_MESSAGE_GUIDANCE } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
 import { RunHistoryWriteError } from "@mycellios/db";
 import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
@@ -1372,6 +1372,7 @@ describe("userTurnInstructions", () => {
 
     expect(instructions).toEqual([
       "Bot instructions",
+      PIN_MESSAGE_GUIDANCE,
       computerLine,
       "This entire computer workspace is your private home.",
       "Agent environment",
@@ -1407,6 +1408,7 @@ describe("userTurnInstructions", () => {
 
     expect(instructions).toEqual([
       "Bot instructions",
+      PIN_MESSAGE_GUIDANCE,
       computerLine,
       "This entire computer workspace is your private home.",
       ...stableMiddle,
@@ -1435,6 +1437,7 @@ describe("userTurnInstructions", () => {
 
     expect(instructions).toEqual([
       "Bot instructions",
+      PIN_MESSAGE_GUIDANCE,
       computerLine,
       "Catalog guidance",
       "This entire computer workspace is your private home.",
@@ -1442,6 +1445,33 @@ describe("userTurnInstructions", () => {
       archiveBot,
       ...stableTail,
     ]);
+  });
+
+  it("adds the cross-conversation history guidance only where history reaches across, and pin guidance only when pin_message is offered", () => {
+    const empty = {
+      ...base,
+      groupContext: undefined,
+      messagingContext: undefined,
+      redactedMemoryContext: undefined,
+      redactedScratchpadContext: undefined,
+      hasHistoricalContext: false,
+      agentEnvironmentInstruction: undefined,
+      botDirectory: undefined,
+      pluginLine: undefined,
+      agentSkillsLine: undefined,
+      taughtSkillsLine: undefined,
+    };
+    const text = (parts: Partial<Parameters<typeof userTurnInstructions>[0]>) =>
+      userTurnInstructions({ ...empty, ...parts }).filter(Boolean).join("\n\n");
+    const across = text({ historyRetrievalEnabled: true, historyAcross: true });
+    expect(across).toContain(HISTORY_ACROSS_GUIDANCE);
+    expect(across).toContain(PIN_MESSAGE_GUIDANCE);
+    expect(text({ historyRetrievalEnabled: true })).not.toContain(HISTORY_ACROSS_GUIDANCE);
+    expect(text({ historyRetrievalEnabled: false, historyAcross: true })).not.toContain(HISTORY_ACROSS_GUIDANCE);
+    expect(
+      text({ historyRetrievalEnabled: true, historyAcross: true, disabledBuiltinTools: new Set(["search_history"]) }),
+    ).not.toContain(HISTORY_ACROSS_GUIDANCE);
+    expect(text({ disabledBuiltinTools: new Set(["pin_message"]) })).not.toContain(PIN_MESSAGE_GUIDANCE);
   });
 
   it("omits paired history guidance when either history tool is disabled", () => {

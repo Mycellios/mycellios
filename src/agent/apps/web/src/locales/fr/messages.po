@@ -6619,3 +6619,84 @@ msgstr "{count, plural, one {# exécution précédente a été regroupée avec c
 #: src/lib/routine-paused-label.ts
 msgid "Paused by its {time} run"
 msgstr "Mise en pause par son exécution de {time}"
+
+#: src/components/PinnedMessages.tsx
+msgid "Show pins from"
+msgstr "Afficher les messages épinglés de"
+
+#: src/components/PinnedMessages.tsx
+msgid "This conversation"
+msgstr "Cette conversation"
+
+#: src/components/PinnedMessages.tsx
+msgid "All of {name}'s conversations"
+msgstr "Toutes les conversations de {name}"
+
+#: src/components/PinnedMessages.tsx
+msgid "{title} (archived)"
+msgstr "{title} (archivée)"
+
+#: src/components/PinnedMessages.tsx
+msgid "No pinned messages in {name}'s conversations yet."
+msgstr "Aucun message épinglé dans les conversations de {name} pour le moment."
+
+#: src/components/PinnedMessages.tsx
+msgid "Showing the newest 200 pins."
+msgstr "Affichage des 200 messages épinglés les plus récents."
+
+#: src/components/PinnedMessages.tsx
+#: src/pages/SpaceSearch.tsx
+msgid "Untitled conversation"
+msgstr "Conversation sans titre"
+
+#: src/components/PinnedMessages.tsx
+msgid "Main chat"
+msgstr "Chat principal"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by {byName}"
+msgstr "Épinglé par {byName}"
+
+#: src/components/PinnedMessages.tsx
+msgid "Pinned by your Mico"
+msgstr "Épinglé par votre Mico"
+
+#: src/components/ChatSearch.tsx
+msgid "Search messages"
+msgstr "Rechercher des messages"
+
+#: src/components/ChatSearch.tsx
+msgid "Previous match"
+msgstr "Résultat précédent"
+
+#: src/components/ChatSearch.tsx
+msgid "Next match"
+msgstr "Résultat suivant"
+
+#: src/components/ChatSearch.tsx
+msgid "Type to search this conversation."
+msgstr "Saisissez du texte pour rechercher dans cette conversation."
+
+#: src/components/ChatSearch.tsx
+msgid "Could not search this conversation."
+msgstr "Impossible de rechercher dans cette conversation."
+
+#: src/components/ChatSearch.tsx
+msgid "No messages match."
+msgstr "Aucun message ne correspond."
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}+"
+msgstr "{current} sur {count}+"
+
+#: src/components/ChatSearch.tsx
+msgid "{current} of {count}"
+msgstr "{current} sur {count}"
+
+#: src/pages/Shell.tsx
+msgid "That message is no longer in this conversation."
+msgstr "Ce message ne figure plus dans cette conversation."
+
+#: src/pages/Shell.tsx
+msgid "The pinned message could not be opened."
+msgstr "Impossible d'ouvrir le message épinglé."

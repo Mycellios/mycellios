@@ -27,7 +27,9 @@ import type {
   Me,
   MessageReaction,
   ProductEvent,
+  MicoMessagePin,
   Routine,
+  SearchFilter,
   SearchHit,
   Space,
   SpaceMemoryConfig,
@@ -236,6 +238,7 @@ import {
 } from "../lib/thread-tabs";
 import { sendFirstMessage } from "../lib/new-conversation";
 import { MessagePinsContext, PinnedMessagesButton, useMessagePins } from "../components/PinnedMessages";
+import { ChatSearchButton } from "../components/ChatSearch";
 import { LocalProject } from "../components/LocalProject";
 import { MicoWorkMenu } from "../components/MicoWorkMenu";
 import { WorkflowWorkspace } from "./workflows/WorkflowWorkspace";
@@ -513,6 +516,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const [query, setQuery] = useState("");
   const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [snapshot, setSnapshot] = useState<ThreadSnapshot | null>(() => {
     const thread = seed?.thread;
     if (!thread || (taskScope && thread.threadId !== taskScope.taskThreadId)) return null;
@@ -2251,7 +2255,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const timer = window.setTimeout(() => {
       setSearchLoading(true);
       void rpc.search
-        .query({ q: spaceQuery })
+        .query({ q: spaceQuery, ...(searchFilter === "all" ? {} : { filter: searchFilter }) })
         .then((result) => {
           if (!abort.signal.aborted) setSearchHits(result.hits);
         })
@@ -2266,12 +2270,14 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       abort.abort();
       window.clearTimeout(timer);
     };
-  }, [showSpaceSearch, spaceQuery]);
+  }, [showSpaceSearch, spaceQuery, searchFilter]);
 
   async function jumpToSearchHit(hit: SearchHit) {
     setQuery("");
     setSearchHits([]);
     const params = new URLSearchParams();
+    // A message in one of the Mico's side conversations opens that conversation.
+    if (hit.botId && hit.taskThreadId) params.set("task", hit.taskThreadId);
     if (hit.messageId) params.set("m", hit.messageId);
     if (hit.routineId) params.set("routine", hit.routineId);
     navigate({
@@ -2280,7 +2286,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     });
   }
 
-  async function jumpToMessage(target: { botId?: string; groupId?: string; messageId: string }) {
+  /** "missing" when the conversation no longer has the message; "stale" when a newer jump or switch won. */
+  async function jumpToMessage(target: { botId?: string; groupId?: string; messageId: string }): Promise<"found" | "missing" | "stale"> {
     const threadTarget = searchHitThreadTarget(target);
     const epoch = historyEpoch.current;
     jumpGeneration.current += 1;
@@ -2292,9 +2299,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     // The epoch check drops a jump that raced a conversation clear (or a bot switch): applying
     // the fetched page would pin deleted messages that every later refresh keeps restoring.
     // jumpId drops an older jump that finished after a newer click.
-    if (epoch !== historyEpoch.current || jumpId !== jumpGeneration.current) return;
-    if (target.groupId && activeGroupId.current !== target.groupId) return;
-    if (target.botId && activeBotId.current !== target.botId) return;
+    if (epoch !== historyEpoch.current || jumpId !== jumpGeneration.current) return "stale";
+    if (target.groupId && activeGroupId.current !== target.groupId) return "stale";
+    if (target.botId && activeBotId.current !== target.botId) return "stale";
     // A reply folded under its peer marker counts: the transcript expands the marker to show it.
     const pageTranscript = foldPeerReplies(page.messages, { includePeerReceipts: true });
     // A relay's dropped marker (e.g. a search hit) lands on its "Messaged X" receipt.
@@ -2351,7 +2358,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         }
       });
     }
+    return targetInPage ? "found" : "missing";
   }
+  /** A jump from a link (search, pin, notification) says so when the message is gone. */
+  const reportMissingJump = (result: "found" | "missing" | "stale") => {
+    if (result === "missing") toast.error(t`That message is no longer in this conversation.`);
+  };
 
   // The routine panel copies a routine's data into local draft state at click time
   // rather than deriving it from `active`, so it goes stale across a bot switch —
@@ -2365,7 +2377,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const messageId = searchParams.get("m");
     const routineId = searchParams.get("routine");
     if (inGroup && groupId && messageId) {
-      void jumpToMessage({ groupId, messageId }).finally(() => {
+      void jumpToMessage({ groupId, messageId }).then(reportMissingJump, () => reportMissingJump("missing")).finally(() => {
         // Keep expandedHistoryThread; only strip the jump URL so refresh does not remount.
         const next = new URLSearchParams(searchParams);
         next.delete("m");
@@ -2387,7 +2399,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       setSearchParams(next, { replace: true });
     }
     if (messageId) {
-      void jumpToMessage({ botId: active.id, messageId }).finally(() => {
+      void jumpToMessage({ botId: active.id, messageId }).then(reportMissingJump, () => reportMissingJump("missing")).finally(() => {
         const next = new URLSearchParams(searchParams);
         next.delete("m");
         setSearchParams(next, { replace: true });
@@ -2420,6 +2432,22 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     [inGroup,groupId,active?.id,taskScope?.taskThreadId]);
   const messagePins = useMessagePins(rpc,JSON.stringify([userId,shellSpaceId,pinTarget]),pinTarget,
     taskScope && activeSnapshot?.threadId!==taskScope.taskThreadId ? undefined : activeSnapshot?.threadId);
+  /** A pin from another of this Mico's conversations: restore it if archived, open it, then jump. */
+  const openPinnedConversation = useCallback(async (pin: MicoMessagePin) => {
+    const botId = activeBotId.current;
+    if (!botId) return;
+    try {
+      if (pin.taskThreadId && pin.archived) await rpc.development.restore({ botId, taskThreadId: pin.taskThreadId });
+    } catch (error) {
+      toast.error(errorText(error, t`The pinned message could not be opened.`));
+      return;
+    }
+    const params = new URLSearchParams();
+    if (pin.taskThreadId) params.set("task", pin.taskThreadId);
+    params.set("m", pin.messageId);
+    setMobileSidebarOpen(false);
+    navigate({ pathname: `/app/${encodeURIComponent(botId)}`, search: `?${params}` });
+  }, [navigate, rpc, t]);
   const currentRuns = activeThreadRuns(activeSnapshot);
   const answerableAskIds = useMemo(() => answerableAskMessageIds(activeSnapshot), [activeSnapshot]);
   useEffect(() => {
@@ -4080,7 +4108,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       {active && !inGroup && !activeProject ? <MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
         onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /> : null}
       {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-      {(active || activeGroup) && activeSnapshot && !newConversation ? <PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage} /> : null}
+      {pinTarget && activeSnapshot && !newConversation ? <ChatSearchButton key={`search:${activeSnapshot.threadId}`} rpc={rpc}
+        scope={JSON.stringify([userId, shellSpaceId, pinTarget])} target={pinTarget} threadId={activeSnapshot.threadId} onJump={jumpToReplyMessage} /> : null}
+      {(active || activeGroup) && activeSnapshot && !newConversation ? <PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage}
+        mico={!inGroup && active ? { rpc, scope: JSON.stringify([userId, shellSpaceId]), botId: active.id, name: active.name,
+          threadId: activeSnapshot.threadId, onOpen: pin => void openPinnedConversation(pin) } : undefined} /> : null}
       {(active || activeGroup) ? <ChatHeaderTools triggerRef={mobileBrowserTrigger}
         open={panel === "tools"} onToggle={() => {
           close?.();
@@ -4385,6 +4417,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             <SpaceSearchResults
               hits={searchHits}
               loading={searchLoading}
+              filter={searchFilter}
+              onFilter={setSearchFilter}
               onSelect={(hit) => void jumpToSearchHit(hit)}
             />
           ) : (

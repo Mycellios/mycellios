@@ -1,6 +1,6 @@
 import { resetThreadContext, ThreadContextBusyError } from "@mycellios/db";
 import { answerSideQuestion } from "../side-question.js";
-import { messagePinRoutes } from "./message-pins.js";
+import { messagePinRoutes, micoPinRoutes } from "./message-pins.js";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
 import { settleCallRequest } from "@mycellios/adapters";
@@ -666,5 +666,6 @@ export function threadsRoutes(ctx: RouterContext) {
         },
       ),
     },
+    ...micoPinRoutes(ctx),
   };
 }
