@@ -29,7 +29,7 @@ describe("logUnexpectedRpcError", () => {
 
   it("names the procedure and the upstream cause when a procedure answers 503 itself", async () => {
     const sink = createTestSink();
-    installLogger(createLogger({ service: "rakazo-api", sinks: [sink] }));
+    installLogger(createLogger({ service: "api", sinks: [sink] }));
     const router = {
       account: os.handler(() => {
         throw new ORPCError("SERVICE_UNAVAILABLE", {
