@@ -17,7 +17,7 @@ import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
 import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread } from "@mycellios/db";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   AdapterContext,
   AgentContextStrategy,
@@ -4248,6 +4248,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   return null;
                 })
             : null;
+        // An external webhook's text could choose what gets saved, so those runs only read.
+        const personalWriteTarget =
+          personalMemory && run.trigger !== "webhook" ? personalMemory.writeTarget : null;
+        // Ids recalled from personal memory in this run, so forget_memory reaches the same memory.
+        const personalMemoryIds = new Set<string>();
         const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
 
         await deps.events.append({
@@ -4381,6 +4386,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           recallPromise,
           personalRecallPromise,
         ]);
+        for (const hit of personalRecalled?.hits ?? []) personalMemoryIds.add(hit.id);
         const personalMemoryContext = personalRecalled
           ? formatPersonalMemory(personalRecalled.hits)
           : "";
@@ -4791,9 +4797,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             groupId: thread.groupId,
             trigger: run.trigger,
             semanticMemoryEnabled: semanticMemoryEnabled || Boolean(personalMemory),
-            // Personal memory is read-only in this phase: saving needs the Space provider.
-            semanticMemorySaves: semanticMemoryEnabled,
-            semanticMemoryForgets: Boolean(semanticMemory?.forget),
+            semanticMemorySaves: semanticMemoryEnabled || Boolean(personalWriteTarget),
+            semanticMemoryForgets:
+              Boolean(semanticMemory?.forget) || Boolean(personalWriteTarget?.canForget),
             mediaImagesEnabled: Boolean(deps.artifacts && mediaGeneration?.capabilities.images),
             mediaVideoEnabled: Boolean(deps.artifacts && mediaGeneration?.capabilities.video),
             cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
@@ -7730,6 +7736,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 .search(query, { limit: MAX_RECALLED_MEMORIES, signal: context.signal })
                 .catch(() => null),
             ]);
+            for (const hit of personal?.hits ?? []) personalMemoryIds.add(hit.id);
             const personalHits = (personal?.hits ?? []).map((hit) => ({
               memory: hit.title ? `${hit.title}: ${hit.snippet}` : hit.snippet,
               score: hit.score ?? 0,
@@ -7778,8 +7785,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
           }
           if (name === "save_memory") {
+            // The person's own memory, when they let this Mico write to it, takes the save.
+            if (personalMemory && personalWriteTarget) {
+              const content = String(args.content ?? "").trim();
+              return finish(
+                await personalMemory.save({
+                  content,
+                  // A retried call in this run updates the same entry instead of duplicating it.
+                  operationKey: `mycellios:${personalWriteTarget.id}:${run.id}:${createHash("sha256").update(content).digest("hex")}`,
+                  secrets: runSecrets,
+                  signal: context.signal,
+                }),
+              );
+            }
+            if (!semanticMemory || !memoryScope) {
+              return finish({ ok: false, error: "No memory this Mico can save to." });
+            }
             return finish(
-              await semanticMemory!.save(
+              await semanticMemory.save(
                 {
                   content: String(args.content ?? ""),
                   scope: memoryScope!,
@@ -7791,6 +7814,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
           }
           if (name === "forget_memory") {
+            const forgetId = String(args.id ?? "");
+            // Personal memory takes ids it returned in this run, or every id when it is the
+            // only memory that can forget.
+            if (
+              personalMemory &&
+              personalWriteTarget?.canForget &&
+              (personalMemoryIds.has(forgetId) || !semanticMemory?.forget)
+            ) {
+              return finish(
+                await personalMemory.forget({
+                  id: forgetId,
+                  ...(typeof args.reason === "string" ? { reason: args.reason } : {}),
+                  signal: context.signal,
+                }),
+              );
+            }
             if (!semanticMemory?.forget) {
               return finish({
                 error: "This memory provider does not support forgetting individual facts.",
@@ -8938,7 +8977,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
           lateRoutineNote,
           ownRoutineNote,
           personalMemory && !disabledBuiltinTools.has("recall_memory")
-            ? personalMemoryInstruction(personalMemory.connections)
+            ? personalMemoryInstruction(
+                personalMemory.connections,
+                personalWriteTarget && !disabledBuiltinTools.has("save_memory")
+                  ? {
+                      ...personalWriteTarget,
+                      canForget:
+                        personalWriteTarget.canForget && !disabledBuiltinTools.has("forget_memory"),
+                    }
+                  : null,
+              )
             : undefined,
         ]
           .filter(Boolean)

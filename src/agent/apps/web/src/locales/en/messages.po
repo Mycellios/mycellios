@@ -14935,9 +14935,17 @@ msgid "Connect personal memory"
 msgstr "Connect personal memory"
 
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
-msgid "Micos that can read it"
-msgstr "Micos that can read it"
+msgid "Micos that can use it"
+msgstr "Micos that can use it"
 
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
-msgid "Could not change which Micos can read this memory"
-msgstr "Could not change which Micos can read this memory"
+msgid "Can save new memories"
+msgstr "Can save new memories"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Can forget what it saved"
+msgstr "Can forget what it saved"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not change which Micos can use this memory"
+msgstr "Could not change which Micos can use this memory"

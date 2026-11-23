@@ -2000,8 +2000,10 @@ model MicoMemoryGrant {
   bot          Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
   connectionId String
   connection   MemoryConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  /// read (phase 2); read_write arrives with phase 3.
+  /// read or read_write (writing needs the server's write capability).
   access       String           @default("read")
+  /// May forget entries; only with read_write.
+  allowForget  Boolean          @default(false)
   autoRecall   Boolean          @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
