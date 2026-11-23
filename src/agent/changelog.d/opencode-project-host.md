@@ -1,2 +1,0 @@
-- OpenCode can start in the project folder or task worktree authorized on your Desktop and keep its session tied to that project.
-- The model picker shows the coding engines detected on the Mico's selected computer. A disconnected Desktop does not hand coding work to the server.
