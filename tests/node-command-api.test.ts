@@ -192,6 +192,14 @@ describe("node command API", () => {
       desiredState: { contributionEnabled: false, generation: 1 },
       events: [{ type: "command.queued" }, { type: "command.delivered" }, { type: "command.applied" }],
     });
+    // Owner consent for verified runtime updates: off by default, unavailable without a signed feed.
+    expect((await runtime.app.inject({ method: "GET", url: "/v1/nodes/auto-update" })).statusCode).toBe(401);
+    expect((await runtime.app.inject({ method: "GET", url: "/v1/nodes/auto-update", headers: accountHeaders })).json())
+      .toEqual({ schema: "mycellios-node-auto-update/1", enabled: false, channel: "stable", available: false, updatedAt: null });
+    expect((await runtime.app.inject({ method: "PUT", url: "/v1/nodes/auto-update", headers: accountHeaders, payload: { enabled: true, channel: "dev" } })).statusCode).toBe(400);
+    const consent = await runtime.app.inject({ method: "PUT", url: "/v1/nodes/auto-update", headers: accountHeaders, payload: { enabled: true } });
+    expect(consent.statusCode).toBe(200);
+    expect(consent.json()).toMatchObject({ enabled: true, channel: "stable", available: false });
     const accountNodes = await runtime.app.inject({ method: "GET", url: "/v1/nodes", headers: accountHeaders });
     expect(accountNodes.statusCode).toBe(200);
     expect(accountNodes.json()).toMatchObject({ data: [{ nodeId: identity.id, generation: 1, status: "active",

@@ -227,13 +227,13 @@ import {
 import { NodeEnrollmentStore } from "./node-enrollment-store.js";
 import { NodeCommandStore } from "./node-command-store.js";
 import { NodeReconciliationStore } from "./node-reconciliation-store.js";
+import { registerNodeRuntimeUpdateRoutes } from "./node-runtime-update-routes.js";
 import { NodeOwnershipTransferStore } from "./node-ownership-transfer-store.js";
 import {
   nodeCommandResultSchema,
   nodeCommandSchema,
   nodeEnrollmentCreateSchema,
   nodeEnrollmentRedeemSchema,
-  nodeSnapshotSchema,
 } from "../contracts/node-control.js";
 import {
   WORKER_SESSION_TOKEN_PREFIX,
@@ -1050,6 +1050,10 @@ export async function createCoordinator(
           },
         })
       : null;
+  // Snapshot reconciliation and owner-consented verified runtime updates (specs/node-runtime-auto-update).
+  await registerNodeRuntimeUpdateRoutes(app, { database, commands: nodeCommands, reconciliation: nodeReconciliation, releases: componentReleases,
+    workerSessionNode: (request) => workerSessionPrincipals.get(request), accountId: (request) => { const principal = principalFor(request); return principal.kind === "user" ? principal.userId : null; },
+    workerInMaintenance: async (nodeId) => (await store.listWorkers()).some((worker) => worker.identityKind === "device" && worker.identityId === nodeId && hub.isWorkerInMaintenance(worker.id)) });
   const developmentLabs = config.componentUpdatesPath
     ? new DevelopmentLabStore({ root: config.componentUpdatesPath })
     : null;
@@ -4407,27 +4411,6 @@ export async function createCoordinator(
     } catch (error) {
       const code = error instanceof Error ? error.message : "node_command_result_invalid";
       return reply.code(code.endsWith("conflict") ? 409 : 400).send({ error: { code } });
-    }
-  });
-
-  app.post("/internal/v1/nodes/:identityId/snapshot", async (request, reply) => {
-    const { identityId } = z.object({ identityId: z.string().min(1).max(256) }).strict().parse(request.params);
-    if (workerSessionPrincipals.get(request) !== identityId) return reply.code(401).send({ error: { code: "worker_session_required" } });
-    const snapshot = nodeSnapshotSchema.parse(request.body);
-    if (snapshot.nodeId !== identityId) return reply.code(403).send({ error: { code: "node_snapshot_wrong_node" } });
-    const ownership = (await database.getNodeOwnership("device", identityId));
-    if (!ownership || ownership.status !== "active" || ownership.generation !== snapshot.generation) {
-      return reply.code(409).send({ error: { code: "node_generation_mismatch" } });
-    }
-    try {
-      return reply.code(200).send({
-        ...(await nodeReconciliation.reconcile(snapshot)),
-        acknowledgedCommandIds: (await nodeCommands.acknowledgedCommandIds(identityId, snapshot.generation)),
-      });
-    } catch (error) {
-      const code = error instanceof Error ? error.message : "node_snapshot_invalid";
-      const conflict = code.includes("regression") || code.includes("mismatch") || code.includes("downgrade");
-      return reply.code(conflict ? 409 : 400).send({ error: { code } });
     }
   });
 

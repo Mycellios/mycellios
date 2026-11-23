@@ -102,6 +102,51 @@ describe("NodeCommandApplicator", () => {
     expect(fixture.applicator.takeRestartAfterAck(rollback.id)).toBe(true);
   });
 
+  it("stops new leases before an update and waits for active leases before touching components", async () => {
+    const order: string[] = [];
+    const lifecycle: NodeComponentLifecycleApi = {
+      update: vi.fn(async () => { order.push("update"); return { state: "applied", manifest: { manifestId: `sha256:${"b".repeat(64)}` }, changedComponents: ["node-app"] } as never; }),
+      rollback: vi.fn(),
+    };
+    const fixture = await setup(lifecycle);
+    vi.mocked(fixture.agent.beginRuntimeUpdateDrain).mockImplementation(async () => { order.push("drain"); return fixture.release; });
+    vi.mocked(fixture.agent.waitForIdle).mockImplementation(async () => { order.push("idle"); });
+    const update = command("update", { version: 1, channel: "stable", manifestId: `sha256:${"b".repeat(64)}` });
+    await expect(fixture.applicator.apply(application(update))).resolves.toMatchObject({ restartRequired: true });
+    expect(order).toEqual(["drain", "idle", "update"]);
+    expect((await fixture.control.load()).draining).toBe(true);
+  });
+
+  it("rejects a busy update without activation and resumes admission at once", async () => {
+    const lifecycle: NodeComponentLifecycleApi = { update: vi.fn(), rollback: vi.fn() };
+    const fixture = await setup(lifecycle);
+    vi.mocked(fixture.agent.waitForIdle).mockRejectedValue(new Error("worker_drain_timeout"));
+    await expect(fixture.applicator.apply(application(command("update", { version: 1, channel: "stable" }))))
+      .rejects.toMatchObject({ code: "node_update_waiting_idle" });
+    expect(lifecycle.update).not.toHaveBeenCalled();
+    expect(fixture.release).toHaveBeenCalledTimes(1);
+    expect((await fixture.control.load()).draining).toBe(false);
+  });
+
+  it("keeps the owner's pause through an update, its failure and an up-to-date result", async () => {
+    const lifecycle: NodeComponentLifecycleApi = {
+      update: vi.fn()
+        .mockRejectedValueOnce(new Error("component_update_artifact_sha256_mismatch"))
+        .mockResolvedValueOnce({ state: "up-to-date", manifest: { manifestId: `sha256:${"c".repeat(64)}` }, changedComponents: [] } as never),
+      rollback: vi.fn(),
+    };
+    const fixture = await setup(lifecycle);
+    await fixture.applicator.apply(application(command("pause", { version: 1 })));
+    await expect(fixture.applicator.apply(application(command("update", { version: 1, channel: "stable" }))))
+      .rejects.toThrow("component_update_artifact_sha256_mismatch");
+    expect(await fixture.control.load()).toMatchObject({ contributionEnabled: false, draining: false });
+    await expect(fixture.applicator.apply(application(command("update", { version: 1, channel: "stable" }))))
+      .resolves.toMatchObject({ state: "up-to-date", restartRequired: false });
+    expect(await fixture.control.load()).toMatchObject({ contributionEnabled: false, draining: false });
+    await fixture.applicator.reconcileContribution(true, false);
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(false);
+  });
+
   it("rejects lifecycle operations until their privileged helpers are integrated", async () => {
     const fixture = await setup();
     await expect(fixture.applicator.apply(application(command("update", { version: 1, channel: "stable" })))).rejects.toMatchObject({ code: "node_update_not_configured" });

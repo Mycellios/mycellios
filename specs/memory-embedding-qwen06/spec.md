@@ -430,8 +430,10 @@ Node code ships only in a new native node build:
 - Desktop embeds the pinned runtime MSI.
 Nodes do not update their JavaScript by themselves. A paired node gets it
 when its owner installs the new release, or when the operator sends an
-`update` node command for a published, signed component. That command
-updates only `python-product`, so it cannot deliver this change alone.
+`update` node command for a published, signed component. On builds before
+`specs/node-runtime-auto-update`, that command updates only `python-product`,
+so it cannot deliver this change alone. Later Windows builds also accept a
+signed `node-app` component, which owners can opt in to receive automatically.
 Desktop preview upgrades stay manual while Windows packages are unsigned.
 
 ### Measured versus tested

@@ -1,5 +1,22 @@
 # Status and evidence
 
+## Verified node runtime updates — source candidate, 2026-11-23
+
+`specs/node-runtime-auto-update/spec.md` adds a signed `node-app` component.
+The bundled Windows supervisor launches it and restores the previous or
+bundled app when it fails boot health. Owners can opt in to automatic updates
+of their own nodes on the stable channel. Only focused unit and in-memory
+coordinator tests cover it.
+
+It is off in production, for these reasons:
+- there is no stable signing key;
+- the publisher has no multi-component release support;
+- the coordinator has no feed configured.
+
+Existing nodes need one manual runtime installation before they can receive
+anything. No physical node has received a published release. Desktop and
+runtime packages are never installed automatically.
+
 ## Privacy from node owners — merged, not yet in production, 2026-11-21
 
 `specs/node-owner-privacy/spec.md` phases 1-5 and the first parts of phase 7

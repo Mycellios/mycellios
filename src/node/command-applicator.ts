@@ -91,34 +91,27 @@ export class NodeCommandApplicator {
       }
       case "update": {
         if (!this.components) throw new NodeCommandExecutionError("node_update_not_configured", "Component update trust is not configured.");
+        // Drain first: stop new leases, then wait for active leases and runtime
+        // operations. A busy node rejects this update and resumes at once; the
+        // owner pause (contributionEnabled) is never changed by an update.
+        const wasDraining = (await this.controlStore.load()).draining;
         await this.controlStore.setDraining(true);
         this.drainRelease ??= await this.agent.beginRuntimeUpdateDrain();
-        await this.agent.waitForIdle(60_000);
-        const channelChanged = command.payload.channel !== this.configuration.updateChannel;
-        let configRevision = this.configuration.revision;
-        if (channelChanged) {
-          configRevision = (await this.configurationStore.save({
-            ...this.configuration,
-            revision: this.configuration.revision + 1,
-            updateChannel: command.payload.channel,
-          })).revision;
-        }
-        let result;
         try {
-          result = await this.components.update(
-            command.payload.channel,
-            command.payload.manifestId as `sha256:${string}` | undefined,
-          );
-        } catch (error) {
-          if (channelChanged) await this.configurationStore.rollback().catch(() => undefined);
-          throw error;
-        }
-        if (result.state === "waiting-idle") {
-          if (channelChanged) await this.configurationStore.rollback().catch(() => undefined);
+          await this.agent.waitForIdle(60_000);
+        } catch {
+          if (!wasDraining) await this.reconcileDrain(false);
           throw new NodeCommandExecutionError("node_update_waiting_idle", "The node did not become idle before activation.");
         }
-        if (result.state === "applied" || channelChanged) this.restartAfterAck = command.id;
-        return { operationKey, ...result, configRevision, restartRequired: result.state === "applied" || channelChanged };
+        try {
+          const result = await this.applyComponentUpdate(command, operationKey);
+          // Without a restart (already current) the node resumes immediately.
+          if (!result.restartRequired && !wasDraining) await this.reconcileDrain(false);
+          return result;
+        } catch (error) {
+          if (!wasDraining) await this.reconcileDrain(false).catch(() => undefined);
+          throw error;
+        }
       }
       case "rollback": {
         if (!this.components) throw new NodeCommandExecutionError("node_rollback_not_configured", "Component update trust is not configured.");
@@ -147,6 +140,38 @@ export class NodeCommandApplicator {
         return { operationKey, ...receipt, stopAfterAck: true };
       }
     }
+  }
+
+  private async applyComponentUpdate(
+    command: Extract<NodeCommandApplication["command"], { type: "update" }>,
+    operationKey: string,
+  ): Promise<{ restartRequired: boolean } & Record<string, unknown>> {
+    const components = this.components!;
+    const channelChanged = command.payload.channel !== this.configuration.updateChannel;
+    let configRevision = this.configuration.revision;
+    if (channelChanged) {
+      configRevision = (await this.configurationStore.save({
+        ...this.configuration,
+        revision: this.configuration.revision + 1,
+        updateChannel: command.payload.channel,
+      })).revision;
+    }
+    let result;
+    try {
+      result = await components.update(
+        command.payload.channel,
+        command.payload.manifestId as `sha256:${string}` | undefined,
+      );
+    } catch (error) {
+      if (channelChanged) await this.configurationStore.rollback().catch(() => undefined);
+      throw error;
+    }
+    if (result.state === "waiting-idle") {
+      if (channelChanged) await this.configurationStore.rollback().catch(() => undefined);
+      throw new NodeCommandExecutionError("node_update_waiting_idle", "The node did not become idle before activation.");
+    }
+    if (result.state === "applied" || channelChanged) this.restartAfterAck = command.id;
+    return { operationKey, ...result, configRevision, restartRequired: result.state === "applied" || channelChanged };
   }
 
   takeRestartAfterAck(commandId: string): boolean {

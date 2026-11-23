@@ -98,8 +98,17 @@ jobs:
       - name: Stage native node payload
         if: needs.native_scope.outputs.required == 'true'
         shell: bash
+        env:
+          # Public Ed25519 trust anchor for signed component updates (no secret).
+          # Unset: the payload keeps manual-only updates (specs/node-runtime-auto-update).
+          MYCELLIOS_NODE_COMPONENT_TRUST: ${{ vars.MYCELLIOS_NODE_COMPONENT_TRUST }}
         run: |
           set -euo pipefail
+          trust_args=()
+          if [ -n "${MYCELLIOS_NODE_COMPONENT_TRUST:-}" ]; then
+            printf '%s' "$MYCELLIOS_NODE_COMPONENT_TRUST" > "$RUNNER_TEMP/node-component-trust.json"
+            trust_args=(--component-trust="$RUNNER_TEMP/node-component-trust.json")
+          fi
           node scripts/stage-node-installer.mjs \
             --dist=dist \
             --runtime=build/distribution-runtime \
@@ -108,7 +117,8 @@ jobs:
             --source-root=. \
             --target="${{ matrix.target }}" \
             --source-revision="$GITHUB_SHA" \
-            --output="build/node-package/${{ matrix.target }}"
+            --output="build/node-package/${{ matrix.target }}" \
+            "${trust_args[@]}"
           node scripts/verify-node-installer.mjs --root="build/node-package/${{ matrix.target }}"
       - name: Build and verify native Debian installer
         if: needs.native_scope.outputs.required == 'true' && matrix.target == 'linux-x64'
