@@ -109,7 +109,12 @@ These rules apply to the complete repository.
   related-test discovery is not proof of complete behavioral coverage. Security,
   auth, billing, migrations, dependencies and native changes retain focused gates.
   Real release builds, artifact identity, rollback and health checks remain required.
-  Production web/API/coordinator deploys go only through Nucleus. On main pushes,
+  Production web/API/coordinator deploys go only through Nucleus.
+  The coordinator ingress rehearsal keeps `mycellios-coordinator` on a stable
+  gateway and verifies reload and rollback with concurrent traffic in Docker.
+  Run `node deploy/coordinator-ingress/rehearse.mjs` on an isolated Linux
+  runner. Route health alone does not authorize changing application admission.
+  On main pushes,
   `.github/workflows/deploy.yml` builds the coordinator/agent images on GitHub-hosted
   runners into GHCR as `sha-<commit>` with the OCI revision label, waits for that
   commit's `CI summary`, then sends a GitHub OIDC token (no stored secret). Nucleus
