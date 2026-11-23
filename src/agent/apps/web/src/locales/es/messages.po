@@ -13973,6 +13973,10 @@ msgid "{title} deleted"
 msgstr "{title} eliminada"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title} archivada"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "No se pudo eliminar la conversación. Inténtalo de nuevo."
 

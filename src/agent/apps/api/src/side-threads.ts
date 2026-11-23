@@ -11,6 +11,7 @@ import {
   THREAD_TITLE_SOURCES,
   taskThreadKind,
   threadStartedByForKind,
+  WAITING_ON_USER_RUN_STATUSES,
 } from "@mycellios/core";
 import {
   archiveSideThreadInTransaction,
@@ -108,13 +109,20 @@ export async function restoreSideThread(deps: Pick<RouterDeps, "prisma">, actor:
 /**
  * Hide a conversation the person started and schedule its removal once the undo window
  * and a short grace period have passed. The worker reconciler finishes it if the job is lost.
+ * A turn that only waits for the person (a question, an approval, a takeover) holds no work,
+ * so deleting cancels it first; a turn that is still working refuses the delete.
  */
 export async function deleteSideThread(
-  deps: Pick<RouterDeps, "prisma" | "jobs">,
+  deps: LifecycleDeps,
   actor: Actor,
   target: BotTarget,
 ) {
   const ids = sideThreadIds(target);
+  const waiting = await deps.prisma.run.findMany({
+    where: { threadId: ids.threadId, status: { in: [...WAITING_ON_USER_RUN_STATUSES] } },
+    select: { id: true },
+  });
+  if (waiting.length) await stopThreadRuns(deps, actor, target, waiting.map((run) => run.id));
   const result = await deps.prisma.$transaction((tx) => markSideThreadDeletedInTransaction(tx, actor, ids));
   await deps.jobs
     .enqueue(threadDeleteJob(ids.threadId, new Date(result.deleteAfter.getTime() + THREAD_DELETE_GRACE_MS)))

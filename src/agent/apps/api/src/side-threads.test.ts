@@ -25,12 +25,15 @@ const mainChat = { kind: "bot", botId: "mico", threadId: "main", bot: { id: "mic
 const tx = { marker: "tx" };
 function deps() {
   return {
-    prisma: { $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)) },
+    prisma: {
+      $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
+      run: { findMany: vi.fn().mockResolvedValue([]) },
+    },
     sandbox: {},
     events: {},
     jobs: { enqueue: vi.fn().mockResolvedValue(undefined) },
   } as never as {
-    prisma: { $transaction: ReturnType<typeof vi.fn> };
+    prisma: { $transaction: ReturnType<typeof vi.fn>; run: { findMany: ReturnType<typeof vi.fn> } };
     jobs: { enqueue: ReturnType<typeof vi.fn> };
   };
 }
@@ -105,6 +108,26 @@ describe("deleteSideThread", () => {
     });
   });
 
+  it("cancels a turn that only waits for the person before deleting", async () => {
+    const d = deps();
+    d.prisma.run.findMany.mockResolvedValue([{ id: "ask" }]);
+    mocks.markDeleted.mockResolvedValue({ deleteAfter: new Date() });
+    await expect(deleteSideThread(d as never, actor, target)).resolves.toBeDefined();
+    expect(d.prisma.run.findMany).toHaveBeenCalledWith({
+      where: { threadId: "side", status: { in: ["waiting_input", "waiting_takeover"] } },
+      select: { id: true },
+    });
+    expect(mocks.stopThreadRuns).toHaveBeenCalledWith(d, actor, target, ["ask"]);
+    expect(mocks.stopThreadRuns.mock.invocationCallOrder[0]).toBeLessThan(mocks.markDeleted.mock.invocationCallOrder[0]!);
+  });
+
+  it("stops nothing when no turn waits", async () => {
+    const d = deps();
+    mocks.markDeleted.mockResolvedValue({ deleteAfter: new Date() });
+    await deleteSideThread(d as never, actor, target);
+    expect(mocks.stopThreadRuns).not.toHaveBeenCalled();
+  });
+
   it("keeps the pending delete when the job cannot be queued; the reconciler finishes it", async () => {
     const d = deps();
     mocks.markDeleted.mockResolvedValue({ deleteAfter: new Date() });
@@ -115,6 +138,7 @@ describe("deleteSideThread", () => {
   it("refuses the main chat and a conversation that still works", async () => {
     const d = deps();
     await expect(deleteSideThread(d as never, actor, mainChat)).rejects.toMatchObject({ code: "main_chat" });
+    expect(d.prisma.run.findMany).not.toHaveBeenCalled();
     mocks.markDeleted.mockRejectedValue(new ThreadLifecycleError("busy", "Stop it before you delete it."));
     await expect(deleteSideThread(d as never, actor, target)).rejects.toMatchObject({ code: "busy" });
     expect(d.jobs.enqueue).not.toHaveBeenCalled();

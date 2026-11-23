@@ -6485,6 +6485,10 @@ msgid "{title} deleted"
 msgstr "{title}: удалено"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title}: в архиве"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "Не удалось удалить диалог. Попробуйте ещё раз."
 

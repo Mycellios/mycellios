@@ -4489,6 +4489,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       confirmDelete={isMobileSidebar}
       messageCount={activeSnapshot?.messages.length ?? 0}
       refreshKey={active.conversations?.revision}
+      onConversationsChanged={() => void refreshBots().catch(() => undefined)}
       onWarm={warmConversation}
       onSelect={threadId => {
         close?.();
