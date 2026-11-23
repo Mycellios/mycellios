@@ -115,7 +115,7 @@ export class ManualUpdateController {
     fetch?: typeof fetch;
     busy(): boolean;
     prepare(): Promise<boolean>;
-    handoff(file: string, release: ManualRelease): Promise<void>;
+    handoff(file: string, release: ManualRelease, force: boolean): Promise<void>;
     /** Defaults to the Windows installer; the RPM/DEB entries use their own catalog and handoff. */
     packageKind?: ManualPackageKind;
     catalogUrl?: string;
@@ -314,7 +314,7 @@ export class ManualUpdateController {
             if (intent !== this.intent) return;
             this.current = { ...this.current, waitingFor: undefined };
             this.committed = true;
-            await this.options.handoff(this.file!, this.release!);
+            await this.options.handoff(this.file!, this.release!, this.force);
             // The system package manager applies the update; the app stays open so the
             // owner can finish work and restart after the installer exits.
             if (this.options.installAction === "system-installer") {
