@@ -487,6 +487,12 @@ These rules apply to the complete repository.
 - Worker maintenance does not close HTTP job admission. An empty jobs query is
   not a global drain; coordinator replacement requires a common admission
   barrier and a handoff that preserves active calls and original deadlines.
+- The isolated coordinator release probe runs from
+  `dist/coordinator/release-standby-main.js` on a private candidate address.
+  Only `/internal/release/standby/ready` returns its exact revision and database
+  readiness. Public health, application routes and worker upgrades reject
+  traffic. This probe never opens SQLite, starts job recovery or authorizes a
+  route switch. Run `tests/coordinator-release-standby.test.ts` on changes.
 - The optional embedding ingress proxy protects only its configured HTTP route,
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
