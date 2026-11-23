@@ -199,7 +199,8 @@ describe("browser handoff", () => {
         runId: "run-1", fence: 9, expiresAt: new Date(Date.now() + 60_000),
       }) },
     } as unknown as PrismaClient;
-    const sandbox = { connectTabView } as unknown as RouterDeps["sandbox"];
+    const connectScreen = vi.fn().mockResolvedValue({ url: "http://10.0.0.5:6080/embed.html" });
+    const sandbox = { connectScreen, connectTabView } as unknown as RouterDeps["sandbox"];
     const handler = new RPCHandler(createRouter(routerDeps(prisma, sandbox)));
     const { response } = await handler.handle(new Request("https://api.example.test/rpc/computer/tabViewUrl", {
       method: "POST",
@@ -209,9 +210,14 @@ describe("browser handoff", () => {
     expect(response?.status).toBe(status);
     if (!streamed) {
       expect(connectTabView).not.toHaveBeenCalled();
+      expect(connectScreen).not.toHaveBeenCalled();
       if (status === 200) expect(await response?.json()).toMatchObject({ json: { url: null } });
       return;
     }
+    // Takeover alone does not start the control screen the tab stream rides on.
+    expect(connectScreen).toHaveBeenCalledWith(expect.anything(),
+      { view: "stream", interactive: true, controlToken: "lease-1" }, expect.anything());
+    expect(connectScreen.mock.invocationCallOrder[0]).toBeLessThan(connectTabView.mock.invocationCallOrder[0]!);
     expect(connectTabView).toHaveBeenCalledWith(expect.anything(), { controlToken: "lease-1" },
       expect.objectContaining({ browserThreadId: threadId, screenLeaseId: expect.stringMatching(/:9$/) }));
     const { json } = await response!.json() as { json: { url: string } };
