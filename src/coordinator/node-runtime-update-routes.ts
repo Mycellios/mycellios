@@ -30,9 +30,12 @@ export async function registerNodeRuntimeUpdateRoutes(
   options: NodeRuntimeUpdateRouteOptions,
 ): Promise<NodeAutoUpdateScheduler | null> {
   const preferences = new NodeAutoUpdateStore(options.database);
-  await preferences.initialize();
+  if (!(await preferences.initialize())) {
+    // Content-free: the PostgreSQL migration owner has not applied nodeAutoUpdateSchemaSql yet.
+    app.log.warn({ code: "node_auto_update_schema_missing" }, "automatic node updates are unavailable");
+  }
   const releases = options.releases;
-  const scheduler = releases
+  const scheduler = releases && preferences.available
     ? new NodeAutoUpdateScheduler({
         database: options.database,
         commands: options.commands,
@@ -57,6 +60,7 @@ export async function registerNodeRuntimeUpdateRoutes(
     if (!accountId) return reply.code(403).send({ error: { code: "account_session_required" } });
     const body = nodeAutoUpdatePreferenceInputSchema.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: { code: "node_auto_update_invalid" } });
+    if (!preferences.available) return reply.code(503).send({ error: { code: "node_auto_update_unavailable" } });
     // Consent covers only nodes this account owns; the scheduler rechecks ownership per node.
     return preferences.set(accountId, body.data.enabled, scheduler !== null);
   });
