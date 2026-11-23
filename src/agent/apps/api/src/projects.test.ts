@@ -37,6 +37,19 @@ it("keeps ordinary Mico tasks on their existing computer route", async () => {
   expect(await f.call("projectTask", { botId: "mico", taskThreadId: "task" })).toBeNull();
   expect(f.prisma.developmentProject.findFirst).not.toHaveBeenCalled();
 });
+it("keeps delegated and transferred work on the Mico's existing computer route", async () => {
+  const f = fixture();
+  for (const thread of [
+    { taskBotId: "mico", projectKey: "work:root", taskKey: "delegation:key" },
+    { taskBotId: "mico", projectKey: "routine:daily", taskKey: "work-transfer:key" },
+  ]) {
+    f.prisma.thread.findFirst.mockResolvedValue(thread);
+    expect(await f.call("projectTask", { botId: "mico", taskThreadId: "delegated" })).toBeNull();
+  }
+  f.prisma.thread.findFirst.mockResolvedValue({ taskBotId: "mico", projectKey: "legacy", taskKey: "other:key" });
+  await expect(f.call("projectTask", { botId: "mico", taskThreadId: "legacy" })).rejects.toThrow("legacy project");
+  expect(f.prisma.developmentProject.findFirst).not.toHaveBeenCalled();
+});
 it("distinguishes owned ordinary runs from project runs without trusting worker paths", async () => {
   const f = fixture();
   f.prisma.run.findFirst.mockResolvedValue({ thread: { projectKey: null } });
