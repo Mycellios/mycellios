@@ -782,6 +782,15 @@ export function computerRoutes(ctx: RouterContext) {
         const screenContext = await computerScreenContext(
           deps.prisma, context.actor, computer.id, bot.id, "browser.tab-view", input.runId,
         );
+        // The tab stream rides the control screen, which takeover alone does not start.
+        const controlScreen = await deps.sandbox
+          .connectScreen(
+            toComputerRef(computer),
+            { view: "stream", interactive: true, controlToken: computer.controlLeaseId },
+            screenContext,
+          )
+          .catch((error: unknown) => clearGoneSandbox(deps, computer, error));
+        if (!controlScreen) return { url: null };
         const session = await deps.sandbox
           .connectTabView(
             toComputerRef(computer),
