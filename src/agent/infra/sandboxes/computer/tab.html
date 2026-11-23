@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Browser tab</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #111113;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+      #tab {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        outline: none;
+        touch-action: none;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="tab" tabindex="0" aria-label="Browser tab"></canvas>
+    <script>
+      (() => {
+        // One conversation's browser tab, streamed by the page-browser helper's tab-stream
+        // through the screen gateway. Messages are length-prefixed both ways (see that helper).
+        const canvas = document.getElementById("tab");
+        const context = canvas.getContext("2d", { alpha: false });
+        // The app cannot look into this sandboxed frame, so tell it how the tab is doing.
+        const report = (mycelliosScreen, detail) => {
+          try {
+            window.parent.postMessage(detail ? { mycelliosScreen, detail } : { mycelliosScreen }, "*");
+          } catch {}
+        };
+        report("loading");
+
+        const params = new URLSearchParams(window.location.search);
+        const path = String(params.get("path") || "websockify");
+        const base = path.startsWith("/") ? "" : window.location.pathname.replace(/[^/]+$/, "");
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const socket = new WebSocket(`${protocol}://${window.location.host}${base}${path}`, ["binary"]);
+        socket.binaryType = "arraybuffer";
+        report("connecting");
+
+        let connected = false;
+        let ended = false;
+        const end = (state, detail) => {
+          if (ended) return;
+          ended = true;
+          report(connected ? "disconnected" : state, detail);
+        };
+
+        const encoder = new TextEncoder();
+        const send = (event) => {
+          if (socket.readyState !== WebSocket.OPEN) return;
+          const body = encoder.encode(JSON.stringify(event));
+          const message = new Uint8Array(4 + body.length);
+          new DataView(message.buffer).setUint32(0, body.length);
+          message.set(body, 4);
+          socket.send(message);
+        };
+
+        // Decode at most one frame at a time and keep only the newest one waiting.
+        let decoding = false;
+        let waiting = null;
+        const draw = async (jpeg) => {
+          if (decoding) {
+            waiting = jpeg;
+            return;
+          }
+          decoding = true;
+          try {
+            const image = await createImageBitmap(new Blob([jpeg], { type: "image/jpeg" }));
+            if (canvas.width !== image.width || canvas.height !== image.height) {
+              canvas.width = image.width;
+              canvas.height = image.height;
+            }
+            context.drawImage(image, 0, 0);
+            image.close();
+            if (!connected) {
+              connected = true;
+              report("connected");
+            }
+          } catch {}
+          decoding = false;
+          if (waiting) {
+            const next = waiting;
+            waiting = null;
+            void draw(next);
+          }
+        };
+
+        const decoder = new TextDecoder();
+        let pending = new Uint8Array(0);
+        socket.addEventListener("message", (event) => {
+          const chunk = new Uint8Array(event.data);
+          const joined = new Uint8Array(pending.length + chunk.length);
+          joined.set(pending);
+          joined.set(chunk, pending.length);
+          let offset = 0;
+          const view = new DataView(joined.buffer);
+          while (joined.length - offset >= 5) {
+            const length = view.getUint32(offset);
+            if (length < 1 || length > 8 * 1024 * 1024) {
+              socket.close();
+              return;
+            }
+            if (joined.length - offset - 4 < length) break;
+            const kind = joined[offset + 4];
+            const payload = joined.subarray(offset + 5, offset + 4 + length);
+            offset += 4 + length;
+            if (kind === 1 && payload.length > 2) {
+              const header = (payload[0] << 8) | payload[1];
+              void draw(payload.slice(2 + header));
+            } else if (kind === 2) {
+              let status = null;
+              try {
+                status = JSON.parse(decoder.decode(payload));
+              } catch {}
+              if (status?.type === "closed") end("failed", "The browser tab was closed.");
+              if (status?.type === "page" && typeof status.title === "string") {
+                document.title = status.title || "Browser tab";
+              }
+            }
+          }
+          pending = joined.slice(offset);
+        });
+        socket.addEventListener("error", () => end("failed"));
+        socket.addEventListener("close", () => end("failed"));
+
+        const modifiers = (event) =>
+          (event.altKey ? 1 : 0) | (event.ctrlKey ? 2 : 0) | (event.metaKey ? 4 : 0) | (event.shiftKey ? 8 : 0);
+        // Coordinates are fractions of the drawn frame, which object-fit may letterbox.
+        const position = (event) => {
+          const box = canvas.getBoundingClientRect();
+          if (!canvas.width || !canvas.height || !box.width || !box.height) return null;
+          const scale = Math.min(box.width / canvas.width, box.height / canvas.height);
+          const left = box.left + (box.width - canvas.width * scale) / 2;
+          const top = box.top + (box.height - canvas.height * scale) / 2;
+          return {
+            x: (event.clientX - left) / (canvas.width * scale),
+            y: (event.clientY - top) / (canvas.height * scale),
+          };
+        };
+        const BUTTONS = ["left", "middle", "right"];
+        const pointer = (type, event) => {
+          const at = position(event);
+          if (!at) return;
+          send({
+            t: "mouse",
+            type,
+            ...at,
+            button: type === "mouseMoved" ? "none" : (BUTTONS[event.button] ?? "none"),
+            buttons: event.buttons & 7,
+            clickCount: type === "mouseMoved" ? 0 : Math.min(3, Math.max(1, event.detail || 1)),
+            modifiers: modifiers(event),
+          });
+        };
+        let move = null;
+        canvas.addEventListener("pointermove", (event) => {
+          if (move) {
+            move = event;
+            return;
+          }
+          move = event;
+          requestAnimationFrame(() => {
+            const latest = move;
+            move = null;
+            if (latest) pointer("mouseMoved", latest);
+          });
+        });
+        canvas.addEventListener("pointerdown", (event) => {
+          canvas.focus();
+          canvas.setPointerCapture?.(event.pointerId);
+          pointer("mousePressed", event);
+          event.preventDefault();
+        });
+        canvas.addEventListener("pointerup", (event) => {
+          pointer("mouseReleased", event);
+          event.preventDefault();
+        });
+        canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+        canvas.addEventListener(
+          "wheel",
+          (event) => {
+            const at = position(event);
+            if (!at) return;
+            const unit = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1;
+            send({ t: "wheel", ...at, dx: event.deltaX * unit, dy: event.deltaY * unit, modifiers: modifiers(event) });
+            event.preventDefault();
+          },
+          { passive: false },
+        );
+
+        const keyCode = (event) => (Number.isInteger(event.keyCode) && event.keyCode < 256 ? event.keyCode : 0);
+        const key = (type, event) => {
+          // Paste arrives through the paste event with the clipboard's text.
+          const shortcut = event.ctrlKey || event.metaKey;
+          if (shortcut && event.key.toLowerCase() === "v") return;
+          const text = type === "keyDown" && !shortcut && event.key.length === 1 ? event.key : undefined;
+          const typed = type === "keyDown" && event.key === "Enter" ? "\r" : text;
+          send({ t: "key", type, key: event.key, code: event.code, keyCode: keyCode(event), text: typed, modifiers: modifiers(event) });
+          event.preventDefault();
+        };
+        canvas.addEventListener("keydown", (event) => key("keyDown", event));
+        canvas.addEventListener("keyup", (event) => key("keyUp", event));
+        document.addEventListener("paste", (event) => {
+          const text = event.clipboardData?.getData("text/plain");
+          if (text) send({ t: "text", text: text.slice(0, 32000) });
+          event.preventDefault();
+        });
+
+        // The app asks a reconnected screen to take the keyboard back; nothing else is accepted.
+        window.addEventListener("message", (event) => {
+          const data = event.data;
+          if (event.source !== window.parent || !data || typeof data !== "object") return;
+          const keys = Object.keys(data);
+          if (keys.length === 1 && keys[0].endsWith("ScreenFocus") && data[keys[0]] === true) canvas.focus();
+        });
+        canvas.focus();
+      })();
+    </script>
+  </body>
+</html>

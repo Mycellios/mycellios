@@ -55,6 +55,7 @@ import {
   foldPeerReplies,
   inferAttachmentMimeType,
   isActive,
+  errorStatus,
   isRetryableError,
   isRunTerminalEvent,
   isRunWorking,
@@ -882,7 +883,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const computerOpenRef = useRef(false);
   const computerBotIdRef = useRef<string | undefined>(undefined);
   const computerBootEpoch = useRef(0);
-  const openComputerRef = useRef<(botId?: string) => Promise<boolean>>(async () => false);
+  const openComputerRef = useRef<(botId?: string, takeControl?: boolean, handoffRunId?: string) => Promise<boolean>>(async () => false);
   const [computerViewport, setComputerViewport] = useState<{
     height: number;
     offsetTop: number;
@@ -1589,7 +1590,29 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const request = ++screenRequest.current;
     const issuedState = computerRef.current?.botId === id ? computerRef.current.state : undefined;
     return loadComputerScreen({
-      load: () => rpc.computer.screenUrl({ botId: id }),
+      load: async () => {
+        const view = tabViewRef.current;
+        if (view?.botId === id) {
+          // Until takeover finishes there is nothing to show; the handoff clears the screen.
+          if (!view.ready) return { url: null };
+          if (userHoldsComputerControl(computerRef.current, id)) {
+            // One stream per handoff: refreshes reuse it until its hour-long seal nears expiry.
+            if (view.url && Date.now() - (view.issuedAt ?? 0) < TAB_VIEW_REUSE_MS) {
+              return { url: view.url };
+            }
+            const tab = await rpc.computer
+              .tabViewUrl({ botId: id, runId: view.runId })
+              .catch(() => null);
+            if (tab?.url && tabViewRef.current === view) {
+              view.url = tab.url;
+              view.issuedAt = Date.now();
+              return tab;
+            }
+          }
+          endTabView(view);
+        }
+        return rpc.computer.screenUrl({ botId: id });
+      },
       isCurrent: () =>
         request === screenRequest.current &&
         (activeBotId.current === id || computerBotIdRef.current === id) &&
@@ -3663,11 +3686,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     takeControl,
     showProgress,
     force = false,
+    handoffRunId,
   }: {
     botId: string;
     takeControl: boolean;
     showProgress: boolean;
     force?: boolean;
+    handoffRunId?: string;
   }) {
     const epoch = ++computerBootEpoch.current;
     const stillThisBoot = () => computerBootEpoch.current === epoch;
@@ -3676,7 +3701,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const cached = computerCacheRef.current.get(targetBotId);
     const targetComputer = computer?.botId === targetBotId ? computer : (cached?.computer ?? null);
     const targetScreen = computer?.botId === targetBotId ? screenUrl : (cached?.screenUrl ?? null);
-    const needsBoot = force || targetComputer?.state !== "running" || !targetScreen;
+    const needsBoot = !handoffRunId && (force || targetComputer?.state !== "running" || !targetScreen);
     if (showProgress && needsBoot) setBootingBotId(targetBotId);
     setComputerError(null);
     setComputerErrorFromScreen(false);
@@ -3692,8 +3717,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         }
       }
       if (takeControl) {
-        await rpc.computer.takeover({ botId: targetBotId });
+        await rpc.computer.takeover({ botId: targetBotId, ...(handoffRunId ? { runId: handoffRunId } : {}) });
         if (!stillThisBoot() || !stillThisBot()) return;
+        const tabView = tabViewRef.current;
+        if (handoffRunId && tabView?.botId === targetBotId && tabView.runId === handoffRunId) {
+          tabView.ready = true;
+        }
       }
       await refreshComputerFor(targetBotId);
     } catch (error) {
@@ -3903,7 +3932,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, [panel, computerOpen, computerBot?.id, active?.id, computer?.state]);
 
   /** Open the computer view. Only an explicit Take control asks for the lease. */
-  async function openComputer(botId?: string, takeControl = false) {
+  async function openComputer(botId?: string, takeControl = false, handoffRunId?: string) {
     const id = botId ?? active?.id;
     if (!id) return false;
     const bot = botsRef.current.find((candidate) => candidate.id === id);
@@ -3917,6 +3946,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       commitComputer(targetComputer);
       setScreenUrl(targetScreen);
     }
+    if (handoffRunId) setScreenUrl(null);
     // Reopening during a boot shows it; a second boot would be refused as busy.
     const bootInFlight = bootsInFlight.current.has(id) || targetComputer?.state === "booting";
     setComputerOpen(true);
@@ -3926,14 +3956,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       if (!bootsInFlight.current.has(id)) await refreshComputerFor(id).catch(() => undefined);
       return true;
     }
-    const needsTakeover = takeControl && !userHoldsComputerControl(targetComputer, id);
-    const blocked = computerTakeoverBlocked(targetComputer, snapshot?.run?.status);
+    const needsTakeover = takeControl && (Boolean(handoffRunId) || !userHoldsComputerControl(targetComputer, id));
+    const blocked = !handoffRunId && computerTakeoverBlocked(targetComputer, snapshot?.run?.status);
     try {
       await bootComputer({
         botId: id,
         takeControl: needsTakeover && !blocked,
         showProgress: (needsTakeover && !blocked) || targetComputer?.state !== "running",
         force: targetComputer?.state !== "running",
+        handoffRunId,
       });
       return true;
     } catch {
@@ -3942,13 +3973,49 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     }
   }
   openComputerRef.current = openComputer;
-  const onOpenComputer = useCallback((botId?: string) => {
-    void openComputerRef.current(botId);
-  }, []);
+  const browserHandoffPending = useRef(false);
+  const tabViewRef = useRef<TabView | null>(null);
+  const [tabViewBotId, setTabViewBotId] = useState<string | null>(null);
+  function endTabView(view: TabView) {
+    if (tabViewRef.current !== view) return;
+    tabViewRef.current = null;
+    setTabViewBotId(null);
+  }
+  const onOpenComputer = useCallback((id?: string, runId?: string) => {
+    if (!runId) {
+      void openComputerRef.current(id);
+      return;
+    }
+    const targetBotId = id ?? activeBotId.current;
+    if (!targetBotId || browserHandoffPending.current) return;
+    const chat = readVisit.current.visit;
+    browserHandoffPending.current = true;
+    void rpc.computer.focusBrowserTab({ botId: targetBotId, runId })
+      .catch((error: unknown) => ({ state: errorStatus(error) === 404 ? "unsupported" : "unavailable" } as const))
+      .then(async ({ state }) => {
+        if (!alive.current || readVisit.current.visit !== chat) return;
+        if (state === "focused") {
+          // Show only the conversation's tab once control is the user's.
+          const view: TabView = { botId: targetBotId, runId, ready: false };
+          tabViewRef.current = view;
+          setTabViewBotId(targetBotId);
+          const opened = await openComputerRef.current(targetBotId, true, runId);
+          if (!opened || !view.ready) endTabView(view);
+          return;
+        }
+        if (state === "unsupported") {
+          await openComputerRef.current(targetBotId);
+          return;
+        }
+        toast.error(t`Could not open this conversation’s browser tab.`);
+      })
+      .finally(() => { browserHandoffPending.current = false; });
+  }, [rpc, t]);
 
   async function releaseComputer(reason?: ComputerReleaseReason) {
     const botId = computerBotIdRef.current ?? activeBotId.current;
     if (!botId) return;
+    if (tabViewRef.current?.botId === botId) endTabView(tabViewRef.current);
     try {
       await rpc.computer.release({ botId, reason });
       if (computerBotIdRef.current !== botId && activeBotId.current !== botId) return;
@@ -5793,6 +5860,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           onStopTeaching={stopTeaching}
           onStopRun={() => void stopRun()}
           onRelease={releaseComputer}
+          tabView={tabViewBotId === computerBot.id}
+          onShowDesktop={() => {
+            const view = tabViewRef.current;
+            if (view?.botId !== computerBot.id) return;
+            endTabView(view);
+            void refreshComputerScreen(computerBot.id).catch(() => undefined);
+          }}
           onTakeControl={() => void openComputer(computerBot.id, true)}
           onStart={() => void openComputer(computerBot.id)}
           onRefreshTeaching={refreshActiveTeaching}
@@ -5809,6 +5883,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   // Empty chrome until the first bot list lands would flash "Select a bot" before the chat.
   return initialBotsLoaded || initialLoadFailed ? shell : <PageLoading layout="chat" />;
 }
+
+/** A browser handoff showing only the waiting conversation's tab instead of the desktop. */
+type TabView = { botId: string; runId: string; ready: boolean; url?: string; issuedAt?: number };
+/** Screen capabilities are sealed for an hour; reuse a tab view URL for less than that. */
+const TAB_VIEW_REUSE_MS = 50 * 60_000;
 
 function routineListData(results: Array<{ data?: Routine[] }>) {
   return results.map((result) => result.data);

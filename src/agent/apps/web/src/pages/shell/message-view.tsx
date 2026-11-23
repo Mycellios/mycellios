@@ -112,7 +112,7 @@ export const MessageView = memo(function MessageView({
   voiceReady: boolean;
   speaking: boolean;
   onSpeak: (message: ThreadMessage) => void;
-  onOpenComputer: (botId?: string) => void;
+  onOpenComputer: (botId?: string, handoffRunId?: string) => void;
   /** Opens where an imported item's setup is finished. */
   onOpenImportSetup?: (target: ImportSetupTarget) => void;
   /** Opens the agent importer (from Chief's first-run focus card). */
@@ -736,7 +736,7 @@ export const MessageView = memo(function MessageView({
                   type="button"
                   size="sm"
                   data-testid="computer-card-open"
-                  onClick={() => onOpenComputer(message.botId)}
+                  onClick={() => onOpenComputer(message.botId, block.state === "Needs you" ? message.runId : undefined)}
                 >
                   <Trans>Open</Trans>
                 </Button>

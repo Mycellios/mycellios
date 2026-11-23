@@ -1128,6 +1128,7 @@ export interface BrowserActResult {
 
 /** A sandbox must route these commands through its owned screen, never generic host execution. */
 export type PageBrowserCommand =
+  | { command: "focus" }
   | { command: "navigate"; url: string }
   | { command: "snapshot" }
   | { command: "act"; actions: BrowserActStep[] };

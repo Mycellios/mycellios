@@ -41,6 +41,26 @@ class PageBrowserTest(unittest.TestCase):
             self.assertIsNone(helper.scoped_target(client, one, create=False))
             self.assertEqual(helper.scoped_target(client, two, create=False), "2" * 32)
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "scoped display lock is Linux-only")
+    def test_focus_activates_only_the_saved_tab_without_creating_or_navigating(self):
+        client = Mock()
+        key = "a" * 64
+        target = "1" * 32
+        other = "2" * 32
+        client.call.return_value = {"targetInfos": [
+            {"type": "page", "targetId": target}, {"type": "page", "targetId": other},
+        ]}
+        with TemporaryDirectory() as base:
+            directory = Path(base) / "scope"
+            directory.mkdir(mode=0o700)
+            (directory / key).write_text(target)
+            with patch.object(helper, "Path", return_value=directory):
+                self.assertEqual(helper.run_scoped(client, 9222, "focus", {"conversationKey": key}), {"ok": True})
+                client.call.assert_any_call("Target.activateTarget", {"targetId": target})
+                client.call.reset_mock()
+                self.assertFalse(helper.run_scoped(client, 9222, "focus", {"conversationKey": "b" * 64})["ok"])
+                client.call.assert_not_called()
+
     def test_closed_stdin_cancels_helper_without_a_browser(self):
         with subprocess.Popen([sys.executable, str(Path(__file__).with_name("rakazo-page-browser")), "snapshot", "{}"],
                               env={**os.environ, "RAKAZO_BROWSER_WATCH_STDIN": "1", "RAKAZO_CDP_PORT": "0"},
@@ -645,6 +665,106 @@ class PageBrowserTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "File not found"):
                 helper.act(Mock(), "session", [{"kind": "upload", "ref": "e1", "paths": ["nope.pdf"]}])
         ensure.assert_not_called()
+
+
+class TabStreamTest(unittest.TestCase):
+    base = "1" * 32
+    popup = "2" * 32
+
+    def stream(self):
+        client = Mock()
+        sent = []
+        client._send_frame.side_effect = lambda payload: sent.append(__import__("json").loads(payload))
+        viewer = Mock()
+        stream = helper.TabStream(client, self.base, viewer)
+        return stream, sent, viewer
+
+    @staticmethod
+    def viewer_messages(viewer):
+        data = b"".join(call.args[0] for call in viewer.sendall.call_args_list)
+        messages = []
+        while data:
+            length, kind = struct.unpack("!IB", data[:5])
+            messages.append((kind, data[5:4 + length]))
+            data = data[4 + length:]
+        return messages
+
+    def attach(self, stream, sent, target, session):
+        attach = next(m for m in reversed(sent) if m["method"] == "Target.attachToTarget")
+        self.assertEqual(attach["params"]["targetId"], target)
+        stream.handle({"id": attach["id"], "result": {"sessionId": session}})
+
+    def test_pointer_and_keys_map_to_the_frame_and_drop_anything_else(self):
+        viewport = (1000.0, 500.0)
+        self.assertEqual(
+            helper.tab_input_command({"t": "mouse", "type": "mousePressed", "x": 0.5, "y": 2, "button": "left",
+                                      "buttons": 1, "clickCount": 1}, viewport),
+            ("Input.dispatchMouseEvent", {"x": 500.0, "y": 500.0, "modifiers": 0, "type": "mousePressed",
+                                          "button": "left", "buttons": 1, "clickCount": 1}),
+        )
+        self.assertEqual(helper.tab_input_command({"t": "key", "type": "keyDown", "key": "a", "code": "KeyA",
+                                                   "keyCode": 65, "text": "a"}, viewport)[1]["type"], "keyDown")
+        self.assertEqual(helper.tab_input_command({"t": "key", "type": "keyDown", "key": "Tab", "code": "Tab",
+                                                   "keyCode": 9}, viewport)[1]["type"], "rawKeyDown")
+        self.assertEqual(helper.tab_input_command({"t": "text", "text": "hunter2"}, viewport),
+                         ("Input.insertText", {"text": "hunter2"}))
+        for event in (
+            {"t": "mouse", "type": "mousePressed", "x": "1", "y": 0},
+            {"t": "mouse", "type": "dragStart", "x": 0, "y": 0},
+            {"t": "nav", "action": "location='https://evil.example'"},
+            {"t": "eval", "expression": "1"},
+            {"t": "text", "text": "x" * 32_001},
+            "keyDown",
+        ):
+            self.assertIsNone(helper.tab_input_command(event, viewport))
+        # No frame yet means no size to map a pointer to.
+        self.assertIsNone(helper.tab_input_command({"t": "mouse", "type": "mouseMoved", "x": 0, "y": 0}, (0.0, 0.0)))
+
+    def test_frames_reach_the_viewer_before_they_are_acknowledged(self):
+        stream, sent, viewer = self.stream()
+        stream.show(self.base)
+        self.attach(stream, sent, self.base, "s1")
+        self.assertIn({"method": "Page.startScreencast", "params": helper.TAB_STREAM_SCREENCAST,
+                       "sessionId": "s1"}, [{k: m[k] for k in ("method", "params", "sessionId") if k in m} for m in sent])
+        jpeg = b"\xff\xd8jpeg"
+        stream.handle({"method": "Page.screencastFrame", "sessionId": "s1", "params": {
+            "data": __import__("base64").b64encode(jpeg).decode(), "sessionId": 7,
+            "metadata": {"deviceWidth": 800, "deviceHeight": 600}}})
+        kind, payload = self.viewer_messages(viewer)[-1]
+        self.assertEqual(kind, helper.TAB_STREAM_FRAME)
+        header = struct.unpack("!H", payload[:2])[0]
+        self.assertEqual(payload[2 + header:], jpeg)
+        self.assertEqual(stream.viewport, (800.0, 600.0))
+        self.assertEqual(sent[-1]["method"], "Page.screencastFrameAck")
+        self.assertEqual(sent[-1]["params"], {"sessionId": 7})
+        # Frames from another session are not this tab's.
+        before = len(viewer.sendall.call_args_list)
+        stream.handle({"method": "Page.screencastFrame", "sessionId": "other", "params": {"data": "", "sessionId": 8}})
+        self.assertEqual(len(viewer.sendall.call_args_list), before)
+
+    def test_a_sign_in_popup_is_shown_and_closing_it_returns_to_the_tab(self):
+        stream, sent, _viewer = self.stream()
+        stream.show(self.base)
+        self.attach(stream, sent, self.base, "s1")
+        # Another tab's popup is not followed.
+        stream.handle({"method": "Target.targetCreated", "params": {"targetInfo": {
+            "targetId": "3" * 32, "type": "page", "openerId": "4" * 32}}})
+        self.assertEqual(stream.target, self.base)
+        stream.handle({"method": "Target.targetCreated", "params": {"targetInfo": {
+            "targetId": self.popup, "type": "page", "openerId": self.base}}})
+        self.attach(stream, sent, self.popup, "s2")
+        self.assertEqual((stream.target, stream.session), (self.popup, "s2"))
+        self.assertIn({"method": "Page.stopScreencast", "sessionId": "s1"},
+                      [{k: m[k] for k in ("method", "sessionId") if k in m} for m in sent])
+        self.assertTrue(stream.handle({"method": "Target.targetDestroyed", "params": {"targetId": self.popup}}))
+        self.attach(stream, sent, self.base, "s3")
+        self.assertEqual(stream.target, self.base)
+        self.assertFalse(stream.handle({"method": "Target.targetDestroyed", "params": {"targetId": self.base}}))
+
+    def test_server_refuses_arguments_outside_its_socket_directory(self):
+        self.assertEqual(helper.serve_tab_stream("/tmp/elsewhere", "a" * 64), 2)
+        self.assertEqual(helper.serve_tab_stream("/home/sockets/tab-1-x", "a" * 64), 2)
+        self.assertEqual(helper.serve_tab_stream("/tmp/screens/sockets/tab-1-x", "not-a-key"), 2)
 
 
 if __name__ == "__main__":

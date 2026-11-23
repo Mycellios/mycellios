@@ -151,6 +151,16 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
             .toMatchObject({ ok: true, url: secondUrl });
           expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, first))
             .toMatchObject({ ok: true, url: firstUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "focus" }, first))
+            .toMatchObject({ ok: true });
+          // The visible tab moved back to the first real conversation without a navigation.
+          expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, context))
+            .toMatchObject({ ok: true, url: firstUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "focus" }, {
+            ...context, browserThreadId: "conversation-missing",
+          })).toMatchObject({ ok: false });
+          expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, context))
+            .toMatchObject({ ok: true, url: firstUrl });
         }
         const socketPath = viewerUrl.searchParams.get("path");
         expect(socketPath).toMatch(/^websockify\?/);

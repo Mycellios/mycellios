@@ -102,10 +102,12 @@ const SCREEN_FRAME_STATES: ReadonlySet<string> = new Set<ScreenFrameState>([
 /** A state report posted by a framed screen page, or null for any other message. */
 export function screenFrameMessage(data: unknown): ScreenFrameMessage | null {
   if (!data || typeof data !== "object") return null;
-  const { rakazoScreen, detail } = data as Record<string, unknown>;
-  if (typeof rakazoScreen !== "string" || !SCREEN_FRAME_STATES.has(rakazoScreen)) return null;
+  // The tab view page reports under the product name; noVNC pages keep the original key.
+  const { rakazoScreen, mycelliosScreen, detail } = data as Record<string, unknown>;
+  const state = rakazoScreen ?? mycelliosScreen;
+  if (typeof state !== "string" || !SCREEN_FRAME_STATES.has(state)) return null;
   const text = typeof detail === "string" ? detail.trim().slice(0, 200) : "";
-  return { rakazoScreen: rakazoScreen as ScreenFrameState, ...(text ? { detail: text } : {}) };
+  return { rakazoScreen: state as ScreenFrameState, ...(text ? { detail: text } : {}) };
 }
 
 /** Whether a report shows the page got past loading; a page stalled there is still silent. */

@@ -863,7 +863,14 @@ export const appContract = {
       .input(z.object({ id: Id, workersStopped: z.literal(true) }))
       .output(z.object({ ok: z.literal(true) })),
     dismissUpdate: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
-    takeover: oc.input(botId).output(z.object({ leaseId: Id, expiresAt: z.string() })),
+    takeover: oc.input(botId.extend({ runId: Id.optional() })).output(z.object({ leaseId: Id, expiresAt: z.string() })),
+    focusBrowserTab: oc
+      .input(z.object({ botId: Id, runId: Id }))
+      .output(z.object({ state: z.enum(["focused", "unavailable", "unsupported"]) })),
+    /** The waiting conversation's browser tab, streamed while the user holds control. */
+    tabViewUrl: oc
+      .input(z.object({ botId: Id, runId: Id }))
+      .output(z.object({ url: z.string().nullable() })),
     release: oc
       .input(
         z.object({

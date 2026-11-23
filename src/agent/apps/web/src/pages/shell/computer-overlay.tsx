@@ -40,6 +40,9 @@ type ComputerOverlayProps = {
   onStopTeaching: () => void | Promise<void>;
   onStopRun: () => void;
   onRelease: (reason?: ComputerReleaseReason) => Promise<void>;
+  /** The screen shows only the waiting conversation's browser tab. */
+  tabView?: boolean;
+  onShowDesktop?: () => void;
   onTakeControl: () => void;
   onStart: () => void;
   onRefreshTeaching: () => Promise<void>;
@@ -67,6 +70,8 @@ export function ComputerOverlay({
   onStopTeaching,
   onStopRun,
   onRelease,
+  tabView = false,
+  onShowDesktop,
   onTakeControl,
   onStart,
   onRefreshTeaching,
@@ -131,10 +136,23 @@ export function ComputerOverlay({
             {recordingSkill ? (
               <TeachStopButton busy={teachBusy} onStop={onStopTeaching} />
             ) : hasControl ? (
-              <ComputerReleaseActions
-                takeoverRequested={Boolean(computer?.takeoverRequested)}
-                onRelease={onRelease}
-              />
+              <>
+                {tabView && onShowDesktop ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="computer-show-desktop"
+                    onClick={onShowDesktop}
+                  >
+                    <Trans>Show desktop</Trans>
+                  </Button>
+                ) : null}
+                <ComputerReleaseActions
+                  takeoverRequested={Boolean(computer?.takeoverRequested)}
+                  onRelease={onRelease}
+                />
+              </>
             ) : computer?.state === "running" && !computerTakeoverBlocked(computer, runStatus) ? (
               <Button
                 type="button"

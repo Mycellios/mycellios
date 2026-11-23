@@ -28,9 +28,10 @@ const actor = {
   isDeploymentOwner: true,
 } satisfies Actor;
 
-function routerDeps(prisma: PrismaClient) {
+function routerDeps(prisma: PrismaClient, sandbox?: RouterDeps["sandbox"]) {
   return {
     prisma,
+    sandbox,
     jobs: { enqueue: vi.fn() },
     env: {
       defaultProvider: "fake",
@@ -137,5 +138,84 @@ describe("computer boot", () => {
     expect(response?.status).toBe(404);
     expect(lifecycle.provisionComputer).toHaveBeenCalledOnce();
     expect(lifecycle.releaseComputerExecutionLease).toHaveBeenCalledOnce();
+  });
+});
+
+describe("browser handoff", () => {
+  it.each([
+    ["side-thread", "run-1", true, "focused"],
+    [null, "run-1", true, "unavailable"],
+    ["side-thread", "run-2", true, "unavailable"],
+    ["side-thread", "run-1", false, "unavailable"],
+  ])("requires the owned waiting run, its screen fence and an existing tab", async (threadId, leaseRunId, available, state) => {
+    const pageBrowser = vi.fn().mockResolvedValue({ ok: available });
+    const findRun = vi.fn().mockResolvedValue(threadId ? { threadId } : null);
+    const prisma = {
+      bot: { findFirst: vi.fn().mockResolvedValue({ ...stoppedBot, computer: {
+        ...stoppedBot.computer, botId: "bot-1", kind: "docker", state: "running",
+        providerRef: "sandbox-1", controlRunId: "run-1",
+      } }) },
+      run: { findFirst: findRun },
+      computerExecutionLease: { findUnique: vi.fn().mockResolvedValue({
+        runId: leaseRunId, fence: 9, expiresAt: new Date(Date.now() + 60_000),
+      }) },
+    } as unknown as PrismaClient;
+    const sandbox = { pageBrowser } as unknown as RouterDeps["sandbox"];
+    const handler = new RPCHandler(createRouter(routerDeps(prisma, sandbox)));
+    const { response } = await handler.handle(new Request("https://api.example.test/rpc/computer/focusBrowserTab", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ json: { botId: "bot-1", runId: "run-1" } }),
+    }), { prefix: "/rpc", context: { actor } });
+    expect(response?.status).toBe(200);
+    expect(await response?.json()).toMatchObject({ json: { state } });
+    expect(findRun).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      id: "run-1", botId: "bot-1", userId: actor.userId, spaceId: actor.spaceId, status: "waiting_takeover",
+    }) }));
+    if (!threadId || leaseRunId !== "run-1") {
+      expect(pageBrowser).not.toHaveBeenCalled();
+    } else {
+      expect(pageBrowser).toHaveBeenCalledWith(expect.anything(), { command: "focus" },
+        expect.objectContaining({ browserThreadId: threadId, screenLeaseId: expect.stringMatching(/:9$/) }));
+    }
+  });
+
+  it.each([
+    ["run-1", "side-thread", 200, true],
+    ["run-2", "side-thread", 403, false],
+    ["run-1", null, 200, false],
+  ])("streams only the tab of the waiting run whose control the user holds (%s, %s)", async (controlRunId, threadId, status, streamed) => {
+    const connectTabView = vi.fn().mockResolvedValue({ url: "http://10.0.0.5:6080/tab.html?path=websockify%3Ftoken%3Dfake-tab-token" });
+    const findRun = vi.fn().mockResolvedValue(threadId ? { threadId } : null);
+    const prisma = {
+      bot: { findFirst: vi.fn().mockResolvedValue({ ...stoppedBot, screenGeneration: 0, computer: {
+        ...stoppedBot.computer, botId: "bot-1", kind: "docker", state: "running", providerRef: "sandbox-1",
+        controlHolder: "user", controlBotId: "bot-1", controlLeaseId: "lease-1", screenGeneration: 0,
+        controlLeaseExpiresAt: new Date(Date.now() + 60_000), controlRunId,
+      } }) },
+      run: { findFirst: findRun },
+      computer: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      computerExecutionLease: { findUnique: vi.fn().mockResolvedValue({
+        runId: "run-1", fence: 9, expiresAt: new Date(Date.now() + 60_000),
+      }) },
+    } as unknown as PrismaClient;
+    const sandbox = { connectTabView } as unknown as RouterDeps["sandbox"];
+    const handler = new RPCHandler(createRouter(routerDeps(prisma, sandbox)));
+    const { response } = await handler.handle(new Request("https://api.example.test/rpc/computer/tabViewUrl", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ json: { botId: "bot-1", runId: "run-1" } }),
+    }), { prefix: "/rpc", context: { actor } });
+    expect(response?.status).toBe(status);
+    if (!streamed) {
+      expect(connectTabView).not.toHaveBeenCalled();
+      if (status === 200) expect(await response?.json()).toMatchObject({ json: { url: null } });
+      return;
+    }
+    expect(connectTabView).toHaveBeenCalledWith(expect.anything(), { controlToken: "lease-1" },
+      expect.objectContaining({ browserThreadId: threadId, screenLeaseId: expect.stringMatching(/:9$/) }));
+    const { json } = await response!.json() as { json: { url: string } };
+    expect(json.url).toMatch(/^https:\/\/web\.example\.test\/novnc\/session\/control\/.+\/tab\.html\?/);
+    expect(json.url).not.toContain("fake-tab-token");
   });
 });

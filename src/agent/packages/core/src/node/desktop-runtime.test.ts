@@ -31,6 +31,7 @@ import {
   shellQuote,
   stopBrowserProfileCommand,
   stopExtraScreenCommand,
+  tabViewCommand,
   terminalCommand,
 } from "./desktop-runtime.js";
 
@@ -383,6 +384,29 @@ describe("shared Linux desktop lifecycle", () => {
     expect(interactiveScreenCommand(false)).toMatch(/pkill -f .*rakazo-terminal\.py/);
     expect(interactiveScreenCommand(false)).toContain("desktop-targets/terminal-1");
     expect(stopExtraScreenCommand(1, "a")).toMatch(/pkill -f .*sockets\/terminal-2-/);
+  });
+
+  it("streams a conversation tab only for the current control lease and ends it with control", () => {
+    const key = "a".repeat(64);
+    const command = tabViewCommand("control", "view-token", key, screenPorts(0));
+    // A released or replaced lease is refused before anything starts.
+    expect(command).toMatch(/\[ "\$\(cat \S+\/control-token-1\)" = 'control' \] \|\| exit 75/);
+    expect(command).toMatch(/DISPLAY=:1 nohup \S+-page-browser tab-stream \S+\/sockets\/tab-1-[0-9a-f]{32} a{64} /);
+    expect(command).toMatch(/printf '%s: unix_socket:%s\\n' 'view-token' \S+\/sockets\/tab-1-/);
+    expect(command).toContain("desktop-targets/tab-1");
+    expect(() => tabViewCommand("control", "view-token", "not-a-key", screenPorts(0))).toThrow(
+      "invalid browser conversation scope",
+    );
+    expect(() => tabViewCommand("control", "bad token", key, screenPorts(0))).toThrow(
+      "invalid tab view token",
+    );
+    for (const release of [interactiveScreenCommand(false), stopExtraScreenCommand(1, "a")]) {
+      expect(release).toMatch(/pkill -f .*-page-browser tab-stream/);
+      expect(release).toMatch(/desktop-targets\/tab-/);
+    }
+    const result = spawnSync("bash", ["-n", "-c", command], { encoding: "utf8" });
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
   });
 
   it.each([DEFAULT_DESKTOP_ENV, env])(

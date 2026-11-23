@@ -35,6 +35,15 @@ export const SCREEN_RELEASE_TIMEOUT_MS = 8_000;
 const SANDBOX_ERROR_RESPONSE_TIMEOUT_MS = 1_000;
 const SANDBOX_SUCCESS_RESPONSE_TIMEOUT_MS = 30_000;
 
+/** The private name of one conversation's browser tab inside the computer. */
+function browserConversationKey(context: AdapterContext) {
+  return context.browserThreadId
+    ? createHash("sha256")
+        .update(JSON.stringify([context.spaceId, context.userId, context.botId, context.browserThreadId]))
+        .digest("hex")
+    : undefined;
+}
+
 async function safeBody(res: Response, signal?: AbortSignal): Promise<string> {
   const declared = Number(res.headers.get("content-length") ?? 0);
   if (Number.isFinite(declared) && declared > MAX_SANDBOX_ERROR_RESPONSE_BYTES) {
@@ -243,9 +252,8 @@ export class DockerSandboxProvider implements SandboxProvider {
     request: PageBrowserCommand,
     context: AdapterContext,
   ): Promise<PageBrowserResult> {
-    const conversationKey = context.browserThreadId
-      ? createHash("sha256").update(JSON.stringify([context.spaceId, context.userId, context.botId, context.browserThreadId])).digest("hex")
-      : undefined;
+    const conversationKey = browserConversationKey(context);
+    if (request.command === "focus" && !conversationKey) return { ok: false };
     const endpoint = conversationKey ? "browser/scoped" : "browser";
     const res = await fetch(this.url(`/computers/${computer.id}/${endpoint}`), {
       method: "POST",
@@ -300,6 +308,28 @@ export class DockerSandboxProvider implements SandboxProvider {
       mimeType: "text/html",
       close: async () => undefined,
     };
+  }
+
+  async connectTabView(
+    computer: ComputerRef,
+    request: { controlToken: string },
+    context: AdapterContext,
+  ) {
+    const conversationKey = browserConversationKey(context);
+    if (!conversationKey) throw new Error("tab view needs a conversation");
+    const res = await fetch(this.url(`/computers/${computer.id}/tab-view`), {
+      method: "POST",
+      headers: { ...this.headers(context, computer.botId), "content-type": "application/json" },
+      body: JSON.stringify({ controlToken: request.controlToken, conversationKey }),
+      redirect: "error",
+      signal: context.signal,
+    });
+    if (!res.ok) {
+      const detail = await safeBody(res, context.signal);
+      throw new Error(`sandbox tab view failed: ${res.status} ${detail}`.trim());
+    }
+    const body = await readSandboxJson<{ viewUrl: string }>(res, context.signal);
+    return { url: body.viewUrl };
   }
 
   async connectTerminal(computer: ComputerRef, request: TerminalRequest, context: AdapterContext) {

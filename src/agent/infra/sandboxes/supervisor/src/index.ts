@@ -93,6 +93,7 @@ import {
   shouldReplayComputerActions,
   stopExtraScreenCommand,
   teardownReleasedScreen,
+  tabViewCommand,
   terminalCommand,
   toSandboxInput,
   withKeyedLock,
@@ -517,6 +518,7 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
           }),
       }),
       z.object({ command: z.literal("snapshot") }),
+      z.object({ command: z.literal("focus") }),
       z.object({
         command: z.literal("act"),
         actions: z
@@ -546,6 +548,7 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
       }),
     ])
     .parse(input);
+  if (body.command === "focus" && !conversationKey) return c.notFound();
   const browserCommand = conversationKey ? `scoped-${body.command}` : body.command;
   const browserArgs = JSON.stringify({ ...body, ...(conversationKey ? { conversationKey } : {}) });
   const carriesSavedLogin =
@@ -914,6 +917,53 @@ app.post("/computers/:id/terminal", async (c) => {
 });
 
 class TerminalControlReleasedError extends Error {}
+
+// Stream one conversation's browser tab to the person holding control, instead of the desktop.
+app.post("/computers/:id/tab-view", async (c) => {
+  const body = z
+    .object({
+      controlToken: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+      conversationKey: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .parse(await c.req.json());
+  try {
+    const id = c.req.param("id");
+    const botId = requestHeader(c, "bot-id");
+    const { container, info } = await managedContainer(id, botId, requestHeader(c, "space-id"));
+    const viewToken = randomUUID();
+    const layout = await withComputerScreenLock(id, async () => {
+      const screen = await ensureManagedScreen(
+        id,
+        container,
+        botId,
+        requestHeader(c, "screen-id"),
+        requestHeader(c, "screen-lease-id"),
+        false,
+      );
+      const result = await runContainerCommand(
+        container,
+        [
+          "bash",
+          "-c",
+          tabViewCommand(body.controlToken, viewToken, body.conversationKey, screen.layout),
+        ],
+        { env: computerCommandEnv(screen.layout) },
+      );
+      if (result.code === 75) throw new TerminalControlReleasedError();
+      if (result.code !== 0) throw new Error(result.stderr || "tab view failed to start");
+      return screen.layout;
+    });
+    const screenUrl = new URL(await publishedScreenUrl(container, info, layout.controlPort));
+    screenUrl.pathname = "/tab.html";
+    return c.json({ viewUrl: screenUrlWithToken(screenUrl.toString(), viewToken) });
+  } catch (error) {
+    if (error instanceof TerminalControlReleasedError) {
+      return c.json({ error: "screen control is not active" }, 409);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message }, 400);
+  }
+});
 
 app.post("/computers/:id/input", async (c) => {
   const id = c.req.param("id");

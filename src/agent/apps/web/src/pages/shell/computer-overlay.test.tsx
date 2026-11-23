@@ -122,3 +122,44 @@ it("offers Start for an asleep computer", async () => {
   expect(container.textContent).toContain("Computer is asleep");
   expect(startButton()).toBeDefined();
 });
+
+it("offers Show desktop only while a held handoff shows the waiting tab", async () => {
+  const onShowDesktop = vi.fn();
+  const props = (tabView: boolean, hasControl: boolean) => (
+    <ComputerOverlay
+      bot={bot}
+      computer={{ ...computer("running"), controlHolder: "user", controlBotId: "bot-1" }}
+      computerViewport={null}
+      recordingSkill={null}
+      teachBusy={false}
+      hasControl={hasControl}
+      composerRunning={false}
+      sending={false}
+      booting={false}
+      sendError={null}
+      embeddedScreenUrl={null}
+      screenFrameRef={() => undefined}
+      computerScreenError={null}
+      computerBooting={null}
+      onStopTeaching={() => undefined}
+      onStopRun={() => undefined}
+      onRelease={async () => undefined}
+      tabView={tabView}
+      onShowDesktop={onShowDesktop}
+      onTakeControl={() => undefined}
+      onStart={() => undefined}
+      onRefreshTeaching={async () => undefined}
+      onRefreshComputer={async () => undefined}
+      onClose={() => undefined}
+    />
+  );
+  const showDesktop = () => container.querySelector("[data-testid=computer-show-desktop]");
+  await act(async () => root.render(props(true, true)));
+  expect(showDesktop()?.textContent).toBe("Show desktop");
+  await act(async () => (showDesktop() as HTMLButtonElement).click());
+  expect(onShowDesktop).toHaveBeenCalledOnce();
+  await act(async () => root.render(props(false, true)));
+  expect(showDesktop()).toBeNull();
+  await act(async () => root.render(props(true, false)));
+  expect(showDesktop()).toBeNull();
+});
