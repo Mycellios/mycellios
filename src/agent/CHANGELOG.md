@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-23
+
+### Added
+
+- Connect your own memory server in Settings > Memory > Personal memory. Any MCP server that
+  implements the open Memory MCP profile (`memory_search` and `memory_read`) works, with OAuth or a
+  bearer token. Mycellios checks whether the server is compatible and whether it allows writing.
+  No Mico uses a connected memory yet; per-Mico access comes in a later release.
+- The sign-in page offers "Forgot your password?". It emails a reset link, and opening that
+  link lets you choose a new password and continue signing in where you left off.
+- Choose which Micos can read each personal memory in Settings > Memory > Personal memory. A Mico
+  with access searches that memory before each reply in your own chats and can look things up in it
+  with `recall_memory`. No Mico has access until you give it, and personal memory is never used in
+  messaging channels, groups or other people's conversations. Micos cannot write to it yet.
+
+### Fixed
+
+- Writing in a Mico conversation started by delegated or transferred work from Mycellios Desktop no
+  longer fails with "Reconnect this project conversation before continuing". These conversations
+  now use the Mico's own folder, like its other conversations.
+- Open on a pending computer request selects the Mico’s existing browser tab and lets you take control in one click on supported computers.
+- That tab now opens on its own, without loading the whole remote desktop, and sign-in windows it opens appear in front of you. Show desktop returns to the full screen.
+- Creating an account with a password that is too weak now says so, instead of the general
+  "Could not create your account" message.
+- Mycellios Desktop work is less likely to stop while the server is busy. The server keeps more
+  database connections open for the requests that keep a Desktop task running.
+- Sending a message in a conversation a Mico received as delegated work no longer fails with
+  "Internal server error" in Mycellios Desktop. The message now runs in the Mico's own folder,
+  like the delegated work itself.
+- Open on a Mico's sign-in request now shows only its browser tab on server computers; it was falling back to the whole desktop.
+- If that tab is gone, Open still shows the computer so you can help, instead of only an error.
+- A Mico can open its own side conversation again when message content is encrypted, and a queued
+  message can be moved to a new conversation. Both failed in production because the first message
+  was sealed before the new conversation's Space was known.
+- Windows now shows the installer confirmation from the Mycellios window before closing for a restart. If the security check stalls, it cancels that attempt so you can retry.
+
 ## [0.18.0] - 2026-11-23
 
 ### Added
