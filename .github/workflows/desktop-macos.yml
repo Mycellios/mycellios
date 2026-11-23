@@ -52,7 +52,12 @@ jobs:
           test "$(uname -m)" = '${{ matrix.machine }}'
           mkdir -p "$RUNNER_TEMP/desktop-release/evidence"
           if [ '${{ matrix.arch }}' = arm64 ]; then
-            curl -fL --retry 2 https://www.mycellios.com/downloads/macos-arm64 -o "$RUNNER_TEMP/runtime.pkg"
+            # 262 MB through the public ingress: resume an interrupted or stalled
+            # transfer instead of failing the release (the SHA-256 check below
+            # still rejects any wrong byte).
+            curl -fL --retry 5 --retry-all-errors --retry-delay 10 \
+              --speed-limit 10240 --speed-time 60 -C - \
+              https://www.mycellios.com/downloads/macos-arm64 -o "$RUNNER_TEMP/runtime.pkg"
             echo "66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  $RUNNER_TEMP/runtime.pkg" | shasum -a 256 -c
           fi
       - name: Build current source and qualify its packaged local server
