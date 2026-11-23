@@ -14793,3 +14793,75 @@ msgstr "Requesting…"
 #: src/components/composer/NewChatControl.tsx
 msgid "There are no older messages to compact yet."
 msgstr "There are no older messages to compact yet."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Add another sign-in method before unlinking this one."
+msgstr "Add another sign-in method before unlinking this one."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Could not load your sign-in methods. Try again."
+msgstr "Could not load your sign-in methods. Try again."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Could not link {provider}. Try again."
+msgstr "Could not link {provider}. Try again."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Could not unlink {provider}. Try again."
+msgstr "Could not unlink {provider}. Try again."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "{provider} is now linked to your account."
+msgstr "{provider} is now linked to your account."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "This {provider} account is already linked to another Mycellios account."
+msgstr "This {provider} account is already linked to another Mycellios account."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Loading sign-in methods…"
+msgstr "Loading sign-in methods…"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Sign-in methods"
+msgstr "Sign-in methods"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Linked as {email}"
+msgstr "Linked as {email}"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Linked"
+msgstr "Linked"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Not linked"
+msgstr "Not linked"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "This is your only sign-in method."
+msgstr "This is your only sign-in method."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Unlink {name}"
+msgstr "Unlink {name}"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Link {name}"
+msgstr "Link {name}"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Link"
+msgstr "Link"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Unlink {unlinkName}?"
+msgstr "Unlink {unlinkName}?"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "You will no longer be able to sign in with it. You can link it again later."
+msgstr "You will no longer be able to sign in with it. You can link it again later."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Unlinking…"
+msgstr "Unlinking…"

@@ -15176,3 +15176,75 @@ msgstr "Últimas {limit} peticiones por modelo"
 #: src/pages/Shell.tsx
 msgid "Could not delete the message. Try again."
 msgstr "No se ha podido eliminar el mensaje. Inténtalo de nuevo."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Add another sign-in method before unlinking this one."
+msgstr "Añade otro método de inicio de sesión antes de desvincular este."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Could not load your sign-in methods. Try again."
+msgstr "No se han podido cargar tus métodos de inicio de sesión. Inténtalo de nuevo."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Could not link {provider}. Try again."
+msgstr "No se ha podido vincular {provider}. Inténtalo de nuevo."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Could not unlink {provider}. Try again."
+msgstr "No se ha podido desvincular {provider}. Inténtalo de nuevo."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "{provider} is now linked to your account."
+msgstr "{provider} ya está vinculado a tu cuenta."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "This {provider} account is already linked to another Mycellios account."
+msgstr "Esta cuenta de {provider} ya está vinculada a otra cuenta de Mycellios."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Loading sign-in methods…"
+msgstr "Cargando métodos de inicio de sesión…"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Sign-in methods"
+msgstr "Métodos de inicio de sesión"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Linked as {email}"
+msgstr "Vinculado como {email}"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Linked"
+msgstr "Vinculado"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Not linked"
+msgstr "Sin vincular"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "This is your only sign-in method."
+msgstr "Es tu único método de inicio de sesión."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Unlink {name}"
+msgstr "Desvincular {name}"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Link {name}"
+msgstr "Vincular {name}"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Link"
+msgstr "Vincular"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Unlink {unlinkName}?"
+msgstr "¿Desvincular {unlinkName}?"
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "You will no longer be able to sign in with it. You can link it again later."
+msgstr "Ya no podrás iniciar sesión con él. Puedes volver a vincularlo más adelante."
+
+#: src/pages/settings/SignInMethodsSettings.tsx
+msgid "Unlinking…"
+msgstr "Desvinculando…"

@@ -195,6 +195,13 @@ import {
   MycelliosApiRedirectSchema,
   MycelliosApiUsageSchema,
 } from "./mycellios-api-billing.js";
+import {
+  MycelliosIdentityLinkInput,
+  MycelliosIdentityLinkSchema,
+  MycelliosIdentityListInput,
+  MycelliosIdentityUnlinkInput,
+  MycelliosSignInMethodsSchema,
+} from "./mycellios-identities.js";
 import { MessageReactionSchema } from "./reactions.js";
 import { RoutineWatchSchema } from "./routine-watch.js";
 import { RunLogsInputSchema, RunLogsOutputSchema } from "./run-logs.js";
@@ -285,6 +292,11 @@ export const appContract = {
     usage: oc.input(MycelliosApiReadInput).output(MycelliosApiUsageSchema),
     checkout: oc.input(MycelliosApiCheckoutInput).output(MycelliosApiRedirectSchema),
     portal: oc.input(MycelliosApiPortalInput).output(MycelliosApiRedirectSchema),
+  },
+  mycelliosIdentities: {
+    list: oc.input(MycelliosIdentityListInput).output(MycelliosSignInMethodsSchema),
+    link: oc.input(MycelliosIdentityLinkInput).output(MycelliosIdentityLinkSchema),
+    unlink: oc.input(MycelliosIdentityUnlinkInput).output(z.object({ unlinked: z.literal(true) })),
   },
   referrals: {
     invite: oc.input(ReferralOwnerInput).output(ReferralInviteSchema),

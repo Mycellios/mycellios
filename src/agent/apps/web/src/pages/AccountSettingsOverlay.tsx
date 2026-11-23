@@ -24,6 +24,7 @@ import type { RefObject, ReactNode } from "react";
 import { useSignOut } from "../lib/sign-out";
 import { appPath } from "../lib/app-path";
 import { MobileSessions } from "./settings/MobileSessions";
+import { SignInMethodsSettings } from "./settings/SignInMethodsSettings";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { AccountAccess } from "../components/AccountAccess";
 import { SuccessPop } from "../components/ai/primitives";
@@ -532,6 +533,7 @@ export function GeneralSettingsPanels({
         </SettingsGroup>
       ) : null}
 
+      {mode !== "general" && accountId ? <SignInMethodsSettings key={accountId} accountId={accountId} /> : null}
       {mode === "all" ? <SkillLibrarySettings /> : null}
       {mode !== "general" ? <Disclosure alwaysVisible summary={t`Account access`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground"><AccountAccess onSecurity={setAccountSecurity} /></Disclosure> : null}
     </div>
