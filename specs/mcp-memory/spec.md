@@ -116,7 +116,7 @@ empty = whole memory the token allows), `autoRecall` (boolean, default true),
   `allowForget` requires `read_write` and the server's `memory_forget` tool.
 - Only a person changes grants, through the authenticated UI/API. Micos,
   routines, delegated runs, peer messages and messaging channels can never
-  create, widen or remove a grant (same rule as OpenBot's channel settings).
+  create, widen or remove a grant.
 - Only the connection owner can grant it, and only to Micos they can manage.
 
 ## Runtime behavior
