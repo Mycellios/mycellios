@@ -100,24 +100,66 @@ export function planNodeAutoUpdate(input: NodeAutoUpdateInput): NodeAutoUpdateDe
   return { action: "update", manifestId: input.targetManifestId as `sha256:${string}` };
 }
 
+/**
+ * Table of owner consent for automatic node updates. On PostgreSQL the migration owner applies
+ * it: the coordinator's runtime role has no CREATE on its schema, so the coordinator never runs
+ * this DDL there itself.
+ */
+export const nodeAutoUpdateSchemaSql = `CREATE TABLE IF NOT EXISTS node_auto_update_preferences (
+  account_id TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
+  channel TEXT NOT NULL CHECK(channel IN ('stable')),
+  updated_at BIGINT NOT NULL
+)`;
+
+/** PostgreSQL codes for a table that is missing or not readable by the runtime role. */
+const MISSING_TABLE_CODES = new Set(["42P01", "42501"]);
+
 export class NodeAutoUpdateStore {
+  private ready = false;
+
   constructor(
     private readonly database: MeshDatabase,
     private readonly now: () => number = Date.now,
   ) {}
 
-  /** Owned by this module so the shared schema file does not grow. */
-  async initialize(): Promise<void> {
-    await this.database.raw.exec(`
-      CREATE TABLE IF NOT EXISTS node_auto_update_preferences (
-        account_id TEXT PRIMARY KEY,
-        enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
-        channel TEXT NOT NULL CHECK(channel IN ('stable')),
-        updated_at INTEGER NOT NULL
-      )`);
+  /** True once the preferences table exists and is usable. */
+  get available(): boolean {
+    return this.ready;
+  }
+
+  /**
+   * SQLite creates the table here. On PostgreSQL this only checks that the migration owner
+   * applied `nodeAutoUpdateSchemaSql`; without it automatic updates stay unavailable instead of
+   * stopping the coordinator.
+   */
+  async initialize(): Promise<boolean> {
+    if (this.database.raw.dialect === "postgres") {
+      try {
+        await this.database.raw.prepare("SELECT account_id FROM node_auto_update_preferences LIMIT 1").all();
+        this.ready = true;
+      } catch (error) {
+        const code = (error as { code?: unknown } | null)?.code;
+        if (typeof code !== "string" || !MISSING_TABLE_CODES.has(code)) throw error;
+        this.ready = false;
+      }
+      return this.ready;
+    }
+    await this.database.raw.exec(nodeAutoUpdateSchemaSql);
+    this.ready = true;
+    return true;
   }
 
   async get(accountId: string, available: boolean): Promise<NodeAutoUpdatePreference> {
+    if (!this.ready) {
+      return nodeAutoUpdatePreferenceSchema.parse({
+        schema: "mycellios-node-auto-update/1",
+        enabled: false,
+        channel: NODE_AUTO_UPDATE_POLICY.channel,
+        available: false,
+        updatedAt: null,
+      });
+    }
     const row = (await this.database.raw.prepare(
       "SELECT enabled, updated_at FROM node_auto_update_preferences WHERE account_id = ?",
     ).get(accountId)) as { enabled: number | boolean; updated_at: number } | undefined;
@@ -131,6 +173,7 @@ export class NodeAutoUpdateStore {
   }
 
   async set(accountId: string, enabled: boolean, available: boolean): Promise<NodeAutoUpdatePreference> {
+    if (!this.ready) throw new Error("node_auto_update_unavailable");
     const updatedAt = this.now();
     await this.database.transaction(async () => {
       const existing = await this.database.raw.prepare(

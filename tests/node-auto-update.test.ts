@@ -97,6 +97,40 @@ describe("planNodeAutoUpdate", () => {
   });
 });
 
+describe("NodeAutoUpdateStore on PostgreSQL", () => {
+  function postgresDatabase(selectError: unknown) {
+    const exec = vi.fn(async () => undefined);
+    const all = vi.fn(async () => {
+      if (selectError) throw selectError;
+      return [];
+    });
+    const database = { raw: { dialect: "postgres", exec, prepare: () => ({ all, get: async () => undefined }) } };
+    return { database: database as unknown as MeshDatabase, exec };
+  }
+
+  it("never runs DDL as the runtime role and stays unavailable while the owner has not created the table", async () => {
+    for (const code of ["42P01", "42501"]) {
+      const { database, exec } = postgresDatabase(Object.assign(new Error("relation is missing"), { code }));
+      const preferences = new NodeAutoUpdateStore(database, () => NOW);
+      await expect(preferences.initialize()).resolves.toBe(false);
+      expect(preferences.available).toBe(false);
+      expect(exec).not.toHaveBeenCalled();
+      await expect(preferences.get("owner-a", true)).resolves.toMatchObject({ enabled: false, available: false, updatedAt: null });
+      await expect(preferences.set("owner-a", true, true)).rejects.toThrow("node_auto_update_unavailable");
+    }
+  });
+
+  it("uses the owner-created table and still surfaces unrelated database errors", async () => {
+    const ready = postgresDatabase(null);
+    const preferences = new NodeAutoUpdateStore(ready.database, () => NOW);
+    await expect(preferences.initialize()).resolves.toBe(true);
+    expect(preferences.available).toBe(true);
+    expect(ready.exec).not.toHaveBeenCalled();
+    const broken = postgresDatabase(Object.assign(new Error("connection lost"), { code: "08006" }));
+    await expect(new NodeAutoUpdateStore(broken.database).initialize()).rejects.toThrow("connection lost");
+  });
+});
+
 describe("NodeAutoUpdateScheduler", () => {
   it("stores consent per account and queues an owner-scoped, exact update command once", async () => {
     const database = await MeshDatabase.open(":memory:");

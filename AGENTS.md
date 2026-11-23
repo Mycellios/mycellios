@@ -363,6 +363,11 @@ These rules apply to the complete repository.
   and earlier arm64 catalogs compatible; both Mac builds use the all-Mac opt-in.
   The download page opts into `?include=macos-all`; retain the three-platform
   `macos-arm64` opt-in and byte-identical legacy two-platform default catalog.
+- The coordinator's PostgreSQL schema is applied by the migration owner; its runtime
+  role has no CREATE on `mycellios`. Never run DDL at coordinator startup on
+  PostgreSQL. Export new tables as owner SQL (like `eventDemoSchemaSql` and
+  `nodeAutoUpdateSchemaSql`) and keep the feature unavailable, not crashing, until
+  the table exists. Check `tests/node-auto-update.test.ts`.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.
 - Run `npm run verify:structure`, relevant focused tests and `npm run typecheck`.
