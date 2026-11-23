@@ -329,7 +329,8 @@ export function MicoTaskTabs({
       setRevision(value => value + 1);
       onChangedRef.current?.();
       // Another conversation may share the title, so say which one left and offer it back.
-      toast(t`${titleOf(tab)} archived`, {
+      const title = titleOf(tab);
+      toast(t`${title} archived`, {
         action: { label: t`Undo`, onClick: () => void undoArchive(tab.threadId, wasShown) },
       });
     } catch (cause) {
