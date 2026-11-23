@@ -1,5 +1,7 @@
 // First: copies storage saved under the legacy key names before any module reads it.
 import "./lib/legacy-storage";
+// Before monitoring: removes an identity provider's return (and any session it carries) from the address.
+import "./lib/identity-link-return";
 import { installFocusInput } from "./lib/focus-input";
 import { syncNativeLogo } from "./lib/logo-preference";
 import { installActionSounds } from "./lib/reply-sound";

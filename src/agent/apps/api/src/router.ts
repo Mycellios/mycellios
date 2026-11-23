@@ -35,6 +35,7 @@ import type { BillingService } from "./billing.js";
 import { accountRoutes } from "./routes/account.js";
 import { mycelliosApiKeyRoutes } from "./routes/mycellios-api-keys.js";
 import { mycelliosApiBillingRoutes } from "./routes/mycellios-api-billing.js";
+import { mycelliosIdentityRoutes } from "./routes/mycellios-identities.js";
 import { referralRoutes } from "./routes/referrals.js";
 import { boardsRoutes } from "./routes/boards.js";
 import { botsRoutes } from "./routes/bots.js";
@@ -138,6 +139,8 @@ export interface RouterDeps {
   billing?: BillingService;
   env: {
     mycelliosSso?: boolean;
+    /** The Mycellios identity authority (the OIDC issuer) when Mycellios SSO is on. */
+    mycelliosIdentityIssuer?: string;
     defaultModelMaxTokens?: number;
     defaultModelContextWindow?: number;
     ticketBoardEnabled?: boolean;
@@ -175,6 +178,7 @@ export function createRouter(deps: RouterDeps) {
     ...accountRoutes(ctx),
     ...mycelliosApiKeyRoutes(ctx),
     ...mycelliosApiBillingRoutes(ctx),
+    ...mycelliosIdentityRoutes(ctx),
     ...referralRoutes(ctx),
     ...spacesRoutes(ctx),
     ...modelsRoutes(ctx),

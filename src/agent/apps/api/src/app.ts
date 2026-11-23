@@ -735,6 +735,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     },
     env: {
       mycelliosSso: env.mycelliosSso,
+      mycelliosIdentityIssuer: env.mycelliosSso ? env.oidc?.issuer : undefined,
       defaultModelMaxTokens: env.defaultModelMaxTokens,
       defaultModelContextWindow: env.defaultModelContextWindow,
       phoneCallsEnabled: env.phoneCallsEnabled,

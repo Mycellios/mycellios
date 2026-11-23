@@ -7,6 +7,7 @@ const DESTINATIONS = {
   "api-keys": "/app?settings=api-keys",
   "api-plan": "/app?settings=api-plan",
   "api-usage": "/app?settings=api-usage",
+  profile: "/app?settings=profile",
 } as const;
 
 export type SignInNext = keyof typeof DESTINATIONS;
@@ -15,7 +16,9 @@ export type SignInNext = keyof typeof DESTINATIONS;
 export function signInNextFor(pathname: string, search: string): SignInNext | null {
   if (pathname !== "/app") return null;
   const section = new URLSearchParams(search).get("settings");
-  return section === "api-keys" || section === "api-plan" || section === "api-usage" ? section : null;
+  return section === "api-keys" || section === "api-plan" || section === "api-usage" || section === "profile"
+    ? section
+    : null;
 }
 
 /** Where a signed-in user lands for a `next` value; unknown values use the app. */
