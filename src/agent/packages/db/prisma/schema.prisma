@@ -556,6 +556,7 @@ model SpaceKey {
 
 model SpaceMember {
   desktopExecution DesktopExecutionPreference?
+  desktopBotDevices DesktopBotDevice[]
   id               String                 @id
   spaceId          String
   organizationId   String
@@ -586,6 +587,22 @@ model DesktopExecutionPreference {
 
   @@id([spaceId, userId])
   @@map("desktop_execution_preferences")
+}
+
+/// The PC an owner last chose for a Mico, as a hashed device key. Not a lease or a
+/// bearer: it only settles which online PC runs the Mico after restarts.
+model DesktopBotDevice {
+  spaceId    String
+  userId     String
+  botId      String
+  deviceKey  String
+  updatedAt  DateTime    @default(now()) @updatedAt
+  membership SpaceMember @relation(fields: [spaceId, userId], references: [spaceId, userId], onDelete: Cascade)
+  bot        Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@id([spaceId, userId, botId])
+  @@index([botId])
+  @@map("desktop_bot_devices")
 }
 
 model Invitation {
@@ -760,6 +777,7 @@ model WorkflowExecution {
 
 model Bot {
   memoryGrants MicoMemoryGrant[]
+  desktopDevices DesktopBotDevice[]
   ledGroups ChatGroup[] @relation("ChatGroupLead")
   sentBotMessageRequests BotMessageRequest[] @relation("BotMessageRequestSender")
   botMessageRecipients BotMessageRecipient[] @relation("BotMessageRecipientBot")

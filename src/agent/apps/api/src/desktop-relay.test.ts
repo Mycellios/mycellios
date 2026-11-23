@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
 import { afterEach, expect, it } from "vitest";
-import { desktopRelayKey, signDesktopRelay } from "../../../packages/adapters/src/desktop-relay.js";
+import { desktopDeviceKey, desktopRelayKey, signDesktopRelay } from "../../../packages/adapters/src/desktop-relay.js";
 import { HostComputerSandbox } from "../../../packages/adapters/src/host-computer-sandbox.js";
 import { startHostComputerServer } from "../../../packages/adapters/src/host-computer-server.js";
 import { DesktopRelayClient } from "../../desktop/src/desktop-relay.js";
@@ -417,4 +417,71 @@ it("routes a Mico to the PC that reports its folder and reports an unchosen one 
   // Only folder keys are accepted, never names or paths.
   expect((await call("session-b", "account", { ...mac, workspaces: ["Writer"] })).status).toBe(409);
   expect((await call("session-b", "account", { ...mac, workspaces: Array.from({ length: 257 }, (_, n) => createHash("sha256").update(String(n)).digest("hex")) })).status).toBe(409);
+});
+
+it("remembers the PC the owner chose for a Mico after the API forgets the binding", async () => {
+  const chosen = new Map<string, string>();
+  let failLookup = false;
+  const mount = () => {
+    const app = new Hono();
+    close = mountDesktopRelay(app, {
+      enabled: true,
+      secret: "test-purpose-secret",
+      desktopExecution: async () => true,
+      authenticate: async (request) => request.headers.get("x-test-auth") === "yes"
+        ? { actor: owner, sessionId: request.headers.get("x-test-session") ?? "session-a" }
+        : null,
+      ownsBot: async (_actor, id) => id === "test-bot" || id === "other-bot",
+      chosenDevice: {
+        get: async (scope, botId) => {
+          if (failLookup) throw new Error("database unavailable");
+          return chosen.get(JSON.stringify([scope.userId, scope.spaceId, botId]));
+        },
+        remember: async (scope, botId, deviceKey) => { chosen.set(JSON.stringify([scope.userId, scope.spaceId, botId]), deviceKey); },
+      },
+    });
+    const call = (session: string, action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+      method: "POST",
+      headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "x-test-session": session, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const probe = async (botId: string) => {
+      const body = JSON.stringify({ probe: botId, agentExecution: 1, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+      const time = String(Date.now());
+      return (await app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body })).json();
+    };
+    return { call, probe };
+  };
+  let api = mount();
+  const windows = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await api.call("session-a", "identity", {})).json(), agentExecution: 1 };
+  const mac = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await api.call("session-b", "identity", {})).json(), agentExecution: 1 };
+  const folder = createHash("sha256").update("test-bot").digest("hex");
+  // Both PCs hold the Mico's folder, so its folder alone cannot settle which runs it.
+  expect((await api.call("session-a", "account", { ...windows, workspaces: [folder] })).status).toBe(200);
+  expect((await api.call("session-b", "account", { ...mac, workspaces: [folder] })).status).toBe(200);
+  expect(await api.probe("test-bot")).toMatchObject({ available: false, unresolved: true });
+  // Sending from Desktop on the Mac binds it there, and that choice is saved hashed.
+  expect((await api.call("session-b", "bind", { deviceId: mac.deviceId, botId: "test-bot", generation: mac.generation })).status).toBe(200);
+  expect([...chosen.values()]).toEqual([desktopDeviceKey(mac.deviceId)]);
+  expect([...chosen.values()]).not.toContain(mac.deviceId);
+  expect(await api.probe("test-bot")).toEqual({ agentExecution: 1, available: true, preferred: true });
+
+  // A restarted API has no bindings: the saved choice routes the routine to the Mac.
+  close();
+  api = mount();
+  expect((await api.call("session-a", "account", { ...windows, workspaces: [folder] })).status).toBe(200);
+  expect((await api.call("session-b", "account", { ...mac, workspaces: [folder] })).status).toBe(200);
+  expect(await api.probe("test-bot")).toEqual({ agentExecution: 1, available: true, preferred: true });
+  const bound = async (session: string, deviceId: string) =>
+    ((await (await api.call(session, "poll", { deviceId })).json()) as { bindings?: Array<{ botId: string }> }).bindings?.map(item => item.botId);
+  expect(await bound("session-b", mac.deviceId)).toEqual(["test-bot"]);
+  expect(await bound("session-a", windows.deviceId)).toEqual([]);
+  // A Mico nobody chose stays unresolved, and an unavailable store never guesses a PC.
+  expect(await api.probe("other-bot")).toMatchObject({ available: false, unresolved: true });
+  failLookup = true;
+  close();
+  api = mount();
+  expect((await api.call("session-a", "account", { ...windows, workspaces: [folder] })).status).toBe(200);
+  expect((await api.call("session-b", "account", { ...mac, workspaces: [folder] })).status).toBe(200);
+  expect(await api.probe("test-bot")).toMatchObject({ available: false, unresolved: true });
 });

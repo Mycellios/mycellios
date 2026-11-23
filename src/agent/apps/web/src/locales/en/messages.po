@@ -14960,3 +14960,7 @@ msgstr "Could not change which Micos can use this memory"
 #: src/lib/native-computer-execution.ts
 msgid "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
 msgstr "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
+
+#: src/lib/run-error.ts
+msgid "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
+msgstr "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."

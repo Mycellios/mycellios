@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopUnreachableError } from "./computer-errors.js";
-import { DesktopRelayBroker, desktopAgentSelection, desktopRelayAvailable, desktopRelayKey, desktopRelayPresence, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
+import { DesktopRelayBroker, desktopAgentSelection, desktopDeviceKey, desktopRelayAvailable, desktopRelayKey, desktopRelayPresence, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
 const owner = { userId: "user", spaceId: "space", sessionId: "session" };
 const binding = { deviceId: "device", botId: "bot", generation: "generation" };
 const context = () => ({ userId: "user", spaceId: "space", botId: "bot", operationId: "op", traceId: "trace", signal: new AbortController().signal });
@@ -426,6 +426,42 @@ it("routes each Mico to the one online PC that holds its folder and never guesse
   broker.register(mac, { deviceId: "mac-pc", generation: "mac-gen", agentExecution: 1, workspaces: [folder("planner"), folder("shared"), folder("writer")] });
   broker.connectAccountBot(owner, "writer");
   expect(broker.ownedBindings(owner, "windows-pc")).toEqual(["writer"]);
+});
+
+it("gives a Mico to the online PC its owner chose and reports only new choices", () => {
+  broker = new DesktopRelayBroker();
+  const mac = { ...owner, sessionId: "mac-session" };
+  const pcs = () => {
+    broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen", agentExecution: 1, workspaces: [folder("shared")] });
+    broker.register(mac, { deviceId: "mac-pc", generation: "mac-gen", agentExecution: 1, workspaces: [folder("shared")] });
+  };
+  pcs();
+  expect(broker.needsChoice(owner, "shared")).toBe(true);
+  // An explicit bind is a new choice; the same PC reasserting it is not.
+  expect(broker.bind(mac, { deviceId: "mac-pc", generation: "mac-gen", botId: "shared" })).toBe(true);
+  expect(broker.bind(mac, { deviceId: "mac-pc", generation: "mac-gen", botId: "shared" })).toBe(false);
+  expect(broker.needsChoice(owner, "shared")).toBe(false);
+  expect(broker.bind(owner, { deviceId: "windows-pc", generation: "windows-gen", botId: "shared" })).toBe(true);
+
+  // After a restart only the remembered key settles it; a raw id or an offline PC never does.
+  broker.close();
+  broker = new DesktopRelayBroker();
+  pcs();
+  broker.connectAccountBot(owner, "shared", "mac-pc");
+  broker.connectAccountBot(owner, "shared", desktopDeviceKey("gone-pc"));
+  expect(broker.unresolved(owner, "shared")).toBe(true);
+  broker.connectAccountBot(owner, "shared", desktopDeviceKey("mac-pc"));
+  expect(broker.ownedBindings(mac, "mac-pc")).toEqual(["shared"]);
+  expect(broker.agentAvailable(owner, "shared")).toBe(true);
+  expect(broker.needsChoice(owner, "shared")).toBe(false);
+
+  // One online PC still takes every Mico without a lookup.
+  broker.close();
+  broker = new DesktopRelayBroker();
+  broker.register(owner, { deviceId: "windows-pc", generation: "windows-gen", agentExecution: 1 });
+  expect(broker.needsChoice(owner, "shared")).toBe(false);
+  broker.connectAccountBot(owner, "shared", desktopDeviceKey("mac-pc"));
+  expect(broker.ownedBindings(owner, "windows-pc")).toEqual(["shared"]);
 });
 
 it("keeps one online PC taking every Mico and leaves older Desktops unresolved, not offline", () => {

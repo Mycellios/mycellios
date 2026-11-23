@@ -55,8 +55,15 @@ describe("normalizeRunError", () => {
       "This Mico needs a workspace to run this task.",
     );
   });
-  it("tells users which PC to message when several are online and none holds the Mico", () => {
-    expect(normalizeRunError(DESKTOP_OWNER_UNRESOLVED_ERROR).summary).toBe(DESKTOP_OWNER_UNRESOLVED_ERROR);
+  it("tells users how to choose a PC when several are online and none holds the Mico", () => {
+    expect(normalizeRunError(DESKTOP_OWNER_UNRESOLVED_ERROR)).toEqual({
+      summary: DESKTOP_OWNER_UNRESOLVED_ERROR,
+      details: DESKTOP_OWNER_UNRESOLVED_ERROR,
+      recovery: "computer",
+    });
+    // Runs stored before the choice was remembered show the current guidance.
+    const legacy = "More than one of your PCs is connected and none is clearly this Mico's. Send it a message from Mycellios Desktop on the PC that should run it.";
+    expect(normalizeRunError(legacy)).toMatchObject({ summary: DESKTOP_OWNER_UNRESOLVED_ERROR, recovery: "computer" });
     expect(isUncertainDesktopRun(DESKTOP_OWNER_UNRESOLVED_ERROR)).toBe(false);
   });
   it("tells users where to reopen a task tied to a PC", () => {
