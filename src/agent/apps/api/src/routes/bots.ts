@@ -52,7 +52,7 @@ import { deleteAgentSecret, listAgentSecrets, putAgentSecret } from "../agent-se
 import type { RouterDeps } from "../router.js";
 import { loadMessagePage } from "../thread-message-pages.js";
 import type { RouterContext } from "./context.js";
-import { computerContext, modelSetup, THREAD_MESSAGE_PAGE_SIZE } from "./shared.js";
+import { codingEnginesForComputer, computerContext, modelSetup, THREAD_MESSAGE_PAGE_SIZE } from "./shared.js";
 
 /** Surface a Space deletion race as a retryable conflict instead of a generic failure. */
 function mapSpaceLifecycleError(error: unknown): unknown {
@@ -427,7 +427,13 @@ export function botsRoutes(ctx: RouterContext) {
         });
         if (!modelChange.ok) throw new ORPCError("BAD_REQUEST", { message: modelChange.error });
         if (input.agentEngine && input.agentEngine !== "pi") {
-          await requireNativeEngine(deps, context.actor, input.agentEngine);
+          if (input.agentEngine === "acp" || input.agentEngine === existing.agentEngine) {
+            await requireNativeEngine(deps, context.actor, input.agentEngine);
+          } else {
+            const available = await codingEnginesForComputer(deps, context.actor, existing, context.signal);
+            if (!available.engines.includes(input.agentEngine))
+              throw new ORPCError("BAD_REQUEST", { message: "This coding engine is unavailable on the selected computer." });
+          }
         }
         const thinkingLevel = input.thinkingLevel;
         if (!existing.thread) throw new IsolationError();

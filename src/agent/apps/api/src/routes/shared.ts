@@ -1,9 +1,11 @@
 import type { AdapterContext } from "@mycellios/adapter-kit";
 import {
   deploymentModelRole,
+  discoverNativeEngines,
   findConnectedModelCredential,
   hasHostedModelCredits,
   hostCredentialSource,
+  nativeHostAccess,
   resolveMemberMainModel,
 } from "@mycellios/adapters";
 import type { Actor, Me } from "@mycellios/contracts";
@@ -18,6 +20,33 @@ export function computerContext(actor: Actor, botId: string, operationId: string
     userId: actor.userId,
     botId,
     signal: new AbortController().signal,
+  };
+}
+
+/** Inspect the Mico's selected host. A PC without a live reply offers no server engines. */
+export async function codingEnginesForComputer(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: { id: string; computer?: { kind: string; scope: string } | null },
+  signal?: AbortSignal,
+) {
+  if (bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated") {
+    const probe = computerContext(actor, bot.id, "engine-discovery");
+    const combined = AbortSignal.any([signal ?? probe.signal, AbortSignal.timeout(4_000)]);
+    const engines = await deps.sandbox.nativeEngines?.({ ...probe, signal: combined }).catch(() => undefined);
+    return {
+      computer: "desktop" as const,
+      engines: (Array.isArray(engines) ? engines : []).filter(
+        id => id === "codex" || id === "claude" || id === "opencode",
+      ),
+    };
+  }
+  const engines = await nativeHostAccess(deps.dataDir, actor) ? await discoverNativeEngines(deps.dataDir) : [];
+  return {
+    computer: "server" as const,
+    engines: engines.flatMap(({ id, available }) =>
+      available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
+    ),
   };
 }
 

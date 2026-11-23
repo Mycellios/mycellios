@@ -11,13 +11,18 @@ import {
 } from "@mycellios/db";
 import { resolveThreadTarget, stopThreadRuns } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
+import { codingEnginesForComputer } from "./shared.js";
 
-export function localCapabilityRoutes({ authed, deps }: RouterContext) {
+export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
   const acpRegistry = createAcpRegistry();
   let quota: { at: number; value: Awaited<ReturnType<typeof discoverNativeCodexQuota>> } | undefined;
   let pendingQuota: ReturnType<typeof discoverNativeCodexQuota> | undefined;
   return {
     engines: {
+      forBot: authed.engines.forBot.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        return codingEnginesForComputer(deps, context.actor, bot, context.signal);
+      }),
       codexQuota: authed.engines.codexQuota.handler(async ({ context }) => {
         // Check on every request, including cached reads, so revocation is immediate.
         if (!(await nativeHostAccess(deps.dataDir, context.actor))) return null;

@@ -154,13 +154,17 @@ export class DesktopAgentRuntime implements AgentRuntime {
     // The approval judge is a server authority, not another Desktop task waiting for
     // a runtime slot held by the very operation it is deciding whether to admit.
     if (request.usageOperationKind === "setup" && !request.tools.length || request.script) { yield* this.options.fallback.run(request, context); return; }
-    const isolatedServerRun = context.isolatedWorkspace && (!request.agentEngine || request.agentEngine === "pi");
-    if (context.cloudWorkspace || isolatedServerRun) {
+    const isNative = Boolean(request.agentEngine && request.agentEngine !== "pi");
+    const isolatedServerRun = context.isolatedWorkspace && !isNative;
+    const nativeServerRun = isNative && context.desktopWorkspace === false;
+    if (context.cloudWorkspace || isolatedServerRun || nativeServerRun) {
       yield* this.options.fallback.run({
         ...request,
         instructions: context.cloudWorkspace
           ? `${request.instructions}\nThis turn uses a server workspace separate from Desktop. For work that requires files only on the PC, explain which files are needed.`
-          : `${request.instructions}\nThis Mico has selected an isolated server computer. Do not switch to Desktop or claim access to files on the PC.`,
+          : context.isolatedWorkspace
+            ? `${request.instructions}\nThis Mico has selected an isolated server computer. Do not switch to Desktop or claim access to files on the PC.`
+            : request.instructions,
       }, context);
       return;
     }
@@ -171,10 +175,10 @@ export class DesktopAgentRuntime implements AgentRuntime {
       if (route.unresolved) throw Error(DESKTOP_OWNER_UNRESOLVED_ERROR);
       // The executor also supplies resumeToolResult on fresh turns. Only an
       // actual checkpoint or project binding requires the original Desktop.
-      if (route.preferred && (context.projectSessionId || request.resumeFromCheckpoint || request.turnCheckpoint)) {
+      if ((route.preferred || context.desktopWorkspace) && (context.projectSessionId || request.resumeFromCheckpoint || request.turnCheckpoint)) {
         throw Error("This task is bound to your Desktop. Reconnect the PC to resume it.");
       }
-      if (route.preferred) {
+      if (route.preferred || context.desktopWorkspace) {
         // Local-first: never move a Desktop turn to the cloud without consent.
         // The user can switch this Mico's computer explicitly from its settings.
         throw Error("Your Desktop is offline. Reconnect it to continue. This Mico did not move to the cloud; switch its computer explicitly if you want to run it there.");

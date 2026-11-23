@@ -462,7 +462,13 @@
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
-  permissions outside the approved MCP bridge. Verify the scoped settings and
+  permissions outside the approved MCP bridge. For Desktop OpenCode, resolve a
+  project or task worktree on the native host from the existing local grant.
+  Use it for the CLI and ACP working directory, keeping the private profile and
+  session on the host outside the repo. Resume only with the same project binding
+  and an ACP CLI that advertises session load. The chat picker discovers native
+  engines from the Mico's authorized computer. An offline Desktop never offers
+  the server's engines or delegates its run to them. Verify the scoped settings and
   native-agent-runtime tests. Protocol fixtures do not qualify real inference.
   Managed OpenCode installs are explicitly admitted by allowOpenCodeInstall
   in the host's native-agents.json and the same account/Space grant. Verify

@@ -6,6 +6,8 @@ import type {
   SandboxKind,
 } from "@mycellios/contracts";
 
+export type NativeCodingEngine = "codex" | "claude" | "opencode";
+
 export interface AdapterContext {
   operationId: string;
   traceId: string;
@@ -19,10 +21,14 @@ export interface AdapterContext {
   browserThreadId?: string;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
+  /** Resolved by the local Desktop host only, never received in a run request. */
+  resolveOpenCodeProject?: () => Promise<string | undefined>;
   /** Server-selected workspace for this run, including after Desktop reconnects. */
   cloudWorkspace?: { workerId: string; runFence: number };
   /** Server-derived from the owned Computer scope; never supplied by a client. */
   isolatedWorkspace?: boolean;
+  /** True for the selected Desktop, false for a server assignment, absent for legacy callers. */
+  desktopWorkspace?: boolean;
   /** Opaque fence for releasing a graphical screen without tearing down its replacement. */
   screenLeaseId?: string;
   /** Retain a completed run's screen for reuse by this bot. */
