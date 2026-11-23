@@ -29,7 +29,7 @@ export async function loadComputerScreen(options: {
 }
 
 /** The web server's screen proxy route, at the root or under the app's base path (/agent/). */
-const SCREEN_PROXY_PATH = /^(?:/[A-Za-z0-9_-]+)*/novnc//;
+const SCREEN_PROXY_PATH = /^(?:\/[A-Za-z0-9_-]+)*\/novnc\//;
 
 export function embeddableScreenUrl(url: string | null): string | null {
   if (!url) return null;
