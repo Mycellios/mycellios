@@ -34,6 +34,8 @@ export function manualUpdatePhase(contents: string): string | null {
 export async function launchManualUpdate(options: {
   profile: string; executable: string; oldPid: number; installer: string;
   release: ManualRelease; reopenUrl: string;
+  ownerWindow?: string;
+  prepareToQuit?(): Promise<void>;
 }): Promise<void> {
   // Windows process APIs report long paths, while TEMP/profile inputs can use
   // 8.3 aliases. Resolve the same files before the worker checks process identity.
@@ -44,10 +46,11 @@ export async function launchManualUpdate(options: {
   const directory = path.join(profile, "updates", randomUUID());
   const helper = path.join(directory, "manual-update-helper.ps1");
   const config = path.join(directory, "request.json");
+  const commit = path.join(directory, "commit.json");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await writePrivateFile(helper, await readFile(new URL("./manual-update-helper.ps1", import.meta.url), "utf8"));
   await writePrivateFile(config, JSON.stringify({ schema: "mycellios-manual-update/1",
-    profile, executable: appExecutable, oldPid: options.oldPid,
+    profile, executable: appExecutable, oldPid: options.oldPid, ownerWindow: options.ownerWindow,
     installer, version: options.release.version, sha256: options.release.sha256,
     bytes: options.release.bytes, reopenUrl: options.reopenUrl }));
   const executable = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -65,12 +68,12 @@ export async function launchManualUpdate(options: {
   })();
   // A successful spawn is not a successful handoff: wait for the exact worker's acknowledgement.
   // Windows scans and any owner file confirmation happen while Desktop stays open.
-  const deadline = Date.now() + 120_000;
+  const started = Date.now();
   let lastPhase: string | null = null;
   try {
     await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
     child.unref();
-    while (Date.now() < deadline) {
+    while (true) {
       const phase = await readFile(path.join(directory, "progress.json"), "utf8")
         .then(manualUpdatePhase).catch(() => null);
       if (phase) lastPhase = phase;
@@ -82,13 +85,22 @@ export async function launchManualUpdate(options: {
         throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})${detail}`);
       }
       if (phase === "waiting-for-app") {
-        await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));
+        await options.prepareToQuit?.();
+        await writePrivateFile(commit, JSON.stringify({ approved: true }));
         return;
+      }
+      const checkingWithWindows = lastPhase === "waiting-for-windows-approval" || lastPhase === "scanning-installer";
+      if (Date.now() >= started + (checkingWithWindows ? 8 * 60_000 : 120_000)) {
+        throw Error(checkingWithWindows ? "The Windows installer check did not finish" : "The update helper did not acknowledge the handoff");
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    throw Error("The update helper did not acknowledge the handoff");
   } catch (error) {
+    // The launcher owns the worker's process handle. Cancel only this uncommitted
+    // attempt so a suspended Windows scan cannot hold the profile lock forever.
+    if (child.exitCode === null && child.signalCode === null) {
+      await writePrivateFile(path.join(directory, "cancel.json"), "{}").catch(() => undefined);
+    }
     // An early launcher failure can leave both PowerShell logs empty. Record
     // bounded process facts locally so it can be diagnosed without user content,
     // credentials, an installer retry or a forced application shutdown.

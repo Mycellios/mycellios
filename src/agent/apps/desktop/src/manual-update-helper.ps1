@@ -16,30 +16,49 @@ public interface IMycelliosAttachment {
  [PreserveSig]int CheckPolicy();
  [PreserveSig]int Prompt(IntPtr window,int kind,out int action);
  [PreserveSig]int Save();
+ [PreserveSig]int Execute(IntPtr window,[MarshalAs(UnmanagedType.LPWStr)]string verb,out IntPtr process);
+ [PreserveSig]int SaveWithUI(IntPtr window);
 }
 public static class MycelliosAttachment {
- public static void Approve(string file,string source,IntPtr owner) {
+ private static bool ConfirmPolicy(IMycelliosAttachment attachment,IntPtr owner,bool confirmed,Action<string> progress) {
+  int policy=attachment.CheckPolicy();
+  if(policy==0)return confirmed;
+  if(policy!=1){Marshal.ThrowExceptionForHR(policy);throw new InvalidOperationException("Windows blocked the installer");}
+  if(confirmed)return true;
+  if(owner==IntPtr.Zero)throw new InvalidOperationException("Open Mycellios to review the Windows file check before restarting");
+  progress("waiting-for-windows-approval");
+  int action;int prompt=attachment.Prompt(owner,2,out action);
+  if(prompt!=0){Marshal.ThrowExceptionForHR(prompt);throw new OperationCanceledException("Windows file check was not approved");}
+  if(action!=2)throw new OperationCanceledException("Windows file check was cancelled");
+  return true;
+ }
+ public static void Approve(string file,string source,IntPtr owner,Action<string> progress) {
   var attachment=(IMycelliosAttachment)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("4125dd96-e03a-4103-8f70-e0597d803b9c")));
   try {
    var client=new Guid("1e433c96-ef84-4b21-b6c9-4a8615e0d472");
    attachment.SetClientGuid(ref client);attachment.SetClientTitle("Mycellios");
    attachment.SetLocalPath(file);attachment.SetFileName(System.IO.Path.GetFileName(file));
    if(!String.IsNullOrEmpty(source))attachment.SetSource(source);
-   // Windows may scan or quarantine the attachment and update its evidence.
-   int saved=attachment.Save();
+   // Show the owner prompt before running a potentially slow attachment scan.
+   bool confirmed=ConfirmPolicy(attachment,owner,false,progress);
+   progress("scanning-installer");
+   int saved=owner==IntPtr.Zero ? attachment.Save() : attachment.SaveWithUI(owner);
    if(saved!=0){Marshal.ThrowExceptionForHR(saved);throw new InvalidOperationException("Windows did not validate the installer");}
-   int policy=attachment.CheckPolicy();
-   if(policy==1){
-    if(owner==IntPtr.Zero)throw new InvalidOperationException("Open Mycellios to review the Windows file check before restarting");
-    int action;int prompt=attachment.Prompt(owner,2,out action);
-    if(prompt!=0){Marshal.ThrowExceptionForHR(prompt);throw new OperationCanceledException("Windows file check was not approved");}
-    if(action!=2)throw new OperationCanceledException("Windows file check was cancelled");
-   }else if(policy!=0){Marshal.ThrowExceptionForHR(policy);throw new InvalidOperationException("Windows blocked the installer");}
+   ConfirmPolicy(attachment,owner,confirmed,progress);
   }finally{Marshal.FinalReleaseComObject(attachment);}
  }
 }
 public static class MycelliosUpdatePath {
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window,int command);
+ [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+ [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window,out uint pid);
+ public static IntPtr OwnedWindow(long handle,uint pid) {
+  var window=new IntPtr(handle);
+  uint owner;
+  if(!IsWindowVisible(window) || GetWindowThreadProcessId(window,out owner)==0 || owner!=pid)
+   throw new InvalidOperationException("The Mycellios update window is no longer available");
+  return window;
+ }
  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
  private static extern uint GetLongPathName(string path, StringBuilder result, uint capacity);
  public static string Canonical(string path) {
@@ -66,7 +85,16 @@ if($Launch){
  # Windows PowerShell can lose the native process handle returned by
  # Start-Process. Retain it before waiting so exit/acknowledgement is real.
  $null=$worker.Handle
- $worker.WaitForExit()
+ $cancel=Join-Path $job 'cancel.json'
+ $commit=Join-Path $job 'commit.json'
+ while(!$worker.WaitForExit(200)){
+  if((Test-Path -LiteralPath $cancel) -and !(Test-Path -LiteralPath $commit)){
+   # This is the exact child of this launcher, before the app authorized shutdown.
+   try {$worker.Kill()} catch {if(!$worker.HasExited){throw}}
+   $worker.WaitForExit()
+   break
+  }
+ }
  $worker.Refresh()
  exit $worker.ExitCode
 }
@@ -177,7 +205,7 @@ try {
  $owner=[IntPtr]::Zero
  if($old){
   if(!([MycelliosUpdatePath]::Canonical($old.Path)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
-  $owner=$old.MainWindowHandle
+  if($config.ownerWindow){$owner=[MycelliosUpdatePath]::OwnedWindow([long]$config.ownerWindow,[uint32]$config.oldPid)}
  }
  # Apply Windows attachment policy and any required owner confirmation BEFORE
  # acknowledging shutdown. A rejected, cancelled or unavailable check keeps
@@ -197,7 +225,7 @@ try {
  # Windows trust services are allowed to update ADS evidence or quarantine a
  # file. Release only its verification handle, then re-open and hash again.
  $installerLock.Dispose();$installerLock=$null
- [MycelliosAttachment]::Approve($installer,$source,$owner)
+ [MycelliosAttachment]::Approve($installer,$source,$owner,[Action[string]]{param($phaseName) Progress $phaseName})
  $installerLock=[IO.File]::Open($installer,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
  Installer-Valid
  if($old){

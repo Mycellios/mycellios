@@ -198,6 +198,7 @@ const catalogPackage: ManualPackageKind | null =
 // Without a Developer ID certificate, a writable ad-hoc app replaces itself from the
 // verified disk image and reopens, as Windows does; otherwise the disk image opens.
 const macosSelfUpdate = process.platform === "darwin" && app.isPackaged ? macosSelfUpdateBundle(process.execPath) : null;
+const desktopUpdateBusy = () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy());
 const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
   ? new ManualUpdateController({
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
@@ -207,18 +208,23 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
     catalogUrl: DESKTOP_CATALOG_ALL_URL,
     publishedRelease: () => publishedDesktopRelease(app.getVersion(), catalogPackage),
     ...(catalogPackage !== "windows-x64" && !macosSelfUpdate ? { installAction: "system-installer" as const } : {}),
-    busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
+    busy: desktopUpdateBusy,
     prepare: prepareRendererUpdate,
-    handoff: catalogPackage !== "windows-x64" && !macosSelfUpdate ? file => openSystemInstaller(file) : async (file, release) => {
+    handoff: catalogPackage !== "windows-x64" && !macosSelfUpdate ? file => openSystemInstaller(file) : async (file, release, force) => {
       const profile = app.getPath("userData");
       if (!macosSelfUpdate) await requireManualUpdateSpace(profile, process.execPath);
       const win = mainWindow;
       if (!win || win.isDestroyed()) throw Error("The app window changed");
-      const reopen = new URL(win.webContents.getURL());
-      reopen.search = "";
-      reopen.hash = "";
-      win.setEnabled(false);
-      try {
+      const reopenUrl = () => {
+        const url = new URL(win.webContents.getURL());
+        url.search = "";
+        url.hash = "";
+        return url.href;
+      };
+      let preparingToQuit = false;
+      const prepareToQuit = async () => {
+        preparingToQuit = true;
+        win.setEnabled(false);
         await win.webContents.session.cookies.flushStore();
         await win.webContents.session.flushStorageData();
         await accountComputer?.freezeForUpdate();
@@ -231,17 +237,38 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
         // handed to it during the install; the restored generation reconnects after.
         await Promise.allSettled([accountComputer?.released(), cloudComputer?.release()]);
         hostComputer?.activate(false);
-        if (macosSelfUpdate) await launchMacosUpdate({ profile, bundle: macosSelfUpdate, dmg: file, release, oldPid: process.pid });
-        else await launchManualUpdate({ profile, executable: process.execPath,
-          oldPid: process.pid, installer: file, release, reopenUrl: reopen.href });
+      };
+      try {
+        if (macosSelfUpdate) {
+          await prepareToQuit();
+          await launchMacosUpdate({ profile, bundle: macosSelfUpdate, dmg: file, release, oldPid: process.pid });
+        } else {
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+          const expectedUrl = reopenUrl();
+          await launchManualUpdate({ profile, executable: process.execPath,
+            oldPid: process.pid, ownerWindow: win.getNativeWindowHandle().readBigUInt64LE().toString(),
+            installer: file, release, reopenUrl: expectedUrl,
+            prepareToQuit: async () => {
+              if (!await prepareRendererUpdate() || mainWindow !== win || win.isDestroyed() ||
+                  reopenUrl() !== expectedUrl || (!force && desktopUpdateBusy())) {
+                throw Error("The app changed during the Windows check. Save or finish your work and retry.");
+              }
+              await prepareToQuit();
+            },
+          });
+        }
         quitting = true;
         app.quit();
       } catch (error) {
-        if (!win.isDestroyed()) win.setEnabled(true);
-        hostComputer?.cancelUpdate();
-        cloudComputer?.cancelUpdate();
-        accountComputer?.cancelUpdate();
-        accountComputer?.start();
+        if (preparingToQuit) {
+          if (!win.isDestroyed()) win.setEnabled(true);
+          hostComputer?.cancelUpdate();
+          cloudComputer?.cancelUpdate();
+          accountComputer?.cancelUpdate();
+          accountComputer?.start();
+        }
         throw error;
       }
     },

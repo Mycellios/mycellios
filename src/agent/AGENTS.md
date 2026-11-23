@@ -826,8 +826,11 @@
   checks visible and distinguish starting-installer from a running installer.
   Before acknowledging shutdown, Windows Attachment Execution Services must scan
   the exact file and enforce its download-origin policy and any owner prompt,
-  attached to the still-open Mycellios window. Preserve zone evidence, reject
-  cancelled/blocked checks, and rehash under the verification lock after scanning.
+  attached to the owned, visible main window. Present a required prompt before
+  scanning, then recheck Windows policy and rehash under the verification lock.
+  Keep the app and PC online until that approval, then recheck current drafts and
+  local work before committing the restart. On timeout, cancel only that launcher's
+  uncommitted worker. Preserve zone evidence and reject cancelled/blocked checks.
   Only then launch the approved bytes directly, avoiding a second hidden shell
   prompt after quit. Keep the install progress window responsive through relaunch.
   Qualification Job Objects close their descendants when the command ends: verify

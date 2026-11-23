@@ -68,7 +68,9 @@ it.runIf(process.platform === "win32")("parses the real helper and requires the 
   expect(text).not.toMatch(/Stop-Process|taskkill|ExecutionPolicy|RmShutdown|legacyShutdown/);
   expect(text).toContain("The previous app has not finished saving; update was not applied");
   expect(text).toContain("$start.UseShellExecute=$false");
-  expect(text.indexOf("[MycelliosAttachment]::Approve($installer,$source,$owner)")).toBeLessThan(text.indexOf("Progress 'waiting-for-app'"));
+  expect(text).toMatch(/\[MycelliosAttachment\]::Approve\(\$installer,\$source,\$owner,[^\n]+\n[\s\S]*Progress 'waiting-for-app'/);
+  expect(text).toMatch(/ConfirmPolicy\(attachment,owner,false,progress\);[\s\S]*attachment\.SaveWithUI\(owner\);[\s\S]*ConfirmPolicy\(attachment,owner,confirmed,progress\);/);
+  expect(text).toContain("GetWindowThreadProcessId(window,out owner)==0 || owner!=pid");
   expect(text).toContain("if(action!=2)throw new OperationCanceledException");
   expect(text).toContain("$window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()");
   expect(text).toContain("$installDeadline=(Get-Date).AddMinutes(10)");
@@ -155,7 +157,7 @@ it.runIf(process.platform === "win32")("rejects an Internet-marked installer dis
   }
 }, 60_000);
 
-it.runIf(process.platform === "win32")("acknowledges a live app through a Windows path alias and survives its normal exit", async () => {
+it.runIf(process.platform === "win32").each([false, true])("keeps approval bound to the prepared app (reject preparation: %s)", async rejectPreparation => {
   const profileRoot = await mkdtemp(path.join(os.tmpdir(), "mycellios update exit "));
   const aliasScript = path.join(profileRoot, "alias.ps1");
   await writeFile(aliasScript, "param([string]$Folder)\n(New-Object -ComObject Scripting.FileSystemObject).GetFolder($Folder).ShortPath\n");
@@ -187,8 +189,25 @@ it.runIf(process.platform === "win32")("acknowledges a live app through a Window
       import path from "node:path";
       const { launchManualUpdate } = await import(process.argv[1]);
       const request = JSON.parse(process.argv[2]);
-      await launchManualUpdate({ ...request, oldPid: process.pid });
       const updates = path.join(request.profile, "updates");
+      let prepared = false;
+      const handoff = launchManualUpdate({ ...request, oldPid: process.pid, prepareToQuit: async () => {
+        const [job] = (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
+        const directory = path.join(updates, job.name);
+        const progress = JSON.parse((await readFile(path.join(directory, "progress.json"), "utf8")).replace(/^\uFEFF/, ""));
+        if (progress.phase !== "waiting-for-app") throw Error("Quit prepared before Windows approval");
+        const files = await readdir(directory);
+        if (files.includes("commit.json")) throw Error("Windows handoff committed before preparing to quit");
+        prepared = true;
+        if (request.rejectPreparation) throw Error("New unsaved work");
+      }});
+      if (request.rejectPreparation) {
+        const error = await handoff.catch(error => error);
+        if (!prepared || error?.message !== "New unsaved work") throw Error("The update did not stop at the quit guard");
+        return;
+      }
+      await handoff;
+      if (!prepared) throw Error("The app must prepare to quit before committing the update");
       const [job] = (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
       const commit = path.join(updates, job.name, "commit.json");
       if (JSON.parse(await readFile(commit, "utf8")).approved !== true) throw Error("Missing acknowledgement");
@@ -196,9 +215,15 @@ it.runIf(process.platform === "win32")("acknowledges a live app through a Window
       await writeFile(commit, '{"approved":false}');
     `;
     await promisify(execFile)(executable, [
-      "--import", "tsx", "--input-type=module", "-e", source, moduleUrl, JSON.stringify(request),
+      "--import", "tsx", "--input-type=module", "-e", source, moduleUrl, JSON.stringify({ ...request, rejectPreparation }),
     ], { windowsHide: true, timeout: 50_000 });
     const [job] = (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
+    if (rejectPreparation) {
+      const jobDir = path.join(updates, job!.name);
+      await expect(readFile(path.join(jobDir, "commit.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(readFile(path.join(jobDir, "cancel.json"), "utf8")).resolves.toBe("{}");
+      return;
+    }
     const result = path.join(updates, job!.name, "result.json");
     await expect.poll(async () => {
       const contents = await readFile(result, "utf8").catch(() => "");
