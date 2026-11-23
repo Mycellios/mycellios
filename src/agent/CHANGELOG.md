@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-23
+
+### Added
+
+- Delete a message you sent from its menu when your private conversation is idle.
+- Request context compaction from the conversation options of an idle Pi Mico chat while keeping all messages visible.
+- Settings → Account has two more Mycellios API sections next to API keys. API subscription (Suscripción de la API) shows
+  the Mycellios Go plan, its status, the monthly tokens and the API token balance, and opens Stripe Checkout or the
+  billing portal. API usage (Uso de la API) shows the requests made with your API keys, grouped by model. Both explain how
+  they differ from Billing and from what your Micos use. Links to `?settings=api-plan` and `?settings=api-usage` open them
+  directly, also after signing in, and old dashboard account links now land there.
+- Link or unlink Google and X as sign-in methods in Settings → Profile. The last
+  sign-in method of an account cannot be unlinked.
+
+### Changed
+
+- Mico browser commands use a dedicated tab for each conversation on managed Docker computers.
+- On phones, the workspace menu opens beside the chat list with a short slide, leaving the
+  list visible. Menus and conversation switches use brief transitions and respect reduced
+  motion. Options that are not available yet say "Coming soon".
+- On phones, the keyboard opens only when you tap a text field and closes when you do
+  something else. Unsent drafts are kept. Send, attach and dictation keep the keyboard open.
+
+### Fixed
+
+- A Mico working on your computer no longer stops with "Desktop execution interrupted" when the
+  server answers slowly for a few seconds. Mycellios Desktop now resends its latest result until the
+  server takes it, for up to about a minute and a half, instead of giving up after 20 seconds.
+- A Mico that was waiting when Desktop updated, or whose tools changed meanwhile, resumes its task instead of failing with a model provider error.
+- A message for a Mico on your computer no longer fails with "The operation was aborted due to
+  timeout" when the server is slow to check whether your PC is connected. Before, that check gave up
+  after five seconds and the message, including replies from other Micos waiting to be delivered,
+  was lost. Now the message waits and tries again, without moving to a server workspace, and if your
+  PC still does not answer it ends saying so.
+- With two PCs connected to the same account, a Mico set to This PC now runs on the PC that holds
+  its folder. Before, messages from other Micos or delegated work could run on the server instead,
+  and a Mico using Codex, Claude Code or OpenCode failed with "not authorized to use the server's
+  native agents" while both PCs were online. When neither PC or both hold the Mico's folder, the
+  chat now asks you to send it a message from Mycellios Desktop on the PC that should run it.
+- A Mico using Codex, Claude Code or OpenCode no longer moves to the server when its PC is offline
+  and the server cannot run that agent for you. It shows that your Desktop is offline instead.
+- Micos that work on This PC can use their tools again. Since Desktop 0.17.0, every tool call
+  of a Mico running on the PC failed with "Unsupported Desktop runtime value".
+- Typing in the message field on phones no longer lags: the draft is saved in the background
+  instead of on every keystroke, and the field measures its height once per frame.
+- Conversations open faster on phones: the next conversations are prepared before you pick
+  them, even when only the current tab fits. A slow background read no longer holds up the
+  others.
+- A Mico on This PC can pass dates between the PC and the server. When a value still cannot
+  cross, the error names its kind and where it was, so a routine's history shows what failed.
+- Changing a Mico's model applies to new conversation turns. A paused turn keeps its original model and connection, and a new native session carries the conversation history forward.
+
 ## [0.17.0] - 2026-11-22
 
 ### Added
