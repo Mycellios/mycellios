@@ -22,7 +22,10 @@ describe("work resource reservations", () => {
     expect(nativeWorkProjectSession(thread,{})).toBe("thread");
     expect(nativeWorkProjectSession(thread,{delegationState:"running"})).toBe("thread");
     const internal={...thread,projectKey:"work:root",taskKey:"delegation:effect"};
-    expect(nativeWorkProjectSession(internal,{})).toBe("thread");
+    // A message written later in the delegated conversation has no delegation state of its own.
+    expect(nativeWorkProjectSession(internal,{})).toBeUndefined();
+    expect(nativeWorkProjectSession({...internal,projectKey:"routine:daily"},{})).toBeUndefined();
+    expect(nativeWorkProjectSession({...internal,projectKey:"project:one"},{delegationState:"running"})).toBe("thread");
     expect(nativeWorkProjectSession(internal,{delegationState:"running"})).toBeUndefined();
     expect(nativeWorkProjectSession({...internal,taskKey:"work-transfer:task:1"},{delegationState:"running"})).toBeUndefined();
     expect(nativeWorkProjectSession({...thread,taskBotId:null},{})).toBeUndefined();

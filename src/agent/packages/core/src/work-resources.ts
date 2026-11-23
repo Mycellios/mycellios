@@ -17,15 +17,22 @@ export function taskThreadKind(thread: { taskBotId?: string | null; projectKey?:
   return isMicoTaskThread(thread) ? "conversation" : "other";
 }
 
+/**
+ * Delegated or transferred work outside a development project. It runs in the Mico's existing
+ * workspace, also when someone later writes in that conversation; a delegation inside a
+ * `project:` conversation keeps that project's isolated binding.
+ */
+export function isInternalWorkThread(thread: { taskBotId?: string | null; projectKey?: string | null; taskKey?: string | null }) {
+  return Boolean(thread.taskBotId) && taskThreadKind(thread) === "delegation" && !thread.projectKey?.startsWith("project:");
+}
+
 export function nativeWorkProjectSession(
   thread: { id: string; taskBotId?: string | null; projectKey?: string | null; taskKey?: string | null },
-  task: { delegationState?: string | null },
+  _task: { delegationState?: string | null },
 ): string | undefined {
   // Internal delegated conversations use the Mico's existing workspace. Explicit
   // development projects retain the native binding and its independent admission.
-  const internalWork = task.delegationState && thread.projectKey?.startsWith("work:") &&
-    (thread.taskKey?.startsWith("delegation:") || thread.taskKey?.startsWith("work-transfer:"));
-  return thread.taskBotId && !internalWork && !isMicoTaskThread(thread) ? thread.id : undefined;
+  return thread.taskBotId && !isInternalWorkThread(thread) && !isMicoTaskThread(thread) ? thread.id : undefined;
 }
 
 export function normalizeWorkResources(resources: string[]): string[] {
