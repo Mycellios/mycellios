@@ -161,24 +161,36 @@ describe("space selection storage", () => {
 });
 
 describe("shell RPC space isolation", () => {
-  it("blocks manual and automatic private writes until the server admits the exact thread", async () => {
+  it("sends private writes only after the server admits the exact thread", async () => {
     vi.stubGlobal("window", { location: { origin: "https://example.test", pathname: "/app" }, localStorage: { getItem: () => "space-a" } });
-    const fetch = vi.fn(async () => Response.json({ json: { threadId: "main" } }));
+    const paths: string[] = [];
+    let threadId = "main";
+    const fetch = vi.fn(async (request: Request) => {
+      paths.push(new URL(request.url).pathname);
+      return Response.json({ json: { threadId, cursor: 0, messageId: "sent" } });
+    });
     vi.stubGlobal("fetch", fetch);
     const client = createSpaceRpc("space-a", { botId: "mico", taskThreadId: "private" });
-    await expect(client.threads.send({ botId: "mico", text: "Do not leak", clientNonce: "nonce" })).rejects.toThrow("Load this task");
-    await expect(client.threads.markRead({ botId: "mico" })).rejects.toThrow("Load this task");
-    expect(fetch).not.toHaveBeenCalled();
+    await expect(client.threads.send({ botId: "mico", text: "Do not leak", clientNonce: "nonce" })).rejects.toThrow("did not return this task");
     await expect(client.threads.get({ botId: "mico" })).rejects.toThrow("did not return this task");
-    await expect(client.threads.stop({ botId: "mico" })).rejects.toThrow("Load this task");
-    expect(fetch).toHaveBeenCalledTimes(1);
-    fetch.mockImplementation(async () => Response.json({ json: { threadId: "private" } }));
-    await client.threads.get({ botId: "mico" });
+    await expect(client.threads.stop({ botId: "mico" })).rejects.toThrow("did not return this task");
+    // Each refused write only read the thread head; nothing was written.
+    expect(paths.map(path => path.split("/").slice(-2).join("/"))).toEqual(["threads/head", "threads/get", "threads/head"]);
+    threadId = "private";
+    paths.length = 0;
+    // The history may have been read by another client: the first write admits the thread itself.
+    await Promise.all([
+      client.threads.send({ botId: "mico", text: "Hello", clientNonce: "nonce" }),
+      client.threads.markRead({ botId: "mico" }),
+    ]);
     await client.threads.markRead({ botId: "mico" });
+    expect(paths.map(path => path.split("/").slice(-2).join("/"))).toEqual(["threads/head", "threads/send", "threads/markRead", "threads/markRead"]);
     await expect(client.threads.markRead({ botId: "mico" }, { context: { spaceId: "space-b" } })).rejects.toThrow("different Space");
-    fetch.mockImplementation(async () => Response.json({ json: { threadId: "main" } }));
+    threadId = "main";
     await expect(client.threads.get({ botId: "mico" })).rejects.toThrow();
-    await expect(client.threads.markRead({ botId: "mico" })).rejects.toThrow("Load this task");
+    paths.length = 0;
+    await expect(client.threads.markRead({ botId: "mico" })).rejects.toThrow("did not return this task");
+    expect(paths.map(path => path.split("/").slice(-2).join("/"))).toEqual(["threads/head"]);
   });
   it("pins the actual wire request to its task and Space after another view changes selection", async () => {
     let selected = "space-a";

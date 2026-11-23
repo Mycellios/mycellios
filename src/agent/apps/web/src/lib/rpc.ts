@@ -183,31 +183,42 @@ export const rpc: RpcClient = createORPCClient(displayLink);
 export function createSpaceRpc(spaceId: string | null, taskScope?: TaskThreadScope): typeof rpc {
   const boundTask = taskScope ? { ...taskScope } : undefined;
   let taskAdmitted = false;
+  let admitting: Promise<void> | null = null;
+  const scopedContext = (context: RpcClientContext): RpcClientContext => ({
+    ...context,
+    // A call that names its own space (e.g. renaming another space's section) keeps it.
+    spaceId: context.spaceId === undefined ? spaceId : context.spaceId,
+  });
+  const admissionRead = (path: readonly string[], privateRequest: boolean) => privateRequest &&
+    (path[0] === "bootstrap" || (path[0] === "threads" && ["get", "head", "messages"].includes(path[1] ?? "")));
+  /** Admit the task through this client: the history may have been read by another one. */
+  const admitTask = (task: TaskThreadScope, context: RpcClientContext) => {
+    admitting ??= (async () => {
+      const path = ["threads", "head"];
+      const input = { botId: task.botId, taskThreadId: task.taskThreadId };
+      // Shared by concurrent writes, so it does not take one caller's abort signal.
+      const result = await displayLink.call(path, input, { context: scopedContext(context) });
+      taskThreadResult(path, input, result, task);
+      taskAdmitted = true;
+    })().finally(() => { admitting = null; });
+    return admitting;
+  };
   return createORPCClient({
     call: async (path, input, options) => {
       const boundInput = taskThreadInput(path, input, boundTask);
       const privateRequest = Boolean(boundTask && boundInput && typeof boundInput === "object" &&
         "taskThreadId" in boundInput && boundInput.taskThreadId === boundTask.taskThreadId);
-      const admissionRead = privateRequest && (path[0] === "bootstrap" ||
-        (path[0] === "threads" && ["get", "head", "messages"].includes(path[1] ?? "")));
+      const admission = admissionRead(path, privateRequest);
       if (privateRequest && options.context.spaceId !== undefined && options.context.spaceId !== spaceId)
         throw new Error("This task request belongs to a different Space.");
-      if (privateRequest && !admissionRead && !taskAdmitted)
-        throw new Error("Load this task conversation before sending changes. Update the server if it does not support tasks.");
-      const result = await displayLink.call(path, boundInput, {
-        ...options,
-        // A call that names its own space (e.g. renaming another space's section) keeps it.
-        context: {
-          ...options.context,
-          spaceId: options.context.spaceId === undefined ? spaceId : options.context.spaceId,
-        },
-      });
+      if (privateRequest && !admission && !taskAdmitted) await admitTask(boundTask!, options.context);
+      const result = await displayLink.call(path, boundInput, { ...options, context: scopedContext(options.context) });
       try {
         const validated = taskThreadResult(path, boundInput, result, boundTask);
-        if (admissionRead) taskAdmitted = true;
+        if (admission) taskAdmitted = true;
         return validated;
       } catch (error) {
-        if (admissionRead) taskAdmitted = false;
+        if (admission) taskAdmitted = false;
         throw error;
       }
     },
