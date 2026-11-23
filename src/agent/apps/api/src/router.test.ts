@@ -6828,7 +6828,8 @@ describe("routine run place", () => {
     const save = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
       const threadId = "threadId" in data ? data.threadId : routine.threadId;
       const place = placeOf(threadId);
-      return { ...routine, ...data, threadId, thread: place ? places[place] : null };
+      const written = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+      return { ...routine, ...written, threadId, thread: place ? places[place] : null };
     });
     const findThread = vi.fn(async () => (ownThread ? { id: ownThread } : null));
     const client = createRouterClient(
