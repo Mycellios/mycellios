@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
+import { LookupStatusError, lookupFailureReason } from "@mycellios/adapters";
 import { readBoundedJsonResponse } from "@mycellios/core";
 import { ContributionEnrollmentSchema, ContributionStateSchema, ContributionOwnedNodesSchema, ContributionOwnerSchema } from "@mycellios/contracts";
 
@@ -8,8 +9,8 @@ const origin = "https://www.mycellios.com";
 /** Uses the current linked account session, never a model key or a browser-supplied account ID. */
 export function contributionAccount(token: string, transport: typeof fetch = fetch, signal?: AbortSignal) {
   async function request(route: string, body?: unknown) {
-    try {
     const bounded = signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000);
+    try {
     const response = await transport(`${origin}/v1${route}`, {
       method: body === undefined ? "GET" : "POST", redirect: "error", cache: "no-store", signal: bounded,
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -19,13 +20,18 @@ export function contributionAccount(token: string, transport: typeof fetch = fet
       await response.body?.cancel();
       throw new ORPCError(response.status === 401 ? "UNAUTHORIZED" : response.status === 404 ? "NOT_FOUND" : "SERVICE_UNAVAILABLE", {
         message: "Contribution could not be confirmed. Refresh before trying again.",
+        cause: new LookupStatusError(response.status),
       });
     }
     if (response.status === 204) { await response.body?.cancel(); return null; }
     return await readBoundedJsonResponse<unknown>(response, 2 * 1024 * 1024, bounded);
     } catch (error) {
       if (error instanceof ORPCError) throw error;
-      throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Contribution could not be confirmed. Refresh before trying again." });
+      // Network messages can carry credentials: keep only a fixed reason for the server log.
+      throw new ORPCError("SERVICE_UNAVAILABLE", {
+        message: "Contribution could not be confirmed. Refresh before trying again.",
+        cause: new Error(lookupFailureReason(error, bounded)),
+      });
     }
   }
   async function ownedNode(nodeId: string) {

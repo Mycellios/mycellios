@@ -25,6 +25,37 @@ describe("Mycellios account integration", () => {
     expect(failure.message).not.toContain("test-account-key");
     expect(JSON.stringify(failure)).not.toContain("private diagnostics");
   });
+  it.each([
+    {
+      name: "an authority error status",
+      fetch: async () => new Response("private diagnostics test-account-key", { status: 502 }),
+      reason: "HTTP 502",
+    },
+    {
+      name: "a network failure",
+      fetch: async () => {
+        throw new Error("fetch failed", {
+          cause: Object.assign(new Error("private diagnostics test-account-key"), {
+            code: "ECONNRESET",
+          }),
+        });
+      },
+      reason: "network ECONNRESET",
+    },
+    {
+      name: "an incompatible account body",
+      fetch: async () => Response.json({ ...account, asset: "USD" }),
+      reason: "invalid response",
+    },
+  ])("keeps only a fixed reason for $name", async ({ fetch, reason }) => {
+    const failure = await readMycelliosAccount(connection, { fetch: vi.fn(fetch) }).catch(
+      (error) => error,
+    );
+    expect(failure.message).toContain("temporarily unavailable");
+    expect(failure.cause).toBeInstanceOf(Error);
+    expect(failure.cause.message).toBe(reason);
+    expect(failure.cause.cause).toBeUndefined();
+  });
   it("reads canonical contribution credits without a ledger write", async () => {
     const transport = vi.fn(async () => Response.json(account));
     await expect(readMycelliosAccount(connection, { fetch: transport })).resolves.toEqual(account);
