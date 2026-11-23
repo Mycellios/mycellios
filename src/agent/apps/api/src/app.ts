@@ -188,6 +188,13 @@ import { mountVoiceHttpRoutes, voiceAccountErrorStatus } from "./voice.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
 
 /**
+ * Default API PostgreSQL pool size when DB_POOL_MAX is unset. Every Desktop relay
+ * poll and result authenticates against the database, so 8 connections queued
+ * those requests for tens of seconds on a busy host and cut running Desktop work.
+ */
+const API_DB_POOL_MAX_DEFAULT = 16;
+
+/**
  * Origins for the Expo web dev server. Native clients send the app scheme.
  * Keep arbitrary Expo hosts out of the origin allowlist.
  */
@@ -266,7 +273,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const created = prismaOverride
     ? { prisma: prismaOverride, pool: undefined }
     : createDb(env.databaseUrl, {
-        poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, 8),
+        poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, API_DB_POOL_MAX_DEFAULT),
         applicationName: "rakazo-api",
         encryptContent: env.contentEncryption,
       });
@@ -338,7 +345,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   let ownedJobPool: Pool | undefined;
   if (!inMemoryJobs && !created.pool) {
     ownedJobPool = createPool(env.databaseUrl, {
-      poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, 8),
+      poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, API_DB_POOL_MAX_DEFAULT),
       applicationName: "rakazo-api-jobs",
     });
   }
