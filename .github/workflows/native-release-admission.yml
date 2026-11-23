@@ -3,7 +3,9 @@ on:
   pull_request:
     paths:
       - src/coordinator/release-admission.ts
+      - 'src/coordinator/release-standby*.ts'
       - tests/release-admission.postgres.test.ts
+      - tests/coordinator-release-standby.postgres.test.ts
       - .github/workflows/native-release-admission.yml
   workflow_dispatch:
 permissions:
@@ -41,4 +43,7 @@ jobs:
         env:
           # Disposable CI service, never a production credential or database.
           MYCELLIOS_RELEASE_TEST_POSTGRES_URL: postgres://asr_test:ephemeral_fixture_only@127.0.0.1:5432/asr_test
-        run: node node_modules/vitest/vitest.mjs run tests/release-admission.postgres.test.ts --maxWorkers=1
+        run: >-
+          node node_modules/vitest/vitest.mjs run
+          tests/release-admission.postgres.test.ts tests/coordinator-release-standby.postgres.test.ts
+          --maxWorkers=1

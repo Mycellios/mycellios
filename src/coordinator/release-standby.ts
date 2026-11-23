@@ -1,4 +1,11 @@
 import Fastify from "fastify";
+import { MeshDatabase } from "../storage/database.js";
+
+export async function checkReleaseStandbyDatabase(url: string, schema?: string): Promise<void> {
+  // The PostgreSQL adapter opens using SELECT only. There is no SQLite fallback.
+  const database = await MeshDatabase.openPostgres(url, schema);
+  await database.close();
+}
 
 export function createReleaseStandby(revision: string, checkDatabase: () => Promise<void>) {
   if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error("release_standby_revision_required");
