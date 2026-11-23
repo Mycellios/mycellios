@@ -1,6 +1,6 @@
 # Personal memory over MCP
 
-Status: phase 2 in progress (opened 2026-11-23; phase 1 merged).
+Status: phase 3 in progress (opened 2026-11-23; phases 1 and 2 merged).
 
 ## Goal
 
@@ -208,8 +208,36 @@ With at least one usable grant:
    - Pending: reading a whole entry with `memory_read`, the per-connection rate
      limit, and qualification against a real profile server (Jarvis
      `/api/v1/mcp/memory`) and a testkit server.
-3. **Writes and forget.** `save_memory`/`forget_memory` with write scope,
-   redaction, approval card and idempotency.
+3. **Writes and forget.** As built:
+   - Grants gain `access` = `read_write` and `allowForget` (additive
+     `20261123230000` migration).
+     - `memory.grants.set` refuses writing when the connection's last check found
+       no `memory_write`, and forgetting without `memory_forget`.
+     - It also refuses a second memory a Mico would save to, so the single write
+       target needs no extra field.
+   - The resolver uses a write grant only while the connection's stored
+     capabilities still allow it.
+   - `save_memory` writes to the personal write target when there is one, and
+     otherwise to the Space provider.
+     - It sends `title` (first line), `content` and the spec's `operationKey`.
+     - It refuses content over 8,000 bytes, or content that contains a run
+       secret or looks like a password, key or token. The refusal happens before
+       anything is sent.
+   - `forget_memory` reaches personal memory for ids it returned in this run, or
+     for any id when no Space provider can forget.
+     - It stays in `APPROVAL_REQUIRED_BUILTIN_TOOLS`: a card in Ask mode, the
+       approval model in Auto, nothing in Never ask.
+     - That differs from the "always shows an approval card" above. Making it
+       explicit would also change the Space providers, so it stays an open
+       question.
+   - Webhook runs only read.
+   - The per-turn instruction names the write target and says whether the Mico
+     may forget.
+   - The settings section shows "Can save new memories" and "Can forget what it
+     saved, after you approve" under each Mico with access.
+   - Scopes: the MCP client asks for every scope the resource publishes, so the
+     owner decides about writing on the server's consent screen. A connection
+     authorized read-only is reconnected to gain writing.
 4. **Legacy.** Decide whether Supermemory/Honcho/Serenity become profile
    servers or stay as legacy Space providers; no removal without a migration
    path for existing Spaces.

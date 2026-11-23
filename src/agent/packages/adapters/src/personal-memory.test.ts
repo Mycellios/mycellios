@@ -8,12 +8,27 @@ import {
 
 const scope = { spaceId: "space-1", userId: "user-1", botId: "bot-1" };
 
-function grant(id: string, name: string, options: { autoRecall?: boolean; mapping?: object } = {}) {
+const WRITABLE = { read: true, write: true, forget: true, projects: false, status: false };
+
+function grant(
+  id: string,
+  name: string,
+  options: {
+    autoRecall?: boolean;
+    mapping?: object;
+    access?: "read" | "read_write";
+    allowForget?: boolean;
+    capabilities?: object;
+  } = {},
+) {
   return {
     autoRecall: options.autoRecall ?? true,
+    access: options.access ?? "read",
+    allowForget: options.allowForget ?? false,
     connection: {
       id,
       toolMapping: options.mapping ?? {},
+      capabilities: options.capabilities ?? { ...WRITABLE, write: false, forget: false },
       server: { id: `server-${id}`, name },
     },
   };
@@ -115,6 +130,105 @@ describe("createPersonalMemoryResolver", () => {
   });
 });
 
+describe("personal memory writes", () => {
+  const writer = (options: Parameters<typeof grant>[2] = {}) =>
+    grant("w", "Mine", { access: "read_write", capabilities: WRITABLE, ...options });
+  const saveInput = { content: "Prefers MCP over custom APIs", operationKey: "op-1", secrets: [] };
+
+  it("has no write target with read access only", async () => {
+    const { resolver, callServerTool } = setup([grant("a", "Read")], async () => ({}));
+    const memory = await resolver.resolve(scope);
+    expect(memory!.writeTarget).toBeNull();
+    expect(await memory!.save(saveInput)).toMatchObject({ ok: false });
+    expect(callServerTool).not.toHaveBeenCalled();
+  });
+
+  it("has no write target when the server no longer accepts writes", async () => {
+    const { resolver } = setup(
+      [writer({ capabilities: { ...WRITABLE, write: false } })],
+      async () => ({}),
+    );
+    expect((await resolver.resolve(scope))!.writeTarget).toBeNull();
+  });
+
+  it("saves with a title, the content and the operation key", async () => {
+    const { resolver, callServerTool } = setup([writer()], async () => ({
+      structuredContent: { id: "entry-1", status: "created" },
+    }));
+    const memory = await resolver.resolve(scope);
+    expect(memory!.writeTarget).toEqual({ id: "w", name: "Mine", canForget: false });
+    expect(await memory!.save(saveInput)).toEqual({
+      ok: true,
+      id: "entry-1",
+      status: "created",
+      memory: "Mine",
+    });
+    expect(callServerTool.mock.calls[0]?.[2]).toBe("memory_write");
+    expect(callServerTool.mock.calls[0]?.[3]).toEqual({
+      title: "Prefers MCP over custom APIs",
+      content: "Prefers MCP over custom APIs",
+      operationKey: "op-1",
+    });
+  });
+
+  it("never sends secrets or oversized content", async () => {
+    const { resolver, callServerTool } = setup([writer()], async () => ({}));
+    const memory = (await resolver.resolve(scope))!;
+    expect(
+      await memory.save({
+        ...saveInput,
+        content: "The deploy key is hunter2-secret",
+        secrets: ["hunter2-secret"],
+      }),
+    ).toMatchObject({ ok: false });
+    expect(await memory.save({ ...saveInput, content: "token: abcdefghijkl" })).toMatchObject({
+      ok: false,
+    });
+    expect(await memory.save({ ...saveInput, content: "x".repeat(8_001) })).toMatchObject({
+      ok: false,
+    });
+    expect(callServerTool).not.toHaveBeenCalled();
+  });
+
+  it("reports a refused or unconfirmed save", async () => {
+    const refused = setup([writer()], async () => ({
+      isError: true,
+      content: [{ type: "text", text: "Only memory.write connections can save" }],
+    }));
+    expect(await (await refused.resolver.resolve(scope))!.save(saveInput)).toEqual({
+      ok: false,
+      error: "The memory server refused it: Only memory.write connections can save",
+    });
+    const silent = setup([writer()], async () => ({ structuredContent: {} }));
+    expect(await (await silent.resolver.resolve(scope))!.save(saveInput)).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("forgets only when the owner allowed it", async () => {
+    const noForget = setup([writer()], async () => ({}));
+    expect(await (await noForget.resolver.resolve(scope))!.forget({ id: "entry-1" })).toMatchObject(
+      { ok: false },
+    );
+    expect(noForget.callServerTool).not.toHaveBeenCalled();
+    const { resolver, callServerTool } = setup([writer({ allowForget: true })], async () => ({
+      structuredContent: { id: "entry-1", forgotten: true },
+    }));
+    const memory = (await resolver.resolve(scope))!;
+    expect(memory.writeTarget?.canForget).toBe(true);
+    expect(await memory.forget({ id: "entry-1", reason: "Outdated" })).toEqual({
+      ok: true,
+      id: "entry-1",
+      forgotten: true,
+      memory: "Mine",
+    });
+    expect(callServerTool.mock.calls[0]?.slice(2)).toEqual([
+      "memory_forget",
+      { id: "entry-1", reason: "Outdated" },
+    ]);
+  });
+});
+
 describe("formatPersonalMemory", () => {
   it("frames hits as untrusted data and escapes them", () => {
     const text = formatPersonalMemory([
@@ -151,5 +265,20 @@ describe("formatPersonalMemory", () => {
     expect(text).toContain("Mine");
     expect(text).toContain("recall_memory");
     expect(text).toContain("cannot write");
+  });
+
+  it("names the memory the Mico saves to, and forgetting only when allowed", () => {
+    const connections = [{ id: "a", name: "Mine", autoRecall: true }];
+    const saves = personalMemoryInstruction(connections, {
+      id: "a",
+      name: "Mine",
+      canForget: false,
+    });
+    expect(saves).toContain("save_memory saves to Mine");
+    expect(saves).not.toContain("forget_memory");
+    expect(saves).not.toContain("cannot write");
+    expect(
+      personalMemoryInstruction(connections, { id: "a", name: "Mine", canForget: true }),
+    ).toContain("forget_memory");
   });
 });

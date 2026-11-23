@@ -44,7 +44,8 @@ function StatusText({ connection }: { connection: MemoryConnection }) {
 
 /**
  * Personal memory servers over the open Memory MCP profile (specs/mcp-memory): connect,
- * authorize and check them, and choose which Micos may read each one (none by default).
+ * authorize and check them, and choose which Micos may read, save to or forget in each one
+ * (none by default).
  */
 export function PersonalMemoryConnections({
   onBusyChange,
@@ -140,24 +141,40 @@ export function PersonalMemoryConnections({
       t`Could not connect this memory`,
     );
 
-  const toggleGrant = (connectionId: string, botId: string) =>
+  type GrantChoice = Pick<MicoMemoryGrant, "botId" | "autoRecall" | "access" | "allowForget">;
+
+  /** Replace one Mico's access to a memory; null removes it. */
+  const changeGrant = (connectionId: string, botId: string, change: Partial<GrantChoice> | null) =>
     run(
       `grant:${connectionId}`,
       async () => {
-        const current = grants.filter((grant) => grant.connectionId === connectionId);
-        const next = current.some((grant) => grant.botId === botId)
-          ? current.filter((grant) => grant.botId !== botId)
-          : [...current, { botId, autoRecall: true }];
+        const current: GrantChoice[] = grants
+          .filter((grant) => grant.connectionId === connectionId)
+          .map(({ botId: id, autoRecall, access, allowForget }) => ({
+            botId: id,
+            autoRecall,
+            access,
+            allowForget,
+          }));
+        const existing = current.find((grant) => grant.botId === botId) ?? {
+          botId,
+          autoRecall: true,
+          access: "read" as const,
+          allowForget: false,
+        };
+        const others = current.filter((grant) => grant.botId !== botId);
+        const updated = change ? { ...existing, ...change } : null;
+        if (updated && updated.access !== "read_write") updated.allowForget = false;
         const saved = await rpc.memory.grants.set({
           connectionId,
-          grants: next.map((grant) => ({ botId: grant.botId, autoRecall: grant.autoRecall })),
+          grants: updated ? [...others, updated] : others,
         });
         setGrants((all) => [
           ...all.filter((grant) => grant.connectionId !== connectionId),
           ...saved,
         ]);
       },
-      t`Could not change which Micos can read this memory`,
+      t`Could not change which Micos can use this memory`,
     );
 
   const busy = pending !== null;
@@ -199,28 +216,72 @@ export function PersonalMemoryConnections({
           {connection.status === "compatible" && bots.length > 0 ? (
             <fieldset className="mt-3" data-testid="personal-memory-access">
               <legend className="text-[13px] text-muted-foreground">
-                <Trans>Micos that can read it</Trans>
+                <Trans>Micos that can use it</Trans>
               </legend>
               <div className="mt-2 flex flex-col gap-2">
-                {bots.map((bot) => (
-                  <label
-                    key={bot.id}
-                    htmlFor={`${accessId}-${connection.id}-${bot.id}`}
-                    className="flex min-w-0 items-center gap-2 text-[14px] text-foreground"
-                  >
-                    <Checkbox
-                      id={`${accessId}-${connection.id}-${bot.id}`}
-                      checked={grants.some(
-                        (grant) => grant.connectionId === connection.id && grant.botId === bot.id,
-                      )}
-                      disabled={busy}
-                      onCheckedChange={() => void toggleGrant(connection.id, bot.id)}
-                    />
-                    <span className="min-w-0 break-words" dir="auto">
-                      {bot.name}
-                    </span>
-                  </label>
-                ))}
+                {bots.map((bot) => {
+                  const grant = grants.find(
+                    (item) => item.connectionId === connection.id && item.botId === bot.id,
+                  );
+                  const id = `${accessId}-${connection.id}-${bot.id}`;
+                  const writes = grant?.access === "read_write";
+                  return (
+                    <div key={bot.id} className="flex min-w-0 flex-col gap-2">
+                      <label
+                        htmlFor={id}
+                        className="flex min-w-0 items-center gap-2 text-[14px] text-foreground"
+                      >
+                        <Checkbox
+                          id={id}
+                          checked={Boolean(grant)}
+                          disabled={busy}
+                          onCheckedChange={() =>
+                            void changeGrant(connection.id, bot.id, grant ? null : {})
+                          }
+                        />
+                        <span className="min-w-0 break-words" dir="auto">
+                          {bot.name}
+                        </span>
+                      </label>
+                      {grant && connection.capabilities.write ? (
+                        <label
+                          htmlFor={`${id}-write`}
+                          className="ms-6 flex min-w-0 items-center gap-2 text-[13px] text-foreground"
+                        >
+                          <Checkbox
+                            id={`${id}-write`}
+                            checked={writes}
+                            disabled={busy}
+                            onCheckedChange={() =>
+                              void changeGrant(connection.id, bot.id, {
+                                access: writes ? "read" : "read_write",
+                              })
+                            }
+                          />
+                          <Trans>Can save new memories</Trans>
+                        </label>
+                      ) : null}
+                      {writes && connection.capabilities.forget ? (
+                        <label
+                          htmlFor={`${id}-forget`}
+                          className="ms-12 flex min-w-0 items-center gap-2 text-[13px] text-foreground"
+                        >
+                          <Checkbox
+                            id={`${id}-forget`}
+                            checked={grant.allowForget}
+                            disabled={busy}
+                            onCheckedChange={() =>
+                              void changeGrant(connection.id, bot.id, {
+                                allowForget: !grant.allowForget,
+                              })
+                            }
+                          />
+                          <Trans>Can forget what it saved</Trans>
+                        </label>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </fieldset>
           ) : null}

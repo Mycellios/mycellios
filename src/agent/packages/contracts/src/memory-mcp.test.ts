@@ -5,7 +5,9 @@ import {
   MemoryGrantsSetInput,
   MemoryToolMappingSchema,
   memoryToolPayload,
+  parseMemoryForgetResult,
   parseMemorySearchResults,
+  parseMemoryWriteResult,
   parseStoredMemoryCapabilities,
   parseStoredMemoryToolMapping,
 } from "./memory-mcp.js";
@@ -58,10 +60,37 @@ describe("memory grants input", () => {
     ).toBe(false);
   });
 
-  it("defaults automatic recall to on", () => {
+  it("defaults to reading with automatic recall", () => {
     expect(
       MemoryGrantsSetInput.parse({ connectionId: "c", grants: [{ botId: "b" }] }).grants[0],
-    ).toEqual({ botId: "b", autoRecall: true });
+    ).toEqual({ botId: "b", autoRecall: true, access: "read", allowForget: false });
+  });
+
+  it("allows forgetting only with write access", () => {
+    const parse = (grant: object) =>
+      MemoryGrantsSetInput.safeParse({ connectionId: "c", grants: [{ botId: "b", ...grant }] })
+        .success;
+    expect(parse({ access: "read", allowForget: true })).toBe(false);
+    expect(parse({ access: "read_write", allowForget: true })).toBe(true);
+  });
+});
+
+describe("memory write and forget results", () => {
+  it("accepts only a confirmed write status", () => {
+    expect(parseMemoryWriteResult({ id: "e1", status: "updated" })).toEqual({
+      id: "e1",
+      status: "updated",
+    });
+    expect(parseMemoryWriteResult({ id: "e1", status: "queued" })).toBeNull();
+    expect(parseMemoryWriteResult({ status: "created" })).toBeNull();
+  });
+
+  it("needs an id and a forgotten flag", () => {
+    expect(parseMemoryForgetResult({ id: "e1", forgotten: true })).toEqual({
+      id: "e1",
+      forgotten: true,
+    });
+    expect(parseMemoryForgetResult({ id: "e1" })).toBeNull();
   });
 });
 

@@ -217,16 +217,21 @@ export function parseStoredMemoryCapabilities(value: unknown): MemoryCapabilitie
   return parsed.success ? parsed.data : NO_MEMORY_CAPABILITIES;
 }
 
+/** What a Mico may do with one personal memory. Writing needs the server's write capability. */
+export const MicoMemoryAccessSchema = z.enum(["read", "read_write"]);
+export type MicoMemoryAccess = z.infer<typeof MicoMemoryAccessSchema>;
+
 /**
- * A Mico's access to one personal memory (specs/mcp-memory, phase 2). Nothing is granted
- * by default; only the connection's owner grants it, through the authenticated API.
+ * A Mico's access to one personal memory (specs/mcp-memory). Nothing is granted by default;
+ * only the connection's owner grants it, through the authenticated API.
  */
 export const MicoMemoryGrantSchema = z.object({
   id: z.string(),
   botId: z.string(),
   connectionId: z.string(),
-  /** Phase 2 grants reading only; writing comes with phase 3. */
-  access: z.literal("read"),
+  access: MicoMemoryAccessSchema,
+  /** May forget entries; only with read_write and a server that can forget. */
+  allowForget: z.boolean(),
   /** Search this memory automatically before each reply. */
   autoRecall: z.boolean(),
   createdAt: z.string(),
@@ -236,14 +241,24 @@ export type MicoMemoryGrant = z.infer<typeof MicoMemoryGrantSchema>;
 
 export const MemoryGrantsSetInput = z.object({
   connectionId: z.string().min(1).max(128),
-  /** The complete set of Micos that may read this memory; omitted Micos lose access. */
+  /** The complete set of Micos that may use this memory; omitted Micos lose access. */
   grants: z
-    .array(z.object({ botId: z.string().min(1).max(128), autoRecall: z.boolean().default(true) }))
+    .array(
+      z.object({
+        botId: z.string().min(1).max(128),
+        autoRecall: z.boolean().default(true),
+        access: MicoMemoryAccessSchema.default("read"),
+        allowForget: z.boolean().default(false),
+      }),
+    )
     .max(200)
     .superRefine((grants, ctx) => {
       const ids = grants.map((grant) => grant.botId);
       if (new Set(ids).size !== ids.length) {
         ctx.addIssue({ code: "custom", message: "Each Mico can appear only once" });
+      }
+      if (grants.some((grant) => grant.allowForget && grant.access !== "read_write")) {
+        ctx.addIssue({ code: "custom", message: "Forgetting needs write access" });
       }
     }),
 });
@@ -320,4 +335,34 @@ export function parseMemorySearchResults(payload: unknown, limit: number): Memor
     });
   }
   return hits;
+}
+
+/** Largest memory_write content, in UTF-8 bytes (Memory MCP profile v1). */
+export const MEMORY_WRITE_CONTENT_MAX_BYTES = 8_000;
+export const MEMORY_WRITE_TITLE_MAX_CHARS = 200;
+
+export interface MemoryWriteResult {
+  id: string;
+  status: "created" | "updated" | "unchanged";
+}
+
+/** Parse a memory_write result; null when the server did not confirm the write. */
+export function parseMemoryWriteResult(payload: unknown): MemoryWriteResult | null {
+  if (!payload || typeof payload !== "object") return null;
+  const row = payload as Record<string, unknown>;
+  const id = boundedText(typeof row.id === "number" ? String(row.id) : row.id, 200);
+  const status = row.status;
+  if (!id || (status !== "created" && status !== "updated" && status !== "unchanged")) return null;
+  return { id, status };
+}
+
+/** Parse a memory_forget result; null when the server did not answer in the profile shape. */
+export function parseMemoryForgetResult(
+  payload: unknown,
+): { id: string; forgotten: boolean } | null {
+  if (!payload || typeof payload !== "object") return null;
+  const row = payload as Record<string, unknown>;
+  const id = boundedText(typeof row.id === "number" ? String(row.id) : row.id, 200);
+  if (!id || typeof row.forgotten !== "boolean") return null;
+  return { id, forgotten: row.forgotten };
 }

@@ -45,6 +45,29 @@ Results may be `structuredContent` or JSON text:
 A connection may map profile tools to differently named tools with the same semantics. The
 mapping is per connection; Mycellios ships no built-in mappings.
 
+## How Micos use it
+
+- **Reading.** A Mico with access searches the memory before each reply and can search it with
+  `recall_memory`.
+- **Saving.** A Mico the person allowed to save uses `save_memory`, and it goes to that memory.
+  - A Mico saves to one memory at most.
+  - Each call sends `title` (the first line), `content` and
+    `operationKey = mycellios:<connection>:<run>:<sha256(content)>`, so a retried call updates
+    the same entry.
+  - Content over 8,000 bytes is refused before anything is sent.
+  - Content that contains one of the run's secrets, or that looks like a password, key or token,
+    is also refused before anything is sent.
+- **Forgetting.** A Mico the person also allowed to forget uses `forget_memory`. It follows the
+  Space's approval mode:
+  - **Ask:** it asks the person.
+  - **Auto:** the approval model decides, or it asks.
+  - **Never ask:** it runs without asking.
+- **When nothing is written.** Runs started by an external webhook only read.
+- **Changes on the server.** Writing stops as soon as a check finds the server no longer offers
+  `memory_write`.
+- **Turning on writing for a read-only connection.** If a connection was authorized for reading
+  only, remove it and connect it again, then accept writing on the server's consent screen.
+
 ## Safety
 
 Recalled text is untrusted data, never instructions. Mycellios stores connection credentials in its
