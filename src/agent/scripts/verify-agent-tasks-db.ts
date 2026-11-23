@@ -11,12 +11,13 @@ import EmbeddedPostgres from "embedded-postgres";
 // Conversations a Mico opens itself (start_task / message_task / close_task) and their
 // reports, against a fresh disposable loopback PostgreSQL cluster. Synthetic rows only:
 // no production data, accounts, credentials or models; never point it at another database.
+// Content encryption is on, as in production: a new conversation's first message must be
+// sealed inside the same transaction that creates it.
 process.env.NODE_ENV = "test";
-process.env.CONTENT_ENCRYPTION = "off";
 const {
   createDb, asSystem, startAgentTask, messageAgentTask, stopAgentTaskRuns, queueTaskReportInTransaction,
   pendingTeammateRequest, agentTasksStartedByRun, finalizeRun, archiveSideThreadInTransaction, readHistoryPage,
-  isOwnedAgentTask, expireStuckRun, AgentTaskError, countUnfinishedAgentTasks,
+  isOwnedAgentTask, expireStuckRun, AgentTaskError, countUnfinishedAgentTasks, LocalKeyProvider,
 } = await import("@mycellios/db");
 const { taskThreadKind, AGENT_TASK_UNFINISHED_LIMIT, TASK_REPORT_CUT_MARKER } = await import("@mycellios/core");
 const { stopThreadRuns } = await import("../apps/api/src/thread-target.js");
@@ -38,7 +39,8 @@ try {
   const url = `postgresql://postgres:${password}@127.0.0.1:${port}/postgres`;
   await promisify(execFile)(process.execPath, [path.resolve("node_modules/prisma/build/index.js"), "db", "push", "--config", "packages/db/prisma.config.ts"],
     { windowsHide: true, env: { ...process.env, DATABASE_URL: url, DATABASE_MIGRATION_URL: url }, maxBuffer: 1024 * 1024 });
-  db = createDb(url, { encryptContent: false, applicationName: "synthetic-agent-tasks" });
+  db = createDb(url, { encryptContent: true, keyProvider: new LocalKeyProvider([{ id: "synthetic", key: randomBytes(32) }]),
+    applicationName: "synthetic-agent-tasks" });
   const prisma = asSystem(db.prisma, "isolated synthetic agent task acceptance");
   const scope = { spaceId: "space", userId: "owner" };
   await prisma.user.create({ data: { id: scope.userId, name: "Synthetic owner", email: "owner@example.invalid" } });

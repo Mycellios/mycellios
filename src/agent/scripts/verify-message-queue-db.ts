@@ -321,6 +321,17 @@ try {
     assert.equal((await sealedCall("queueState", { botId: "mico" })).messages.find((row: any) => row.messageId === secret.messageId).text, "Factura de marzo");
     await endRun(r6.id);
     checks.push("an edit draft is stored sealed with the Space key and reads back as text; the saved edit replaces the sealed message");
+    // 13. Moving a queued message to a new conversation seals its first message inside the
+    // same transaction, which needs the new conversation's Space before it commits.
+    const r7 = await liveRun(main);
+    const privateMove = await sealedCall("send", { botId: "mico", text: "Borrador privado aparte", clientNonce: randomUUID(), delivery: "queue" });
+    const sealedMove = await sealedCall("queueMove", { botId: "mico", messageId: privateMove.messageId });
+    const [movedRow] = await rows<{ blocks: unknown }>('SELECT blocks FROM messages WHERE "threadId" = $1', [sealedMove.threadId]);
+    assert.ok(movedRow && !JSON.stringify(movedRow.blocks).includes("Borrador privado aparte"));
+    const movedOpened = await runAsTenant(actor, () => sealed.prisma.message.findFirstOrThrow({ where: { threadId: sealedMove.threadId } }));
+    assert.ok(JSON.stringify(movedOpened.blocks).includes("Borrador privado aparte"));
+    await endRun(r7.id);
+    checks.push("a queued message moved to a new conversation is sealed with the Space key in the same transaction and reads back as text");
   } finally {
     sql.release();
   }

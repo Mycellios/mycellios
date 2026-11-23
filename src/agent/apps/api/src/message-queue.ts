@@ -416,7 +416,8 @@ export async function moveQueuedMessageToConversation(
           taskKey: `mico-task:${target.botId}:queue:${input.messageId}`,
           startedBy: "user",
         },
-        select: { id: true },
+        // The Space and owner let content encryption seal the moved message before commit.
+        select: { id: true, spaceId: true, userId: true },
       });
       // The first message names the conversation, as in any new conversation.
       const message = await createThreadMessageInTransaction(tx, {
