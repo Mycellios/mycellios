@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-23
+
+### Added
+
+- Run OpenCode in an authorized Desktop project folder or task worktree and reopen its session in that project.
+- Choose from the coding engines available on the Mico's selected computer. When Desktop is offline, its coding task waits for that computer.
+- Each routine can now run in its own conversation or in the Mico's main chat, with a "Run in
+  its own conversation" switch in the routine settings. A routine in its own conversation no
+  longer waits behind a question or a takeover pending in the main chat. Routines a Mico
+  creates outside a group now get their own conversation too, unless it is asked to post in the
+  main chat; routines in a group stay in the group.
+
+### Fixed
+
+- Sending a message in a conversation opened from its tab no longer fails with "Load this task
+  conversation before sending changes". The conversation is now checked on the first send
+  instead of refusing it.
+- When the server does not answer while Mycellios Desktop checks access to this computer, the
+  chat now says the message was not sent and to try again, instead of showing a technical
+  "Error invoking remote method" message. A server outage no longer asks you to sign in again.
+- A conversation whose Mico waits for your answer can now be deleted; deleting it cancels the
+  question. Before, Delete stayed disabled until you answered.
+- Archiving a conversation now confirms it with a message that names it and offers Undo, and the
+  Mico leaves "Needs you" at once. Before, the sidebar kept asking for an answer until the page
+  reloaded, so archiving looked like it did nothing.
+- With two of your PCs online, a Mico now stays on the PC you last used it from, even after
+  Mycellios restarts. Before, a Mico used on both PCs stopped answering after each update and
+  its routines failed until you sent it a message from Desktop again. When no PC has been chosen
+  yet, the message is translated and opens the Mico's computer settings instead of offering to
+  change the model.
+
 ## [0.20.0] - 2026-11-23
 
 ### Added
