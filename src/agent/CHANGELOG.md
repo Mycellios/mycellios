@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-11-23
+
+### Fixed
+
+- Opening a Mico's request for help now shows its browser tab instead of the whole desktop.
+  Before, the tab view started before the control screen was ready and fell back to the desktop.
+- Show a Mico's computer screen when Mycellios is served under a path such as `/agent`.
+  Before, the screen stayed on "Screen not connected" because its address pointed outside the app.
+
 ## [0.19.0] - 2026-11-23
 
 ### Added
