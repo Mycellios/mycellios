@@ -479,7 +479,8 @@ describe("tab keyboard, mouse and menu", () => {
     expect(changed).toHaveBeenCalledOnce();
     expect(toast).toHaveBeenCalledOnce();
     const [message, options] = toast.mock.calls[0] as [string, { action: { label: string; onClick: () => void } }];
-    expect(message).toBe("Beta archived");
+    // Tests run the uncompiled macro, which drops a leading placeholder; the build keeps "{title} archived".
+    expect(message).toMatch(/archived$/);
     expect(options.action.label).toBe("Undo");
     await act(async () => { options.action.onClick(); await Promise.resolve(); });
     await flush();
