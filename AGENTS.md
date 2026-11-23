@@ -441,6 +441,14 @@ These rules apply to the complete repository.
   adapter advertises no loaded model. Retain false model-ready metrics and
   explicit contribution/update/work-policy guards; test both native control
   availability and unavailable advertised deployments in worker-hardening.
+- Verified node runtime updates follow `specs/node-runtime-auto-update/spec.md`.
+  Only signed components (pinned Ed25519 keys, SHA-256/files checks, canary,
+  boot-health rollback) update automatically, never EXE/MSI/DMG/PKG/DEB
+  packages. The trust anchor and `node-app` launch belong to the bundled
+  supervisor. Owner consent covers only that owner's nodes. Updates skip owner
+  pause, drain and maintenance, drain before swapping and never change the
+  pause. Check node-runtime-auto-update, node-auto-update and
+  node-command-applicator tests.
 - Native embedding/speech qualification requires both operator credentials, three
   normal completed leases, validated outputs and current session/build/activation
   binding. Preserve zero generated-text tokens and strip worker-declared evidence.

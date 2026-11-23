@@ -23,8 +23,11 @@ import { NodeControlStateStore } from "./control-state.js";
 import { NodeCommandExecutor } from "./command-executor.js";
 import { runNodeCommandClient } from "./command-client.js";
 import { NodeCommandApplicator } from "./command-applicator.js";
-import { NodeComponentLifecycle, resolveNodePythonProduct } from "./component-lifecycle.js";
-import { acquireComponentInUseLease, type ComponentInUseLease } from "../update/component-update-manager.js";
+import { NODE_MANAGED_COMPONENT_IDS, NodeComponentLifecycle, resolveNodePythonProduct } from "./component-lifecycle.js";
+import { acquireComponentInUseLease, readComponentInstallState, type ComponentInUseLease } from "../update/component-update-manager.js";
+import { effectiveComponentUpdates } from "./update-trust.js";
+import { bootstrapVersion, NODE_BOOTSTRAP_ROOT_ENV } from "./node-app-launch.js";
+import type { NodeUpdateObservation } from "../contracts/node-control.js";
 import { resolveNodeSourceRevision } from "./build-identity.js";
 import { NodeReconciliationStateStore } from "./reconciliation-state.js";
 import { MYCELLIOS_RUNTIME_ABI } from "../update/runtime-compatibility.js";
@@ -48,8 +51,31 @@ const version = packageVersion();
 const runtimeMetadata = readNativeRuntimeBuildMetadata(resolve(import.meta.dirname, "../.."));
 const sourceRevision = await resolveNodeSourceRevision();
 let environment = headlessEnvironmentFromNodeConfiguration(config, version);
-const componentLifecycle = config.componentUpdates
-  ? new NodeComponentLifecycle(config, version, async () => true, async () => async () => undefined)
+// The bundled supervisor names its install root; a component never supplies its
+// own trust anchor or bootstrap version (specs/node-runtime-auto-update).
+const supervisedBootstrapRoot = process.env[NODE_BOOTSTRAP_ROOT_ENV]?.trim() || null;
+const bootstrapRoot = supervisedBootstrapRoot ?? resolve(import.meta.dirname, "../..");
+const nodeAppSource: NodeUpdateObservation["nodeApp"] = supervisedBootstrapRoot
+  && resolve(import.meta.dirname, "../..") !== resolve(supervisedBootstrapRoot) ? "component" : "bundled";
+const componentUpdates = await effectiveComponentUpdates(config, bootstrapRoot).catch((error: unknown) => {
+  console.warn(`node_component_trust_unavailable:${error instanceof Error ? error.message : "unknown"}`);
+  return undefined;
+});
+const lifecycleConfig = componentUpdates ? { ...config, componentUpdates } : config;
+const updateWorkIdle = () => (agent?.activeWorkCount ?? 0) === 0;
+const componentLifecycle = componentUpdates
+  ? new NodeComponentLifecycle(
+    lifecycleConfig,
+    supervisedBootstrapRoot ? await bootstrapVersion(supervisedBootstrapRoot) : version,
+    updateWorkIdle,
+    // Activation proceeds only while no lease or runtime operation is active.
+    async () => updateWorkIdle() ? async () => undefined : null,
+    fetch,
+    undefined,
+    undefined,
+    // Only the bundled supervisor can launch and roll back a node-app root.
+    supervisedBootstrapRoot ? NODE_MANAGED_COMPONENT_IDS : ["python-product"],
+  )
   : null;
 let pendingComponentActivation = componentLifecycle
   ? await componentLifecycle.pendingActivationIsCurrent()
@@ -83,7 +109,7 @@ let lastIncident: { code: string; occurredAt: string } | null = null;
 let componentInUseLease: ComponentInUseLease | null = null;
 let memoryReplica: MemoryEmbeddingNodeReplica | null = null;
 try {
-  const activePythonProduct = await resolveNodePythonProduct(config);
+  const activePythonProduct = await resolveNodePythonProduct(lifecycleConfig);
   if (activePythonProduct && componentLifecycle) {
     componentInUseLease = await acquireComponentInUseLease(componentLifecycle.storageRoot, ["python-product"]);
     environment.pythonPath = componentInUseLease.roots["python-product"]!;
@@ -277,6 +303,7 @@ try {
             build: { version, sourceRevision },
             runtime: { ready: agent?.isReady === true, abi: MYCELLIOS_RUNTIME_ABI, backend: runtime.verifiedGpuRuntime?.backend ?? "cpu",
               uninstallAvailable: config.uninstall !== undefined },
+            ...(await updateObservation(currentConfig.config.updateChannel)),
             diagnostics: {
               capturedAt: new Date().toISOString(),
               configRevision: currentConfig.config.revision,
@@ -359,6 +386,23 @@ try {
     // completed child cannot stay alive and prevent the supervisor restart.
     if (process.connected) process.disconnect();
   }
+}
+
+async function updateObservation(channel: "dev" | "stable"): Promise<{ updates?: NodeUpdateObservation }> {
+  const platform = process.platform;
+  const arch = process.arch;
+  if ((platform !== "win32" && platform !== "linux" && platform !== "darwin") || (arch !== "x64" && arch !== "arm64")) return {};
+  let activeManifestId: `sha256:${string}` | null = null;
+  if (componentLifecycle) {
+    const state = await readComponentInstallState(componentLifecycle.storageRoot).catch(() => null);
+    activeManifestId = (state?.channels[channel]?.manifestId as `sha256:${string}` | undefined) ?? null;
+  }
+  return { updates: {
+    // Automatic updates need the signed trust anchor and the supervising bootstrap.
+    capable: componentLifecycle !== null && supervisedBootstrapRoot !== null
+      && (componentUpdates?.pinnedKeys[channel].length ?? 0) > 0,
+    channel, platform, arch, activeManifestId, nodeApp: nodeAppSource,
+  } };
 }
 
 function argument(name: string): string | undefined {

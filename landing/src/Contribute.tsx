@@ -32,8 +32,11 @@ import {
   createNodeEnrollmentBundle,
   createNodeOwnershipTransfer,
   enqueueOwnedNodeCommand,
+  loadNodeAutoUpdate,
   loadOwnedNodes,
   revokeOwnedNode,
+  saveNodeAutoUpdate,
+  type NodeAutoUpdateSetting,
   type OwnedNode,
 } from "./api-access";
 import type { AuthSession, PublicAuthConfig } from "./auth";
@@ -359,6 +362,7 @@ function NativeNodeSetup(
           )}
         </div>
       </UiCard>
+      {props.accessToken && <NodeAutoUpdateCard accessToken={props.accessToken} onError={props.onError} onNotice={props.onNotice} />}
       <UiCard className="contribute-activity-card">
         <div className="contribute-card-head">
           <div>
@@ -393,6 +397,71 @@ function NativeNodeSetup(
       </div>
     </UiDisclosure>
   );
+}
+
+function NodeAutoUpdateCard({ accessToken, onError, onNotice }: {
+  accessToken: string;
+  onError(value: string | null): void;
+  onNotice(value: string | null): void;
+}) {
+  const [setting, setSetting] = useState<NodeAutoUpdateSetting | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    let active = true;
+    loadNodeAutoUpdate(accessToken).then((value) => { if (active) setSetting(value); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [accessToken]);
+  const change = async (enabled: boolean) => {
+    setSaving(true);
+    onError(null);
+    try {
+      const next = await saveNodeAutoUpdate(accessToken, enabled);
+      setSetting(next);
+      onNotice(enabled ? "Automatic verified updates enabled for your devices." : "Automatic updates turned off. Manual updates remain available.");
+    } catch (cause) {
+      onError(errorText(cause));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <UiCard className="contribute-settings-card">
+      <div className="contribute-card-head">
+        <div>
+          <UiHeading as="h2">Runtime updates</UiHeading>
+        </div>
+        <RefreshCw />
+      </div>
+      <UiFieldLabel className="model-auto-toggle">
+        <UiInput
+          type="checkbox"
+          checked={setting?.enabled ?? false}
+          disabled={setting === null || saving}
+          onChange={(event) => void change(event.target.checked)}
+        />
+        <span>
+          <strong>Update my devices automatically</strong>
+          <small>{nodeAutoUpdateSummary(setting)}</small>
+        </span>
+      </UiFieldLabel>
+    </UiCard>
+  );
+}
+
+export function nodeAutoUpdateSummary(setting: NodeAutoUpdateSetting | null): string {
+  if (!setting) return "Loading…";
+  const base = "Only your own devices, on the stable channel, with signed and hash-verified runtime components. Devices wait until idle, keep your pause and restore the previous runtime if the new one fails.";
+  return setting.available ? base : `${base} No verified release is published yet.`;
+}
+
+/** Whether this device can receive verified runtime updates without the owner. */
+export function nodeUpdateReadiness(node: OwnedNode): string | null {
+  const observed = node.observed;
+  if (!observed) return null;
+  if (!observed.updates) return "Automatic updates need one manual runtime update on this computer.";
+  if (!observed.updates.capable) return "This runtime has no signed update trust. Install the current runtime once to enable automatic updates.";
+  const manifest = observed.updates.activeManifestId;
+  return manifest ? `Verified runtime ${manifest.slice("sha256:".length, "sha256:".length + 12)}` : "Running the installed runtime; ready for verified updates.";
 }
 
 function OwnedNodeCard({
@@ -582,6 +651,7 @@ function OwnedNodeCard({
         </UiBadge>
       </header>
       <UiText>{presentation.summary}</UiText>
+      {nodeUpdateReadiness(node) && <UiText as="small">{nodeUpdateReadiness(node)}</UiText>}
       <NodeDiagnostics node={node} />
       <div className="page-actions">
         <UiButton

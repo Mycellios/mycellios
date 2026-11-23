@@ -114,6 +114,25 @@ export async function loadOwnedNodes(accessToken: string, apiBaseUrl?: string): 
   return (await apiRequest<{ data: OwnedNode[] }>("/v1/nodes", accessToken, {}, apiBaseUrl)).data;
 }
 
+export interface NodeAutoUpdateSetting {
+  schema: "mycellios-node-auto-update/1";
+  enabled: boolean;
+  channel: "stable";
+  /** False while the coordinator has no signed component feed. */
+  available: boolean;
+  updatedAt: string | null;
+}
+
+export function loadNodeAutoUpdate(accessToken: string, apiBaseUrl?: string): Promise<NodeAutoUpdateSetting> {
+  return apiRequest<NodeAutoUpdateSetting>("/v1/nodes/auto-update", accessToken, {}, apiBaseUrl);
+}
+
+export function saveNodeAutoUpdate(accessToken: string, enabled: boolean, apiBaseUrl?: string): Promise<NodeAutoUpdateSetting> {
+  return apiRequest<NodeAutoUpdateSetting>("/v1/nodes/auto-update", accessToken, {
+    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }),
+  }, apiBaseUrl);
+}
+
 export function enqueueOwnedNodeCommand(
   accessToken: string,
   accountId: string,

@@ -319,6 +319,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
   private readonly maintenance = new WorkerMaintenance();
+  isWorkerInMaintenance(workerId: string): boolean { return this.maintenance.blocked(workerId); }
   async setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> { await this.maintenance.set(workerId, enabled, this.store, this.isConnected(workerId)); }
   currentWorkerSessionId(workerId: string): string | null { const state = this.connections.get(workerId); return state?.ready ? state.sessionId : null; }
 
