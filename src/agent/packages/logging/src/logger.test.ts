@@ -20,6 +20,20 @@ describe("logger", () => {
     expect(sink.events.map((event) => event.message)).toEqual(["w", "e"]);
   });
 
+  it("keeps an error passed as a warning binding instead of dropping it", () => {
+    const sink = createTestSink();
+    const logger = createLogger({ service: "api", sinks: [sink] });
+    logger.warn("checkpoint deferred", {
+      error: new Error("export failed", { cause: new Error("computer not found") }),
+      "run.id": "run-1",
+    });
+    expect(sink.events[0]).toMatchObject({
+      level: "warn",
+      "run.id": "run-1",
+      error: { name: "Error", message: "export failed", cause: { message: "computer not found" } },
+    });
+  });
+
   it("merges child bindings under call-site bindings", () => {
     const sink = createTestSink();
     const logger = createLogger({
