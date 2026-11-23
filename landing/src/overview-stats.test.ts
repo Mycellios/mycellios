@@ -3,10 +3,12 @@ import {
   deviceHardware,
   deviceRows,
   hourlyTasks,
+  isTestModel,
   modelDisplayName,
   modelKind,
   modelRows,
   onlineGpuCapacity,
+  publicModelLabel,
   type StatsSnapshot,
   type StatsWorker,
 } from "./overview-stats";
@@ -24,6 +26,15 @@ describe("model presentation", () => {
     ["jev", "Jev"],
     ["qa-qwen-embedding-gpu-20261020-3ba86b0f", "Qa Qwen Embedding GPU"],
   ])("names %s as %s", (id, name) => expect(modelDisplayName(id)).toBe(name));
+
+  it("gives the public dashboards readable English names and marks credit-lab models as tests", () => {
+    expect(publicModelLabel("agent-credit-lab-qwen3-1.7b")).toBe("Qwen3 1.7B (test)");
+    expect(publicModelLabel("jev")).toBe("Decision pilot");
+    expect(publicModelLabel("mycellios-kokoro-es")).toBe("Kokoro (Spanish)");
+    expect(publicModelLabel("mycellios-qwen3-embedding-4b")).toBe("Qwen3 Embedding 4B");
+    expect(isTestModel("agent-credit-lab-qwen3-1.7b")).toBe(true);
+    expect(isTestModel("mycellios-whisper-small")).toBe(false);
+  });
 
   it("classifies by runtime adapter first, then by id", () => {
     expect(modelKind("anything", ["kokoro"])).toBe("voice");

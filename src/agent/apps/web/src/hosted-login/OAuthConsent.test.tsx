@@ -4,8 +4,11 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   AuthServiceError,
+  completePasswordReset,
+  consumeRecoveryRedirect,
   EmailConfirmationRequired,
   loadAuthConfig,
+  requestPasswordReset,
   restoreAuthSession,
   signIn,
   signUp,
@@ -17,6 +20,9 @@ import { getOAuthAuthorization, OAuthConsentError } from "./oauth-consent";
 vi.mock("./auth", async (original) => ({
   ...(await original<typeof import("./auth")>()),
   loadAuthConfig: vi.fn(),
+  consumeRecoveryRedirect: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  completePasswordReset: vi.fn(),
   restoreAuthSession: vi.fn(),
   signIn: vi.fn(),
   signUp: vi.fn(),
@@ -56,6 +62,9 @@ beforeEach(async () => {
   );
   vi.mocked(loadAuthConfig).mockResolvedValue(config);
   vi.mocked(restoreAuthSession).mockResolvedValue(null);
+  vi.mocked(consumeRecoveryRedirect).mockResolvedValue(null);
+  vi.mocked(requestPasswordReset).mockResolvedValue(undefined);
+  vi.mocked(completePasswordReset).mockResolvedValue(session);
   vi.mocked(validAuthSession).mockResolvedValue(session);
   vi.mocked(signIn).mockResolvedValue(session);
   vi.mocked(signUp).mockResolvedValue(session);
@@ -303,4 +312,51 @@ it("still restarts an expired authorization from the agent", async () => {
   await act(async () => root.render(<OAuthConsent />));
   expect(getOAuthAuthorization).toHaveBeenCalledTimes(1);
   expect(host.querySelector('a[href="/agent/sign-in"]')?.textContent).toBe("Sign in again");
+});
+
+async function submitField(name: string, value: string) {
+  host.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value = value;
+  await act(async () =>
+    host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),
+  );
+}
+it("sends a reset link without revealing whether the account exists", async () => {
+  await render();
+  await click("Forgot your password?");
+  expect(host.querySelector("h1")?.textContent).toBe("Reset your password");
+  expect(host.querySelector('[name="password"]')).toBeNull();
+  await submitField("email", "new@example.test");
+  expect(requestPasswordReset).toHaveBeenCalledWith(config, "new@example.test");
+  expect(host.querySelector('[role="status"]')?.textContent).toContain("If an account uses that email");
+  expect(signIn).not.toHaveBeenCalled();
+  await click("Back to sign in");
+  expect(host.querySelector("h1")?.textContent).toBe("Sign in");
+});
+it("sets the new password from a reset link and then continues the pending authorization", async () => {
+  vi.mocked(consumeRecoveryRedirect).mockResolvedValue({ session });
+  await render();
+  expect(host.querySelector("h1")?.textContent).toBe("Choose a new password");
+  expect(host.querySelector('[name="password"]')?.getAttribute("autocomplete")).toBe("new-password");
+  expect(restoreAuthSession).not.toHaveBeenCalled();
+  expect(getOAuthAuthorization).not.toHaveBeenCalled();
+  await submitField("password", "a-new-strong-fixture-password");
+  expect(completePasswordReset).toHaveBeenCalledWith(config, { session }, "a-new-strong-fixture-password");
+  expect(getOAuthAuthorization).toHaveBeenCalled();
+});
+it("keeps the reset form and explains a weak new password", async () => {
+  vi.mocked(consumeRecoveryRedirect).mockResolvedValue({ session });
+  vi.mocked(completePasswordReset).mockRejectedValue(new AuthServiceError("private detail", 422, "weak_password"));
+  await render();
+  await submitField("password", "short");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Choose a longer password");
+  expect(host.textContent).not.toContain("private detail");
+  expect(host.querySelector("h1")?.textContent).toBe("Choose a new password");
+  expect(getOAuthAuthorization).not.toHaveBeenCalled();
+});
+it("offers a new link when the reset link has expired", async () => {
+  vi.mocked(consumeRecoveryRedirect).mockResolvedValue("expired");
+  await render();
+  expect(host.querySelector("h1")?.textContent).toBe("Reset your password");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("expired or was already used");
+  expect(host.querySelector('[name="email"]')).not.toBeNull();
 });

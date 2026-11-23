@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MarketingHeader } from "./MarketingHeader";
-import { renderJournalNavigation } from "../../../src/coordinator/content-hub-navigation";
-import { MARKETING_BRAND_PATHS, MARKETING_EXPLORE_LINKS, MARKETING_PRIMARY_LINKS, MARKETING_SOCIAL_LINKS, marketingDestination } from "../../../src/contracts/marketing-navigation";
+import { MarketingFooter, MarketingHeader } from "./MarketingHeader";
+import { renderJournalFooter, renderJournalNavigation } from "../../../src/coordinator/content-hub-navigation";
+import { MARKETING_BRAND_PATHS, MARKETING_EXPLORE_LINKS, MARKETING_LEGAL_LINKS, MARKETING_PRIMARY_LINKS, MARKETING_SOCIAL_LINKS, marketingDestination } from "../../../src/contracts/marketing-navigation";
 
 function navigationLinks(markup: string, className: string) {
   const section = markup.match(new RegExp(`<nav class="${className}"[^>]*>([\\s\\S]*?)</nav>`))![1]!;
@@ -23,6 +23,13 @@ describe("shared public marketing navigation", () => {
       expect(markup).not.toContain('>Login</a>');
       expect(markup).not.toContain('href="/create"');
     }
+  });
+
+  it("gives the React and server-rendered journal footers the same legal links", () => {
+    const legal = (markup: string) => [...markup.match(/<nav class="marketing-footer-legal"[^>]*>([\s\S]*?)<\/nav>/)![1]!.matchAll(/href="([^"]+)"[^>]*>([^<]+)</g)].map(match => ({ href: match[1], label: match[2] }));
+    const expected = MARKETING_LEGAL_LINKS.map(({ href, label }) => ({ href, label }));
+    expect(legal(renderToStaticMarkup(<MarketingFooter />))).toEqual(expected);
+    expect(legal(renderJournalFooter())).toEqual(expected);
   });
 
   it("keeps the paper bar by default and continues dark canvases only when asked", () => {

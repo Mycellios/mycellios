@@ -26,6 +26,12 @@ export const MARKETING_FOOTER_GROUPS = [
   { title: "Compare", links: [{ label: "Mycellios vs OpenClaw", href: "/compare/openclaw" }, { label: "Mycellios vs Hermes Agent", href: "/compare/hermes-agent" }, { label: "Mycellios vs Claude Cowork", href: "/compare/claude-cowork" }, { label: "Choose an AI agent", href: "/compare/best-ai-agent-apps" }, { label: "All comparisons", href: "/compare" }] },
 ] as const;
 
+/** Legal links shown in every marketing footer, React and server-rendered alike. */
+export const MARKETING_LEGAL_LINKS = [
+  { label: "Terms", href: "/terms" },
+  { label: "Privacy", href: "/privacy" },
+] as const;
+
 export const MARKETING_FOOTER_LINKS = [
   { label: "Journal", href: "/blog" },
   { label: "Changelog", href: "/changelog" },

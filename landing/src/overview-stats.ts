@@ -92,6 +92,19 @@ export function modelDisplayName(id: string, languageName: (language: ModelLangu
   return languages.length > 0 ? `${name} (${languages.join(", ")})` : name;
 }
 
+const ENGLISH_LANGUAGE_NAMES: Record<ModelLanguage, string> = { es: "Spanish", en: "English" };
+
+/** Models registered for credit qualification are tests, not public offers. */
+export function isTestModel(id: string): boolean {
+  return id.trim().toLowerCase().startsWith("agent-credit-lab-");
+}
+
+/** English public label for the marketing dashboards: a readable name, never the raw operator id. */
+export function publicModelLabel(id: string): string {
+  if (modelKind(id) === "decisions") return "Decision pilot";
+  return `${modelDisplayName(id, language => ENGLISH_LANGUAGE_NAMES[language])}${isTestModel(id) ? " (test)" : ""}`;
+}
+
 export interface ModelRow {
   id: string;
   name: string;
