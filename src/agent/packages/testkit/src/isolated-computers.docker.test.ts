@@ -93,6 +93,7 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
       const sandbox = new HostAwareSandbox(provider, forbiddenHost, async () => connected);
       const infos: ContainerInfo[] = [];
       const observations: Array<{ file: string; sha256: string; width: number; height: number }> = [];
+      let tabView: Record<string, unknown> | undefined;
       for (const [index, member] of members.entries()) {
         const network = computerNetworkNameFor(member.homeKey);
         // No external egress is available even while Chrome initializes. Names
@@ -161,6 +162,16 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
           })).toMatchObject({ ok: false });
           expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, context))
             .toMatchObject({ ok: true, url: firstUrl });
+          // The handoff view streams only the first conversation's tab, and only under control.
+          await expect(provider.connectTabView(ref, { controlToken: "tab-lease" }, first)).rejects.toThrow(/409/);
+          await provider.setScreenControl(ref, true, context, "tab-lease");
+          tabView = await expectTabView(
+            new URL((await provider.connectTabView(ref, { controlToken: "tab-lease" }, first)).url),
+            firstUrl,
+            path.join(output, "tab-view.jpg"),
+          );
+          await provider.setScreenControl(ref, false, context, "tab-lease");
+          await expect(provider.connectTabView(ref, { controlToken: "tab-lease" }, first)).rejects.toThrow(/409/);
         }
         const socketPath = viewerUrl.searchParams.get("path");
         expect(socketPath).toMatch(/^websockify\?/);
@@ -208,7 +219,8 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
         expect(Object.keys(finalInfo.NetworkSettings.Networks)).toEqual([computerNetworkNameFor(members[index]!.homeKey)]);
       }
       expect(hostCalls).toBe(0);
-      proof = { passed: true, realDocker: true, realSupervisor: true, containerizedSupervisor: true, realViewerHttpAndVnc: true, isolatedContainers: 2, distinctHomes: true, distinctProcesses: true, privateInternalNetworks: true, realScreens: observations, desktopReconnectPreserved: true, hostCalls, modelCalls: 0, paidCloudResources: false };
+      expect(tabView).toMatchObject({ frames: expect.any(Number), inputAccepted: true });
+      proof = { passed: true, realDocker: true, realSupervisor: true, containerizedSupervisor: true, realViewerHttpAndVnc: true, isolatedContainers: 2, distinctHomes: true, distinctProcesses: true, privateInternalNetworks: true, realScreens: observations, tabView, desktopReconnectPreserved: true, hostCalls, modelCalls: 0, paidCloudResources: false };
     } finally {
       const cleanupErrors: unknown[] = [];
       for (const { ref, context } of computers) {
@@ -272,3 +284,101 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
     }
   }, 420_000);
 });
+
+/**
+ * Open the real tab view: its page, then its gateway socket. Expect real JPEG frames of the
+ * conversation's tab and an open stream after pointer and key input.
+ */
+async function expectTabView(url: URL, pageUrl: string, file: string) {
+  expect(url.pathname).toBe("/tab.html");
+  expect(url.toString()).not.toContain(pageUrl);
+  const page = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  expect(page.ok).toBe(true);
+  expect(await page.text()).toContain('id="tab"');
+  const socketPath = url.searchParams.get("path");
+  expect(socketPath).toMatch(/^websockify\?token=/);
+  const socketUrl = new URL(socketPath!, url);
+  socketUrl.protocol = "ws:";
+  return await new Promise<Record<string, unknown>>((resolve, reject) => {
+    const socket = new WebSocket(socketUrl, ["binary"]);
+    socket.binaryType = "arraybuffer";
+    let settled = false;
+    const finish = (error?: Error, proof?: Record<string, unknown>) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      socket.close();
+      if (error) reject(error);
+      else resolve(proof!);
+    };
+    const timeout = setTimeout(() => finish(new Error("Real tab view sent no frame")), 30_000);
+    const send = (event: Record<string, unknown>) => {
+      const body = new TextEncoder().encode(JSON.stringify(event));
+      const message = new Uint8Array(4 + body.length);
+      new DataView(message.buffer).setUint32(0, body.length);
+      message.set(body, 4);
+      socket.send(message);
+    };
+    let pending = new Uint8Array(0);
+    let frames = 0;
+    socket.addEventListener("message", event => {
+      const chunk = new Uint8Array(event.data as ArrayBuffer);
+      const joined = new Uint8Array(pending.length + chunk.length);
+      joined.set(pending);
+      joined.set(chunk, pending.length);
+      const view = new DataView(joined.buffer);
+      let offset = 0;
+      while (joined.length - offset >= 5) {
+        const length = view.getUint32(offset);
+        if (joined.length - offset - 4 < length) break;
+        const kind = joined[offset + 4];
+        const payload = joined.subarray(offset + 5, offset + 4 + length);
+        offset += 4 + length;
+        if (kind === 2) {
+          const status = JSON.parse(new TextDecoder().decode(payload)) as { type?: string };
+          if (status.type === "closed" || status.type === "error") finish(new Error(`Tab view reported ${status.type}`));
+          continue;
+        }
+        if (kind !== 1) continue;
+        const headerLength = (payload[0]! << 8) | payload[1]!;
+        const header = JSON.parse(new TextDecoder().decode(payload.subarray(2, 2 + headerLength))) as { w: number; h: number };
+        const jpeg = payload.slice(2 + headerLength);
+        if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
+          finish(new Error("Tab view frame is not a JPEG"));
+          return;
+        }
+        frames += 1;
+        if (frames > 1) continue;
+        if (!(header.w > 0 && header.h > 0)) {
+          finish(new Error("Tab view frame has no size"));
+          return;
+        }
+        // Real input reaches the tab and the stream stays up.
+        send({ t: "mouse", type: "mousePressed", x: 0.5, y: 0.5, button: "left", buttons: 1, clickCount: 1 });
+        send({ t: "mouse", type: "mouseReleased", x: 0.5, y: 0.5, button: "left", buttons: 0, clickCount: 1 });
+        send({ t: "key", type: "keyDown", key: "Tab", code: "Tab", keyCode: 9 });
+        send({ t: "key", type: "keyUp", key: "Tab", code: "Tab", keyCode: 9 });
+        setTimeout(() => {
+          if (socket.readyState !== WebSocket.OPEN) {
+            finish(new Error("Tab view closed after input"));
+            return;
+          }
+          void writeFile(file, jpeg).then(
+            () => finish(undefined, {
+              file: path.basename(file),
+              sha256: createHash("sha256").update(jpeg).digest("hex"),
+              width: header.w,
+              height: header.h,
+              frames,
+              inputAccepted: true,
+            }),
+            (error: unknown) => finish(error as Error),
+          );
+        }, 1_500);
+      }
+      pending = joined.slice(offset);
+    });
+    socket.addEventListener("error", () => finish(new Error("Real tab view WebSocket failed")));
+    socket.addEventListener("close", () => finish(new Error("Real tab view WebSocket closed")));
+  });
+}
