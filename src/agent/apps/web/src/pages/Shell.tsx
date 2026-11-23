@@ -4008,6 +4008,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           return;
         }
         toast.error(t`Could not open this conversation’s browser tab.`);
+        // The request still waits for the person: show the computer so they can still help.
+        await openComputerRef.current(targetBotId);
       })
       .finally(() => { browserHandoffPending.current = false; });
   }, [rpc, t]);

@@ -75,6 +75,7 @@ export function createRunSandbox(
 
 export class HostAwareSandbox implements SandboxProvider {
   readonly pageBrowser?: SandboxProvider["pageBrowser"];
+  readonly connectTabView?: SandboxProvider["connectTabView"];
   readonly appControl?: SandboxProvider["appControl"];
 
   constructor(
@@ -102,6 +103,16 @@ export class HostAwareSandbox implements SandboxProvider {
               fallback: "computer_act",
               error: "Page browser is unavailable on this computer.",
             });
+      };
+    }
+    // Without this the API sees no tab view and every handoff falls back to the desktop.
+    if (isolated.connectTabView || host.connectTabView) {
+      this.connectTabView = (computer, request, context) => {
+        const provider = this.route(computer);
+        if (!provider.connectTabView) {
+          return Promise.reject(new Error("tab view is unavailable on this computer"));
+        }
+        return provider.connectTabView(computer, request, context);
       };
     }
   }

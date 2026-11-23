@@ -118,6 +118,28 @@ describe("host-aware sandbox", () => {
     expect(pageBrowser).not.toHaveBeenCalled();
   });
 
+  it("exposes the browser tab view through the production Docker wrapper", async () => {
+    const connectTabView = vi
+      .spyOn(DockerSandboxProvider.prototype, "connectTabView")
+      .mockResolvedValue({ url: "http://10.0.0.5:6080/tab.html" });
+    const sandbox = createRunSandbox("docker", {
+      prisma: { deploymentSettings: { findUnique: vi.fn() } } as unknown as PrismaClient,
+    });
+    const computer: ComputerRef = { id: "computer", providerRef: "computer", botId: "home", kind: "docker" };
+    // The API offers the tab view only when the composed sandbox has it.
+    expect(sandbox.connectTabView).toBeTypeOf("function");
+    await expect(sandbox.connectTabView!(computer, { controlToken: "lease" }, ctx)).resolves.toEqual({
+      url: "http://10.0.0.5:6080/tab.html",
+    });
+    expect(connectTabView).toHaveBeenCalledWith(computer, { controlToken: "lease" }, ctx);
+
+    connectTabView.mockClear();
+    await expect(
+      sandbox.connectTabView!({ ...computer, kind: "desktop" }, { controlToken: "lease" }, ctx),
+    ).rejects.toThrow("tab view is unavailable");
+    expect(connectTabView).not.toHaveBeenCalled();
+  });
+
   it("routes billing capability by computer kind rather than the current host setting", () => {
     const isolated: SandboxProvider = new FakeSandboxProvider();
     isolated.billsWhileRunning = vi.fn(() => true);
