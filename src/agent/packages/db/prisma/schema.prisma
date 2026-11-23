@@ -210,6 +210,7 @@ model User {
   secrets                     Secret[]
   tailnetConnections          TailnetConnection[]
   mcpServers                  McpServer[]
+  memoryConnections           MemoryConnection[]
   botSections                 BotSection[]
   developmentProjects         DevelopmentProject[]
   actionApprovalRules         ActionApprovalRule[]
@@ -509,6 +510,7 @@ model Space {
   tailnetConnections          TailnetConnection[]
   tailnetPolicies             TailnetPolicy[]
   mcpServers                  McpServer[]
+  memoryConnections           MemoryConnection[]
   mcpOAuthSessions            McpOAuthSession[]
   modelOAuthSessions          ModelOAuthSession[]
   botMcpServers              BotMcpServer[]
@@ -1951,10 +1953,34 @@ model McpServer {
   updatedAt     DateTime          @updatedAt
   assignments   BotMcpServer[]
   oauthSessions McpOAuthSession[]
+  memoryConnection MemoryConnection?
 
   @@unique([spaceId, userId, slug])
   @@index([spaceId, userId])
   @@map("mcp_servers")
+}
+
+/// A personal memory server (specs/mcp-memory). Transport and OAuth stay on its McpServer
+/// row, which is hidden from the generic MCP list and from Mico tool assignments.
+model MemoryConnection {
+  id           String    @id @default(cuid())
+  spaceId      String
+  space        Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serverId     String    @unique
+  server       McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  toolMapping  Json      @default("{}")
+  /// unchecked | authorization_required | compatible | incompatible | unreachable
+  status       String    @default("unchecked")
+  message      String?
+  capabilities Json      @default("{}")
+  checkedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([spaceId, userId])
+  @@map("memory_connections")
 }
 
 model McpOAuthSession {

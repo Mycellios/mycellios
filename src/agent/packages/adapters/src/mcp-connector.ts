@@ -16,7 +16,7 @@ import type {
   SecretStore,
 } from "@mycellios/adapter-kit";
 import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
-import type { McpOAuthEnvField } from "@mycellios/contracts";
+import type { McpOAuthEnvField, McpToolDescription } from "@mycellios/contracts";
 import {
   isLocalMcpHost,
   mcpOAuthEnvReferences,
@@ -712,9 +712,9 @@ export class McpConnector implements ConnectorProvider {
       this.sessions.get(key)?.revision === server.revision ||
       this.connecting.get(key)?.revision === server.revision;
     try {
-      let toolCount: number;
+      let listed: Array<{ name: string; inputSchema?: unknown; annotations?: unknown }>;
       if (shared) {
-        toolCount = (
+        listed = (
           await this.withSession(server, context, (session) => {
             const material = this.sessions.get(key)?.material;
             secrets = [
@@ -723,19 +723,31 @@ export class McpConnector implements ConnectorProvider {
             ];
             return session.listTools({ signal: context.signal });
           })
-        ).tools.length;
+        ).tools;
       } else {
         const connected = await this.connectSession(server, context, () => undefined);
         secrets = [...oauthMaterialSecrets(connected.material), ...(connected.launchSecrets ?? [])];
         try {
-          toolCount = (await connected.session.listTools({ signal: context.signal })).tools.length;
+          listed = (await connected.session.listTools({ signal: context.signal })).tools;
         } finally {
           await closeEntry(connected).catch(() => undefined);
         }
       }
       this.unavailable.delete(key);
       this.discoveryBackoff.delete(key);
-      update = { status: "ok", message: null, toolCount };
+      update = {
+        status: "ok",
+        message: null,
+        toolCount: listed.length,
+        tools: listed.map((tool) => ({
+          name: tool.name,
+          inputSchema: tool.inputSchema,
+          annotations:
+            tool.annotations && typeof tool.annotations === "object"
+              ? (tool.annotations as McpToolDescription["annotations"])
+              : null,
+        })),
+      };
     } catch (error) {
       // Like discovery: a shared session that cannot list its tools is dropped.
       if (shared) await this.evict(key).catch(() => undefined);

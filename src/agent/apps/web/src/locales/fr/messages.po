@@ -7396,3 +7396,63 @@ msgstr "Branche de {name}"
 #: src/components/BranchOriginDivider.tsx
 msgid "Open where this branch started"
 msgstr "Ouvrir le point de départ de cette branche"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Read and write"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Read only"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Needs authorization"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Not a memory server"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Unreachable"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Not checked"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not load memory connections"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not connect this memory"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Personal memory"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "A memory server you own, connected over MCP. No Mico uses it until you give that Mico access."
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not check this memory"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not remove this memory"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "MCP URL"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Bearer token (only without OAuth)"
+msgstr ""
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Connect personal memory"
+msgstr ""

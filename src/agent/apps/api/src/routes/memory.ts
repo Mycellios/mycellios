@@ -12,7 +12,7 @@ import {
 import type { RouterContext } from "./context.js";
 
 export function memoryRoutes(ctx: RouterContext) {
-  const { deps, repos, taughtSkills, agentSkills, authed } = ctx;
+  const { deps, repos, taughtSkills, agentSkills, authed, memoryConnections } = ctx;
   return {
     memory: {
       reviewStatus: authed.memory.reviewStatus.handler(async({context})=>{
@@ -143,6 +143,20 @@ export function memoryRoutes(ctx: RouterContext) {
       disconnectProvider: authed.memory.disconnectProvider.handler(async ({ context }) =>
         disconnectMemoryProvider(deps, context.actor),
       ),
+      connections: {
+        list: authed.memory.connections.list.handler(({ context }) =>
+          memoryConnections.list(context.actor),
+        ),
+        create: authed.memory.connections.create.handler(({ context, input }) =>
+          memoryConnections.create(context.actor, input),
+        ),
+        check: authed.memory.connections.check.handler(({ context, input }) =>
+          memoryConnections.check(context.actor, input.id),
+        ),
+        remove: authed.memory.connections.remove.handler(({ context, input }) =>
+          memoryConnections.remove(context.actor, input.id),
+        ),
+      },
     },
     scratchpad: {
       list: authed.scratchpad.list.handler(async ({ context, input }) => {
