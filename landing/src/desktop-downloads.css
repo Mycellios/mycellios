@@ -38,6 +38,7 @@
 .desktop-details code { overflow-wrap: anywhere; }
 .desktop-checksums { margin-top: 24px; }
 .desktop-checksums code { display: block; overflow-wrap: anywhere; font-size: 12px; margin-top: 8px; color: var(--agent-muted); }
+.desktop-checksums a { display: inline-flex; align-items: center; min-height: 32px; }
 .desktop-downloads footer { margin-top: 24px; justify-content: flex-start; }
 @media (max-width: 720px) {
  .desktop-systems { grid-template-columns: minmax(0, 1fr); }

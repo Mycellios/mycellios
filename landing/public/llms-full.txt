@@ -11,9 +11,9 @@ Each public page below has a Markdown version linked beside it. Spanish guides a
 ## Product, guides and comparisons
 
 - [Mycellios — AI agents, your models & shared compute](https://www.mycellios.com/): Work with AI agents in one workspace. Connect your models or use Mycellios Credits, and contribute compatible compute to earn Credits for verified work. [Markdown](https://www.mycellios.com/index.md).
-- [Live distributed AI network | mycellios](https://www.mycellios.com/network): Inspect the public mycellios network snapshot: connected workers, available models, and recorded inference activity when data is available. [Markdown](https://www.mycellios.com/network.md).
+- [Live distributed AI network | Mycellios](https://www.mycellios.com/network): Inspect the public mycellios network snapshot: connected workers, available models, and recorded inference activity when data is available. [Markdown](https://www.mycellios.com/network.md).
 - [Contribute compute and earn AI Credits | Mycellios](https://www.mycellios.com/earn): Activate compatible compute from your Mycellios account. Earn AI Credits for approved, independently verified work and pause contribution whenever you choose. [Markdown](https://www.mycellios.com/earn.md).
-- [Native package availability | mycellios](https://www.mycellios.com/downloads): Check which mycellios native packages are published for Windows, macOS, and Linux, or contribute from your browser without installing software. [Markdown](https://www.mycellios.com/downloads.md).
+- [Native package availability | Mycellios](https://www.mycellios.com/downloads): Check which mycellios native packages are published for Windows, macOS, and Linux, or contribute from your browser without installing software. [Markdown](https://www.mycellios.com/downloads.md).
 - [Browser contribution | Mycellios](https://www.mycellios.com/browser/): Connect a desktop, tablet, or phone browser to mycellios and contribute voluntary, measurable compute that you can pause anytime. [Markdown](https://www.mycellios.com/browser.md).
 - [AI Credits, costs & pricing | Mycellios](https://www.mycellios.com/pricing): Understand Mycellios Credits and optional model providers. Estimate your own provider and hosting costs, and check current model prices before use. [Markdown](https://www.mycellios.com/pricing.md).
 - [Compare AI agent apps | Mycellios](https://www.mycellios.com/compare): Compare Mycellios with other agent apps, with original guidance and current product sources. [Markdown](https://www.mycellios.com/compare.md).
@@ -623,7 +623,7 @@ Source: https://www.mycellios.com/es/guias
 
 Open Mycellios in your browser or on desktop, create a Mico and choose a model connection. A practical guide to your first AI task.
 
-Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+Check the requirements of your connection before you start. Model and tool availability can vary.
 
 ## Choose where to work
 
@@ -658,7 +658,7 @@ Source: https://www.mycellios.com/guides/get-started
 
 Abre Mycellios en el navegador o en escritorio, crea un Mico y elige un modelo. Guía práctica para completar tu primera tarea con IA.
 
-Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+Comprueba los requisitos de tu conexión antes de empezar. La disponibilidad de modelos y herramientas puede variar.
 
 ## Elige dónde trabajar
 
@@ -693,7 +693,7 @@ Source: https://www.mycellios.com/es/guias/empezar
 
 Understand Mycellios Credits, the optional managed provider, your own model connections and the difference between Credits and Spore.
 
-Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+Check the requirements of your connection before you start. Model and tool availability can vary.
 
 ## One workspace, your choice of provider
 
@@ -730,7 +730,7 @@ Source: https://www.mycellios.com/guides/models-and-credits
 
 Entiende los Créditos, el proveedor opcional Mycellios y tus propias conexiones de modelos. Conoce los costes y la diferencia con Spore.
 
-Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+Comprueba los requisitos de tu conexión antes de empezar. La disponibilidad de modelos y herramientas puede variar.
 
 ## Un espacio, el proveedor que elijas
 
@@ -767,7 +767,7 @@ Source: https://www.mycellios.com/es/guias/modelos-y-creditos
 
 Learn how to activate and pause browser contribution, check real earnings and use verified-work Credits for eligible AI models in Mycellios.
 
-Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+Check the requirements of your connection before you start. Model and tool availability can vary.
 
 ## Start from your account
 
@@ -802,7 +802,7 @@ Source: https://www.mycellios.com/guides/contribute-compute
 
 Aprende a activar y pausar la contribución desde el navegador, comprobar las ganancias reales y usar Créditos de trabajo verificado para IA.
 
-Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+Comprueba los requisitos de tu conexión antes de empezar. La disponibilidad de modelos y herramientas puede variar.
 
 ## Empieza desde tu cuenta
 

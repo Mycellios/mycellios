@@ -91,6 +91,12 @@ describe("coordinator content security policy", () => {
       expect(page.headers["content-security-policy"]).toContain(sha(bootstrap));
       const api = await runtime.app.inject({ method: "GET", url: "/health" });
       expect(api.headers["content-security-policy"]).toContain("script-src 'self'");
+      const missing = await runtime.app.inject({ method: "GET", url: "/esto-no-existe", headers: { accept: "text/html" } });
+      expect(missing.statusCode).toBe(404);
+      expect(missing.headers["content-type"]).toContain("text/html");
+      expect(missing.headers["content-security-policy"]).toContain("script-src 'self'");
+      const missingApi = await runtime.app.inject({ method: "GET", url: "/v1/missing", headers: { accept: "text/html" } });
+      expect(missingApi.json()).toMatchObject({ statusCode: 404 });
     } finally {
       await runtime.app.close();
     }

@@ -258,6 +258,17 @@ export function OAuthConsent() {
                         "Este correo ya tiene una cuenta de Mycellios. Pulsa Iniciar sesión debajo para continuar.",
                       ),
                     );
+                  } else if (
+                    mode === "sign-up" &&
+                    error instanceof AuthServiceError &&
+                    error.code === "weak_password"
+                  ) {
+                    setError(
+                      text(
+                        "Choose a longer password that is harder to guess.",
+                        "Elige una contraseña más larga y difícil de adivinar.",
+                      ),
+                    );
                   } else
                     setError(
                       mode === "sign-up"

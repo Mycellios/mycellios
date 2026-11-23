@@ -14,6 +14,7 @@ export const MARKETING_EXPLORE_LINKS = [
   { id: "docs", label: "Documentation", href: "/docs" },
   { id: "journal", label: "Journal", href: "/blog" },
   { id: "changelog", label: "Changelog", href: "/changelog" },
+  { id: "network", label: "Live network", href: "/network" },
   { id: "staking", label: "Staking", href: "/spore" },
   { id: "rewards", label: "Rewards", href: "/spore/rewards" },
 ] as const;

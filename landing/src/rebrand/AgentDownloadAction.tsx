@@ -47,6 +47,8 @@ export function AgentDownloadAction() {
   useEffect(() => {
     const quick = suggestedDownload(navigator.userAgent).id;
     if (quick) setSelected(quick);
+    // Android phones get the signed APK; desktop detection below never matches them.
+    else if (/android/i.test(navigator.userAgent)) setSelected(ANDROID);
     void detectInstaller().then(id => { if (id) setSelected(id); }).catch(() => {});
     let active = true;
     const controller = new AbortController();
@@ -65,7 +67,7 @@ export function AgentDownloadAction() {
   const packageFor = (id: InstallerId) => id === "fedora-x64" ? catalog?.fedora : catalog?.packages.find(pkg => pkg.id === id);
   // Until the catalog answers, desktop entries open the downloads page instead of
   // claiming an installer is published.
-  const hrefFor = (id: MenuPlatform) => id === ANDROID ? "/downloads/desktop#android-title" : !catalog ? "/downloads/desktop" : packageFor(id) ? desktopLatestDownloadPath(id) : undefined;
+  const hrefFor = (id: MenuPlatform) => id === ANDROID ? "/downloads/desktop#desktop-android" : !catalog ? "/downloads/desktop" : packageFor(id) ? desktopLatestDownloadPath(id) : undefined;
   const confirmed = (id: MenuPlatform) => id === ANDROID || Boolean(catalog && packageFor(id));
   const menuItems = () => Array.from(root.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
   const close = (restoreFocus = false) => { setOpen(false); if (restoreFocus) toggle.current?.focus(); };
@@ -88,7 +90,7 @@ export function AgentDownloadAction() {
   const item = (id: MenuPlatform, label: string) => {
     const href = hrefFor(id);
     return href ? <Link key={id} className="agent-download-item" href={href} role="menuitem" data-selected={selected === id || undefined} onClick={() => { setSelected(id); close(true); }}>
-      <PlatformLogo platform={systemOf(id)} /><span>{label}</span>{confirmed(id) ? <small>Available</small> : null}
+      <PlatformLogo platform={systemOf(id)} /><span>{label}</span>
     </Link> : null;
   };
   return <div className="agent-download" ref={root}>

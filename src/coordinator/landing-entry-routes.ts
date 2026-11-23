@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { MARKETING_COMPARISONS, MARKETING_INDEXABLE_PATHS, RETIRED_MARKETING_PAGES, STATS_HOST } from "../contracts/marketing-pages.js";
+import { sendNotFound } from "./landing-not-found.js";
 
 const REPOSITORY_DOCS = "https://github.com/Mycellios/mycellios/blob/main/docs";
 const CANONICAL_LANDING_HOST = "www.mycellios.com";
@@ -60,6 +61,8 @@ export function registerCanonicalLandingHostRedirect(app: FastifyInstance): void
 }
 
 export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: string): void {
+  // Browsers get a navigable page for unknown URLs; API clients keep the JSON error.
+  app.setNotFoundHandler((request, reply) => sendNotFound(request, reply));
   app.addHook("onRequest", async (request, reply) => {
     if (["GET", "HEAD"].includes(request.method) && request.hostname === STATS_HOST && request.url.split("?")[0] === "/") {
       return reply.sendFile(existsSync(resolve(assetsRoot, "stats/index.html")) ? "stats/index.html" : "index.html");
@@ -91,7 +94,7 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
   }
   for (const path of MARKETING_GUIDE_PATHS) {
     const documentName = `${path.slice(1)}/index.html`;
-    app.get(path, async (_request, reply) => existsSync(resolve(assetsRoot, documentName)) ? reply.sendFile(documentName) : reply.code(404).send({ error: "Page not published" }));
+    app.get(path, async (request, reply) => existsSync(resolve(assetsRoot, documentName)) ? reply.sendFile(documentName) : sendNotFound(request, reply, "Page not published"));
     app.get(`${path}/`, async (request, reply) => reply.redirect(`${path}${request.url.includes("?") ? request.url.slice(request.url.indexOf("?")) : ""}`, 308));
   }
   for (const path of MARKETING_INDEXABLE_PATHS) {
@@ -104,7 +107,7 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
   }
   for (const [slug] of MARKETING_COMPARISONS) {
     const documentName = `compare/${slug}/index.html`;
-    app.get(`/compare/${slug}`, async (_request, reply) => existsSync(resolve(assetsRoot, documentName)) ? reply.sendFile(documentName) : reply.code(404).send({ error: "Page not published" }));
+    app.get(`/compare/${slug}`, async (request, reply) => existsSync(resolve(assetsRoot, documentName)) ? reply.sendFile(documentName) : sendNotFound(request, reply, "Page not published"));
     app.get(`/compare/${slug}/`, async (_request, reply) => reply.redirect(`/compare/${slug}`, 308));
   }
   for (const [path, destination] of Object.entries(RETIRED_MARKETING_PAGES)) {
@@ -120,6 +123,8 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
     ["/docs/protocol", `${REPOSITORY_DOCS}/ARCHITECTURE.md`], ["/docs/protocol/", `${REPOSITORY_DOCS}/ARCHITECTURE.md`],
     ["/docs/downloads", "/downloads"], ["/docs/network", "/network"], ["/docs/blog", "/blog"],
     ["/docs/downloads/", "/downloads"], ["/docs/network/", "/network"], ["/docs/blog/", "/blog"],
+    // Common sign-in addresses lead to Agent, which owns sign-in and registration.
+    ...["/login", "/signin", "/sign-in", "/signup", "/sign-up", "/register"].flatMap(path => [[path, "/agent"], [`${path}/`, "/agent"]] as const),
   ] as const;
   for (const [path, destination] of redirects) {
     app.get(path, async (_request, reply) => reply.redirect(destination));

@@ -481,12 +481,12 @@ function renderBlogIndex(posts: PaginatedPosts): string {
     : `${SITE_ORIGIN}${BLOG_PATH}?page=${posts.page}`;
   const entries = posts.items.length > 0
     ? posts.items.map(renderBlogEntry).join("")
-    : `<section class="blog-state"><div><p class="blog-hero__eyebrow">Field notes</p><h2>Guides are coming soon</h2><p>Our first research note is being prepared.</p></div></section>`;
+    : `<section class="blog-state"><div><p class="blog-hero__eyebrow">Field notes</p><h2>Start with the guides</h2><p>Our first research note is being prepared. Meanwhile, the <a href="/guides">Mycellios guides</a> cover getting started, models and Credits, and contributing compute.</p></div></section>`;
   const pagination = renderPagination(posts.page, pageCount);
   return renderDocument({
-    title: "Research & field notes | mycellios",
+    title: "Research & field notes | Mycellios",
     description:
-      "Technical research, product updates and field notes from the team building mycellios.",
+      "Technical research, product updates and field notes from the team building Mycellios.",
     canonical,
     body: `
       ${renderNavigation()}
@@ -494,7 +494,7 @@ function renderBlogIndex(posts: PaginatedPosts): string {
         <header class="blog-hero">
           <p class="blog-hero__eyebrow">Research &amp; field notes</p>
           <h1>Notes from the network.</h1>
-          <p>Architecture notes, experiments and product updates from the mycellios team.</p>
+          <p>Architecture notes, experiments and product updates from the Mycellios team.</p>
         </header>
         <section class="blog-feed" aria-label="Latest articles">${entries}</section>
         ${pagination}
@@ -541,7 +541,7 @@ function renderBlogPost(post: BlogPost): string {
     },
     publisher: {
       "@type": "Organization",
-      name: "mycellios",
+      name: "Mycellios",
       url: SITE_ORIGIN,
     },
     ...(post.image ? { image: [post.image.url] } : {}),
@@ -600,7 +600,7 @@ function renderBlogStatePage(
   options: { noIndex: boolean },
 ): string {
   return renderDocument({
-    title: `${title} | mycellios`,
+    title: `${title} | Mycellios`,
     description: message,
     canonical: `${SITE_ORIGIN}${BLOG_PATH}`,
     noIndex: options.noIndex,
@@ -609,7 +609,7 @@ function renderBlogStatePage(
       <main class="blog-main">
         <section class="blog-state">
           <div>
-            <p class="blog-hero__eyebrow">mycellios journal</p>
+            <p class="blog-hero__eyebrow">Mycellios journal</p>
             <h1>${escapeHtml(title)}</h1>
             <p>${escapeHtml(message)}</p>
             <a href="${BLOG_PATH}">Back to the journal</a>
@@ -655,7 +655,7 @@ function renderDocument(options: DocumentOptions): string {
     <link rel="shortcut icon" href="/assets/brand/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="/assets/brand/app-icon.png" />
     <meta property="og:type" content="${options.ogType ?? "website"}" />
-    <meta property="og:site_name" content="mycellios" />
+    <meta property="og:site_name" content="Mycellios" />
     <meta property="og:url" content="${escapeHtml(options.canonical)}" />
     <meta property="og:title" content="${escapeHtml(options.title)}" />
     <meta property="og:description" content="${escapeHtml(options.description)}" />

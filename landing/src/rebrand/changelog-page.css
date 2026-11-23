@@ -1,4 +1,4 @@
-.changelog-page { --changelog-paper:#faf9f7; --changelog-stone:#efede7; --changelog-ink:#16221b; --changelog-muted:#59635d; --changelog-moss:#467c66; --changelog-soft:#dce7dc; }
+.changelog-page { --changelog-paper:#faf9f7; --changelog-stone:#efede7; --changelog-ink:#16221b; --changelog-muted:#59635d; --changelog-moss:#3b6c58; --changelog-soft:#dce7dc; }
 .changelog-hero { position:relative; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); margin-top:40px; overflow:hidden; isolation:isolate; border-radius:22px; background:var(--changelog-stone); }
 .changelog-hero-copy { position:relative; z-index:1; padding:62px 0 48px 46px; }
 .changelog-hero h1 { font-size:clamp(43px,5.2vw,72px); line-height:1.02; font-weight:500; letter-spacing:-.05em; }

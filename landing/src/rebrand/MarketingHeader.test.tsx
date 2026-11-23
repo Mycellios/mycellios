@@ -25,6 +25,13 @@ describe("shared public marketing navigation", () => {
     }
   });
 
+  it("keeps the paper bar by default and continues dark canvases only when asked", () => {
+    expect(renderToStaticMarkup(<MarketingHeader />)).not.toContain("data-tone");
+    const dark = renderToStaticMarkup(<MarketingHeader active="network" tone="dark" />);
+    expect(dark).toContain('data-tone="dark"');
+    expect(navigationLinks(dark, "marketing-desktop-nav")).toEqual(navigationLinks(renderToStaticMarkup(<MarketingHeader active="network" />), "marketing-desktop-nav"));
+  });
+
   it("uses the same official social marks and accessible link labels on both surfaces", () => {
     for (const markup of [renderToStaticMarkup(<MarketingHeader />), renderJournalNavigation()]) {
       for (const social of MARKETING_SOCIAL_LINKS) {

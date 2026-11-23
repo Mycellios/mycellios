@@ -5,6 +5,7 @@ import { resolve, sep } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import { buildNativeSourceProvenance } from "./scripts/native-build-provenance.mjs";
 import { marketingNavigationAssets } from "./scripts/marketing-navigation-assets.mjs";
+import { agentChangelogRecent } from "./scripts/agent-changelog-recent.mjs";
 
 /*
  * Where `node_modules` actually lives.
@@ -120,7 +121,7 @@ export default defineConfig({
   define: {
     __MYCELLIOS_BUILD_IDENTITY__: JSON.stringify(landingBuildIdentity),
   },
-  plugins: [landingSeoAssets(), react(), preloadHeroRenderer(), marketingNavigationAssets(import.meta.dirname)],
+  plugins: [landingSeoAssets(), react(), preloadHeroRenderer(), marketingNavigationAssets(import.meta.dirname), agentChangelogRecent(import.meta.dirname)],
   publicDir: "public",
   server: {
     host: LOCAL_UI_HOST,

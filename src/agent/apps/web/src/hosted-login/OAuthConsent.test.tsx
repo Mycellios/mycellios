@@ -171,6 +171,15 @@ it("explains duplicate registration and preserves the email for sign-in", async 
   expect(host.querySelector<HTMLInputElement>('[name="email"]')!.value).toBe("new@example.test");
   expect(getOAuthAuthorization).not.toHaveBeenCalled();
 });
+it("says when the identity service rejects a weak password", async () => {
+  vi.mocked(signUp).mockRejectedValue(new AuthServiceError("private detail", 422, "weak_password"));
+  await render();
+  await click("Create account");
+  await submit();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Choose a longer password");
+  expect(host.textContent).not.toContain("private detail");
+  expect(host.querySelector("h1")?.textContent).toBe("Create your account");
+});
 it("disables switching and submission while registration is in progress", async () => {
   let reject!: (reason: Error) => void;
   vi.mocked(signUp).mockImplementation(

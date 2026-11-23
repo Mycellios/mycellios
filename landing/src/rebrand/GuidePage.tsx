@@ -1,3 +1,4 @@
+import { ArrowUpRight } from "lucide-react";
 import { GUIDE_INDEXES, MARKETING_GUIDES } from "../../../src/contracts/marketing-guides";
 import { seoPageForPath } from "../seo";
 import { Heading, Link, Text } from "../ui/primitives";
@@ -15,16 +16,16 @@ export function GuidePage() {
     <div className="marketing-shell guide-article" lang={page.language}>
       <nav className="guide-navigation" aria-label={spanish ? "Navegación de guías" : "Guide navigation"}>
         {guide && <Link href={index.path}>{index.title}</Link>}
-        <Link href={page.alternatePath!} lang={spanish ? "en" : "es"} hrefLang={spanish ? "en" : "es"}>{spanish ? "Read in English" : "Leer en español"}</Link>
+        <Link className="guide-language" href={page.alternatePath!} lang={spanish ? "en" : "es"} hrefLang={spanish ? "en" : "es"}>{spanish ? "Read in English" : "Leer en español"}</Link>
       </nav>
       <Heading as="h1">{content.heading}</Heading>
       <Text className="guide-description">{content.paragraphs[0]}</Text>
-      <Text>{content.paragraphs[1]}</Text>
+      <Text className="guide-lead">{content.paragraphs[1]}</Text>
       {content.sections?.map(section => <section key={section.title}><Heading as="h2">{section.title}</Heading>{section.paragraphs.map(paragraph => <Text key={paragraph}>{paragraph}</Text>)}</section>)}
       <nav className="guide-related" aria-label={spanish ? "Más recursos" : "Related resources"}>
         <Heading as="h2">{spanish ? "Continúa por aquí" : "Keep exploring"}</Heading>
-        {content.links.map(link => <Link key={link.href} href={link.href}>{link.label}</Link>)}
-        <Link href="https://github.com/Mycellios/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md">{spanish ? "Estado y evidencias del proyecto" : "Project status and evidence"}</Link>
+        {content.links.map(link => <Link key={link.href} href={link.href}>{link.label}<ArrowUpRight size={15} aria-hidden="true" /></Link>)}
+        <Link href="https://github.com/Mycellios/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md">{spanish ? "Estado y evidencias del proyecto" : "Project status and evidence"}<ArrowUpRight size={15} aria-hidden="true" /></Link>
       </nav>
     </div><MarketingFooter />
   </main>;

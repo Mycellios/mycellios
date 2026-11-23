@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUpRight, Download, Hash } from "lucide-react";
 import { Button, Card, Heading, Link, Text } from "../ui/primitives";
 import { MarketingFooter, MarketingHeader } from "./MarketingHeader";
-import { CHANGELOG_FILTERS, CHANGELOG_RELEASES, releaseFilterFor, releasesFor, type ChangelogRelease, type ReleaseFilter } from "../../../src/contracts/marketing-changelog";
+import { CHANGELOG_FILTERS, releaseFilterFor, releasesFor, type ChangelogRelease, type ReleaseFilter } from "../../../src/contracts/marketing-changelog";
+import { CHANGELOG_RELEASES, FULL_CHANGELOG_URL } from "./changelog-releases";
 import "./changelog-page.css";
 
 const formatDate = (date: string, monthOnly = false) => new Intl.DateTimeFormat("en", monthOnly ? { month: "long", year: "numeric", timeZone: "UTC" } : { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
@@ -12,7 +13,7 @@ function ReleaseNote({ release, latest }: { release: ChangelogRelease; latest: b
   return <Card className="changelog-release" id={release.id} aria-labelledby={`${release.id}-title`} data-release>
     <header><div className="changelog-release-meta"><time dateTime={release.date}>{formatDate(release.date)}</time>{latest && <span className="changelog-latest">Latest update</span>}<span>{release.platform}</span><span>{release.channel}</span></div>
       <Heading as="h2" id={`${release.id}-title`}><Link href={`#${release.id}`} aria-label={release.product === "desktop" ? `Desktop ${release.version} · ${release.platform}` : "Mycellios Agent web update"}>{release.product === "desktop" ? `Desktop ${release.version}` : "Mycellios Agent"}<Hash size={20} aria-hidden="true" /></Link></Heading>
-      <Heading as="h3" className="changelog-release-title">{release.title}</Heading><Text>{release.summary}</Text>
+      {release.title && <Heading as="h3" className="changelog-release-title">{release.title}</Heading>}<Text>{release.summary}</Text>
     </header>
     {release.groups.map(group => <section className="changelog-change-group" key={group.kind} aria-label={`${group.kind} in ${release.platform} ${release.version}`}><Heading as="h4" data-change-kind={group.kind}>{group.kind}<span>{group.items.length}</span></Heading><ul>{group.items.map(item => <li key={item}>{item}</li>)}</ul></section>)}
     <div className="changelog-update-note"><strong>About this update</strong><Text>{release.updateNote}</Text></div>
@@ -22,7 +23,7 @@ function ReleaseNote({ release, latest }: { release: ChangelogRelease; latest: b
 
 export function ChangelogPage() {
   const [filter, setFilter] = useState<ReleaseFilter>(() => releaseFilterFor(typeof window === "undefined" ? "" : window.location.search));
-  const entries = releasesFor(filter), latest = CHANGELOG_RELEASES[0]!;
+  const entries = releasesFor(CHANGELOG_RELEASES, filter), latest = CHANGELOG_RELEASES.find(release => release.product === "desktop") ?? CHANGELOG_RELEASES[0]!;
   const [active, setActive] = useState(entries[0]!.id);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -43,7 +44,7 @@ export function ChangelogPage() {
     if (next === "all") url.searchParams.delete("product"); else url.searchParams.set("product", next);
     url.hash = "";
     window.history.replaceState({}, "", `${url.pathname}${url.search}`);
-    setFilter(next); setActive(releasesFor(next)[0]!.id);
+    setFilter(next); setActive(releasesFor(CHANGELOG_RELEASES, next)[0]!.id);
   }
   const months = [...new Set(entries.map(entry => entry.date.slice(0, 7)))];
 
@@ -60,6 +61,7 @@ export function ChangelogPage() {
           <div className="changelog-index-heading"><strong>Release archive</strong><span aria-live="polite">{entries.length} {entries.length === 1 ? "update" : "updates"}</span></div>
           {months.map(month => <div className="changelog-month" key={month}><Text>{formatDate(`${month}-01`, true)}</Text><ul>{entries.filter(entry => entry.date.startsWith(month)).map(entry => <li key={entry.id}><Link href={`#${entry.id}`} aria-current={active === entry.id ? "location" : undefined} onClick={() => setActive(entry.id)}><span><strong>{entry.version}</strong><small>{entry.platform}</small></span><time dateTime={entry.date}>{formatDay(entry.date)}</time></Link></li>)}</ul></div>)}
         </nav>
+        <Link className="changelog-index-journal" href={FULL_CHANGELOG_URL} target="_blank" rel="noreferrer">Full release history<ArrowUpRight size={14} aria-hidden="true" /></Link>
         <Link className="changelog-index-journal" href="/blog">Stories behind the work<ArrowUpRight size={14} aria-hidden="true" /></Link>
       </aside>
       <div className="changelog-notes">

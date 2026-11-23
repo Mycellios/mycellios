@@ -47,7 +47,7 @@
 .agent-demo-sidebar { width:224px; flex-shrink:0; display:flex; flex-direction:column; background:#eeebe5; border-right:1px solid #ded9d1; padding:10px 9px; } /* taste-skill-ignore: Actual Agent sidebar separator inside the product UI. */
 .agent-demo-sidebar-top { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:38px; padding-inline:7px; }
 .agent-demo-sidebar-top > img { border-radius:50%; }
-.agent-demo-sidebar-top > div { display:flex; align-items:center; gap:3px; color:#73776f; }
+.agent-demo-sidebar-top > div { display:flex; align-items:center; gap:3px; color:#62665e; }
 .agent-demo-sidebar-top > div > span { display:flex; padding:5px; }
 .agent-demo-search { width:100%; padding:7px 10px; margin:8px 0; border:1px solid #c8c4ba; background:#f8f5f0; color:#242b26; } /* taste-skill-ignore: Search field boundary inside the product UI. */
 .agent-demo-personal { display:flex; align-items:center; justify-content:space-between; padding:21px 10px 10px; font-size:10px; text-transform:uppercase; font-weight:500; letter-spacing:.045em; }
@@ -58,7 +58,7 @@
 .mico-avatar { display:block; flex-shrink:0; object-fit:contain; }
 .agent-demo-mico > span:not(.mico-avatar) { display:grid; gap:5px; flex:1; min-width:0; }
 .agent-demo-mico strong { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; line-height:1.4; font-weight:500; }
-.agent-demo-mico strong > small { font-size:10px; font-weight:400; color:#777c73; }
+.agent-demo-mico strong > small { font-size:10px; font-weight:400; color:#62665e; }
 .agent-demo-mico > span:not(.mico-avatar) > span { font-size:11px; line-height:1.45; color:#62665d; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .agent-demo-sidebar-bottom { margin-top:auto; padding-top:20px; }
 .agent-demo-sidebar-bottom > a { display:flex; align-items:center; gap:9px; min-height:38px; padding:5px 7px; font-size:11px; }
@@ -73,7 +73,7 @@
 .agent-demo-toolbar > div { position:absolute; right:12px; display:flex; align-items:center; gap:5px; }
 .agent-demo-transcript { flex:1; min-height:0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#d4d0c8 transparent; overscroll-behavior:contain; }
 .agent-demo-thread { width:min(100% - 40px,600px); padding:12px 0 20px; margin-inline:auto; font-size:12px; line-height:1.5; }
-.agent-demo-time { display:block; margin-bottom:24px; text-align:center; color:#73776f; font-size:10px; }
+.agent-demo-time { display:block; margin-bottom:24px; text-align:center; color:#62665e; font-size:10px; }
 .agent-demo-step + .agent-demo-step, .agent-demo-declined { margin-top:10px; }
 .agent-demo-message { width:fit-content; max-width:92%; padding:10px 13px; border-radius:18px; }
 .agent-demo-user { margin-left:auto; color:#fff; background:#427d6e; }
@@ -84,8 +84,8 @@
 .agent-demo-attachment { display:flex; align-items:center; gap:12px; width:fit-content; min-width:240px; padding:10px 13px; background:#eeebe5; border-radius:12px; }
 .agent-demo-attachment > span:first-of-type, .agent-demo-artifact > span { display:grid; gap:3px; }
 .agent-demo-attachment strong, .agent-demo-artifact strong { font-size:12px; font-weight:500; }
-.agent-demo-attachment small, .agent-demo-artifact small { color:#73776f; font-size:10px; }
-.agent-demo-attachment > span:last-child { margin-left:auto; padding-left:20px; color:#73776f; font-size:10px; }
+.agent-demo-attachment small, .agent-demo-artifact small { color:#62665e; font-size:10px; }
+.agent-demo-attachment > span:last-child { margin-left:auto; padding-left:20px; color:#62665e; font-size:10px; }
 .agent-demo-permission { max-width:390px; padding:12px; background:#f1eee8; border:1px solid #ded9d1; border-radius:14px; } /* taste-skill-ignore: Actual Agent permission card boundary inside data-ui. */
 .agent-demo-permission > div { display:flex; align-items:center; gap:9px; }
 .agent-demo-permission strong { font-size:12px; font-weight:500; }
@@ -96,10 +96,10 @@
 .agent-demo-action > span:last-child { margin-left:auto; font-size:10px; }
 .agent-demo-artifact { display:flex; align-items:center; gap:12px; padding:10px 13px; background:#eeebe5; color:#242b26; width:fit-content; min-width:240px; text-align:left; }
 .agent-demo-artifact > svg:last-child { margin-left:auto; }
-.agent-demo-composer { display:flex; align-items:center; gap:10px; flex-shrink:0; min-height:44px; margin:6px 18px 8px; padding:6px; border:1px solid #ded9d1; border-radius:999px; font-size:12px; color:#777c73; } /* taste-skill-ignore: Actual Agent message input boundary inside data-ui. */
+.agent-demo-composer { display:flex; align-items:center; gap:10px; flex-shrink:0; min-height:44px; margin:6px 18px 8px; padding:6px; border:1px solid #ded9d1; border-radius:999px; font-size:12px; color:#62665e; } /* taste-skill-ignore: Actual Agent message input boundary inside data-ui. */
 .agent-demo-composer > span:first-child, .agent-demo-send { display:grid; place-items:center; flex-shrink:0; width:29px; height:29px; border-radius:50%; background:#eeebe5; }
 .agent-demo-draft { flex:1; min-width:0; overflow:hidden; white-space:nowrap; color:#242b26; }
-.agent-demo-draft:empty::before { content:attr(data-placeholder); color:#777c73; }
+.agent-demo-draft:empty::before { content:attr(data-placeholder); color:#62665e; }
 .agent-demo-preview { display:flex; flex-direction:column; flex:0 0 31%; min-width:0; background:#faf8f4; border-left:1px solid #ded9d1; } /* taste-skill-ignore: Actual Agent preview-panel separator inside data-ui. */
 .agent-demo-preview > div:first-child { display:flex; align-items:center; justify-content:space-between; height:57px; padding:12px; font-size:11px; }
 .agent-demo-preview > div > span { display:flex; align-items:center; gap:7px; }
@@ -107,7 +107,7 @@
 .agent-demo-computer { display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:25px; text-align:center; }
 .agent-demo-computer strong { font-size:14px; font-weight:500; }
 .agent-demo-computer p { font-size:12px; color:#62665d; }
-.agent-demo-computer > span { font-size:10px; color:#73776f; }
+.agent-demo-computer > span { font-size:10px; color:#62665e; }
 .agent-demo-cursor { position:absolute; left:0; top:0; opacity:0; pointer-events:none; z-index:5; }
 .agent-demo-figure figcaption { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:34px; color:#74776e; font-size:10px; line-height:1.5; }
 .agent-demo-figure figcaption > span, .agent-demo-figure figcaption > div { background:#faf9f7; }

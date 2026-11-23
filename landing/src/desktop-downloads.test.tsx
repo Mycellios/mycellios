@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { isDesktopDownloadCatalog } from "../../src/contracts/desktop-downloads";
-import { DesktopDownloads, detectInstaller } from "./DesktopDownloads";
+import { isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../src/contracts/desktop-downloads";
+import { DesktopDownloads, detectInstaller, hasSeparateSources } from "./DesktopDownloads";
 
 const catalog = () => ({
   schema: "mycellios-desktop-downloads/1", version: "0.3.9", runtimeVersion: "0.2.95",
@@ -14,6 +14,22 @@ const catalog = () => ({
 });
 
 describe("Desktop downloads", () => {
+  it("lists one source link when every package was built from the same source", () => {
+    const shared = catalog() as unknown as DesktopDownloadCatalog;
+    expect(hasSeparateSources(shared)).toBe(false);
+    const sameEverywhere = { ...shared, packages: shared.packages.map(p => ({ ...p, source: shared.source })) };
+    expect(hasSeparateSources(sameEverywhere)).toBe(false);
+    const split = { ...shared, packages: [{ ...shared.packages[0]!, source: { path: "/downloads/desktop/releases/0.3.9/windows-source.tar.gz", sha256: "d".repeat(64) } }, shared.packages[1]!] };
+    expect(hasSeparateSources(split)).toBe(true);
+  });
+
+  it("offers Android inside its card instead of a second Android section", () => {
+    const html = renderToStaticMarkup(<DesktopDownloads />);
+    expect(html.match(/Download for Android/g)).toHaveLength(1);
+    expect(html).not.toContain('href="#android-title"');
+    expect(html).not.toContain("Mycellios for Android");
+  });
+
   it("distinguishes Intel and Apple Silicon without removing supported downloads", () => {
     const html=renderToStaticMarkup(<DesktopDownloads />);
     expect(html).toContain('Download for macOS · Intel');expect(html).toContain('Download for macOS · Apple silicon');expect(html).toContain('macOS 13 or later');

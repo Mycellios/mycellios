@@ -36,7 +36,7 @@
 .agent-case-document dt { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; }
 .agent-case-document dt svg { flex:none; color:#4e8065; }
 .agent-case-document dd { margin:5px 0 0 22px; color:#62665d; font-size:12px; line-height:1.65; }
-.mycellios-reference .agent-case-caption { margin:14px 0 0; color:#75796f; font-size:11px; line-height:1.5; }
+.mycellios-reference .agent-case-caption { margin:14px 0 0; color:#62665e; font-size:11px; line-height:1.5; }
 .agent-case-fallback { align-items:center; }
 .agent-case-fallback a { display:inline-flex; align-items:center; min-height:44px; margin-top:24px; font-size:14px; }
 @media (max-width:1250px) { .agent-journey-thread { left:0; width:22px; } }
