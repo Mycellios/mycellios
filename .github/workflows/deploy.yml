@@ -52,6 +52,12 @@ jobs:
             context: src/agent/infra/sandboxes/computer
             dockerfile: src/agent/infra/sandboxes/computer/Dockerfile
             revision-arg: GIT_SHA
+          # The sandbox supervisor that starts those computers. Its routes and the computer
+          # image change together, so each commit publishes both from the same tree.
+          - image: supervisor
+            context: .
+            dockerfile: src/agent/infra/sandboxes/supervisor/Dockerfile
+            revision-arg: GIT_SHA
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
