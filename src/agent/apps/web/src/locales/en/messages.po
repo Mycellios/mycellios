@@ -14949,3 +14949,7 @@ msgstr "Can forget what it saved"
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Could not change which Micos can use this memory"
 msgstr "Could not change which Micos can use this memory"
+
+#: src/lib/native-computer-execution.ts
+msgid "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
+msgstr "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."

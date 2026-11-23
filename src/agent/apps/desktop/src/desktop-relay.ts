@@ -99,7 +99,10 @@ export class DesktopRelayClient {
       this.options.revoked();
     }
     if (!response.ok)
-      throw Object.assign(new Error("Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
+      throw Object.assign(new Error(response.status >= 500
+        // A server restart or overload, not an account problem: signing in again would not help.
+        ? "The server is temporarily unavailable."
+        : "Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
     return response;
   }
   async identity() {
