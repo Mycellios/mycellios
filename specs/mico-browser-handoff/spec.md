@@ -24,7 +24,9 @@ they close. Viewer input is limited to pointer, wheel, key, pasted text and
 history/reload events; everything else is dropped. Releasing control revokes
 the route and stops the stream with the terminal. Show desktop returns to noVNC.
 
-An unavailable tab leaves the run waiting and reports the failure. Providers
+An unavailable tab leaves the run waiting, reports the failure and opens the
+ordinary computer view so the person can still help. The production sandbox is
+composed through `HostAwareSandbox`, which must forward `connectTabView`. Providers
 without scoped Chromium tabs, and computers on older images or supervisors,
 keep their existing computer view. This feature requires compatible API,
 supervisor and computer image versions.
