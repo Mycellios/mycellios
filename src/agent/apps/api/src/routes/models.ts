@@ -190,8 +190,9 @@ export function modelsRoutes(ctx: RouterContext) {
             fetch: deps.modelConnectionFetch, signal: context.signal,
             credentialId: owned?.credential.id,
           });
-        } catch {
+        } catch (error) {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
+            cause: error,
             message: "Mycellios models are temporarily unavailable. Try again.",
           });
         }
@@ -220,6 +221,7 @@ export function modelsRoutes(ctx: RouterContext) {
             });
           if (error instanceof ORPCError && (error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN")) throw error;
           throw new ORPCError("SERVICE_UNAVAILABLE", {
+            cause: error,
             message: "Mycellios credits are temporarily unavailable.",
           });
         }

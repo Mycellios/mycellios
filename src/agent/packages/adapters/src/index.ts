@@ -111,6 +111,7 @@ export * from "./model-credit-reconciler.js";
 export * from "./model-roles.js";
 export * from "./model-selection.js";
 export * from "./model-vision.js";
+export * from "./lookup-failure.js";
 export * from "./mycellios-account.js";
 export * from "./mycellios-model-limits.js";
 export * from "./native-agent-runtime.js";

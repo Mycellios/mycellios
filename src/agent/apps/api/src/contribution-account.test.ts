@@ -75,5 +75,14 @@ it("does not follow redirects or reveal upstream credentials and diagnostics", a
 });
 it("redacts transport exceptions instead of relaying private request details", async () => {
   const transport = vi.fn(async () => { throw new Error("private-token-in-transport-diagnostic"); });
-  await expect(contributionAccount("secret", transport).status("own-node")).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", message: "Contribution could not be confirmed. Refresh before trying again." });
+  const failure = await contributionAccount("secret", transport).status("own-node").catch(error => error);
+  expect(failure).toMatchObject({ code: "SERVICE_UNAVAILABLE", message: "Contribution could not be confirmed. Refresh before trying again." });
+  expect(failure.cause.message).toBe("lookup failure Error");
+  expect(JSON.stringify(failure)).not.toContain("private-token");
+});
+it("keeps only the authority status as the cause of an unavailable lookup", async () => {
+  const transport = vi.fn(async () => new Response("private-diagnostic", { status: 502 }));
+  const failure = await contributionAccount("secret", transport).status("own-node").catch(error => error);
+  expect(failure).toMatchObject({ code: "SERVICE_UNAVAILABLE", status: 503 });
+  expect(failure.cause.message).toBe("HTTP 502");
 });

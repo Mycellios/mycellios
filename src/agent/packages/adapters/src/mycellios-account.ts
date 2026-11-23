@@ -1,6 +1,7 @@
 import type { MycelliosAccount } from "@mycellios/contracts";
 import { ModelHeadersSchema, MycelliosAccountSchema } from "@mycellios/contracts";
 import { readBoundedResponseBytes } from "@mycellios/core";
+import { LookupStatusError, lookupFailureReason } from "./lookup-failure.js";
 import { mycelliosApiBaseUrl } from "./mycellios-api.js";
 import { createOpenAiCompatibleFetch } from "./pi-openai-compatible-provider.js";
 import { withAbort } from "./web-ssrf.js";
@@ -61,7 +62,7 @@ export async function readMycelliosAccount(
       void response.body?.cancel().catch(() => undefined);
       if (response.status === 401 || response.status === 403)
         throw new MycelliosAccountAccessError(response.status);
-      throw new Error("Account lookup failed");
+      throw new LookupStatusError(response.status);
     }
     const bytes = await readBoundedResponseBytes(response, {
       maxBytes: 16_384,
@@ -71,9 +72,11 @@ export async function readMycelliosAccount(
     return MycelliosAccountSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
   } catch (error) {
     if (error instanceof MycelliosAccountAccessError) throw error;
-    // Provider bodies and network exceptions can contain credentials. Do not relay them.
+    // Provider bodies and network exceptions can contain credentials. Do not relay them;
+    // the cause keeps only a fixed reason so the server log can say what failed.
     throw new Error(
       "Mycellios credits are temporarily unavailable. Your balance has not been changed.",
+      { cause: new Error(lookupFailureReason(error, signal)) },
     );
   }
 }
