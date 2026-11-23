@@ -204,15 +204,15 @@ it.runIf(process.platform === "win32").each([false, true])("keeps approval bound
       if (request.rejectPreparation) {
         const error = await handoff.catch(error => error);
         if (!prepared || error?.message !== "New unsaved work") throw Error("The update did not stop at the quit guard");
-        return;
+      } else {
+        await handoff;
+        if (!prepared) throw Error("The app must prepare to quit before committing the update");
+        const [job] = (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
+        const commit = path.join(updates, job.name, "commit.json");
+        if (JSON.parse(await readFile(commit, "utf8")).approved !== true) throw Error("Missing acknowledgement");
+        // Exit normally but prevent the dummy installer from running.
+        await writeFile(commit, '{"approved":false}');
       }
-      await handoff;
-      if (!prepared) throw Error("The app must prepare to quit before committing the update");
-      const [job] = (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
-      const commit = path.join(updates, job.name, "commit.json");
-      if (JSON.parse(await readFile(commit, "utf8")).approved !== true) throw Error("Missing acknowledgement");
-      // Exit normally but prevent the dummy installer from running.
-      await writeFile(commit, '{"approved":false}');
     `;
     await promisify(execFile)(executable, [
       "--import", "tsx", "--input-type=module", "-e", source, moduleUrl, JSON.stringify({ ...request, rejectPreparation }),
