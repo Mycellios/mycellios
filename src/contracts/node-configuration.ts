@@ -12,7 +12,7 @@ const pinnedUpdateKey = z.object({
   keyId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
   spki: z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/),
 }).strict();
-const componentUpdates = z.object({
+export const nodeComponentUpdatesSchema = z.object({
   feedUrl: z.string().url(),
   pinnedKeys: z.object({
     dev: z.array(pinnedUpdateKey).max(8),
@@ -78,7 +78,7 @@ export const nodeConfigurationSchema = z.object({
     }).strict(),
   ]),
   updateChannel: z.enum(["dev", "stable"]),
-  componentUpdates: componentUpdates.optional(),
+  componentUpdates: nodeComponentUpdatesSchema.optional(),
   uninstall: z.object({ manifestPath: absolutePath }).strict().optional(),
 }).strict();
 

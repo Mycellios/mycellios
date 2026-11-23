@@ -27,6 +27,12 @@ const pendingActivationSchema = z.object({
   requestedAt: z.string().datetime(),
 }).strict();
 
+/** Components this node installs. `node-app` needs the bundled supervisor. */
+export const NODE_MANAGED_COMPONENT_IDS = ["node-app", "python-product"] as const;
+const NODE_APP_CANARY_MARKER = "MYCELLIOS_NODE_APP_CANARY_OK";
+
+export type NodeAppCanary = (componentRoot: string, expectedRevision: string | null) => Promise<void>;
+
 export interface NodeComponentLifecycleApi {
   update(channel: ComponentUpdateChannel, manifestId?: `sha256:${string}`): Promise<ComponentUpdateApplyResult>;
   rollback(componentIds: readonly string[]): Promise<ComponentRollbackResult>;
@@ -43,6 +49,8 @@ export class NodeComponentLifecycle implements NodeComponentLifecycleApi {
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly canary: (componentRoot: string) => Promise<void> = (root) =>
       canaryPythonProduct(config.runtime.pythonExecutable, root),
+    private readonly nodeAppCanary: NodeAppCanary = canaryNodeApp,
+    private readonly managedComponentIds: readonly string[] = ["python-product"],
   ) {
     this.storageRoot = componentStorageRoot(config);
   }
@@ -60,14 +68,16 @@ export class NodeComponentLifecycle implements NodeComponentLifecycleApi {
       bootstrapVersion: this.bootstrapVersion,
       workerProtocol: { min: WORKER_PROTOCOL_MIN, max: WORKER_PROTOCOL_MAX },
       runtimeAbi: MYCELLIOS_RUNTIME_ABI,
-      managedComponentIds: ["python-product"],
+      managedComponentIds: this.managedComponentIds,
       ...(manifestId ? { expectedManifestId: manifestId } : {}),
       fetch: this.fetchImpl,
       isIdle: this.isIdle,
       acquireActivationLease: this.acquireActivationLease,
-      onPrepare: async ({ stagedComponentRoots }) => {
+      onPrepare: async ({ manifest, stagedComponentRoots }) => {
         const pythonProduct = stagedComponentRoots["python-product"];
         if (pythonProduct) await this.canary(pythonProduct);
+        const nodeApp = stagedComponentRoots["node-app"];
+        if (nodeApp) await this.nodeAppCanary(nodeApp, manifest.revision);
       },
       // The pointer is consumed only by the next service process. The caller
       // requests that restart after its durable command result is ACKed.
@@ -96,6 +106,8 @@ export class NodeComponentLifecycle implements NodeComponentLifecycleApi {
       onPrepare: async ({ stagedComponentRoots }) => {
         const pythonProduct = stagedComponentRoots["python-product"];
         if (pythonProduct) await this.canary(pythonProduct);
+        const nodeApp = stagedComponentRoots["node-app"];
+        if (nodeApp) await this.nodeAppCanary(nodeApp, null);
         await this.writePending(this.config.updateChannel, componentIds, targetManifestIds);
       },
     });
@@ -134,6 +146,9 @@ export class NodeComponentLifecycle implements NodeComponentLifecycleApi {
       onPrepare: async ({ previousComponentRoots }) => {
         const pythonProduct = previousComponentRoots["python-product"];
         if (pythonProduct) await this.canary(pythonProduct);
+        // A null previous node-app means the bundled app, which needs no canary.
+        const nodeApp = previousComponentRoots["node-app"];
+        if (nodeApp) await this.nodeAppCanary(nodeApp, null);
       },
     });
     await this.markActivationHealthy();
@@ -183,6 +198,32 @@ export async function resolveNodePythonProduct(config: NodeConfiguration): Promi
   );
 }
 
+/** Entry point of an installed node-app root (mirrors the install layout). */
+export function nodeAppEntrypoint(componentRoot: string): string {
+  return join(componentRoot, "app", "node", "main.js");
+}
+
+export async function canaryNodeApp(componentRoot: string, expectedRevision: string | null): Promise<void> {
+  try {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(componentRoot, "app", "node", "component-canary.js"),
+      expectedRevision ?? "-",
+    ], {
+      cwd: componentRoot,
+      timeout: 60_000,
+      maxBuffer: 64 * 1024,
+      windowsHide: true,
+      env: {
+        NODE_ENV: "production",
+        ...(process.platform === "win32" && process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
+      },
+    });
+    if (stdout.trim() !== NODE_APP_CANARY_MARKER) throw new Error("marker_missing");
+  } catch (error) {
+    throw new Error("node_app_canary_failed", { cause: error });
+  }
+}
+
 export async function canaryPythonProduct(pythonExecutable: string, componentRoot: string): Promise<void> {
   try {
     const { stdout } = await execFileAsync(pythonExecutable, [
@@ -206,7 +247,7 @@ export async function canaryPythonProduct(pythonExecutable: string, componentRoo
   }
 }
 
-function componentStorageRoot(config: NodeConfiguration): string {
+export function componentStorageRoot(config: NodeConfiguration): string {
   return join(config.runtime.cachePath, "component-updates");
 }
 

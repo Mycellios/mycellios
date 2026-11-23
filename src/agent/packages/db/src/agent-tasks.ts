@@ -158,7 +158,9 @@ export async function startAgentTask(
           startedBy: "agent",
           startedByRunId: source.id,
         },
-        select: { id: true },
+        // Naming the Space and owner lets content encryption seal the brief below before
+        // this transaction commits; with only the id it cannot see the new conversation.
+        select: { id: true, spaceId: true, userId: true },
       });
       const nonce = agentTaskStartNonce(thread.id);
       const blocks: MessageBlock[] = [

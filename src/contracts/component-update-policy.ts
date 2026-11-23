@@ -26,6 +26,13 @@ export const MANAGED_COMPONENT_POLICIES = Object.freeze({
     restartScope: "agent", backend: "any", driverApi: null, dependencies: [] as const,
     targets: ["win32/x64", "linux/x64", "darwin/arm64"] as const,
   }),
+  // The native node's JavaScript (app/, package.json and its production
+  // node_modules). The bundled supervisor launches it and restores the previous
+  // root when it fails boot health (specs/node-runtime-auto-update).
+  "node-app": Object.freeze({
+    restartScope: "agent", backend: "any", driverApi: null, dependencies: [] as const,
+    targets: ["win32/x64", "linux/x64", "darwin/arm64"] as const,
+  }),
   "python-product": Object.freeze({
     restartScope: "runtime", backend: "any", driverApi: null, dependencies: [] as const,
     targets: ["win32/x64", "linux/x64", "darwin/arm64"] as const,

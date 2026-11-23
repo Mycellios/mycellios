@@ -130,6 +130,28 @@ export const nodeDesiredStateSchema = z.object({
   updatedBy: nodeControlActorSchema,
 }).strict();
 
+export const nodeUpdateObservationSchema = z.object({
+  capable: z.boolean(),
+  channel: z.enum(["dev", "stable"]),
+  platform: z.enum(["win32", "linux", "darwin"]),
+  arch: z.enum(["x64", "arm64"]),
+  activeManifestId: sha256.nullable(),
+  nodeApp: z.enum(["bundled", "component"]),
+}).strict();
+
+/** Owner standing consent for verified runtime updates of their own nodes. */
+export const nodeAutoUpdatePreferenceSchema = z.object({
+  schema: z.literal("mycellios-node-auto-update/1"),
+  enabled: z.boolean(),
+  channel: z.literal("stable"),
+  available: z.boolean(),
+  updatedAt: timestamp.nullable(),
+}).strict();
+
+export const nodeAutoUpdatePreferenceInputSchema = z.object({
+  enabled: z.boolean(),
+}).strict();
+
 export const nodeSnapshotSchema = z.object({
   schema: z.literal("mycellios-node-snapshot/1"),
   nodeId: identifier,
@@ -145,6 +167,9 @@ export const nodeSnapshotSchema = z.object({
   activeCommandIds: z.array(z.string().uuid()).max(256),
   build: z.object({ version: z.string().min(1).max(128), sourceRevision: z.string().regex(/^[a-f0-9]{40}$/) }).strict(),
   runtime: z.object({ ready: z.boolean(), abi: runtimeIdentifier.nullable(), backend: runtimeIdentifier.nullable(), uninstallAvailable: z.boolean().optional() }).strict(),
+  // Reported only by nodes that carry the signed component updater. Older
+  // builds omit it and are never auto-updated (specs/node-runtime-auto-update).
+  updates: nodeUpdateObservationSchema.optional(),
   diagnostics: z.object({
     capturedAt: timestamp,
     configRevision: z.number().int().positive(),
@@ -228,4 +253,6 @@ export type NodeCommandResult = z.infer<typeof nodeCommandResultSchema>;
 export type NodeDesiredState = z.infer<typeof nodeDesiredStateSchema>;
 export type NodeSnapshot = z.infer<typeof nodeSnapshotSchema>;
 export type NodeEvent = z.infer<typeof nodeEventSchema>;
+export type NodeUpdateObservation = z.infer<typeof nodeUpdateObservationSchema>;
+export type NodeAutoUpdatePreference = z.infer<typeof nodeAutoUpdatePreferenceSchema>;
 export type NodeEnrollmentBundle = z.infer<typeof nodeEnrollmentBundleSchema>;

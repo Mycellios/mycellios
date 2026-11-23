@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey } from "node:crypto";
 import { chmod, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -48,6 +48,10 @@ export async function stageNodeInstaller(input) {
     schema: "mycellios-node-runtime-identity/1", version: provenance.version, sourceRevision: input.sourceRevision,
     sourceId: provenance.sourceId, provenanceSha256: sha256(provenanceBytes),
   }, null, 2)}\n`, { flag: "wx" });
+  if (input.componentTrust !== undefined) {
+    // Signed component-update trust anchor (specs/node-runtime-auto-update).
+    await writeFile(join(output, "app", NODE_COMPONENT_TRUST_FILE), serializeComponentTrust(input.componentTrust), { flag: "wx" });
+  }
   if (platform !== "win32") await (await import("node:fs/promises")).chmod(join(output, "bin", "node"), 0o755);
   const launcher = await writeInstallerLauncher(output, platform);
   const files = await inventoryNodeInstaller(output);
@@ -164,6 +168,46 @@ function parseTarget(target) {
   return [platform, match[2]];
 }
 
+export const NODE_COMPONENT_TRUST_FILE = "component-update-trust.json";
+
+/** Mirrors src/node/update-trust.ts; the node re-validates it strictly. */
+export function serializeComponentTrust(value) {
+  const keys = ["feedUrl", "pinnedKeys"];
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== keys.join()) {
+    throw new Error("node_installer_component_trust_shape_is_invalid");
+  }
+  const url = new URL(value.feedUrl);
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+    throw new Error("node_installer_component_trust_feed_is_invalid");
+  }
+  const pinned = value.pinnedKeys;
+  if (!pinned || typeof pinned !== "object" || Object.keys(pinned).sort().join() !== "dev,stable") {
+    throw new Error("node_installer_component_trust_keys_are_invalid");
+  }
+  for (const channel of ["dev", "stable"]) {
+    const list = pinned[channel];
+    if (!Array.isArray(list) || list.length > 8) throw new Error("node_installer_component_trust_keys_are_invalid");
+    const seen = new Set();
+    for (const key of list) {
+      if (!key || Object.keys(key).sort().join() !== "keyId,spki" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(key.keyId)
+        || seen.has(key.keyId) || !isEd25519Spki(key.spki)) throw new Error("node_installer_component_trust_keys_are_invalid");
+      seen.add(key.keyId);
+    }
+  }
+  if (pinned.stable.length === 0 && pinned.dev.length === 0) throw new Error("node_installer_component_trust_keys_are_empty");
+  return `${JSON.stringify({ schema: "mycellios-node-component-trust/1", componentUpdates: { feedUrl: value.feedUrl, pinnedKeys: pinned } }, null, 2)}
+`;
+}
+
+function isEd25519Spki(value) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(value)) return false;
+  try {
+    const bytes = Buffer.from(value, "base64url");
+    const key = createPublicKey({ key: bytes, format: "der", type: "spki" });
+    return key.asymmetricKeyType === "ed25519" && Buffer.from(key.export({ format: "der", type: "spki" })).equals(bytes);
+  } catch { return false; }
+}
+
 function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 
 async function main(argv) {
@@ -177,7 +221,8 @@ async function main(argv) {
   }
   await stageNodeInstaller({ output: values.output, dist: values.dist, runtime: values.runtime,
     nodeExecutable: values["node-executable"], nodeModules: values["node-modules"], target: values.target,
-    sourceRevision: values["source-revision"], sourceProvenance: buildNativeSourceProvenance(values["source-root"]) });
+    sourceRevision: values["source-revision"], sourceProvenance: buildNativeSourceProvenance(values["source-root"]),
+    ...(values["component-trust"] ? { componentTrust: JSON.parse(await readFile(values["component-trust"], "utf8")) } : {}) });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) await main(process.argv.slice(2));
