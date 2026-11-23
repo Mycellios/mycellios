@@ -15,6 +15,10 @@ describe("app control requests", () => {
     expect(appControlRequest.safeParse({ op: "snapshot", windowId: "--app" }).success).toBe(false);
     expect(appControlRequest.safeParse({ op: "press", windowId: "w-1", keys: "ctrl+s" }).success).toBe(true);
     expect(appControlRequest.safeParse({ op: "press", windowId: "w-1", keys: "ctrl+s --force" }).success).toBe(false);
+    for (const [written, sent] of [["F6", "f6"], ["Ctrl + L", "ctrl+l"], ["Enter", "return"], ["Control+Shift+Esc", "ctrl+shift+escape"]]) {
+      const parsed = appControlRequest.parse({ op: "press", windowId: "w-1", keys: written });
+      expect(parsed).toMatchObject({ keys: sent });
+    }
     expect(appControlRequest.safeParse({ op: "windows", app: "-v" }).success).toBe(false);
   });
 
@@ -26,6 +30,15 @@ describe("app control requests", () => {
     for (const invocation of [set, press, appControlInvocation({ op: "act", ref: REF, action: "click" })])
       expect(invocation.argv).not.toContain("--headed");
     expect(() => appControlInvocation({ op: "act", ref: REF, action: "set_value" })).toThrow();
+  });
+
+  it("lets snapshots settle and reads a whole region below the default depth", () => {
+    expect(appControlInvocation({ op: "snapshot", windowId: "w-3" }).argv).toEqual([
+      "snapshot", "--window-id", "w-3", "-i", "--compact", "--timeout-ms", "10000",
+    ]);
+    expect(appControlInvocation({ op: "snapshot", windowId: "w-3", root: REF }).argv).toEqual([
+      "snapshot", "--window-id", "w-3", "-i", "--compact", "--timeout-ms", "10000", "--root", REF, "--max-depth", "50",
+    ]);
     expect(() => appControlInvocation({ op: "act", ref: REF, action: "click", text: "x" })).toThrow();
   });
 
