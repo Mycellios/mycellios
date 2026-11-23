@@ -79,6 +79,21 @@ describe("screen proxy", () => {
     expect(novncRequestPath("/rpc/computer.boot")).toBeNull();
   });
 
+  it("serves the screen routes under the app's base path", () => {
+    expect(novncRequestPath("/agent/novnc/session/control/token/tab.html", "/agent")).toBe(
+      "/novnc/session/control/token/tab.html",
+    );
+    // noVNC's absolute socket path arrives with a doubled leading slash.
+    expect(novncRequestPath("//agent/novnc/session/view/token/websockify", "/agent")).toBe(
+      "/novnc/session/view/token/websockify",
+    );
+    expect(novncRequestPath("/novnc/session/view/token/vnc.html", "/agent")).toBe(
+      "/novnc/session/view/token/vnc.html",
+    );
+    expect(novncRequestPath("/agent/rpc/computer.boot", "/agent")).toBeNull();
+    expect(novncRequestPath("/agent/novnc/session/view/token/vnc.html")).toBeNull();
+  });
+
   it("rejects legacy URLs without contacting the API", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);

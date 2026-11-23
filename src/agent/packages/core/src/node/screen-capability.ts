@@ -97,8 +97,10 @@ export function sealScreenCapability(
     cipher.final(),
   ]);
   const token = Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString("base64url");
-  const prefix = `/novnc/session/${policy}/${expiresAt}.${token}`;
-  const result = new URL(`${prefix}${target.pathname || "/"}`, new URL(origin).origin);
+  // A web app served under a path (WEB_ORIGIN https://host/agent) proxies screens there too.
+  const webOrigin = new URL(origin);
+  const prefix = `${webOrigin.pathname.replace(/\/+$/, "")}/novnc/session/${policy}/${expiresAt}.${token}`;
+  const result = new URL(`${prefix}${target.pathname || "/"}`, webOrigin.origin);
   // noVNC reads these from the browser URL. Keep its socket inside the capability
   // route while the provider's nested socket token stays sealed server-side.
   result.search = new URLSearchParams({

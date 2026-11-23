@@ -383,6 +383,12 @@ describe("proxied screen pages", () => {
     expect(isProxiedScreenPage("https://app.example.test/novnc/session/view/1.t/vnc.html")).toBe(
       true,
     );
+    expect(
+      isProxiedScreenPage("https://app.example.test/agent/novnc/session/control/1.t/tab.html"),
+    ).toBe(true);
+    expect(screenStreamKey("https://app.example.test/agent/novnc/session/view/1.aaa/embed.html")).toBe(
+      screenStreamKey("https://app.example.test/agent/novnc/session/view/2.bbb/embed.html"),
+    );
     expect(isProxiedScreenPage("https://screen.example.test/embed")).toBe(false);
     expect(isProxiedScreenPage("not a url")).toBe(false);
   });

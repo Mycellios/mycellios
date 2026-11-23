@@ -21,8 +21,10 @@ const SENSITIVE_FORWARD_HEADERS = new Set([
  * Stock noVNC builds its socket URL as host + "/" + path, so the absolute capability path arrives
  * as "//novnc/...". Collapse leading slashes so that socket reaches the proxy instead of hanging.
  */
-export function novncRequestPath(url: string | undefined): string | null {
-  const path = url?.replace(/^\/{2,}/, "/");
+export function novncRequestPath(url: string | undefined, basePrefix = ""): string | null {
+  let path = url?.replace(/^\/{2,}/, "/");
+  // Under APP_BASE_PATH the screen routes live at <base>/novnc/; the capability is the rest.
+  if (basePrefix && path?.startsWith(`${basePrefix}/novnc/`)) path = path.slice(basePrefix.length);
   return path?.startsWith("/novnc/") ? path : null;
 }
 

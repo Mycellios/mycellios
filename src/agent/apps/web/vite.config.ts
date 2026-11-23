@@ -104,9 +104,14 @@ function attachDesktopStackProbe(
   });
 }
 
-function attachNovncProxy(server: ViteDevServer | PreviewServer, secret: string, api: string) {
+function attachNovncProxy(
+  server: ViteDevServer | PreviewServer,
+  secret: string,
+  api: string,
+  basePrefix = "",
+) {
   server.middlewares.use(async (req, res, next) => {
-    const path = novncRequestPath(req.url);
+    const path = novncRequestPath(req.url, basePrefix);
     if (!path) {
       next();
       return;
@@ -293,7 +298,7 @@ function attachNovncProxy(server: ViteDevServer | PreviewServer, secret: string,
   });
 
   server.httpServer?.on("upgrade", async (req, socket, head) => {
-    const path = novncRequestPath(req.url);
+    const path = novncRequestPath(req.url, basePrefix);
     if (!path) return;
     req.url = path;
     const connectionId = randomUUID();
@@ -622,8 +627,8 @@ export default defineConfig(async ({ command, mode }) => {
       },
       {
         name: "rakazo-novnc-proxy",
-        configureServer: (server) => attachNovncProxy(server, screenProxySecret(), api),
-        configurePreviewServer: (server) => attachNovncProxy(server, screenProxySecret(), api),
+        configureServer: (server) => attachNovncProxy(server, screenProxySecret(), api, deploymentPrefix),
+        configurePreviewServer: (server) => attachNovncProxy(server, screenProxySecret(), api, deploymentPrefix),
       },
     ],
     worker: { format: "es" },

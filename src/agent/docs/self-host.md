@@ -166,6 +166,12 @@ Docker, and `firewall-backend: nftables` are unsupported. The
 `SANDBOX_SCREEN_NETWORK=internal` topology shares one network instead of per-bot bridges,
 so the mode does not apply there.
 
+With `SANDBOX_SCREEN_NETWORK=isolated` the supervisor joins the Compose `web` service to each
+computer network so its screen proxy can reach the screen. A deployment whose containers are not
+started by Compose names its web container instead, with
+`SANDBOX_SCREEN_PEERS=<container name>` (comma-separated for several). When the web app is served
+under a path, its `WEB_ORIGIN` includes that path and screens use `<path>/novnc/`.
+
 ## Docker Compose (single machine)
 
 1. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` and `POSTGRES_APP_PASSWORD` (`openssl rand -hex 16` each), plus `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, and `SCREEN_PROXY_SECRET` to independent long random strings (32+ characters; 64 hex for `ENCRYPTION_KEY`). Docker sandboxes also need a dedicated `SANDBOX_SUPERVISOR_TOKEN`. Keep existing `ENCRYPTION_KEY` values so stored credentials stay decryptable.

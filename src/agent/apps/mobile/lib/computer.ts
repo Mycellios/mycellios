@@ -82,8 +82,11 @@ export function embeddableScreenUrl(url: string | null, apiBase: string): string
 export function screenStreamKey(url: string): string {
   try {
     const parsed = new URL(url);
-    const match = parsed.pathname.match(/^\/novnc\/session\/(view|control)\/[^/]+(\/.*)?$/);
-    if (match) return `${parsed.origin}/novnc/session/${match[1]}${match[2] ?? ""}`;
+    // At the root, or under the web app's base path (/agent/).
+    const match = parsed.pathname.match(
+      /^((?:\/[A-Za-z0-9_-]+)*)\/novnc\/session\/(view|control)\/[^/]+(\/.*)?$/,
+    );
+    if (match) return `${parsed.origin}${match[1]}/novnc/session/${match[2]}${match[3] ?? ""}`;
     const viewOnly = parsed.searchParams.get("view_only");
     const policy = viewOnly == null ? "" : `?view_only=${viewOnly}`;
     return `${parsed.origin}${parsed.pathname}${policy}`;
@@ -104,7 +107,9 @@ const SCREEN_SOURCE_RENEW_REMAINING_MS =
 
 function screenCapabilityExpiresAt(url: string): number | null {
   try {
-    const match = new URL(url).pathname.match(/^\/novnc\/session\/(?:view|control)\/(\d+)\./);
+    const match = new URL(url).pathname.match(
+      /^(?:\/[A-Za-z0-9_-]+)*\/novnc\/session\/(?:view|control)\/(\d+)\./,
+    );
     if (!match) return null;
     const expiresAt = Number(match[1]);
     return Number.isSafeInteger(expiresAt) ? expiresAt : null;
@@ -241,7 +246,7 @@ export async function screenPageStatus(
  */
 export function isProxiedScreenPage(url: string): boolean {
   try {
-    return new URL(url).pathname.startsWith("/novnc/session/");
+    return /^(?:\/[A-Za-z0-9_-]+)*\/novnc\/session\//.test(new URL(url).pathname);
   } catch {
     return false;
   }

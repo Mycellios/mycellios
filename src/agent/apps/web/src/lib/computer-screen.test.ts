@@ -110,6 +110,16 @@ describe("embeddableScreenUrl", () => {
     );
   });
 
+  it("keeps the screen proxy under the app's base path", () => {
+    vi.stubGlobal("window", { location: { href: "https://app.example/agent/app" } });
+    expect(embeddableScreenUrl("https://app.example/agent/novnc/session/control/1.x/tab.html?a=1")).toBe(
+      "https://app.example/agent/novnc/session/control/1.x/tab.html?a=1",
+    );
+    expect(screenIframeSandbox("https://app.example/agent/novnc/session/control/1.x/tab.html")).toBe(
+      "allow-scripts allow-pointer-lock",
+    );
+  });
+
   it("keeps a non-local screen even when the port differs", () => {
     vi.stubGlobal("window", { location: { href: "http://localhost:5173/" } });
     expect(embeddableScreenUrl("https://screen.example:6080/vnc.html")).toBe(
