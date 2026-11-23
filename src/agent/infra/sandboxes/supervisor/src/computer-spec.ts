@@ -169,6 +169,21 @@ export function resolveScreenNetworkMode(value: string | undefined): ScreenNetwo
 }
 
 /**
+ * Containers that proxy screens besides the Compose `web` service, by name. A deployment
+ * that does not run under Compose (no project labels) names its web container here, so
+ * isolated computer networks still admit the screen proxy.
+ */
+export function resolveScreenPeerNames(value: string | undefined): string[] {
+  const names = (value ?? "").split(",").map((name) => name.trim()).filter(Boolean);
+  for (const name of names) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(name)) {
+      throw new Error(`Unsupported SANDBOX_SCREEN_PEERS container name: ${name}`);
+    }
+  }
+  return [...new Set(names)];
+}
+
+/**
  * Egress policy for per-bot computer networks. `open` gives full outbound access,
  * including the host's bridge addresses, the LAN, and link-local cloud metadata
  * endpoints. `restricted` keeps public internet egress but lets the operator drop

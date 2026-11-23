@@ -28,6 +28,9 @@ export async function loadComputerScreen(options: {
   return result.url;
 }
 
+/** The web server's screen proxy route, at the root or under the app's base path (/agent/). */
+const SCREEN_PROXY_PATH = /^(?:/[A-Za-z0-9_-]+)*/novnc//;
+
 export function embeddableScreenUrl(url: string | null): string | null {
   if (!url) return null;
   try {
@@ -35,7 +38,7 @@ export function embeddableScreenUrl(url: string | null): string | null {
     const page = new URL(window.location.href);
     // The server that served this page proxies /novnc/. Keep the frame on this origin even when the
     // API's WEB_ORIGIN names another host for it (localhost vs 127.0.0.1), as the CSP frames 'self'.
-    if (parsed.pathname.startsWith("/novnc/")) {
+    if (SCREEN_PROXY_PATH.test(parsed.pathname)) {
       return `${page.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
     }
     const local = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
@@ -52,7 +55,7 @@ export function embeddableScreenUrl(url: string | null): string | null {
 export function screenIframeSandbox(url: string | null) {
   if (!url) return undefined;
   try {
-    return new URL(url, window.location.href).pathname.startsWith("/novnc/")
+    return SCREEN_PROXY_PATH.test(new URL(url, window.location.href).pathname)
       ? "allow-scripts allow-pointer-lock"
       : undefined;
   } catch {

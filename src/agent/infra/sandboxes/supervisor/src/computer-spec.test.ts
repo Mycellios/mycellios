@@ -42,6 +42,7 @@ import {
   resolveComputerEgressMode,
   resolveComputerImage,
   resolveScreenNetworkMode,
+  resolveScreenPeerNames,
   resolveScreenPublishTarget,
   resolveSpaceComputerLimit,
   resolveTeamScreenLimit,
@@ -1418,6 +1419,13 @@ describe("graphical computer spec", () => {
     expect(resolveScreenNetworkMode("published")).toBe("published");
     expect(resolveScreenNetworkMode("isolated")).toBe("isolated");
     expect(() => resolveScreenNetworkMode("typo")).toThrow(/Unsupported/);
+  });
+
+  it("reads the named screen proxy containers", () => {
+    expect(resolveScreenPeerNames(undefined)).toEqual([]);
+    expect(resolveScreenPeerNames(" web-a, web-b ,web-a,")).toEqual(["web-a", "web-b"]);
+    expect(() => resolveScreenPeerNames("web a")).toThrow(/Unsupported/);
+    expect(() => resolveScreenPeerNames("--all")).toThrow(/Unsupported/);
   });
 
   it("uses the host identity for host-run bind mounts without ever using root", () => {

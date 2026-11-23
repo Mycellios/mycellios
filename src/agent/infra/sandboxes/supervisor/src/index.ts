@@ -47,6 +47,7 @@ import {
   resolveComputerDns,
   resolveComputerEgressMode,
   resolveScreenNetworkMode,
+  resolveScreenPeerNames,
   resolveScreenPublishTarget,
   resolveSpaceComputerLimit,
   resolveTeamScreenLimit,
@@ -117,6 +118,7 @@ let supervisorInfo: Docker.ContainerInspectInfo | undefined;
 let dockerApiVersion: string | undefined;
 const supervisorToken = resolveSupervisorToken(process.env);
 const screenNetworkMode = resolveScreenNetworkMode(process.env.SANDBOX_SCREEN_NETWORK);
+const screenPeerNames = resolveScreenPeerNames(process.env.SANDBOX_SCREEN_PEERS);
 const computerEgressSetting = resolveComputerEgressMode();
 // `auto` starts open and becomes restricted once the probe shows the host rules are in place.
 let computerEgressMode: ComputerEgressMode =
@@ -1707,6 +1709,14 @@ async function composeScreenPeerIds(info: Docker.ContainerInspectInfo) {
       },
     });
     for (const container of webContainers) peerIds.add(container.Id);
+  }
+  // Named peers for deployments outside Compose; one being replaced right now is skipped.
+  if (screenPeerNames.length > 0) {
+    const named = await docker.listContainers({
+      all: true,
+      filters: { name: screenPeerNames.map((name) => `^/${name}$`) },
+    });
+    for (const container of named) peerIds.add(container.Id);
   }
   return peerIds;
 }

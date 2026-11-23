@@ -194,6 +194,21 @@ describe("sealed screen capabilities", () => {
     );
   });
 
+  it("places screens under the web app's base path", () => {
+    const provider = new URL("https://screen.example/vnc.html");
+    provider.searchParams.set("path", "websockify?token=fake-socket-token");
+    const url = new URL(
+      sealScreenCapability(provider.toString(), "fake-secret", "https://app.example/agent", scope, 100),
+    );
+    expect(url.pathname).toMatch(/^\/agent\/novnc\/session\/view\/.+\/vnc\.html$/);
+    const socket = new URL(url.searchParams.get("path")!, url.origin);
+    expect(socket.pathname).toBe(url.pathname.replace("/vnc.html", "/websockify"));
+    // The web proxy drops its base path before asking the API to open the capability.
+    expect(openScreenCapability(socket.pathname.slice("/agent".length), "fake-secret", 101)?.target.path).toBe(
+      "/websockify?token=fake-socket-token",
+    );
+  });
+
   it("routes the tab view socket like the embed page, with its token sealed", () => {
     const provider = new URL("http://127.0.0.1:49152/tab.html?view_only=false");
     provider.searchParams.set("path", "websockify?token=fake-tab-token");
