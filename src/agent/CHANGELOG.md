@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-23
+
+### Added
+
+- Let a Mico save to your personal memory, and forget what it saved, when you allow it.
+  - Turn this on per Mico in Settings > Memory > Personal memory: "Can save new memories" and
+    "Can forget what it saved".
+  - Forgetting follows your approval settings, like other actions that change data.
+  - It works with memory servers that offer saving.
+
+### Fixed
+
+- Opening a Mico's request for help on a busy computer now shows its browser tab. Before, finding
+  the tab could take a few seconds too long and the whole desktop opened instead.
+- While the server restarts, Desktop now waits a little longer between reconnection attempts
+  instead of retrying many times a second. It still reconnects within a few seconds once the
+  server is back.
+- Micos using apps on your PC can now read web pages in Chrome: reading one region of a window
+  returns all of it instead of stopping at the browser's outer frames, and each read waits for
+  the page to finish building before answering.
+- Keyboard shortcuts written as "Ctrl+L", "F6" or "Enter" are accepted instead of failing.
+
 ## [0.19.1] - 2026-11-23
 
 ### Fixed
