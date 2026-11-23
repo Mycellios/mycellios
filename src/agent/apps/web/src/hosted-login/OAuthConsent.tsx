@@ -4,13 +4,16 @@ import wordmark from "../../public/mycellios/mark.png";
 import { BrandLaunch } from "../components/BrandLaunch";
 import { resolveUiLocale } from "../lib/ui-locale";
 import { launchText } from "./launch-copy";
-import type { AuthSession, PublicAuthConfig } from "./auth";
+import type { AuthSession, PasswordRecovery, PublicAuthConfig } from "./auth";
 import {
   AuthServiceError,
   clearAuthSession,
+  completePasswordReset,
+  consumeRecoveryRedirect,
   EmailConfirmationRequired,
   isDefinitiveAuthFailure,
   loadAuthConfig,
+  requestPasswordReset,
   restoreAuthSession,
   signIn,
   signInWithOAuth,
@@ -42,7 +45,9 @@ export function OAuthConsent() {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [resume, setResume] = useState(0);
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [mode, setMode] = useState<"sign-in" | "sign-up" | "reset-request" | "reset">("sign-in");
+  const [recovery, setRecovery] = useState<PasswordRecovery | null>(null);
+  const [resetSent, setResetSent] = useState(false);
   const [confirmationRequired, setConfirmationRequired] = useState(false);
   const [locale] = useState(() => resolveUiLocale());
   const text = (english: string, spanish: string) => (locale === "es" ? spanish : english);
@@ -51,10 +56,24 @@ export function OAuthConsent() {
     void (async () => {
       const [c, allowed] = await Promise.all([loadAuthConfig(), loadFirstPartyClients()]);
       if (!c.enabled) throw new Error();
-      const s = await restoreAuthSession(c);
+      // A reset link must be read before the ordinary session restore, which drops unknown fragments.
+      const recovered = await consumeRecoveryRedirect(c);
+      const s = recovered && recovered !== "expired" ? null : await restoreAuthSession(c);
       if (active) {
         setConfig(c);
         setClients(allowed);
+        if (recovered === "expired") {
+          setMode("reset-request");
+          setError(
+            text(
+              "This reset link has expired or was already used. Request a new one.",
+              "Este enlace ha caducado o ya se ha usado. Pide uno nuevo.",
+            ),
+          );
+        } else if (recovered) {
+          setRecovery(recovered);
+          setMode("reset");
+        }
         setSession(s);
       }
     })().catch(() => {
@@ -208,7 +227,11 @@ export function OAuthConsent() {
             ? text("Authorize access", "Autorizar acceso")
             : mode === "sign-up"
               ? text("Create your account", "Crear tu cuenta")
-              : text("Sign in", "Iniciar sesión")}
+              : mode === "reset-request"
+                ? text("Reset your password", "Restablecer la contraseña")
+                : mode === "reset"
+                  ? text("Choose a new password", "Elige una contraseña nueva")
+                  : text("Sign in", "Iniciar sesión")}
         </h1>
         </header>
         {error ? <p role="alert">{error}</p> : null}
@@ -217,7 +240,112 @@ export function OAuthConsent() {
             {text("Sign in again", "Volver a entrar")}
           </a>
         ) : null}
-        {!session ? (
+        {!session && (mode === "reset-request" || mode === "reset") ? (
+          <>
+            {resetSent ? (
+              <p role="status">
+                {text(
+                  "If an account uses that email, we sent it a link to reset the password.",
+                  "Si hay una cuenta con ese correo, le hemos enviado un enlace para restablecer la contraseña.",
+                )}
+              </p>
+            ) : (
+              <form
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (busy) return;
+                  setBusy(true);
+                  setError("");
+                  const data = new FormData(event.currentTarget);
+                  try {
+                    if (mode === "reset-request") {
+                      await requestPasswordReset(config, String(data.get("email")));
+                      setResetSent(true);
+                    } else if (recovery) {
+                      const next = await completePasswordReset(config, recovery, String(data.get("password")));
+                      setRecovery(null);
+                      setMode("sign-in");
+                      setSession(next);
+                    }
+                  } catch (error) {
+                    setError(
+                      error instanceof AuthServiceError && error.code === "weak_password"
+                        ? text(
+                            "Choose a longer password that is harder to guess.",
+                            "Elige una contraseña más larga y difícil de adivinar.",
+                          )
+                        : error instanceof AuthServiceError && error.code === "same_password"
+                          ? text(
+                              "Choose a password you have not used for this account.",
+                              "Elige una contraseña que no hayas usado en esta cuenta.",
+                            )
+                          : error instanceof AuthServiceError && error.status === 429
+                            ? text(
+                                "Too many attempts. Wait a minute and try again.",
+                                "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
+                              )
+                            : text(
+                                "Could not reset the password. Please try again.",
+                                "No se ha podido restablecer la contraseña. Inténtalo de nuevo.",
+                              ),
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {mode === "reset-request" ? (
+                  <label>
+                    <span className="login-label">{text("Email address", "Correo electrónico")}</span>
+                    <input
+                      name="email"
+                      type="email"
+                      autoComplete="username"
+                      placeholder={text("you@example.com", "tu@correo.com")}
+                      required
+                      disabled={busy}
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    <span className="login-label">{text("New password", "Contraseña nueva")}</span>
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={text("New password", "Contraseña nueva")}
+                      required
+                      disabled={busy}
+                    />
+                  </label>
+                )}
+                <button type="submit" disabled={busy}>
+                  {busy
+                    ? text("Please wait…", "Un momento…")
+                    : mode === "reset-request"
+                      ? text("Send reset link", "Enviar enlace")
+                      : text("Save password", "Guardar contraseña")}
+                </button>
+              </form>
+            )}
+            {mode === "reset-request" ? (
+              <p className="login-switcher">
+                <button
+                  type="button"
+                  className="login-switch"
+                  disabled={busy}
+                  onClick={() => {
+                    setMode("sign-in");
+                    setError("");
+                    setResetSent(false);
+                  }}
+                >
+                  {text("Back to sign in", "Volver a iniciar sesión")}
+                </button>
+              </p>
+            ) : null}
+          </>
+        ) : !session ? (
           <>
             {confirmationRequired ? (
               <p role="status">
@@ -336,6 +464,22 @@ export function OAuthConsent() {
                   : text("Create account", "Crear cuenta")}
               </button>
             </p>
+            {mode === "sign-in" ? (
+              <p className="login-switcher">
+                <button
+                  type="button"
+                  className="login-switch"
+                  disabled={busy}
+                  onClick={() => {
+                    setMode("reset-request");
+                    setError("");
+                    setConfirmationRequired(false);
+                  }}
+                >
+                  {text("Forgot your password?", "¿Has olvidado la contraseña?")}
+                </button>
+              </p>
+            ) : null}
             {(["google", "twitter"] as const)
               .filter((p) => config.providers?.[p])
               .map((p) => (

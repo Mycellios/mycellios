@@ -14,6 +14,7 @@ import {
   type Vec3,
 } from "./network-globe";
 import { publicHardwareLabel, publicRegionLabel } from "./network-labels";
+import { publicModelLabel } from "./overview-stats";
 import "./network-page.css";
 import "./ui/dark-theme.css";
 
@@ -982,7 +983,7 @@ export function NetworkPage({
               <div className="net-wall-activity-row head" role="row"><span>job</span><span>model</span><span>status</span><span>tokens</span><span>age</span></div>
               {recentJobs.map((job) => <div className="net-wall-activity-row" role="row" key={job.id}>
                 <span className="id">{shortId(job.id)}</span>
-                <span>{job.model}</span>
+                <span title={job.model}>{publicModelLabel(job.model)}</span>
                 <UiBadge className={`status s-${job.status}`}>{job.status}</UiBadge>
                 <span>{(job.inputTokens + job.outputTokens).toLocaleString("en-US")}</span>
                 <span>{relativeTime(job.updatedAt)}</span>
@@ -1391,7 +1392,7 @@ function NodePanel({ node, jobs, onClose }: {
         : worker.kind === "browser" ? "browser compute" : "not announced"} />
       <Row label="device" value={worker.kind} />
       <Row label="memory offered" value={formatMemory(worker.offeredVramMb / 1_024)} />
-      <Row label="serving" value={deployment ? `${deployment.model} · ${deployment.mode}` : "—"} />
+      <Row label="serving" value={deployment ? `${publicModelLabel(deployment.model)} · ${deployment.mode}` : "—"} />
       <Row label="models held" value={String(worker.deployments.length || "none")} />
       {reliability !== null && <>
         <Row label="reliability" value={`${Math.round(reliability * 100)}%`} />

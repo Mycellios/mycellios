@@ -211,6 +211,114 @@ export function signIn(
   return authRequest(config, "/auth/v1/token?grant_type=password", { email, password });
 }
 
+/**
+ * Asks the identity service to email a password reset link that returns to this
+ * page. The service answers the same way whether or not the account exists.
+ */
+export async function requestPasswordReset(config: PublicAuthConfig, email: string): Promise<void> {
+  assertAuthConfig(config);
+  const url = new URL("/auth/v1/recover", config.url);
+  url.searchParams.set("redirect_to", recoveryRedirectTarget());
+  const response = await authTimedFetch(
+    url,
+    {
+      method: "POST",
+      headers: { apikey: config.anonKey, "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    },
+    20_000,
+    "Password reset",
+  );
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error_code?: unknown } | null;
+    throw new AuthServiceError(
+      `Password reset failed (HTTP ${response.status}).`,
+      response.status,
+      typeof payload?.error_code === "string" ? payload.error_code : undefined,
+    );
+  }
+}
+
+/** A verified reset link, held in memory until the person chooses a new password. */
+export interface PasswordRecovery {
+  session: AuthSession;
+}
+
+/**
+ * Reads a reset link returned by the identity service (`type=recovery`). The
+ * session is verified but not stored: it becomes the signed-in session only
+ * after `completePasswordReset`. Expired or used links return "expired".
+ */
+export async function consumeRecoveryRedirect(
+  config: PublicAuthConfig,
+): Promise<PasswordRecovery | "expired" | null> {
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const recovery = params.get("type") === "recovery" && params.has("access_token");
+  const expired = params.get("error_code") === "otp_expired";
+  if (!recovery && !expired) return null;
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  if (expired) return "expired";
+  assertAuthConfig(config);
+  const accessToken = params.get("access_token")!;
+  const refreshToken = params.get("refresh_token");
+  if (!refreshToken) return "expired";
+  const response = await authTimedFetch(
+    new URL("/auth/v1/user", config.url),
+    { headers: { apikey: config.anonKey, authorization: `Bearer ${accessToken}` } },
+    10_000,
+    "Identity verification",
+  );
+  const user = (await response.json().catch(() => null)) as { id?: unknown; email?: unknown } | null;
+  if (!response.ok || typeof user?.id !== "string") return "expired";
+  return {
+    session: {
+      accessToken,
+      refreshToken,
+      expiresAt: Date.now() + Number(params.get("expires_in") ?? 3600) * 1_000,
+      user: { id: user.id, email: typeof user.email === "string" ? user.email : null },
+    },
+  };
+}
+
+/** Saves the new password with the reset link's session, then keeps that session. */
+export async function completePasswordReset(
+  config: PublicAuthConfig,
+  recovery: PasswordRecovery,
+  password: string,
+): Promise<AuthSession> {
+  assertAuthConfig(config);
+  const response = await authTimedFetch(
+    new URL("/auth/v1/user", config.url),
+    {
+      method: "PUT",
+      headers: {
+        apikey: config.anonKey,
+        authorization: `Bearer ${recovery.session.accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ password }),
+    },
+    20_000,
+    "Password update",
+  );
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error_code?: unknown } | null;
+    throw new AuthServiceError(
+      `Password update failed (HTTP ${response.status}).`,
+      response.status,
+      typeof payload?.error_code === "string" ? payload.error_code : undefined,
+    );
+  }
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify(recovery.session));
+  return recovery.session;
+}
+
+function recoveryRedirectTarget(): string {
+  const redirect = new URL(`${window.location.pathname}${window.location.search}`, window.location.origin);
+  redirect.searchParams.delete(OAUTH_STATE_PARAM);
+  return redirect.toString();
+}
+
 export async function signUp(
   config: PublicAuthConfig,
   email: string,
