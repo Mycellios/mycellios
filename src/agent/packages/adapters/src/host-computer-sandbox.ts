@@ -50,6 +50,10 @@ async function drainCompletedResponse(reader: ReadableStreamDefaultReader<Uint8A
   }
 }
 
+function isExitEvent(value: unknown) {
+  return typeof value === "object" && value !== null && (value as { type?: unknown }).type === "exit";
+}
+
 /** Authenticated native host transport. Commands are never retried after a lost response. */
 export class HostComputerSandbox implements SandboxProvider {
   constructor(
@@ -118,6 +122,7 @@ export class HostComputerSandbox implements SandboxProvider {
     if (signal.aborted) abort();
     const decoder = new TextDecoder();
     let pending = "";
+    let exited = false;
     try {
       while (true) {
         signal.throwIfAborted();
@@ -150,6 +155,7 @@ export class HostComputerSandbox implements SandboxProvider {
             await drainCompletedResponse(reader);
             return;
           }
+          exited = isExitEvent(frame.value);
           yield frame.value;
           newline = pending.indexOf("\n");
         }
@@ -159,6 +165,10 @@ export class HostComputerSandbox implements SandboxProvider {
       throw new Error("Local computer disconnected. Check the result before retrying.");
     } finally {
       signal.removeEventListener("abort", abort);
+      // A caller that stops reading at a command's exit has its complete result; the
+      // PC still sends the final empty chunk. Cancelling now would make the relay
+      // drop the operation and refuse that chunk, so the PC records a failure.
+      if (exited && !signal.aborted) await drainCompletedResponse(reader);
       const cancellation = reader.cancel().catch(() => undefined);
       if (!signal.aborted) await cancellation;
       reader.releaseLock();
