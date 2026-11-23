@@ -378,6 +378,8 @@ export function resetDesktopRuntimeCommand(env = DEFAULT_DESKTOP_ENV) {
 }
 
 const TARGETS = "/tmp/rakazo/desktop-targets";
+// The runtime directory every screen transport shares.
+const RUNTIME_DIR = TARGETS.slice(0, TARGETS.lastIndexOf("/"));
 
 // Menu exec strings run through `/bin/sh -c`, where `#` starts a comment; rgb:a/b/c keeps
 // hex colors intact. infra/sandboxes/computer/fluxbox.menu carries the same entry.
@@ -386,7 +388,7 @@ export const TERMINAL_MENU_COMMAND =
   "xterm -bg rgb:11/11/13 -fg rgb:e8/e8/ea -cr rgb:e8/e8/ea -title Terminal -xrm 'XTerm*selectToClipboard: true'";
 
 // Keep fixed mapping files present: TokenFile may be reading the directory concurrently.
-function revokeTargetCommand(kind: "view" | "control" | "terminal", display: number | string) {
+function revokeTargetCommand(kind: "view" | "control" | "terminal" | "tab", display: number | string) {
   return `mkdir -p ${TARGETS}; : >/tmp/rakazo/${kind}-target-next-${display}; mv /tmp/rakazo/${kind}-target-next-${display} ${TARGETS}/${kind}-${display}`;
 }
 
@@ -419,6 +421,55 @@ function stopTerminalCommand(layout: DesktopLayout) {
     `for i in $(seq 1 10); do pgrep -f ${pattern} >/dev/null || break; sleep 0.1; done`,
     `pkill -KILL -f ${pattern} || true`,
     `rm -rf ${socketPrefix}* /tmp/rakazo/terminal-state-${layout.displayNumber}`,
+  ].join("\n");
+}
+
+const TAB_VIEW_HELPER = "/usr/local/bin/rakazo-page-browser";
+
+function tabViewServerPattern(socket: string) {
+  return `^([^ ]*/)?python[0-9.]* ${TAB_VIEW_HELPER} tab-stream ${socket}( |$)`;
+}
+
+/** Revoke the tab view route and end its stream; part of every control release. */
+function stopTabViewCommand(layout: DesktopLayout) {
+  const socketPrefix = `${RUNTIME_DIR}/sockets/tab-${layout.displayNumber}-`;
+  const pattern = quoteLayout(tabViewServerPattern(`${socketPrefix}[^ ]+`));
+  return [
+    revokeTargetCommand("tab", layout.displayNumber),
+    `pkill -f ${pattern} || true`,
+    `for i in $(seq 1 10); do pgrep -f ${pattern} >/dev/null || break; sleep 0.1; done`,
+    `pkill -KILL -f ${pattern} || true`,
+    `rm -f ${socketPrefix}*`,
+  ].join("\n");
+}
+
+/**
+ * Stream one conversation's browser tab to the person holding the current control lease. The
+ * helper reads that conversation's own tab mapping; a newer view replaces an older one.
+ */
+export function tabViewCommand(
+  controlToken: string,
+  viewToken: string,
+  conversationKey: string,
+  layout: DesktopLayout,
+) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(viewToken)) throw new Error("invalid tab view token");
+  if (!/^[a-f0-9]{64}$/.test(conversationKey)) throw new Error("invalid browser conversation scope");
+  const display = layout.displayNumber;
+  const tokenFile = `${RUNTIME_DIR}/control-token-${display}`;
+  const socket = `${RUNTIME_DIR}/sockets/tab-${display}-${browserKeyForScreen(controlToken)}`;
+  return [
+    "set -e",
+    `[ -f ${tokenFile} ] && [ "$(cat ${tokenFile})" = ${shellQuote(controlToken)} ] || exit 75`,
+    stopTabViewCommand(layout),
+    `mkdir -p ${RUNTIME_DIR}/sockets`,
+    // The helper finds this display's browser debugging port from DISPLAY.
+    `DISPLAY=${layout.display} nohup ${TAB_VIEW_HELPER} tab-stream ${socket} ${conversationKey} 8>&- 9>&- </dev/null >${RUNTIME_DIR}/tab-${display}.log 2>&1 &`,
+    `for i in $(seq 1 50); do [ -S ${socket} ] && break; sleep 0.1; done`,
+    `[ -S ${socket} ] && pgrep -f ${shellQuote(tabViewServerPattern(socket))} >/dev/null || exit 1`,
+    `printf '%s: unix_socket:%s\\n' ${shellQuote(viewToken)} ${socket} >${RUNTIME_DIR}/tab-target-next-${display}`,
+    `mv ${RUNTIME_DIR}/tab-target-next-${display} ${TARGETS}/tab-${display}`,
+    gatewayCommand(layout.controlPort, layout.bindHost),
   ].join("\n");
 }
 
@@ -476,6 +527,7 @@ function renderStopScreenTransportsCommand(index: number | undefined, env = DEFA
     stopVncCommand("view", layout),
     stopVncCommand("control", layout),
     stopTerminalCommand(layout),
+    stopTabViewCommand(layout),
     `rm -f /tmp/rakazo/control-token-${layout.displayNumber}`,
   ].join("\n");
 }
@@ -616,8 +668,9 @@ export function interactiveScreenCommand(
     "set -eu",
     revokeTargetCommand("control", layout.displayNumber),
     stopVncCommand("control", layout),
-    // The terminal belongs to the control lease and ends with it.
+    // The terminal and the tab view belong to the control lease and end with it.
     stopTerminalCommand(layout),
+    stopTabViewCommand(layout),
     `rm -f ${tokenFile}`,
   ].join("\n");
   if (!interactive) {
@@ -681,7 +734,7 @@ export function startTerminalCommand(
 ) {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(terminalToken)) throw new Error("invalid terminal token");
   const display = layout.displayNumber;
-  const tokenFile = `/tmp/rakazo/control-token-${display}`;
+  const tokenFile = `${RUNTIME_DIR}/control-token-${display}`;
   const socket = `/tmp/rakazo/sockets/terminal-${display}-${browserKeyForScreen(controlToken)}`;
   const target = `${TARGETS}/terminal-${display}`;
   const next = `/tmp/rakazo/terminal-target-next-${display}`;
@@ -708,7 +761,7 @@ export function startTerminalCommand(
   ].join("\n");
 }
 
-const REGISTRY = "/tmp/rakazo/desktop-assignments";
+const REGISTRY = `${RUNTIME_DIR}/desktop-assignments`;
 const TOKEN_PLACEHOLDER = "RAKAZO_INTERNAL_VIEW_TOKEN";
 
 function registryLockCommand(screenId: string) {

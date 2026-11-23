@@ -502,7 +502,14 @@
   Docker computers. A display lock serializes tab activation and CDP input.
   Preserve the browser's existing cookies and desktop permissions. Scoped calls
   require a compatible supervisor and helper; never replay against a focused
-  tab on an older image. Verify the supervisor route and page-browser tests.
+  tab on an older image. For a waiting takeover card, Open focuses the saved Docker
+  tab for its exact waiting run and takes control under the existing lease. Never
+  silently open another tab when that target is gone. Update the API, supervisor
+  and computer image together. Verify the supervisor, helper, and browser handoff tests.
+  The handoff then shows only that tab: the page-browser helper's `tab-stream` screencasts
+  it over CDP through the control gateway (`tab.html`, sealed like the embed page),
+  follows popups it opens and replays only validated input. It belongs to the control
+  lease and stops with it; Show desktop returns to noVNC. Older images fall back.
   The phone menu groups conversations by unread, read and archived state, counts
   open conversations waiting for the person, and gives owned rows a touch menu
   with the same actions and a delete confirmation. Verify the mobile fixture in

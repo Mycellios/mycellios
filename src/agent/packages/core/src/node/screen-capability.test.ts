@@ -194,6 +194,23 @@ describe("sealed screen capabilities", () => {
     );
   });
 
+  it("routes the tab view socket like the embed page, with its token sealed", () => {
+    const provider = new URL("http://127.0.0.1:49152/tab.html?view_only=false");
+    provider.searchParams.set("path", "websockify?token=fake-tab-token");
+    const url = new URL(
+      sealScreenCapability(provider.toString(), "fake-secret", "https://app.example", scope, 100),
+    );
+    expect(url.toString()).not.toContain("fake-tab-token");
+    expect(url.pathname).toMatch(/^\/novnc\/session\/control\/.+\/tab\.html$/);
+    expect(url.searchParams.get("path")).toBe("websockify");
+    // tab.html joins a relative socket path to its own directory, as embed.html does.
+    const socket = url.pathname.replace(/[^/]+$/, "websockify");
+    expect(openScreenCapability(socket, "fake-secret", 101)?.target).toMatchObject({
+      path: "/websockify?token=fake-tab-token",
+      interactive: true,
+    });
+  });
+
   it("randomizes issuance even at the same timestamp", () => {
     expect(path("http://127.0.0.1:49152/embed.html")).not.toBe(
       path("http://127.0.0.1:49152/embed.html"),

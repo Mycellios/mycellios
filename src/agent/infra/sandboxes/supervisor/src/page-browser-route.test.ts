@@ -51,7 +51,7 @@ beforeEach(() => {
   }));
 });
 
-async function snapshot(id: string, screen: string, lease: string, home = "home", conversationKey?: string) {
+async function snapshot(id: string, screen: string, lease: string, home = "home", conversationKey?: string, command = "snapshot") {
   return supervisorApp.request(`/computers/${id}/browser${conversationKey ? "/scoped" : ""}`, {
     method: "POST",
     headers: {
@@ -62,7 +62,7 @@ async function snapshot(id: string, screen: string, lease: string, home = "home"
       "x-rakazo-screen-id": screen,
       "x-rakazo-screen-lease-id": lease,
     },
-    body: JSON.stringify({ command: "snapshot", ...(conversationKey ? { conversationKey } : {}) }),
+    body: JSON.stringify({ command, ...(conversationKey ? { conversationKey } : {}) }),
   });
 }
 
@@ -76,6 +76,21 @@ it("forwards only a validated scoped command without weakening the display fence
   mock.exec.mockClear();
   expect(await (await snapshot("scoped", "first", "run:1", "home", key)).json()).toMatchObject({ ok: false });
   expect((await snapshot("scoped", "first", "run:2", "home", "../outside")).status).toBeGreaterThanOrEqual(400);
+  expect(mock.exec).not.toHaveBeenCalled();
+});
+
+it("only focuses an existing conversation through the scoped browser route", async () => {
+  const key = "b".repeat(64);
+  expect((await snapshot("handoff", "first", "run:2", "home", undefined, "focus")).status).toBe(404);
+  expect(mock.exec).not.toHaveBeenCalled();
+  expect(await (await snapshot("handoff", "first", "run:2", "home", key, "focus")).json())
+    .toMatchObject({ ok: true });
+  expect(mock.exec.mock.calls.at(-1)?.[0].Cmd.slice(-3)).toEqual([
+    pageBrowserHelper, "scoped-focus", JSON.stringify({ command: "focus", conversationKey: key }),
+  ]);
+  mock.exec.mockClear();
+  expect(await (await snapshot("handoff", "first", "run:1", "home", key, "focus")).json())
+    .toMatchObject({ ok: false });
   expect(mock.exec).not.toHaveBeenCalled();
 });
 

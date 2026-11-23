@@ -224,6 +224,14 @@ describe("screen frame reports", () => {
     expect(screenFrameMessage(null)).toBeNull();
   });
 
+  it("reads the tab view page's reports under the product key", () => {
+    expect(Object.values(screenFrameMessage({ mycelliosScreen: "connected", detail: " tab " }) ?? {})).toEqual([
+      "connected",
+      "tab",
+    ]);
+    expect(screenFrameMessage({ mycelliosScreen: "exploded" })).toBeNull();
+  });
+
   it("counts only reports past loading as a started page", () => {
     expect(screenFrameStarted({ rakazoScreen: "loading" })).toBe(false);
     expect(screenFrameStarted({ rakazoScreen: "connecting" })).toBe(true);

@@ -1628,6 +1628,10 @@ msgstr "Could not connect this voice provider"
 msgid "Could not connect to the computer screen"
 msgstr "Could not connect to the computer screen"
 
+#: pages/Shell.tsx
+msgid "Could not open this conversation’s browser tab."
+msgstr "Could not open this conversation’s browser tab."
+
 #: src/components/AccountAccess.tsx
 #: src/components/PasskeyOffer.tsx
 #: src/components/PasskeySettings.tsx
@@ -4733,6 +4737,10 @@ msgstr "Show Micos"
 #: src/pages/Shell.tsx
 msgid "Show computer"
 msgstr "Show computer"
+
+#: src/pages/shell/computer-overlay.tsx
+msgid "Show desktop"
+msgstr "Show desktop"
 
 #: src/pages/Artifacts.tsx
 msgid "Show list"

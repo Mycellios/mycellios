@@ -12,6 +12,7 @@ import {
   stopBrowserCommand,
   stopExtraScreenCommand,
   stopScreenTransportsCommand,
+  tabViewCommand as coreTabViewCommand,
 } from "@mycellios/core/node/desktop-runtime";
 
 export {
@@ -63,6 +64,18 @@ export function terminalCommand(
   return coreTerminalCommand(controlToken, terminalToken, cwd, env, {
     ...layout,
     bindHost: env.bindHost,
+  });
+}
+
+export function tabViewCommand(
+  controlToken: string,
+  viewToken: string,
+  conversationKey: string,
+  layout = screenPorts(0, DOCKER_DESKTOP_ENV),
+) {
+  return coreTabViewCommand(controlToken, viewToken, conversationKey, {
+    ...layout,
+    bindHost: DOCKER_DESKTOP_ENV.bindHost,
   });
 }
 

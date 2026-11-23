@@ -392,17 +392,22 @@ def scoped_target(client: CdpClient, mapping: Path, create: bool) -> str | None:
     return target
 
 
+def scope_directory(port: int) -> Path:
+    directory = Path(f"/tmp/mycellios-browser-{os.getuid()}-{port}")
+    directory.mkdir(mode=0o700, exist_ok=True)
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise RuntimeError("Browser tab storage is not private")
+    return directory
+
+
 def run_scoped(client: CdpClient, port: int, command: str, args: dict[str, Any]) -> dict[str, Any]:
     import fcntl
 
     key = args.get("conversationKey")
     if not isinstance(key, str) or not re.fullmatch(r"[a-f0-9]{64}", key):
         raise RuntimeError("Invalid browser conversation scope")
-    directory = Path(f"/tmp/mycellios-browser-{os.getuid()}-{port}")
-    directory.mkdir(mode=0o700, exist_ok=True)
-    info = directory.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise RuntimeError("Browser tab storage is not private")
+    directory = scope_directory(port)
     # Activation and real keyboard input share a display. Serialize a whole
     # command, including target selection, so input cannot leak to another tab.
     lock_fd = os.open(directory / "display.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
@@ -418,6 +423,8 @@ def run_scoped(client: CdpClient, port: int, command: str, args: dict[str, Any])
                     "error": "Open a page in this conversation first."}
         if command != "snapshot":
             client.call("Target.activateTarget", {"targetId": target})
+        if command == "focus":
+            return {"ok": True}
         session_id = client.call("Target.attachToTarget", {"targetId": target, "flatten": True})["sessionId"]
         client.call("Page.enable", session_id=session_id)
         ensure_world(client, session_id)
@@ -1206,6 +1213,279 @@ def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> di
                 "error": str(exc), "fallback": "computer_act"}
 
 
+# Live view of one conversation's tab for the person taking over. The viewer page talks to this
+# server through the screen gateway's byte stream, so every message is length-prefixed:
+# server -> viewer: !I length, !B kind, payload (1 = !H header length, JSON header, JPEG; 2 = JSON)
+# viewer -> server: !I length, JSON input event
+TAB_STREAM_FRAME = 1
+TAB_STREAM_STATUS = 2
+TAB_STREAM_MAX_INPUT = 64 * 1024
+TAB_STREAM_SCREENCAST = {"format": "jpeg", "quality": 60, "maxWidth": 1280, "maxHeight": 800, "everyNthFrame": 1}
+TAB_STREAM_BUTTONS = ("none", "left", "middle", "right")
+TARGET_ID = re.compile(r"[a-fA-F0-9]{32}")
+
+
+def tab_stream_message(kind: int, payload: bytes) -> bytes:
+    return struct.pack("!IB", len(payload) + 1, kind) + payload
+
+
+def _bounded_int(value: Any, low: int, high: int, default: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+        return default
+    return value
+
+
+def _fraction(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+        raise ValueError("Invalid pointer position")
+    return min(1.0, max(0.0, float(value)))
+
+
+def _short_text(value: Any, limit: int) -> str:
+    return value if isinstance(value, str) and len(value) <= limit else ""
+
+
+def tab_input_command(message: Any, viewport: tuple[float, float]) -> tuple[str, dict[str, Any]] | None:
+    """Translate one viewer event into a CDP call for the shown tab; anything unexpected is dropped."""
+    if not isinstance(message, dict):
+        return None
+    width, height = viewport
+    kind = message.get("t")
+    try:
+        if kind in ("mouse", "wheel"):
+            if width <= 0 or height <= 0:
+                return None
+            point = {"x": _fraction(message.get("x")) * width, "y": _fraction(message.get("y")) * height,
+                     "modifiers": _bounded_int(message.get("modifiers"), 0, 15)}
+            if kind == "wheel":
+                delta = lambda name: max(-10_000.0, min(10_000.0, float(message.get(name) or 0)))  # noqa: E731
+                return "Input.dispatchMouseEvent", {**point, "type": "mouseWheel",
+                                                    "deltaX": delta("dx"), "deltaY": delta("dy")}
+            event = message.get("type")
+            button = message.get("button", "none")
+            if event not in ("mousePressed", "mouseReleased", "mouseMoved") or button not in TAB_STREAM_BUTTONS:
+                return None
+            return "Input.dispatchMouseEvent", {**point, "type": event, "button": button,
+                                                "buttons": _bounded_int(message.get("buttons"), 0, 7),
+                                                "clickCount": _bounded_int(message.get("clickCount"), 0, 3)}
+    except (TypeError, ValueError):
+        return None
+    if kind == "key":
+        event = message.get("type")
+        if event not in ("keyDown", "keyUp"):
+            return None
+        text = _short_text(message.get("text"), 4) if event == "keyDown" else ""
+        params: dict[str, Any] = {
+            "type": "keyUp" if event == "keyUp" else ("keyDown" if text else "rawKeyDown"),
+            "key": _short_text(message.get("key"), 32),
+            "code": _short_text(message.get("code"), 32),
+            "windowsVirtualKeyCode": _bounded_int(message.get("keyCode"), 0, 255),
+            "nativeVirtualKeyCode": _bounded_int(message.get("keyCode"), 0, 255),
+            "modifiers": _bounded_int(message.get("modifiers"), 0, 15),
+        }
+        if text:
+            params["text"] = params["unmodifiedText"] = text
+        return "Input.dispatchKeyEvent", params
+    if kind == "text":
+        text = _short_text(message.get("text"), 32_000)
+        return ("Input.insertText", {"text": text}) if text else None
+    if kind == "nav":
+        action = message.get("action")
+        if action == "reload":
+            return "Page.reload", {}
+        if action in ("back", "forward"):
+            return "Runtime.evaluate", {"expression": f"history.{action}()"}
+    return None
+
+
+class TabStream:
+    """Screencast one conversation tab, following popups it opens, and replay the viewer's input."""
+
+    def __init__(self, client: CdpClient, base_target: str, viewer: socket.socket) -> None:
+        self.client = client
+        self.viewer = viewer
+        self.base = base_target
+        self.popups: list[str] = []
+        self.target: str | None = None
+        self.session: str | None = None
+        self.viewport = (0.0, 0.0)
+        self._send_lock = threading.Lock()
+        self._emit_lock = threading.Lock()
+        self._callbacks: dict[int, Any] = {}
+        self._next_id = 1_000_000
+
+    def send(self, method: str, params: dict[str, Any] | None = None, *,
+             session: str | None = None, callback: Any = None) -> None:
+        with self._send_lock:
+            msg_id = self._next_id
+            self._next_id += 1
+            if callback is not None:
+                self._callbacks[msg_id] = callback
+            payload: dict[str, Any] = {"id": msg_id, "method": method, "params": params or {}}
+            if session:
+                payload["sessionId"] = session
+            self.client._send_frame(json.dumps(payload).encode("utf-8"))
+
+    def emit(self, kind: int, payload: bytes) -> None:
+        with self._emit_lock:
+            self.viewer.sendall(tab_stream_message(kind, payload))
+
+    def status(self, **fields: Any) -> None:
+        self.emit(TAB_STREAM_STATUS, json.dumps(fields).encode("utf-8"))
+
+    def show(self, target: str) -> None:
+        previous = self.session
+
+        def attached(message: dict[str, Any]) -> None:
+            session = (message.get("result") or {}).get("sessionId")
+            if not isinstance(session, str):
+                self.status(type="error", reason="attach")
+                return
+            if previous:
+                self.send("Page.stopScreencast", session=previous)
+                self.send("Target.detachFromTarget", {"sessionId": previous})
+            self.target, self.session = target, session
+            self.viewport = (0.0, 0.0)
+            self.send("Page.enable", session=session)
+            self.send("Page.startScreencast", TAB_STREAM_SCREENCAST, session=session)
+            self.status(type="tab", popup=target != self.base)
+
+        self.send("Target.activateTarget", {"targetId": target})
+        self.send("Target.attachToTarget", {"targetId": target, "flatten": True}, callback=attached)
+
+    def handle(self, message: dict[str, Any]) -> bool:
+        """Apply one CDP message; False once the conversation's tab is gone."""
+        if "id" in message:
+            callback = self._callbacks.pop(message["id"], None)
+            if callback is not None:
+                callback(message)
+            return True
+        method = message.get("method")
+        params = message.get("params") or {}
+        if method == "Page.screencastFrame":
+            if message.get("sessionId") != self.session:
+                return True
+            meta = params.get("metadata") or {}
+            width, height = float(meta.get("deviceWidth") or 0), float(meta.get("deviceHeight") or 0)
+            self.viewport = (width, height)
+            header = json.dumps({"w": width, "h": height}).encode("utf-8")
+            self.emit(TAB_STREAM_FRAME, struct.pack("!H", len(header)) + header
+                      + base64.b64decode(params.get("data") or ""))
+            # Acknowledge only after the viewer took the frame, so a slow link slows the screencast.
+            self.send("Page.screencastFrameAck", {"sessionId": params.get("sessionId")}, session=self.session)
+        elif method == "Target.targetCreated":
+            info = params.get("targetInfo") or {}
+            created = info.get("targetId")
+            if (info.get("type") == "page" and isinstance(created, str) and TARGET_ID.fullmatch(created)
+                    and info.get("openerId") in (self.base, *self.popups) and created not in self.popups):
+                self.popups.append(created)
+                self.show(created)
+        elif method == "Target.targetDestroyed":
+            gone = params.get("targetId")
+            if gone == self.base:
+                self.status(type="closed")
+                return False
+            if gone in self.popups:
+                self.popups.remove(gone)
+                if gone == self.target:
+                    self.show(self.popups[-1] if self.popups else self.base)
+        elif method == "Target.targetInfoChanged":
+            info = params.get("targetInfo") or {}
+            if info.get("targetId") == self.target:
+                self.status(type="page", url=str(info.get("url") or "")[:2048],
+                            title=str(info.get("title") or "")[:300])
+        return True
+
+    def pump(self) -> None:
+        while True:
+            message = json.loads(self.client._read_frame().decode("utf-8"))
+            if isinstance(message, dict) and not self.handle(message):
+                return
+
+    def read_input(self) -> None:
+        try:
+            while True:
+                length = struct.unpack("!I", _recv_exact(self.viewer, 4))[0]
+                if not 0 < length <= TAB_STREAM_MAX_INPUT:
+                    return
+                command = tab_input_command(json.loads(_recv_exact(self.viewer, length).decode("utf-8")),
+                                            self.viewport)
+                if command is not None and self.session:
+                    self.send(command[0], command[1], session=self.session)
+        except (OSError, ValueError, RuntimeError):
+            return
+        finally:
+            # Ending the CDP connection stops the pump and the screencast with it.
+            self.client.close()
+
+
+def _recv_exact(sock: socket.socket, size: int) -> bytes:
+    data = bytearray()
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise RuntimeError("viewer closed")
+        data += chunk
+    return bytes(data)
+
+
+def serve_tab_viewer(viewer: socket.socket, key: str, port: int) -> None:
+    client: CdpClient | None = None
+    try:
+        wait_for_cdp(port)
+        client = CdpClient(discover_ws_url(port))
+        client.connect()
+        target = scoped_target(client, scope_directory(port) / key, create=False)
+        if target is None:
+            viewer.sendall(tab_stream_message(TAB_STREAM_STATUS, b'{"type":"closed"}'))
+            return
+        assert client._sock is not None
+        client._sock.settimeout(None)
+        stream = TabStream(client, target, viewer)
+        stream.show(target)
+        # Popups the tab opens (sign-in windows) are followed while the person is in control.
+        stream.send("Target.setDiscoverTargets", {"discover": True})
+        threading.Thread(target=stream.read_input, daemon=True).start()
+        stream.pump()
+    except Exception:  # noqa: BLE001 - the viewer reports a closed stream; nothing else to tell
+        pass
+    finally:
+        if client is not None:
+            client.close()
+        try:
+            viewer.close()
+        except OSError:
+            pass
+
+
+def serve_tab_stream(socket_path: str, key: str) -> int:
+    # The supervisor places the socket in the shared screen socket directory under /tmp.
+    if (not re.fullmatch(r"[a-f0-9]{64}", key) or not socket_path.startswith("/tmp/")
+            or os.path.basename(os.path.dirname(socket_path)) != "sockets"
+            or not re.fullmatch(r"tab-\d+-[A-Za-z0-9_-]+", os.path.basename(socket_path))):
+        print("invalid tab stream arguments", file=sys.stderr)
+        return 2
+    port = cdp_port()
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        os.unlink(socket_path)
+    except FileNotFoundError:
+        pass
+    server.bind(socket_path)
+    server.listen(4)
+    current: list[socket.socket] = []
+    while True:
+        viewer, _ = server.accept()
+        # One person views the tab at a time; a reopened view replaces the older one.
+        for older in current:
+            try:
+                older.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        current[:] = [viewer]
+        threading.Thread(target=serve_tab_viewer, args=(viewer, key, port), daemon=True).start()
+
+
 def exit_when_stdin_closes() -> None:
     """The supervisor owns this pipe; losing it cancels this helper, not Chromium."""
     try:
@@ -1227,6 +1507,8 @@ def read_stdin_line() -> str:
 
 
 def run(argv: list[str]) -> int:
+    if len(argv) == 4 and argv[1] == "tab-stream":
+        return serve_tab_stream(argv[2], argv[3])
     stdin_args = (
         read_stdin_line() if os.environ.get("RAKAZO_BROWSER_ARGS_STDIN") == "1" else None
     )
@@ -1246,7 +1528,7 @@ def run(argv: list[str]) -> int:
     command = argv[1]
     scoped = command.startswith("scoped-")
     command = command.removeprefix("scoped-")
-    if command not in ("navigate", "snapshot", "act"):
+    if command not in ("navigate", "snapshot", "act", "focus") or (command == "focus" and not scoped):
         print(json.dumps({"ok": False, "error": "Unknown browser command.", "fallback": "computer_act"}))
         return 2
     args: dict[str, Any] = {}

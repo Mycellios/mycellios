@@ -180,6 +180,15 @@ export interface SandboxProvider {
     request: TerminalRequest,
     context: AdapterContext,
   ): Promise<{ url: string; headers?: Record<string, string> }>;
+  /**
+   * Stream the browser tab of `context.browserThreadId` to the person holding control. It ends
+   * with the control lease, like the terminal.
+   */
+  connectTabView?(
+    computer: ComputerRef,
+    request: { controlToken: string },
+    context: AdapterContext,
+  ): Promise<{ url: string; headers?: Record<string, string> }>;
   setScreenControl?(
     computer: ComputerRef,
     interactive: boolean,

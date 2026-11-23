@@ -274,11 +274,54 @@ export function computerRoutes(ctx: RouterContext) {
         });
         return { ok: true as const };
       }),
+      focusBrowserTab: authed.computer.focusBrowserTab.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const computer = bot.computer;
+        if (computer?.kind !== "docker" || !deps.sandbox.pageBrowser) {
+          return { state: "unsupported" as const };
+        }
+        if (
+          computer.state !== "running" ||
+          !computer.providerRef ||
+          computer.controlRunId !== input.runId
+        ) {
+          return { state: "unavailable" as const };
+        }
+        const run = await deps.prisma.run.findFirst({
+          where: {
+            id: input.runId,
+            botId: bot.id,
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            status: "waiting_takeover",
+            OR: [{ cloudComputerId: null }, { cloudComputerId: computer.id }],
+          },
+          select: { threadId: true },
+        });
+        if (!run) return { state: "unavailable" as const };
+
+        const screenContext = await computerScreenContext(
+          deps.prisma, context.actor, computer.id, bot.id, "browser.handoff", input.runId,
+        );
+        if (!screenContext.screenLeaseId) return { state: "unavailable" as const };
+        const result = await deps.sandbox.pageBrowser(
+          toComputerRef(computer),
+          { command: "focus" },
+          { ...screenContext, browserThreadId: run.threadId, signal: AbortSignal.timeout(5_000) },
+        ).catch(() => null);
+        return { state: result?.ok === true ? "focused" as const : "unavailable" as const };
+      }),
       takeover: authed.computer.takeover.handler(async ({ context, input }) => {
         let bot = await repos.getBot(context.actor, input.botId);
         if (!bot.computer?.providerRef || bot.computer.state !== "running") {
           throw new ORPCError("BAD_REQUEST", { message: "computer must be running" });
         }
+        const verifyHandoffRun = (computer: { controlRunId: string | null }) => {
+          if (input.runId && computer.controlRunId !== input.runId) {
+            throw new ORPCError("CONFLICT", { message: "Computer control changed; try again" });
+          }
+        };
+        verifyHandoffRun(bot.computer);
         if (hasActiveComputerControl(bot.computer) && bot.computer.controlBotId === bot.id) {
           await bindWaitingTakeoverToControl(deps, {
             spaceId: context.actor.spaceId,
@@ -331,6 +374,7 @@ export function computerRoutes(ctx: RouterContext) {
           throw new ORPCError("BAD_REQUEST", { message: "computer must be running" });
         }
 
+        verifyHandoffRun(bot.computer);
         const executionLease = await deps.prisma.computerExecutionLease.findUnique({
           where: { computerId_botId: { computerId: bot.computer.id, botId: bot.id } },
         });
@@ -340,6 +384,9 @@ export function computerRoutes(ctx: RouterContext) {
               select: { botId: true, status: true },
             })
           : null;
+        if (input.runId && (executionLease?.runId !== input.runId || executionRun?.status !== "waiting_takeover")) {
+          throw new ORPCError("CONFLICT", { message: "Computer control changed; try again" });
+        }
         const waitingForTakeover =
           executionRun?.botId === bot.id &&
           (executionRun.status === "waiting_takeover" ||
@@ -366,6 +413,7 @@ export function computerRoutes(ctx: RouterContext) {
             maintenanceId: null,
             controlHolder: { not: "user" },
             controlLeaseId: null,
+            ...(input.runId ? { controlRunId: input.runId } : {}),
           },
           data: {
             controlHolder: "user",
@@ -380,6 +428,7 @@ export function computerRoutes(ctx: RouterContext) {
           const current = await deps.prisma.computer.findUniqueOrThrow({
             where: { id: bot.computer.id },
           });
+          verifyHandoffRun(current);
           if (!hasActiveComputerControl(current) || current.controlBotId !== bot.id) {
             throw new ORPCError("CONFLICT", { message: "Computer control changed; try again" });
           }
@@ -674,6 +723,70 @@ export function computerRoutes(ctx: RouterContext) {
               bot.id,
               "terminal",
             ),
+          )
+          .catch((error: unknown) => clearGoneSandbox(deps, computer, error));
+        if (!session) return { url: null };
+        await keepComputerAwake(deps, computer.id);
+        return {
+          url: addScreenProxyCapability(
+            withViewOnly(session.url, false),
+            deps.env.screenProxySecret,
+            deps.env.webOrigin,
+            {
+              botId: bot.id,
+              computerId: computer.id,
+              botGeneration: bot.screenGeneration,
+              computerGeneration: computer.screenGeneration,
+              controlLeaseId: computer.controlLeaseId,
+            },
+            undefined,
+            session.headers,
+          ),
+        };
+      }),
+      tabViewUrl: authed.computer.tabViewUrl.handler(async ({ context, input }) => {
+        let bot = await repos.getBot(context.actor, input.botId);
+        if (await expireStaleComputerControl(deps, bot.computer)) {
+          bot = await repos.getBot(context.actor, input.botId);
+        }
+        const computer = bot.computer;
+        if (
+          computer?.kind !== "docker" ||
+          !computer.providerRef ||
+          computer.state !== "running" ||
+          !deps.sandbox.connectTabView
+        ) {
+          return { url: null };
+        }
+        // Like the terminal: only the user holding control for this waiting run sees its tab.
+        if (
+          !hasActiveComputerControl(computer) ||
+          computer.controlBotId !== bot.id ||
+          !computer.controlLeaseId ||
+          computer.controlRunId !== input.runId
+        ) {
+          throw new ORPCError("FORBIDDEN", { message: "Take control first." });
+        }
+        const run = await deps.prisma.run.findFirst({
+          where: {
+            id: input.runId,
+            botId: bot.id,
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            status: "waiting_takeover",
+            OR: [{ cloudComputerId: null }, { cloudComputerId: computer.id }],
+          },
+          select: { threadId: true },
+        });
+        if (!run) return { url: null };
+        const screenContext = await computerScreenContext(
+          deps.prisma, context.actor, computer.id, bot.id, "browser.tab-view", input.runId,
+        );
+        const session = await deps.sandbox
+          .connectTabView(
+            toComputerRef(computer),
+            { controlToken: computer.controlLeaseId },
+            { ...screenContext, browserThreadId: run.threadId },
           )
           .catch((error: unknown) => clearGoneSandbox(deps, computer, error));
         if (!session) return { url: null };
@@ -1065,13 +1178,14 @@ async function computerScreenContext(
   computerId: string,
   botId: string,
   operationId: string,
+  expectedRunId?: string,
 ): Promise<AdapterContext> {
   const context = computerContext(actor, botId, operationId);
   const lease = await prisma.computerExecutionLease.findUnique({
     where: { computerId_botId: { computerId, botId } },
     select: { runId: true, fence: true, expiresAt: true },
   });
-  if (!lease || lease.expiresAt.getTime() <= Date.now()) return context;
+  if (!lease || lease.expiresAt.getTime() <= Date.now() || (expectedRunId && lease.runId !== expectedRunId)) return context;
   return { ...context, screenLeaseId: screenLeaseIdForRun(lease, lease.runId) };
 }
 

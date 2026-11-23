@@ -107,7 +107,11 @@ export function sealScreenCapability(
     view_only: policy === "control" ? "false" : "true",
     // noVNC can resolve paths relative to its document directory. An absolute
     // path prevents it from repeating the capability prefix.
-    path: target.pathname === "/embed.html" ? "websockify" : `${prefix}/websockify`,
+    // The tab view page resolves its socket the same way as the embed page.
+    path:
+      target.pathname === "/embed.html" || target.pathname === "/tab.html"
+        ? "websockify"
+        : `${prefix}/websockify`,
   }).toString();
   return result.toString();
 }

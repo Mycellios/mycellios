@@ -1669,6 +1669,10 @@ msgstr "No se pudo conectar este proveedor de voz"
 msgid "Could not connect to the computer screen"
 msgstr "No se pudo conectar a la pantalla de la computadora"
 
+#: pages/Shell.tsx
+msgid "Could not open this conversation’s browser tab."
+msgstr "No se pudo abrir la pestaña del navegador de esta conversación."
+
 #: src/components/AccountAccess.tsx
 #: src/components/PasskeyOffer.tsx
 #: src/components/PasskeySettings.tsx
@@ -4782,6 +4786,10 @@ msgstr "Mostrar Micos"
 #: src/pages/Shell.tsx
 msgid "Show computer"
 msgstr "Mostrar computadora"
+
+#: src/pages/shell/computer-overlay.tsx
+msgid "Show desktop"
+msgstr "Mostrar escritorio"
 
 #: src/pages/Artifacts.tsx
 msgid "Show list"
