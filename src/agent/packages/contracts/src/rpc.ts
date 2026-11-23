@@ -142,6 +142,7 @@ import {
   OPENAI_COMPATIBLE_PROVIDER_ID,
   REPLY_QUOTE_MAX_LENGTH,
   ReorderBotsInput,
+  RoutineRunInChoiceSchema,
   RoutineSchema,
   ScratchpadItemSchema,
   ScratchpadItemStatusSchema,
@@ -1012,6 +1013,8 @@ export const appContract = {
             runAt: IsoDate.optional(),
             /** Null removes the change trigger. */
             watch: RoutineWatchSchema.nullable().optional(),
+            /** Moves the routine's runs; a group routine keeps its group. */
+            runIn: RoutineRunInChoiceSchema.optional(),
           })
           .superRefine((value, ctx) => {
             if (

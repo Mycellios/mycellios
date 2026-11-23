@@ -482,6 +482,7 @@ import {
   listSchedulesFromTool,
   ROUTINE_RUN_SCHEDULE_UPDATE_ERROR,
   routineRunMayUpdateSchedule,
+  runInFromTool,
   SCHEDULE_TOOL_NAMES,
   updateScheduleFromTool,
 } from "./schedule-tools.js";
@@ -7423,11 +7424,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
               command === undefined ? undefined : protectedComputerLifecycleRefusal(command);
             if (graphical && refusal)
               return finish({ error: desktopProtectionGuardMessage(refusal) });
+            const place = runInFromTool(args.runIn);
+            if ("error" in place) return finish(place);
             const created = await createScheduleFromTool(deps, {
               spaceId: run.spaceId,
               botId: bot.id,
               userId: run.userId,
               threadId: thread.id,
+              inGroup: Boolean(thread.groupId),
+              ...place,
               name: String(args.name ?? ""),
               prompt: String(args.prompt ?? ""),
               timezone: args.timezone ? String(args.timezone) : undefined,
@@ -7460,12 +7465,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
             // A scheduled run may only turn its own routine off (never write new unattended work).
             if (run.trigger === "routine" && !routineRunMayUpdateSchedule(run.routineId, args))
               return finish({ error: ROUTINE_RUN_SCHEDULE_UPDATE_ERROR });
+            const place = runInFromTool(args.runIn);
+            if ("error" in place) return finish(place);
             const updated = await updateScheduleFromTool(deps, {
               spaceId: run.spaceId,
               botId: bot.id,
               userId: run.userId,
               threadId: thread.id,
               ...(thread.groupId ? { scopeThreadId: thread.id } : {}),
+              ...place,
               routineId: String(args.routineId ?? ""),
               name: isScheduleValueProvided(args.name) ? String(args.name) : undefined,
               prompt: isScheduleValueProvided(args.prompt) ? String(args.prompt) : undefined,

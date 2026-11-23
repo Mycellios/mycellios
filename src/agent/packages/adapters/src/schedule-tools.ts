@@ -1,6 +1,7 @@
 import type { ConnectorProvider, JobPublisher } from "@mycellios/adapter-kit";
 import { routineJobKey, routineWakeupJob } from "@mycellios/adapter-kit";
-import { RoutineWatchSchema, TimeZoneSchema } from "@mycellios/contracts";
+import type { RoutineRunInChoice } from "@mycellios/contracts";
+import { RoutineRunInChoiceSchema, RoutineWatchSchema, TimeZoneSchema } from "@mycellios/contracts";
 import {
   cronFromPreset,
   formatCron,
@@ -14,7 +15,12 @@ import {
   zonedDateTime,
 } from "@mycellios/core";
 import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
-import { archiveRoutineThreadInTransaction, followRoutineRenameInTransaction } from "@mycellios/db";
+import {
+  archiveRoutineThreadInTransaction,
+  findRoutineOwnThread,
+  followRoutineRenameInTransaction,
+  routineRunIn,
+} from "@mycellios/db";
 
 import { localDateTime } from "./current-time.js";
 import { validateRoutineWatch } from "./routine-watch.js";
@@ -284,17 +290,45 @@ export async function userTimeZone(prisma: PrismaClient, userId: string): Promis
   return timezone && TimeZoneSchema.safeParse(timezone).success ? timezone : "UTC";
 }
 
+export const RUN_IN_GROUP_ERROR = "A routine created in a group runs in that group; leave runIn out.";
+
+/** The run place a tool call asked for: absent, "thread" or "chat"; anything else is an error. */
+export function runInFromTool(value: unknown): { runIn?: RoutineRunInChoice } | { error: string } {
+  if (!isScheduleValueProvided(value)) return {};
+  const parsed = RoutineRunInChoiceSchema.safeParse(value);
+  return parsed.success ? { runIn: parsed.data } : { error: 'runIn must be "thread" or "chat".' };
+}
+
+/** The Mico's main chat, where a routine runs when asked to (runIn "chat"). */
+async function mainChatThreadId(
+  prisma: PrismaClient,
+  scope: { spaceId: string; userId: string; botId: string },
+): Promise<string | null> {
+  const main = await prisma.thread.findFirst({
+    where: { botId: scope.botId, spaceId: scope.spaceId, userId: scope.userId },
+    select: { id: true },
+  });
+  return main?.id ?? null;
+}
+
 /** Each routine is an unattended model run, so a looping bot must not stack them. */
 export const MAX_ACTIVE_ROUTINES_PER_BOT = 50;
 
-/** Persist and enqueue a bot routine that wakes in the originating thread. */
+/**
+ * Persist and enqueue a bot routine. It runs in its own conversation unless the main chat is
+ * asked for; one created in a group runs in that group, and an explicit target keeps its thread.
+ */
 export async function createScheduleFromTool(
   deps: ScheduleToolDeps,
   input: {
     spaceId: string;
     botId: string;
     userId: string;
+    /** The conversation the call came from; the creation is announced there. */
     threadId: string;
+    /** That conversation is a group. */
+    inGroup?: boolean;
+    runIn?: RoutineRunInChoice;
     target?: { botId: string; threadId: string };
     name: string;
     prompt: string;
@@ -303,20 +337,30 @@ export async function createScheduleFromTool(
   },
 ) {
   const routineBotId = input.target?.botId ?? input.botId;
-  const routineThreadId = input.target?.threadId ?? input.threadId;
   const name = input.name.trim();
   const prompt = input.prompt.trim();
   if (!name) return { error: "name is required." };
   if (!prompt) return { error: "prompt is required." };
+  if (input.inGroup && input.runIn !== undefined) return { error: RUN_IN_GROUP_ERROR };
+  // Null: the first run creates the routine's own conversation.
+  let ownThreadId: string | null = input.inGroup ? input.threadId : null;
+  if (input.runIn === "chat") {
+    ownThreadId = await mainChatThreadId(deps.prisma, input);
+    if (!ownThreadId) return { error: "This Mico has no main chat." };
+  }
+  const routineThreadId = input.target?.threadId ?? ownThreadId;
+  const grouped = !input.target && input.inGroup;
 
   const active = await deps.prisma.routine.findMany({
     where: { spaceId: input.spaceId, botId: routineBotId, active: true },
-    select: { id: true, name: true, threadId: true },
+    select: { id: true, name: true, threadId: true, thread: { select: { groupId: true } } },
   });
-  // Match per thread: schedule_update in a group only reaches this thread's routines.
+  // schedule_update in a group reaches only that thread's routines, so a group matches its own;
+  // elsewhere it reaches every routine outside a group, wherever it runs.
   const sameName = active.find(
     (row) =>
-      row.threadId === routineThreadId && row.name.trim().toLowerCase() === name.toLowerCase(),
+      (grouped ? row.threadId === routineThreadId : !row.thread?.groupId) &&
+      row.name.trim().toLowerCase() === name.toLowerCase(),
   );
   if (sameName) {
     return {
@@ -337,7 +381,7 @@ export async function createScheduleFromTool(
   }
   const timezone = parsedTimezone.data;
   if (input.schedule.watch !== undefined) {
-    return createWatchFromTool(deps, { ...input, name, prompt, timezone });
+    return createWatchFromTool(deps, { ...input, routineThreadId: ownThreadId, name, prompt, timezone });
   }
   const resolved = resolveScheduleTiming(input.schedule, timezone);
   if (!resolved.ok) return { error: resolved.error };
@@ -376,7 +420,7 @@ export async function createScheduleFromTool(
   try {
     await deps.events.append({
       spaceId: input.spaceId,
-      threadId: routineThreadId,
+      threadId: routineThreadId ?? input.threadId,
       botId: routineBotId,
       type: "routine.created",
       payload: { name: row.name },
@@ -404,6 +448,8 @@ async function createWatchFromTool(
     botId: string;
     userId: string;
     threadId: string;
+    /** Null: its own conversation, created by its first run. */
+    routineThreadId: string | null;
     name: string;
     prompt: string;
     timezone: string;
@@ -444,7 +490,7 @@ async function createWatchFromTool(
       spaceId: input.spaceId,
       botId: input.botId,
       userId: input.userId,
-      threadId: input.threadId,
+      threadId: input.routineThreadId,
       name: input.name,
       prompt: input.prompt,
       crons: [],
@@ -466,7 +512,7 @@ async function createWatchFromTool(
   try {
     await deps.events.append({
       spaceId: input.spaceId,
-      threadId: input.threadId,
+      threadId: input.routineThreadId ?? input.threadId,
       botId: input.botId,
       type: "routine.created",
       payload: { name: row.name },
@@ -533,6 +579,8 @@ export async function updateScheduleFromTool(
     prompt?: string;
     active?: boolean;
     timezone?: string;
+    /** Moves the routine's runs; never one in a group. */
+    runIn?: RoutineRunInChoice;
     schedule: Record<string, unknown>;
     /** A run of this routine itself: pausing records it, so the pause is never silent. */
     ownRun?: { routineId: string; runId: string; startedAt: Date };
@@ -564,10 +612,35 @@ export async function updateScheduleFromTool(
     }
     timezone = parsed.data;
   }
+  // Moving to the main chat keeps the routine's own conversation; moving back reuses it.
+  let threadId: string | null | undefined;
+  if (input.runIn !== undefined) {
+    if (input.scopeThreadId) return { error: RUN_IN_GROUP_ERROR };
+    const current = existing.threadId
+      ? await deps.prisma.thread.findFirst({
+          where: { id: existing.threadId, spaceId: input.spaceId, userId: input.userId },
+          select: { botId: true, groupId: true },
+        })
+      : null;
+    const runIn = routineRunIn({ threadId: existing.threadId, thread: current });
+    if (runIn === "group") return { error: RUN_IN_GROUP_ERROR };
+    if (input.runIn === "chat" && runIn !== "chat") {
+      threadId = await mainChatThreadId(deps.prisma, input);
+      if (!threadId) return { error: "This Mico has no main chat." };
+    } else if (input.runIn === "thread" && runIn !== "thread") {
+      threadId = await findRoutineOwnThread(deps.prisma, existing);
+    }
+  }
   const hasTiming = TIMING_FIELDS.some((field) => isScheduleValueProvided(input.schedule[field]));
   const retime =
     hasTiming || isScheduleValueProvided(input.schedule.startAt) || timezone !== existing.timezone;
-  if (!retime && name === undefined && prompt === undefined && input.active === undefined) {
+  if (
+    !retime &&
+    name === undefined &&
+    prompt === undefined &&
+    input.active === undefined &&
+    threadId === undefined
+  ) {
     return { error: "Nothing to update." };
   }
   if (retime && existing.watch != null) {
@@ -647,6 +720,7 @@ export async function updateScheduleFromTool(
       ...(name === undefined ? {} : { name }),
       ...(prompt === undefined ? {} : { prompt }),
       ...(timingChanged ? { crons, timezone, active, nextRunAt } : {}),
+      ...(threadId === undefined ? {} : { threadId }),
       ...pausedBy,
     },
   });
@@ -662,9 +736,14 @@ export async function updateScheduleFromTool(
     if (active && nextRunAt) await deps.jobs.enqueue(routineWakeupJob(existing.id, nextRunAt));
     else if (existing.active) await deps.jobs.cancel(routineJobKey(existing.id));
   }
-  // Its own conversation follows the new name unless the person renamed it.
-  if (name !== undefined && name !== existing.name) {
-    await followRoutineRenameInTransaction(deps.prisma, { ...existing, name }).catch(() => undefined);
+  // Its own conversation follows the new name unless the person renamed it, also when the
+  // routine comes back to it.
+  if ((name !== undefined && name !== existing.name) || (threadId && input.runIn === "thread")) {
+    await followRoutineRenameInTransaction(deps.prisma, {
+      ...existing,
+      name: name ?? existing.name,
+      threadId: threadId ?? existing.threadId,
+    }).catch(() => undefined);
   }
 
   try {
@@ -689,6 +768,7 @@ export async function updateScheduleFromTool(
     nextRunAt: nextRunAt?.toISOString() ?? null,
     oneShot: isOneShotRoutineCrons(crons),
     ...describeRoutineTiming({ crons, timezone, nextRunAt }),
+    ...(threadId === undefined ? {} : { runIn: input.runIn }),
     ...(pausedByOwnRun
       ? {
           pausedByThisRun: true as const,

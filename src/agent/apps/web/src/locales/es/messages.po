@@ -10070,6 +10070,9 @@ msgstr "Los resultados aparecerán en el chat de este Mico. No se ejecutará nad
 msgid "Notify me when there are results or a problem"
 msgstr "Avisarme cuando haya resultados o un problema"
 
+msgid "Run in its own conversation"
+msgstr "Ejecutar en su propia conversación"
+
 msgid "Choose a model to use this provider"
 msgstr "Elige una opción para usar este proveedor"
 

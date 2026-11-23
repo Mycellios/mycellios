@@ -6800,6 +6800,103 @@ describe("routines.update", () => {
   });
 });
 
+describe("routine run place", () => {
+  const actor = {
+    spaceId: "space-1",
+    userId: "user-1",
+    email: "user@mycellios.test",
+    isDeploymentOwner: false,
+  } satisfies Actor;
+  const places = {
+    main: { botId: "bot-1", groupId: null },
+    own: { botId: null, groupId: null },
+    group: { botId: null, groupId: "group-1" },
+  } as const;
+  const threadIds = { main: "main-thread", own: "own-thread", group: "group-thread" } as const;
+
+  function fixture(current: keyof typeof places | null, ownThread: string | null) {
+    const routine = {
+      id: "routine-1", botId: "bot-1", spaceId: "space-1", userId: "user-1", name: "Brief",
+      prompt: "Summarize", crons: ["0 9 * * *"], timezone: "UTC", active: false, notify: true,
+      webhookEnabled: false, githubEnabled: false, messageProvider: null, modelProvider: null,
+      modelId: null, thinkingLevel: null, watch: null, watchState: null, lastRunAt: null,
+      nextRunAt: null, createdAt: new Date("2026-11-01T00:00:00Z"),
+      threadId: current ? threadIds[current] : null, thread: current ? places[current] : null,
+    };
+    const placeOf = (threadId: unknown) =>
+      Object.entries(threadIds).find(([, id]) => id === threadId)?.[0] as keyof typeof places | undefined;
+    const save = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      const threadId = "threadId" in data ? data.threadId : routine.threadId;
+      const place = placeOf(threadId);
+      return { ...routine, ...data, threadId, thread: place ? places[place] : null };
+    });
+    const findThread = vi.fn(async () => (ownThread ? { id: ownThread } : null));
+    const client = createRouterClient(
+      createRouter({
+        prisma: {
+          routine: { findFirst: vi.fn(async () => routine), create: save, update: save },
+          thread: { findFirst: findThread },
+          bot: { findFirst: vi.fn(async () => ({ id: "bot-1", thread: { id: threadIds.main }, computer: null })) },
+          $executeRaw: vi.fn(async () => 1),
+        },
+        env: { sandboxProvider: "fake" },
+        events: { append: vi.fn(async () => undefined) },
+        jobs: { enqueue: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined) },
+      } as unknown as RouterDeps),
+      { context: { actor } as never },
+    );
+    return { client, save, findThread };
+  }
+
+  it("reports where a routine runs", async () => {
+    for (const [current, runIn] of [[null, "thread"], ["own", "thread"], ["main", "chat"], ["group", "group"]] as const) {
+      const { client } = fixture(current, null);
+      await expect(client.routines.update({ routineId: "routine-1", notify: false })).resolves.toMatchObject({ runIn });
+    }
+  });
+
+  it("creates a routine in its own conversation unless the main chat is chosen", async () => {
+    const { client, save } = fixture(null, null);
+    const input = { botId: "bot-1", name: "Brief", prompt: "Summarize", crons: ["0 9 * * *"] };
+    await expect(client.routines.create(input)).resolves.toMatchObject({ runIn: "thread" });
+    expect(save.mock.calls[0]![0].data).toMatchObject({ threadId: null });
+    await expect(client.routines.create({ ...input, runIn: "chat" })).resolves.toMatchObject({ runIn: "chat" });
+    expect(save.mock.calls[1]![0].data).toMatchObject({ threadId: threadIds.main });
+  });
+
+  it("moves a main-chat routine back to its earlier conversation", async () => {
+    const { client, save, findThread } = fixture("main", threadIds.own);
+    await expect(client.routines.update({ routineId: "routine-1", runIn: "thread" })).resolves.toMatchObject({ runIn: "thread" });
+    expect(findThread).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ spaceId: "space-1", userId: "user-1", taskKey: "routine:routine-1", taskBotId: "bot-1" }),
+    }));
+    expect(save.mock.calls[0]![0].data).toMatchObject({ threadId: threadIds.own });
+  });
+
+  it("lets the next run create the conversation when the routine never had one", async () => {
+    const { client, save } = fixture("main", null);
+    await client.routines.update({ routineId: "routine-1", runIn: "thread" });
+    expect(save.mock.calls[0]![0].data).toMatchObject({ threadId: null });
+  });
+
+  it("moves a routine to the main chat without touching its own conversation", async () => {
+    const { client, save, findThread } = fixture("own", null);
+    await expect(client.routines.update({ routineId: "routine-1", runIn: "chat" })).resolves.toMatchObject({ runIn: "chat" });
+    expect(save.mock.calls[0]![0].data).toMatchObject({ threadId: threadIds.main });
+    expect(findThread).not.toHaveBeenCalled();
+  });
+
+  it("refuses to move a group routine and leaves an unchanged place alone", async () => {
+    const group = fixture("group", null);
+    for (const runIn of ["thread", "chat"] as const)
+      await expect(group.client.routines.update({ routineId: "routine-1", runIn })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(group.save).not.toHaveBeenCalled();
+    const same = fixture("main", null);
+    await same.client.routines.update({ routineId: "routine-1", runIn: "chat" });
+    expect(same.save.mock.calls[0]![0].data).not.toHaveProperty("threadId");
+  });
+});
+
 describe("openai-compatible enabled models", () => {
   const actor = {
     spaceId: "space-1",
