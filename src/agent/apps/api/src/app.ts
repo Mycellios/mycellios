@@ -905,6 +905,16 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       }
       return (await prisma.desktopExecutionPreference.findUnique({ where }))?.enabled ?? false;
     }),
+    chosenDevice: {
+      get: (scope, botId) => runAsTenant(scope, async () => (await prisma.desktopBotDevice.findUnique({
+        where: { spaceId_userId_botId: { spaceId: scope.spaceId, userId: scope.userId, botId } },
+        select: { deviceKey: true },
+      }))?.deviceKey),
+      remember: (scope, botId, deviceKey) => runAsTenant(scope, async () => {
+        const id = { spaceId: scope.spaceId, userId: scope.userId, botId };
+        await prisma.desktopBotDevice.upsert({ where: { spaceId_userId_botId: id }, create: { ...id, deviceKey }, update: { deviceKey } });
+      }),
+    },
     spaces: actor => runAsSystem("native account computer memberships",async()=>
       (await prisma.spaceMember.findMany({where:{userId:actor.userId},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",

@@ -191,10 +191,14 @@ export const DESKTOP_RUN_INTERRUPTED_ERROR =
   "Desktop execution interrupted; check existing results before retrying";
 
 /**
- * Several of the owner's PCs are online and none holds this Mico alone. Sending a
- * message from Desktop binds the Mico to that PC; the turn never moves to the cloud.
+ * Several of the owner's PCs are online and none was chosen for this Mico. Sending
+ * from, opening or connecting the Mico in Desktop chooses that PC and the server
+ * remembers it; the turn never moves to the cloud.
  */
 export const DESKTOP_OWNER_UNRESOLVED_ERROR =
+  "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings.";
+/** Stored on runs before the choice was remembered; shown with the current text. */
+const LEGACY_DESKTOP_OWNER_UNRESOLVED_ERROR =
   "More than one of your PCs is connected and none is clearly this Mico's. Send it a message from Mycellios Desktop on the PC that should run it.";
 
 const DESKTOP_SETUP_INTERRUPTED_PREFIX = "Desktop turn interrupted while preparing its computer: ";
@@ -332,6 +336,8 @@ export function normalizeRunError(
       recovery: "computer",
     };
   }
+  if (trimmed === DESKTOP_OWNER_UNRESOLVED_ERROR || trimmed === LEGACY_DESKTOP_OWNER_UNRESOLVED_ERROR)
+    return { summary: translate(DESKTOP_OWNER_UNRESOLVED_ERROR), details, recovery: "computer" };
   if (trimmed === "Bot has no computer")
     return {
       summary: translate(

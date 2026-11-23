@@ -34,6 +34,10 @@ type Operation = {
 const sameOwner = (a: DesktopExecutorOwner, b: DesktopExecutorOwner) =>
   a.userId === b.userId && a.spaceId === b.spaceId && a.sessionId === b.sessionId;
 const key = (scope: { userId: string; spaceId: string }, botId: string) => JSON.stringify([scope.userId, scope.spaceId, botId]);
+/** A PC as remembered at rest: never the raw device id Desktop reports. */
+export function desktopDeviceKey(deviceId: string) {
+  return createHash("sha256").update(`mycellios-desktop-device-v1\n${deviceId}`).digest("hex");
+}
 export function desktopRelayKey(secret: string) {
   return createHmac("sha256", secret).update("mycellios-desktop-executor-v1").digest("hex");
 }
@@ -108,26 +112,39 @@ export class DesktopRelayBroker {
   }
   /**
    * The PC that runs a Mico nobody connected explicitly. One online PC takes every
-   * Mico, as before. With several, only the one PC reporting this Mico's folder
-   * may take it: none or several leave it unresolved, never guessed.
+   * Mico, as before. With several, the PC the owner last chose for it (`chosen`, a
+   * desktopDeviceKey remembered across restarts) takes it while online; otherwise
+   * only the one PC reporting this Mico's folder may: none or several leave it
+   * unresolved, never guessed.
    */
-  private owningAccount(scope: {userId:string;spaceId:string}, botId: string) {
+  private owningAccount(scope: {userId:string;spaceId:string}, botId: string, chosen?: string) {
     const live = this.liveAccounts(scope);
     if (live.length === 1) return live[0];
+    const newest = (accounts: typeof live) => accounts.reduce((latest, account) => account.seen > latest.seen ? account : latest);
+    const picked = chosen ? live.filter(account => desktopDeviceKey(account.deviceId) === chosen) : [];
+    if (picked.length) return newest(picked);
     const folder = createHash("sha256").update(botId).digest("hex");
     const holders = live.filter(account => account.workspaces?.has(folder));
     if (new Set(holders.map(account => account.deviceId)).size !== 1) return undefined;
-    return holders.reduce((newest, account) => account.seen > newest.seen ? account : newest);
+    return newest(holders);
   }
   needsExecutionPreference(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string}) {
     const account = this.accounts.get(this.accountKey(owner, input.deviceId));
     return !account || !sameOwner(owner, account) || account.generation !== input.generation || account.agentExecution !== 1;
   }
+  /**
+   * Several PCs of this account and Space are online and none holds this Mico, so
+   * only a remembered owner choice can settle which one runs it.
+   */
+  needsChoice(scope: {userId:string;spaceId:string}, botId: string) {
+    this.expire();
+    return !this.bindings.has(key(scope, botId)) && this.liveAccounts(scope).length > 1;
+  }
   /** Called only after the API rechecks ownership of this particular bot. */
-  connectAccountBot(scope: {userId:string;spaceId:string}, botId: string) {
+  connectAccountBot(scope: {userId:string;spaceId:string}, botId: string, chosen?: string) {
     this.expire();
     if (this.bindings.has(key(scope,botId))) return;
-    const account = this.owningAccount(scope, botId);
+    const account = this.owningAccount(scope, botId, chosen);
     if (account) this.bind(account,{deviceId:account.deviceId,generation:account.generation,botId});
   }
   /**
@@ -138,7 +155,8 @@ export class DesktopRelayBroker {
     this.expire();
     return !this.bindings.has(key(scope, botId)) && this.liveAccounts(scope).length > 0;
   }
-  bind(owner: DesktopExecutorOwner, input: DesktopExecutorBinding) {
+  /** True when the Mico was not on this PC before: an explicit bind is then a new owner choice. */
+  bind(owner: DesktopExecutorOwner, input: DesktopExecutorBinding): boolean {
     this.expire();
     const id = key(owner, input.botId);
     const existing = this.bindings.get(id);
@@ -148,10 +166,11 @@ export class DesktopRelayBroker {
       const busy = [...this.operations.values()].some(op => op.binding === existing && !op.closed);
       if (busy) throw new Error("This agent is already connected to a computer. Disconnect it first.");
       this.bindings.set(id, { ...owner, ...input, seen: this.now() });
-      return;
+      return existing.deviceId !== input.deviceId;
     }
     if (this.bindings.size >= 128 && !existing) throw new Error("Desktop relay is busy");
     this.bindings.set(id, existing ?? { ...owner, ...input, seen: this.now() });
+    return !existing;
   }
   available(scope: { userId: string; spaceId: string }, botId: string) {
     this.expire();

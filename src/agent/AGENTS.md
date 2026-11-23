@@ -763,7 +763,9 @@
   Verify desktop-agent runtime/engine and relay tests, host consent/native runtime,
   and scripts/verify-desktop-execution-db.ts against isolated PostgreSQL. Physical
   installed-Desktop/mobile acceptance is separate from fixtures and builds.
-- With several Desktops online in one account/Space, an unbound Mico goes only to
+- With several Desktops online in one account/Space, an unbound Mico goes first to
+  the PC its owner last chose (explicit Desktop bind, saved hashed in
+  desktop_bot_devices so API/Desktop restarts and routines keep it), else only to
   the one PC whose account registration reports its folder key (SHA-256 of the bot
   id, sent after the server's `ownership: 1`); none or several is `unresolved`, never
   guessed or offline. One online PC still takes every Mico; explicit binds win. The
