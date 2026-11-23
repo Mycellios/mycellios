@@ -27,6 +27,44 @@ describe("logUnexpectedRpcError", () => {
     expect(sink.events).toEqual([]);
   });
 
+  it("names the procedure and the upstream cause when a procedure answers 503 itself", async () => {
+    const sink = createTestSink();
+    installLogger(createLogger({ service: "api", sinks: [sink] }));
+    const router = {
+      account: os.handler(() => {
+        throw new ORPCError("SERVICE_UNAVAILABLE", {
+          message: "Contribution could not be confirmed.",
+          cause: new Error("fetch failed", {
+            cause: new Error("connect ECONNREFUSED 127.0.0.1:7091"),
+          }),
+        });
+      }),
+    };
+    const rpc = new RPCHandler(router, {
+      clientInterceptors: [onError((error, { path }) => handleRpcError(error, path))],
+    });
+
+    const { response } = await rpc.handle(
+      new Request("http://localhost/rpc/account", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { prefix: "/rpc", context: {} },
+    );
+
+    expect(response?.status).toBe(503);
+    expect(sink.events).toEqual([
+      expect.objectContaining({
+        level: "warn",
+        message: "rpc account returned SERVICE_UNAVAILABLE",
+        "error.code": "SERVICE_UNAVAILABLE",
+        "http.status": 503,
+        reason: "connect ECONNREFUSED 127.0.0.1:7091",
+      }),
+    ]);
+  });
+
   it("names the procedure and every cause behind an opaque failure", () => {
     const sink = createTestSink();
     installLogger(createLogger({ service: "rakazo-api", sinks: [sink] }));
