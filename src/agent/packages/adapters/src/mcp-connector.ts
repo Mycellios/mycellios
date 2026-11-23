@@ -669,6 +669,38 @@ export class McpConnector implements ConnectorProvider {
   }
 
   /**
+   * Call one tool on a server that is not a Mico tool assignment: a personal memory server
+   * (specs/mcp-memory). The caller enforces its own grant. Transport, OAuth, private-endpoint
+   * checks and credential redaction are the same as for assigned tools. Throws a sanitized
+   * error when the transport or authorization fails.
+   */
+  async callServerTool(
+    server: McpServer,
+    context: AdapterContext,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<unknown> {
+    let material: OAuthMaterial | undefined;
+    let launchSecrets: string[] = [];
+    const sessionKey = this.sessionKey(server, context);
+    const secrets = () => [
+      ...(material ? oauthMaterialSecrets(material) : []),
+      ...launchSecrets,
+    ];
+    try {
+      const result = await this.withSession(server, context, (session) => {
+        material = this.sessions.get(sessionKey)?.material;
+        launchSecrets = this.sessions.get(sessionKey)?.launchSecrets ?? [];
+        return session.callTool(toolName, args, { signal: context.signal });
+      });
+      return redactConnectorPayload(result, secrets());
+    } catch (error) {
+      await this.evict(sessionKey);
+      throw new Error(sanitizeConnectorError(error, secrets()));
+    }
+  }
+
+  /**
    * Launch (or reuse) a server once and list its tools, for the settings "Test connection"
    * and the check after a save. A live session in this process is reused; otherwise an
    * isolated session is started and stopped again. Concurrent probes of one server share a

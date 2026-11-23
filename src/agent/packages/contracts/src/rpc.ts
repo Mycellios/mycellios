@@ -171,7 +171,12 @@ import {
   VoiceInfoSchema,
   VoiceStatusSchema,
 } from "./domain.js";
-import { MemoryConnectionCreateInput, MemoryConnectionSchema } from "./memory-mcp.js";
+import {
+  MemoryConnectionCreateInput,
+  MemoryConnectionSchema,
+  MemoryGrantsSetInput,
+  MicoMemoryGrantSchema,
+} from "./memory-mcp.js";
 import { ComputerCommandSchema, ProductEventSchema } from "./events.js";
 import { Id, IsoDate } from "./ids.js";
 import {
@@ -955,6 +960,11 @@ export const appContract = {
       /** List the server's tools and record whether they implement the profile. */
       check: oc.input(z.object({ id: Id })).output(MemoryConnectionSchema),
       remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    },
+    /** Which Micos may read each personal memory. Only a person changes them. */
+    grants: {
+      list: oc.output(z.array(MicoMemoryGrantSchema)),
+      set: oc.input(MemoryGrantsSetInput).output(z.array(MicoMemoryGrantSchema)),
     },
   },
   workflows: {

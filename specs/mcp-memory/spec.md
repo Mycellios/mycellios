@@ -1,6 +1,6 @@
 # Personal memory over MCP
 
-Status: phase 1 in progress (opened 2026-11-23).
+Status: phase 2 in progress (opened 2026-11-23; phase 1 merged).
 
 ## Goal
 
@@ -185,10 +185,29 @@ With at least one usable grant:
    the existing transport, OAuth broker and endpoint checks; those rows are hidden
    from the generic MCP list and refused as Mico tool assignments. No runtime use
    yet.
-2. **Grants and read-only runtime.** `MicoMemoryGrant`, Mico settings UI,
-   per-run filtering, automatic recall every turn, `recall_memory`, system
-   context. Qualify against a real profile server (Jarvis `/api/v1/mcp/memory`)
-   and against a local test server in the testkit.
+   Done (PR #556).
+2. **Grants and read-only runtime.** As built:
+   - `mico_memory_grants` (`botId`, `connectionId`, `access` = `read`,
+     `autoRecall`), owner-only RLS, cascading with the Mico and the connection.
+     `projectIds`, `allowForget` and `read_write` are deferred to the phase
+     that needs them.
+   - `memory.grants.list` and `memory.grants.set` (the complete set of Micos for
+     one connection). The Personal memory settings section shows "Micos that
+     can read it" under each compatible connection.
+   - The executor resolves grants per run only when the Mico belongs to the
+     acting person and the run is not a messaging channel or group thread, and
+     only for connections that last checked compatible with an enabled server.
+   - Automatic search before every reply (`autoRecall` grants, 2.5 s, up to 5
+     hits per connection, 8 KB) in its own untrusted `<personal_memory>` block.
+   - `recall_memory` merges the Space provider (if any) with personal memory and
+     names memories that could not be searched. `save_memory` and
+     `forget_memory` stay tied to the Space provider; with personal memory
+     alone the Mico gets `recall_memory` only.
+   - A per-turn instruction names the memories the Mico can read and says it
+     cannot write to them.
+   - Pending: reading a whole entry with `memory_read`, the per-connection rate
+     limit, and qualification against a real profile server (Jarvis
+     `/api/v1/mcp/memory`) and a testkit server.
 3. **Writes and forget.** `save_memory`/`forget_memory` with write scope,
    redaction, approval card and idempotency.
 4. **Legacy.** Decide whether Supermemory/Honcho/Serenity become profile

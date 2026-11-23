@@ -96,6 +96,7 @@ export * from "./mcp-transport.js";
 export * from "./media-generation-factory.js";
 export * from "./media-generation-provider.js";
 export * from "./memory-provider-factory.js";
+export * from "./personal-memory.js";
 export * from "./messaging-composition.js";
 export * from "./messaging-context.js";
 export * from "./messaging-delivery.js";

@@ -377,6 +377,13 @@ import { generateMediaFromTool } from "./media-generation-tools.js";
 import { selectRunMediaGeneration } from "./native-image-generation.js";
 import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
+import type { PersonalMemoryResolver } from "./personal-memory.js";
+import {
+  formatPersonalMemory,
+  PERSONAL_MEMORY_AUTO_RECALL_LIMIT,
+  personalMemoryErrorMessage,
+  personalMemoryInstruction,
+} from "./personal-memory.js";
 import { appendMemoryFact, selectMemoryTools } from "./memory-tools.js";
 import {
   HostedModelCreditsRequiredError,
@@ -2917,6 +2924,8 @@ export interface ExecutorDeps {
   sandbox: SandboxProvider;
   memory: MemoryStore;
   memoryProviders: MemoryProviderResolver;
+  /** Personal memory servers granted per Mico (specs/mcp-memory); absent means none. */
+  personalMemory?: PersonalMemoryResolver;
   home: AgentHomeStore;
   artifacts?: ArtifactStore;
   connector?: ConnectorProvider;
@@ -4223,6 +4232,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
+        // Personal memory (specs/mcp-memory) is read only in the owner's own runs of their own
+        // Mico, outside messaging channels and group threads. Grants are checked per run.
+        const personalMemory =
+          deps.personalMemory &&
+          !messagingChannelRun &&
+          !thread.groupId &&
+          bot.userId === run.userId
+            ? await deps.personalMemory
+                .resolve({ spaceId: run.spaceId, userId: run.userId, botId: bot.id })
+                .catch((error: unknown) => {
+                  getLogger().error("personal memory resolve failed", {
+                    error: personalMemoryErrorMessage(error),
+                  });
+                  return null;
+                })
+            : null;
         const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
 
         await deps.events.append({
@@ -4315,6 +4340,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 context,
               )
             : Promise.resolve(null);
+        // Searched before every reply (not only after compaction): personal memory holds
+        // facts the conversation never contained. Bounded by its own short timeout.
+        const personalRecallPromise =
+          personalMemory && threadContext.includeSemanticRecall
+            ? personalMemory
+                .search(task.prompt, {
+                  limit: PERSONAL_MEMORY_AUTO_RECALL_LIMIT,
+                  automatic: true,
+                  signal: context.signal,
+                })
+                .catch(() => null)
+            : Promise.resolve(null);
         const [
           discovered,
           currentTurnImages,
@@ -4322,6 +4359,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           scratchpadContext,
           ticketContext,
           recalled,
+          personalRecalled,
         ] = await Promise.all([
           discoveredPromise,
           loadCurrentTurnImages(deps, turnBlocks, context),
@@ -4341,7 +4379,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 text: task.prompt,
               }),
           recallPromise,
+          personalRecallPromise,
         ]);
+        const personalMemoryContext = personalRecalled
+          ? formatPersonalMemory(personalRecalled.hits)
+          : "";
         const semanticMemoryEnabled = Boolean(semanticMemory) && !messagingChannelRun;
         let recalledMemory = "";
         let recallSucceeded = false;
@@ -4748,7 +4790,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             pageBrowserAllowed,
             groupId: thread.groupId,
             trigger: run.trigger,
-            semanticMemoryEnabled,
+            semanticMemoryEnabled: semanticMemoryEnabled || Boolean(personalMemory),
+            // Personal memory is read-only in this phase: saving needs the Space provider.
+            semanticMemorySaves: semanticMemoryEnabled,
             semanticMemoryForgets: Boolean(semanticMemory?.forget),
             mediaImagesEnabled: Boolean(deps.artifacts && mediaGeneration?.capabilities.images),
             mediaVideoEnabled: Boolean(deps.artifacts && mediaGeneration?.capabilities.video),
@@ -7661,18 +7705,48 @@ export function createRunExecutor(deps: ExecutorDeps) {
             });
           }
           if (name === "recall_memory") {
-            return semanticMemory!.recall(
-              {
-                query: String(args.query ?? ""),
-                scope: memoryScope!,
-                botId: bot.id,
-                ...(thread.historyCompactedUpToSeq == null
-                  ? {}
-                  : { historyGeneration: thread.historyCompactionGeneration }),
-                limit: MAX_RECALLED_MEMORIES,
-              },
-              context,
-            );
+            const query = String(args.query ?? "");
+            const spaceRecall =
+              semanticMemory && memoryScope
+                ? semanticMemory.recall(
+                    {
+                      query,
+                      scope: memoryScope,
+                      botId: bot.id,
+                      ...(thread.historyCompactedUpToSeq == null
+                        ? {}
+                        : { historyGeneration: thread.historyCompactionGeneration }),
+                      limit: MAX_RECALLED_MEMORIES,
+                    },
+                    context,
+                  )
+                : null;
+            if (!personalMemory) {
+              return spaceRecall ?? { ok: false, error: "No memory is available to this Mico." };
+            }
+            const [shared, personal] = await Promise.all([
+              spaceRecall,
+              personalMemory
+                .search(query, { limit: MAX_RECALLED_MEMORIES, signal: context.signal })
+                .catch(() => null),
+            ]);
+            const personalHits = (personal?.hits ?? []).map((hit) => ({
+              memory: hit.title ? `${hit.title}: ${hit.snippet}` : hit.snippet,
+              score: hit.score ?? 0,
+              id: hit.id,
+              provenance: `personal memory: ${hit.connectionName}`,
+              ...(hit.updatedAt ? { updatedAt: hit.updatedAt } : {}),
+            }));
+            const unavailable = personal
+              ? personal.unavailable
+              : personalMemory.connections.map((connection) => connection.name);
+            return {
+              ok: true,
+              untrusted: true,
+              value: [...(shared?.ok ? shared.value : []), ...personalHits],
+              ...(unavailable.length > 0 ? { unavailable } : {}),
+              ...(shared && !shared.ok ? { sharedMemoryError: shared.error } : {}),
+            };
           }
           if (name === "search_history" || name === "read_history") {
             const response = await runHistoryTool(deps.prisma, {
@@ -8863,6 +8937,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           formatCurrentTimeInstruction(new Date(), userTimeZone),
           lateRoutineNote,
           ownRoutineNote,
+          personalMemory && !disabledBuiltinTools.has("recall_memory")
+            ? personalMemoryInstruction(personalMemory.connections)
+            : undefined,
         ]
           .filter(Boolean)
           .join("\n\n");
@@ -8880,6 +8957,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           historicalContext.push({
             role: "user",
             content: redactSecrets(recalledMemory, runSecrets),
+          });
+        }
+        if (personalMemoryContext) {
+          historicalContext.push({
+            role: "user",
+            content: redactSecrets(personalMemoryContext, runSecrets),
           });
         }
         const modelImageBudget =
@@ -10528,6 +10611,8 @@ export function selectBuiltinToolsForRun(options: {
   groupId: string | null;
   trigger: string;
   semanticMemoryEnabled: boolean;
+  /** A memory the run may write to exists; omitted keeps the earlier behavior. */
+  semanticMemorySaves?: boolean;
   /** The configured provider can forget individual facts. */
   semanticMemoryForgets?: boolean;
   cloudAgentEnabled?: boolean;
@@ -10559,6 +10644,7 @@ export function selectBuiltinToolsForRun(options: {
       ),
       options.semanticMemoryEnabled,
       Boolean(options.semanticMemoryForgets),
+      options.semanticMemorySaves ?? options.semanticMemoryEnabled,
     ),
     Boolean(options.cloudAgentEnabled),
   ).filter(

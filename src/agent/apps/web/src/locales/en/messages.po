@@ -14933,3 +14933,11 @@ msgstr "Bearer token (only without OAuth)"
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Connect personal memory"
 msgstr "Connect personal memory"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Micos that can read it"
+msgstr "Micos that can read it"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not change which Micos can read this memory"
+msgstr "Could not change which Micos can read this memory"
