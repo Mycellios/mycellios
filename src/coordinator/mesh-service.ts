@@ -113,6 +113,8 @@ const PRETOKEN_DEGRADATION_CODES = new Set([
 export interface MeshServiceOptions {
   firstTokenTimeoutMs?: number;
   modelRequestTimeoutsMs?: Readonly<Record<string, number>> | undefined;
+  /** Another revision may still own the active jobs during a handoff. */
+  preserveAdmittedJobs?: boolean;
   /** Hold workers that reject an anomalous share of offers after reading them. */
   leaseRejectionHold?: boolean | undefined;
 }
@@ -157,7 +159,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
 
   static async create(store: MeshStore, scheduler: Scheduler, hub: WorkerHub, requestTimeoutMs: number, options: MeshServiceOptions = {}): Promise<MeshService> {
     const service = new MeshService(store, scheduler, hub, requestTimeoutMs, options);
-    await service.recoverOrphanedJobs();
+    if (!options.preserveAdmittedJobs) await service.recoverOrphanedJobs();
     return service;
   }
 

@@ -92,13 +92,26 @@ export class MeshDatabase {
     } catch (error) { await raw.close().catch(() => undefined); throw error; }
   }
 
-  static async openPostgres(url: string, schema = "mycellios"): Promise<MeshDatabase> {
-    const raw = new PostgresDriver(url, schema);
+  static async openPostgres(url: string, schema = "mycellios", admissionRevision?: string): Promise<MeshDatabase> {
+    const raw = new PostgresDriver(url, schema, admissionRevision);
     const database = new MeshDatabase(raw);
     try {
       const row = await raw.prepare("SELECT version FROM schema_meta LIMIT 1").get();
       if (!row || Number(row.version) !== SCHEMA_VERSION) throw new Error("Application database schema requires migration");
       await raw.prepare("SELECT usage_id FROM api_operator_funded_usage LIMIT 1").all();
+      if (admissionRevision !== undefined) {
+        const gate = await raw.prepare(`
+          SELECT count(DISTINCT rel.relname) AS members
+          FROM pg_trigger t
+          JOIN pg_class rel ON rel.oid=t.tgrelid
+          JOIN pg_namespace n ON n.oid=rel.relnamespace
+          JOIN pg_proc f ON f.oid=t.tgfoid
+          WHERE n.nspname=current_schema() AND rel.relname IN ('jobs','deployment_operations')
+            AND t.tgname='mycellios_release_admission_guard' AND t.tgenabled='O' AND t.tgtype=6
+            AND f.proname=t.tgname AND f.pronamespace=n.oid
+        `).get();
+        if (gate?.members !== 2) throw new Error("Coordinator admission barrier required");
+      }
       return database;
     } catch (error) { await raw.close().catch(() => undefined); throw error; }
   }

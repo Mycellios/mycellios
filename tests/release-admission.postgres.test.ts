@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import postgres from "postgres";
 import { NativeReleaseAdmission } from "../src/coordinator/release-admission.js";
+import { MeshDatabase } from "../src/storage/database.js";
 const enabled = Boolean(process.env.MYCELLIOS_RELEASE_TEST_POSTGRES_URL);
 const schema = "release_test_" + Math.random().toString(36).slice(2);
 let sql: postgres.Sql;
@@ -10,6 +11,11 @@ beforeAll(async () => {
   sql = postgres(process.env.MYCELLIOS_RELEASE_TEST_POSTGRES_URL!, { max: 2, onnotice: () => {} });
   await sql.unsafe(`CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.jobs(id text primary key,status text,deadline_at bigint); CREATE TABLE ${schema}.deployment_operations(id text,status text); CREATE TABLE ${schema}.api_usage(status text); CREATE TABLE ${schema}.economic_credit_holds(status text)`);
   await sql.unsafe(`INSERT INTO ${schema}.jobs VALUES('active','streaming')`);
+  await sql.unsafe(`
+    CREATE TABLE ${schema}.schema_meta(version integer);
+    INSERT INTO ${schema}.schema_meta VALUES(33);
+    CREATE TABLE ${schema}.api_operator_funded_usage(usage_id text)
+  `);
 });
 afterAll(async () => { if (enabled) { await sql.unsafe(`DROP SCHEMA ${schema} CASCADE`); await sql.end(); } });
 it.skipIf(!enabled)("closes every insert while letting existing work finish and preserves revision ownership", async () => {
@@ -61,4 +67,29 @@ it.skipIf(!enabled)("transfers admission without a gap in the barrier or disrupt
   await expect(insert(next, `INSERT INTO ${schema}.jobs VALUES('candidate-denied','queued')`))
     .rejects.toMatchObject({ code: "55000" });
   await gate.open(revision);
+});
+
+it.skipIf(!enabled)("fences persistent application database connections by release revision", async () => {
+  const gate = new NativeReleaseAdmission(sql, schema);
+  const next = "b".repeat(40);
+  const url = process.env.MYCELLIOS_RELEASE_TEST_POSTGRES_URL!;
+  await expect(MeshDatabase.openPostgres(url, schema, revision)).rejects.toThrow("admission barrier required");
+  await gate.close(revision);
+  const incumbent = await MeshDatabase.openPostgres(url, schema, revision);
+  const candidate = await MeshDatabase.openPostgres(url, schema, next);
+  try {
+    const addJob = (database: MeshDatabase, id: string) =>
+      database.raw.prepare("INSERT INTO jobs VALUES(?, 'streaming', 1720000000000)").run(id);
+    await addJob(incumbent, "incumbent-driver");
+    await expect(addJob(candidate, "candidate-before-transfer")).rejects.toMatchObject({ code: "55000" });
+    await gate.transfer(revision, next);
+    await expect(addJob(incumbent, "incumbent-after-transfer")).rejects.toMatchObject({ code: "55000" });
+    await addJob(candidate, "candidate-driver");
+    await incumbent.raw.prepare("UPDATE jobs SET status='completed' WHERE id=?").run("incumbent-driver");
+    expect(await candidate.raw.prepare("SELECT status, deadline_at FROM jobs WHERE id=?").get("incumbent-driver"))
+      .toEqual({ status: "completed", deadline_at: 1720000000000 });
+    await gate.open(next);
+  } finally {
+    await Promise.all([incumbent.close(), candidate.close()]);
+  }
 });

@@ -493,6 +493,12 @@ These rules apply to the complete repository.
   readiness. Public health, application routes and worker upgrades reject
   traffic. This probe never opens SQLite, starts job recovery or authorizes a
   route switch. Run `tests/coordinator-release-standby.test.ts` on changes.
+- In a coordinated PostgreSQL handoff, the controller may set
+  `MYCELLIOS_RELEASE_ADMISSION_REVISION` to the exact baked image revision.
+  Establish the shared admission barrier first. The setting identifies new job
+  inserts and preserves jobs and unsettled usage during startup. Do not enable
+  it for ordinary crash recovery or use it by itself to run two live coordinators.
+  Validate both generations with `tests/release-admission.postgres.test.ts`.
 - The optional embedding ingress proxy protects only its configured HTTP route,
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image

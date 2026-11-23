@@ -96,6 +96,8 @@ const activationManager = baseActivationConfig && !dynamicWorkerActivation
 const runtime = await createCoordinator(config, {
   logger: true,
   runtimeMetadata,
+  ...(process.env.MYCELLIOS_RELEASE_ADMISSION_REVISION !== undefined
+    ? { releaseAdmissionRevision: process.env.MYCELLIOS_RELEASE_ADMISSION_REVISION } : {}),
   engineRuntimeProfileReconciliation: engineActivationAuthority !== undefined,
   ...(activationManager ? { activationManager } : {}),
   ...(baseActivationConfig && dynamicWorkerActivation

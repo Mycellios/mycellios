@@ -21,8 +21,11 @@ export class PostgresDriver implements SqlDriver {
   private readonly sql: postgres.Sql;
   private closed = false;
 
-  constructor(url: string, readonly schema = "mycellios") {
+  constructor(url: string, readonly schema = "mycellios", admissionRevision?: string) {
     if (!/^[a-z_][a-z_0-9]*$/.test(schema)) throw new Error("Invalid application database schema");
+    if (admissionRevision !== undefined && !/^[a-f0-9]{40}$/.test(admissionRevision)) {
+      throw new Error("Exact release admission revision required");
+    }
     let parsed: URL;
     try { parsed = new URL(url); }
     catch { throw new Error("Invalid PostgreSQL connection configuration"); }
@@ -37,6 +40,7 @@ export class PostgresDriver implements SqlDriver {
         search_path: '"' + schema + '",pg_catalog',
         statement_timeout: 15000,
         idle_in_transaction_session_timeout: 30000,
+        ...(admissionRevision !== undefined ? { "mycellios.release_admission_revision": admissionRevision } : {}),
       },
       types: {
         bigint: postgres.BigInt,

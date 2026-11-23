@@ -46,6 +46,23 @@ describe("coordinator crash recovery", () => {
     (await database.close());
   });
 
+  it("leaves jobs from the preceding generation intact during a handoff", async () => {
+    const database = await MeshDatabase.open(":memory:");
+    const store = new MeshStore(database);
+    const hub = await WorkerHub.create(store);
+    try {
+      const deadlineAt = Date.now() + 60_000;
+      await store.createJob({ id: "older-release", sessionId: "session", model: "model",
+        workloadClass: "interactive", deadlineAt });
+      const before = await store.getJob("older-release");
+      await MeshService.create(store, new Scheduler(store), hub, 10_000, { preserveAdmittedJobs: true });
+      expect(await store.getJob("older-release")).toEqual(before);
+    } finally {
+      await hub.close();
+      await database.close();
+    }
+  });
+
   it("migrates schema v30 dispatch operations with nullable SPORE quote audit fields", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-v30-migration-"));
     directories.push(directory);
