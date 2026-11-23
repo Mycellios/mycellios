@@ -11,6 +11,7 @@ describe("Panel deep links", () => {
     expect(panelViewFromLocation("/dashboard", "?view=tasks")).toBe("jobs");
     expect(panelViewFromLocation("/dashboard", "?view=chat")).toBe("overview");
     expect(panelViewFromLocation("/dashboard", "?view=inference")).toBe("overview");
+    expect(panelViewFromLocation("/downloads", "")).toBe("downloads");
   });
 });
 

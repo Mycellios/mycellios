@@ -90,6 +90,17 @@ describe("marketing route entries", () => {
     expect((await app.inject("/account/?tab=usage")).headers.location).toBe("/account?tab=usage");
     expect((await app.inject("/dashboard")).statusCode).toBe(200);
   });
+  it("serves the legal pages and the Desktop downloads screen instead of a 404", async () => {
+    const app = await site();
+    for (const url of ["/terms", "/privacy", "/downloads/desktop"]) {
+      const response = await app.inject({ url, headers: { accept: "text/html" } });
+      expect(response.statusCode, url).toBe(200);
+      expect(response.body, url).toContain("<h1>Mycellios</h1>"); // the app shell renders the route
+    }
+    expect((await app.inject("/terms/?from=footer")).headers.location).toBe("/terms?from=footer");
+    expect((await app.inject("/privacy/")).headers.location).toBe("/privacy");
+  });
+
   it("shows people a navigable 404 page while API clients keep the JSON error", async () => {
     const app = await site();
     const html = { accept: "text/html,application/xhtml+xml" };

@@ -80,6 +80,10 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
     "/compare": "compare/index.html",
     "/stats": "stats/index.html",
     "/admin": "admin/index.html",
+    "/terms": "terms/index.html",
+    "/privacy": "privacy/index.html",
+    // The same downloads screen the isolated /downloads/desktop build renders.
+    "/downloads/desktop": "downloads/index.html",
     "/downloads": "downloads/index.html",
   } as const;
   for (const [path, documentName] of Object.entries(routeDocuments)) {
@@ -129,7 +133,7 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
   for (const [path, destination] of redirects) {
     app.get(path, async (_request, reply) => reply.redirect(destination));
   }
-  for (const path of ["/dashboard", "/account", "/spore", "/spore/rewards", "/stats", "/pricing", "/compare", "/changelog"]) {
+  for (const path of ["/dashboard", "/account", "/spore", "/spore/rewards", "/stats", "/pricing", "/compare", "/changelog", "/terms", "/privacy"]) {
     app.get(`${path}/`, async (request, reply) => {
       const queryIndex = request.url.indexOf("?");
       return reply.redirect(`${path}${queryIndex === -1 ? "" : request.url.slice(queryIndex)}`);

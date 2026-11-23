@@ -7,13 +7,18 @@ import { join, resolve } from "node:path";
  *
  * Scripts may only come from this origin or be one of the inline scripts that
  * ship inside the served HTML files (allowed by hash). Injected inline scripts,
- * inline event handlers, javascript: URLs and third-party script hosts are
+ * inline event handlers, javascript: URLs and third-party script hosts (except
+ * the edge analytics beacon below) are
  * refused. `unsafe-eval`/`wasm-unsafe-eval` stay allowed because the browser
  * contribution runtime (ONNX Runtime WebGPU/WASM, Emscripten embind) compiles
  * WebAssembly and generates small method wrappers at runtime.
  */
 const BASE_DIRECTIVES = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
-const SCRIPT_SOURCES = "'self' 'unsafe-eval' 'wasm-unsafe-eval'";
+// The Cloudflare edge in front of www.mycellios.com injects its Web Analytics beacon
+// into every page; it is the only third-party script host allowed. The beacon reports
+// to cloudflareinsights.com, which needs no rule while this policy sets no connect-src.
+const EDGE_ANALYTICS_SCRIPT = "https://static.cloudflareinsights.com";
+const SCRIPT_SOURCES = `'self' 'unsafe-eval' 'wasm-unsafe-eval' ${EDGE_ANALYTICS_SCRIPT}`;
 const WORKER_SOURCES = "'self' blob:";
 const MAX_HTML_FILES = 5_000;
 const RECHECK_INTERVAL_MS = 30_000;
