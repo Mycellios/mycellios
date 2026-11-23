@@ -491,7 +491,7 @@ describe("tab keyboard, mouse and menu", () => {
 
   it("deletes a conversation that only waits for an answer", async () => {
     const { host, root, rpc } = await setup("waiting-delete", "a");
-    rpc.development.list.mockResolvedValue(rows.map(row => row.threadId === "b" ? { ...row, state: "waiting" } : row));
+    rpc.development.list!.mockResolvedValue(rows.map(row => row.threadId === "b" ? { ...row, state: "waiting" } : row));
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="waiting-delete" taskThreadId="a" rpc={rpc as unknown as RpcClient} onSelect={vi.fn()} refreshKey="1" />));
     await flush();
     expect(host.querySelector('[data-thread-tab="b"] [data-thread-status]')!.getAttribute("data-thread-status")).toBe("waiting");
