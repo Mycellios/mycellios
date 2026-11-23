@@ -26,7 +26,8 @@ function renamable(tab: TaskTab) {
 
 /** Conversations that are not owned by a routine, workflow, delegation or app. */
 const ownConversation = renamable;
-const working = (tab: TaskTab) => tab.state === "running" || tab.state === "queued" || tab.state === "waiting";
+/** A conversation that waits for the person holds no work: deleting it cancels the wait. */
+const working = (tab: TaskTab) => tab.state === "running" || tab.state === "queued";
 const LIST_LIMIT = 1000;
 /** The navigation of the tab row on screen per Mico, for actions that end after a remount (Undo). */
 const mountedSelectors = new Map<string, (target?: string) => void>();
@@ -55,7 +56,7 @@ function editableWithText(target: EventTarget | null) {
 /** Conversations belong to the existing Mico; a tab never creates another model or agent. */
 export function MicoTaskTabs({
   botId, taskThreadId, newConversationOpen = false, rpc, onSelect, onWarm, scope, inMenu = false, messageCount = 0,
-  confirmDelete = false, refreshKey,
+  confirmDelete = false, refreshKey, onConversationsChanged,
 }: {
   botId: string;
   taskThreadId?: string;
@@ -72,6 +73,8 @@ export function MicoTaskTabs({
   confirmDelete?: boolean;
   /** Changes when the roster reports that the Mico's conversations moved, so the list is read again. */
   refreshKey?: string;
+  /** A conversation was archived, deleted or restored: the sidebar's "Needs you" reads it again. */
+  onConversationsChanged?: () => void;
 }) {
   const { t } = useLingui();
   /** A short marker for threads the user did not start as a conversation. */
@@ -86,6 +89,8 @@ export function MicoTaskTabs({
   currentRef.current = current;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onChangedRef = useRef(onConversationsChanged);
+  onChangedRef.current = onConversationsChanged;
   const tabButtons = useRef(new Map<string, HTMLButtonElement>());
   const addButton = useRef<HTMLButtonElement>(null);
   const nav = useRef<HTMLElement>(null);
@@ -317,13 +322,32 @@ export function MicoTaskTabs({
       // The server stops the conversation's queued messages and work before it archives.
       const result = await rpc.development.archive({ botId, taskThreadId: tab.threadId });
       const before = readConversationTabs(scope);
+      const wasShown = currentRef.current === tab.threadId;
       update(state => closeTab(state, tab.threadId));
       markRow(tab.threadId, { archived: true, archivedAt: result.archivedAt, state: "closed" });
       leave(tab.threadId, before);
       setRevision(value => value + 1);
+      onChangedRef.current?.();
+      // Another conversation may share the title, so say which one left and offer it back.
+      toast(t`${titleOf(tab)} archived`, {
+        action: { label: t`Undo`, onClick: () => void undoArchive(tab.threadId, wasShown) },
+      });
     } catch (cause) {
       toast.error(errorText(cause, t`Could not archive the conversation. Try again.`));
     } finally { if (alive.current) setBusy(tab.threadId, false); }
+  }
+
+  async function undoArchive(id: string, reopen: boolean) {
+    try {
+      await rpc.development.restore({ botId, taskThreadId: id });
+      markRow(id, { archived: false, archivedAt: null, state: "idle" });
+      update(state => openTab(state, id));
+      if (reopen) (mountedSelectors.get(scope) ?? onSelectRef.current)(id);
+      if (alive.current) setRevision(value => value + 1);
+      onChangedRef.current?.();
+    } catch (cause) {
+      toast.error(errorText(cause, t`Could not restore the conversation. Try again.`));
+    }
   }
 
   async function restore(tab: TaskTab) {
@@ -335,6 +359,7 @@ export function MicoTaskTabs({
       markRow(tab.threadId, { archived: false, archivedAt: null, state: "idle" });
       select(tab.threadId);
       setRevision(value => value + 1);
+      onChangedRef.current?.();
     } catch (cause) {
       if (alive.current) setError(errorText(cause, t`Could not restore the conversation. Try again.`));
     } finally { if (alive.current) setBusy(tab.threadId, false); }
@@ -359,6 +384,7 @@ export function MicoTaskTabs({
     try {
       const { deleteAfter } = await rpc.development.remove({ botId, taskThreadId: id });
       markRow(id, { deleteAfter });
+      onChangedRef.current?.();
       if (offerUndo) {
         toast(t`${title} deleted`, {
           duration: Math.max(1_000, Date.parse(deleteAfter) - Date.now()),
@@ -380,6 +406,7 @@ export function MicoTaskTabs({
       markRow(id, { deleteAfter: null });
       if (reopen) (mountedSelectors.get(scope) ?? onSelectRef.current)(id);
       if (alive.current) setRevision(value => value + 1);
+      onChangedRef.current?.();
     } catch (cause) {
       toast.error(errorText(cause, t`Could not undo the deletion.`));
     }
