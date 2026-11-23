@@ -21,7 +21,7 @@ export class PostgresDriver implements SqlDriver {
   private readonly sql: postgres.Sql;
   private closed = false;
 
-  constructor(url: string, readonly schema = "mycellios", admissionRevision?: string) {
+  constructor(url: string, readonly schema = "mycellios", private readonly admissionRevision?: string) {
     if (!/^[a-z_][a-z_0-9]*$/.test(schema)) throw new Error("Invalid application database schema");
     if (admissionRevision !== undefined && !/^[a-f0-9]{40}$/.test(admissionRevision)) {
       throw new Error("Exact release admission revision required");
@@ -50,6 +50,24 @@ export class PostgresDriver implements SqlDriver {
       },
       onnotice: () => undefined,
     });
+  }
+
+  async verifyApplicationSchema(expectedVersion: number): Promise<void> {
+    const row = await this.prepare("SELECT version FROM schema_meta LIMIT 1").get();
+    if (!row || Number(row.version) !== expectedVersion) throw new Error("Application database schema requires migration");
+    await this.prepare("SELECT usage_id FROM api_operator_funded_usage LIMIT 1").all();
+    if (this.admissionRevision === undefined) return;
+    const gate = await this.prepare(`
+      SELECT count(DISTINCT rel.relname) AS members
+      FROM pg_trigger t
+      JOIN pg_class rel ON rel.oid=t.tgrelid
+      JOIN pg_namespace n ON n.oid=rel.relnamespace
+      JOIN pg_proc f ON f.oid=t.tgfoid
+      WHERE n.nspname=current_schema() AND rel.relname IN ('jobs','deployment_operations')
+        AND t.tgname='mycellios_release_admission_guard' AND t.tgenabled='O' AND t.tgtype=6
+        AND f.proname=t.tgname AND f.pronamespace=n.oid
+    `).get();
+    if (gate?.members !== 2) throw new Error("Coordinator admission barrier required");
   }
 
   private connection(): Connection {
