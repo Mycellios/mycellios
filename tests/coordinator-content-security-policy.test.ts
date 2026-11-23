@@ -38,15 +38,17 @@ describe("coordinator content security policy", () => {
     expect(inlineScriptHashes(html)).toEqual([sha(bootstrap), sha('import "/a.js";')]);
   });
 
-  it("refuses injected and third-party scripts while keeping the base directives", () => {
+  it("refuses injected and third-party scripts except the edge analytics beacon", () => {
     const policy = contentSecurityPolicy(["'sha256-abc'"]);
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("base-uri 'self'");
-    expect(policy).toContain("script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-abc'");
+    expect(policy).toContain("script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-abc'");
     expect(policy).toContain("worker-src 'self' blob:");
     expect(policy).not.toContain("unsafe-inline");
-    expect(policy).not.toMatch(/script-src[^;]*https?:/);
+    // The Cloudflare beacon host is the only external script origin.
+    expect(policy.match(/script-src[^;]*/)![0].match(/https?:\/\/[^\s;]+/g)).toEqual(["https://static.cloudflareinsights.com"]);
+    expect(policy).not.toContain("connect-src");
   });
 
   it("allows the inline scripts of every served page and refreshes after a release", () => {

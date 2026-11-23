@@ -410,6 +410,7 @@ describe("network observatory", () => {
     expect(resolveLandingSurface("/network", "")).toBe("network");
     expect(resolveLandingSurface("/network", "?view=inference")).toBe("panel");
     expect(resolveLandingSurface("/network", "?view=overview")).toBe("panel");
+    expect(resolveLandingSurface("/downloads/desktop", "")).toBe("downloads");
     expect(resolveLandingSurface("/admin", "")).toBe("panel");
     expect(resolveLandingSurface("/", "")).toBe("landing");
   });
