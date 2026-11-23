@@ -1140,6 +1140,8 @@
   wake-ups count missed times on the run (runs.missedRuns/missedReason). The conversation
   follows renames unless titleSource is user, a run reopens it, deleting the routine archives
   it with its history. Verify with verify-routine-isolation-db.ts and the routine tests above.
+  `runIn` (thread default/chat; group is kept, never moved) is set by the editor switch and the
+  schedule tools; moving back reuses the conversation found by key, never a second one.
 
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong

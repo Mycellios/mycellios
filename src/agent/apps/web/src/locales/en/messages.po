@@ -11929,6 +11929,9 @@ msgstr "None"
 msgid "Notify me when there are results or a problem"
 msgstr "Notify me when there are results or a problem"
 
+msgid "Run in its own conversation"
+msgstr "Run in its own conversation"
+
 msgid "Open another panel"
 msgstr "Open another panel"
 

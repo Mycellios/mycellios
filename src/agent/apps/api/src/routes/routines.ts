@@ -18,9 +18,12 @@ import {
 import {
   archiveRoutineThreadInTransaction,
   ensureRoutineThread,
+  findRoutineOwnThread,
   followRoutineRenameInTransaction,
   IsolationError,
   Prisma,
+  routineRunIn,
+  routineRunInInclude,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 import { assertRoutineModel } from "../model-pins.js";
@@ -36,6 +39,12 @@ import {
 } from "../routines.js";
 import type { RouterContext } from "./context.js";
 import { isRecordNotFound } from "./shared.js";
+
+/** A routine moved to the main chat runs in this thread. */
+function mainChatId(bot: { thread: { id: string } | null }): string {
+  if (!bot.thread) throw new ORPCError("BAD_REQUEST", { message: "This Mico has no main chat." });
+  return bot.thread.id;
+}
 
 export function routinesRoutes(ctx: RouterContext) {
   const { deps, repos, announceRoutine, codexCatalog, agentSkills, authed } = ctx;
@@ -67,8 +76,11 @@ export function routinesRoutes(ctx: RouterContext) {
           }
         }
         await assertRoutineModel(deps, context.actor, input, codexCatalog);
+        // Without a place the first run creates the routine's own conversation.
+        const threadId = input.runIn === "chat" ? mainChatId(bot) : null;
         const row = await deps.prisma.routine.create({
-          data: routineRowData(context.actor, input, routineNextRunAt(input)),
+          data: { ...routineRowData(context.actor, input, routineNextRunAt(input)), threadId },
+          include: routineRunInInclude,
         });
         await announceRoutine(context.actor, bot, row);
         return mapRoutine(row);
@@ -82,9 +94,23 @@ export function routinesRoutes(ctx: RouterContext) {
             userId: context.actor.userId,
             bot: { archivedAt: null },
           },
+          include: routineRunInInclude,
         });
         if (!existing) throw new ORPCError("NOT_FOUND");
         const bot = await repos.getBot(context.actor, existing.botId);
+        // Moving to the main chat keeps the routine's own conversation and its history; moving
+        // back reuses it, or the next run creates one. A group routine keeps its group.
+        let threadId: string | null | undefined;
+        const runIn = routineRunIn(existing);
+        if (input.runIn !== undefined && input.runIn !== runIn) {
+          if (runIn === "group") {
+            throw new ORPCError("BAD_REQUEST", { message: "A group routine runs in its group." });
+          }
+          threadId =
+            input.runIn === "chat"
+              ? mainChatId(bot)
+              : await findRoutineOwnThread(deps.prisma, existing);
+        }
         const active = input.active ?? existing.active;
         const crons = input.crons ?? existing.crons;
         const timezone = input.timezone ?? existing.timezone;
@@ -244,8 +270,10 @@ export function routinesRoutes(ctx: RouterContext) {
                     watch: (input.watch as Prisma.InputJsonValue | null) ?? Prisma.DbNull,
                     ...(watchChanged ? { watchState: Prisma.DbNull } : {}),
                   }),
+              ...(threadId === undefined ? {} : { threadId }),
               nextRunAt,
             },
+            include: routineRunInInclude,
           })
           .catch(async (error: unknown) => {
             if (isRecordNotFound(error)) {
@@ -267,8 +295,9 @@ export function routinesRoutes(ctx: RouterContext) {
             }
             throw error;
           });
-        // The routine's own conversation follows the new name unless the person renamed it.
-        if (input.name !== undefined && row.name !== existing.name) {
+        // The routine's own conversation follows the new name unless the person renamed it, also
+        // when the routine comes back to it from the main chat.
+        if ((input.name !== undefined && row.name !== existing.name) || (threadId && runIn === "chat")) {
           await followRoutineRenameInTransaction(deps.prisma, row).catch((error: unknown) => {
             getLogger().error("routine conversation rename", error);
           });

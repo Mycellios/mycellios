@@ -196,6 +196,10 @@ export function useRoutineEditor({
                   ? routineModel
                   : {}),
                 ...(runAt ? { runAt } : {}),
+                // Only a change is sent, so a group routine or an older server is left alone.
+                ...(routineDraft.runIn && routineDraft.runIn !== targetRoutine.runIn
+                  ? { runIn: routineDraft.runIn }
+                  : {}),
               });
             } else {
               saved = await rpc.routines.create({
@@ -211,6 +215,7 @@ export function useRoutineEditor({
                 messageProvider: routineDraft.messageProvider,
                 watch,
                 ...routineModel,
+                ...(routineDraft.runIn ? { runIn: routineDraft.runIn } : {}),
               });
             }
             if (routineSaveRequest.current === saveRequest && activeBotId.current === targetBotId) {

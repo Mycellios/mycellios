@@ -186,15 +186,22 @@ function scheduleCreateBranch(
   };
 }
 
+const runInSpec = {
+  type: "string",
+  enum: ["thread", "chat"],
+  description:
+    'Where its runs happen: "thread" (default), a conversation of its own that nothing pending in your main chat can hold up, or "chat", your main chat; leave it out in groups.',
+};
+
 /** Exactly one timing method. Null or blank leftovers stay valid so callers can ignore them. */
 const scheduleCreateInputSchema = {
   oneOf: [
-    scheduleCreateBranch(["cron"]),
-    scheduleCreateBranch(["every", "unit"]),
-    scheduleCreateBranch(["runAt"]),
-    scheduleCreateBranch(["delayMinutes"]),
-    scheduleCreateBranch(["delaySeconds"]),
-    scheduleCreateBranch(["watch"]),
+    scheduleCreateBranch(["cron"], { runIn: runInSpec }),
+    scheduleCreateBranch(["every", "unit"], { runIn: runInSpec }),
+    scheduleCreateBranch(["runAt"], { runIn: runInSpec }),
+    scheduleCreateBranch(["delayMinutes"], { runIn: runInSpec }),
+    scheduleCreateBranch(["delaySeconds"], { runIn: runInSpec }),
+    scheduleCreateBranch(["watch"], { runIn: runInSpec }),
   ],
 };
 
@@ -1213,6 +1220,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         runAt: scheduleTimingSpecs.runAt,
         delayMinutes: scheduleTimingSpecs.delayMinutes,
         delaySeconds: scheduleTimingSpecs.delaySeconds,
+        runIn: runInSpec,
       },
       required: ["routineId"],
     },
