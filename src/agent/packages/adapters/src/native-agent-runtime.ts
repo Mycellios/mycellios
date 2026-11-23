@@ -378,6 +378,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       { spaceId: context.spaceId, userId: context.userId, botId: request.botId, threadId: request.threadId },
       engine,
     );
+    const openCodeProject = engine === "opencode" ? await context.resolveOpenCodeProject?.() : undefined;
     await mkdir(cwd, { recursive: true, mode: 0o700 });
     const controller = new AbortController();
     const signal = context.signal
@@ -387,7 +388,7 @@ export class NativeAgentRuntime implements AgentRuntime {
     const continuity = new WorkContinuation(workContinuationEnabled(request));
     request = withWorkContinuation({ ...request, instructions: withConversationStyle(request.instructions ?? "") }, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
-    const baseBinding = [engine, request.model.id, request.instructions, tools];
+    const baseBinding = [engine, request.model.id, request.instructions, tools, ...(openCodeProject ? [openCodeProject] : [])];
     const modelConfig = request.nativeConfig;
     const binding = hash(engine === "codex" && (modelConfig?.modelId || modelConfig?.thinkingLevel || modelConfig?.fastMode)
       ? [...baseBinding, [modelConfig.modelId ?? null, modelConfig.thinkingLevel ?? null, Boolean(modelConfig.fastMode)]]
@@ -845,15 +846,19 @@ export class NativeAgentRuntime implements AgentRuntime {
             // Keep its fresh profile inside the same account/Space/chat boundary as this run.
             const openCodeHome = engine === "opencode" ? join(cwd, ".opencode-home") : null;
             const openCodeConfig = openCodeHome ? await prepareOpenCodeProfile(openCodeHome) : null;
+            const projectCwd = openCodeProject ?? cwd;
+            if (openCodeProject && await context.resolveOpenCodeProject?.() !== openCodeProject)
+              throw new Error("The selected project changed. Open it again.");
+            let loadingSession = false;
             process = new NativeAgentProcess(
               command,
               [],
-              cwd,
+              projectCwd,
               (message) => {
                 const update = object(message.params?.update);
                 const content = object(update.content);
                 if (
-                  message.method === "session/update" &&
+                  !loadingSession && message.method === "session/update" &&
                   update.sessionUpdate === "agent_message_chunk" &&
                   content.type === "text"
                 )
@@ -890,13 +895,13 @@ export class NativeAgentRuntime implements AgentRuntime {
                 OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeConfig),
               } : undefined,
             );
-            await process.request("initialize", {
+            const initialized = await process.request<{ agentCapabilities?: { loadSession?: boolean } }>("initialize", {
               protocolVersion: 1,
               clientCapabilities: {},
               clientInfo: { name: "rakazo", version: "0.1.0" },
             });
-            const started = await process.request<{ sessionId: string }>("session/new", {
-              cwd,
+            const sessionOptions = {
+              cwd: projectCwd,
               mcpServers: [
                 {
                   type: "http",
@@ -905,8 +910,20 @@ export class NativeAgentRuntime implements AgentRuntime {
                   headers: [{ name: "Authorization", value: `Bearer ${bridge.token}` }],
                 },
               ],
-            });
-            sessionId = started.sessionId;
+            };
+            const resume = Boolean(openCodeProject && initialized.agentCapabilities?.loadSession);
+            if (resume && sessionId) {
+              loadingSession = true;
+              try {
+                await process.request("session/load", { ...sessionOptions, sessionId });
+              } finally {
+                loadingSession = false;
+              }
+            } else {
+              startPrompt = historicalPrompt();
+              const started = await process.request<{ sessionId: string }>("session/new", sessionOptions);
+              sessionId = started.sessionId;
+            }
             startedModelTurn = true;
             const promptSession = async (value: string, images = false) => {
             const result = await process!.request<{ stopReason: string }>(
@@ -925,7 +942,7 @@ export class NativeAgentRuntime implements AgentRuntime {
               900000,
             );
             if (result.stopReason !== "end_turn") throw new Error("The ACP turn did not complete");
-            await finish();
+            await finish(resume ? sessionId : undefined);
             };
             continueTurn = async (note) => { if (!signal.aborted && !paused) await promptSession(note); };
             await promptSession(`${request.instructions}\n\n${startPrompt}`, true);

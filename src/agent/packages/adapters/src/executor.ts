@@ -4216,6 +4216,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           runId,
           cloudWorkspace: cloudComputer ? { workerId, runFence: fence } : undefined,
           isolatedWorkspace: (cloudComputer ?? bot.computer)?.scope === "isolated",
+          desktopWorkspace: !cloudComputer && bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated",
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },

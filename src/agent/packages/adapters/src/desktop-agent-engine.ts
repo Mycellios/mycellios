@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentRuntime } from "@mycellios/adapter-kit";
-import { NativeAgentRuntime } from "./native-agent-runtime.js";
+import { discoverNativeEngines, NativeAgentRuntime } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 
@@ -14,6 +14,15 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
   const makeRuntime = createRuntime ?? ((dataDir, authorized) => new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized }));
   return {
     describe: () => new PiAgentRuntime().describe(),
+    async nativeEngines() {
+      const scope = accessScope();
+      if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return [];
+      const available = await discoverNativeEngines(path.join(profile, "agent-executor", scope));
+      if (accessScope() !== scope) return [];
+      return available.flatMap(({ id, available }) =>
+        available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
+      );
+    },
     abort: async runId => { const owned = active.get(runId); await owned?.runtime.abort(owned.localId); },
     async *run(request, context) {
       const scope = accessScope();
