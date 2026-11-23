@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { MemoryConnection } from "@mycellios/contracts";
-import { Button, Field, FieldLabel, Input } from "@mycellios/ui-web";
+import type { Bot, MemoryConnection, MicoMemoryGrant } from "@mycellios/contracts";
+import { Button, Checkbox, Field, FieldLabel, Input } from "@mycellios/ui-web";
 import { useCallback, useEffect, useId, useState } from "react";
 import { SettingsLabel } from "../../components/SettingsRows";
 import { connectMcpOauth } from "../../lib/mcp-connect";
@@ -43,8 +43,8 @@ function StatusText({ connection }: { connection: MemoryConnection }) {
 }
 
 /**
- * Personal memory servers over the open Memory MCP profile (specs/mcp-memory). Phase 1
- * connects, authorizes and checks them; no Mico uses one until it is granted access.
+ * Personal memory servers over the open Memory MCP profile (specs/mcp-memory): connect,
+ * authorize and check them, and choose which Micos may read each one (none by default).
  */
 export function PersonalMemoryConnections({
   onBusyChange,
@@ -56,7 +56,10 @@ export function PersonalMemoryConnections({
   const nameId = useId();
   const endpointId = useId();
   const tokenId = useId();
+  const accessId = useId();
   const [connections, setConnections] = useState<MemoryConnection[] | null>(null);
+  const [grants, setGrants] = useState<MicoMemoryGrant[]>([]);
+  const [bots, setBots] = useState<Bot[]>([]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [endpoint, setEndpoint] = useState("");
@@ -71,10 +74,12 @@ export function PersonalMemoryConnections({
 
   useEffect(() => {
     let live = true;
-    rpc.memory.connections
-      .list()
-      .then((rows) => {
-        if (live) setConnections(rows);
+    Promise.all([rpc.memory.connections.list(), rpc.memory.grants.list(), rpc.bots.list()])
+      .then(([rows, granted, micos]) => {
+        if (!live) return;
+        setConnections(rows);
+        setGrants(granted);
+        setBots(micos);
       })
       .catch((err) => {
         if (live) setError(errorText(err, t`Could not load memory connections`));
@@ -135,6 +140,26 @@ export function PersonalMemoryConnections({
       t`Could not connect this memory`,
     );
 
+  const toggleGrant = (connectionId: string, botId: string) =>
+    run(
+      `grant:${connectionId}`,
+      async () => {
+        const current = grants.filter((grant) => grant.connectionId === connectionId);
+        const next = current.some((grant) => grant.botId === botId)
+          ? current.filter((grant) => grant.botId !== botId)
+          : [...current, { botId, autoRecall: true }];
+        const saved = await rpc.memory.grants.set({
+          connectionId,
+          grants: next.map((grant) => ({ botId: grant.botId, autoRecall: grant.autoRecall })),
+        });
+        setGrants((all) => [
+          ...all.filter((grant) => grant.connectionId !== connectionId),
+          ...saved,
+        ]);
+      },
+      t`Could not change which Micos can read this memory`,
+    );
+
   const busy = pending !== null;
   const canAdd = name.trim().length > 0 && endpoint.trim().length > 0;
 
@@ -171,6 +196,34 @@ export function PersonalMemoryConnections({
               {connection.message}
             </p>
           ) : null}
+          {connection.status === "compatible" && bots.length > 0 ? (
+            <fieldset className="mt-3" data-testid="personal-memory-access">
+              <legend className="text-[13px] text-muted-foreground">
+                <Trans>Micos that can read it</Trans>
+              </legend>
+              <div className="mt-2 flex flex-col gap-2">
+                {bots.map((bot) => (
+                  <label
+                    key={bot.id}
+                    htmlFor={`${accessId}-${connection.id}-${bot.id}`}
+                    className="flex min-w-0 items-center gap-2 text-[14px] text-foreground"
+                  >
+                    <Checkbox
+                      id={`${accessId}-${connection.id}-${bot.id}`}
+                      checked={grants.some(
+                        (grant) => grant.connectionId === connection.id && grant.botId === bot.id,
+                      )}
+                      disabled={busy}
+                      onCheckedChange={() => void toggleGrant(connection.id, bot.id)}
+                    />
+                    <span className="min-w-0 break-words" dir="auto">
+                      {bot.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
@@ -204,6 +257,7 @@ export function PersonalMemoryConnections({
                     setConnections((current) =>
                       (current ?? []).filter((item) => item.id !== connection.id),
                     );
+                    setGrants((all) => all.filter((grant) => grant.connectionId !== connection.id));
                   },
                   t`Could not remove this memory`,
                 )

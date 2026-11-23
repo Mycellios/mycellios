@@ -2,10 +2,68 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateMemoryProfile,
   MemoryConnectionCreateInput,
+  MemoryGrantsSetInput,
   MemoryToolMappingSchema,
+  memoryToolPayload,
+  parseMemorySearchResults,
   parseStoredMemoryCapabilities,
   parseStoredMemoryToolMapping,
 } from "./memory-mcp.js";
+
+describe("memory search results", () => {
+  it("reads structuredContent first, then the first JSON text part", () => {
+    expect(memoryToolPayload({ structuredContent: { results: [] } })).toEqual({ results: [] });
+    expect(
+      memoryToolPayload({
+        content: [
+          { type: "text", text: "not json" },
+          { type: "text", text: '{"results":[{"id":"1"}]}' },
+        ],
+      }),
+    ).toEqual({ results: [{ id: "1" }] });
+    expect(memoryToolPayload({ content: [{ type: "image" }] })).toBeUndefined();
+  });
+
+  it("keeps valid hits, bounds their text and respects the limit", () => {
+    const hits = parseMemorySearchResults(
+      {
+        results: [
+          { id: 7, content: "from content", score: 0.5 },
+          { id: "2", snippet: "y".repeat(5_000), title: "Long" },
+          { id: "3" },
+          { snippet: "missing id" },
+          { id: "4", snippet: "over the limit" },
+        ],
+      },
+      2,
+    );
+    expect(hits.map((hit) => hit.id)).toEqual(["7", "2"]);
+    expect(hits[0]).toEqual({ id: "7", snippet: "from content", score: 0.5 });
+    expect(hits[1]!.snippet.length).toBeLessThanOrEqual(1_000);
+  });
+
+  it("returns nothing for an unexpected payload", () => {
+    expect(parseMemorySearchResults(undefined, 5)).toEqual([]);
+    expect(parseMemorySearchResults({ results: "no" }, 5)).toEqual([]);
+  });
+});
+
+describe("memory grants input", () => {
+  it("rejects the same Mico twice", () => {
+    expect(
+      MemoryGrantsSetInput.safeParse({
+        connectionId: "c",
+        grants: [{ botId: "b" }, { botId: "b" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("defaults automatic recall to on", () => {
+    expect(
+      MemoryGrantsSetInput.parse({ connectionId: "c", grants: [{ botId: "b" }] }).grants[0],
+    ).toEqual({ botId: "b", autoRecall: true });
+  });
+});
 
 const readOnly = { readOnlyHint: true };
 const tool = (name: string, properties: Record<string, unknown>, annotations?: object) => ({

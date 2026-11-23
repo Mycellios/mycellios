@@ -211,6 +211,7 @@ model User {
   tailnetConnections          TailnetConnection[]
   mcpServers                  McpServer[]
   memoryConnections           MemoryConnection[]
+  micoMemoryGrants            MicoMemoryGrant[]
   botSections                 BotSection[]
   developmentProjects         DevelopmentProject[]
   actionApprovalRules         ActionApprovalRule[]
@@ -511,6 +512,7 @@ model Space {
   tailnetPolicies             TailnetPolicy[]
   mcpServers                  McpServer[]
   memoryConnections           MemoryConnection[]
+  micoMemoryGrants            MicoMemoryGrant[]
   mcpOAuthSessions            McpOAuthSession[]
   modelOAuthSessions          ModelOAuthSession[]
   botMcpServers              BotMcpServer[]
@@ -757,6 +759,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  memoryGrants MicoMemoryGrant[]
   ledGroups ChatGroup[] @relation("ChatGroupLead")
   sentBotMessageRequests BotMessageRequest[] @relation("BotMessageRequestSender")
   botMessageRecipients BotMessageRecipient[] @relation("BotMessageRecipientBot")
@@ -1979,8 +1982,33 @@ model MemoryConnection {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  grants       MicoMemoryGrant[]
+
   @@index([spaceId, userId])
   @@map("memory_connections")
+}
+
+/// A Mico's access to one personal memory (specs/mcp-memory, phase 2). Nothing is granted
+/// by default, and only the connection's owner creates or removes a grant.
+model MicoMemoryGrant {
+  id           String           @id @default(cuid())
+  spaceId      String
+  space        Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  botId        String
+  bot          Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  connectionId String
+  connection   MemoryConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  /// read (phase 2); read_write arrives with phase 3.
+  access       String           @default("read")
+  autoRecall   Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([botId, connectionId])
+  @@index([spaceId, userId, botId])
+  @@map("mico_memory_grants")
 }
 
 model McpOAuthSession {

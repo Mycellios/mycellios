@@ -9,10 +9,12 @@ import {
   serializeSpaceMemoryConfig,
   updateMemoryProviderDefaultScope,
 } from "../memory-provider-config.js";
+import { createMemoryGrants } from "../memory-grants.js";
 import type { RouterContext } from "./context.js";
 
 export function memoryRoutes(ctx: RouterContext) {
   const { deps, repos, taughtSkills, agentSkills, authed, memoryConnections } = ctx;
+  const memoryGrants = createMemoryGrants(deps);
   return {
     memory: {
       reviewStatus: authed.memory.reviewStatus.handler(async({context})=>{
@@ -155,6 +157,12 @@ export function memoryRoutes(ctx: RouterContext) {
         ),
         remove: authed.memory.connections.remove.handler(({ context, input }) =>
           memoryConnections.remove(context.actor, input.id),
+        ),
+      },
+      grants: {
+        list: authed.memory.grants.list.handler(({ context }) => memoryGrants.list(context.actor)),
+        set: authed.memory.grants.set.handler(({ context, input }) =>
+          memoryGrants.set(context.actor, input),
         ),
       },
     },

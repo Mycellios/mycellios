@@ -216,3 +216,108 @@ export function parseStoredMemoryCapabilities(value: unknown): MemoryCapabilitie
   const parsed = MemoryCapabilitiesSchema.safeParse(value);
   return parsed.success ? parsed.data : NO_MEMORY_CAPABILITIES;
 }
+
+/**
+ * A Mico's access to one personal memory (specs/mcp-memory, phase 2). Nothing is granted
+ * by default; only the connection's owner grants it, through the authenticated API.
+ */
+export const MicoMemoryGrantSchema = z.object({
+  id: z.string(),
+  botId: z.string(),
+  connectionId: z.string(),
+  /** Phase 2 grants reading only; writing comes with phase 3. */
+  access: z.literal("read"),
+  /** Search this memory automatically before each reply. */
+  autoRecall: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type MicoMemoryGrant = z.infer<typeof MicoMemoryGrantSchema>;
+
+export const MemoryGrantsSetInput = z.object({
+  connectionId: z.string().min(1).max(128),
+  /** The complete set of Micos that may read this memory; omitted Micos lose access. */
+  grants: z
+    .array(z.object({ botId: z.string().min(1).max(128), autoRecall: z.boolean().default(true) }))
+    .max(200)
+    .superRefine((grants, ctx) => {
+      const ids = grants.map((grant) => grant.botId);
+      if (new Set(ids).size !== ids.length) {
+        ctx.addIssue({ code: "custom", message: "Each Mico can appear only once" });
+      }
+    }),
+});
+export type MemoryGrantsSetInput = z.infer<typeof MemoryGrantsSetInput>;
+
+/** The most results one memory search asks a server for. */
+export const MEMORY_SEARCH_LIMIT_MAX = 10;
+const SNIPPET_MAX_CHARS = 1_000;
+
+export interface MemorySearchHit {
+  id: string;
+  title?: string;
+  snippet: string;
+  score?: number;
+  updatedAt?: string;
+  projectId?: string;
+}
+
+/** The JSON a profile tool returned, from `structuredContent` or its first JSON text part. */
+export function memoryToolPayload(result: unknown): unknown {
+  if (!result || typeof result !== "object") return undefined;
+  const row = result as { structuredContent?: unknown; content?: unknown };
+  if (row.structuredContent && typeof row.structuredContent === "object") {
+    return row.structuredContent;
+  }
+  if (!Array.isArray(row.content)) return undefined;
+  for (const part of row.content) {
+    if (!part || typeof part !== "object") continue;
+    const { type, text } = part as { type?: unknown; text?: unknown };
+    if (type !== "text" || typeof text !== "string") continue;
+    try {
+      return JSON.parse(text);
+    } catch {
+      // Not JSON: try the next text part.
+    }
+  }
+  return undefined;
+}
+
+function boundedText(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  if (!text) return undefined;
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/**
+ * Parse a `memory_search` result. Hits without an id or text are dropped, text is bounded,
+ * and at most `limit` hits are kept, so a server cannot flood the model's context.
+ */
+export function parseMemorySearchResults(payload: unknown, limit: number): MemorySearchHit[] {
+  const results =
+    payload && typeof payload === "object" ? (payload as { results?: unknown }).results : undefined;
+  if (!Array.isArray(results)) return [];
+  const hits: MemorySearchHit[] = [];
+  for (const item of results) {
+    if (hits.length >= limit) break;
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const id = boundedText(typeof row.id === "number" ? String(row.id) : row.id, 200);
+    const snippet =
+      boundedText(row.snippet, SNIPPET_MAX_CHARS) ?? boundedText(row.content, SNIPPET_MAX_CHARS);
+    if (!id || !snippet) continue;
+    const title = boundedText(row.title, 200);
+    const updatedAt = boundedText(row.updatedAt, 64);
+    const projectId = boundedText(row.projectId, 200);
+    hits.push({
+      id,
+      snippet,
+      ...(title ? { title } : {}),
+      ...(typeof row.score === "number" && Number.isFinite(row.score) ? { score: row.score } : {}),
+      ...(updatedAt ? { updatedAt } : {}),
+      ...(projectId ? { projectId } : {}),
+    });
+  }
+  return hits;
+}

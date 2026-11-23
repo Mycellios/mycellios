@@ -2,14 +2,23 @@ import type { ConnectorTool } from "@mycellios/adapter-kit";
 
 const SEMANTIC_MEMORY_TOOL_NAMES = new Set(["recall_memory", "save_memory", "forget_memory"]);
 
-/** `forget_memory` is offered only when the provider implements its optional forget verb. */
+/**
+ * `forget_memory` is offered only when the provider implements its optional forget verb, and
+ * `save_memory` only when the run has a memory it may write to (read-only personal memory
+ * offers `recall_memory` alone).
+ */
 export function selectMemoryTools(
   tools: ConnectorTool[],
   semanticMemoryConfigured: boolean,
   semanticMemoryForgets: boolean,
+  semanticMemorySaves = semanticMemoryConfigured,
 ): ConnectorTool[] {
   return semanticMemoryConfigured
-    ? tools.filter((tool) => semanticMemoryForgets || tool.name !== "forget_memory")
+    ? tools.filter(
+        (tool) =>
+          (semanticMemoryForgets || tool.name !== "forget_memory") &&
+          (semanticMemorySaves || tool.name !== "save_memory"),
+      )
     : tools.filter((tool) => !SEMANTIC_MEMORY_TOOL_NAMES.has(tool.name));
 }
 

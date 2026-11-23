@@ -30,6 +30,11 @@ describe("selectMemoryTools", () => {
     expect(names).toEqual(["remember", "recall_memory", "save_memory", "shell"]);
   });
 
+  it("offers only recall_memory for read-only personal memory", () => {
+    const names = selectMemoryTools(allThree, true, false, false).map((t) => t.name);
+    expect(names).toEqual(["remember", "recall_memory", "shell"]);
+  });
+
   it("is a no-op for tool lists with no memory tools at all", () => {
     const shellOnly = [tool("shell")];
     expect(selectMemoryTools(shellOnly, false, false)).toEqual(shellOnly);
