@@ -29,16 +29,23 @@ import {
   verifyComponentUpdateManifest,
   type ComponentUpdateChannel,
   type ComponentUpdateManifest,
+  type PinnedComponentUpdateKey,
 } from "../contracts/component-update-manifest.js";
 import {
   COMPONENT_FILES_POLICY,
+  MANAGED_COMPONENT_POLICIES,
   MAX_COMPONENT_ARTIFACT_BYTES,
 } from "../contracts/component-update-policy.js";
+import { readNativeRuntimeBuildMetadata } from "../core/native-build-identity.js";
 import {
   WORKER_PROTOCOL_MAX,
   WORKER_PROTOCOL_MIN,
 } from "../contracts/worker-admission.js";
-import { buildComponentFilesPackage } from "./component-files.js";
+import {
+  buildComponentFilesPackage,
+  verifyComponentFilesPackage,
+  type BuiltComponentFilesPackage,
+} from "./component-files.js";
 import { STABLE_COMPONENT_UPDATE_KEYS } from "./component-trust.js";
 import {
   COMPONENT_UPDATE_BOOTSTRAP_MIN_VERSION,
@@ -51,6 +58,18 @@ export const PREPARED_COMPONENT_RELEASE_SCHEMA =
   "mycellios-component-dev-release/1" as const;
 export const COMPONENT_PUBLICATION_EVIDENCE_SCHEMA =
   "mycellios-component-publication-evidence/1" as const;
+/**
+ * A release that carries several components built from one source revision
+ * (specs/node-runtime-auto-update). Single-component python-product releases
+ * keep PREPARED_COMPONENT_RELEASE_SCHEMA and its exact files.
+ */
+export const PREPARED_MULTI_COMPONENT_RELEASE_SCHEMA =
+  "mycellios-component-release/2" as const;
+
+/** Components the publisher can build. A release always carries python-product. */
+export type ReleaseComponentId = "python-product" | "node-app";
+export const NODE_RUNTIME_RELEASE_COMPONENTS: readonly ReleaseComponentId[] =
+  Object.freeze(["python-product", "node-app"]);
 
 export type SupportedComponentPlatform = "win32" | "linux" | "darwin";
 export type SupportedComponentArchitecture = "x64" | "arm64";
@@ -117,12 +136,45 @@ export interface PreparedComponentRelease {
   };
 }
 
+export interface PreparedMultiComponentRelease {
+  schema: typeof PREPARED_MULTI_COMPONENT_RELEASE_SCHEMA;
+  target: ComponentUpdateTarget;
+  artifacts: Array<{ componentId: ReleaseComponentId; file: string }>;
+  manifestFile: string;
+  enrollmentFile: string;
+  manifestId: string;
+  sequence: number;
+  provenance: {
+    baseRevision: string;
+    sourceTreeDirty: boolean;
+    releaseRevision: string;
+    sourceTreeDigest: string;
+    components: Array<{ componentId: ReleaseComponentId; filesManifestSha256: string }>;
+    nodeApp: { sourceId: string; provenanceSha256: string };
+  };
+}
+
+export type AnyPreparedComponentRelease =
+  | PreparedComponentRelease
+  | PreparedMultiComponentRelease;
+
 export interface PrepareComponentReleaseOptions {
   workspace: string;
   localRoot: string;
   feedUrl: string;
   target: ComponentUpdateTarget;
   identity?: ComponentSigningIdentity | undefined;
+  /**
+   * Stable keys the receiving bootstrap pins (for nodes, the installer trust
+   * anchor). Stable signing is refused unless the identity is one of them.
+   */
+  pinnedStableKeys?: readonly PinnedComponentUpdateKey[] | undefined;
+  /** Defaults to python-product only; node-app always ships with python-product. */
+  components?: readonly ReleaseComponentId[] | undefined;
+  /** Staged node-app root (scripts/stage-node-installer.mjs --component=node-app). */
+  nodeAppRoot?: string | undefined;
+  /** Source identity the node-app provenance must carry, when known. */
+  expectedNodeAppSourceId?: string | undefined;
   loadIdentity?:
     | ((
       signal: AbortSignal | undefined,
@@ -152,6 +204,12 @@ export interface PreparedComponentReleaseResult {
   sourceTreeDirty: boolean;
   releaseRevision: string;
   enrollment: ComponentUpdateEnrollment;
+  components: Array<{
+    componentId: ReleaseComponentId;
+    artifactSha256: string;
+    artifactBytes: number;
+    filesManifestSha256: string;
+  }>;
 }
 
 export type ComponentPublicationCommitPhase =
@@ -174,12 +232,21 @@ export interface ComponentPublicationReconciliationEvidence {
   manifestStatus: number | null;
   publicManifestVerified: boolean;
   artifactReadbackVerified: boolean;
+  /** Present for multi-component releases: one entry per signed artifact. */
+  artifacts?: Array<{
+    componentId: string;
+    sha256: string;
+    bytes: number;
+    status: number | null;
+    readbackVerified: boolean;
+  }>;
 }
 
 export interface PublishComponentReleaseOptions {
   releaseDirectory: string;
   coordinatorUrl: string;
   target: ComponentUpdateTarget;
+  pinnedStableKeys?: readonly PinnedComponentUpdateKey[] | undefined;
   adminToken?: string | undefined;
   adminTokenFile?: string | undefined;
   signal?: AbortSignal | undefined;
@@ -323,11 +390,24 @@ export async function prepareComponentRelease(
   const workspace = resolve(options.workspace);
   const localRoot = resolveManagedRoot(options.localRoot);
   const target = validateTarget(options.target);
+  const componentIds = normalizeReleaseComponents(options.components, target);
   const feedBaseUrl = validateComponentFeedUrl(options.feedUrl);
   const identity = await resolveSigningIdentity(options, localRoot, target);
-  assertChannelEnrollmentAllowed(identity.enrollment);
+  assertChannelEnrollmentAllowed(identity.enrollment, options.pinnedStableKeys);
   if (options.keyId && options.keyId !== identity.enrollment.keyId) {
     throw new Error("The requested key ID does not match the enrollment.");
+  }
+  const nodeApp = componentIds.includes("node-app")
+    ? await inspectNodeAppRoot(options.nodeAppRoot, options.signal)
+    : null;
+  if (
+    nodeApp
+    && options.expectedNodeAppSourceId !== undefined
+    && nodeApp.sourceId !== options.expectedNodeAppSourceId
+  ) {
+    throw new Error(
+      "The node-app provenance does not match the release source tree.",
+    );
   }
 
   await preparePythonProductSource({
@@ -337,14 +417,46 @@ export async function prepareComponentRelease(
     signal: options.signal,
   });
   assertNotAborted(options.signal);
-  const built = buildComponentFilesPackage(
-    resolve(workspace, "build", "python"),
-    { limits: COMPONENT_FILES_POLICY },
-  );
-  assertNotAborted(options.signal);
-  if (built.packageBytes.length > MAX_COMPONENT_ARTIFACT_BYTES) {
-    throw new Error("The component artifact exceeds the shared client limit.");
+  if (nodeApp) {
+    // node-app JavaScript reads this registry from its own root; it must be the
+    // exact registry of the python-product in the same release.
+    const portable = ["python", "distributed_runtime", "model_adapter_registry.json"] as const;
+    const [nodeRegistry, productRegistry] = await Promise.all([
+      readFile(join(nodeApp.root, ...portable)),
+      readFile(join(workspace, "build", ...portable)),
+    ]);
+    if (!nodeRegistry.equals(productRegistry)) {
+      throw new Error("The node-app adapter registry differs from python-product.");
+    }
   }
+  const builtComponents: Array<{
+    id: ReleaseComponentId;
+    built: BuiltComponentFilesPackage;
+  }> = [];
+  for (const id of componentIds) {
+    const built = buildComponentFilesPackage(
+      id === "node-app"
+        ? nodeApp!.root
+        : resolve(workspace, "build", "python"),
+      { limits: COMPONENT_FILES_POLICY },
+    );
+    assertNotAborted(options.signal);
+    if (built.packageBytes.length > MAX_COMPONENT_ARTIFACT_BYTES) {
+      throw new Error("The component artifact exceeds the shared client limit.");
+    }
+    builtComponents.push({ id, built });
+  }
+  const multiComponent = builtComponents.length > 1;
+  // A single python-product release keeps its historical digest identity.
+  const sourceTreeDigest = multiComponent
+    ? `sha256:${createHash("sha256")
+      .update(
+        builtComponents
+          .map(({ id, built }) => `${id}\n${built.filesManifestSha256}\n`)
+          .join(""),
+      )
+      .digest("hex")}` as const
+    : builtComponents[0]!.built.filesManifestSha256;
   const sourceState = await gitSourceState({
     workspace,
     gitExecutable: options.gitExecutable ?? "git",
@@ -356,10 +468,15 @@ export async function prepareComponentRelease(
       "Stable component publication requires a clean, committed source tree.",
     );
   }
+  if (nodeApp && nodeApp.sourceRevision !== sourceState.baseRevision) {
+    throw new Error(
+      "The node-app was built from a different source revision than this release.",
+    );
+  }
   const releaseRevision = sourceState.dirty
     ? createHash("sha256")
       .update(
-        `${sourceState.baseRevision}\n${built.filesManifestSha256}\n`,
+        `${sourceState.baseRevision}\n${sourceTreeDigest}\n`,
       )
       .digest("hex")
       .slice(0, 40)
@@ -370,6 +487,9 @@ export async function prepareComponentRelease(
     );
   }
   const packageVersion = await workspaceVersion(workspace, options.signal);
+  if (nodeApp && nodeApp.version !== packageVersion) {
+    throw new Error("The node-app version does not match the release workspace.");
+  }
   const keyDirectory = resolve(
     options.keyDirectory ?? join(localRoot, "keys", target.channel),
   );
@@ -377,13 +497,14 @@ export async function prepareComponentRelease(
   const sequence = options.sequence === undefined
     ? await nextSequence(keyDirectory, options.signal)
     : positiveSafeInteger(options.sequence, "sequence");
-  const artifactDigest = built.artifactSha256.slice("sha256:".length);
   const sourceId = `sha256:${createHash("sha256")
     .update(
       `${sourceState.baseRevision}\n${sourceState.dirty ? "dirty" : "clean"}\n`
-      + `${releaseRevision}\n${built.filesManifestSha256}\n${MYCELLIOS_RUNTIME_ABI}\n`,
+      + `${releaseRevision}\n${sourceTreeDigest}\n${MYCELLIOS_RUNTIME_ABI}\n`,
     )
     .digest("hex")}` as const;
+  const version =
+    `${packageVersion}-${target.channel}.${sequence}.${releaseRevision.slice(0, 10)}`;
   const unsigned = buildComponentUpdateManifest({
     channel: target.channel,
     sequence,
@@ -391,7 +512,7 @@ export async function prepareComponentRelease(
     provenance: {
       baseRevision: sourceState.baseRevision,
       sourceTreeDirty: sourceState.dirty,
-      sourceTreeDigest: built.filesManifestSha256,
+      sourceTreeDigest,
     },
     sourceId,
     compatibility: {
@@ -402,33 +523,30 @@ export async function prepareComponentRelease(
       runtimeAbi: MYCELLIOS_RUNTIME_ABI,
       minBootstrapVersion: COMPONENT_UPDATE_BOOTSTRAP_MIN_VERSION,
     },
-    components: [
-      {
-        id: "python-product",
-        version:
-          `${packageVersion}-${target.channel}.${sequence}.${releaseRevision.slice(0, 10)}`,
-        platform: target.platform,
-        arch: target.arch,
-        artifact: {
-          url: new URL(
-            `updates/v1/artifacts/${artifactDigest}`,
-            trailingSlash(feedBaseUrl),
-          ).toString(),
-          sha256: built.artifactSha256,
-          bytes: built.packageBytes.length,
-          format: built.format,
-          filesManifestSha256: built.filesManifestSha256,
-        },
-        requirements: {
-          backend: "any",
-          driver: null,
-          runtimeAbi: MYCELLIOS_RUNTIME_ABI,
-          workerProtocol: { min: WORKER_PROTOCOL_MIN, max: WORKER_PROTOCOL_MAX },
-          dependencies: [],
-        },
-        restartScope: "runtime",
+    components: builtComponents.map(({ id, built }) => ({
+      id,
+      version,
+      platform: target.platform,
+      arch: target.arch,
+      artifact: {
+        url: new URL(
+          `updates/v1/artifacts/${built.artifactSha256.slice("sha256:".length)}`,
+          trailingSlash(feedBaseUrl),
+        ).toString(),
+        sha256: built.artifactSha256,
+        bytes: built.packageBytes.length,
+        format: built.format,
+        filesManifestSha256: built.filesManifestSha256,
       },
-    ],
+      requirements: {
+        backend: "any",
+        driver: null,
+        runtimeAbi: MYCELLIOS_RUNTIME_ABI,
+        workerProtocol: { min: WORKER_PROTOCOL_MIN, max: WORKER_PROTOCOL_MAX },
+        dependencies: [],
+      },
+      restartScope: MANAGED_COMPONENT_POLICIES[id].restartScope,
+    })),
   });
   const manifest = signComponentUpdateManifest(unsigned, {
     keyId: identity.enrollment.keyId,
@@ -446,13 +564,17 @@ export async function prepareComponentRelease(
   assertManagedLocalOutput(releaseDirectory, localRoot);
   await mkdir(releaseDirectory, { recursive: true });
   assertNotAborted(options.signal);
-  const artifactFile = "artifact.blob";
+  const artifactFiles = builtComponents.map(({ id }) =>
+    multiComponent ? `${id}.blob` : "artifact.blob"
+  );
   const manifestFile = "manifest.json";
   const enrollmentFile = "enrollment.json";
-  await writeSameOrCreate(
-    join(releaseDirectory, artifactFile),
-    built.packageBytes,
-  );
+  for (const [index, { built }] of builtComponents.entries()) {
+    await writeSameOrCreate(
+      join(releaseDirectory, artifactFiles[index]!),
+      built.packageBytes,
+    );
+  }
   await writeSameOrCreate(
     join(releaseDirectory, manifestFile),
     Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8"),
@@ -461,21 +583,49 @@ export async function prepareComponentRelease(
     join(releaseDirectory, enrollmentFile),
     Buffer.from(`${JSON.stringify(identity.enrollment, null, 2)}\n`, "utf8"),
   );
-  const release: PreparedComponentRelease = {
-    schema: PREPARED_COMPONENT_RELEASE_SCHEMA,
-    target,
-    artifactFile,
-    manifestFile,
-    enrollmentFile,
-    manifestId: manifest.manifestId,
-    sequence,
-    provenance: {
-      baseRevision: sourceState.baseRevision,
-      sourceTreeDirty: sourceState.dirty,
-      releaseRevision,
-      filesManifestSha256: built.filesManifestSha256,
-    },
-  };
+  const python = builtComponents[0]!.built;
+  const release: AnyPreparedComponentRelease = multiComponent
+    ? {
+      schema: PREPARED_MULTI_COMPONENT_RELEASE_SCHEMA,
+      target,
+      artifacts: builtComponents.map(({ id }, index) => ({
+        componentId: id,
+        file: artifactFiles[index]!,
+      })),
+      manifestFile,
+      enrollmentFile,
+      manifestId: manifest.manifestId,
+      sequence,
+      provenance: {
+        baseRevision: sourceState.baseRevision,
+        sourceTreeDirty: sourceState.dirty,
+        releaseRevision,
+        sourceTreeDigest,
+        components: builtComponents.map(({ id, built }) => ({
+          componentId: id,
+          filesManifestSha256: built.filesManifestSha256,
+        })),
+        nodeApp: {
+          sourceId: nodeApp!.sourceId,
+          provenanceSha256: nodeApp!.provenanceSha256,
+        },
+      },
+    }
+    : {
+      schema: PREPARED_COMPONENT_RELEASE_SCHEMA,
+      target,
+      artifactFile: artifactFiles[0]!,
+      manifestFile,
+      enrollmentFile,
+      manifestId: manifest.manifestId,
+      sequence,
+      provenance: {
+        baseRevision: sourceState.baseRevision,
+        sourceTreeDirty: sourceState.dirty,
+        releaseRevision,
+        filesManifestSha256: python.filesManifestSha256,
+      },
+    };
   await writeSameOrCreate(
     join(releaseDirectory, "release.json"),
     Buffer.from(`${JSON.stringify(release, null, 2)}\n`, "utf8"),
@@ -485,14 +635,29 @@ export async function prepareComponentRelease(
     releaseDirectory,
     manifestId: manifest.manifestId,
     sequence,
-    artifactBytes: built.packageBytes.length,
-    artifactSha256: built.artifactSha256,
-    filesManifestSha256: built.filesManifestSha256,
+    artifactBytes: python.packageBytes.length,
+    artifactSha256: python.artifactSha256,
+    filesManifestSha256: python.filesManifestSha256,
     baseRevision: sourceState.baseRevision,
     sourceTreeDirty: sourceState.dirty,
     releaseRevision,
     enrollment: identity.enrollment,
+    components: builtComponents.map(({ id, built }) => ({
+      componentId: id,
+      artifactSha256: built.artifactSha256,
+      artifactBytes: built.packageBytes.length,
+      filesManifestSha256: built.filesManifestSha256,
+    })),
   };
+}
+
+type SignedComponent = ComponentUpdateManifest["components"][number];
+
+interface PublicationArtifact {
+  component: SignedComponent;
+  digest: string;
+  bytes: Buffer;
+  evidence: NonNullable<ComponentPublicationReconciliationEvidence["artifacts"]>[number];
 }
 
 export async function publishComponentRelease(
@@ -519,7 +684,7 @@ export async function publishComponentRelease(
     release.target.channel,
     options.signal,
   );
-  assertChannelEnrollmentAllowed(enrollment);
+  assertChannelEnrollmentAllowed(enrollment, options.pinnedStableKeys);
   verifyComponentUpdateManifest(manifest, {
     pinnedKey: {
       keyId: enrollment.keyId,
@@ -533,22 +698,54 @@ export async function publishComponentRelease(
   ) {
     throw new Error("Prepared release metadata does not match its manifest.");
   }
-  const artifact = await readFile(
-    resolveReleaseFile(releaseDirectory, release.artifactFile),
-  );
-  assertNotAborted(options.signal);
-  const component = manifest.components[0];
-  const artifactDigest = component?.artifact.sha256.slice("sha256:".length);
-  if (!component || !artifactDigest || !/^[0-9a-f]{64}$/.test(artifactDigest)) {
-    throw new Error("Prepared release artifact identity is invalid.");
+  const artifacts: PublicationArtifact[] = [];
+  for (const entry of preparedReleaseArtifacts(release, manifest)) {
+    const component = entry.component;
+    const digest = component?.artifact.sha256.slice("sha256:".length);
+    if (!component || !digest || !/^[0-9a-f]{64}$/.test(digest)) {
+      throw new Error("Prepared release artifact identity is invalid.");
+    }
+    const bytes = await readFile(resolveReleaseFile(releaseDirectory, entry.file));
+    assertNotAborted(options.signal);
+    if (
+      bytes.length !== component.artifact.bytes
+      || `sha256:${createHash("sha256").update(bytes).digest("hex")}`
+        !== component.artifact.sha256
+    ) {
+      throw new Error(
+        artifacts.length === 0 && release.schema === PREPARED_COMPONENT_RELEASE_SCHEMA
+          ? "Prepared release artifact failed digest verification."
+          : `Prepared ${component.id} artifact failed digest verification.`,
+      );
+    }
+    // Every file digest and the signed files-manifest identity, before upload.
+    try {
+      verifyComponentFilesPackage(bytes, {
+        limits: COMPONENT_FILES_POLICY,
+        expectedFilesManifestSha256: component.artifact.filesManifestSha256 as
+          | `sha256:${string}`
+          | undefined,
+      });
+    } catch (error) {
+      throw new Error(
+        `Prepared ${component.id} artifact failed file verification.`,
+        { cause: error },
+      );
+    }
+    artifacts.push({
+      component,
+      digest,
+      bytes,
+      evidence: {
+        componentId: component.id,
+        sha256: component.artifact.sha256,
+        bytes: component.artifact.bytes,
+        status: null,
+        readbackVerified: false,
+      },
+    });
   }
-  if (
-    artifact.length !== component.artifact.bytes
-    || `sha256:${createHash("sha256").update(artifact).digest("hex")}`
-      !== component.artifact.sha256
-  ) {
-    throw new Error("Prepared release artifact failed digest verification.");
-  }
+  const primary = artifacts[0]!;
   const coordinator = validateComponentFeedUrl(options.coordinatorUrl);
   const authorization = await resolveAdminAuthorization({
     coordinator,
@@ -565,38 +762,44 @@ export async function publishComponentRelease(
     target: release.target,
     manifestId: manifest.manifestId,
     sequence: manifest.sequence,
-    artifactSha256: component.artifact.sha256,
-    artifactBytes: component.artifact.bytes,
+    artifactSha256: primary.component.artifact.sha256,
+    artifactBytes: primary.component.artifact.bytes,
     artifactStatus: null,
     manifestStatus: null,
     publicManifestVerified: false,
     artifactReadbackVerified: false,
+    ...(artifacts.length > 1
+      ? { artifacts: artifacts.map((artifact) => artifact.evidence) }
+      : {}),
   };
   let manifestRequestStarted = false;
   let manifestResponseReceived = false;
 
   try {
-    const artifactResponse = await fetch(
-      new URL(
-        `public/v1/admin/component-updates/artifacts/${artifactDigest}`,
-        trailingSlash(coordinator),
-      ),
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "application/octet-stream",
-          ...(authorization ? { authorization } : {}),
+    for (const artifact of artifacts) {
+      const artifactResponse = await fetch(
+        new URL(
+          `public/v1/admin/component-updates/artifacts/${artifact.digest}`,
+          trailingSlash(coordinator),
+        ),
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/octet-stream",
+            ...(authorization ? { authorization } : {}),
+          },
+          body: new Uint8Array(artifact.bytes),
+          redirect: "error",
+          signal: requestSignal(options.signal, timeouts.artifactUploadMs),
         },
-        body: new Uint8Array(artifact),
-        redirect: "error",
-        signal: requestSignal(options.signal, timeouts.artifactUploadMs),
-      },
-    );
-    evidence.artifactStatus = artifactResponse.status;
-    await assertResponse(
-      artifactResponse,
-      "Component artifact publication failed",
-    );
+      );
+      artifact.evidence.status = artifactResponse.status;
+      if (artifact === primary) evidence.artifactStatus = artifactResponse.status;
+      await assertResponse(
+        artifactResponse,
+        "Component artifact publication failed",
+      );
+    }
     commitPhase = "artifact-staged";
 
     manifestRequestStarted = true;
@@ -661,29 +864,32 @@ export async function publishComponentRelease(
     }
     evidence.publicManifestVerified = true;
 
-    const artifactReadback = await fetch(component.artifact.url, {
-      headers: { accept: "application/octet-stream" },
-      cache: "no-store",
-      redirect: "error",
-      signal: requestSignal(options.signal, timeouts.artifactReadbackMs),
-    });
-    await assertResponse(
-      artifactReadback,
-      "Published artifact URL could not be read back",
-    );
-    const observedArtifact = await readBoundedResponse(
-      artifactReadback,
-      component.artifact.bytes,
-      options.signal,
-    );
-    const observedArtifactIdentity = `sha256:${createHash("sha256")
-      .update(observedArtifact)
-      .digest("hex")}`;
-    if (
-      observedArtifact.length !== component.artifact.bytes
-      || observedArtifactIdentity !== component.artifact.sha256
-    ) {
-      throw new Error("Published artifact readback failed digest verification.");
+    for (const artifact of artifacts) {
+      const artifactReadback = await fetch(artifact.component.artifact.url, {
+        headers: { accept: "application/octet-stream" },
+        cache: "no-store",
+        redirect: "error",
+        signal: requestSignal(options.signal, timeouts.artifactReadbackMs),
+      });
+      await assertResponse(
+        artifactReadback,
+        "Published artifact URL could not be read back",
+      );
+      const observedArtifact = await readBoundedResponse(
+        artifactReadback,
+        artifact.component.artifact.bytes,
+        options.signal,
+      );
+      const observedArtifactIdentity = `sha256:${createHash("sha256")
+        .update(observedArtifact)
+        .digest("hex")}`;
+      if (
+        observedArtifact.length !== artifact.component.artifact.bytes
+        || observedArtifactIdentity !== artifact.component.artifact.sha256
+      ) {
+        throw new Error("Published artifact readback failed digest verification.");
+      }
+      artifact.evidence.readbackVerified = true;
     }
     evidence.artifactReadbackVerified = true;
     commitPhase = "readback-verified";
@@ -709,7 +915,7 @@ export async function publishComponentRelease(
         release,
         manifest,
         enrollment,
-        component,
+        artifacts,
         evidence,
         timeouts,
       });
@@ -736,18 +942,65 @@ export async function publishComponentRelease(
     throw new ComponentPublicationError(
       error instanceof Error ? error.message : "Component publication failed.",
       commitPhase,
-      { ...evidence, target: { ...evidence.target } },
+      {
+        ...evidence,
+        target: { ...evidence.target },
+        ...(evidence.artifacts
+          ? { artifacts: evidence.artifacts.map((entry) => ({ ...entry })) }
+          : {}),
+      },
       { cause: error },
     );
   }
 }
 
+/**
+ * Pairs each prepared artifact file with its signed component. A
+ * multi-component release must list exactly the signed components, all built
+ * for the release target from the release revision.
+ */
+function preparedReleaseArtifacts(
+  release: AnyPreparedComponentRelease,
+  manifest: ComponentUpdateManifest,
+): Array<{ file: string; component: SignedComponent | undefined }> {
+  if (release.schema === PREPARED_COMPONENT_RELEASE_SCHEMA) {
+    return [{ file: release.artifactFile, component: manifest.components[0] }];
+  }
+  if (
+    manifest.revision !== release.provenance.baseRevision
+    || manifest.provenance.sourceTreeDigest !== release.provenance.sourceTreeDigest
+    || manifest.components.length !== release.artifacts.length
+  ) {
+    throw new Error("Prepared release components do not match their manifest.");
+  }
+  const versions = new Set(manifest.components.map((component) => component.version));
+  if (versions.size !== 1) {
+    throw new Error("Prepared release components come from different builds.");
+  }
+  return release.artifacts.map((artifact, index) => {
+    // Signed manifests order components canonically; pair them by id.
+    const matches = manifest.components.filter((candidate) => candidate.id === artifact.componentId);
+    const component = matches.length === 1 ? matches[0] : undefined;
+    if (
+      !component
+      || component.id !== artifact.componentId
+      || component.platform !== release.target.platform
+      || component.arch !== release.target.arch
+      || component.artifact.filesManifestSha256
+        !== release.provenance.components[index]?.filesManifestSha256
+    ) {
+      throw new Error("Prepared release components do not match their manifest.");
+    }
+    return { file: artifact.file, component };
+  });
+}
+
 async function reconcileAmbiguousManifestPublication(input: {
   coordinator: string;
-  release: PreparedComponentRelease;
+  release: AnyPreparedComponentRelease;
   manifest: ComponentUpdateManifest;
   enrollment: ComponentUpdateEnrollment;
-  component: ComponentUpdateManifest["components"][number];
+  artifacts: readonly PublicationArtifact[];
   evidence: ComponentPublicationReconciliationEvidence;
   timeouts: ReturnType<typeof normalizePublicationTimeouts>;
 }): Promise<
@@ -795,25 +1048,28 @@ async function reconcileAmbiguousManifestPublication(input: {
     }
     input.evidence.publicManifestVerified = true;
     try {
-      const artifactReadback = await fetch(input.component.artifact.url, {
-        headers: { accept: "application/octet-stream" },
-        cache: "no-store",
-        redirect: "error",
-        signal: requestSignal(undefined, input.timeouts.artifactReadbackMs),
-      });
-      if (!artifactReadback.ok) return "committed-readback-incomplete";
-      const observedArtifact = await readBoundedResponse(
-        artifactReadback,
-        input.component.artifact.bytes,
-      );
-      const identity = `sha256:${createHash("sha256")
-        .update(observedArtifact)
-        .digest("hex")}`;
-      if (
-        observedArtifact.length !== input.component.artifact.bytes
-        || identity !== input.component.artifact.sha256
-      ) {
-        return "committed-readback-incomplete";
+      for (const { component, evidence } of input.artifacts) {
+        const artifactReadback = await fetch(component.artifact.url, {
+          headers: { accept: "application/octet-stream" },
+          cache: "no-store",
+          redirect: "error",
+          signal: requestSignal(undefined, input.timeouts.artifactReadbackMs),
+        });
+        if (!artifactReadback.ok) return "committed-readback-incomplete";
+        const observedArtifact = await readBoundedResponse(
+          artifactReadback,
+          component.artifact.bytes,
+        );
+        const identity = `sha256:${createHash("sha256")
+          .update(observedArtifact)
+          .digest("hex")}`;
+        if (
+          observedArtifact.length !== component.artifact.bytes
+          || identity !== component.artifact.sha256
+        ) {
+          return "committed-readback-incomplete";
+        }
+        evidence.readbackVerified = true;
       }
       input.evidence.artifactReadbackVerified = true;
       return "verified";
@@ -834,6 +1090,7 @@ export async function shipComponentRelease(
     releaseDirectory: prepared.releaseDirectory,
     coordinatorUrl: options.coordinatorUrl ?? options.feedUrl,
     target: options.target,
+    pinnedStableKeys: options.pinnedStableKeys,
     adminToken: options.adminToken,
     adminTokenFile: options.adminTokenFile,
     signal: options.signal,
@@ -845,7 +1102,7 @@ export async function shipComponentRelease(
 export async function readPreparedComponentRelease(
   releaseDirectory: string,
   signal?: AbortSignal,
-): Promise<PreparedComponentRelease> {
+): Promise<AnyPreparedComponentRelease> {
   assertNotAborted(signal);
   const value = JSON.parse(
     await readFile(resolve(releaseDirectory, "release.json"), "utf8"),
@@ -1012,10 +1269,11 @@ function identityForTarget(
 
 function assertChannelEnrollmentAllowed(
   enrollment: ComponentUpdateEnrollment,
+  pinnedStableKeys: readonly PinnedComponentUpdateKey[] = STABLE_COMPONENT_UPDATE_KEYS,
 ): void {
   if (enrollment.channel === "dev") return;
   if (
-    STABLE_COMPONENT_UPDATE_KEYS.some(
+    pinnedStableKeys.some(
       (key) =>
         key.keyId === enrollment.keyId
         && key.spki === enrollment.spki,
@@ -1028,9 +1286,15 @@ function assertChannelEnrollmentAllowed(
 
 function parsePreparedComponentRelease(
   value: unknown,
-): PreparedComponentRelease {
+): AnyPreparedComponentRelease {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Prepared component release is invalid.");
+  }
+  if (
+    (value as { schema?: unknown }).schema
+    === PREPARED_MULTI_COMPONENT_RELEASE_SCHEMA
+  ) {
+    return parsePreparedMultiComponentRelease(value);
   }
   const candidate = value as Partial<PreparedComponentRelease>;
   if (
@@ -1060,6 +1324,144 @@ function parsePreparedComponentRelease(
     ...candidate,
     target: validateTarget(candidate.target),
   } as PreparedComponentRelease;
+}
+
+function parsePreparedMultiComponentRelease(
+  value: object,
+): PreparedMultiComponentRelease {
+  const candidate = value as Partial<PreparedMultiComponentRelease>;
+  const provenance = candidate.provenance;
+  const artifacts = candidate.artifacts;
+  if (
+    !candidate.target
+    || !Array.isArray(artifacts)
+    || typeof candidate.manifestFile !== "string"
+    || typeof candidate.enrollmentFile !== "string"
+    || typeof candidate.manifestId !== "string"
+    || !/^sha256:[0-9a-f]{64}$/.test(candidate.manifestId)
+    || !Number.isSafeInteger(candidate.sequence)
+    || (candidate.sequence ?? 0) < 1
+    || !provenance
+    || !/^[0-9a-f]{40}$/.test(provenance.baseRevision)
+    || typeof provenance.sourceTreeDirty !== "boolean"
+    || !/^[0-9a-f]{40}$/.test(provenance.releaseRevision)
+    || !/^sha256:[0-9a-f]{64}$/.test(provenance.sourceTreeDigest)
+    || !Array.isArray(provenance.components)
+    || !provenance.nodeApp
+    || !/^sha256:[0-9a-f]{64}$/.test(provenance.nodeApp.sourceId)
+    || !/^[0-9a-f]{64}$/.test(provenance.nodeApp.provenanceSha256)
+    || artifacts.length !== NODE_RUNTIME_RELEASE_COMPONENTS.length
+    || provenance.components.length !== artifacts.length
+    || artifacts.some((artifact, index) =>
+      !artifact
+      || artifact.componentId !== NODE_RUNTIME_RELEASE_COMPONENTS[index]
+      || typeof artifact.file !== "string"
+      || provenance.components[index]?.componentId !== artifact.componentId
+      || !/^sha256:[0-9a-f]{64}$/.test(
+        provenance.components[index]?.filesManifestSha256 ?? "",
+      ))
+  ) {
+    throw new Error("Prepared component release is invalid.");
+  }
+  return {
+    ...candidate,
+    target: validateTarget(candidate.target),
+  } as PreparedMultiComponentRelease;
+}
+
+/**
+ * python-product alone keeps the historical release. node-app always ships with
+ * python-product, so one signed manifest carries both from one revision.
+ */
+function normalizeReleaseComponents(
+  requested: readonly ReleaseComponentId[] | undefined,
+  target: ComponentUpdateTarget,
+): ReleaseComponentId[] {
+  const ids = [...(requested ?? ["python-product"])];
+  if (ids.length === 1 && ids[0] === "python-product") return ids;
+  if (
+    ids.length !== NODE_RUNTIME_RELEASE_COMPONENTS.length
+    || ids.some((id, index) => id !== NODE_RUNTIME_RELEASE_COMPONENTS[index])
+  ) {
+    throw new Error(
+      "A component release carries python-product alone or python-product with node-app.",
+    );
+  }
+  const targetKey = `${target.platform}/${target.arch}` as const;
+  if (
+    !(MANAGED_COMPONENT_POLICIES["node-app"].targets as readonly string[])
+      .includes(targetKey)
+  ) {
+    throw new Error(`node-app is not published for ${targetKey}.`);
+  }
+  return ids;
+}
+
+/**
+ * Reads a staged node-app root and its sealed source identity without running
+ * it. The release must be built from the same revision as python-product.
+ */
+async function inspectNodeAppRoot(
+  rootValue: string | undefined,
+  signal: AbortSignal | undefined,
+): Promise<{
+  root: string;
+  version: string;
+  sourceRevision: string;
+  sourceId: string;
+  provenanceSha256: string;
+}> {
+  if (!rootValue) throw new Error("A node-app release requires its staged root.");
+  const root = resolve(rootValue);
+  assertNotAborted(signal);
+  let metadata: ReturnType<typeof readNativeRuntimeBuildMetadata>;
+  try {
+    metadata = readNativeRuntimeBuildMetadata(root);
+  } catch (error) {
+    throw new Error("The staged node-app has invalid build metadata.", { cause: error });
+  }
+  if (!metadata.buildIdentity) {
+    throw new Error("The staged node-app has no release provenance.");
+  }
+  const provenanceBytes = await readFile(
+    join(root, "app", "mycellios-native-build-provenance.json"),
+  );
+  const identity = JSON.parse(
+    await readFile(join(root, "app", "manifest.json"), "utf8"),
+  ) as Record<string, unknown>;
+  const provenanceSha256 = createHash("sha256").update(provenanceBytes).digest("hex");
+  if (
+    identity.schema !== "mycellios-node-runtime-identity/1"
+    || Object.keys(identity).sort().join() !== "provenanceSha256,schema,sourceId,sourceRevision,version"
+    || typeof identity.sourceRevision !== "string"
+    || !/^[0-9a-f]{40}$/.test(identity.sourceRevision)
+    || identity.version !== metadata.version
+    || identity.sourceId !== metadata.buildIdentity.sourceId
+    || identity.provenanceSha256 !== provenanceSha256
+  ) {
+    throw new Error("The staged node-app identity does not match its provenance.");
+  }
+  for (const required of [
+    ["app", "node", "main.js"],
+    ["app", "node", "component-canary.js"],
+    ["python", "distributed_runtime", "model_adapter_registry.json"],
+  ]) {
+    if (!existsSync(join(root, ...required))) {
+      throw new Error(`The staged node-app is missing ${required.join("/")}.`);
+    }
+  }
+  if (existsSync(join(root, "app", "component-update-trust.json"))) {
+    // The trust anchor belongs to the bundled bootstrap, never to a component.
+    throw new Error("The staged node-app must not carry a component trust anchor.");
+  }
+  assertNotAborted(signal);
+  return {
+    root,
+    version: metadata.version,
+    sourceRevision: identity.sourceRevision,
+    sourceId: metadata.buildIdentity.sourceId,
+    provenanceSha256,
+  };
 }
 
 function validateTarget(target: ComponentUpdateTarget): ComponentUpdateTarget {

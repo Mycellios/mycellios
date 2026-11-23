@@ -107,3 +107,80 @@ jobs:
           node-version: 24.22.2
       - name: Verify public catalogs, original Android signer and actual downloads
         run: node scripts/verify-installer-promotion.mjs
+  node-components:
+    # Signed node runtime components (specs/node-runtime-auto-update): one stable
+    # manifest carrying python-product and node-app, both built from the admitted
+    # revision. Opt-in with the MYCELLIOS_NODE_COMPONENT_PUBLICATION=enabled
+    # variable; once enabled, a missing stable key, trust anchor or publication
+    # token fails this job closed. Installers never depend on it, and nothing
+    # here builds, signs or installs an EXE/MSI/DMG/PKG/DEB.
+    needs: [admit, publish]
+    if: needs.admit.outputs.ready == 'true' && vars.MYCELLIOS_NODE_COMPONENT_PUBLICATION == 'enabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: node-component-release
+    concurrency:
+      group: node-component-publication
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+    env:
+      REVISION: ${{ needs.admit.outputs.revision }}
+    steps:
+      - name: Require the stable signing key, trust anchor and publication token
+        env:
+          MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY: ${{ secrets.MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY }}
+          MYCELLIOS_NODE_COMPONENT_TRUST: ${{ vars.MYCELLIOS_NODE_COMPONENT_TRUST }}
+          MYCELLIOS_MODEL_ADMIN_TOKEN: ${{ secrets.MYCELLIOS_COMPONENT_PUBLISH_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          for name in MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY MYCELLIOS_NODE_COMPONENT_TRUST MYCELLIOS_MODEL_ADMIN_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured; refusing to publish node components."
+              exit 1
+            fi
+          done
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.admit.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Confirm the admitted revision
+        run: test "$(git rev-parse HEAD)" = "$REVISION"
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile production node payload
+        run: npm run clean --silent && npx tsc -p tsconfig.build.json
+      - name: Stage the node-app component from the installer layout
+        run: |
+          node scripts/prepare-packaged-python-source.mjs
+          node scripts/stage-node-installer.mjs --component=node-app \
+            --dist=dist \
+            --node-modules=node_modules \
+            --python-source=build/python \
+            --source-root=. \
+            --source-revision="$REVISION" \
+            --output=build/node-package/node-app-windows-x64
+      - name: Sign and publish python-product and node-app in one manifest
+        env:
+          MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY: ${{ secrets.MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY }}
+          MYCELLIOS_NODE_COMPONENT_TRUST: ${{ vars.MYCELLIOS_NODE_COMPONENT_TRUST }}
+          MYCELLIOS_MODEL_ADMIN_TOKEN: ${{ secrets.MYCELLIOS_COMPONENT_PUBLISH_ADMIN_TOKEN }}
+          MYCELLIOS_COMPONENT_UPDATE_PUBLISH_URL: ${{ vars.MYCELLIOS_COMPONENT_UPDATE_PUBLISH_URL }}
+        run: |
+          npx tsx scripts/component-update-cli.ts release \
+            --platform=win32 \
+            --arch=x64 \
+            --revision="$REVISION" \
+            --node-app-root=build/node-package/node-app-windows-x64 \
+            --output=".codex-runtime/component-updates/releases/stable/$REVISION"
+      - name: Keep the signed public release record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: node-components-${{ needs.admit.outputs.revision }}
+          path: .codex-runtime/component-updates/releases/stable/${{ needs.admit.outputs.revision }}
+          if-no-files-found: ignore
+          retention-days: 90

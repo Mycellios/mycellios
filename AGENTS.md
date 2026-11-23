@@ -468,6 +468,12 @@ These rules apply to the complete repository.
   pause, drain and maintenance, drain before swapping and never change the
   pause. Check node-runtime-auto-update, node-auto-update and
   node-command-applicator tests.
+  Releases sign `python-product` and `node-app` from one clean revision into one
+  manifest (`component-update-cli release`, opt-in `node-components` job). Stable
+  signing fails closed without the environment secret or a key pinned by
+  `MYCELLIOS_NODE_COMPONENT_TRUST`; never generate, commit or print it. The
+  installer and node-app share `stage-node-installer.mjs`'s app tree. Check
+  component-update-node-release and node-installer-layout tests.
 - Native embedding/speech qualification requires both operator credentials, three
   normal completed leases, validated outputs and current session/build/activation
   binding. Preserve zero generated-text tokens and strip worker-declared evidence.

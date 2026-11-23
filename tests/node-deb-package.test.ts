@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { stageNodeInstaller } from "../scripts/stage-node-installer.mjs";
+import { prepareNativePythonProductSource } from "../scripts/native-python-product-policy.mjs";
 import { buildNodeDeb } from "../scripts/build-node-deb.mjs";
 import { verifyNodeDeb } from "../scripts/verify-node-deb.mjs";
 import { buildNativeSourceProvenance } from "../scripts/native-build-provenance.mjs";
@@ -37,6 +38,7 @@ async function stagedFixture() {
   await writeFile(join(dist, "contracts", "node-control.js"), "export {};\n"); await writeFile(join(runtime, "runtime-manifest.json"), JSON.stringify({ platform: "linux", arch: "x64" }));
   await writeFile(join(runtime, "bin"), "runtime"); await writeFile(join(nodeModules, "ws", "package.json"), "{}"); await writeFile(join(nodeModules, "zod", "package.json"), "{}");
   const nodeExecutable = join(root, "host", "node"); await writeFile(nodeExecutable, "node");
-  await stageNodeInstaller({ output, dist, runtime, nodeExecutable, nodeModules, target: "linux-x64", sourceRevision: "a".repeat(40), sourceProvenance: buildNativeSourceProvenance(resolve(".")) });
+  const pythonSource = join(root, "python"); prepareNativePythonProductSource(resolve("python"), pythonSource);
+  await stageNodeInstaller({ output, dist, runtime, nodeExecutable, nodeModules, pythonSource, target: "linux-x64", sourceRevision: "a".repeat(40), sourceProvenance: buildNativeSourceProvenance(resolve(".")) });
   return { root, output };
 }

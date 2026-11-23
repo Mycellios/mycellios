@@ -1,8 +1,8 @@
 # Verified node runtime updates
 
-Status: implemented and unit-tested. Not active in production. Not yet
-qualified on a physical node. Activation is blocked by the steps in
-"Activation" below.
+Status: implemented and unit-tested, including stable multi-component
+publication. Not active in production. Not yet qualified on a physical node.
+Activation is blocked by the owner steps in "Activation" below.
 
 ## Goal
 
@@ -44,8 +44,18 @@ TypeScript code (`app/`) therefore becomes a signed component instead.
 `MANAGED_COMPONENT_POLICIES["node-app"]` (`restartScope: "agent"`) is a
 `json-gzip-v1` files package. It mirrors the installed layout:
 `package.json`, `app/**` (including `mycellios-native-build-provenance.json`
-and `manifest.json`) and the production `node_modules` (`ws`, `zod`).
-`bin/` and `runtime/` stay with the installer.
+and `manifest.json`), the production `node_modules` (`ws`, `zod`) and
+`python/distributed_runtime/model_adapter_registry.json`, which
+`app/contracts/model-adapter-registry.js` reads from its own root. `bin/`,
+`runtime/`, the rest of `python/` (shipped as `python-product`) and the
+trust anchor stay with the installer.
+
+`scripts/stage-node-installer.mjs` writes this tree once for both outputs:
+`stageNodeInstaller` (the MSI/DEB/PKG layout, which also gets the full
+`python/` product that `node.json`'s `runtime.pythonPath` points at) and
+`stageNodeApp` (`--component=node-app`). Earlier installer layouts had
+neither `package.json` nor `python/` at their root, although `main.js` and the
+adapter registry read both from there.
 
 - **Canary.** Before the pointer changes, `canaryNodeApp` runs
   `app/node/component-canary.js` from the staged root with the bundled
@@ -156,26 +166,80 @@ Desktop devices → "Runtime updates" in `landing/src/Contribute.tsx` (shared UI
 kit). Each paired device shows whether it still needs one manual runtime
 update, or which verified runtime it runs.
 
+### Publication (`src/update/component-update-publisher.ts`)
+
+One stable manifest carries `python-product` and `node-app`, so a node never
+receives one without the other:
+
+- **Same revision.** `prepareComponentRelease({ components: ["python-product",
+  "node-app"] })` builds `python-product` from `build/python` and `node-app`
+  from the staged root. It refuses a `node-app` whose `app/manifest.json`
+  revision is not the clean release revision, whose provenance `sourceId` is
+  not the release source tree, whose version differs, whose adapter registry
+  differs from `python-product`'s, or that carries a trust anchor. The
+  manifest `revision` is that revision, which the node-app canary checks.
+  `sourceTreeDigest` seals both files manifests.
+- **Release record.** A multi-component release uses
+  `mycellios-component-release/2` with one `<component>.blob` per artifact.
+  A python-product-only release keeps `mycellios-component-dev-release/1`,
+  `artifact.blob` and its exact manifest.
+- **Publish.** Before any request, every artifact must match its signed size,
+  SHA-256 and files manifest (per-file digests). Artifacts upload first
+  (content-addressed, idempotent), then the manifest; the public manifest and
+  every artifact are read back and verified. Reconciliation evidence lists each
+  artifact.
+- **Targets.** Only `win32/x64` is published today: Linux and macOS nodes run
+  without the supervisor and reject manifests that contain `node-app`.
+
+### Stable signing (`src/update/component-release-signing.ts`)
+
+- The Desktop bootstrap list `STABLE_COMPONENT_UPDATE_KEYS` stays empty, so the
+  Desktop agent still refuses stable manifests. Node releases instead pass the
+  stable keys from the installer trust anchor (`MYCELLIOS_NODE_COMPONENT_TRUST`)
+  as `pinnedStableKeys`: CI can only sign with a key the nodes already pin.
+- `resolveStableReleaseSigning` fails closed with fixed codes when the trust
+  anchor or the private key is missing, the key is not Ed25519, or its public
+  key is not pinned. Errors never carry key material, and the key and admin
+  token are removed from child process environments.
+- `component-update-cli keygen` still creates only dev keys. Tests use dev or
+  throwaway keys.
+
+### Release job (`.github/workflows/installer-release.yml`)
+
+`node-components` runs after the installers of an admitted revision are
+published, only when the variable `MYCELLIOS_NODE_COMPONENT_PUBLICATION` is
+`enabled`, in the `node-component-release` environment. It checks that the
+secrets exist, compiles `dist`, stages `node-app`, then runs
+`component-update-cli release --platform=win32 --arch=x64`. That command
+signs and publishes both components to the trust anchor's feed (or
+`MYCELLIOS_COMPONENT_UPDATE_PUBLISH_URL`) and keeps the public release record
+as a workflow artifact. Installers never depend on this job, and it builds no
+package.
+
 ## Activation
 
-1. **Publisher (follow-up).** `prepareComponentRelease` publishes only
-   `python-product` with a single artifact. #483 changed both Python and node
-   TypeScript, so one release must carry both components at the same revision.
-   That needs:
-   - a multi-artifact prepared release;
-   - `node-app` staging from the installer layout;
-   - a CI publication job.
-2. **Stable key ceremony (owner).** `component-update-cli keygen` creates only
-   dev keys. A stable key requires the offline production ceremony. The private
-   key never enters CI or this repository.
+1. **Stable key ceremony (owner, offline).** Generate an Ed25519 key on an
+   offline computer and keep the private key offline. Store it only as the
+   `MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY` secret of the protected
+   `node-component-release` environment. Only its public half goes in
+   `MYCELLIOS_NODE_COMPONENT_TRUST` and the coordinator.
+2. **Release job.** Add the environment secret
+   `MYCELLIOS_COMPONENT_PUBLISH_ADMIN_TOKEN` (the coordinator's
+   `MYCELLIOS_MODEL_ADMIN_TOKEN`), then set
+   `MYCELLIOS_NODE_COMPONENT_PUBLICATION=enabled`.
 3. **Coordinator env (Nucleus memberEnv):**
    - `MYCELLIOS_COMPONENT_UPDATES_DIST=<persistent volume path>`;
    - `MYCELLIOS_COMPONENT_UPDATE_STABLE_KEY_ID=<key id>`;
    - `MYCELLIOS_COMPONENT_UPDATE_STABLE_PUBLIC_KEY=<base64url SPKI>`, or the
      `_FILE` form.
    `MYCELLIOS_NODE_UPDATES_DIST` (`/updates/node/`, legacy installer files) is
-   not used by this design. Check that `/updates/v1/` reaches the coordinator
-   through the public ingress.
+   not used by this design. On 2026-11-23 `/updates/v1/` on
+   www.mycellios.com already reached the coordinator (an empty 404 from the
+   registered route without a feed; unknown paths get Fastify's JSON 404).
+   Publication also sends `PUT /public/v1/admin/component-updates/...` with
+   artifacts of a few MiB through the same ingress; set
+   `MYCELLIOS_COMPONENT_UPDATE_PUBLISH_URL` if that path has a smaller body
+   limit.
 4. **Installer trust:** set the repository variable
    `MYCELLIOS_NODE_COMPONENT_TRUST` to
    `{"feedUrl":"https://www.mycellios.com/","pinnedKeys":{"dev":[],"stable":[{"keyId":"…","spki":"…"}]}}`.
@@ -186,8 +250,10 @@ update, or which verified runtime it runs.
    - no `updates` observation.
    They cannot receive anything automatically. The owner installs the new
    runtime package once (stop the `MycelliosNode` service, then run the MSI,
-   which is a MajorUpgrade). That package already contains #483. After that
-   hop, later releases arrive automatically once the owner opts in.
+   which is a MajorUpgrade). The package must be built from a revision that
+   stages `package.json` and `python/` at the install root (see "Component
+   `node-app`"). It already contains #483. After that hop, later releases
+   arrive automatically once the owner opts in.
 
 ## Platforms
 
@@ -216,7 +282,19 @@ manual updates until their service definitions adopt the supervisor.
   - backoff and failure caps;
   - durable consent and exact command queueing.
 - `tests/node-command-api.test.ts`: the consent routes.
+- `tests/component-update-node-release.test.ts`:
+  - one manifest with both components from the same clean revision;
+  - a real coordinator accepts it and a supervised node verifies and activates
+    both components, with the node-app canary bound to that revision;
+  - a node-app from another revision or source tree is refused;
+  - a tampered node-app artifact is rejected before any upload;
+  - stable signing fails closed without the key or trust anchor, or with an
+    unpinned or non-Ed25519 key;
+  - the python-product-only release keeps its record and manifest.
+- `tests/node-installer-layout.test.ts`: `package.json` and the `python/`
+  product at the install root.
 - `landing/src/contribute-node-updates.test.ts`: the owner-facing status.
 
-Not run: a physical node receiving a published release, and the 10-minute
-health window on Windows.
+Not run: a physical node receiving a published release, the 10-minute health
+window on Windows, an installed MSI with the new layout, and the release job
+(no stable key exists yet).

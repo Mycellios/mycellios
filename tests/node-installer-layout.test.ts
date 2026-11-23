@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { stageNodeInstaller } from "../scripts/stage-node-installer.mjs";
 import { verifyNodeInstaller } from "../scripts/verify-node-installer.mjs";
 import { buildNativeSourceProvenance } from "../scripts/native-build-provenance.mjs";
+import { prepareNativePythonProductSource } from "../scripts/native-python-product-policy.mjs";
 
 const cleanup: string[] = [];
 afterEach(async () => Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true }))));
@@ -18,7 +19,9 @@ describe("native node installer layout", () => {
       entrypoints: { service: "app/node/main.js", install: "app/node/install-main.js", uninstall: "app/node/uninstall-main.js", launcher: process.platform === "win32" ? "install.ps1" : "install" } });
     const paths = manifest.files.map((file) => file.path);
     expect(paths).toEqual(expect.arrayContaining(["app/node/main.js", "app/contracts/node-control.js", process.platform === "win32" ? "bin/node.exe" : "bin/node",
-      "node_modules/ws/package.json", "node_modules/zod/package.json", "runtime/runtime-manifest.json"]));
+      "node_modules/ws/package.json", "node_modules/zod/package.json", "runtime/runtime-manifest.json",
+      // main.js reads <root>/package.json; node.json's pythonPath is <root>/python.
+      "package.json", "python/distributed_runtime/model_adapter_registry.json", "python/mycellios-native-python-manifest.json"]));
     expect(paths).toContain(process.platform === "win32" ? "install.ps1" : "install");
     expect(paths.some((path) => path.includes("vitest"))).toBe(false);
     expect(JSON.parse(await readFile(join(fixture.output, "layout-manifest.json"), "utf8")).files).toEqual(manifest.files);
@@ -65,5 +68,6 @@ async function createFixture() {
   await writeFile(join(runtime, "python"), "runtime");
   await writeFile(join(nodeModules, "ws", "package.json"), "{}"); await writeFile(join(nodeModules, "zod", "package.json"), "{}");
   const nodeExecutable = join(root, "host", "node"); await writeFile(nodeExecutable, "node");
-  return { output, dist, runtime, nodeExecutable, nodeModules, target: `${process.platform}-${process.arch}`, sourceRevision: "a".repeat(40), sourceProvenance: buildNativeSourceProvenance(resolve(".")) };
+  const pythonSource = join(root, "python"); prepareNativePythonProductSource(resolve("python"), pythonSource);
+  return { output, dist, runtime, nodeExecutable, nodeModules, pythonSource, target: `${process.platform}-${process.arch}`, sourceRevision: "a".repeat(40), sourceProvenance: buildNativeSourceProvenance(resolve(".")) };
 }

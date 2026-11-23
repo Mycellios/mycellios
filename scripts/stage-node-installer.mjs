@@ -3,9 +3,13 @@ import { chmod, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } f
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildNativeSourceProvenance, verifyNativeBuildProvenanceDocument } from "./native-build-provenance.mjs";
+import { verifyNativePythonProductSource } from "./native-python-product-policy.mjs";
 
 export const NODE_INSTALLER_LAYOUT_SCHEMA = "mycellios-node-installer-layout/2";
+export const NODE_APP_COMPONENT_SCHEMA = "mycellios-node-app-component/1";
 const PRODUCTION_DEPENDENCIES = ["ws", "zod"];
+/** Read by app/contracts/model-adapter-registry.js from <root>/python. */
+const NODE_APP_PYTHON_FILES = ["distributed_runtime/model_adapter_registry.json"];
 
 export async function stageNodeInstaller(input) {
   const output = resolve(input.output);
@@ -13,9 +17,10 @@ export async function stageNodeInstaller(input) {
   const runtime = resolve(input.runtime);
   const nodeExecutable = resolve(input.nodeExecutable);
   const modules = resolve(input.nodeModules);
+  const python = resolve(input.pythonSource);
   if (!/^[a-f0-9]{40}$/.test(input.sourceRevision)) throw new Error("node_installer_source_revision_is_invalid");
   const provenance = verifyNativeBuildProvenanceDocument(input.sourceProvenance);
-  if (output === dist || output === runtime || output === modules || output === dirname(output)) {
+  if (output === dist || output === runtime || output === modules || output === python || output === dirname(output)) {
     throw new Error("node_installer_output_is_unsafe");
   }
   await assertDirectory(dist, "node_installer_dist_is_missing");
@@ -30,24 +35,15 @@ export async function stageNodeInstaller(input) {
     throw new Error("node_installer_runtime_target_mismatch");
   }
   await assertSymlinksStayInside(runtime);
+  // node.json points runtime.pythonPath at <installRoot>/python (installation-bootstrap.ts).
+  verifyNativePythonProductSource(python);
   await rm(output, { recursive: true, force: true });
   await mkdir(join(output, "bin"), { recursive: true });
-  await Promise.all([
-    copyTree(dist, join(output, "app")),
+  const [{ provenanceBytes }] = await Promise.all([
+    writeNodeAppTree({ output, dist, modules, python, pythonFiles: "all", sourceRevision: input.sourceRevision, provenance }),
     copyTree(runtime, join(output, "runtime"), { materializeInternalSymlinks: true }),
     cp(nodeExecutable, join(output, "bin", platform === "win32" ? "node.exe" : "node")),
-    ...PRODUCTION_DEPENDENCIES.map(async (dependency) => {
-      const source = join(modules, dependency);
-      await assertDirectory(source, `node_installer_dependency_is_missing:${dependency}`);
-      await copyTree(source, join(output, "node_modules", dependency));
-    }),
   ]);
-  const provenanceBytes = Buffer.from(`${JSON.stringify(provenance, null, 2)}\n`);
-  await writeFile(join(output, "app", "mycellios-native-build-provenance.json"), provenanceBytes, { flag: "wx" });
-  await writeFile(join(output, "app", "manifest.json"), `${JSON.stringify({
-    schema: "mycellios-node-runtime-identity/1", version: provenance.version, sourceRevision: input.sourceRevision,
-    sourceId: provenance.sourceId, provenanceSha256: sha256(provenanceBytes),
-  }, null, 2)}\n`, { flag: "wx" });
   if (input.componentTrust !== undefined) {
     // Signed component-update trust anchor (specs/node-runtime-auto-update).
     await writeFile(join(output, "app", NODE_COMPONENT_TRUST_FILE), serializeComponentTrust(input.componentTrust), { flag: "wx" });
@@ -73,6 +69,75 @@ export async function stageNodeInstaller(input) {
   };
   await writeFile(join(output, "layout-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });
   return manifest;
+}
+
+/**
+ * Stages the signed `node-app` component (specs/node-runtime-auto-update): the
+ * same package.json, app/ and production node_modules as the installer layout,
+ * plus the adapter registry its JavaScript reads from <root>/python. It has no
+ * bin/, runtime/, launchers, Python product (that is python-product) or trust
+ * anchor: a component cannot replace the anchor its bootstrap pins.
+ */
+export async function stageNodeApp(input) {
+  const output = resolve(input.output);
+  const dist = resolve(input.dist);
+  const modules = resolve(input.nodeModules);
+  const python = resolve(input.pythonSource);
+  if (!/^[a-f0-9]{40}$/.test(input.sourceRevision)) throw new Error("node_installer_source_revision_is_invalid");
+  const provenance = verifyNativeBuildProvenanceDocument(input.sourceProvenance);
+  if (output === dist || output === modules || output === python || output === dirname(output)) {
+    throw new Error("node_installer_output_is_unsafe");
+  }
+  verifyNativePythonProductSource(python);
+  await assertDirectory(dist, "node_installer_dist_is_missing");
+  await assertRegularFile(join(dist, "node", "main.js"), "node_installer_main_is_missing");
+  await assertRegularFile(join(dist, "node", "component-canary.js"), "node_app_component_canary_is_missing");
+  await assertAbsent(join(dist, NODE_COMPONENT_TRUST_FILE), "node_app_component_contains_trust_anchor");
+  await rm(output, { recursive: true, force: true });
+  await mkdir(output, { recursive: true });
+  const { provenanceBytes } = await writeNodeAppTree({
+    output, dist, modules, python, pythonFiles: NODE_APP_PYTHON_FILES, sourceRevision: input.sourceRevision, provenance,
+  });
+  return {
+    schema: NODE_APP_COMPONENT_SCHEMA,
+    sourceRevision: input.sourceRevision,
+    source: { revision: input.sourceRevision, sourceId: provenance.sourceId, provenanceSha256: sha256(provenanceBytes), version: provenance.version },
+    files: await inventoryNodeInstaller(output),
+  };
+}
+
+/** One node app layout for both the installer and the `node-app` component. */
+async function writeNodeAppTree({ output, dist, modules, python, pythonFiles, sourceRevision, provenance }) {
+  await Promise.all([
+    copyTree(dist, join(output, "app")),
+    ...(pythonFiles === "all"
+      ? [copyTree(python, join(output, "python"))]
+      : pythonFiles.map(async (portable) => {
+        const destination = join(output, "python", ...portable.split("/"));
+        await mkdir(dirname(destination), { recursive: true });
+        await cp(join(python, ...portable.split("/")), destination, { errorOnExist: true, force: false });
+      })),
+    ...PRODUCTION_DEPENDENCIES.map(async (dependency) => {
+      const source = join(modules, dependency);
+      await assertDirectory(source, `node_installer_dependency_is_missing:${dependency}`);
+      await copyTree(source, join(output, "node_modules", dependency));
+    }),
+  ]);
+  // app/node/main.js and the component canary read <root>/package.json.
+  await writeFile(join(output, "package.json"), `${JSON.stringify({
+    name: "mycellios-node", version: provenance.version, private: true, type: "module",
+  }, null, 2)}\n`, { flag: "wx" });
+  const provenanceBytes = Buffer.from(`${JSON.stringify(provenance, null, 2)}\n`);
+  await writeFile(join(output, "app", "mycellios-native-build-provenance.json"), provenanceBytes, { flag: "wx" });
+  await writeFile(join(output, "app", "manifest.json"), `${JSON.stringify({
+    schema: "mycellios-node-runtime-identity/1", version: provenance.version, sourceRevision,
+    sourceId: provenance.sourceId, provenanceSha256: sha256(provenanceBytes),
+  }, null, 2)}\n`, { flag: "wx" });
+  return { provenanceBytes };
+}
+
+async function assertAbsent(path, error) {
+  if (await lstat(path).catch(() => null)) throw new Error(error);
 }
 
 async function writeInstallerLauncher(root, platform) {
@@ -216,11 +281,22 @@ async function main(argv) {
     if (!match) throw new Error(`node_installer_argument_is_invalid:${argument}`);
     return [match[1], match[2]];
   }));
-  for (const key of ["output", "dist", "runtime", "node-executable", "node-modules", "target", "source-revision", "source-root"]) {
+  if (values.component !== undefined) {
+    // --component=node-app stages only the signed node-app component root.
+    if (values.component !== "node-app") throw new Error(`node_installer_component_is_invalid:${values.component}`);
+    for (const key of ["output", "dist", "node-modules", "python-source", "source-revision", "source-root"]) {
+      if (!values[key]) throw new Error(`node_installer_argument_is_missing:${key}`);
+    }
+    const staged = await stageNodeApp({ output: values.output, dist: values.dist, nodeModules: values["node-modules"], pythonSource: values["python-source"],
+      sourceRevision: values["source-revision"], sourceProvenance: buildNativeSourceProvenance(values["source-root"]) });
+    process.stdout.write(`node-app component staged: ${staged.files.length} files, ${staged.source.sourceId}\n`);
+    return;
+  }
+  for (const key of ["output", "dist", "runtime", "node-executable", "node-modules", "python-source", "target", "source-revision", "source-root"]) {
     if (!values[key]) throw new Error(`node_installer_argument_is_missing:${key}`);
   }
   await stageNodeInstaller({ output: values.output, dist: values.dist, runtime: values.runtime,
-    nodeExecutable: values["node-executable"], nodeModules: values["node-modules"], target: values.target,
+    nodeExecutable: values["node-executable"], nodeModules: values["node-modules"], pythonSource: values["python-source"], target: values.target,
     sourceRevision: values["source-revision"], sourceProvenance: buildNativeSourceProvenance(values["source-root"]),
     ...(values["component-trust"] ? { componentTrust: JSON.parse(await readFile(values["component-trust"], "utf8")) } : {}) });
 }

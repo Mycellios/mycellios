@@ -10,8 +10,16 @@ coordinator tests cover it.
 
 It is off in production, for these reasons:
 - there is no stable signing key;
-- the publisher has no multi-component release support;
-- the coordinator has no feed configured.
+- the coordinator has no feed configured;
+- the opt-in release job (`node-components` in `installer-release.yml`) is
+  not enabled.
+
+The release job signs `python-product` and `node-app` from one revision into
+one stable `win32/x64` manifest. Focused tests publish it to an in-process
+coordinator and activate it on a test node; it has never run in CI. A real
+staged `node-app` passed its canary locally. Installer layouts now include the
+root `package.json` and `python/` that `main.js` reads; earlier ones lacked
+them, and no installed MSI has been checked.
 
 Existing nodes need one manual runtime installation before they can receive
 anything. No physical node has received a published release. Desktop and
