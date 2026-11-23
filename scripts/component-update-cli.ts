@@ -17,6 +17,17 @@ import {
   type SupportedComponentArchitecture,
   type SupportedComponentPlatform,
 } from "../src/update/component-update-publisher.js";
+import {
+  NODE_RUNTIME_RELEASE_COMPONENTS,
+} from "../src/update/component-update-publisher.js";
+import {
+  NODE_COMPONENT_TRUST_ENV,
+  releaseChildEnvironment,
+  resolveStableReleaseSigning,
+  STABLE_SIGNING_KEY_ENV,
+} from "../src/update/component-release-signing.js";
+import { nodeComponentUpdatesSchema } from "../src/contracts/node-configuration.js";
+import { buildNativeSourceProvenance } from "./native-build-provenance.mjs";
 
 const workspace = resolve(import.meta.dirname, "..");
 const localRoot = resolve(workspace, ".codex-runtime", "component-updates");
@@ -53,8 +64,44 @@ switch (command) {
         ?? process.env.MYCELLIOS_COMPONENT_UPDATE_FEED_URL
         ?? await manifestCoordinator(releaseDirectory, release.manifestFile),
       target: release.target,
+      ...stablePinsFromEnvironment(),
       ...authorizationOptions(args),
     }));
+    break;
+  }
+  case "release": {
+    // Stable python-product + node-app release from one clean revision
+    // (specs/node-runtime-auto-update). Fails closed before building anything
+    // when the stable key or the installer trust anchor is missing.
+    const signing = resolveStableReleaseSigning(process.env);
+    delete process.env[STABLE_SIGNING_KEY_ENV];
+    const authorization = authorizationOptions(args);
+    const revision = requiredOption(args, "revision");
+    const nodeAppRoot = resolve(requiredOption(args, "node-app-root"));
+    const target: ComponentUpdateTarget = {
+      channel: "stable",
+      platform: readPlatform(args),
+      arch: readArchitecture(args),
+    };
+    const shipped = await shipComponentRelease({
+      workspace,
+      localRoot,
+      feedUrl: signing.feedUrl,
+      target,
+      identity: signing.identity,
+      pinnedStableKeys: signing.pinnedStableKeys,
+      components: NODE_RUNTIME_RELEASE_COMPONENTS,
+      nodeAppRoot,
+      expectedNodeAppSourceId: buildNativeSourceProvenance(workspace).sourceId,
+      revision,
+      ...(option(args, "output") ? { outputDirectory: option(args, "output") } : {}),
+      processEnvironment: releaseChildEnvironment(process.env),
+      coordinatorUrl:
+        option(args, "coordinator")
+        ?? (process.env.MYCELLIOS_COMPONENT_UPDATE_PUBLISH_URL?.trim() || signing.feedUrl),
+      ...authorization,
+    });
+    print(shipped);
     break;
   }
   case "ship": {
@@ -126,6 +173,17 @@ function prepareOptions(
     ...(option(options, "revision")
       ? { revision: option(options, "revision") }
       : {}),
+  };
+}
+
+function stablePinsFromEnvironment(): {
+  pinnedStableKeys?: PrepareComponentReleaseOptions["pinnedStableKeys"];
+} {
+  const value = process.env[NODE_COMPONENT_TRUST_ENV]?.trim();
+  if (!value) return {};
+  return {
+    pinnedStableKeys:
+      nodeComponentUpdatesSchema.parse(JSON.parse(value)).pinnedKeys.stable,
   };
 }
 
@@ -281,6 +339,12 @@ function printHelp(): void {
       "  npm run dev:update:keygen",
       "  npm run dev:update:coordinator",
       "  npm run dev:update:ship -- --coordinator http://127.0.0.1:8787",
+      "",
+      "Stable node runtime release (CI, installer-release.yml):",
+      "  tsx scripts/component-update-cli.ts release --platform win32 --arch x64 \\",
+      "    --revision <sha> --node-app-root build/node-app/windows-x64",
+      "  needs MYCELLIOS_COMPONENT_STABLE_SIGNING_KEY, MYCELLIOS_NODE_COMPONENT_TRUST",
+      "  and MYCELLIOS_MODEL_ADMIN_TOKEN; it refuses to run without them.",
       "",
       "Remote ship uses the same command with an HTTPS coordinator and",
       "MYCELLIOS_MODEL_ADMIN_TOKEN_FILE. Enroll enrollment.json once in the",

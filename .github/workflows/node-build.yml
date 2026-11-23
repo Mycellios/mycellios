@@ -114,6 +114,7 @@ jobs:
             --runtime=build/distribution-runtime \
             --node-executable="$(node -p 'process.execPath')" \
             --node-modules=node_modules \
+            --python-source=build/python \
             --source-root=. \
             --target="${{ matrix.target }}" \
             --source-revision="$GITHUB_SHA" \
