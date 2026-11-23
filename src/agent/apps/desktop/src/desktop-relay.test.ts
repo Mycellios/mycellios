@@ -1,11 +1,21 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { DesktopRelayClient, missingOperationAction } from "./desktop-relay.js";
+import { DesktopRelayClient, missingOperationAction, pollRetryDelayMs } from "./desktop-relay.js";
 
 it("forgets a settled delivery and still aborts an unsettled orphan", () => {
   const settled = new Set(["done"]);
   expect(missingOperationAction("done", ["done"], settled)).toBe("keep");
   expect(missingOperationAction("done", [], settled)).toBe("forget");
   expect(missingOperationAction("orphan", [], settled)).toBe("abort");
+});
+
+it("backs off failed polls instead of retrying at once, up to five seconds", () => {
+  expect([0, 1, 2, 3, 4, 5, 6, 12].map((failures) => pollRetryDelayMs(failures, true))).toEqual([
+    0, 250, 500, 1_000, 2_000, 4_000, 5_000, 5_000,
+  ]);
+  // Without agent execution the ordinary 2 s poll interval is already the floor.
+  expect([0, 1, 4, 5, 9].map((failures) => pollRetryDelayMs(failures, false))).toEqual([
+    2_000, 2_000, 2_000, 4_000, 5_000,
+  ]);
 });
 
 afterEach(() => {
@@ -311,7 +321,8 @@ it("recovers after a long network outage but does not claim a live connection wh
     await client.bind("bot"); await vi.advanceTimersByTimeAsync(2_000);
     offline = true; await vi.advanceTimersByTimeAsync(50_000);
     expect(client.connected("bot")).toBe(false); expect(revoked).not.toHaveBeenCalled();
-    const before = binds; offline = false; await vi.advanceTimersByTimeAsync(2_000);
+    // A failed poll waits at most the 5 s retry cap before trying again.
+    const before = binds; offline = false; await vi.advanceTimersByTimeAsync(5_000);
     expect(client.connected("bot")).toBe(true); expect(binds).toBeGreaterThan(before);
   } finally { client.stop(); }
 });
