@@ -1599,7 +1599,31 @@ export function threadLifecycleErrorCode(error: ThreadLifecycleError) {
 }
 
 export function logUnexpectedRpcError(error: unknown, path: readonly string[]): void {
-  if (error instanceof ORPCError) return;
+  if (error instanceof ORPCError) {
+    // A procedure that answers 5xx on purpose (an upstream it needs is down) is still a server
+    // failure. The access log only shows "/rpc/*", so name the procedure and what it reported.
+    if (error.status >= 500) {
+      getLogger().warn(`rpc ${path.join("/")} returned ${error.code}`, {
+        "error.code": error.code,
+        "http.status": error.status,
+        reason: rpcFailureReason(error),
+      });
+    }
+    return;
+  }
   const where = `rpc ${path.join("/")} failed`;
   getLogger().error(where, error);
+}
+
+const RPC_FAILURE_REASON_MAX = 300;
+
+/** The deepest cause's message (undici keeps the host and errno there), else the error's own. */
+function rpcFailureReason(error: ORPCError<string, unknown>): string | undefined {
+  let reason: string | undefined = error.message || undefined;
+  let cause: unknown = error.cause;
+  for (let depth = 0; cause instanceof Error && depth < 5; depth += 1) {
+    if (cause.message) reason = cause.message;
+    cause = cause.cause;
+  }
+  return reason?.slice(0, RPC_FAILURE_REASON_MAX);
 }
