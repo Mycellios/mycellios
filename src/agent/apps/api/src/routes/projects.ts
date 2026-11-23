@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { createRepos, isOwnedRoutineThread } from "@mycellios/db";
-import { isMicoTaskThread, nativeWorkProjectSession } from "@mycellios/core";
+import { isMicoTaskThread, nativeWorkProjectSession, taskThreadKind } from "@mycellios/core";
 import type { RouterContext } from "./context.js";
 
 /** Metadata never grants filesystem access. Every query retains both ownership fences. */
@@ -48,7 +48,9 @@ export function projectRoutes({ deps, authed }: RouterContext) {
       const thread = await deps.prisma.thread.findFirst({ where: { ...scope, id: input.taskThreadId, taskBotId: input.botId } });
       if (!thread) throw new ORPCError("NOT_FOUND");
       if (!thread.projectKey?.startsWith("project:")) {
-        if (isMicoTaskThread(thread) || await isOwnedRoutineThread(deps.prisma, context.actor, thread)) return null;
+        // Delegated and transferred work runs in the Mico's existing workspace, as its runs do.
+        if (isMicoTaskThread(thread) || taskThreadKind(thread) === "delegation" ||
+          await isOwnedRoutineThread(deps.prisma, context.actor, thread)) return null;
         throw new ORPCError("CONFLICT", { message: "Reconnect this legacy project before continuing." });
       }
       const project = await deps.prisma.developmentProject.findFirst({ where: { ...scope, id: thread.projectKey.slice(8) } });
