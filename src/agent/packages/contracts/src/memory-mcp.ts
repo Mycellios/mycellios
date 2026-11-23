@@ -1,0 +1,218 @@
+import * as z from "zod";
+import { McpRemoteEndpointSchema } from "./mcp.js";
+
+/**
+ * Memory MCP profile v1 (specs/mcp-memory/spec.md). A remote MCP server is a memory
+ * server when it exposes these tools. The profile is product-neutral: Mycellios never
+ * names a particular memory service; any server that implements it can be connected.
+ */
+export const MEMORY_MCP_PROFILE_VERSION = 1;
+
+export const MEMORY_PROFILE_TOOLS = [
+  "memory_search",
+  "memory_read",
+  "memory_write",
+  "memory_forget",
+  "memory_status",
+] as const;
+export type MemoryProfileTool = (typeof MEMORY_PROFILE_TOOLS)[number];
+
+const REQUIRED_TOOLS: readonly MemoryProfileTool[] = ["memory_search", "memory_read"];
+const READ_ONLY_TOOLS: readonly MemoryProfileTool[] = [
+  "memory_search",
+  "memory_read",
+  "memory_status",
+];
+
+/** Input properties each profile tool must declare; other properties are allowed. */
+const REQUIRED_INPUTS: Record<MemoryProfileTool, readonly string[]> = {
+  memory_search: ["query"],
+  memory_read: ["id"],
+  memory_write: ["title", "content"],
+  memory_forget: ["id"],
+  memory_status: [],
+};
+
+const McpToolName = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9_.:-]+$/, "Tool names use letters, digits, _ . : or -");
+
+/**
+ * Optional per-connection mapping from profile tools to differently named tools with the
+ * same semantics, for servers that predate the profile. Generic data, never a vendor table.
+ */
+export const MemoryToolMappingSchema = z
+  .object({
+    memory_search: McpToolName.optional(),
+    memory_read: McpToolName.optional(),
+    memory_write: McpToolName.optional(),
+    memory_forget: McpToolName.optional(),
+    memory_status: McpToolName.optional(),
+  })
+  .strict()
+  .superRefine((mapping, ctx) => {
+    const names = Object.values(mapping).filter((name): name is string => Boolean(name));
+    if (new Set(names).size !== names.length) {
+      ctx.addIssue({ code: "custom", message: "Each profile tool needs a different server tool" });
+    }
+  });
+export type MemoryToolMapping = z.infer<typeof MemoryToolMappingSchema>;
+
+export const MemoryCapabilitiesSchema = z.object({
+  read: z.boolean(),
+  write: z.boolean(),
+  forget: z.boolean(),
+  projects: z.boolean(),
+  status: z.boolean(),
+});
+export type MemoryCapabilities = z.infer<typeof MemoryCapabilitiesSchema>;
+
+export const NO_MEMORY_CAPABILITIES: MemoryCapabilities = {
+  read: false,
+  write: false,
+  forget: false,
+  projects: false,
+  status: false,
+};
+
+/** The parts of an MCP `tools/list` entry the profile reads. */
+export interface McpToolDescription {
+  name: string;
+  inputSchema?: unknown;
+  annotations?: { readOnlyHint?: unknown; destructiveHint?: unknown } | null;
+}
+
+export type MemoryProfileEvaluation =
+  | {
+      compatible: true;
+      capabilities: MemoryCapabilities;
+      /** Server tool name serving each available profile tool. */
+      tools: Partial<Record<MemoryProfileTool, string>>;
+      warnings: string[];
+    }
+  | { compatible: false; problems: string[] };
+
+function declaredProperties(schema: unknown): Record<string, unknown> {
+  if (!schema || typeof schema !== "object") return {};
+  const properties = (schema as { properties?: unknown }).properties;
+  return properties && typeof properties === "object" && !Array.isArray(properties)
+    ? (properties as Record<string, unknown>)
+    : {};
+}
+
+function propertyAcceptsString(property: unknown): boolean {
+  if (!property || typeof property !== "object") return true;
+  const type = (property as { type?: unknown }).type;
+  if (type === undefined) return true;
+  return type === "string" || (Array.isArray(type) && type.includes("string"));
+}
+
+/**
+ * Decide whether a server's tools implement the memory profile. A required tool that is
+ * missing, lacks a required input, or declares itself not read-only (it would be called
+ * automatically every turn) makes the server incompatible. Optional tools with problems
+ * are left out and reported as warnings.
+ */
+export function evaluateMemoryProfile(
+  serverTools: readonly McpToolDescription[],
+  mapping: MemoryToolMapping = {},
+): MemoryProfileEvaluation {
+  const byName = new Map(serverTools.map((tool) => [tool.name, tool]));
+  const problems: string[] = [];
+  const warnings: string[] = [];
+  const tools: Partial<Record<MemoryProfileTool, string>> = {};
+  for (const profileTool of MEMORY_PROFILE_TOOLS) {
+    const serverName = mapping[profileTool] ?? profileTool;
+    const required = REQUIRED_TOOLS.includes(profileTool);
+    const report = (message: string) => (required ? problems : warnings).push(message);
+    const tool = byName.get(serverName);
+    if (!tool) {
+      if (required) problems.push(`Missing the required tool ${serverName}.`);
+      continue;
+    }
+    const properties = declaredProperties(tool.inputSchema);
+    const missingInputs = REQUIRED_INPUTS[profileTool].filter(
+      (input) => !(input in properties) || !propertyAcceptsString(properties[input]),
+    );
+    if (missingInputs.length > 0) {
+      report(`${serverName} does not accept ${missingInputs.join(", ")} as text.`);
+      continue;
+    }
+    if (READ_ONLY_TOOLS.includes(profileTool)) {
+      if (tool.annotations?.readOnlyHint === false) {
+        report(`${serverName} declares that it changes data, so it cannot be used for reading.`);
+        continue;
+      }
+      if (tool.annotations?.readOnlyHint !== true) {
+        warnings.push(`${serverName} does not declare itself read-only.`);
+      }
+    }
+    tools[profileTool] = serverName;
+  }
+  if (problems.length > 0) return { compatible: false, problems };
+  const searchProperties = declaredProperties(byName.get(tools.memory_search ?? "")?.inputSchema);
+  return {
+    compatible: true,
+    tools,
+    warnings,
+    capabilities: {
+      read: true,
+      write: Boolean(tools.memory_write),
+      // Forgetting is only offered alongside writing (spec: forget requires read_write).
+      forget: Boolean(tools.memory_write && tools.memory_forget),
+      projects: "projectId" in searchProperties,
+      status: Boolean(tools.memory_status),
+    },
+  };
+}
+
+export const MemoryConnectionStatusSchema = z.enum([
+  /** Saved but not checked yet. */
+  "unchecked",
+  /** The account must be authorized (OAuth) before it can be checked. */
+  "authorization_required",
+  "compatible",
+  "incompatible",
+  "unreachable",
+]);
+export type MemoryConnectionStatus = z.infer<typeof MemoryConnectionStatusSchema>;
+
+export const MemoryConnectionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  endpoint: z.string(),
+  /** The personal MCP server row that carries transport and OAuth state. */
+  serverId: z.string(),
+  oauthStatus: z.enum(["none", "connected", "reconnect"]),
+  status: MemoryConnectionStatusSchema,
+  /** Human-readable result of the last check; never contains credentials. */
+  message: z.string().nullable(),
+  capabilities: MemoryCapabilitiesSchema,
+  toolMapping: MemoryToolMappingSchema,
+  checkedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type MemoryConnection = z.infer<typeof MemoryConnectionSchema>;
+
+export const MemoryConnectionCreateInput = z.object({
+  name: z.string().trim().min(1).max(80),
+  endpoint: McpRemoteEndpointSchema,
+  /** Only for servers without OAuth; sent as `Authorization: Bearer <token>`. */
+  token: z.string().min(8).max(4096).optional(),
+  toolMapping: MemoryToolMappingSchema.default({}),
+});
+export type MemoryConnectionCreateInput = z.infer<typeof MemoryConnectionCreateInput>;
+
+/** Parse stored JSON, falling back to an empty mapping for rows written by other versions. */
+export function parseStoredMemoryToolMapping(value: unknown): MemoryToolMapping {
+  const parsed = MemoryToolMappingSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
+
+export function parseStoredMemoryCapabilities(value: unknown): MemoryCapabilities {
+  const parsed = MemoryCapabilitiesSchema.safeParse(value);
+  return parsed.success ? parsed.data : NO_MEMORY_CAPABILITIES;
+}

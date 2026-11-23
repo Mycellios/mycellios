@@ -1,4 +1,3 @@
-import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { SpaceMemoryConfig } from "@mycellios/contracts";
 import {
@@ -14,10 +13,12 @@ import {
 } from "@mycellios/ui-web";
 import { XIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { SettingsLabel } from "../components/SettingsRows";
 import { useSpaceRpc } from "../lib/space-rpc";
 import { errorText } from "../lib/user-error";
 import { SpaceMemorySection } from "./KnowledgeSection";
+import { PersonalMemoryConnections } from "./memory-providers/PersonalMemoryConnections";
 import {
   defaultMemoryProviderSettings,
   MEMORY_PROVIDER_SETTINGS,
@@ -196,6 +197,8 @@ export function MemorySettingsOverlay({
           {error ? <p className="text-[13px] text-destructive">{error}</p> : null}
 
           <SpaceMemorySection />
+
+          <PersonalMemoryConnections onBusyChange={onBusyChange} />
 
           {config === undefined ? (
             <LoadingSkeleton label={t`Loading memory settings…`} layout="settings" />

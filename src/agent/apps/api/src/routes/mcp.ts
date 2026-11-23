@@ -245,7 +245,12 @@ export function mcpRoutes(ctx: RouterContext) {
       servers: {
         list: authed.mcp.servers.list.handler(async ({ context }) => {
           const rows = await deps.prisma.mcpServer.findMany({
-            where: { spaceId: context.actor.spaceId, userId: context.actor.userId },
+            // Memory servers are managed under memory.connections, never as Mico tools.
+            where: {
+              spaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              memoryConnection: null,
+            },
             orderBy: [{ name: "asc" }, { createdAt: "asc" }],
           });
           const secretIds = rows.flatMap((row) => (row.secretId ? [row.secretId] : []));
@@ -571,6 +576,7 @@ export function mcpRoutes(ctx: RouterContext) {
                     spaceId: context.actor.spaceId,
                     userId: context.actor.userId,
                     enabled: true,
+                    memoryConnection: null,
                   },
                   select: { id: true },
                 }),
@@ -636,6 +642,7 @@ export function mcpRoutes(ctx: RouterContext) {
                 id: { in: input.assignments.map((assignment) => assignment.serverId) },
                 spaceId: context.actor.spaceId,
                 userId: context.actor.userId,
+                memoryConnection: null,
               },
               select: { id: true },
             });

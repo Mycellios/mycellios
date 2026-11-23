@@ -46,6 +46,7 @@ import { createAgentImportServices } from "../agent-import-services.js";
 import { createAgentSkillsService } from "../agent-skills.js";
 import { createBotRemoval } from "../bot-removal.js";
 import { createMcpServers } from "../mcp-servers.js";
+import { createMemoryConnections } from "../memory-connections.js";
 import { createModelConnector, prepareAllowedThinkingLevels } from "../model-credentials.js";
 import { createMycelliosProvider } from "../mycellios-provider.js";
 import type { RouterDeps } from "../router.js";
@@ -105,6 +106,12 @@ export function createRouterContext(deps: RouterDeps) {
     insertMcpServer,
     announceMcpServer,
   } = createMcpServers(deps, onboardingDeps, mcpOAuth);
+  const memoryConnections = createMemoryConnections(deps, mcpOAuth, {
+    prepareMcpServer,
+    insertMcpServer,
+    removeMcpServerInTransaction,
+    mcpAwaitsOAuth,
+  });
   const announceRoutine = createRoutineAnnouncer(deps);
   const codexCatalog = deps.codexCatalog ?? new CodexCatalogCache();
   const mycelliosProvider = createMycelliosProvider(deps, codexCatalog);
@@ -424,6 +431,7 @@ export function createRouterContext(deps: RouterDeps) {
     prepareMcpServer,
     insertMcpServer,
     announceMcpServer,
+    memoryConnections,
     announceRoutine,
     codexCatalog,
     mycelliosProvider,

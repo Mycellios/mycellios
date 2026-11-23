@@ -171,6 +171,7 @@ import {
   VoiceInfoSchema,
   VoiceStatusSchema,
 } from "./domain.js";
+import { MemoryConnectionCreateInput, MemoryConnectionSchema } from "./memory-mcp.js";
 import { ComputerCommandSchema, ProductEventSchema } from "./events.js";
 import { Id, IsoDate } from "./ids.js";
 import {
@@ -947,6 +948,14 @@ export const appContract = {
       .input(z.object({ defaultMemoryScope: MemoryScopeSchema }))
       .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
+    /** Personal memory servers over the open Memory MCP profile (specs/mcp-memory). */
+    connections: {
+      list: oc.output(z.array(MemoryConnectionSchema)),
+      create: oc.input(MemoryConnectionCreateInput).output(MemoryConnectionSchema),
+      /** List the server's tools and record whether they implement the profile. */
+      check: oc.input(z.object({ id: Id })).output(MemoryConnectionSchema),
+      remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    },
   },
   workflows: {
     list: oc.output(z.array(WorkflowSchema)),

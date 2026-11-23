@@ -1,4 +1,4 @@
-import type { McpServerHealth } from "@mycellios/contracts";
+import type { McpServerHealth, McpToolDescription } from "@mycellios/contracts";
 import type { PrismaClient } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 
@@ -9,6 +9,11 @@ export type McpServerHealthUpdate = {
   status: McpServerHealth["status"];
   message?: string | null;
   toolCount?: number | null;
+  /**
+   * Tools a successful probe listed, for callers that check a server's shape (the Memory
+   * MCP profile). Returned to the caller only; never persisted or sent to a model.
+   */
+  tools?: McpToolDescription[];
 };
 
 /**

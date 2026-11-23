@@ -15256,3 +15256,63 @@ msgstr "Ya no podrás iniciar sesión con él. Puedes volver a vincularlo más a
 #: src/pages/settings/SignInMethodsSettings.tsx
 msgid "Unlinking…"
 msgstr "Desvinculando…"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Read and write"
+msgstr "Lectura y escritura"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Read only"
+msgstr "Solo lectura"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Needs authorization"
+msgstr "Falta autorizar"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Not a memory server"
+msgstr "No es un servidor de memoria"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Unreachable"
+msgstr "No disponible"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Not checked"
+msgstr "Sin comprobar"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not load memory connections"
+msgstr "No se pudieron cargar las memorias conectadas"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not connect this memory"
+msgstr "No se pudo conectar esta memoria"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Personal memory"
+msgstr "Memoria personal"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "A memory server you own, connected over MCP. No Mico uses it until you give that Mico access."
+msgstr "Un servidor de memoria tuyo, conectado por MCP. Ningún Mico lo usa hasta que le des acceso."
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not check this memory"
+msgstr "No se pudo comprobar esta memoria"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Could not remove this memory"
+msgstr "No se pudo quitar esta memoria"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "MCP URL"
+msgstr "URL MCP"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Bearer token (only without OAuth)"
+msgstr "Token Bearer (solo sin OAuth)"
+
+#: src/pages/memory-providers/PersonalMemoryConnections.tsx
+msgid "Connect personal memory"
+msgstr "Conectar memoria personal"
