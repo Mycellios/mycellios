@@ -1,5 +1,6 @@
 export type ReleaseProduct = "desktop" | "agent";
 export type ReleaseFilter = "all" | ReleaseProduct;
+export type ChangeKind = "New" | "Improved" | "Fixed" | "Removed" | "Security";
 
 export interface ChangelogRelease {
   id: string;
@@ -10,13 +11,13 @@ export interface ChangelogRelease {
   title: string;
   summary: string;
   channel: "Preview" | "Web update";
-  groups: readonly { kind: "New" | "Improved" | "Fixed"; items: readonly string[] }[];
+  groups: readonly { kind: ChangeKind; items: readonly string[] }[];
   updateNote: string;
   sourceUrl: string;
 }
 
-/** Curated published updates. Dates refer to the linked publication, not local build time. */
-export const CHANGELOG_RELEASES: readonly ChangelogRelease[] = [
+/** Hand-written notes for publications that predate src/agent/CHANGELOG.md. Dates refer to the linked publication. */
+export const CURATED_RELEASES: readonly ChangelogRelease[] = [
   {
     id: "desktop-0-3-11-windows",
     product: "desktop",
@@ -95,6 +96,85 @@ export function releaseFilterFor(search: string): ReleaseFilter {
   return value === "desktop" || value === "agent" ? value : "all";
 }
 
-export function releasesFor(filter: ReleaseFilter): readonly ChangelogRelease[] {
-  return filter === "all" ? CHANGELOG_RELEASES : CHANGELOG_RELEASES.filter(release => release.product === filter);
+export function releasesFor(releases: readonly ChangelogRelease[], filter: ReleaseFilter): readonly ChangelogRelease[] {
+  return filter === "all" ? releases : releases.filter(release => release.product === filter);
+}
+
+const CHANGELOG_SOURCE = "https://github.com/Mycellios/mycellios/blob/main/src/agent/CHANGELOG.md";
+// Upgrade notes for self-hosters stay in the source file; they are not product changes.
+const KIND_ORDER: readonly ChangeKind[] = ["New", "Improved", "Fixed", "Removed", "Security"];
+const SECTION_KINDS:Readonly<Record<string, ChangeKind>> = { Added: "New", Changed: "Improved", Fixed: "Fixed", Removed: "Removed", Security: "Security", "Breaking changes": "Improved" };
+
+/** Plain text for a Keep a Changelog bullet: no Markdown links, code ticks or emphasis. */
+function plainChangelogText(text: string): string {
+  return text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Desktop releases from src/agent/CHANGELOG.md, the file the daily release
+ * workflow writes when it cuts a version. Unreleased notes are left out.
+ */
+export function desktopReleasesFromChangelog(markdown: string): ChangelogRelease[] {
+  const releases: ChangelogRelease[] = [];
+  let release: { version: string; date: string; groups: Map<ChangeKind, string[]> } | null = null;
+  let kind: ChangeKind | null = null;
+  let item: string[] | null = null;
+  const closeItem = () => { if (release && kind && item) release.groups.get(kind)!.push(plainChangelogText(item.join(" "))); item = null; };
+  const closeRelease = () => {
+    closeItem();
+    if (!release) return;
+    const groups = KIND_ORDER.flatMap(groupKind => release!.groups.get(groupKind)?.length ? [{ kind: groupKind, items: release!.groups.get(groupKind)! }] : []);
+    const count = groups.reduce((total, group) => total + group.items.length, 0);
+    if (count) releases.push({
+      id: `desktop-${release.version.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`,
+      product: "desktop",
+      date: release.date,
+      version: release.version,
+      platform: "Desktop & web",
+      title: "",
+      summary: `${count} ${count === 1 ? "change" : "changes"} to Mycellios Agent and the Desktop app.`,
+      channel: "Preview",
+      groups,
+      updateNote: "Get the current preview from Desktop downloads; Agent on the web updates by itself. Desktop packages are unsigned or not notarized previews, so updates are installed manually.",
+      sourceUrl: `${CHANGELOG_SOURCE}#${`${release.version} - ${release.date}`.toLowerCase().replace(/[^a-z0-9 -]/g, "").replace(/ /g, "-")}`,
+    });
+    release = null;
+  };
+  for (const line of markdown.split(/\r?\n/)) {
+    const heading = /^## \[([^\]]+)\](?: - (\d{4}-\d{2}-\d{2}))?/.exec(line);
+    if (heading) {
+      closeRelease();
+      kind = null;
+      if (heading[2] && heading[1] !== "Unreleased") release = { version: heading[1]!, date: heading[2], groups: new Map() };
+      continue;
+    }
+    const section = /^### (.+?)\s*$/.exec(line);
+    if (section) {
+      closeItem();
+      kind = SECTION_KINDS[section[1]!] ?? null;
+      if (release && kind && !release.groups.has(kind)) release.groups.set(kind, []);
+      continue;
+    }
+    if (!release || !kind) continue;
+    const bullet = /^- (.*)$/.exec(line);
+    if (bullet) { closeItem(); item = [bullet[1]!]; } else if (item && /^\s+\S/.test(line)) item.push(line.trim()); else if (!line.trim()) closeItem();
+  }
+  closeRelease();
+  return releases;
+}
+
+const versionParts = (version: string) => version.split(/[.-]/).map(part => Number(part) || 0);
+function compareVersionsDescending(a: string, b: string): number {
+  const left = versionParts(a), right = versionParts(b);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (right[index] ?? 0) - (left[index] ?? 0);
+    if (difference) return difference;
+  }
+  return 0;
+}
+
+/** Newest first; releases on the same day are ordered by version. */
+export function changelogReleases(changelogMarkdown: string): ChangelogRelease[] {
+  return [...desktopReleasesFromChangelog(changelogMarkdown), ...CURATED_RELEASES]
+    .sort((a, b) => b.date.localeCompare(a.date) || (a.product === b.product ? compareVersionsDescending(a.version, b.version) : 0));
 }

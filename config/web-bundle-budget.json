@@ -54,6 +54,10 @@
           "match": "gsap-",
           "maximumBytes": 72000
         },
+        "changelog-route": {
+          "match": "ChangelogPage-",
+          "maximumBytes": 50000
+        },
         "globe-renderer": {
           "match": "HeroGlobe-",
           "maximumBytes": 50000

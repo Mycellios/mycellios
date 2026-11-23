@@ -90,4 +90,33 @@ describe("marketing route entries", () => {
     expect((await app.inject("/account/?tab=usage")).headers.location).toBe("/account?tab=usage");
     expect((await app.inject("/dashboard")).statusCode).toBe(200);
   });
+  it("shows people a navigable 404 page while API clients keep the JSON error", async () => {
+    const app = await site();
+    const html = { accept: "text/html,application/xhtml+xml" };
+    for (const url of ["/login", "/signup/", "/sign-in"]) {
+      const moved = await app.inject({ url, headers: html });
+      expect(moved.statusCode, url).toBe(302);
+      expect(moved.headers.location, url).toBe("/agent");
+    }
+    for (const url of ["/esto-no-existe", "/loginx?next=x", "/guides/models-and-credits"]) {
+      const page = await app.inject({ url, headers: html });
+      expect(page.statusCode, url).toBe(404);
+      expect(page.headers["content-type"], url).toContain("text/html");
+      expect(page.headers["x-robots-tag"], url).toBe("noindex");
+      expect(page.body, url).toContain('<html lang="en">');
+      expect(page.body, url).toContain('href="/"');
+      expect(page.body, url).not.toContain("<script");
+    }
+    for (const request of [
+      { url: "/esto-no-existe" },
+      { url: "/public/v1/missing", headers: html },
+      { url: "/v1/missing", headers: html },
+      { url: "/assets/missing.js", headers: html },
+      { url: "/esto-no-existe", method: "POST" as const, headers: html },
+    ]) {
+      const response = await app.inject(request);
+      expect(response.statusCode, request.url).toBe(404);
+      expect(response.json(), request.url).toMatchObject({ statusCode: 404, error: "Not Found" });
+    }
+  });
 });

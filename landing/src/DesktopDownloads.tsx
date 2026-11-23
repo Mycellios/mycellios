@@ -37,6 +37,11 @@ const SYSTEMS: Array<{ id: System; name: string; Icon: typeof Apple; rows: Array
     steps: "Open the package with your software installer. On Fedora you can also install the downloaded RPM with dnf." },
 ];
 
+/** Packages built from one release share a source; list it once instead of once per package. */
+export function hasSeparateSources(catalog: DesktopDownloadCatalog): boolean {
+  return new Set(catalog.packages.map(p => (p.source ?? catalog.source).path)).size > 1;
+}
+
 export function DesktopDownloads() {
   const [recommended, setRecommended] = useState<InstallerId | "">("");
   useEffect(() => { let active = true; void detectInstaller().then(id => { if (active) setRecommended(id); }).catch(() => {}); return () => { active = false; }; }, []);
@@ -60,7 +65,8 @@ export function DesktopDownloads() {
   ] : [];
   const versionLabel = catalog ? (versions.every(p => p.version === catalog.version)
     ? `Version ${catalog.version}` : versions.map(p => `${p.platform} ${p.version}`).join(" · ")) + " · Preview" : "Checking downloads…";
-  const separateSources = catalog?.packages.some(p => p.source !== undefined);
+  // One link per distinct source: packages built from the same release share it.
+  const separateSources = catalog ? hasSeparateSources(catalog) : false;
   const suggested = recommended ? packageFor(recommended) : undefined;
   const recommendedSystem = recommended ? (recommended.startsWith("macos-") ? "macos" : recommended === "windows-x64" ? "windows" : "linux") : undefined;
   return <main className="marketing-page desktop-download-page"><MarketingHeader /><div className="desktop-downloads">
@@ -96,7 +102,7 @@ export function DesktopDownloads() {
         <Smartphone size={28} aria-hidden="true" />
         <Heading as="h2" id="desktop-android">Android</Heading>
         <dl className="desktop-specs"><div><dt>System</dt><dd>Android 8 or later</dd></div><div><dt>File</dt><dd>App package (APK)</dd></div><div><dt>Needs</dt><dd>Your Mycellios account</dd></div></dl>
-        <div className="desktop-installers"><div className="desktop-installer"><Link variant="secondary" size="md" href="#android-title">Get the Android app</Link></div></div>
+        <AndroidDownload />
       </Card>
     </div>
     <Text className="desktop-version">{versionLabel}</Text>
@@ -107,9 +113,8 @@ export function DesktopDownloads() {
       <Text>Recent Desktop builds download updates in the background. Signed channels can install when idle. This preview asks you to approve installation through the system installer. Your account, chats and project settings are kept.</Text>
       <Text>The contribution runtime is included for Windows, Linux and Apple silicon Macs. Intel Macs can use agents and local projects; compute contribution is not available yet. Joining the network requires your account and permission.</Text>
       {catalog ? <div className="desktop-checksums">{catalog.packages.map(p => <div key={p.id}><Text><strong>{platformLabel(p.id)}</strong> · {p.format} · {Math.ceil(p.bytes / 1_000_000)} MB<code>{p.sha256}</code></Text>{separateSources ? <Link href={(p.source ?? catalog.source).path}>{platformLabel(p.id)} source code and build information</Link> : null}</div>)}{!separateSources ? <Link href={catalog.source.path}>Source code and build information</Link> : null}</div> : null}
-      {fedoraPackage ? <div className="desktop-checksums"><Text><strong>Fedora</strong> · RPM · Version {fedoraPackage.version} · {Math.ceil(fedoraPackage.bytes / 1_000_000)} MB<code>{fedoraPackage.sha256}</code></Text><Link href={fedoraPackage.source.path}>Fedora source code and build information</Link></div> : null}
+      {fedoraPackage ? <div className="desktop-checksums"><Text><strong>Fedora</strong> · RPM · Version {fedoraPackage.version} · {Math.ceil(fedoraPackage.bytes / 1_000_000)} MB<code>{fedoraPackage.sha256}</code></Text>{fedoraPackage.source.path !== catalog?.source.path ? <Link href={fedoraPackage.source.path}>Fedora source code and build information</Link> : null}</div> : null}
       <footer><Link href="/downloads?product=runtime">Standalone runtime</Link><Link href="https://github.com/Mycellios/mycellios/releases">All releases on GitHub</Link></footer>
     </div></Disclosure>
-    <AndroidDownload />
   </div><MarketingFooter /></main>;
 }

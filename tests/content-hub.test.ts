@@ -115,7 +115,8 @@ describe("Content Hub blog integration", () => {
     expect(listing.statusCode).toBe(200);
     expect(listing.body.match(/<h1>/g)).toHaveLength(1);
     expect(listing.body).toContain("<h1>Notes from the network.</h1>");
-    expect(listing.body).toContain("<h2>Guides are coming soon</h2>");
+    expect(listing.body).toContain("<h2>Start with the guides</h2>");
+    expect(listing.body).toContain('href="/guides"');
   });
 
   it("server-renders list and article routes without trusting metadata as HTML", async () => {

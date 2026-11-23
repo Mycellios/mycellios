@@ -650,6 +650,7 @@ body:has(.net) { margin: 0; }
 .net-wall-activity-row .id { color: var(--rb-bronze); }
 .net-wall-activity-row .status.s-completed { color: var(--rb-sage); }
 .net-wall-activity-row .status.s-running, .net-wall-activity-row .status.s-streaming { color: rgba(238, 233, 226, .9); }
+.net-wall-activity-row .status.s-failed, .net-wall-activity-row .status.s-cancelled, .net-wall-activity-row .status.s-expired { color: #f19b8a; }
 
 .net-wall-empty { display: grid; justify-items: center; gap: 6px; padding: 42px 18px; text-align: center; }
 .net-wall-empty strong { color: rgba(238, 233, 226, .92); font-size: 12px; }
@@ -760,8 +761,8 @@ body:has(.net) { margin: 0; }
   .net-overview-list article { padding: 24px 0; }
   .net-history, .net-ledger, .net-method { padding-top: 86px; }
   .net-section-head { display: grid; align-items: start; }
-  .net-range { justify-content: flex-start; }
-  .net-range button { flex: 1 1 calc(50% - 4px); }
+  .net-range { justify-content: flex-start; flex-wrap: nowrap; width: 100%; }
+  .net-range button { flex: 1 1 0; min-width: 0; padding: 0 6px; white-space: nowrap; }
   .net-chart-grid { grid-template-columns: 1fr; }
   .net-chart { padding: 20px 16px; }
   .net-chart header { display: grid; }

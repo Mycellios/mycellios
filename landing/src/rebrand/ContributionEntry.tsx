@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Globe2, Monitor, Terminal } from "lucide-react";
 import { Button, Disclosure, DisclosureSummary, Heading, Link, Text } from "../ui/primitives";
 import { AGENT_URL } from "./AssemblageAgent";
@@ -70,7 +70,7 @@ export function ContributionEntry() {
           {(Object.keys(contributionInstallers) as Array<keyof typeof contributionInstallers>).map(value => <Button key={value} variant="ghost" aria-pressed={platform === value} onClick={() => { window.clearTimeout(timer.current); setPlatform(value); setCopyStatus(""); }}>{contributionInstallers[value].label}</Button>)}
         </div>
         <div className="contribution-terminal-code">
-          <pre tabIndex={0} aria-label={`${installer.shell} download command`}><code>{installer.command}</code></pre>
+          <pre tabIndex={0} aria-label={`${installer.shell} download command`}><code>{installer.command.split(" ").map((token, index) => <Fragment key={index}>{index ? " " : ""}<span data-command-token={/^https?:/.test(token) ? "url" : "word"}>{token}</span></Fragment>)}</code></pre>
           <Button variant="ghost" aria-label="Copy download command" onClick={() => void copyCommand()}>{copyStatus === "Command copied" ? <Check size={17} aria-hidden="true" /> : <Copy size={17} aria-hidden="true" />}</Button>
         </div>
         <Text as="small" role="status" className="contribution-terminal-status">{copyStatus || `Run in ${installer.shell} to download the latest installer · ${installer.note}`}</Text>

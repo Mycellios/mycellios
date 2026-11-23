@@ -40,6 +40,7 @@
 .mycellios-reference .contribution-terminal-code { display: flex; align-items: flex-start; gap: 4px; padding-top: 12px; border-top: 1px solid #415044; }
 .mycellios-reference .contribution-terminal-code pre { flex: 1; min-width: 0; margin: 0; padding-block: 8px; background: transparent; color: #d0e7b9; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.8; }
 .mycellios-reference .contribution-terminal-code code { font: inherit; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.mycellios-reference .contribution-terminal-code code > [data-command-token="word"] { white-space: nowrap; }
 .mycellios-reference .contribution-entry .contribution-terminal-code > button { flex: 0 0 44px; min-height: 44px; padding: 0; color: #f5f6ed; background: transparent; border: 0; box-shadow: none; }
 .mycellios-reference .contribution-entry .contribution-terminal-code > button:hover { background: #354438; }
 .mycellios-reference .contribution-terminal .contribution-terminal-status { display: block; margin-top: 12px; color: #b9c6b5; font-size: 11px; line-height: 1.6; }

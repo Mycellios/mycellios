@@ -37,7 +37,7 @@ export interface SeoPage {
 const organization = {
   "@type": "Organization",
   "@id": ORGANIZATION_ID,
-  name: "mycellios",
+  name: "Mycellios",
   url: `${SITE_ORIGIN}/`,
   slogan: "Distributed intelligence, rooted in nature.",
   logo: {
@@ -52,14 +52,14 @@ const website = {
   "@type": "WebSite",
   "@id": WEBSITE_ID,
   url: `${SITE_ORIGIN}/`,
-  name: "mycellios",
+  name: "Mycellios",
   publisher: { "@id": ORGANIZATION_ID },
 };
 
 const softwareApplication = {
   "@type": "SoftwareApplication",
   "@id": SOFTWARE_ID,
-  name: "mycellios",
+  name: "Mycellios",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Windows, macOS, Linux, Android, Web browser",
   description:
@@ -99,7 +99,9 @@ const comparisonPaths = Object.keys(comparisonPages) as ComparisonSeoPath[];
 const guidePages = Object.fromEntries([...GUIDE_INDEXES, ...MARKETING_GUIDES].map(guide => {
   const entries = MARKETING_GUIDES.filter(entry => entry.language === guide.language);
   const page = extraPage(`${guide.title} | Mycellios`, guide.description, guide.path, {
-    heading: guide.title, paragraphs: [guide.description, guide.language === "es" ? "Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar." : "Choose a guide and check the requirements of your connection. Model and tool availability can vary."],
+    heading: guide.title, paragraphs: [guide.description, "sections" in guide
+      ? (guide.language === "es" ? "Comprueba los requisitos de tu conexión antes de empezar. La disponibilidad de modelos y herramientas puede variar." : "Check the requirements of your connection before you start. Model and tool availability can vary.")
+      : (guide.language === "es" ? "Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar." : "Choose a guide and check the requirements of your connection. Model and tool availability can vary.")],
     ...("sections" in guide ? { sections: guide.sections } : {}),
     links: [...entries.filter(entry => entry.path !== guide.path).map(entry => ({ href: entry.path, label: entry.title })), { href: "https://www.mycellios.com/agent", label: guide.language === "es" ? "Abrir Mycellios" : "Open Mycellios" }, { href: "/downloads/desktop", label: guide.language === "es" ? "Descargar la aplicación" : "Download the app" }],
   });
@@ -147,7 +149,7 @@ const basePages = {
     },
   },
   "/network": extraPage(
-    "Live distributed AI network | mycellios",
+    "Live distributed AI network | Mycellios",
     "Inspect the public mycellios network snapshot: connected workers, available models, and recorded inference activity when data is available.",
     "/network", {
       heading: "Mycellios public network status",
@@ -175,9 +177,9 @@ const basePages = {
         { href: "/downloads", label: "Check native package availability" },
       ],
     }),
-  "/spore": privatePage("$SPORE participation preview | mycellios", "Preview the proposed SPORE participation flow. No token, staking contract, treasury, price feed or reward program is live.", "/spore", "SPORE participation preview"),
+  "/spore": privatePage("$SPORE participation preview | Mycellios", "Preview the proposed SPORE participation flow. No token, staking contract, treasury, price feed or reward program is live.", "/spore", "SPORE participation preview"),
   "/downloads": {
-    title: "Native package availability | mycellios",
+    title: "Native package availability | Mycellios",
     description:
       "Check which mycellios native packages are published for Windows, macOS, and Linux, or contribute from your browser without installing software.",
     canonicalPath: "/downloads",
@@ -224,14 +226,14 @@ const basePages = {
       applicationCategory: "DeveloperApplication",
       operatingSystem: "Any compatible desktop, tablet, or phone browser",
       description:
-        "A universal browser worker for voluntarily contributing compatible compute to the mycellios network.",
+        "A universal browser worker for voluntarily contributing compatible compute to the Mycellios network.",
       url: `${SITE_ORIGIN}/browser/`,
       publisher: { "@id": ORGANIZATION_ID },
     },
   },
-  "/admin": privatePage("Network administration | mycellios", "Operational administration for the mycellios network.", "/admin", "Mycellios network administration"),
+  "/admin": privatePage("Network administration | Mycellios", "Operational administration for the Mycellios network.", "/admin", "Mycellios network administration"),
   "/dashboard": privatePage("Mycellios Stats dashboard", "Inspect Mycellios capacity, model availability and recorded network work.", "/dashboard", "Mycellios dashboard"),
-  "/account": privatePage("Account and subscription | mycellios", "Secure account, subscription, billing and usage management for mycellios.", "/account", "Mycellios account and subscription"),
+  "/account": privatePage("Account and subscription | Mycellios", "Secure account, subscription, billing and usage management for Mycellios.", "/account", "Mycellios account and subscription"),
 } satisfies Record<string, SeoPage>;
 
 export const SEO_PAGES = basePages as typeof basePages & Record<string, SeoPage>;
@@ -332,7 +334,7 @@ export function applySeoMetadata(pathname = window.location.pathname): void {
   upsertMeta("name", "description", page.description);
   upsertMeta("name", "robots", page.robots);
   upsertMeta("property", "og:type", "website");
-  upsertMeta("property", "og:site_name", "mycellios");
+  upsertMeta("property", "og:site_name", "Mycellios");
   upsertMeta("property", "og:locale", page.language === "es" ? "es_ES" : "en_US");
   upsertMeta("property", "og:url", url);
   upsertMeta("property", "og:title", page.title);

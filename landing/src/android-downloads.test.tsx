@@ -9,7 +9,7 @@ it("admits only an owned versioned APK with source and signer identity",()=>{
 });
 it("exposes Android voice and manual install guidance without inventing an available release",()=>{
  const html=renderToStaticMarkup(<AndroidDownload/>);
- expect(html).toContain("Download for Android");expect(html).toContain("disabled");
+ expect(html).toContain("Download for Android");expect(html).toContain("disabled");expect(html).not.toContain("android-title");
  expect(html).toContain("Quick Tap");expect(html).toContain("screen on");
  expect(html).toContain("Updates are manual");expect(html).not.toContain('href="/downloads/android/releases');
 });

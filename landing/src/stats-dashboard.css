@@ -56,7 +56,7 @@
 .stats-table-wrap td:first-child { max-width:320px; overflow-wrap:anywhere; }
 .stats-table-wrap td small { display:block; margin-top:5px; color:#59635d; font-size:11px; }
 .stats-connected { color:#426b4d; }
-.stats-offline { color:#77756d; }
+.stats-offline { color:#646259; }
 .stats-pagination { display:flex; align-items:center; gap:15px; justify-content:flex-end; margin-top:15px; }
 .stats-pagination > small { margin-right:auto; color:#59635d; font-size:12px; }
 .stats-methodology { margin:50px 0 65px; max-width:900px; }

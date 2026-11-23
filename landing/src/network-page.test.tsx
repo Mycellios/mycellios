@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { NetworkPage, deriveDailyJobs, deriveNetworkMetrics, historyForRange, nodeState, type NetworkSnapshot, type NetworkTelemetryHistory } from "./NetworkPage";
+import { NetworkPage, deriveDailyJobs, deriveNetworkMetrics, publicNodeName, historyForRange, nodeState, type NetworkSnapshot, type NetworkTelemetryHistory } from "./NetworkPage";
 import {
   BORDER_LINES,
   LAND_POINTS,
@@ -128,6 +128,17 @@ describe("network observatory", () => {
     expect(deriveNetworkMetrics(privateRegions).regions).toBe(0);
   });
 
+  it("uses the coordinator's deduplicated GPU count and never shows raw region tags as node names", () => {
+    expect(deriveNetworkMetrics({ ...snapshot, summary: { ...snapshot.summary, gpuCount: 4 } }).gpuCount).toBe(4);
+    const { gpuCount: _omitted, ...summaryWithoutGpus } = snapshot.summary;
+    const cellOnly = { ...snapshot, summary: summaryWithoutGpus, workers: [{ ...snapshot.workers[0]!, kind: "cell" as const }] };
+    expect(deriveNetworkMetrics(cellOnly).gpuCount).toBe(0); // pipeline cells add no hardware
+    const worker = snapshot.workers[0]!;
+    expect(publicNodeName({ ...worker, region: "eu-private-wan" })).not.toContain("eu-private-wan");
+    expect(publicNodeName({ ...worker, region: "owner-native" })).not.toContain("owner-native");
+    expect(publicNodeName({ ...worker, region: "Madrid" })).toBe("Madrid");
+  });
+
   it("places known regions at their real coordinates and flags unknown ones", () => {
     const madrid = placeWorker("Madrid", "worker-madrid-1");
     expect(madrid!.located).toBe(true);
@@ -250,12 +261,14 @@ describe("network observatory", () => {
   it("renders the reference-grade chart wall from persisted samples only", () => {
     const html = renderToStaticMarkup(<NetworkPage initialSnapshot={snapshot} initialHistory={wallHistory} animate={false} />);
     expect(html).toContain('id="net-wall-network-title"');
-    expect(html).toContain("jobs completed per day");
+    expect(html).toContain("Jobs completed per day");
     expect(html).toContain("derived from the persisted cumulative counter");
-    expect(html).toContain("online capacity (GB)");
-    expect(html).toContain("observed VRAM on connected online workers");
-    expect(html).toContain("nodes online");
-    expect(html).toContain("workers online");
+    expect(html).toContain("Online capacity (GB)");
+    expect(html).toContain("memory offered by connected online nodes");
+    expect(html).not.toContain("÷ 1024");
+    // One availability chart: the same series is not repeated under a second name.
+    expect(html).toContain("Nodes online");
+    expect(html).not.toContain("workers online");
     expect(html).toContain("sampled every 10 min");
     // Striped bars render as stacks of thin rects inside a bronze group.
     expect(html).toContain('class="net-wall-bars"');

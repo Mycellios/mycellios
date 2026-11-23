@@ -13,6 +13,7 @@ import {
   visitorLocation,
   type Vec3,
 } from "./network-globe";
+import { publicHardwareLabel, publicRegionLabel } from "./network-labels";
 import "./network-page.css";
 import "./ui/dark-theme.css";
 
@@ -64,6 +65,10 @@ export interface NetworkSnapshot {
     mobile: number;
     offeredVramMb: number;
     completedJobs: number;
+    /** Physical GPUs on online, deduplicated hosts (coordinator inventory). */
+    gpuCount?: number;
+    /** Connected coordinator pipeline cells; they never add hardware. */
+    virtualWorkers?: number;
   };
   workers: NetworkWorker[];
   models: Array<{ id: string; replicas: number; pipelines: number }>;
@@ -139,8 +144,9 @@ export function deriveNetworkMetrics(snapshot: NetworkSnapshot) {
         return location ? [`${location.lon},${location.lat}`] : [];
       }),
   );
-  const gpuCount = activeWorkers.reduce(
-    (total, worker) => total + (worker.gpus.length || (worker.kind === "browser" ? 1 : 0)),
+  // Prefer the coordinator's inventory: it merges sessions of one host and skips virtual cells.
+  const gpuCount = snapshot.summary.gpuCount ?? activeWorkers.reduce(
+    (total, worker) => total + (worker.kind === "cell" ? 0 : worker.gpus.length || (worker.kind === "browser" ? 1 : 0)),
     0,
   );
   return {
@@ -715,7 +721,7 @@ export function NetworkPage({
     done();
   }, []);
 
-  return <><LandingHeader active="network" /><main className={`net net-view-${viewMode}`}>
+  return <><LandingHeader active="network" tone="dark" /><main className={`net net-view-${viewMode}`}>
     <div className="net-stage">
       {viewMode === "globe" && <canvas
         ref={canvasRef}
@@ -752,7 +758,7 @@ export function NetworkPage({
               aria-label={hasData ? `Interactive globe showing ${nodes.length} Mycellios worker records with reported regional locations` : "Interactive globe awaiting network snapshot"}
               role="img"
             />
-            <header><span>REPORTED REGIONS</span><strong>{hasData ? `${snapshot.summary.online} online · ${metrics.regions} regions` : "Awaiting snapshot"}</strong></header>
+            <header><span>REPORTED REGIONS</span><strong>{hasData ? `${snapshot.summary.online} online · ${metrics.regions ? `${metrics.regions} ${metrics.regions === 1 ? "region" : "regions"}` : "locations not reported"}` : "Awaiting snapshot"}</strong></header>
             <UiButton type="button" onClick={() => selectViewMode("globe")} aria-label="Open full-screen globe"><ArrowRight /></UiButton>
           </UiCard>
           <DashboardChart title="Online capacity" unit="GB" samples={visibleHistory?.samples ?? []} series={[{ key: "offeredVramMb", label: "Online", tone: "bronze", divisor: 1024 }, { key: "freeVramMb", label: "Free", tone: "sage", divisor: 1024 }]} />
@@ -830,7 +836,7 @@ export function NetworkPage({
 
       {!loading && !error && nodes.length === 0 && <div className="net-empty">
         <strong>{snapshot.workers.length ? "Waiting for reported locations" : "No nodes announced"}</strong>
-        <span>{snapshot.workers.length ? `${unlocatedWorkers} worker records have not reported a supported city. They are included in the network totals. Review their region settings to place them on the map.` : "The coordinator is reachable, but no worker is currently visible."}</span>
+        <span>{snapshot.workers.length ? `${unlocatedWorkers === 1 ? "One node has" : `${unlocatedWorkers} nodes have`} not reported a supported city. They are still included in the network totals.` : "The coordinator is reachable, but no worker is currently visible."}</span>
         <UiLink href="/dashboard?view=nodes">Review worker regions →</UiLink>
       </div>}
 
@@ -865,8 +871,9 @@ export function NetworkPage({
             <UiCard className="net-signal-group">
               <header><strong>LIVE</strong><span>coordinator snapshot</span></header>
               <div className="net-signal-cards">
-                <SignalCard label="Workers online" value={observed(metrics.activeWorkers.length)} tone="healthy" />
-                <SignalCard label="Native nodes" value={observed(metrics.activeWorkers.filter((worker) => worker.kind !== "browser").length)} />
+                <SignalCard label="Nodes online" value={observed(snapshot.summary.online)} tone="healthy" />
+                <SignalCard label="GPUs online" value={observed(metrics.gpuCount)} />
+                <SignalCard label="Pipeline cells" value={observed(snapshot.summary.virtualWorkers ?? metrics.activeWorkers.filter((worker) => worker.kind === "cell").length)} />
                 <SignalCard label="Browser nodes" value={observed(snapshot.summary.mobile)} />
                 <SignalCard label="Models serving" value={observed(metrics.availableModels)} />
                 <SignalCard label="Tasks in flight" value={observed(metrics.activeJobs.length)} />
@@ -896,7 +903,7 @@ export function NetworkPage({
 
         <section className="net-wall" aria-labelledby="net-wall-network-title">
           <header className="net-wall-head">
-            <UiHeading as="h2" id="net-wall-network-title">network</UiHeading>
+            <UiHeading as="h2" id="net-wall-network-title">Network history</UiHeading>
             <div className="net-range" role="group" aria-label="History range">
               {HISTORY_RANGES.map(({ value, label }) => <UiButton type="button" key={value} className={historyRange === value ? "active" : ""} aria-pressed={historyRange === value} onClick={() => selectHistoryRange(value)}>{label}</UiButton>)}
             </div>
@@ -907,13 +914,13 @@ export function NetworkPage({
           {visibleHistory && visibleHistory.samples.length > 0 ? <div className="net-wall-grid">
             <StripedBarChart
               full
-              title="jobs completed per day"
+              title="Jobs completed per day"
               note="derived from the persisted cumulative counter"
               buckets={dailyJobs}
             />
             <StepAreaChart
-              title="online capacity (GB)"
-              note="observed VRAM on connected online workers ÷ 1024"
+              title="Online capacity (GB)"
+              note="memory offered by connected online nodes"
               samples={visibleHistory.samples}
               metric="offeredVramMb"
               divisor={1024}
@@ -921,17 +928,9 @@ export function NetworkPage({
               tone="bronze"
             />
             <StepLineChart
-              title="nodes online"
-              note="observed online nodes"
-              samples={visibleHistory.samples}
-              metric="onlineNodes"
-              unit="nodes"
-              tone="ivory"
-            />
-            <StepLineChart
               full
               highResolution
-              title="workers online"
+              title="Nodes online"
               note={`sampled every ${visibleHistory.intervalMinutes} min · ${visibleHistory.samples.length} persisted observations`}
               samples={visibleHistory.samples}
               metric="onlineNodes"
@@ -943,7 +942,7 @@ export function NetworkPage({
 
         <section className="net-wall" aria-labelledby="net-wall-snapshot-title">
           <header className="net-wall-head">
-            <UiHeading as="h2" id="net-wall-snapshot-title">snapshot</UiHeading>
+            <UiHeading as="h2" id="net-wall-snapshot-title">Snapshot</UiHeading>
             <span className="net-wall-note">{hasData ? `observed ${relativeTime(snapshot.capturedAt)}` : "awaiting first snapshot"}</span>
           </header>
           <div className="net-wall-stats">
@@ -975,7 +974,7 @@ export function NetworkPage({
 
         <section className="net-wall" aria-labelledby="net-wall-activity-title">
           <header className="net-wall-head">
-            <UiHeading as="h2" id="net-wall-activity-title">recorded activity</UiHeading>
+            <UiHeading as="h2" id="net-wall-activity-title">Recorded activity</UiHeading>
             <span className="net-wall-note">latest stored jobs · age shown</span>
           </header>
           <div className="net-wall-panel net-wall-activity">
@@ -1000,7 +999,7 @@ export function NetworkPage({
           <div className="net-ledger-table" role="table" aria-label="Public node ledger">
             <div className="net-ledger-row head" role="row"><span>Node</span><span>State</span><span>Hardware</span><span>Work</span><span>Last seen</span></div>
             {metrics.activeWorkers.slice(0, 12).map((worker) => <div className="net-ledger-row" role="row" key={worker.id}>
-              <span><strong>{worker.region && worker.region !== "auto" ? worker.region : shortId(worker.id)}</strong><small>{worker.kind} · {shortId(worker.id)}</small></span>
+              <span><strong>{publicNodeName(worker)}</strong><small>{worker.kind === "cell" ? "pipeline cell" : worker.kind}{publicRegionLabel(worker.region) ? ` · ${shortId(worker.id)}` : ""}</small></span>
               <span><i className={`net-state-dot ${nodeState(worker)}`} />{nodeState(worker)}</span>
               <span><strong>{describeHardware(worker)}</strong><small>{formatMemory(worker.offeredVramMb / 1024)}</small></span>
               <span><strong>{worker.jobsCompleted.toLocaleString("en-US")}</strong><small>completed jobs</small></span>
@@ -1388,7 +1387,7 @@ function NodePanel({ node, jobs, onClose }: {
     <div className="net-panel-id">{worker.id}</div>
     <div className="net-panel-rows">
       <Row label="gpu" value={gpu
-        ? `${gpu.model.toLowerCase()} · ${formatMemory(gpu.offeredVramMb / 1_024)}`
+        ? `${describeHardware(worker)} · ${formatMemory(gpu.offeredVramMb / 1_024)}`
         : worker.kind === "browser" ? "browser compute" : "not announced"} />
       <Row label="device" value={worker.kind} />
       <Row label="memory offered" value={formatMemory(worker.offeredVramMb / 1_024)} />
@@ -1413,10 +1412,12 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function describeHardware(worker: NetworkWorker): string {
-  const gpu = worker.gpus[0];
-  if (gpu?.model) return gpu.model.toLowerCase();
-  if (worker.kind === "browser") return "browser worker";
-  return worker.kind;
+  return publicHardwareLabel(worker).toLowerCase();
+}
+
+/** A located node shows its place; everything else shows its short id, never a raw region tag. */
+export function publicNodeName(worker: NetworkWorker): string {
+  return publicRegionLabel(worker.region) ?? shortId(worker.id);
 }
 
 function formatMemory(gigabytes: number): string {
