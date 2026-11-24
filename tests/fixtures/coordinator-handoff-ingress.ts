@@ -1,10 +1,13 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
+import { promisify } from "node:util";
+
+const run = promisify(execFile);
 
 const relay = `
 const net = require('node:net');
@@ -35,7 +38,8 @@ export function coordinatorHandoffIngress(kitPath: string, source: string) {
     members.push(name);
   }
   function command(script: string, ...args: string[]) {
-    return execFileSync("bash", [join(kit, script), ...args], { encoding: "utf8", timeout: 45_000 });
+    // These scripts probe coordinators running on this event loop.
+    return run("bash", [join(kit, script), ...args], { encoding: "utf8", timeout: 20_000 });
   }
   async function register(revision: string, backend: string) {
     if (!created) {
@@ -84,8 +88,9 @@ export function coordinatorHandoffIngress(kitPath: string, source: string) {
       // Use Docker DNS, the same upstream resolution used for production alias probes.
       for (let attempt = 0; attempt < 30; attempt++) {
         try {
-          const reply = JSON.parse(docker("exec", gateway, "wget", "-T", "1", "-qO-",
-            `http://coordinator-release-${revision}:4174/health`));
+          const { stdout } = await run("docker", ["exec", gateway, "wget", "-T", "1", "-qO-",
+            `http://coordinator-release-${revision}:4174/health`], { encoding: "utf8", timeout: 3_000 });
+          const reply = JSON.parse(stdout);
           if (reply.revision === revision && reply.status === "ok" &&
               (await fetch(address + "/health", { signal: AbortSignal.timeout(1_000) })).ok) return;
         } catch { /* A fixture container may still be booting. */ }
@@ -94,10 +99,10 @@ export function coordinatorHandoffIngress(kitPath: string, source: string) {
       throw new Error("Ingress fixture did not reach the exact coordinator");
     },
     async transfer(from: string, to: string, changeOwner: () => Promise<void>) {
-      command("hold.sh", "hold", state, operation, from);
+      await command("hold.sh", "hold", state, operation, from);
       await changeOwner();
-      command("switch.sh", gateway, state, operation, from, to);
-      command("hold.sh", "release", state, operation, to);
+      await command("switch.sh", gateway, state, operation, from, to);
+      await command("hold.sh", "release", state, operation, to);
       const response = await fetch(address + "/health", { signal: AbortSignal.timeout(3_000) });
       if (!response.ok || (await response.json()).revision !== to) throw new Error("Ingress did not serve transferred revision");
     },
