@@ -1,0 +1,10 @@
+{
+  "extensionName": { "message": "Mycellios Agent" },
+  "extensionDescription": { "message": "Tus Micos en el panel lateral de Chrome." },
+  "actionTitle": { "message": "Abrir Mycellios Agent" },
+  "signInTitle": { "message": "Inicia sesión en Mycellios" },
+  "signIn": { "message": "Iniciar sesión" },
+  "unavailableTitle": { "message": "No se puede conectar con Mycellios" },
+  "retry": { "message": "Reintentar" },
+  "openInTab": { "message": "Abrir en una pestaña" }
+}

@@ -51,7 +51,17 @@ export interface ContentSecurityPolicyExtensions {
   connectSrc?: readonly string[];
   /** Only the app-managed Desktop instance may embed a selected local project's server. */
   localProjectPreview?: boolean;
+  /** The hosted web app may open in the official browser extension's side panel. */
+  browserExtensionFrames?: boolean;
 }
+
+/**
+ * Origins of the official Mycellios browser extension (apps/browser-extension). Its manifest key
+ * pins this ID, so only that extension's side panel may frame the app; no page or other extension.
+ */
+export const BROWSER_EXTENSION_ORIGINS = [
+  "chrome-extension://bnbdbnbloaeblmjpoknddcffkmpfhmgg",
+] as const;
 
 // An https origin with an optional port and no path. A wildcard covers subdomains of a base with at
 // least two labels (https://*.example.com), so it cannot cover a whole top-level domain.
@@ -91,6 +101,9 @@ export function appContentSecurityPolicy(extensions: ContentSecurityPolicyExtens
       ...APP_DIRECTIVES["frame-src"]!,
       ...(extensions.localProjectPreview ? ["http://127.0.0.1:*", "http://localhost:*"] : []),
     ],
+    "frame-ancestors": extensions.browserExtensionFrames
+      ? [...BROWSER_EXTENSION_ORIGINS]
+      : APP_DIRECTIVES["frame-ancestors"]!,
   });
 }
 

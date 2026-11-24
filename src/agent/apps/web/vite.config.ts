@@ -529,6 +529,8 @@ export default defineConfig(async ({ command, mode }) => {
   // Invalid origins throw here, so the server refuses to start rather than serve a wider policy.
   const appPolicy = appContentSecurityPolicy({
     localProjectPreview: Boolean(desktopStackToken),
+    // The hosted app (never the Desktop-managed stack) opens in the extension's side panel.
+    browserExtensionFrames: !desktopStackToken,
     scriptSrc: parseContentSecuritySources(
       "RAKAZO_CSP_SCRIPT_SRC",
       process.env.RAKAZO_CSP_SCRIPT_SRC ?? rootEnv.RAKAZO_CSP_SCRIPT_SRC,
