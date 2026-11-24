@@ -1,5 +1,6 @@
 import type { AttachmentMimeType, MessageBlock } from "@mycellios/contracts";
 import {
+  ATTACHMENT_DOCX_MIME_TYPE,
   ATTACHMENT_MAX_BYTES,
   attachmentSizeLabel,
   isAllowedAttachmentMimeType,
@@ -202,6 +203,7 @@ const EXTENSION_MIME_TYPES: Record<string, AttachmentMimeType> = {
   ".htm": "text/html",
   ".json": "application/json",
   ".zip": "application/zip",
+  ".docx": ATTACHMENT_DOCX_MIME_TYPE,
 };
 
 const MIME_TYPE_EXTENSIONS: Record<AttachmentMimeType, string> = {
@@ -221,6 +223,7 @@ const MIME_TYPE_EXTENSIONS: Record<AttachmentMimeType, string> = {
   "text/html": ".html",
   "application/json": ".json",
   "application/zip": ".zip",
+  [ATTACHMENT_DOCX_MIME_TYPE]: ".docx",
 };
 
 export function inferAttachmentMimeType(

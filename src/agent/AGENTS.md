@@ -92,6 +92,16 @@
   safe types; everything else downloads. Verify artifact-shares and
   ArtifactShareButton tests plus scripts/verify-artifact-shares-db.ts.
 
+- Word (.docx) attachments preview in the chat file card, review workspace and
+  Library, as the reference app's file preview does (behavior reference only; no
+  copied code). `lib/docx-preview.ts` bounds the file (20 MiB, declared ZIP
+  expansion), converts it with the pinned mammoth in a terminable module worker,
+  keeps only embedded raster images and sanitizes the HTML with a private DOMPurify
+  allowlist before DocxViewer renders it with app tokens. Never fetch linked
+  resources or run document content; failures show the existing error with the
+  download kept. Shared links keep downloading .docx. Verify docx-preview,
+  DocxViewer and the media-preview E2E.
+
 - PC app control (`pc_windows`, `pc_snapshot`, `pc_act`) follows
   specs/desktop-accessibility-control/spec.md. Desktop runs the pinned agent-desktop
   CLI (`app-control-runner.ts`, SHA-256 verified before every call, Windows x64 only)
