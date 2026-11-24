@@ -499,6 +499,10 @@ These rules apply to the complete repository.
   inserts and preserves jobs and unsettled usage during startup. Do not enable
   it for ordinary crash recovery or use it by itself to run two live coordinators.
   Validate both generations with `tests/release-admission.postgres.test.ts`.
+- Use `dist/coordinator/release-admission-main.js` from an isolated operator
+  container with `MYCELLIOS_RELEASE_OWNER_URL_FILE` mounted privately.
+  The command binds mutations to the exact baked revision. Never mount the
+  owner credential in a serving or standby coordinator.
 - The handoff runtime reports process-local job and transport counts at
   `/internal/release/work` over unforwarded loopback. This observation does not
   certify a global drain. The controller must also verify admission ownership,

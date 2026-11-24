@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - src/coordinator/release-admission.ts
+      - 'src/coordinator/release-admission-*.ts'
       - 'src/coordinator/release-standby*.ts'
       - tests/release-admission.postgres.test.ts
       - tests/coordinator-release-standby.postgres.test.ts

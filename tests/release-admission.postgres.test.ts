@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import postgres from "postgres";
 import { NativeReleaseAdmission } from "../src/coordinator/release-admission.js";
+import { runReleaseAdmissionCommand } from "../src/coordinator/release-admission-command.js";
 import { MeshDatabase } from "../src/storage/database.js";
 const enabled = Boolean(process.env.MYCELLIOS_RELEASE_TEST_POSTGRES_URL);
 const schema = "release_test_" + Math.random().toString(36).slice(2);
@@ -92,4 +93,18 @@ it.skipIf(!enabled)("fences persistent application database connections by relea
   } finally {
     await Promise.all([incumbent.close(), candidate.close()]);
   }
+});
+
+it.skipIf(!enabled)("runs image-bound operator commands against real PostgreSQL", async () => {
+  const gate = new NativeReleaseAdmission(sql, schema);
+  const next = "b".repeat(40);
+  const run = (image: string, ...args: string[]) => runReleaseAdmissionCommand(gate, args, image);
+  await expect(run(next, "close", revision)).rejects.toThrow("release_admission_image_mismatch");
+  await expect(run(revision, "status", revision)).rejects.toThrow("Native admission is not closed");
+  expect(await run(revision, "close", revision)).toEqual({ revision, barrier: "active" });
+  await expect(run(revision, "transfer", revision, next)).rejects.toThrow("release_admission_image_mismatch");
+  expect(await run(next, "status", revision)).toMatchObject({ revision, barrier: "active" });
+  expect(await run(next, "transfer", revision, next)).toEqual({ revision: next, barrier: "active" });
+  await expect(run(revision, "open", next)).rejects.toThrow("release_admission_image_mismatch");
+  expect(await run(next, "open", next)).toEqual({ revision: next, barrier: "removed" });
 });
