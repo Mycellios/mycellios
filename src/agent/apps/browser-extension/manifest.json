@@ -8,16 +8,16 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr/scFEz1UCOxHXyMYauZQQr26xSnwG0DuuaVu1ByClq2QyWwoJBCn4dvvz9Jd3HLdqneJ9Q6SqKmi2QNZXY1qrLt1qEAj9d1tYYRs9rM+FBxPyH3wfrhe+mQU/QZewzmVyNw3M7iD3pOnkBpDYTyiYk6Tm7CJXD9p7oOHZddoFr6hj18q5lWR6FUCIn4oQMOABiSsIoqUqGRtfMWJ09i0UPg0UYITBr0EXORalGUvQ7WHGRRlGuf8RWB5OnVE8A4j8OWdVhh0YJb/stIChtbjgdq8bgWxVgXlyWUzPvN4JZO08ulkarggptdhKmP1spHeFc2e4RXkHGATqD6x+8k6QIDAQAB",
   "minimum_chrome_version": "116",
   "icons": {
-    "16": "icons/icon-64.png",
-    "32": "icons/icon-64.png",
-    "48": "icons/icon-192.png",
-    "128": "icons/icon-192.png"
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "action": {
     "default_title": "__MSG_actionTitle__",
     "default_icon": {
-      "16": "icons/icon-64.png",
-      "32": "icons/icon-64.png"
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
     }
   },
   "side_panel": {

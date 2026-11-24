@@ -20,6 +20,14 @@ The hosted app sends `frame-ancestors 'none'` except for the origins in
 ID. Only the public key is in the repository. A Chrome Web Store listing gets its own ID, which
 must be added to that list before the listed build can open the app.
 
+## Chrome Web Store package
+
+The Store refuses a manifest with a `key` field. Build the upload ZIP from this folder with the
+`key` field removed and the extension's private key at the ZIP root as `key.pem`, so the first
+upload keeps the ID that `BROWSER_EXTENSION_ORIGINS` names. The private key never goes into the
+repository. If the Store assigns a different ID anyway, add that origin to the list and deploy
+before publishing the listing. Raise `version` in the manifest for each upload.
+
 ## Permissions
 
 - `sidePanel`: show Agent beside the page.
