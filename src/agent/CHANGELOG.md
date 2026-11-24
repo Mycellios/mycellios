@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-24
+
+### Added
+
+- Talk to a group by voice. The voice conversation button now shows in a group's message box:
+  what you say goes to the group like a typed message, and each Mico that answers is read
+  aloud in its own voice as soon as it finishes. The panel shows the Mico that is speaking or
+  working, else the group's lead.
+- "Read new replies aloud" now works in groups too. It reads the first answer to your newest
+  message, or the answer of the Mico you named, in that Mico's voice.
+
+### Fixed
+
+- Show the Credits balance more reliably when the Mycellios service is busy. The server now
+  shares one short balance read per account, and still reads a fresh balance after a turn
+  ends or contributed work is verified.
+- Mycellios checks for computer updates much less often while none is running, and not at all
+  while the window is hidden. Progress still appears at once when you start an update, and an
+  update started on another device appears within a minute.
+- A PC connected to a project folder now waits for work instead of asking the server every
+  two seconds, which cuts its background traffic sharply. New work still starts right away.
+- The web app can update when you click Update with a saved chat draft. Your draft is still there after the page reloads.
+- Once every teammate has answered, "Waiting for replies" shrinks to one "Replies in" line
+  that closes as soon as you click it. Before, the full list stayed open and closing it waited
+  for the server.
+- Mycellios Agent can open in Chrome's side panel with the Chrome Web Store version of the extension.
+- Windows updates no longer fill the disk. Each update kept a full copy of the previous
+  version (about 1.5–2 GB) next to the app and never removed it. Now only the two most recent
+  copies stay, for rolling back by hand, and older ones are removed after the next successful
+  update.
+
 ## [0.22.0] - 2026-11-24
 
 ### Added
