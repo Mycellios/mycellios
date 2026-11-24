@@ -54,7 +54,7 @@ export async function codingEnginesForComputer(
     engines: engines.flatMap(({ id, available }) =>
       available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
     ),
-    signedOut: signedOutEngines(engines),
+    signedOut: signedOutEngines(engines) as Array<"codex" | "claude" | "opencode">,
   };
 }
 
