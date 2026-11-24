@@ -99,12 +99,17 @@ it.skipIf(!enabled)("runs image-bound operator commands against real PostgreSQL"
   const gate = new NativeReleaseAdmission(sql, schema);
   const next = "b".repeat(40);
   const run = (image: string, ...args: string[]) => runReleaseAdmissionCommand(gate, args, image);
+  expect(await run(next, "state")).toEqual({ revision: null, barrier: "removed" });
+  await expect(run(next, "state", revision)).rejects.toThrow("release_admission_command_invalid");
   await expect(run(next, "close", revision)).rejects.toThrow("release_admission_image_mismatch");
   await expect(run(revision, "status", revision)).rejects.toThrow("Native admission is not closed");
   expect(await run(revision, "close", revision)).toEqual({ revision, barrier: "active" });
+  expect(await run(next, "state")).toEqual({ revision, barrier: "active" });
   await expect(run(revision, "transfer", revision, next)).rejects.toThrow("release_admission_image_mismatch");
   expect(await run(next, "status", revision)).toMatchObject({ revision, barrier: "active" });
   expect(await run(next, "transfer", revision, next)).toEqual({ revision: next, barrier: "active" });
+  expect(await run(revision, "state")).toEqual({ revision: next, barrier: "active" });
   await expect(run(revision, "open", next)).rejects.toThrow("release_admission_image_mismatch");
   expect(await run(next, "open", next)).toEqual({ revision: next, barrier: "removed" });
+  expect(await run(revision, "state")).toEqual({ revision: null, barrier: "removed" });
 });

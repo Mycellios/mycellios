@@ -1,6 +1,6 @@
 import type { NativeReleaseAdmission } from "./release-admission.js";
 
-type AdmissionGate = Pick<NativeReleaseAdmission, "close" | "transfer" | "status" | "open">;
+type AdmissionGate = Pick<NativeReleaseAdmission, "close" | "transfer" | "status" | "open" | "currentRevision">;
 
 export async function runReleaseAdmissionCommand(
   gate: AdmissionGate,
@@ -8,6 +8,10 @@ export async function runReleaseAdmissionCommand(
   imageRevision: string | null,
 ) {
   const [command, revision, candidate] = args;
+  if (command === "state" && args.length === 1) {
+    const owner = await gate.currentRevision();
+    return { revision: owner, barrier: owner === null ? "removed" as const : "active" as const };
+  }
   const exactRevision = (value: string | undefined): value is string => /^[a-f0-9]{40}$/.test(value ?? "");
   if (!exactRevision(revision)) throw new Error("release_admission_command_invalid");
 

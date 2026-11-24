@@ -34,6 +34,9 @@ export class NativeReleaseAdmission {
     if (current !== null && current !== revision) throw new Error("A different release owns native admission");
     return current !== null;
   }
+  currentRevision(): Promise<string | null> {
+    return this.owner(this.sql);
+  }
   async transfer(previous: string, candidate: string): Promise<void> {
     this.label(previous);
     const label = this.label(candidate);
