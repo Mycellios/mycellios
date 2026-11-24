@@ -233,6 +233,7 @@ import {
   writeSaved,
 } from "../lib/query";
 import { getResponseStreamingEnabled, subscribeResponseStreaming } from "../lib/response-streaming";
+import { rosterPollInterval } from "../lib/roster-poll";
 import type { Panel, RightPanelState } from "../lib/right-panel-state";
 import {
   readRightPanelState,
@@ -1821,13 +1822,18 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         });
       });
     let refreshTimer: number | undefined;
+    let pollStopped = false;
+    let poll: number | undefined;
     const refreshVisibleBots = () => {
       if (document.visibilityState !== "visible" && !callsEnabledRef.current) return;
       window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(
         () =>
           void refreshBots().catch((error) => {
-            if (!isRetryableError(error)) window.clearInterval(poll);
+            if (!isRetryableError(error)) {
+              pollStopped = true;
+              window.clearTimeout(poll);
+            }
           }),
         50,
       );
@@ -1836,14 +1842,20 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     document.addEventListener("visibilitychange", refreshVisibleBots);
     // Poll skips while a refresh is in flight; focus/visibility and event-driven
     // callers still bump botsRefreshEpoch so only the latest response applies.
-    const poll = window.setInterval(() => {
-      if (botsRefreshInFlight.current > 0) return;
-      refreshVisibleBots();
-    }, 3_000);
+    // It follows closely while a Mico works and checks less often when all are idle.
+    const schedulePoll = () => {
+      if (pollStopped || cancelled) return;
+      poll = window.setTimeout(() => {
+        if (botsRefreshInFlight.current === 0) refreshVisibleBots();
+        schedulePoll();
+      }, rosterPollInterval(botsRef.current));
+    };
+    schedulePoll();
     return () => {
       cancelled = true;
+      pollStopped = true;
       window.clearTimeout(refreshTimer);
-      window.clearInterval(poll);
+      window.clearTimeout(poll);
       window.removeEventListener("focus", refreshVisibleBots);
       document.removeEventListener("visibilitychange", refreshVisibleBots);
     };

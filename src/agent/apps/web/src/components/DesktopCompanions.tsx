@@ -8,6 +8,14 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { desktopBridge } from "../lib/desktop";
 
+/** What a waiting Mico's island questions depend on; the key includes the account scope. */
+export function companionQuestionKey(
+  scope: string,
+  bot: Pick<Bot, "id" | "status" | "updatedAt" | "preview">,
+): string {
+  return JSON.stringify([scope, bot.id, bot.status, bot.updatedAt, bot.preview]);
+}
+
 export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
   bots: Bot[]; spaceId: string | null; scope: string;
   onOpen?: (spaceId: string, path: string) => void;
@@ -17,6 +25,7 @@ export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
   const bridge = desktopBridge()?.companions;
   const requestScope = useRef(scope);
   requestScope.current = scope;
+  const questionCache = useRef(new Map<string, { key: string; prompts: DesktopQuestionPrompt[] }>());
   useEffect(() => {
     if (!bridge?.onQuestion || !bridge.questionResult) return;
     return bridge.onQuestion(async (request: DesktopQuestionRequest) => {
@@ -65,10 +74,19 @@ export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
       const islandEnabled = Boolean(island?.shown && (island.scopes?.[scope] ?? island.futureScopes ?? true));
       if (islandEnabled) {
         const waiting = bots.filter(bot => !bot.archivedAt && bot.spaceId === spaceId && bot.status === "waiting_input").slice(0, 20);
+        // The roster refreshes often; a waiting Mico's questions only change with its
+        // status, newest activity or preview, so its history is read again only then.
+        const known = questionCache.current;
+        for (const id of [...known.keys()]) if (!waiting.some(bot => bot.id === id)) known.delete(id);
         for (let offset = 0; offset < waiting.length && alive; offset += 4) {
           await Promise.all(waiting.slice(offset, offset + 4).map(async bot => {
+            const key = companionQuestionKey(scope, bot);
+            const cached = known.get(bot.id);
+            if (cached?.key === key) { questions.push(...cached.prompts); return; }
             try { const snapshot = await rpc.threads.get({ botId: bot.id });
-              if (alive) questions.push(...companionQuestions(bot.id, snapshot));
+              const prompts = companionQuestions(bot.id, snapshot);
+              known.set(bot.id, { key, prompts });
+              if (alive) questions.push(...prompts);
             } catch { /* A disconnected Space exposes no cached questions. */ }
           }));
         }

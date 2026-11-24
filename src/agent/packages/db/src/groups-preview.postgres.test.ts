@@ -47,7 +47,8 @@ function trackMessageReads(pool: Pool): MessageRead[] {
     if (!result || typeof (result as Promise<unknown>).then !== "function") return result;
     return (result as Promise<QueryResult>).then((queryResult) => {
       const text = sqlText(args[0]);
-      if (/^\s*select\b/i.test(text) && MESSAGE_FROM.test(text)) {
+      // The window fingerprint reads one hash per thread, not message rows.
+      if (/^\s*select\b/i.test(text) && MESSAGE_FROM.test(text) && !/\bmd5\(/i.test(text)) {
         reads.push({ text, values: sqlValues(args), rowCount: queryResult.rowCount ?? 0 });
       }
       return queryResult;

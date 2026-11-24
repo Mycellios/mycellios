@@ -26,6 +26,28 @@ export interface SidebarPreviewMessage {
 }
 
 /**
+ * Opened newest messages by thread, reused only while their window fingerprint still matches,
+ * so a changed thread is always read again. Process-wide, bounded by entries and by the size
+ * of each entry; the oldest entries leave first.
+ */
+const newestMessageCache = new Map<string, { fingerprint: string; rows: SidebarPreviewMessage[] }>();
+const NEWEST_MESSAGE_CACHE_LIMIT = 3_000;
+const NEWEST_MESSAGE_CACHE_MAX_BYTES = 16_384;
+
+function rememberNewestMessage(
+  key: string,
+  entry: { fingerprint: string; rows: SidebarPreviewMessage[] },
+) {
+  newestMessageCache.delete(key);
+  newestMessageCache.set(key, entry);
+  while (newestMessageCache.size > NEWEST_MESSAGE_CACHE_LIMIT) {
+    const oldest = newestMessageCache.keys().next().value;
+    if (oldest === undefined) break;
+    newestMessageCache.delete(oldest);
+  }
+}
+
+/**
  * A fingerprint of the same window `withNewestThreadMessages` reads, built in the database from
  * each message's id, role, links and stored blocks (ciphertext when sealed), without decrypting
  * anything. A new message, a streamed update, an edit or a deletion changes it, so a result
@@ -75,7 +97,24 @@ export async function withNewestThreadMessages<T extends { thread: { id: string 
   const quiet = options.skipQuietRoutineRuns
     ? Prisma.sql`AND NOT (role = 'system' AND blocks @> ${QUIET_ROUTINE_RUN_MARKER}::jsonb)`
     : Prisma.empty;
-  const threadIds = parents.flatMap((parent) => (parent.thread ? [parent.thread.id] : []));
+  const allThreadIds = parents.flatMap((parent) => (parent.thread ? [parent.thread.id] : []));
+  // Single-message previews (other Spaces, groups, outside chats) are read on every sidebar
+  // refresh. A thread whose newest message is unchanged reuses its opened copy instead of
+  // being read and decrypted again.
+  const reusable = limit === 1;
+  const fingerprints = reusable
+    ? await newestThreadWindowFingerprints(prisma, allThreadIds, 1, options)
+    : new Map<string, string>();
+  const reused = new Map<string, SidebarPreviewMessage[]>();
+  if (reusable) {
+    const quietKey = options.skipQuietRoutineRuns ? "q" : "a";
+    for (const threadId of allThreadIds) {
+      const cached = newestMessageCache.get(`${quietKey}:${threadId}`);
+      if (cached && cached.fingerprint === fingerprints.get(threadId))
+        reused.set(threadId, cached.rows.map((row) => ({ ...row })));
+    }
+  }
+  const threadIds = allThreadIds.filter((threadId) => !reused.has(threadId));
   const loaded =
     threadIds.length === 0
       ? []
@@ -94,11 +133,23 @@ export async function withNewestThreadMessages<T extends { thread: { id: string 
           ORDER BY m."threadId", m.seq DESC
         `);
   const opened = (await contentEncryptionOf(prisma)?.openRows("Message", loaded)) ?? loaded;
-  const byThread = new Map<string, SidebarPreviewMessage[]>();
+  const byThread = new Map<string, SidebarPreviewMessage[]>(reused);
   for (const row of opened) {
     const list = byThread.get(row.threadId);
     if (list) list.push(row);
     else byThread.set(row.threadId, [row]);
+  }
+  if (reusable) {
+    const quietKey = options.skipQuietRoutineRuns ? "q" : "a";
+    for (const threadId of threadIds) {
+      const fingerprint = fingerprints.get(threadId);
+      const rows = byThread.get(threadId) ?? [];
+      if (fingerprint && JSON.stringify(rows).length <= NEWEST_MESSAGE_CACHE_MAX_BYTES)
+        rememberNewestMessage(`${quietKey}:${threadId}`, {
+          fingerprint,
+          rows: rows.map((row) => ({ ...row })),
+        });
+    }
   }
   return parents.map((parent) => ({
     ...parent,
