@@ -27,6 +27,8 @@ queue/steering semantics and authoritative event reducer.
   opens its mention search. Opening a chat must not load every Mico's routines.
 - An empty transcript with a failed run explains the failure and preserves the
   existing composer error and recovery controls.
+- Switching Spaces cannot wait indefinitely for a browser transition capture.
+  If the capture stalls, commit the same scoped navigation without the crossfade.
 - Measure real components in a deterministic browser fixture at desktop and mobile
   widths, including slow acknowledgements, SSE-first delivery, rejection, navigation,
   long transcripts and progress bursts. This is UI evidence, not a live model's
