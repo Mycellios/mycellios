@@ -478,6 +478,7 @@ export function compileAutoDistribution(
     request.phasePlans = { prefill: forced, decode: forced };
     manifest = buildRuntimePipelineManifest(request);
   }
+  assertRootOwnsReturnEndpoint(config, manifest);
   const cwd = process.cwd();
   const snapshotIdentity = BigInt(`0x${profile.source.snapshotIdentityUint64Hex}`).toString(10);
   const launch = compilePythonLaunchDescription(manifest, {
@@ -518,6 +519,38 @@ export function compileAutoDistribution(
     launch,
     boundaries: stageBoundaries(manifest),
   };
+}
+
+/**
+ * The last stage dials the return endpoint and the coordinator calls the API on
+ * whichever node the planner chose as root. When a route crosses machines, both
+ * must name that root node; otherwise the tail dials the wrong host and only
+ * times out minutes later. Pin the root with `stageRoles: ["head"]` when the
+ * endpoints are fixed. Managed agents reach the root through their own tunnel.
+ */
+function assertRootOwnsReturnEndpoint(
+  config: AutoDistributionConfig,
+  manifest: RuntimePipelineManifestV2,
+): void {
+  const stageNodes = manifest.plans.decode.stages.map((stage) =>
+    config.nodes.find((node) => node.id === stage.anchor.memberId));
+  const root = stageNodes[0];
+  if (!root || root.agent.kind === "managed") return;
+  const remoteRoot = root.agent.kind === "http";
+  const crossesMachines = stageNodes.some((node) => node?.agent.kind === "http");
+  if (!crossesMachines) return;
+  const mismatch = (field: string, value: string) =>
+    new Error(
+      `auto_distribute_root_endpoint_mismatch:${root.id}:${field}=${value}:expected=${root.endpoint.host}`
+      + ` (the planner placed the root on ${root.id}; set ${field} to its address`
+      + ` or pin the root with stageRoles ["head"])`,
+    );
+  if (config.runtime.returnEndpoint.host !== root.endpoint.host) {
+    throw mismatch("returnEndpoint.host", config.runtime.returnEndpoint.host);
+  }
+  if (remoteRoot && config.runtime.apiAdvertiseHost !== root.endpoint.host) {
+    throw mismatch("apiAdvertiseHost", config.runtime.apiAdvertiseHost);
+  }
 }
 
 /** Constructs calibration launches without first requiring a resident default route. */
