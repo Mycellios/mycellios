@@ -6832,8 +6832,8 @@ msgstr "New version available"
 msgid "Your chats stay saved. Tasks running on the server will continue while Mycellios refreshes."
 msgstr "Your chats stay saved. Tasks running on the server will continue while Mycellios refreshes."
 
-msgid "Send your draft and attachments, finish any call or recording, and close edited forms before updating. If it still fails, try again when connected."
-msgstr "Send your draft and attachments, finish any call or recording, and close edited forms before updating. If it still fails, try again when connected."
+msgid "Finish any call or recording, send or remove pending attachments, and save and close open forms before updating."
+msgstr "Finish any call or recording, send or remove pending attachments, and save and close open forms before updating."
 
 msgid "Retrying…"
 msgstr "Retrying…"
@@ -14177,6 +14177,10 @@ msgstr "Stop {name}"
 #: src/components/AwaitingReplies.tsx
 msgid "Hide this list"
 msgstr "Hide this list"
+
+#: src/components/AwaitingReplies.tsx
+msgid "Replies in"
+msgstr "Replies in"
 
 #: src/components/AwaitingReplies.tsx
 msgid "The list could not be updated. Try again."

@@ -93,7 +93,7 @@ describe("client updates", () => {
     expect(read).toHaveBeenCalledTimes(1); finish(NEW);
     expect(await first).toBe(NEW); expect(await second).toBe(NEW);
     expect(ctx.updates.getSnapshot()).toBe(NEW); expect(ctx.deps.reload).not.toHaveBeenCalled();
-    expect(await ctx.updates.applyUpdate()).toBe(false); unsubscribe();ctx.stop();
+    expect(await ctx.updates.applyUpdate()).toBe("work-pending"); unsubscribe();ctx.stop();
   });
   it("announces a served newer build and updates only after explicit apply", async () => {
     const { updates, deps } = setup();
@@ -104,7 +104,7 @@ describe("client updates", () => {
     expect(updates.getSnapshot()).toBe(NEW);
     expect(notify).toHaveBeenCalledOnce();
     expect(deps.reload).not.toHaveBeenCalled();
-    expect(await updates.applyUpdate()).toBe(true);
+    expect(await updates.applyUpdate()).toBe("reloading");
     stop();
   });
 
@@ -114,11 +114,11 @@ describe("client updates", () => {
     updates.noteServerBuild(NEW);
     await flush();
     expect(updates.getSnapshot()).toBeNull();
-    expect(await updates.applyUpdate()).toBe(false);
+    expect(await updates.applyUpdate()).toBe("unavailable");
     stop();
   });
 
-  it("protects calls, pending attachments and unsent drafts on manual update", async () => {
+  it("protects unsaved work but allows a manual update with a saved draft", async () => {
     let held = false;
     let draft = false;
     const { updates, deps } = setup({ holdsUnsavedWork: () => held, hasUnsentDraft: () => draft });
@@ -126,22 +126,23 @@ describe("client updates", () => {
     updates.noteServerBuild(NEW);
     await flush();
     held = true;
-    expect(await updates.applyUpdate()).toBe(false);
+    expect(await updates.applyUpdate()).toBe("work-pending");
+    expect(deps.reload).not.toHaveBeenCalled();
     held = false;
     draft = true;
-    expect(await updates.applyUpdate()).toBe(false);
-    expect(deps.reload).not.toHaveBeenCalled();
+    expect(await updates.applyUpdate()).toBe("reloading");
+    expect(deps.reload).toHaveBeenCalledOnce();
     stop();
   });
 
   it("rechecks unsaved work after fetching the served build", async () => {
     let draft = false;
-    const { updates, deps } = setup({ hasUnsentDraft: () => draft });
+    const { updates, deps } = setup({ holdsUnsavedWork: () => draft });
     const stop = updates.subscribe(vi.fn());
     updates.noteServerBuild(NEW);
     await flush();
     vi.mocked(deps.servedBuild).mockImplementation(async () => { draft = true; return NEW; });
-    expect(await updates.applyUpdate()).toBe(false);
+    expect(await updates.applyUpdate()).toBe("work-pending");
     expect(deps.reload).not.toHaveBeenCalled();
     stop();
   });
@@ -390,7 +391,7 @@ describe("client updates", () => {
     const { updates, deps } = setup();
     const stop = updates.subscribe(vi.fn());
     await flush();
-    expect(await updates.applyUpdate()).toBe(true);
+    expect(await updates.applyUpdate()).toBe("reloading");
     expect(deps.reload).toHaveBeenCalledOnce();
     stop();
   });

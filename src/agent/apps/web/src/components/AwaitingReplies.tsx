@@ -6,7 +6,7 @@ import type {
   AwaitingWork,
 } from "@mycellios/contracts";
 import { Button, NativeSelect } from "@mycellios/ui-web";
-import { MessagesSquare } from "lucide-react";
+import { MessagesSquare, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 
@@ -27,7 +27,8 @@ const EMPTY: AwaitingRepliesData = { requests: [], work: [] };
  * "Waiting for replies", above a Mico's composer: the teammates its requests still wait on
  * ("{done} of {total} replies in", one row each with Stop), and the tasks it delegated. A
  * stopped delegated task offers Continue, Reassign and Cancel through the revisioned work
- * controls; Continue resumes it where it stopped. A settled list can be hidden.
+ * controls; Continue resumes it where it stopped. Once every answer is in, the list shrinks to
+ * one "Replies in" line that hides at once (the server call follows).
  */
 export function AwaitingReplies({
   rpc,
@@ -47,12 +48,15 @@ export function AwaitingReplies({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
+  /** Requests hidden here before the server confirms, so Hide answers at once. */
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const current = useRef(botId);
   current.current = botId;
 
   useEffect(() => {
     setData(EMPTY);
     setError(false);
+    setHidden(new Set());
   }, [botId]);
   useEffect(() => {
     let live = true;
@@ -79,7 +83,8 @@ export function AwaitingReplies({
     };
   }, [rpc, botId, refreshKey, reload]);
 
-  if (!data.requests.length && !data.work.length) return null;
+  const requests = data.requests.filter((request) => !hidden.has(request.requestId));
+  if (!requests.length && !data.work.length) return null;
 
   async function act(key: string, action: () => Promise<unknown>) {
     if (busy) return;
@@ -115,7 +120,58 @@ export function AwaitingReplies({
         return t`${name} was stopped`;
     }
   };
-  const settledRequests = data.requests.filter((request) => request.settled);
+  async function hide(requestIds: string[]) {
+    const owner = current.current;
+    setError(false);
+    setHidden((previous) => new Set([...previous, ...requestIds]));
+    try {
+      await rpc.tasks.hideAwaitingReplies({ requestIds });
+    } catch {
+      if (current.current !== owner) return;
+      setHidden((previous) => {
+        const next = new Set(previous);
+        for (const id of requestIds) next.delete(id);
+        return next;
+      });
+      setError(true);
+    }
+  }
+
+  if (!data.work.length && requests.every((request) => request.settled)) {
+    // Nothing is owed any more: one line saying who answered, and a close button.
+    const outcomes = [
+      ...new Set(
+        requests.flatMap((request) => request.recipients.map((recipient) => hint(recipient))),
+      ),
+    ].join(" · ");
+    return (
+      <section
+        data-testid="awaiting-replies"
+        data-settled="true"
+        aria-label={t`Replies in`}
+        className="pointer-events-auto mx-auto mb-2 flex w-full min-w-0 max-w-[42rem] items-center gap-2 rounded-2xl border border-border bg-background/95 py-1.5 ps-3 pe-1.5 text-sm shadow-sm backdrop-blur"
+      >
+        <MessagesSquare size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="shrink-0 text-xs font-medium text-muted-foreground">{t`Replies in`}</span>
+        <span className="min-w-0 flex-1 truncate" dir="auto" title={outcomes}>
+          {outcomes}
+        </span>
+        {error ? (
+          <span role="alert" className="shrink-0 text-xs text-muted-foreground">
+            {t`The list could not be updated. Try again.`}
+          </span>
+        ) : null}
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={t`Hide this list`}
+          onClick={() => void hide(requests.map((request) => request.requestId))}
+        >
+          <X aria-hidden="true" />
+        </Button>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -126,26 +182,8 @@ export function AwaitingReplies({
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         <MessagesSquare size={14} className="shrink-0" aria-hidden="true" />
         <span className="flex-1">{t`Waiting for replies`}</span>
-        {settledRequests.length &&
-        settledRequests.length === data.requests.length &&
-        !data.work.length ? (
-          <Button
-            size="xs"
-            variant="ghost"
-            disabled={busy !== null}
-            onClick={() =>
-              void act("hide", () =>
-                rpc.tasks.hideAwaitingReplies({
-                  requestIds: settledRequests.map((request) => request.requestId),
-                }),
-              )
-            }
-          >
-            {t`Hide this list`}
-          </Button>
-        ) : null}
       </div>
-      {data.requests.map((request) => (
+      {requests.map((request) => (
         <RequestRows
           key={request.requestId}
           request={request}
@@ -207,10 +245,12 @@ function RequestRows({
       data-settled={request.settled ? "true" : "false"}
       className="flex flex-col gap-1 rounded-xl bg-muted/40 px-3 py-2"
     >
-      <p className="text-xs font-medium tabular-nums text-muted-foreground" role="status">
-        {t`${done} of ${total} replies in`}
-        {group ? <span className="ms-1 font-normal">· {t`in ${group}`}</span> : null}
-      </p>
+      {total > 1 || group ? (
+        <p className="text-xs font-medium tabular-nums text-muted-foreground" role="status">
+          {t`${done} of ${total} replies in`}
+          {group ? <span className="ms-1 font-normal">· {t`in ${group}`}</span> : null}
+        </p>
+      ) : null}
       {request.recipients.map((recipient) => {
         const name = recipient.name;
         const stoppable = recipient.state === "asked" || recipient.state === "working";

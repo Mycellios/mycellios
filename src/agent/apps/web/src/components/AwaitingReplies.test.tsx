@@ -141,17 +141,61 @@ describe("Waiting for replies", () => {
     expect(view.tasks.awaitingReplies).toHaveBeenCalledTimes(2);
   });
 
-  it("offers Hide this list once every answer is in, and names the group", async () => {
+  it("shrinks to one Replies in line once every answer is in, and hides it at once", async () => {
     const view = render([settled]);
+    let finish: (value: unknown) => void = () => {};
+    view.tasks.hideAwaitingReplies.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
     await view.draw();
     await flush();
     const list = view.host.querySelector("[data-testid=awaiting-replies]")!;
-    expect(list.textContent).toContain("2 of 2 replies in");
-    expect(list.textContent).toContain("in Launch");
-    expect(list.textContent).toContain("Writer was stopped");
+    expect(list.getAttribute("aria-label")).toBe("Replies in");
+    expect(list.textContent).toContain("Analyst replied · Writer was stopped");
+    expect(list.textContent).not.toContain("Waiting for replies");
     await act(async () => button(list, "Hide this list")!.click());
-    await flush();
     expect(view.tasks.hideAwaitingReplies).toHaveBeenCalledWith({ requestIds: ["request-1"] });
+    // Gone before the server answers.
+    expect(view.host.querySelector("[data-testid=awaiting-replies]")).toBeNull();
+    await act(async () => finish({ ok: true }));
+  });
+
+  it("brings the line back and says so when hiding fails", async () => {
+    const view = render([settled]);
+    view.tasks.hideAwaitingReplies.mockRejectedValueOnce(new Error("offline"));
+    await view.draw();
+    await flush();
+    await act(async () =>
+      button(view.host.querySelector("[data-testid=awaiting-replies]")!, "Hide this list")!.click(),
+    );
+    await flush();
+    expect(view.host.querySelector("[data-testid=awaiting-replies]")).not.toBeNull();
+    expect(view.host.querySelector("[role=alert]")?.textContent).toBe(
+      "The list could not be updated. Try again.",
+    );
+  });
+
+  it("skips the count for a single teammate", async () => {
+    const view = render([
+      {
+        requests: [
+          {
+            requestId: "request-2",
+            createdAt: "2026-11-22T10:00:00.000Z",
+            settled: false,
+            recipients: [{ botId: "writer", name: "Writer", state: "working" }],
+          },
+        ],
+        work: [],
+      },
+    ]);
+    await view.draw();
+    await flush();
+    const list = view.host.querySelector("[data-testid=awaiting-replies]")!;
+    expect(list.textContent).not.toContain("replies in");
+    expect(list.textContent).toContain("Writer is working on it");
   });
 
   it("stops a delegated task with the revisioned controls and offers Continue, Reassign and Cancel once stopped", async () => {

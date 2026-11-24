@@ -16,7 +16,7 @@ function BrowserWebUpdates() {
   const ready = useSyncExternalStore(updates.subscribe, updates.getSnapshot, () => null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"work-pending" | "unavailable" | null>(null);
   const { t } = useLingui();
   const slot = useWebUpdateSlot();
   if (!ready || ready === dismissed || desktopBridge()) return null;
@@ -46,10 +46,11 @@ function BrowserWebUpdates() {
       </details>
       {error && (
         <p role="status" className="mt-2 text-sm">
-          <Trans>
-            Send your draft and attachments, finish any call or recording, and close edited forms
-            before updating. If it still fails, try again when connected.
-          </Trans>
+          {error === "work-pending" ? (
+            <Trans>Finish any call or recording, send or remove pending attachments, and save and close open forms before updating.</Trans>
+          ) : (
+            <Trans>Could not complete the update. Try again.</Trans>
+          )}
         </p>
       )}
       <div className="mt-4 flex flex-wrap justify-end gap-2">
@@ -60,11 +61,12 @@ function BrowserWebUpdates() {
           disabled={busy}
           onClick={async () => {
             setBusy(true);
-            setError(false);
+            setError(null);
             try {
-              if (!(await updates.applyUpdate())) setError(true);
+              const result = await updates.applyUpdate();
+              if (result !== "reloading") setError(result);
             } catch {
-              setError(true);
+              setError("unavailable");
             } finally {
               setBusy(false);
             }

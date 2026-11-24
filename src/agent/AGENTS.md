@@ -1090,7 +1090,7 @@
   A native Android WebView build without push must say so; do not claim Expo,
   APNs/FCM or closed-app delivery without owned configuration and physical proof.
   Web update checks share the existing guarded tracker; they never deploy servers
-  or reload through open settings/drafts/calls. Desktop uses the installed package's
+  or reload through open settings, unsaved work or calls. Desktop uses the installed package's
   real updater policy; do not fabricate channel/automatic-install permissions.
   Account navigation shows all authorized sections directly. Models remain
   reachable from Micos, approvals from Computer use and usage from Billing.
@@ -1434,10 +1434,11 @@
   fallback where no slot is mounted. Keep the same guarded update action and
   dismissal state; never manufacture a download percentage for web refreshes.
   Native download percentages come only from the Desktop bridge's observations.
-  Keep manual reloads guarded against unsaved work, including after the version fetch;
-  desktop retains its separate native installer prompt.
+  Manual reloads may restore already-persisted composer text. Keep guards for unsaved work
+  before and after the version fetch; desktop retains its separate native installer prompt.
   Detect web-only releases from the served build on foreground/minute checks;
-  even required upgrades must retain draft, attachment, recording and call guards.
+  Automatic and required upgrades still wait for unsent drafts. All upgrades keep the
+  attachment, recording and call guards. Verify client-update, client-update-work and WebUpdates.
   Refreshing the client must never cancel or replay server tasks.
   Curated release notes live in `lib/release-notes.ts` and `ReleaseNotes.tsx`.
   Show them after a newer bundle actually loads, using the prior observed build
