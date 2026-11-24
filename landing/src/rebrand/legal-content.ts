@@ -1,7 +1,6 @@
 /**
- * Public legal documents. DRAFT: written from how the product works today and
- * still pending legal review. `[[...]]` marks facts only the owner can supply;
- * the page highlights them and shows a draft notice while any remain.
+ * Public legal documents. `[[...]]` marks unresolved facts in a draft.
+ * The page highlights them and shows a draft notice while any remain.
  */
 export interface LegalSection {
   id: string;
@@ -20,6 +19,8 @@ export interface LegalDocument {
 const COMPANY = "[[legal name of the company]]";
 const ADDRESS = "[[registered address]]";
 const CONTACT = "hello@mycellios.com";
+const PRIVACY_CONTACT = "contact@nodecodex.io";
+const PRIVACY_MINIMUM_AGE = 16;
 
 export const TERMS: LegalDocument = {
   kind: "terms",
@@ -99,12 +100,12 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   kind: "privacy",
   title: "Mycellios Privacy Policy",
-  updated: "[[date of publication]]",
+  updated: "24 November 2026",
   intro:
-    "This policy explains what personal data Mycellios processes, why, who receives it and the choices you have. It covers the website, the Agent workspace, the Desktop and Android apps, the API and the compute network.",
+    "This policy explains what personal data Mycellios processes, why, who receives it and the choices you have. It covers the website, the Agent workspace, the Chrome extension, the Desktop and Android apps, the API and the compute network.",
   sections: [
     { id: "controller", heading: "Who is responsible", paragraphs: [
-      `${COMPANY}, ${ADDRESS}, is responsible for your personal data. Contact: ${CONTACT}.`,
+      `NODECODEX (Andorran tax registration 393340G), Plaça Bartomeu Rebes Duran, 5, pis 0, AD500 Andorra la Vella, Andorra, is responsible for processing your personal data. Contact us at ${PRIVACY_CONTACT}.`,
     ] },
     { id: "data-we-collect", heading: "Data we collect", list: [
       "Account: your email address, name, password (stored hashed) and sign-in records.",
@@ -112,6 +113,10 @@ export const PRIVACY: LegalDocument = {
       "Payments: Credit purchases and balances. Card details are handled by Stripe; we do not receive full card numbers.",
       "Compute contribution: if you enable it, device and runtime information needed to schedule, verify and pay for work.",
       "Technical data: device and app version, IP address, error reports and logs needed to run, secure and fix the service.",
+    ] },
+    { id: "chrome-extension", heading: "Chrome extension", paragraphs: [
+      "The extension checks whether you have a Mycellios session and displays the hosted Agent workspace in Chrome’s side panel. Sign-in opens on Mycellios in a separate browser tab.",
+      "The extension’s site access is limited to www.mycellios.com. It does not read the contents of other sites, your tabs or your browsing history. Account information and anything you enter into Agent through the panel are handled as described in this policy.",
     ] },
     { id: "use", heading: "How we use it", list: [
       "to provide Mycellios and run your agents, routines and integrations;",
@@ -142,25 +147,27 @@ export const PRIVACY: LegalDocument = {
     { id: "transfers", heading: "International transfers", paragraphs: [
       "Some providers process data outside your country. When they do, we rely on appropriate safeguards, such as standard contractual clauses, where the law requires them.",
     ] },
-    { id: "retention", heading: "Retention", paragraphs: [
-      "We keep your data while your account is active. When you delete content or your account, we delete it or make it anonymous within [[number]] days, except what we must keep for legal, tax or security reasons.",
+    { id: "retention", heading: "Retention and deletion", paragraphs: [
+      "We retain account information and content as needed to provide your account and the features you use. To delete your account, use the account deletion option in Mycellios settings or contact us. You can also request deletion of specific personal data.",
+      "When you delete your account, Mycellios removes your account and cleans up the agents, storage and computing resources assigned to it. A shared Space can remain available to its other members. The time needed for cleanup depends on the resources in use and the services that store them.",
+      "We may retain records that are required for accounting or other legal obligations, or that are needed to investigate fraud or resolve disputes. How long we keep those records depends on the applicable obligation or the time needed to resolve the issue.",
     ] },
     { id: "security", heading: "Security", paragraphs: [
       "We protect data with encryption in transit, access controls and isolated environments for agents. No system is completely secure; tell us at once if you find a problem.",
     ] },
     { id: "rights", heading: "Your rights", paragraphs: [
-      `You can ask to access, correct, delete, restrict or port your data, and object to processing. Write to ${CONTACT}. You can also complain to your data protection authority.`,
+      `You can ask to access, correct, delete, restrict or port your data, and object to processing. Write to ${PRIVACY_CONTACT}. You can complain to the Andorran Data Protection Agency (APDA) or your competent data protection authority.`,
     ] },
     { id: "cookies", heading: "Cookies", paragraphs: [
       "We use cookies and local storage that are needed to sign you in and keep your preferences. We do not use advertising cookies.",
     ] },
     { id: "children", heading: "Children", paragraphs: [
-      "Mycellios is not intended for people under [[minimum age]]. If you believe a child has given us data, contact us and we will delete it.",
+      `Mycellios is not intended for people under ${PRIVACY_MINIMUM_AGE}. If you believe someone under that age has given us personal data, contact us so we can investigate and delete it as appropriate.`,
     ] },
     { id: "changes", heading: "Changes", paragraphs: [
       "We may update this policy. For important changes we will notify you in the app or by email.",
     ] },
-    { id: "contact", heading: "Contact", paragraphs: [`Privacy questions: ${CONTACT}.`] },
+    { id: "contact", heading: "Contact", paragraphs: [`Privacy questions can be sent to ${PRIVACY_CONTACT}.`] },
   ],
 };
 
