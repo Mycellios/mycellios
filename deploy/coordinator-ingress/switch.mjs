@@ -4,16 +4,18 @@ import { join, resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { configuration, hostname, operation, parseGate, replace, revision, syncDir } from "./route-state.mjs";
 
-const [gateway, stateDir, id, previous, candidate] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const observing = args[0] === "--observe";
+const [gateway, stateDir, id, previous, candidate] = observing ? args.slice(1) : args;
 if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(gateway ?? "")
-    || !stateDir || !operation.test(id ?? "") || !revision.test(previous ?? "") || !revision.test(candidate ?? "")
-    || previous === candidate || process.argv.length !== 7) {
+    || !stateDir || (observing ? args.length !== 3 : args.length !== 5
+      || !operation.test(id ?? "") || !revision.test(previous ?? "") || !revision.test(candidate ?? "")
+      || previous === candidate)) {
   throw new Error("usage: switch.mjs GATEWAY STATE_DIRECTORY OPERATION_ID PREVIOUS_SHA CANDIDATE_SHA");
 }
 const state = realpathSync(resolve(stateDir));
 const active = join(state, "active.conf");
 const pending = join(state, "pending.json");
-const transition = JSON.stringify({ id, previous, candidate }) + "\n";
 
 function docker(...args) {
   const result = spawnSync("docker", args, { encoding: "utf8", timeout: 5_000, maxBuffer: 64 * 1024 });
@@ -55,43 +57,58 @@ if (!mounts.some((mount) => mount.Type === "bind" && mount.Source === state
     && mount.Destination === "/etc/mycellios-route" && mount.RW === false)) {
   throw new Error("gateway does not use the expected route directory");
 }
-if (parseGate(readFileSync(join(state, "gate.json"), "utf8")).hold !== id) {
-  throw new Error("ingress hold required before changing route");
+const gate = parseGate(readFileSync(join(state, "gate.json"), "utf8"));
+if (observing) {
+  const route = health("127.0.0.1", 4175);
+  if (exists(pending) !== null || readFileSync(active, "utf8") !== configuration(route)
+      || (gate.hold === null && gate.revision !== route)) {
+    throw new Error("route transition requires recovery before observation");
+  }
+  console.log(JSON.stringify({ route, ingressRevision: gate.revision, hold: gate.hold }));
+} else {
+  await switchRoute();
 }
 
-const journal = exists(pending);
-const onDisk = readFileSync(active, "utf8");
-if (journal !== null && journal !== transition) throw new Error("another route transition requires recovery");
-if (onDisk !== configuration(previous) && onDisk !== configuration(candidate)) throw new Error("unexpected route configuration");
-let live = null;
-try { live = health("127.0.0.1", 4175); }
-catch (error) { if (journal === null) throw error; }
-if (live && live !== previous && live !== candidate) throw new Error("unexpected serving revision");
-
-if (onDisk === configuration(candidate) && live === candidate) {
-  if (journal !== null) finish();
-} else {
-  if (journal === null) {
-    if (onDisk !== configuration(previous) || live !== previous || health(hostname(candidate)) !== candidate) {
-      throw new Error("candidate or source revision mismatch");
-    }
-    replace(pending, transition);
+async function switchRoute() {
+  const transition = JSON.stringify({ id, previous, candidate }) + "\n";
+  if (gate.hold !== id) {
+    throw new Error("ingress hold required before changing route");
   }
-  try {
-    if (health(hostname(candidate)) !== candidate) throw new Error("candidate revision mismatch");
-    replace(active, configuration(candidate));
-    await reloadTo(candidate);
-  } catch (error) {
+
+  const journal = exists(pending);
+  const onDisk = readFileSync(active, "utf8");
+  if (journal !== null && journal !== transition) throw new Error("another route transition requires recovery");
+  if (onDisk !== configuration(previous) && onDisk !== configuration(candidate)) throw new Error("unexpected route configuration");
+  let live = null;
+  try { live = health("127.0.0.1", 4175); }
+  catch (error) { if (journal === null) throw error; }
+  if (live && live !== previous && live !== candidate) throw new Error("unexpected serving revision");
+
+  if (onDisk === configuration(candidate) && live === candidate) {
+    if (journal !== null) finish();
+  } else {
+    if (journal === null) {
+      if (onDisk !== configuration(previous) || live !== previous || health(hostname(candidate)) !== candidate) {
+        throw new Error("candidate or source revision mismatch");
+      }
+      replace(pending, transition);
+    }
     try {
-      if (health(hostname(previous)) !== previous) throw new Error("original revision is not ready");
-      replace(active, configuration(previous));
-      await reloadTo(previous);
-    } catch (recoveryError) {
-      throw new AggregateError([error, recoveryError], "route transition requires recovery");
+      if (health(hostname(candidate)) !== candidate) throw new Error("candidate revision mismatch");
+      replace(active, configuration(candidate));
+      await reloadTo(candidate);
+    } catch (error) {
+      try {
+        if (health(hostname(previous)) !== previous) throw new Error("original revision is not ready");
+        replace(active, configuration(previous));
+        await reloadTo(previous);
+      } catch (recoveryError) {
+        throw new AggregateError([error, recoveryError], "route transition requires recovery");
+      }
+      finish();
+      throw error;
     }
     finish();
-    throw error;
   }
-  finish();
+  console.log(JSON.stringify({ previous, candidate, serving: candidate }));
 }
-console.log(JSON.stringify({ previous, candidate, serving: candidate }));

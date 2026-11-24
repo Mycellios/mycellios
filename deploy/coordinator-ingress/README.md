@@ -34,6 +34,12 @@ probe route and leaves the hold with its owner. Reverse the revisions to switch
 back while held. A reverse handoff after public traffic has opened must also
 preserve work already admitted by the candidate.
 
+Use `bash switch.sh --observe GATEWAY STATE_DIR` to read the private probe's
+revision and the configured ingress gate under a shared lock. During a hold,
+the probe can point at the candidate while the gate retains the source revision.
+An unfinished reload journal or disagreement between the running probe and
+the route file prevents a verified observation.
+
 Nginx lets established connections finish during reload. POST requests keep
 their original destination once sent. The lifecycle controller must keep
 the previous coordinator running until application work drains. This

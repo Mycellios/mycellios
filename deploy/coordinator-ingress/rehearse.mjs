@@ -91,8 +91,15 @@ try {
     run("bash", [join(directory, "switch.sh"), gateway, state, operation, from, to], { env, timeout: 45_000 });
   const gate = (action, revision, id = operation) =>
     run("bash", [join(directory, "hold.sh"), action, state, id, revision], { timeout: 45_000 });
+  const observe = async () => {
+    const { stdout } = await run("bash", [join(directory, "switch.sh"), "--observe", gateway, state],
+      { timeout: 45_000 });
+    return JSON.parse(stdout);
+  };
+  assert.deepEqual(await observe(), { route: old, ingressRevision: old, hold: null });
   await assert.rejects(change(old, candidate));
   await gate("hold", old);
+  assert.deepEqual(await observe(), { route: old, ingressRevision: old, hold: operation });
   await assert.rejects(gate("release", old, "e".repeat(64)));
   await assert.rejects(change(old, notReady));
   await gate("release", old);
@@ -130,11 +137,13 @@ exec "${dockerBin}" "$@"
   assert.equal(waiting, true);
   await change(old, candidate);
   await change(old, candidate); // Recovery after a lost success response.
+  assert.deepEqual(await observe(), { route: candidate, ingressRevision: old, hold: operation });
   assert.equal(waiting, true);
   await gate("release", candidate);
   assert.equal(await held, candidate);
   assert.deepEqual(await submission, { revision: candidate, input: "rehearsal-body", submissions: 1 });
   await until(async () => await health() === candidate);
+  assert.deepEqual(await observe(), { route: candidate, ingressRevision: candidate, hold: null });
   const switchedAddress = docker("exec", `${network}-b`, "node", "-e",
     "require('node:dns').lookup('mycellios-coordinator',(e,a)=>{if(e)throw e;console.log(a)})");
   assert.equal(switchedAddress, originalAddress);
@@ -147,6 +156,7 @@ exec "${dockerBin}" "$@"
   await change(candidate, old);
   await gate("release", old);
   await until(async () => await health() === old);
+  assert.deepEqual(await observe(), { route: old, ingressRevision: old, hold: null });
   stopTraffic = true;
   await traffic;
   assert.ok(revisions.includes(old) && revisions.includes(candidate));
