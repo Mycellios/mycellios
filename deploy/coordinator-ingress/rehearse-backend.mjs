@@ -2,7 +2,15 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
 const { REVISION: revision, READY: ready } = process.env;
-const server = createServer((request, response) => {
+let submissions = 0;
+const server = createServer(async (request, response) => {
+  if (request.url === "/fixture-submit" && request.method === "POST") {
+    let input = "";
+    for await (const chunk of request) input += chunk;
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ revision, input, submissions: ++submissions }));
+    return;
+  }
   if (request.url === "/stream") {
     response.writeHead(200, { "Content-Type": "text/plain" });
     const send = () => response.write(`${revision}\n`);

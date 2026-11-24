@@ -112,6 +112,9 @@ These rules apply to the complete repository.
   Production web/API/coordinator deploys go only through Nucleus.
   The coordinator ingress rehearsal keeps `mycellios-coordinator` on a stable
   gateway and verifies reload and rollback with concurrent traffic in Docker.
+  Route selection and the bounded hold share one atomic gate record. Check
+  that a held POST reaches the selected backend once and that existing
+  streams and WebSockets remain attached to their original backend.
   Run `node deploy/coordinator-ingress/rehearse.mjs` on an isolated Linux
   runner. Route health alone does not authorize changing application admission.
   On main pushes,

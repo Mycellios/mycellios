@@ -15,6 +15,7 @@ const gateway = `${network}-gateway`;
 const old = "a".repeat(40);
 const candidate = "b".repeat(40);
 const notReady = "c".repeat(40);
+const operation = "d".repeat(64);
 const containers = [];
 const readers = new AbortController();
 let socket;
@@ -46,14 +47,21 @@ try {
       "--mount", `type=bind,src=${join(directory, "rehearse-backend.mjs")},dst=/fixture.mjs,readonly`,
       "node:24-alpine", "node", "/fixture.mjs"]);
   }
+  chmodSync(state, 0o755);
   writeFileSync(join(state, "active.conf"), config(old));
+  writeFileSync(join(state, "gate.json"), JSON.stringify({ revision: old, hold: null }) + "\n", { mode: 0o600 });
+  launch("gate", [
+    "--mount", `type=bind,src=${state},dst=/route-state`,
+    "--mount", `type=bind,src=${directory},dst=/fixture,readonly`,
+    "node:24-alpine", "node", "/fixture/route-gate.mjs", "/route-state",
+  ]);
   launch("gateway", ["--network-alias", "mycellios-coordinator", "-p", "127.0.0.1::4174",
     "--mount", `type=bind,src=${state},dst=/etc/mycellios-route,readonly`,
     "--mount", `type=bind,src=${join(directory, "nginx.conf")},dst=/etc/nginx/nginx.conf,readonly`,
     "nginx:1.29.8-alpine"]);
   const url = `http://${docker("port", gateway, "4174/tcp")}`;
   const health = async () => {
-    const result = await fetch(`${url}/health`, { signal: AbortSignal.timeout(800) });
+    const result = await fetch(`${url}/health`, { signal: AbortSignal.timeout(10_500) });
     assert.equal(result.status, 200);
     return (await result.json()).revision;
   };
@@ -80,8 +88,14 @@ try {
   })();
 
   const change = (from, to, env = process.env) =>
-    run("bash", [join(directory, "switch.sh"), gateway, state, from, to], { env, timeout: 45_000 });
+    run("bash", [join(directory, "switch.sh"), gateway, state, operation, from, to], { env, timeout: 45_000 });
+  const gate = (action, revision, id = operation) =>
+    run("bash", [join(directory, "hold.sh"), action, state, id, revision], { timeout: 45_000 });
+  await assert.rejects(change(old, candidate));
+  await gate("hold", old);
+  await assert.rejects(gate("release", old, "e".repeat(64)));
   await assert.rejects(change(old, notReady));
+  await gate("release", old);
   assert.equal(await health(), old);
   assert.equal(readFileSync(join(state, "active.conf"), "utf8"), config(old));
 
@@ -97,12 +111,29 @@ fi
 exec "${dockerBin}" "$@"
 `);
   chmodSync(script, 0o700);
+  await gate("hold", old);
   await assert.rejects(change(old, candidate, { ...process.env, PATH: `${shim}:${process.env.PATH}` }));
+  await gate("release", old);
   assert.equal(await health(), old);
   assert.equal(readFileSync(join(state, "active.conf"), "utf8"), config(old));
 
+  await gate("hold", old);
+  let waiting = true;
+  const held = health().finally(() => { waiting = false; });
+  const submission = fetch(`${url}/fixture-submit`, {
+    method: "POST", body: "rehearsal-body", signal: AbortSignal.timeout(10_500),
+  }).then(async (response) => {
+    assert.equal(response.status, 200);
+    return response.json();
+  });
+  await setTimeout(150);
+  assert.equal(waiting, true);
   await change(old, candidate);
   await change(old, candidate); // Recovery after a lost success response.
+  assert.equal(waiting, true);
+  await gate("release", candidate);
+  assert.equal(await held, candidate);
+  assert.deepEqual(await submission, { revision: candidate, input: "rehearsal-body", submissions: 1 });
   await until(async () => await health() === candidate);
   const switchedAddress = docker("exec", `${network}-b`, "node", "-e",
     "require('node:dns').lookup('mycellios-coordinator',(e,a)=>{if(e)throw e;console.log(a)})");
@@ -112,7 +143,9 @@ exec "${dockerBin}" "$@"
   await until(() => frames.length > observedFrames);
   assert.ok(frames.every((frame) => frame === old));
 
+  await gate("hold", candidate);
   await change(candidate, old);
+  await gate("release", old);
   await until(async () => await health() === old);
   stopTraffic = true;
   await traffic;
@@ -120,6 +153,7 @@ exec "${dockerBin}" "$@"
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ candidateRejected: true, failedReloadRecovered: true, rollback: true,
     stableAddress: true, previousStreamSurvived: true, previousWebSocketSurvived: true,
+    newRequestWaitedForCandidate: true, foreignHoldRejected: true,
     requests: revisions.length, requestErrors: errors.length }));
 } finally {
   stopTraffic = true;
