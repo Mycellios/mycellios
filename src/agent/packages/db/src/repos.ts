@@ -20,7 +20,12 @@ import type { ComputerMode } from "./computers.js";
 import { computerKindForMode, ensureComputerRecord, parseComputerMode } from "./computers.js";
 import { rosterConversationSignals } from "./conversation-surfaces.js";
 import { createThreadMessageInTransaction } from "./messages.js";
-import { NOT_QUIET_ROUTINE_RUN, withNewestThreadMessages } from "./preview-messages.js";
+import type { SidebarPreviewMessage } from "./preview-messages.js";
+import {
+  NOT_QUIET_ROUTINE_RUN,
+  newestThreadWindowFingerprints,
+  withNewestThreadMessages,
+} from "./preview-messages.js";
 import { isQuietRoutineRunMarker } from "./routine-run-markers.js";
 import { BotSectionNameConflictError, IsolationError } from "./scope.js";
 import { lockSpaceForContentCreation } from "./spaces.js";
@@ -34,6 +39,30 @@ import { withTransactionRetry } from "./transaction-retry.js";
 
 /** Newest messages loaded for sidebar preview; enough to skip a short peer-run tail. */
 const SIDEBAR_PREVIEW_MESSAGE_WINDOW = 16;
+
+/** A roster preview and the window fingerprint it was computed from. */
+interface RosterPreview {
+  fingerprint: string;
+  preview: string;
+  newest: { createdAt: Date } | undefined;
+}
+
+/**
+ * Process-wide, by thread. An entry is only reused while its fingerprint still matches the
+ * thread's current window, so it can never show a stale preview; the oldest entries leave first.
+ */
+const rosterPreviews = new Map<string, RosterPreview>();
+const ROSTER_PREVIEW_CACHE_LIMIT = 5_000;
+
+function rememberRosterPreview(threadId: string, entry: RosterPreview) {
+  rosterPreviews.delete(threadId);
+  rosterPreviews.set(threadId, entry);
+  while (rosterPreviews.size > ROSTER_PREVIEW_CACHE_LIMIT) {
+    const oldest = rosterPreviews.keys().next().value;
+    if (oldest === undefined) break;
+    rosterPreviews.delete(oldest);
+  }
+}
 
 const rosterRunSelection = {
   ...activeRunSelection,
@@ -271,26 +300,53 @@ export function createRepos(
     ...createBotFolderRepos(prisma),
 
     async listBots(actor: Actor, options: { archived?: boolean } = {}): Promise<Bot[]> {
-      const bots = await withNewestThreadMessages(
+      const rows = await withLatestBotRuns(
         prisma,
-        await withLatestBotRuns(
-          prisma,
-          await prisma.bot.findMany({
-            where: {
-              spaceId: actor.spaceId,
-              userId: actor.userId,
-              archivedAt: options.archived ? { not: null } : null,
-            },
-            include: {
-              thread: true,
-              runs: rosterRunSelection,
-              computer: { select: { scope: true } },
-            },
-            orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
-          }),
-        ),
+        await prisma.bot.findMany({
+          where: {
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+            archivedAt: options.archived ? { not: null } : null,
+          },
+          include: {
+            thread: true,
+            runs: rosterRunSelection,
+            computer: { select: { scope: true } },
+          },
+          orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
+        }),
+      );
+      // Decrypting each Mico's newest messages is the costly part of the roster. A thread
+      // whose window has not changed since its preview was computed reuses that preview.
+      const fingerprints = await newestThreadWindowFingerprints(
+        prisma,
+        rows.flatMap((bot) => (bot.thread ? [bot.thread.id] : [])),
         SIDEBAR_PREVIEW_MESSAGE_WINDOW,
         { skipQuietRoutineRuns: true },
+      );
+      const reused = new Map<string, RosterPreview>();
+      for (const bot of rows) {
+        if (!bot.thread) continue;
+        const cached = rosterPreviews.get(bot.thread.id);
+        if (cached && cached.fingerprint === fingerprints.get(bot.thread.id))
+          reused.set(bot.id, cached);
+      }
+      const loaded = new Map(
+        (
+          await withNewestThreadMessages(
+            prisma,
+            rows.filter((bot) => !reused.has(bot.id)),
+            SIDEBAR_PREVIEW_MESSAGE_WINDOW,
+            { skipQuietRoutineRuns: true },
+          )
+        ).map((bot) => [bot.id, bot]),
+      );
+      const bots = rows.map(
+        (bot) =>
+          loaded.get(bot.id) ?? {
+            ...bot,
+            thread: bot.thread ? { ...bot.thread, messages: [] as SidebarPreviewMessage[] } : null,
+          },
       );
       const callThreadIds = capabilities.phoneCallsEnabled
         ? bots.flatMap((bot) => (bot.thread ? [bot.thread.id] : []))
@@ -351,9 +407,12 @@ export function createRepos(
       const listed = await Promise.all(
         bots.map(async (bot) => {
           let messages = bot.thread?.messages ?? [];
-          const updatedAt = rosterUpdatedAt(newestRosterMessage(messages), bot.updatedAt);
-          let preview = "";
-          for (let attempt = 0; attempt < 5; attempt++) {
+          const cached = reused.get(bot.id);
+          const newest = cached ? cached.newest : newestRosterMessage(messages);
+          const updatedAt = rosterUpdatedAt(newest, bot.updatedAt);
+          let preview = cached?.preview ?? "";
+          let pagedBack = false;
+          for (let attempt = 0; !cached && attempt < 5; attempt++) {
             const windowRunIds = [
               ...new Set(messages.flatMap((message) => (message.runId ? [message.runId] : []))),
             ].filter((runId) => !checkedRunIds.has(runId));
@@ -376,6 +435,7 @@ export function createRepos(
             if (preview || messages.length === 0 || !bot.thread || attempt === 4) break;
             const oldest = messages[messages.length - 1];
             if (!oldest) break;
+            pagedBack = true;
             messages = await prisma.message.findMany({
               where: { threadId: bot.thread.id, seq: { lt: oldest.seq }, ...NOT_QUIET_ROUTINE_RUN },
               orderBy: { seq: "desc" },
@@ -383,6 +443,15 @@ export function createRepos(
             });
             if (messages.length === 0) break;
           }
+          // Only a preview found inside the fingerprinted window is reused; one that needed
+          // older pages depends on messages the fingerprint does not cover.
+          const fingerprint = bot.thread ? fingerprints.get(bot.thread.id) : undefined;
+          if (!cached && !pagedBack && bot.thread && fingerprint)
+            rememberRosterPreview(bot.thread.id, {
+              fingerprint,
+              preview,
+              newest: newest ? { createdAt: newest.createdAt } : undefined,
+            });
           const activeRun = primaryActiveRun(bot.runs);
           const mapped = mapBot(
             bot,

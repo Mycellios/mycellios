@@ -228,4 +228,34 @@ describePostgres("listBots sidebar previews (PostgreSQL)", () => {
       updatedAt: shortUpdatedAt,
     });
   });
+
+  it("reuses an unchanged preview without reopening its window and notices an edit", async () => {
+    const actor = actorFor(owner);
+    const list = () => runAsTenant(owner, () => createRepos(prisma).listBots(actor));
+    await list();
+    const start = reads.length;
+    const again = await list();
+    const rowCount = reads.slice(start).reduce((sum, read) => sum + read.rowCount, 0);
+    expect(again.find((bot) => bot.name === "Long")).toMatchObject({
+      preview: "Message 39",
+      updatedAt: longUpdatedAt,
+    });
+    // Long's window is only fingerprinted now; Peer still pages back past its hidden tail.
+    expect(rowCount).toBeLessThan(window * 3);
+
+    const long = await asSystem(prisma).bot.findFirstOrThrow({
+      where: { spaceId: owner.spaceId, userId: owner.userId, name: "Long" },
+      include: { thread: true },
+    });
+    const newest = await asSystem(prisma).message.findFirstOrThrow({
+      where: { threadId: long.thread!.id },
+      orderBy: { seq: "desc" },
+    });
+    await asSystem(prisma).message.update({
+      where: { id: newest.id },
+      data: { blocks: [{ kind: "text", text: "Edited message" }] },
+    });
+    const edited = await list();
+    expect(edited.find((bot) => bot.name === "Long")?.preview).toBe("Edited message");
+  });
 });
