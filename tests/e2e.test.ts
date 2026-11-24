@@ -226,20 +226,26 @@ describe("inference-only coordinator and worker", () => {
       const incumbent = await start(originalRevision);
       const oldResponse = submit(incumbent.address, "incumbent inference");
       void oldResponse.catch(() => {});
-      await waitUntil(() => started.has("incumbent inference"), 5_000);
+      // The worker can enter generation before the coordinator commits the
+      // lease acknowledgement. Sample the stable running state on both sides.
+      await waitUntil(async () => started.has("incumbent inference")
+        && (await incumbent.runtime.store.listJobs())[0]?.status === "running", 5_000);
       const [original] = await incumbent.runtime.store.listJobs();
       expect(original?.deadlineAt).toBeGreaterThan(Date.now());
       expect(incumbent.runtime.service.releaseWorkStatus().jobs).toBe(1);
       const candidate = await start(candidateRevision);
       if (gate) {
-        expect((await candidate.runtime.store.getJob(original!.id))?.status).toBe(original?.status);
+        expect(await candidate.runtime.store.getJob(original!.id)).toMatchObject({
+          status: "running", deadlineAt: original?.deadlineAt,
+        });
         await gate.transfer(originalRevision, candidateRevision);
         expect(await gate.currentRevision()).toBe(candidateRevision);
       }
       const nextRequest = submit(candidate.address, "candidate inference");
       void nextRequest.catch(() => {});
       if (gate) {
-        await waitUntil(() => started.has("candidate inference"), 5_000);
+        await waitUntil(async () => started.has("candidate inference")
+          && (await candidate.runtime.store.listJobs())[0]?.status === "running", 5_000);
         const [newJob] = await candidate.runtime.store.listJobs();
         expect(newJob?.id).not.toBe(original?.id);
         expect(candidate.runtime.service.releaseWorkStatus().jobs).toBe(1);
