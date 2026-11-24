@@ -193,16 +193,22 @@ lines.on("line", (line) => {
         const authorization = bridge.headers.find(
           (header) => header.name === "Authorization",
         ).value;
-        const called = await fetch(bridge.url, {
+        const mcp = (id, method, params) => fetch(bridge.url, {
           method: "POST",
           headers: { Authorization: authorization, "content-type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "tools/call",
-            params: { name: "tool_0", arguments: toolArguments },
-          }),
+          body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
         });
+        let name = "tool_0";
+        const namedTool = process.argv.indexOf("--named-file-tool");
+        if (namedTool >= 0) {
+          const listed = await mcp(0, "tools/list").then(response => response.json());
+          name = process.argv[namedTool + 1];
+          if (!listed.result.tools.every(tool => tool.inputSchema.type === "object") ||
+            !listed.result.tools.some(tool => tool.name === name) ||
+            !message.params.prompt[0].text.includes(`rakazo_${name}`))
+            throw new Error("The file tool must be registered and named in the OpenCode prompt");
+        }
+        const called = await mcp(1, "tools/call", { name, arguments: toolArguments });
         if (echoToolResult)
           send({
             method: "session/update",

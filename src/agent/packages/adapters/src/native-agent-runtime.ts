@@ -215,11 +215,21 @@ export async function discoverNativeEngines(dataDir?: string) {
   ];
 }
 
+const openCodeFileTools = new Set(["list_files", "read_file", "write_file", "edit_file"]);
+
 /** A short-lived, authenticated MCP bridge exposes only this run's authorized catalog. */
 async function toolBridge(
   tools: ConnectorTool[],
   call: (name: string, args: Record<string, unknown>, id: string) => Promise<unknown>,
+  namedFileTools = false,
 ) {
+  const registered = new Map<string, ConnectorTool>();
+  for (const [index, tool] of tools.entries()) {
+    const { type } = tool.inputSchema;
+    if (type !== undefined && type !== "object") continue;
+    const name = namedFileTools && openCodeFileTools.has(tool.name) ? tool.name : `tool_${index}`;
+    registered.set(name, tool);
+  }
   const token = randomBytes(32).toString("hex");
   const bridgeId = randomUUID();
   const calls = new Map<string, { fingerprint: string; result: Promise<unknown> }>();
@@ -262,16 +272,18 @@ async function toolBridge(
       else if (message.method === "ping") result = {};
       else if (message.method === "tools/list")
         result = {
-          tools: tools.map((tool, index) => ({
-            name: `tool_${index}`,
+          tools: Array.from(registered, ([name, tool]) => ({
+            name,
             description: `${tool.name}: ${tool.description}`,
-            inputSchema: tool.inputSchema,
+            // MCP requires an explicit object root even for schemas that express
+            // their object constraints with oneOf or anyOf.
+            inputSchema: { ...tool.inputSchema, type: "object" },
           })),
         };
       else if (message.method === "tools/call") {
         const params = object(message.params);
-        const index = tools.findIndex((_, index) => `tool_${index}` === params.name);
-        if (index < 0) throw new Error("Unknown tool");
+        const tool = typeof params.name === "string" ? registered.get(params.name) : undefined;
+        if (!tool) throw new Error("Unknown tool");
         const id = JSON.stringify(message.id);
         const fingerprint = JSON.stringify(params);
         let cached = calls.get(id);
@@ -280,7 +292,7 @@ async function toolBridge(
           if (calls.size >= 4096) throw new Error("Tool request limit exceeded");
           cached = {
             fingerprint,
-            result: call(tools[index]!.name, object(params.arguments), `${bridgeId}:${id}`),
+            result: call(tool.name, object(params.arguments), `${bridgeId}:${id}`),
           };
           calls.set(id, cached);
         }
@@ -388,7 +400,11 @@ export class NativeAgentRuntime implements AgentRuntime {
     const continuity = new WorkContinuation(workContinuationEnabled(request));
     request = withWorkContinuation({ ...request, instructions: withConversationStyle(request.instructions ?? "") }, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
-    const baseBinding = [engine, request.model.id, request.instructions, tools, ...(openCodeProject ? [openCodeProject] : [])];
+    const openCodeFileToolNames = engine === "opencode"
+      ? tools.filter(({ name }) => openCodeFileTools.has(name)).map(({ name }) => `rakazo_${name}`)
+      : [];
+    const baseBinding = [engine, request.model.id, request.instructions, tools,
+      ...(openCodeProject ? [openCodeProject] : []), ...openCodeFileToolNames];
     const modelConfig = request.nativeConfig;
     const binding = hash(engine === "codex" && (modelConfig?.modelId || modelConfig?.thinkingLevel || modelConfig?.fastMode)
       ? [...baseBinding, [modelConfig.modelId ?? null, modelConfig.thinkingLevel ?? null, Boolean(modelConfig.fastMode)]]
@@ -760,7 +776,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           });
           turnId = startedTurn.turn.id;
         } else {
-          bridge = await toolBridge(tools, orderedCall);
+          bridge = await toolBridge(tools, orderedCall, engine === "opencode");
           if (engine === "claude") {
             const config = JSON.stringify({
               mcpServers: {
@@ -945,7 +961,10 @@ export class NativeAgentRuntime implements AgentRuntime {
             await finish(resume ? sessionId : undefined);
             };
             continueTurn = async (note) => { if (!signal.aborted && !paused) await promptSession(note); };
-            await promptSession(`${request.instructions}\n\n${startPrompt}`, true);
+            const fileInstructions = openCodeFileToolNames.length
+              ? `\n\nUse the registered Mycellios tools for file operations: ${openCodeFileToolNames.join(", ")}. Invoke them as tools. Report a file change only after a tool has confirmed it.`
+              : "";
+            await promptSession(`${request.instructions}${fileInstructions}\n\n${startPrompt}`, true);
           }
         }
       } catch (error) {
