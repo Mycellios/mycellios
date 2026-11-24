@@ -10070,6 +10070,9 @@ msgstr "Los resultados aparecerán en el chat de este Mico. No se ejecutará nad
 msgid "Notify me when there are results or a problem"
 msgstr "Avisarme cuando haya resultados o un problema"
 
+msgid "Run in its own conversation"
+msgstr "Ejecutar en su propia conversación"
+
 msgid "Choose a model to use this provider"
 msgstr "Elige una opción para usar este proveedor"
 
@@ -13970,6 +13973,10 @@ msgid "{title} deleted"
 msgstr "{title} eliminada"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title} archivada"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "No se pudo eliminar la conversación. Inténtalo de nuevo."
 
@@ -15332,3 +15339,11 @@ msgstr "Puede olvidar lo que guardó"
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Could not change which Micos can use this memory"
 msgstr "No se pudo cambiar qué Micos pueden usar esta memoria"
+
+#: src/lib/native-computer-execution.ts
+msgid "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
+msgstr "Mycellios no ha respondido al comprobar el acceso a este ordenador. El mensaje no se ha enviado; vuelve a intentarlo en un momento."
+
+#: src/lib/run-error.ts
+msgid "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
+msgstr "Tienes varios PCs conectados y aún no has elegido cuál ejecuta este Mico. En Mycellios Desktop, desde el PC que debe ejecutarlo, vuelve a enviar el mensaje o elige ese PC en los ajustes de ordenador del Mico."

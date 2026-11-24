@@ -6485,6 +6485,10 @@ msgid "{title} deleted"
 msgstr "{title} を削除しました"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title} をアーカイブしました"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "会話を削除できませんでした。もう一度お試しください。"
 

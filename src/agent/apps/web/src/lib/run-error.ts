@@ -34,6 +34,12 @@ export const translateRunError: RunErrorTranslator = (message, values) => {
         message: "This Mico needs a workspace to run this task.",
         values,
       });
+    case "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings.":
+      return i18n._({
+        id: "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings.",
+        message: "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings.",
+        values,
+      });
     case "Open this chat in Mycellios Desktop on the PC with the project, then retry.":
       return i18n._({
         id: "Open this chat in Mycellios Desktop on the PC with the project, then retry.",

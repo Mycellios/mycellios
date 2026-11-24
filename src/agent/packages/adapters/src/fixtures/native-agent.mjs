@@ -3,6 +3,7 @@ import readline from "node:readline";
 
 const engine = process.argv[2];
 // Answers with the tool result it received, so tests can see what reached the engine.
+const loadAcpSession = process.argv.includes("--fixture-load-acp");
 const echoToolResult = process.argv.includes("--fixture-echo-tool-result");
 const toolArguments = process.argv.includes("--fixture-questionnaire") ? {
   question: "Your trip", questions: [
@@ -176,25 +177,38 @@ lines.on("line", (line) => {
       if (message.method === "initialize")
         reply(message, {
           protocolVersion: 1,
-          agentCapabilities: { mcpCapabilities: { http: true } },
+          agentCapabilities: { mcpCapabilities: { http: true }, ...(loadAcpSession ? { loadSession: true } : {}) },
         });
-      else if (message.method === "session/new") {
+      else if (message.method === "session/new" || message.method === "session/load") {
+        const workspaceLog = process.argv.indexOf("--workspace-log");
+        if (workspaceLog >= 0) appendFileSync(process.argv[workspaceLog + 1], JSON.stringify({
+          method: message.method,
+          cwd: process.cwd(),
+          sessionCwd: message.params.cwd,
+          home: process.env.HOME,
+        }) + "\n");
         bridge = message.params.mcpServers[0];
-        reply(message, { sessionId: "fixture-acp" });
+        reply(message, message.method === "session/load" ? {} : { sessionId: "fixture-acp" });
       } else if (message.method === "session/prompt") {
         const authorization = bridge.headers.find(
           (header) => header.name === "Authorization",
         ).value;
-        const called = await fetch(bridge.url, {
+        const mcp = (id, method, params) => fetch(bridge.url, {
           method: "POST",
           headers: { Authorization: authorization, "content-type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "tools/call",
-            params: { name: "tool_0", arguments: toolArguments },
-          }),
+          body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
         });
+        let name = "tool_0";
+        const namedTool = process.argv.indexOf("--named-file-tool");
+        if (namedTool >= 0) {
+          const listed = await mcp(0, "tools/list").then(response => response.json());
+          name = process.argv[namedTool + 1];
+          if (!listed.result.tools.every(tool => tool.inputSchema.type === "object") ||
+            !listed.result.tools.some(tool => tool.name === name) ||
+            !message.params.prompt[0].text.includes(`${bridge.name}_${name}`))
+            throw new Error("The file tool must be registered and named in the OpenCode prompt");
+        }
+        const called = await mcp(1, "tools/call", { name, arguments: toolArguments });
         if (echoToolResult)
           send({
             method: "session/update",

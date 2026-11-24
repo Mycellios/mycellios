@@ -70,6 +70,12 @@ try {
     assert.equal(await page.evaluate(() => window.fixtureModelSaves), 0);
     await page.screenshot({ path: path.join(output, `personal-credit-exploration-${connected ? "connected" : "unconnected"}.png`) });
   }
+  await page.goto(base + "?desktop=1");
+  await page.getByRole("button", { name: "Model", exact: true }).click();
+  const desktopProviders = page.getByRole("group", { name: "Providers", exact: true });
+  await expect(desktopProviders.getByRole("button", { name: "OpenCode", exact: true })).toBeVisible();
+  await expect(desktopProviders.getByRole("button", { name: "ChatGPT", exact: true })).toHaveCount(0);
+  assert.equal(await page.evaluate(() => window.fixtureModelSaves), 0);
   await page.setViewportSize({ width: 390, height: 720 });
   await open();
   await expect(page.getByRole("button", { name: "Use my credits", exact: true })).toBeVisible();
@@ -82,6 +88,6 @@ try {
   await page.screenshot({ path: path.join(output, "personal-provider-narrow.png") });
   assert.equal(await page.evaluate(() => window.fixtureModelSaves), 0);
   assert.deepEqual(errors, []); assert.deepEqual(unexpectedRpc, []); assert.deepEqual(externalRequests, []);
-  const proof = { verified: true, realComponents: true, syntheticAccount: true, nativeProviderPreserved: true, builtinAlwaysVisible: true, creditExplorationDoesNotSaveOrConnect: true, paidInference: false, liveIdentityOrWallet: false, screenshots: 9 };
+  const proof = { verified: true, realComponents: true, syntheticAccount: true, nativeProviderPreserved: true, desktopEngineScoped: true, builtinAlwaysVisible: true, creditExplorationDoesNotSaveOrConnect: true, paidInference: false, liveIdentityOrWallet: false, screenshots: 9 };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2)); console.log(JSON.stringify(proof));
 } finally { await browser?.close(); await server.close(); }

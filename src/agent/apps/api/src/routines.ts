@@ -9,6 +9,7 @@ import {
   nextCronDateAcrossStrict,
 } from "@mycellios/core";
 import type { Prisma } from "@mycellios/db";
+import { routineRunIn, routineRunInInclude } from "@mycellios/db";
 import type { RouterDeps } from "./router.js";
 
 export function assertRoutineSchedule(input: CreateRoutineInput): void {
@@ -95,6 +96,8 @@ export function mapRoutine(row: {
   nextRunAt: Date | null;
   createdAt: Date;
   pausedByRunAt?: Date | null;
+  threadId?: string | null;
+  thread?: { botId: string | null; groupId: string | null } | null;
 }): Routine {
   return {
     id: row.id,
@@ -117,12 +120,14 @@ export function mapRoutine(row: {
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     pausedByRunAt: !row.active && row.pausedByRunAt ? row.pausedByRunAt.toISOString() : null,
+    runIn: routineRunIn(row),
   };
 }
 
 export async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
   const rows = await deps.prisma.routine.findMany({
     where: { botId, spaceId: actor.spaceId },
+    include: routineRunInInclude,
   });
   return rows.map(mapRoutine);
 }

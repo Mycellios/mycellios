@@ -12,6 +12,7 @@ import "../../src/styles.css";
 i18n.load("en", {}); i18n.activate("en");
 const connected = new URLSearchParams(location.search).has("connected");
 const personal = new URLSearchParams(location.search).has("personal");
+const desktop = new URLSearchParams(location.search).has("desktop");
 const userId = "fixture-user", spaceId = "fixture-space";
 const me = { userId, spaceId, needsModel: !connected, defaultProvider: connected ? "openai-compatible" : null, defaultModel: connected ? "fixture-credit-model" : null } as Me;
 const credentials: ModelCredential[] = connected ? [{
@@ -31,10 +32,11 @@ client.setQueryData(queries.me.queryKey(), me);
 client.setQueryData(queries.models.credentials.queryKey(), credentials);
 client.setQueryData(queries.models.list.queryKey(), models);
 client.setQueryData(["mycellios-chat-catalog", userId, spaceId, connected ? "fixture-owned" : undefined], models.filter(model => model.providerName === "Mycellios"));
-client.setQueryData(queries.engines.list.queryKey(), [{ id: "codex", name: "Codex", available: true }]);
 client.setQueryData(queries.engines.codexModels.queryKey(), []);
 const bot = { id: "fixture-bot", agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null } as Bot;
-if (personal) bot.agentEngine = "pi";
+if (personal || desktop) bot.agentEngine = "pi";
+client.setQueryData(queries.engines.forBot.queryKey({ input: { botId: bot.id } }),
+  desktop ? { computer: "desktop", engines: ["opencode"] } : { computer: "server", engines: ["codex"] });
 let modelSaves = 0;
 Object.defineProperty(window, "fixtureModelSaves", { get: () => modelSaves });
 createRoot(document.getElementById("root")!).render(<I18nProvider i18n={i18n}><QueryClientProvider client={client}>

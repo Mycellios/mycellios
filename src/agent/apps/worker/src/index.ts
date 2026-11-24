@@ -97,6 +97,7 @@ import {
 } from "@mycellios/db";
 import { SERVICE_NAMES } from "@mycellios/logging";
 import { createRootLogger } from "@mycellios/logging/axiom";
+import { startEventLoopDelayReport } from "@mycellios/logging/event-loop";
 import { MarkdownMemoryStore } from "@mycellios/memory";
 
 const logger = createRootLogger(SERVICE_NAMES.worker);
@@ -451,6 +452,8 @@ async function main() {
   reconciler.start();
   stopHealth = startWorkerHealth(reconciler.lastCompletedAt);
 
+  // The timer is unref'd, so it never keeps a stopping worker alive.
+  startEventLoopDelayReport(logger);
   logger.info("worker ready", { degraded: secrets.describe().capabilities.degraded ?? false });
 }
 

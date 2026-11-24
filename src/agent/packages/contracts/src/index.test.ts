@@ -18,6 +18,7 @@ import {
   parseModelMaxImagesPerPrompt,
   parseModelMaxTokens,
   ReorderBotsInput,
+  RoutineSchema,
   RunActivityRowSchema,
   RunSchema,
   UpdateBotInput,
@@ -418,6 +419,25 @@ describe("contracts", () => {
         prompt: "This has no trigger",
       }).success,
     ).toBe(false);
+  });
+
+  it("carries where a routine runs and keeps older payloads valid", () => {
+    const create = { botId: "bot-1", name: "Brief", prompt: "Summarize", crons: ["0 9 * * *"] };
+    expect(CreateRoutineInput.parse(create)).not.toHaveProperty("runIn");
+    for (const runIn of ["thread", "chat"])
+      expect(CreateRoutineInput.parse({ ...create, runIn })).toMatchObject({ runIn });
+    // A group is kept, never chosen.
+    expect(CreateRoutineInput.safeParse({ ...create, runIn: "group" }).success).toBe(false);
+    const routine = {
+      id: "routine-1", botId: "bot-1", name: "Brief", prompt: "Summarize", crons: [], timezone: "UTC",
+      active: true, notify: true, webhookEnabled: false, githubEnabled: false, messageProvider: null,
+      modelProvider: null, modelId: null, thinkingLevel: null, watch: null, watchState: null,
+      lastRunAt: null, nextRunAt: null, createdAt: "2026-11-01T00:00:00.000Z",
+    };
+    expect(RoutineSchema.parse(routine)).not.toHaveProperty("runIn");
+    for (const runIn of ["thread", "chat", "group"])
+      expect(RoutineSchema.parse({ ...routine, runIn })).toMatchObject({ runIn });
+    expect(RoutineSchema.safeParse({ ...routine, runIn: "elsewhere" }).success).toBe(false);
   });
 
   it("accepts bot-to-bot runs in thread snapshots and activity rows", () => {

@@ -61,6 +61,24 @@ describe("native computer admission", () => {
     expect(f.computer.connect).not.toHaveBeenCalled();
     expect(f.send).not.toHaveBeenCalled();
   });
+  it("explains a bridge timeout without submitting, and keeps other bridge errors", async () => {
+    const f = fixture();
+    f.computer.requestAccess.mockRejectedValueOnce(new Error(
+      "Error invoking remote method 'desktop.computer.requestAccess': TimeoutError: The operation was aborted due to timeout",
+    ));
+    await expect(f.fetch(url, message())).rejects.toThrow("did not respond while checking access to this computer");
+    f.computer.requestAccess.mockRejectedValueOnce(new Error(
+      "Error invoking remote method 'desktop.computer.requestAccess': Error: The server is temporarily unavailable.",
+    ));
+    await expect(f.fetch(url, message())).rejects.toThrow("did not respond while checking access to this computer");
+    f.computer.requestAccess.mockRejectedValueOnce(new Error("Local computer unavailable"));
+    await expect(f.fetch(url, message())).rejects.toThrow("Local computer unavailable");
+    expect(f.computer.connect).not.toHaveBeenCalled();
+    expect(f.send).not.toHaveBeenCalled();
+    // The failed admission is not cached: the next send asks again.
+    await f.fetch(url, message());
+    expect(f.send).toHaveBeenCalledTimes(1);
+  });
   it("fails without submitting when the executor is unavailable or disconnected", async () => {
     for (const stage of ["projectAvailable", "connected"] as const) {
       const f = fixture();

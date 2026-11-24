@@ -34,6 +34,21 @@ export type AppControlAction = (typeof APP_CONTROL_ACTIONS)[number];
 const REF = /^@[a-z0-9]{4,64}:e\d{1,6}$/;
 const WINDOW_ID = /^w-\d{1,20}$/;
 const KEY_COMBO = /^(?:(?:ctrl|alt|shift|cmd|win|meta)\+){0,3}[a-z0-9]{1,12}$/;
+const KEY_ALIASES: Record<string, string> = { control: "ctrl", enter: "return", esc: "escape" };
+/** Models write keys as "Ctrl+L", "F6" or "Enter"; the CLI takes lowercase names such as "ctrl+l" and "return". */
+export function normalizeKeyCombo(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  return value
+    .trim()
+    .toLowerCase()
+    .split(/\s*\+\s*/)
+    .map((key) => KEY_ALIASES[key] ?? key)
+    .join("+");
+}
+/** Chromium builds its accessibility tree on first contact; let the snapshot wait for it to settle. */
+export const APP_CONTROL_SNAPSHOT_SETTLE_MS = 10_000;
+/** A region (root) is already narrowed, so read all of it: web page content sits below the default depth. */
+export const APP_CONTROL_REGION_MAX_DEPTH = 50;
 const appName = z
   .string()
   .min(1)
@@ -57,7 +72,7 @@ export const appControlRequest = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("press"),
     windowId: z.string().regex(WINDOW_ID),
-    keys: z.string().regex(KEY_COMBO),
+    keys: z.preprocess(normalizeKeyCombo, z.string().regex(KEY_COMBO)),
   }),
 ]);
 export type AppControlRequest = z.infer<typeof appControlRequest>;
@@ -121,7 +136,9 @@ export function appControlInvocation(request: AppControlRequest): { argv: string
           request.windowId,
           "-i",
           "--compact",
-          ...(request.root ? ["--root", request.root] : []),
+          "--timeout-ms",
+          String(APP_CONTROL_SNAPSHOT_SETTLE_MS),
+          ...(request.root ? ["--root", request.root, "--max-depth", String(APP_CONTROL_REGION_MAX_DEPTH)] : []),
           ...(request.skeleton ? ["--skeleton"] : []),
         ],
       };

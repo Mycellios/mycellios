@@ -6,6 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-11-24
+
+### Fixed
+
+- OpenCode in Desktop can use Mycellios tools to read and edit files in a linked project.
+
+## [0.21.1] - 2026-11-24
+
+### Fixed
+
+- Pause and resume on "Generate AI" now reach the computer. Before, the network refused the
+  command and the button kept showing Pause.
+- Work a Mico does on your PC is saved again when its folder holds a file larger than 8 MB,
+  such as a video it made. Before, one large file stopped the whole folder from being saved.
+  Files over 100 MB stay on the PC only.
+
+## [0.21.0] - 2026-11-23
+
+### Added
+
+- Run OpenCode in an authorized Desktop project folder or task worktree and reopen its session in that project.
+- Choose from the coding engines available on the Mico's selected computer. When Desktop is offline, its coding task waits for that computer.
+- Each routine can now run in its own conversation or in the Mico's main chat, with a "Run in
+  its own conversation" switch in the routine settings. A routine in its own conversation no
+  longer waits behind a question or a takeover pending in the main chat. Routines a Mico
+  creates outside a group now get their own conversation too, unless it is asked to post in the
+  main chat; routines in a group stay in the group.
+
+### Fixed
+
+- Sending a message in a conversation opened from its tab no longer fails with "Load this task
+  conversation before sending changes". The conversation is now checked on the first send
+  instead of refusing it.
+- When the server does not answer while Mycellios Desktop checks access to this computer, the
+  chat now says the message was not sent and to try again, instead of showing a technical
+  "Error invoking remote method" message. A server outage no longer asks you to sign in again.
+- A conversation whose Mico waits for your answer can now be deleted; deleting it cancels the
+  question. Before, Delete stayed disabled until you answered.
+- Archiving a conversation now confirms it with a message that names it and offers Undo, and the
+  Mico leaves "Needs you" at once. Before, the sidebar kept asking for an answer until the page
+  reloaded, so archiving looked like it did nothing.
+- With two of your PCs online, a Mico now stays on the PC you last used it from, even after
+  Mycellios restarts. Before, a Mico used on both PCs stopped answering after each update and
+  its routines failed until you sent it a message from Desktop again. When no PC has been chosen
+  yet, the message is translated and opens the Mico's computer settings instead of offering to
+  change the model.
+
+## [0.20.0] - 2026-11-23
+
+### Added
+
+- Let a Mico save to your personal memory, and forget what it saved, when you allow it.
+  - Turn this on per Mico in Settings > Memory > Personal memory: "Can save new memories" and
+    "Can forget what it saved".
+  - Forgetting follows your approval settings, like other actions that change data.
+  - It works with memory servers that offer saving.
+
+### Fixed
+
+- Opening a Mico's request for help on a busy computer now shows its browser tab. Before, finding
+  the tab could take a few seconds too long and the whole desktop opened instead.
+- While the server restarts, Desktop now waits a little longer between reconnection attempts
+  instead of retrying many times a second. It still reconnects within a few seconds once the
+  server is back.
+- Micos using apps on your PC can now read web pages in Chrome: reading one region of a window
+  returns all of it instead of stopping at the browser's outer frames, and each read waits for
+  the page to finish building before answering.
+- Keyboard shortcuts written as "Ctrl+L", "F6" or "Enter" are accepted instead of failing.
+
 ## [0.19.1] - 2026-11-23
 
 ### Fixed

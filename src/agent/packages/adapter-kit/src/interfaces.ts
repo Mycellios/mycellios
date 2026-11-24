@@ -91,6 +91,7 @@ import type {
   WebSearchHit,
   WebSearchRequest,
   WorkspaceDirectoryRequest,
+  NativeCodingEngine,
 } from "./types.js";
 
 export interface SandboxProvider {
@@ -105,11 +106,13 @@ export interface SandboxProvider {
     request: WorkspaceDirectoryRequest,
     context: AdapterContext,
   ): Promise<string[]>;
+  /** Read the installed coding engines from the owned Desktop without starting a workspace. */
+  nativeEngines?(context: AdapterContext): Promise<NativeCodingEngine[] | undefined>;
   /** Native command environment; omitted for providers with a fixed container environment. */
   environment?(
     computer: ComputerRef,
     context: AdapterContext,
-  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean } | undefined>;
+  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean; nativeEngines?: NativeCodingEngine[] } | undefined>;
   /** Optional live browser on the same leased screen as observe/act. */
   pageBrowser?(
     computer: ComputerRef,
@@ -314,6 +317,8 @@ export interface SemanticMemoryProvider {
 }
 
 export interface AgentRuntime {
+  /** Installed coding engines on this account-authorized native host. */
+  nativeEngines?(): Promise<NativeCodingEngine[]>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,

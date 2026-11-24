@@ -12,6 +12,7 @@ import {
 import {
   DesktopRelayBroker,
   DesktopRelayError,
+  desktopDeviceKey,
   desktopRelayKey,
   hostComputerRequest,
   verifyDesktopRelay,
@@ -29,6 +30,15 @@ export function mountDesktopRelay(
     ownsBot(actor: Pick<Actor,"userId"|"spaceId">, botId: string): Promise<boolean>;
     spaces?(actor: Actor): Promise<string[]>;
     desktopExecution?(actor: Pick<Actor, "userId" | "spaceId">, enabled?: boolean): Promise<boolean>;
+    /**
+     * The PC (a desktopDeviceKey) the owner last chose for a Mico. It survives API
+     * and Desktop restarts, which forget the volatile binding, so routines and other
+     * unattended turns still reach that PC while several PCs are online.
+     */
+    chosenDevice?: {
+      get(scope: Pick<Actor, "userId" | "spaceId">, botId: string): Promise<string | undefined>;
+      remember(scope: Pick<Actor, "userId" | "spaceId">, botId: string, deviceKey: string): Promise<void>;
+    };
   },
 ) {
   const broker = new DesktopRelayBroker();
@@ -56,7 +66,14 @@ export function mountDesktopRelay(
       const botId=input.probe ?? (input.request ? hostComputerRequest.parse(input.request).botId : undefined);
       if (botId) {
         if (!await deps.ownsBot(input.scope,botId)) return c.json({available:false,error:"Unavailable agent"},404);
-        broker.connectAccountBot(input.scope,botId);
+        // Only a remembered choice may settle several online PCs; one PC needs no lookup.
+        const chosen = broker.needsChoice(input.scope, botId)
+          ? await deps.chosenDevice?.get(input.scope, botId).catch((error: unknown) => {
+            getLogger().warn("desktop.relay.choice_unavailable", { error: error instanceof Error ? error.name : "unknown" });
+            return undefined;
+          })
+          : undefined;
+        broker.connectAccountBot(input.scope,botId,chosen);
       }
       if (input.probe && !input.request) {
         // A PC is online but none could take this Mico: never report that as an offline PC.
@@ -142,7 +159,11 @@ export function mountDesktopRelay(
           const value = parseDesktopBinding(input);
           if (!(await deps.ownsBot(session.actor, value.botId)))
             return c.json({ error: "Unavailable agent" }, 404);
-          broker.bind(owner, value);
+          // Sending from, opening or connecting a Mico on this PC is the owner's choice.
+          if (broker.bind(owner, value))
+            await deps.chosenDevice?.remember(owner, value.botId, desktopDeviceKey(value.deviceId)).catch((error: unknown) => {
+              getLogger().warn("desktop.relay.choice_not_saved", { error: error instanceof Error ? error.name : "unknown" });
+            });
           return c.json({ ok: true });
         }
         case "poll": {

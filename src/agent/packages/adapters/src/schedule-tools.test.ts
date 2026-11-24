@@ -12,6 +12,8 @@ import {
   listSchedulesFromTool,
   MAX_ACTIVE_ROUTINES_PER_BOT,
   resolveScheduleTiming,
+  RUN_IN_GROUP_ERROR,
+  runInFromTool,
   SCHEDULE_TOOL_NAMES,
   updateScheduleFromTool,
 } from "./schedule-tools.js";
@@ -337,10 +339,11 @@ describe("schedule tool persistence", () => {
       expect(enqueue).not.toHaveBeenCalled();
     },
   );
-  it("refuses a name already active in the thread, not one in another thread", async () => {
+  it("refuses a name active anywhere outside a group, and in a group only that group's", async () => {
     const findMany = vi.fn(async () => [
-      { id: "routine-1", name: "Morning joke", threadId: "thread-1" },
-      { id: "routine-2", name: "Evening joke", threadId: "thread-2" },
+      { id: "routine-1", name: "Morning joke", threadId: "routine-thread-1", thread: { groupId: null } },
+      { id: "routine-2", name: "Evening joke", threadId: "group-thread-2", thread: { groupId: "group-2" } },
+      { id: "routine-4", name: "Night joke", threadId: "group-thread-1", thread: { groupId: "group-1" } },
     ]);
     const create = vi.fn(async (args: { data: Record<string, unknown> }) => ({
       id: "routine-3",
@@ -374,10 +377,11 @@ describe("schedule tool persistence", () => {
     });
     expect(findMany).toHaveBeenCalledWith({
       where: { spaceId: "ws-1", botId: "bot-1", active: true },
-      select: { id: true, name: true, threadId: true },
+      select: { id: true, name: true, threadId: true, thread: { select: { groupId: true } } },
     });
     expect(create).not.toHaveBeenCalled();
 
+    // A group routine of the same name is not this one's duplicate.
     const other = await createScheduleFromTool(deps, {
       spaceId: "ws-1",
       botId: "bot-1",
@@ -388,6 +392,13 @@ describe("schedule tool persistence", () => {
       schedule: { every: 1, unit: "minutes" },
     });
     expect(other).toMatchObject({ ok: true, routineId: "routine-3" });
+
+    const group = { spaceId: "ws-1", botId: "bot-1", userId: "user-1", threadId: "group-thread-1", inGroup: true,
+      prompt: "Tell a joke", schedule: { every: 1, unit: "minutes" } };
+    expect(await createScheduleFromTool(deps, { ...group, name: "Night joke" })).toMatchObject({
+      error: expect.stringContaining("(routine-4)"),
+    });
+    expect(await createScheduleFromTool(deps, { ...group, name: "Morning joke" })).toMatchObject({ ok: true });
   });
 
   it("refuses a new routine once the bot has the maximum active", async () => {
@@ -460,16 +471,79 @@ describe("schedule tool persistence", () => {
         data: expect.objectContaining({
           spaceId: "ws-1",
           userId: "user-1",
-          threadId: "thread-1",
+          // Its first run creates its own conversation.
+          threadId: null,
           crons: ["*/1 * * * *"],
           active: true,
         }),
       }),
     );
     expect(append).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "routine.created", payload: { name: "Morning joke" } }),
+      expect.objectContaining({
+        type: "routine.created",
+        threadId: "thread-1",
+        payload: { name: "Morning joke" },
+      }),
     );
     expect(enqueue).toHaveBeenCalledOnce();
+  });
+
+  describe("where a created routine runs", () => {
+    function placeDeps() {
+      const create = vi.fn(async (args: { data: Record<string, unknown> }) => ({ id: "routine-1", ...args.data }));
+      const findThread = vi.fn(async () => ({ id: "main-thread-1" }));
+      const deps = {
+        prisma: {
+          user: noTimezone,
+          bot: { findFirst: vi.fn(async () => ({ computer: null })) },
+          routine: { create, findMany: noRoutines },
+          thread: { findFirst: findThread },
+        },
+        events: { append: vi.fn(async () => undefined) },
+        jobs: { enqueue: vi.fn(async () => undefined) },
+      } as unknown as Parameters<typeof createScheduleFromTool>[0];
+      return { deps, create, findThread };
+    }
+    const base = { spaceId: "ws-1", botId: "bot-1", userId: "user-1", threadId: "task-thread-1",
+      name: "Brief", prompt: "Summarize", schedule: { cron: "0 9 * * *" } };
+    const placeOf = (create: ReturnType<typeof placeDeps>["create"]) => create.mock.calls[0]![0].data.threadId;
+
+    it("runs in the Mico's main chat when asked, from any conversation", async () => {
+      const { deps, create, findThread } = placeDeps();
+      await expect(createScheduleFromTool(deps, { ...base, runIn: "chat" })).resolves.toMatchObject({ ok: true });
+      expect(findThread).toHaveBeenCalledWith({
+        where: { botId: "bot-1", spaceId: "ws-1", userId: "user-1" },
+        select: { id: true },
+      });
+      expect(placeOf(create)).toBe("main-thread-1");
+    });
+
+    it("runs in its own conversation by default or when asked, and a watch too", async () => {
+      for (const extra of [{}, { runIn: "thread" as const }, { schedule: { watch: { kind: "files", paths: ["inbox"] } } }]) {
+        const { deps, create, findThread } = placeDeps();
+        await expect(createScheduleFromTool(deps, { ...base, ...extra })).resolves.toMatchObject({ ok: true });
+        expect(placeOf(create)).toBeNull();
+        expect(findThread).not.toHaveBeenCalled();
+      }
+    });
+
+    it("keeps a group routine in its group and refuses another place there", async () => {
+      const { deps, create } = placeDeps();
+      const group = { ...base, threadId: "group-thread-1", inGroup: true };
+      await expect(createScheduleFromTool(deps, group)).resolves.toMatchObject({ ok: true });
+      expect(placeOf(create)).toBe("group-thread-1");
+      create.mockClear();
+      for (const runIn of ["thread", "chat"] as const)
+        await expect(createScheduleFromTool(deps, { ...group, runIn })).resolves.toEqual({ error: RUN_IN_GROUP_ERROR });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("reads the place from tool input", () => {
+      expect(runInFromTool(undefined)).toEqual({});
+      expect(runInFromTool(null)).toEqual({});
+      expect(runInFromTool("chat")).toEqual({ runIn: "chat" });
+      expect(runInFromTool("group")).toHaveProperty("error");
+    });
   });
 
   it.each([
@@ -1207,6 +1281,62 @@ describe("updateScheduleFromTool", () => {
         data: expect.objectContaining({ active: true, pausedByRunId: null, pausedByRunAt: null }),
       }),
     );
+  });
+
+  describe("moving a routine", () => {
+    function moveSetup(place: { botId: string | null; groupId: string | null } | null, ownThread: string | null) {
+      const updateMany = vi.fn(async () => ({ count: 1 }));
+      const findThread = vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
+        where.id ? place : where.taskKey ? (ownThread ? { id: ownThread } : null) : { id: "main-thread-1" },
+      );
+      const executeRaw = vi.fn(async () => 1);
+      const deps = {
+        prisma: {
+          routine: { findFirst: vi.fn(async () => weekly), updateMany },
+          thread: { findFirst: findThread },
+          $executeRaw: executeRaw,
+        },
+        events: { append: vi.fn(async () => undefined) },
+        jobs: { enqueue: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined) },
+      } as unknown as Parameters<typeof updateScheduleFromTool>[0];
+      const move = (patch: Partial<Parameters<typeof updateScheduleFromTool>[1]>) =>
+        updateScheduleFromTool(deps, {
+          spaceId: "ws-1", botId: "bot-1", userId: "user-1", threadId: "thread-1",
+          routineId: "routine-1", schedule: {}, ...patch,
+        });
+      return { move, updateMany, findThread, executeRaw };
+    }
+
+    it("moves a routine from its own conversation to the main chat, keeping that conversation", async () => {
+      const { move, updateMany, executeRaw } = moveSetup({ botId: null, groupId: null }, "thread-1");
+      await expect(move({ runIn: "chat" })).resolves.toMatchObject({ ok: true, runIn: "chat" });
+      expect(updateMany.mock.calls[0]![0]).toMatchObject({ data: { threadId: "main-thread-1" } });
+      // Nothing is archived or renamed.
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
+
+    it("moves a main-chat routine back to its earlier conversation, or lets the next run create one", async () => {
+      const back = moveSetup({ botId: "bot-1", groupId: null }, "own-thread-1");
+      await expect(back.move({ runIn: "thread" })).resolves.toMatchObject({ ok: true, runIn: "thread" });
+      expect(back.updateMany.mock.calls[0]![0]).toMatchObject({ data: { threadId: "own-thread-1" } });
+      expect(back.findThread).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ taskKey: "routine:routine-1", taskBotId: "bot-1", botId: null, groupId: null }),
+      }));
+      const fresh = moveSetup({ botId: "bot-1", groupId: null }, null);
+      await fresh.move({ runIn: "thread" });
+      expect(fresh.updateMany.mock.calls[0]![0]).toMatchObject({ data: { threadId: null } });
+    });
+
+    it("refuses moving a group routine and changes nothing when it already runs there", async () => {
+      const group = moveSetup({ botId: null, groupId: "group-1" }, null);
+      for (const runIn of ["thread", "chat"] as const)
+        await expect(group.move({ runIn })).resolves.toEqual({ error: RUN_IN_GROUP_ERROR });
+      await expect(group.move({ runIn: "chat", scopeThreadId: "thread-1" })).resolves.toEqual({ error: RUN_IN_GROUP_ERROR });
+      expect(group.updateMany).not.toHaveBeenCalled();
+      const same = moveSetup({ botId: "bot-1", groupId: null }, null);
+      await expect(same.move({ runIn: "chat" })).resolves.toEqual({ error: "Nothing to update." });
+      expect(same.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   it("renames the routine's own conversation with the routine", async () => {

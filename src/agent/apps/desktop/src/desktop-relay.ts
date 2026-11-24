@@ -22,6 +22,19 @@ const ONLINE_MS = 40_000;
  */
 const RELAY_STALL_MS = 85_000;
 const RESULT_ATTEMPT_MS = 15_000;
+const POLL_RETRY_BASE_MS = 250;
+const POLL_RETRY_MAX_MS = 5_000;
+
+/**
+ * Delay before the next poll. A failed poll (usually the API restarting) waits 250 ms,
+ * doubling up to 5 s, instead of retrying at once; every Desktop doing that at the same
+ * moment floods the server while it starts. The cap stays far inside RELAY_STALL_MS.
+ */
+export function pollRetryDelayMs(failures: number, agentExecution: boolean): number {
+  const idle = agentExecution ? 0 : 2_000;
+  if (failures <= 0) return idle;
+  return Math.max(idle, Math.min(POLL_RETRY_MAX_MS, POLL_RETRY_BASE_MS * 2 ** (failures - 1)));
+}
 
 /** A delivery the broker has already accepted must be forgotten, never aborted or replayed. */
 export function missingOperationAction(
@@ -43,6 +56,7 @@ export class DesktopRelayClient {
   private stopped = true;
   private timer?: ReturnType<typeof setTimeout>;
   private lastContact = 0;
+  private pollFailures = 0;
   private lastBindingCheck = 0;
   private owner?: string;
   private accountGeneration?: string;
@@ -85,7 +99,10 @@ export class DesktopRelayClient {
       this.options.revoked();
     }
     if (!response.ok)
-      throw Object.assign(new Error("Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
+      throw Object.assign(new Error(response.status >= 500
+        // A server restart or overload, not an account problem: signing in again would not help.
+        ? "The server is temporarily unavailable."
+        : "Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
     return response;
   }
   async identity() {
@@ -279,6 +296,7 @@ export class DesktopRelayClient {
       }
       if (!this.lastContact || (this.options.now ?? Date.now)() - this.lastContact >= ONLINE_MS) recordDesktopDiagnostic("relay_connected");
       this.lastContact = (this.options.now ?? Date.now)();
+      this.pollFailures = 0;
       for (const [id, controller] of this.active) {
         const action = missingOperationAction(id, state.active, this.settled);
         if (action === "keep") continue;
@@ -328,7 +346,10 @@ export class DesktopRelayClient {
       // An older API behind the same address refuses the extra field; the next poll
       // goes without it until a server offers the report again.
       if (workspaces) this.reportWorkspaces = false;
-      if (!this.stopped && !pollController.signal.aborted) recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
+      if (!this.stopped && !pollController.signal.aborted) {
+        this.pollFailures++;
+        recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
+      }
       // A slow server is not an outage: running work keeps its operations until
       // the stall outlasts what the server's own presence lease tolerates.
       if ((this.options.now ?? Date.now)() - this.lastContact > RELAY_STALL_MS) {
@@ -341,7 +362,7 @@ export class DesktopRelayClient {
       }
     }
     if (!this.stopped) {
-      this.timer = setTimeout(() => void this.poll(), this.options.agentExecution ? 0 : 2_000);
+      this.timer = setTimeout(() => void this.poll(), pollRetryDelayMs(this.pollFailures, Boolean(this.options.agentExecution)));
       this.timer.unref();
     }
   }

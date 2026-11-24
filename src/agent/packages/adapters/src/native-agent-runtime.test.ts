@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile, readFile, readdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, readdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,9 @@ import { approvalPausedToolResult } from "./approval-effect.js";
 import { findNativeCommand, nativeEnvironment } from "./native-agent-process.js";
 import { codexPermissionProfile, codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
 import { ScriptedAgentRuntime } from "./scripted-runtime.js";
+import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
+import { startHostComputerServer } from "./host-computer-server.js";
+import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
 import { CONVERSATION_STYLE } from "./conversation-style.js";
 
@@ -73,6 +76,93 @@ describe("native agent protocol integration", () => {
     expect(events.some(event => event.type === "text" && event.text.includes("Fixture complete"))).toBe(false);
   }, 25000);
 
+  it("uses the approved project for OpenCode and reloads only that project's session", async () => {
+    const projects = await realpath(await mkdtemp(join(tmpdir(), "mycellios-opencode-project-")));
+    roots.push(projects);
+    const second = await realpath(await mkdtemp(join(tmpdir(), "mycellios-opencode-other-")));
+    roots.push(second);
+    const direct = await realpath(await mkdtemp(join(tmpdir(), "mycellios-opencode-direct-")));
+    roots.push(direct);
+    const log = join(projects, "fixture.jsonl");
+    const test = await setup("opencode", ["--fixture-load-acp", "--named-file-tool", "write_file", "--workspace-log", log]);
+    await writeFile(join(test.dataDir, "native-agents.json"), JSON.stringify({
+      authorizedScopes: [{ userId: "local", spaceId: "local" }],
+    }));
+    const token = "a".repeat(64);
+    const host = await startHostComputerServer({
+      root: test.dataDir, token, hostname: "127.0.0.1",
+      agentRuntime: Object.assign(test.runtime, { nativeEngines: async (): Promise<["opencode"]> => ["opencode"] }),
+    });
+    const runtime = new DesktopAgentRuntime({
+      fallback: new ScriptedAgentRuntime(),
+      select: async () => ({ available: true, preferred: true }),
+      transport: (input, ctx) => fetch(`http://127.0.0.1:${host.port}/computer`, {
+        method: "POST", headers: { authorization: `Bearer ${token}` },
+        body: JSON.stringify(input),
+        signal: ctx.signal,
+      }),
+    });
+    host.setEnabled(true);
+    const computer = new HostComputerSandbox(`http://127.0.0.1:${host.port}`, token);
+    const run = async (projectSessionId: string | undefined, runId: string) => {
+      const projectContext = { ...test.context, projectSessionId, runId, traceId: runId, operationId: runId };
+      const ref = { id: "native-project", botId: test.request.botId, kind: "desktop" as const, providerRef: "native-project" };
+      const executeTool = vi.fn<NonNullable<AgentRunRequest["executeTool"]>>(async (name, args) => {
+        expect(name).toBe("write_file");
+        const fileName = (args as { path: string }).path;
+        await computer.writeFile(ref, { path: projectSessionId ? fileName : "project/" + fileName, content: Buffer.from(runId) }, projectContext);
+        return { content: "Written" };
+      });
+      const tools = [
+        ...test.request.tools.map(tool => ({ ...tool, name: "write_file" })),
+        builtinAgentTools.find(tool => tool.name === "schedule_create")!,
+      ];
+      const events: AgentRuntimeEvent[] = [];
+      for await (const event of runtime.run({ ...test.request, runId, tools, executeTool }, {
+        ...test.context, projectSessionId,
+      })) events.push(event);
+      expect(events.at(-1)?.type).toBe("done");
+    };
+    try {
+      expect(await computer.nativeEngines({ ...test.context, botId: test.request.botId, traceId: "probe", operationId: "probe" })).toEqual(["opencode"]);
+      const validate = async () => {};
+      const releaseFirst = await host.bindTaskProject("first-project", test.request.botId, projects, validate);
+      const releaseSecond = await host.bindTaskProject("second-project", test.request.botId, second, validate);
+      await run("first-project", "first");
+      await run("first-project", "second");
+      await run("second-project", "third");
+      await expect(run("unknown-project", "rejected")).rejects.toThrow("Link this task on this computer");
+      expect(await readFile(join(projects, "notes.txt"), "utf8")).toBe("second");
+      expect(await readFile(join(second, "notes.txt"), "utf8")).toBe("third");
+      releaseFirst();
+      releaseSecond();
+      await host.selectProject(test.request.botId, direct);
+      await run(undefined, "direct");
+      expect(await readFile(join(direct, "notes.txt"), "utf8")).toBe("direct");
+    } finally {
+      await host.close();
+    }
+    const records = (await readFile(log, "utf8")).trim().split("\n").map(line => JSON.parse(line));
+    expect(records.map(record => record.method)).toEqual(["session/new", "session/load", "session/new", "session/new"]);
+    expect(records.map(record => [record.cwd, record.sessionCwd])).toEqual([
+      [projects, projects], [projects, projects], [second, second], [direct, direct],
+    ]);
+    for (const record of records) expect(record.home).toContain(join(test.dataDir, "native-agents"));
+    expect(await readdir(second)).toEqual(["notes.txt"]);
+  }, 25000);
+
+  it("refuses to spawn OpenCode if the local project grant changes during setup", async () => {
+    const test = await setup("opencode");
+    const resolveOpenCodeProject = vi.fn()
+      .mockResolvedValueOnce(test.dataDir)
+      .mockResolvedValueOnce(undefined);
+    const consume = async () => {
+      for await (const _event of test.runtime.run(test.request, { ...test.context, resolveOpenCodeProject })) { /* drain */ }
+    };
+    await expect(consume()).rejects.toThrow("The selected project changed");
+    expect(test.executeTool).not.toHaveBeenCalled();
+  });
+
   it("discovers the OpenCode executable as an ACP command", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "rakazo-native-test-"));
     roots.push(dataDir);
@@ -119,7 +209,7 @@ describe("native agent protocol integration", () => {
   it.each(["codex", "claude", "acp", "opencode"] as const)(
     "bridges %s tools through the app executor and preserves unknown billing",
     async (engine) => {
-      const test = await setup(engine);
+      const test = await setup(engine, engine === "opencode" ? ["--named-file-tool", "read_file"] : []);
       const events: AgentRuntimeEvent[] = [];
       for await (const event of test.runtime.run(test.request, test.context)) events.push(event);
       expect(test.executeTool).toHaveBeenCalledOnce();

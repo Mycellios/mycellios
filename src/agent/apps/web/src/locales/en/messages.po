@@ -11929,6 +11929,9 @@ msgstr "None"
 msgid "Notify me when there are results or a problem"
 msgstr "Notify me when there are results or a problem"
 
+msgid "Run in its own conversation"
+msgstr "Run in its own conversation"
+
 msgid "Open another panel"
 msgstr "Open another panel"
 
@@ -13583,6 +13586,10 @@ msgid "{title} deleted"
 msgstr "{title} deleted"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title} archived"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "Could not delete the conversation. Try again."
 
@@ -14949,3 +14956,11 @@ msgstr "Can forget what it saved"
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Could not change which Micos can use this memory"
 msgstr "Could not change which Micos can use this memory"
+
+#: src/lib/native-computer-execution.ts
+msgid "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
+msgstr "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
+
+#: src/lib/run-error.ts
+msgid "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
+msgstr "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."

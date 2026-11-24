@@ -50,7 +50,8 @@ it("controls only the matching owned node using its fresh generation and authent
   const f = fixture();
   expect(await f.api.control("own-node", "resume")).toMatchObject({ pending: "resume", enabled: false });
   const call = f.transport.mock.calls.find(([url]) => String(url).endsWith("/commands"))!;
-  expect(JSON.parse(String(call[1]?.body))).toMatchObject({ actor: { id: "verified-account", scopes: ["node:control"] }, generation: 7, type: "resume", payload: {} });
+  expect(JSON.parse(String(call[1]?.body))).toMatchObject({ actor: { id: "verified-account", scopes: ["node:control"] }, generation: 7, type: "resume" });
+  expect(JSON.parse(String(call[1]?.body)).payload).toEqual({ version: 1 });
   expect(call[1]?.redirect).toBe("error");
   await expect(f.api.control("own-node", "resume")).rejects.toMatchObject({ code: "CONFLICT" });
   expect(f.transport.mock.calls.filter(([url]) => String(url).endsWith("/commands"))).toHaveLength(1);

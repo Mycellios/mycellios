@@ -462,7 +462,16 @@
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
-  permissions outside the approved MCP bridge. Verify the scoped settings and
+  permissions outside the approved MCP bridge. Keep the explicit MCP object
+  schema root even for union schemas and expose the authorized file tools with
+  descriptive bridge names so OpenCode can discover and call them.
+  For Desktop OpenCode, resolve a
+  project or task worktree on the native host from the existing local grant.
+  Use it for the CLI and ACP working directory, keeping the private profile and
+  session on the host outside the repo. Resume only with the same project binding
+  and an ACP CLI that advertises session load. The chat picker discovers native
+  engines from the Mico's authorized computer. An offline Desktop never offers
+  the server's engines or delegates its run to them. Verify the scoped settings and
   native-agent-runtime tests. Protocol fixtures do not qualify real inference.
   Managed OpenCode installs are explicitly admitted by allowOpenCodeInstall
   in the host's native-agents.json and the same account/Space grant. Verify
@@ -763,7 +772,9 @@
   Verify desktop-agent runtime/engine and relay tests, host consent/native runtime,
   and scripts/verify-desktop-execution-db.ts against isolated PostgreSQL. Physical
   installed-Desktop/mobile acceptance is separate from fixtures and builds.
-- With several Desktops online in one account/Space, an unbound Mico goes only to
+- With several Desktops online in one account/Space, an unbound Mico goes first to
+  the PC its owner last chose (explicit Desktop bind, saved hashed in
+  desktop_bot_devices so API/Desktop restarts and routines keep it), else only to
   the one PC whose account registration reports its folder key (SHA-256 of the bot
   id, sent after the server's `ownership: 1`); none or several is `unresolved`, never
   guessed or offline. One online PC still takes every Mico; explicit binds win. The
@@ -1134,6 +1145,8 @@
   wake-ups count missed times on the run (runs.missedRuns/missedReason). The conversation
   follows renames unless titleSource is user, a run reopens it, deleting the routine archives
   it with its history. Verify with verify-routine-isolation-db.ts and the routine tests above.
+  `runIn` (thread default/chat; group is kept, never moved) is set by the editor switch and the
+  schedule tools; moving back reuses the conversation found by key, never a second one.
 
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong

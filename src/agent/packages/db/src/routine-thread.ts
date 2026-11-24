@@ -1,4 +1,4 @@
-import type { Actor } from "@mycellios/contracts";
+import type { Actor, RoutineRunIn } from "@mycellios/contracts";
 import type { Prisma, PrismaClient } from "./client.js";
 import { IsolationError } from "./scope.js";
 
@@ -7,6 +7,42 @@ type Tx = Pick<Prisma.TransactionClient, "$executeRaw">;
 /** A routine conversation is titled with the routine's name, cut like its first title. */
 export function routineThreadTitle(name: string): string {
   return name.slice(0, 100);
+}
+
+/** Loads what `routineRunIn` reads with a routine. */
+export const routineRunInInclude = { thread: { select: { botId: true, groupId: true } } } as const;
+
+/**
+ * Where a routine's runs happen. No thread yet means its own conversation, created by its next
+ * run; undefined when the thread was not loaded.
+ */
+export function routineRunIn(row: {
+  threadId?: string | null;
+  thread?: { botId: string | null; groupId: string | null } | null;
+}): RoutineRunIn | undefined {
+  if (!row.threadId) return "thread";
+  if (!row.thread) return undefined;
+  if (row.thread.groupId) return "group";
+  return row.thread.botId ? "chat" : "thread";
+}
+
+/**
+ * The routine's own conversation, archived or not, even while its runs happen in the main chat.
+ * Null until a run creates it.
+ */
+export async function findRoutineOwnThread(
+  prisma: Pick<Prisma.TransactionClient, "thread">,
+  routine: { id: string; botId: string; spaceId: string; userId: string },
+): Promise<string | null> {
+  const key = `routine:${routine.id}`;
+  const thread = await prisma.thread.findFirst({
+    where: {
+      spaceId: routine.spaceId, userId: routine.userId, taskKey: key, projectKey: key,
+      taskBotId: routine.botId, botId: null, groupId: null, externalConversationId: null,
+    },
+    select: { id: true },
+  });
+  return thread?.id ?? null;
 }
 
 /**
@@ -38,6 +74,13 @@ export async function ensureRoutineThread(
       const privateRoutine = target.taskBotId === routine.botId && target.taskKey === key && target.projectKey === key;
       if (privateRoutine && options.reopen !== false) await reopenRoutineThreadInTransaction(tx, scope, target.id);
       return { id: target.id, privateRoutine };
+    }
+    // A routine moved back from the main chat keeps its earlier conversation and history.
+    const own = await findRoutineOwnThread(tx, { ...routine, ...scope });
+    if (own) {
+      if (options.reopen !== false) await reopenRoutineThreadInTransaction(tx, scope, own);
+      await tx.routine.update({ where: { id: routine.id }, data: { threadId: own } });
+      return { id: own, privateRoutine: true };
     }
     const key = `routine:${routine.id}`;
     const thread = await tx.thread.create({
@@ -99,24 +142,27 @@ export async function followRoutineRenameInTransaction(
 /**
  * Deleting a routine archives its own conversation in the same transaction, so its history
  * stays readable under Archived. Work still running there is not stopped: it finishes in the
- * archived conversation. The main chat and group targets are never archived.
+ * archived conversation. The main chat and group targets are never archived. It is found by the
+ * routine's key, so a routine whose runs moved to the main chat still archives it.
  */
 export async function archiveRoutineThreadInTransaction(
   tx: Tx,
-  routine: RoutineIdentity,
+  routine: Omit<RoutineIdentity, "threadId">,
   now = new Date(),
 ): Promise<boolean> {
-  if (!routine.threadId) return false;
+  const key = `routine:${routine.id}`;
   const archived = await tx.$executeRaw`
     UPDATE threads SET "archivedAt" = ${now}
-    WHERE id = ${routine.threadId} AND "spaceId" = ${routine.spaceId} AND "userId" = ${routine.userId}
-      AND "taskBotId" = ${routine.botId} AND "taskKey" = ${`routine:${routine.id}`}
+    WHERE "spaceId" = ${routine.spaceId} AND "userId" = ${routine.userId}
+      AND "taskBotId" = ${routine.botId} AND "taskKey" = ${key}
       AND "botId" IS NULL AND "archivedAt" IS NULL AND "deleteAfter" IS NULL`;
   if (!archived) return false;
   await tx.$executeRaw`
     UPDATE task_inbox SET "archivedAt" = COALESCE("archivedAt", ${now}), pinned = false,
       "remindAt" = NULL, "reminderClaimedAt" = NULL
-    WHERE "threadId" = ${routine.threadId} AND "spaceId" = ${routine.spaceId} AND "userId" = ${routine.userId}`;
+    WHERE "spaceId" = ${routine.spaceId} AND "userId" = ${routine.userId}
+      AND "threadId" IN (SELECT id FROM threads WHERE "spaceId" = ${routine.spaceId}
+        AND "userId" = ${routine.userId} AND "taskBotId" = ${routine.botId} AND "taskKey" = ${key})`;
   return true;
 }
 

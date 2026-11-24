@@ -187,12 +187,12 @@ it("continues a pinned cloud turn without probing a reconnected Desktop", async 
   expect(transport).not.toHaveBeenCalled();
 });
 
-it.each([undefined, "pi"] as const)("keeps isolated %s execution on the server without a Desktop dependency", async agentEngine => {
+it.each([undefined, "pi", "opencode"] as const)("keeps an explicitly assigned isolated %s run on the server", async agentEngine => {
   const fallback = { describe, abort: vi.fn(), run: vi.fn(async function* () { yield { type: "done" as const }; }) };
   const select = vi.fn(); const transport = vi.fn();
   const runtime = new DesktopAgentRuntime({ fallback, select, transport });
   const input = { ...request(), agentEngine, turnCheckpoint: "same-owned-checkpoint" };
-  for await (const _ of runtime.run(input, { ...context, isolatedWorkspace: true })) {}
+  for await (const _ of runtime.run(input, { ...context, isolatedWorkspace: true, desktopWorkspace: false })) {}
   expect(fallback.run).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ model: input.model, turnCheckpoint: "same-owned-checkpoint" }),
     expect.objectContaining({ isolatedWorkspace: true, userId: context.userId, spaceId: context.spaceId }),
@@ -503,4 +503,18 @@ it("runs a routine's tools and its failure report on Desktop when the engine add
     // The cloud gives each tool its own yield signal for the person's waiting message.
     for (const observer of observers) expect(observer.yieldSignal).toBeInstanceOf(AbortSignal);
   } finally { await host.close(); await rm(profile, { recursive: true, force: true }); }
+});
+
+
+it("never runs an explicitly assigned Desktop coding engine on the server, even with lost relay preference", async () => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = vi.fn();
+  const runtime = new DesktopAgentRuntime({
+    fallback, transport, select: async () => ({ available: false, preferred: false }),
+  });
+  await expect(async () => {
+    for await (const _ of runtime.run({ ...request(), agentEngine: "opencode" }, { ...context, desktopWorkspace: true })) {}
+  }).rejects.toThrow("Your Desktop is offline");
+  expect(fallback.run).not.toHaveBeenCalled();
+  expect(transport).not.toHaveBeenCalled();
 });
