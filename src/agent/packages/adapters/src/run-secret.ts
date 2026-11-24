@@ -12,6 +12,7 @@ import {
 import { isLocationAskBlock, isSecretAskBlock } from "@mycellios/core";
 import type { PrismaClient, RunSecretWriter } from "@mycellios/db";
 import { runLocationKind, runSecretKind, withTransactionRetry } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { type ApprovalPausedToolResult, resolveDuplicateEffectGate } from "./approval-effect.js";
 import { prepareBotSecret } from "./bot-secrets.js";
 import { persistPreparedSecret } from "./secret-persistence.js";
@@ -171,18 +172,28 @@ async function withPreparedLocation<T>(
   );
 }
 
-/** The location a run's card gave, decrypted for one attempt; null when there is none. */
+/**
+ * The location a run's card gave, decrypted for one attempt. Null when there is none or it can
+ * no longer be read (a rotated key, a missing record): the turn then reads the stored note and
+ * asks again instead of failing.
+ */
 export async function loadRunLocation(
   prisma: PrismaClient,
   secretStore: SecretStore,
   run: { id: string; userId: string; spaceId: string },
 ): Promise<LocationAnswer | null> {
-  const row = await prisma.secret.findFirst({
-    where: { userId: run.userId, spaceId: run.spaceId, kind: runLocationKind(run.id) },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!row) return null;
-  return parseLocationAnswer(await secretStore.load(row.ciphertext, row.id));
+  try {
+    const row = await prisma.secret.findFirst({
+      where: { userId: run.userId, spaceId: run.spaceId, kind: runLocationKind(run.id) },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!row) return null;
+    return parseLocationAnswer(await secretStore.load(row.ciphertext, row.id));
+  } catch {
+    // The error can echo stored material, so only a fixed code is recorded.
+    getLogger().warn("run location unavailable", { code: "run_location_unreadable" });
+    return null;
+  }
 }
 
 export function createRunSecretWriter(secretStore: SecretStore): RunSecretWriter {

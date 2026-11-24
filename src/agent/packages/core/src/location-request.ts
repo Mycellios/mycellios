@@ -47,19 +47,63 @@ export function withLocationAnswer(prompt: string, answer: LocationAnswer | null
   return prompt.replace(LOCATION_ANSWER_NOTE, () => locationAnswerPrompt(answer));
 }
 
+/** Typed places, or parts of one, shorter than this ("home", "casa") are too common to hide. */
+export const LOCATION_PLACE_MIN_HIDDEN_LENGTH = 5;
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Spaces and commas as people, URLs and query strings write them. */
+const SPACE = String.raw`(?:\s+|%20|\+|_)`;
+const COMMA = String.raw`(?:\s*(?:,|%2C)(?:\s+|%20|\+)?)`;
+
+function placePattern(place: string): string {
+  return place
+    .trim()
+    .split(/(\s*,\s*|\s+)/)
+    .filter(Boolean)
+    .map((part) =>
+      /^\s*,\s*$/.test(part) ? COMMA : /^\s+$/.test(part) ? SPACE : escapeRegExp(part),
+    )
+    .join("");
+}
+
+function coordinatePattern(value: number): string {
+  // Further digits are the same place written more precisely.
+  return `${escapeRegExp(String(value))}\\d*`;
+}
+
 /**
- * The text forms of an answer that tool activity kept in the chat (steps, commands, output,
- * labels) hides. Single coordinates count only with enough digits to be specific.
+ * Patterns for the forms of an answer that tool activity kept in the chat (steps, commands,
+ * output, labels) hides: case-insensitive, URL-encoded spaces and commas included, and never
+ * inside a longer word or number. A typed place is hidden whole and by each of its
+ * comma-separated parts; parts and single coordinates count only when specific enough.
  */
-export function locationRedactionValues(answer: LocationAnswer): string[] {
+export function locationRedactionPatterns(answer: LocationAnswer): RegExp[] {
   if (answer.kind === "declined") return [];
-  if (answer.kind === "place") return answer.place.trim().length >= 3 ? [answer.place.trim()] : [];
-  const latitude = String(answer.latitude);
-  const longitude = String(answer.longitude);
-  return [
-    `${latitude},${longitude}`,
-    `${latitude}, ${longitude}`,
-    `${latitude} ${longitude}`,
-    ...[latitude, longitude].filter((value) => /\.\d{2,}$/.test(value) && value.length >= 5),
-  ];
+  const sources: string[] = [];
+  if (answer.kind === "place") {
+    const parts = [answer.place, ...answer.place.split(",")]
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/\s/g, "").length >= LOCATION_PLACE_MIN_HIDDEN_LENGTH);
+    for (const part of new Set(parts)) {
+      sources.push(placePattern(part));
+      // Letters outside ASCII as a URL writes them (spaces and commas are covered above).
+      const encoded = encodeURIComponent(part).replace(/%20/g, " ").replace(/%2C/gi, ",");
+      if (encoded !== part) sources.push(placePattern(encoded));
+    }
+  } else {
+    const latitude = coordinatePattern(answer.latitude);
+    const longitude = coordinatePattern(answer.longitude);
+    sources.push(`${latitude}(?:${COMMA}|${SPACE}|;)${longitude}`);
+    for (const value of [answer.latitude, answer.longitude])
+      if (/\.\d{2,}$/.test(String(value))) sources.push(coordinatePattern(value));
+  }
+  // Longest first, so a whole place goes before its parts.
+  return sources
+    .sort((a, b) => b.length - a.length)
+    .map((source) => new RegExp(`(?<![\\p{L}\\p{N}.])${source}(?![\\p{L}\\p{N}])`, "giu"));
+}
+
+/** Replaces every match of the answer's patterns with [redacted]. */
+export function hideLocationValues(text: string, patterns: readonly RegExp[]): string {
+  return patterns.reduce((hidden, pattern) => hidden.replace(pattern, "[redacted]"), text);
 }

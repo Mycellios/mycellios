@@ -1,6 +1,13 @@
 import { encodeLocationAnswer } from "@mycellios/contracts";
 import type { Prisma, PrismaClient, RunSecretWriter } from "@mycellios/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const warn = vi.hoisted(() => vi.fn());
+vi.mock("@mycellios/logging", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  getLogger: () => ({ warn, error: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+}));
+
 import { createRunSecretWriter, loadRunLocation } from "./run-secret.js";
 import { EncryptedSecretStore } from "./secrets.js";
 
@@ -110,5 +117,34 @@ describe("location answers waiting with the run", () => {
       ).rejects.toThrow(/changed; retry/);
     }
     expect(rows).toHaveLength(0);
+  });
+
+  it("gives the turn no location, and logs no value, when the stored answer cannot be read", async () => {
+    const { rows, prisma, writer, answer, save } = harness();
+    const value = encodeLocationAnswer({ kind: "place", place: "Gran Via, Madrid" });
+    await writer.withPrepared!(prisma, answer(value), (prepared) => save(prepared, value));
+    warn.mockClear();
+    // A store under a rotated key cannot decrypt the row.
+    await expect(
+      loadRunLocation(prisma, new EncryptedSecretStore("other-key"), {
+        id: "run",
+        userId: "owner",
+        spaceId: "space",
+      }),
+    ).resolves.toBeNull();
+    const failing = {
+      ...prisma,
+      secret: { findFirst: async () => Promise.reject(new Error("db down")) },
+    };
+    await expect(
+      loadRunLocation(failing as unknown as PrismaClient, new EncryptedSecretStore("fake-key"), {
+        id: "run",
+        userId: "owner",
+        spaceId: "space",
+      }),
+    ).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/Gran Via|run-location|ciphertext/);
+    expect(rows).toHaveLength(1);
   });
 });

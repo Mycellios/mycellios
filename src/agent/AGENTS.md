@@ -2322,12 +2322,16 @@
   reads the browser position once on that click (no watch), rounded to three decimals
   (~100 m) on the device and again on the server; typing a place or declining works
   everywhere, and Desktop offers only typing. A position or place never enters the task
-  prompt, the card or events: the run secret writer encrypts it under runLocationKind, every
-  path that ends a run deletes it with the run's other one-time answers, and the task keeps
-  LOCATION_ANSWER_NOTE, which the executor replaces in the model prompt only. Run previews
-  show the source request instead of that note. Tool labels, commands, output, activity notes,
-  plans and completion errors kept in the chat hide the answer's values; the model's own
-  reply and narration are not redacted. Never log the answer. The Android host grants WebView
+  prompt, the card or events: the run secret writer encrypts it under runLocationKind (local
+  only; secret-store migration treats it as ephemeral), every path that ends a run deletes it
+  with the run's other one-time answers, and the task keeps LOCATION_ANSWER_NOTE, which the
+  executor replaces in the model prompt only. An unreadable answer gives the turn the note,
+  never a failure. Run previews show the source request instead of that note. Tool labels,
+  commands, output, activity notes, plans, completion errors, ask_user and approval card text
+  and their notifications hide the answer through locationRedactionPatterns (case-insensitive,
+  URL-encoded spaces/commas, never inside a longer word or number; places and parts under
+  five letters stay visible). The model's reply, narration and helper summaries are not
+  redacted, nor are other spellings. Never log the answer. The Android host grants WebView
   geolocation only to packaged chat routes, without retaining the grant; the Expo preview
   answers by typing. Verify location-request (contracts/core), location-answer, run-location,
   ask-location, runs and LocationAskCard tests and NavigationPolicyTest.
