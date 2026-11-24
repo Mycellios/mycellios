@@ -48,26 +48,28 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
     let active = true;
     let pending = false;
     let queued = false;
+    let queuedFresh = false;
     let failures = 0;
     let contributing = document.body.dataset.mycelliosContributing === "true";
     let timer: number | undefined;
     let deadline: number | undefined;
     let verifiedRefresh: number | undefined;
     let request: AbortController | undefined;
-    const schedule = (delay: number) => {
+    const schedule = (delay: number, fresh = false) => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => { void refresh(); }, delay);
+      timer = window.setTimeout(() => { void refresh(fresh); }, delay);
     };
-    const refresh = async () => {
+    // Polling and focus may share the server's short per-owner read; known balance changes bypass it.
+    const refresh = async (fresh = false) => {
       if (!active) return;
-      if (pending) { queued = true; return; }
+      if (pending) { queued = true; queuedFresh ||= fresh; return; }
       window.clearTimeout(timer);
       pending = true;
       request = new AbortController();
       deadline = window.setTimeout(() => request?.abort(), 12_000);
       let delay = contributing ? 5_000 : 60_000;
       try {
-        const value = await rpc.models.mycelliosAccount(undefined, { signal: request.signal });
+        const value = await rpc.models.mycelliosAccount(fresh ? { refresh: true } : undefined, { signal: request.signal });
         if (active) {
           failures = 0;
           setState({ ownerId, account: value, loading: false, unavailable: false, accessDenied: false });
@@ -76,7 +78,7 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
         if (active) {
           const denied = accessFailure(error);
           delay = denied ? 60_000 : ([2_000, 5_000, 15_000, 60_000][Math.min(failures++, 3)] ?? 60_000);
-          if (denied) queued = false;
+          if (denied) { queued = false; queuedFresh = false; }
           setState(previous => ({
             ownerId,
             account: denied || previous.ownerId !== ownerId ? null : previous.account,
@@ -89,8 +91,9 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
         request = undefined;
         pending = false;
         if (active) {
-          schedule(queued ? 0 : delay);
+          schedule(queued ? 0 : delay, queued && queuedFresh);
           queued = false;
+          queuedFresh = false;
         }
       }
     };
@@ -103,7 +106,7 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
     const onVerified = () => {
       // Bound bursts to one read per second; late settlement is caught by polling.
       if (verifiedRefresh !== undefined) return;
-      verifiedRefresh = window.setTimeout(() => { verifiedRefresh = undefined; void refresh(); }, 1000);
+      verifiedRefresh = window.setTimeout(() => { verifiedRefresh = undefined; void refresh(true); }, 1000);
     };
     window.addEventListener("mycellios:contribution-verified", onVerified);
     window.addEventListener("mycellios:wallet-changed", onVerified);

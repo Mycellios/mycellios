@@ -63,6 +63,7 @@ import { withSerializableRetry } from "../serializable-retry.js";
 import type { RouterContext } from "./context.js";
 import { readMycelliosChatModels } from "../mycellios-model-catalog.js";
 import { ownedMycelliosConnection } from "../mycellios-owned-connection.js";
+import { createMycelliosAccountCache } from "../mycellios-account-cache.js";
 
 export function modelsRoutes(ctx: RouterContext) {
   const {
@@ -80,6 +81,7 @@ export function modelsRoutes(ctx: RouterContext) {
   // A compatible provider can now have several independent connections.
   // Select an owned Mycellios endpoint, never the newest arbitrary gateway.
   const ownedMycellios = (actor: Actor) => ownedMycelliosConnection(deps, actor.userId);
+  const readAccountCached = createMycelliosAccountCache();
   return {
     models: {
       planLimits: authed.models.planLimits.handler(({ context, input }) => planLimits(context.actor.userId, input?.refresh)),
@@ -197,21 +199,22 @@ export function modelsRoutes(ctx: RouterContext) {
           });
         }
       }),
-      mycelliosAccount: authed.models.mycelliosAccount.handler(async ({ context }) => {
+      mycelliosAccount: authed.models.mycelliosAccount.handler(async ({ context, input }) => {
+        // Authorization is resolved on every call; only the authority read is shared.
+        const readOwned = (connection: { baseUrl: string; apiKey?: string }, credentialId?: string) =>
+          readAccountCached({ ...connection, userId: context.actor.userId, credentialId },
+            () => readMycelliosAccount(connection, { fetch: deps.modelConnectionFetch }),
+            { refresh: input?.refresh, signal: context.signal });
         try {
           // Existing owned connections keep working independently of SSO refresh.
           const owned = await ownedMycellios(context.actor);
-          if (owned) return await readMycelliosAccount(owned.saved, {
-            signal: context.signal, fetch: deps.modelConnectionFetch,
-          });
+          if (owned) return await readOwned(owned.saved, owned.credential.id);
           // The signed-in account has a balance even before connecting a model.
           // Never display another provider's or another account's key balance as this user's Credits.
           if (deps.env.mycelliosSso && context.requestHeaders) {
             const token = await deps.auth.oidcAccessToken(context.requestHeaders, context.actor.userId);
             if (!token) throw new ORPCError("UNAUTHORIZED");
-            return await readMycelliosAccount({ baseUrl: productBrand.apiBaseUrl, apiKey: token }, {
-              signal: context.signal, fetch: deps.modelConnectionFetch,
-            });
+            return await readOwned({ baseUrl: productBrand.apiBaseUrl, apiKey: token });
           }
           return null;
         } catch (error) {

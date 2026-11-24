@@ -270,3 +270,12 @@ it("refreshes the real debit after a completed turn without predicting charges o
  });
  expect(vi.getTimerCount()).toBe(0);
 });
+it("asks for a fresh server read only after a known balance change, not on focus",async()=>{
+ vi.useFakeTimers();readAccount.mockResolvedValue({balanceMicrounits:1000000});
+ await rendered(async()=>{
+  await act(async()=>window.dispatchEvent(new Event("focus")));
+  await act(async()=>window.dispatchEvent(new Event("mycellios:wallet-changed")));
+  await act(async()=>vi.advanceTimersByTimeAsync(1000));
+  expect(readAccount.mock.calls.map(call=>call[0])).toEqual([undefined,undefined,{refresh:true}]);
+ });
+});
