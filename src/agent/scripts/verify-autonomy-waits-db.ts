@@ -8,7 +8,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import EmbeddedPostgres from 'embedded-postgres';
 import { archiveSideThreadInTransaction, asSystem, closeEventWait, createDb, listEventWaits, listSideThreads, openEventWait,
-  reconcileWork, workStatus, controlWorkTree, delegateWork, workReturnWillRecover, WORK_RECOVERY_MARKER, WORK_RETURN_RECOVERY_DELAYS_MS } from '@mycellios/db';
+  reconcileWork, workStatus, controlWorkTree, delegateWork, workReturnWillRecover, WORK_RECOVERY_MARKER, INTERRUPTED_TURN_RECOVERY_DELAYS_MS } from '@mycellios/db';
 import { DESKTOP_OWNER_UNRESOLVED_ERROR, DESKTOP_RUN_INTERRUPTED_ERROR } from '@mycellios/core';
 import { reconcileWorkStops } from '../packages/adapters/src/work-stop-reconciler.js';
 import { stopWorkForThread } from '../apps/api/src/work-controls.js';
@@ -346,7 +346,7 @@ try {
   let returnRun = request.returnRunId!;
   await prisma.run.update({ where: { id: returnRun }, data: { status: 'failed', error: 'Synthetic model refusal', completedAt: new Date() } });
   assert.equal(await workReturnWillRecover(prisma, returnRun), false, 'a model failure is not an interruption');
-  for (const [attempt, delay] of WORK_RETURN_RECOVERY_DELAYS_MS.entries()) {
+  for (const [attempt, delay] of INTERRUPTED_TURN_RECOVERY_DELAYS_MS.entries()) {
     const failedAt = new Date();
     await prisma.run.update({ where: { id: returnRun }, data: { status: 'failed', error: DESKTOP_RUN_INTERRUPTED_ERROR, completedAt: failedAt } });
     assert.equal(await workReturnWillRecover(prisma, returnRun), true, 'an interrupted return will start again');
@@ -364,7 +364,7 @@ try {
   assert.equal(await workReturnWillRecover(prisma, returnRun), false, 'the recovery budget is spent');
   await reconcileWork(prisma);
   assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: asking.taskId } })).delegationState, 'failed');
-  assert.equal(await prisma.run.count({ where: { taskId: asking.taskId, trigger: 'task_return' } }), 1 + WORK_RETURN_RECOVERY_DELAYS_MS.length);
+  assert.equal(await prisma.run.count({ where: { taskId: asking.taskId, trigger: 'task_return' } }), 1 + INTERRUPTED_TURN_RECOVERY_DELAYS_MS.length);
   checks.push('a work return cut off by an update or a lost PC connection starts again after growing delays, a bounded number of times, never after a model failure');
 
   const result = { ok: true, isolatedPostgres: true, paidModelCalls: 0, productionAccess: false,

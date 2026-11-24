@@ -3,23 +3,14 @@ import { micoTurnLimit, slotRunsWhere } from "./mico-concurrency.js";
 import type { PrismaClient, Prisma } from "./client.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
-import { eventWaitReceipt, eventWaitState, eventWaitWakeNote, resolveEventWaitTasks, WORK_RECOVERY_MARKER, WORK_RETURN_MARKER } from "./event-waits.js";
+import { eventWaitReceipt, eventWaitState, eventWaitWakeNote, INTERRUPTED_TURN_RECOVERY_DELAYS_MS, INTERRUPTED_TURN_RECOVERY_NOTE,
+  resolveEventWaitTasks, WORK_RECOVERY_MARKER, WORK_RETURN_MARKER } from "./event-waits.js";
 import { reopenThreadForWakeInTransaction } from "./thread-lifecycle.js";
 
 type Scope = { spaceId: string; userId: string };
 type Source = Scope & { id: string; taskId: string; botId: string; threadId: string; leaseOwner: string; leaseFence: number };
 
-/**
- * A turn that takes delegated work back and is stopped by a deploy or a lost PC connection
- * starts again once per delay, so the Mico still answers; after the last one it fails as before.
- * Together they outlast a deploy that keeps the PC relay down for several minutes.
- */
-export const WORK_RETURN_RECOVERY_DELAYS_MS = [30_000, 120_000, 300_000] as const;
 const RECOVERY_NONCE = "work-recovery:";
-const RETURN_RECOVERY_NOTE = "Your previous turn with this work return was interrupted before it finished " +
-  "(an update or a lost connection, not your decision). It may have done part of the work: check this " +
-  "conversation, work_status and command_status before any new write, and do not repeat completed or " +
-  "uncertain actions. Then finish the request and tell the person the outcome. This does not expand permissions.";
 const RUN_ERROR_LIMIT = 500;
 
 /** Why a delegated execution failed, as the person would read it; never a prompt or raw payload. */
@@ -39,9 +30,9 @@ async function interruptedReturnWakeAt(db: Pick<Prisma.TransactionClient, "run" 
   if (run.id !== task.returnRunId || run.trigger !== "task_return" || run.status !== "failed" ||
       task.paused || task.workStopPending || !isInterruptedRunError(run.error)) return undefined;
   const recent = await db.run.findMany({ where: { taskId: task.id, trigger: "task_return" },
-    orderBy: { createdAt: "desc" }, take: WORK_RETURN_RECOVERY_DELAYS_MS.length + 1, select: { clientNonce: true } });
+    orderBy: { createdAt: "desc" }, take: INTERRUPTED_TURN_RECOVERY_DELAYS_MS.length + 1, select: { clientNonce: true } });
   const leading = recent.findIndex(row => !row.clientNonce?.startsWith(RECOVERY_NONCE));
-  const delay = WORK_RETURN_RECOVERY_DELAYS_MS[leading < 0 ? recent.length : leading];
+  const delay = INTERRUPTED_TURN_RECOVERY_DELAYS_MS[leading < 0 ? recent.length : leading];
   if (delay === undefined) return undefined;
   const scope = { spaceId: task.spaceId, userId: task.userId };
   const [bot, thread] = await Promise.all([
@@ -204,7 +195,7 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
               taskId: task.id, status: "queued", trigger: "task_return", clientNonce: `${RECOVERY_NONCE}${run.id}`, wakeAt } });
             await tx.task.update({ where: { id: task.id }, data: { status: "queued", returnRunId: recovery.id,
               ...(task.parentTaskId ? { delegatedRunId: recovery.id } : {}), delegationRevision: { increment: 1 },
-              prompt: `${task.prompt}${WORK_RECOVERY_MARKER} ${RETURN_RECOVERY_NOTE}` } });
+              prompt: `${task.prompt}${WORK_RECOVERY_MARKER}${INTERRUPTED_TURN_RECOVERY_NOTE}` } });
             queued.push(recovery.id);
             continue;
           }
