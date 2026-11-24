@@ -2,7 +2,7 @@ import type { Context } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
 // Only the frame limit is needed; each test passes its own budget.
 vi.mock("./host-computer-protocol.js", () => ({ HOST_COMPUTER_MAX_BYTES: 12 * 1024 * 1024 }));
-const { OMITTED_IMAGE_TEXT, fitDesktopModelContext } = await import("./desktop-model-stream.js");
+const { OMITTED_IMAGE_TEXT, desktopModelCatalog, fitDesktopModelContext } = await import("./desktop-model-stream.js");
 
 const image = (kb: number) => ({ type: "image" as const, mimeType: "image/png", data: "A".repeat(kb * 1024) });
 const text = (value: string) => ({ type: "text" as const, text: value });
@@ -44,6 +44,41 @@ describe("fitDesktopModelContext", () => {
     const fitted = fitDesktopModelContext(context(), 1024);
     const latest = fitted.messages.at(-1)! as { content: Array<{ type: string }> };
     expect(latest.content[1]!.type).toBe("image");
-    expect(fitted.messages.slice(0, -1).flatMap(m => Array.isArray(m.content) ? m.content : []).some(b => b.type === "image")).toBe(false);
+    expect(fitted.messages.slice(0, -1).flatMap((m): Array<{ type: string }> => Array.isArray(m.content) ? m.content : []).some(b => b.type === "image")).toBe(false);
+  });
+});
+
+describe("desktopModelCatalog", () => {
+  const final = { role: "assistant", content: [{ type: "text", text: "Hi" }], stopReason: "stop" };
+  const delta = { type: "text_delta", contentIndex: 0, delta: "Hi" };
+  async function stream(open: (context: unknown, options: Record<string, unknown>, accept?: { firstBatch?: boolean }) => Promise<unknown>) {
+    const catalog = desktopModelCatalog({} as never, { provider: "p", id: "m", desktopTransport: { model: { id: "m", api: "openai-completions", provider: "p" }, open: open as never } });
+    const output = catalog.streamSimple({} as never, { messages: [] } as Context, {});
+    const events: unknown[] = [];
+    for await (const event of output) events.push(event);
+    return { events, result: await output.result() };
+  }
+
+  it("uses the first events a current server sends with the stream, without another read", async () => {
+    const read = vi.fn();
+    let accepted: unknown;
+    const { events, result } = await stream(async (_context, _options, accept) => {
+      accepted = accept;
+      return { read, cancel: async () => undefined, first: { events: [delta], done: true, result: final } };
+    });
+    expect(accepted).toEqual({ firstBatch: true });
+    expect(read).not.toHaveBeenCalled();
+    expect(events).toEqual([delta]);
+    expect(result).toEqual(final);
+  });
+
+  it("reads as before from an older server that sends no first events", async () => {
+    const read = vi.fn()
+      .mockResolvedValueOnce({ events: [delta], done: false })
+      .mockResolvedValueOnce({ events: [], done: true, result: final });
+    const { events, result } = await stream(async () => ({ read, cancel: async () => undefined }));
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(events).toEqual([delta]);
+    expect(result).toEqual(final);
   });
 });

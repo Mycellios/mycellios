@@ -784,6 +784,16 @@
   The bridge carries plain data, bytes and callbacks only (no AbortSignal or class
   instance). The server owns the steering watch for Desktop tools: never send
   steeringPending across it. Verify with the Pi tool-call test in desktop-agent-runtime.
+  Every bridge message costs a relay round trip, so keep them few and full: a model
+  read merges consecutive deltas of one block and answers with everything buffered
+  (desktop-model-batch.ts, bounded by bytes, never by a small event count); open()
+  returns the first batch when the PC asks with firstBatch, and both sides keep
+  working with peers that do not. Checkpoints go without awaiting the reply; the
+  tool call follows on the same ordered stream. The Desktop relay sends every
+  complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
+  with the stream end joined to the last lines, and the API rechecks all of a PC's
+  bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,
+  desktop-agent-runtime and the Desktop/API relay tests.
   Disconnects must not silently substitute a cloud run for an admitted local run.
   Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
   Preserve local project and checkpoint bindings; a tool result payload alone

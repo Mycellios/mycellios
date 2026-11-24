@@ -3,6 +3,8 @@ import type { Context, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import { reliableModelStream, resolveRuntimeModel } from "./pi-runtime.js";
 import { withCloudflareAuth } from "./cloudflare-ai-gateway.js";
 import { observedPiStream } from "./pi-usage.js";
+import { readModelBatch } from "./desktop-model-batch.js";
+import type { ModelBatchState } from "./desktop-model-batch.js";
 
 /** Cloud retains keys, OAuth refresh and private connection endpoints for every provider. */
 export function desktopModelAccess(config: AgentRunModel, signal: AbortSignal, cleanup: Set<() => void>, accounting: {
@@ -15,7 +17,7 @@ export function desktopModelAccess(config: AgentRunModel, signal: AbortSignal, c
   const publicKeys = ["id","name","api","provider","reasoning","input","cost","contextWindow","maxTokens","compat"];
   const descriptor = Object.fromEntries(Object.entries(target.model).filter(([key])=>publicKeys.includes(key)));
   let opened = 0;
-  return { ...metadata, desktopTransport: { model: { ...descriptor, baseUrl: "https://account-model.invalid" }, open: async (context, options) => {
+  return { ...metadata, desktopTransport: { model: { ...descriptor, baseUrl: "https://account-model.invalid" }, open: async (context, options, accept) => {
     signal.throwIfAborted();
     if (++opened > 512) throw Error("Desktop model call limit reached");
     if (!context || typeof context !== "object" || !Array.isArray((context as Context).messages)) throw Error("Invalid model context");
@@ -28,26 +30,25 @@ export function desktopModelAccess(config: AgentRunModel, signal: AbortSignal, c
         { recordUsage: accounting.onUsage }));
     const iterator = stream[Symbol.asyncIterator]();
     let reading = false;
-    let pending: ReturnType<typeof iterator.next> | undefined;
-    return { cancel: async () => { cancel(); cleanup.delete(cancel); await iterator.return?.(); }, read: async () => {
+    const state: ModelBatchState = {};
+    const stop = async () => { cancel(); cleanup.delete(cancel); await iterator.return?.(); };
+    const read = async () => {
       if (reading) throw Error("Concurrent Desktop model reads are unavailable");
       reading = true;
       try {
         ownedSignal.throwIfAborted();
-        const events: unknown[] = [];
-        const deadline = Date.now() + 20;
-        while (events.length < 16) {
-          pending ??= iterator.next();
-          let timer: ReturnType<typeof setTimeout> | undefined;
-          const next = events.length ? await Promise.race([pending, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), Math.max(0, deadline - Date.now())); })]).finally(() => clearTimeout(timer)) : await pending;
-          if (next === null) break;
-          pending = undefined;
-          if (next.done) { cleanup.delete(cancel); return { events, done: true, result: await stream.result() }; }
-          events.push(next.value);
-          if (Date.now() >= deadline || Buffer.byteLength(JSON.stringify(events)) > 128 * 1024) break;
-        }
-        return { events, done: false };
+        const batch = await readModelBatch(iterator, state, () => stream.result());
+        if (batch.done) cleanup.delete(cancel);
+        return batch;
       } finally { reading = false; }
-    } };
+    };
+    // A Desktop that asks for it gets the first events with the stream, one round trip sooner.
+    if (accept?.firstBatch !== true) return { cancel: stop, read };
+    try {
+      return { cancel: stop, read, first: await read() };
+    } catch (error) {
+      await stop().catch(() => undefined);
+      throw error;
+    }
   } } };
 }

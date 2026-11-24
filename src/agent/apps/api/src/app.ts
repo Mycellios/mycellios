@@ -921,6 +921,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     secret: env.screenProxySecret,
     authenticate: requestSession,
     ownsBot: ownsActiveBot,
+    ownedBots: (actor, botIds) =>
+      runAsTenant(actor, async () =>
+        new Set((await prisma.bot.findMany({
+          where: { id: { in: [...botIds] }, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+          select: { id: true },
+        })).map((bot) => bot.id)),
+      ),
   });
   desktopHostProbe = stopDesktopRelay.hasAgentDevice;
   mountDesktopWhatsApp(app, {

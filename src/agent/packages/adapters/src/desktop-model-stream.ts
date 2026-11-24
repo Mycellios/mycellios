@@ -50,10 +50,13 @@ export function desktopModelCatalog(base: Models, config: AgentRunModel): Models
             if (["apiKey", "headers", "fetch", "signal", "onResponse", "onPayload"].includes(key) || typeof value === "function" || value === undefined) continue;
             safe[key] = value;
           }
-          remote = await transport.open(fitDesktopModelContext(context), safe);
+          remote = await transport.open(fitDesktopModelContext(context), safe, { firstBatch: true });
           options?.signal?.throwIfAborted();
+          // An older server ignores firstBatch and sends no first events.
+          let first = remote.first;
           for (;;) {
-            const batch = await remote.read(); options?.signal?.throwIfAborted();
+            const batch = first ?? await remote.read(); options?.signal?.throwIfAborted();
+            first = undefined;
             for (const event of batch.events) output.push(event as Parameters<typeof output.push>[0]);
             if (batch.done) { output.end(batch.result as AssistantMessage); break; }
           }

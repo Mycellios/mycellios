@@ -97,6 +97,27 @@ it("runs the engine on Desktop while awaiting account callbacks, checkpoints and
   expect(fallback.run).not.toHaveBeenCalled();
 });
 
+it("starts a tool without waiting for the checkpoint reply, after the server holds the checkpoint", async () => {
+  const order: string[] = [];
+  const engine: AgentRuntime = { describe, abort: vi.fn(), async *run(input) {
+    await input.onCheckpoint!(() => "before-tool", "call-1");
+    await input.executeTool!("shell", {}, "call-1");
+    yield { type: "done" };
+  } };
+  const host = await startHostComputerServer({ root: tmpdir(), token: "c".repeat(64), hostname: "127.0.0.1", agentRuntime: engine }); hosts.push(host); host.setEnabled(true);
+  const runtime = new DesktopAgentRuntime({ fallback: { describe, abort: vi.fn(), run: vi.fn() }, select: async () => ({ available: true, preferred: true }), transport: (input, ctx) => fetch(`http://127.0.0.1:${host.port}/computer`, { method: "POST", headers: { authorization: `Bearer ${"c".repeat(64)}` }, body: JSON.stringify(input), signal: ctx.signal }) });
+  let toolStarted!: () => void;
+  const started = new Promise<void>(resolve => { toolStarted = resolve; });
+  const input = request();
+  // The server's checkpoint reply waits for the tool: a Desktop that waited for it would never start the tool.
+  input.onCheckpoint = async (capture) => { order.push(`checkpoint:${capture()}`); await started; };
+  input.executeTool = async () => { order.push("tool"); toolStarted(); return { ok: true }; };
+  const events: AgentRuntimeEvent[] = [];
+  for await (const event of runtime.run(input, context)) events.push(event);
+  expect(order).toEqual(["checkpoint:before-tool", "tool"]);
+  expect(events.at(-1)).toEqual({ type: "done" });
+});
+
 it("keeps the Desktop session open for an observer reply after the engine returns", async () => {
   const token = "d".repeat(64);
   const engine: AgentRuntime = {
