@@ -82,8 +82,11 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
     .getByRole("button", { name: "Take control", exact: true })
     .click();
   await expect(page.getByRole("button", { name: "Close computer" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Skip", exact: true }).last()).toBeVisible();
   await expect(page.getByRole("button", { name: "I’m done", exact: true }).last()).toBeVisible();
+  // Skip sits in the computer menu beside the single primary action.
+  await page.getByRole("button", { name: "More computer actions" }).click();
+  await expect(page.getByTestId("computer-skip")).toBeVisible();
+  await page.keyboard.press("Escape");
   if (process.env.SANDBOX_PROVIDER === "boat") await waitForBoatFramebuffer(page);
   await captureScreenshot(page, testInfo, "09-computer-takeover-outcomes");
   await page.getByRole("button", { name: "I’m done", exact: true }).last().click();
@@ -125,7 +128,8 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
     .getByRole("button", { name: "Take control", exact: true })
     .click();
   await expect(page.getByRole("button", { name: "Close computer" })).toBeVisible();
-  await page.getByRole("button", { name: "Skip", exact: true }).last().click();
+  await page.getByRole("button", { name: "More computer actions" }).click();
+  await page.getByTestId("computer-skip").click();
   await expect(page.getByRole("button", { name: "Close computer" })).toBeVisible();
   await page.getByRole("button", { name: "Close computer" }).click();
   await expect(page.getByText(/login was skipped/i).last()).toBeVisible({

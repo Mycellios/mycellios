@@ -2,6 +2,10 @@ import { Trans } from "@lingui/react/macro";
 import type { ComputerReleaseReason } from "@mycellios/contracts";
 import { Button } from "@mycellios/ui-web";
 
+/**
+ * The one primary way to hand the computer back. Skipping a request lives in the
+ * computer's menu, so a waiting request shows a single clear action.
+ */
 export function ComputerReleaseActions({
   takeoverRequested,
   onRelease,
@@ -17,13 +21,8 @@ export function ComputerReleaseActions({
     );
   }
   return (
-    <div className="flex items-center gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={() => void onRelease("skipped")}>
-        <Trans>Skip</Trans>
-      </Button>
-      <Button type="button" size="sm" onClick={() => void onRelease("done")}>
-        <Trans>I’m done</Trans>
-      </Button>
-    </div>
+    <Button type="button" size="sm" onClick={() => void onRelease("done")}>
+      <Trans>I’m done</Trans>
+    </Button>
   );
 }

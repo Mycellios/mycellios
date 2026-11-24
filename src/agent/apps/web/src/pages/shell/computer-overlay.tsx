@@ -7,8 +7,8 @@ import type {
   Run,
   TaughtSkill,
 } from "@mycellios/contracts";
-import { BotAvatar, Button } from "@mycellios/ui-web";
-import { X } from "lucide-react";
+import { BotAvatar, Button, DropdownMenuItem } from "@mycellios/ui-web";
+import { LoaderCircle, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { ComputerMaintenanceActions } from "../../components/ComputerMaintenanceActions";
 import { TeachCaptureOverlay } from "../../components/teach/TeachCaptureOverlay";
@@ -90,9 +90,9 @@ export function ComputerOverlay({
       >
         <div
           data-testid="computer-chrome"
-          className="app-no-drag flex flex-wrap items-center justify-between gap-4 border-b border-sidebar-border px-[18px] py-3.5"
+          className="app-no-drag flex items-center gap-3 border-b border-sidebar-border px-[18px] py-3 max-sm:flex-wrap"
         >
-          <div data-testid="computer-chrome-info" className="flex min-w-0 flex-1 items-center gap-3 max-sm:basis-full">
+          <div data-testid="computer-chrome-info" className="flex min-w-0 flex-1 items-center gap-3">
             <BotAvatar color={bot.color} identity={bot.id} size={28} status={bot.status} />
             {recordingSkill ? (
               <TeachRecordingChrome
@@ -103,24 +103,29 @@ export function ComputerOverlay({
                 variant="overlay"
               />
             ) : (
-              <span className="truncate text-[15.5px] font-medium text-foreground" dir="auto">
+              <span className="min-w-0 truncate text-[15.5px] font-medium text-foreground" dir="auto">
                 {computerLabel(computer?.mode ?? bot.computerMode, bot.name)}
               </span>
             )}
+            {/* Status keeps its own width so it never wraps into or over the actions. */}
             {!recordingSkill && hasControl ? (
               computer?.takeoverRequested ? (
-                <span className="rounded-full bg-warning/15 px-[11px] py-1 text-[13px] text-warning">
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-warning/15 px-[11px] py-1 text-[13px] text-warning">
                   <Trans>Needs you</Trans>
                 </span>
               ) : (
-                <span className="rounded-full bg-success/15 px-[11px] py-1 text-[13px] text-success">
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-success/15 px-[11px] py-1 text-[13px] text-success">
                   <Trans>You have control</Trans>
                 </span>
               )
             ) : null}
           </div>
-          <div data-testid="computer-chrome-actions" className="flex items-center gap-3 max-sm:w-full max-sm:flex-wrap max-sm:justify-end">
-            {composerRunning ? (
+          <div
+            data-testid="computer-chrome-actions"
+            className="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:justify-end"
+          >
+            {/* Watching the Mico work: stopping it is the main action. */}
+            {composerRunning && !hasControl && !recordingSkill ? (
               <Button
                 type="button"
                 variant="outline"
@@ -136,23 +141,10 @@ export function ComputerOverlay({
             {recordingSkill ? (
               <TeachStopButton busy={teachBusy} onStop={onStopTeaching} />
             ) : hasControl ? (
-              <>
-                {tabView && onShowDesktop ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    data-testid="computer-show-desktop"
-                    onClick={onShowDesktop}
-                  >
-                    <Trans>Show desktop</Trans>
-                  </Button>
-                ) : null}
-                <ComputerReleaseActions
-                  takeoverRequested={Boolean(computer?.takeoverRequested)}
-                  onRelease={onRelease}
-                />
-              </>
+              <ComputerReleaseActions
+                takeoverRequested={Boolean(computer?.takeoverRequested)}
+                onRelease={onRelease}
+              />
             ) : computer?.state === "running" && !computerTakeoverBlocked(computer, runStatus) ? (
               <Button
                 type="button"
@@ -164,7 +156,8 @@ export function ComputerOverlay({
                 <Trans>Take control</Trans>
               </Button>
             ) : null}
-            {!recordingSkill ? (
+            {/* Teaching is its own mode, not part of answering a request. */}
+            {!recordingSkill && !(hasControl && computer?.takeoverRequested) ? (
               <TeachComputerOverlayControl
                 key={bot.id}
                 botId={bot.id}
@@ -177,6 +170,18 @@ export function ComputerOverlay({
               <ComputerMaintenanceActions
                 botId={bot.id}
                 computer={computer}
+                leadingItems={
+                  hasControl &&
+                  (computer?.takeoverRequested || (tabView && onShowDesktop) || composerRunning) ? (
+                    <ControlMenuItems
+                      takeoverRequested={Boolean(computer?.takeoverRequested)}
+                      showDesktop={tabView ? onShowDesktop : undefined}
+                      onStopRun={composerRunning ? onStopRun : undefined}
+                      stopDisabled={sending}
+                      onRelease={onRelease}
+                    />
+                  ) : undefined
+                }
                 onChanged={async () => {
                   await onRefreshComputer();
                 }}
@@ -243,6 +248,17 @@ export function ComputerOverlay({
                       <Trans>Start</Trans>
                     </Button>
                   </div>
+                ) : computer?.state === "running" ? (
+                  // The screen stream is still starting; say so instead of a bare label.
+                  <div data-testid="computer-connecting" className="flex flex-col items-center gap-3">
+                    <LoaderCircle
+                      className="size-5 animate-spin motion-reduce:animate-none"
+                      aria-hidden
+                    />
+                    <p>
+                      <Trans>Connecting…</Trans>
+                    </p>
+                  </div>
                 ) : (
                   computerLabel(computer?.mode, bot.name)
                 ))}
@@ -251,5 +267,44 @@ export function ComputerOverlay({
         </div>
       </div>
     </div>
+  );
+}
+
+/** The less frequent control actions, kept in the computer's menu beside one primary button. */
+function ControlMenuItems({
+  takeoverRequested,
+  showDesktop,
+  onStopRun,
+  stopDisabled,
+  onRelease,
+}: {
+  takeoverRequested: boolean;
+  showDesktop?: () => void;
+  onStopRun?: () => void;
+  stopDisabled: boolean;
+  onRelease: (reason?: ComputerReleaseReason) => Promise<void>;
+}) {
+  return (
+    <>
+      {takeoverRequested ? (
+        <DropdownMenuItem data-testid="computer-skip" onClick={() => void onRelease("skipped")}>
+          <Trans>Skip</Trans>
+        </DropdownMenuItem>
+      ) : null}
+      {showDesktop ? (
+        <DropdownMenuItem data-testid="computer-show-desktop" onClick={showDesktop}>
+          <Trans>Show desktop</Trans>
+        </DropdownMenuItem>
+      ) : null}
+      {onStopRun ? (
+        <DropdownMenuItem
+          data-testid="computer-overlay-stop"
+          disabled={stopDisabled}
+          onClick={() => void onStopRun()}
+        >
+          <Trans>Stop</Trans>
+        </DropdownMenuItem>
+      ) : null}
+    </>
   );
 }
