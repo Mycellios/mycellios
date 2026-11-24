@@ -66,7 +66,9 @@ export function LocationAskCard({
   }
 
   async function run(kind: "position" | "place" | "declined", task: () => Promise<void>) {
-    if (busy.current) return;
+    // Only a card the server marked as a location request takes one: a server that does not
+    // know the card would keep the answer as ordinary text.
+    if (busy.current || !block.location) return;
     busy.current = true;
     setPending(kind);
     setError(null);
@@ -114,15 +116,22 @@ export function LocationAskCard({
       </div>
       {answered ? (
         <div
-          className={`mt-2 text-[13.5px] font-medium ${outcome === "declined" ? "text-muted-foreground" : "text-success"}`}
+          className={`mt-2 text-[13.5px] font-medium ${outcome === "shared" || outcome === "typed" ? "text-success" : "text-muted-foreground"}`}
         >
-          {outcome === "declined" ? t`Not shared` : t`Location shared`}
+          {outcome === "shared" || outcome === "typed" ? (
+            t`Location shared`
+          ) : outcome === "declined" ? (
+            t`Not shared`
+          ) : (
+            // Retired by a new message before anyone answered the card.
+            <Trans>No longer active</Trans>
+          )}
         </div>
       ) : !canAnswer ? (
         <div className="mt-2 text-[13.5px] font-medium text-muted-foreground">
           <Trans>No longer active</Trans>
         </div>
-      ) : isRunUser ? (
+      ) : isRunUser && block.location ? (
         <div className="mt-3 flex flex-col gap-2">
           {canShareDevicePosition() ? (
             <Button

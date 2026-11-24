@@ -5,6 +5,7 @@ import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
+  encodeLocationAnswer,
   LoginSecretValue,
   locationAskOutcome,
   MessageBlock as MessageBlockSchema,
@@ -21,7 +22,7 @@ import {
   isConversationalRun,
   isLocationAskBlock,
   isSecretAskBlock,
-  locationAnswerPrompt,
+  locationAnswerTaskPrompt,
   messageReaction,
   messagingChannelId,
   planCardResumeText,
@@ -329,6 +330,8 @@ export interface RunSecretWriter {
     userId: string;
     spaceId: string;
     plaintext: string;
+    /** A location card's encoded answer, kept under runLocationKind until the run ends. */
+    location?: true;
     tx: Prisma.TransactionClient;
   }): Promise<void>;
 }
@@ -817,11 +820,13 @@ async function commitAnswerRunInput(
   if (secretAsk && input.answer.length > BOT_SECRET_VALUE_MAX_LENGTH)
     throw new AnswerTooLongError();
   // A location card is answered only by its run's user: a rounded position, a typed place or a
-  // refusal. The answer reaches the resumed turn and is never written on the card.
+  // refusal. A position or place waits encrypted with the run (never in the task prompt or on
+  // the card), so it needs the run secret writer.
   const locationAsk = !approvalAsk && !secretAsk && isLocationAskBlock(pendingAsk);
   const locationAnswer = locationAsk ? parseLocationAnswer(input.answer) : null;
   if (locationAsk && (!locationAnswer || dismissed || run.userId !== input.answeredByUserId))
     return null;
+  if (locationAnswer && locationAnswer.kind !== "declined" && !runSecretWriter) return null;
   let approvalEffect: { id: string; kind: string; request: Prisma.JsonValue } | null = null;
   let editedInstructions: string | undefined;
   let approvalAnswer = input.answer;
@@ -992,6 +997,17 @@ async function commitAnswerRunInput(
       },
     });
   } else {
+    if (locationAnswer && locationAnswer.kind !== "declined") {
+      await runSecretWriter!.store({
+        botId: run.botId,
+        runId: input.runId,
+        userId: run.userId,
+        spaceId: input.spaceId,
+        plaintext: encodeLocationAnswer(locationAnswer),
+        location: true,
+        tx,
+      });
+    }
     const resumeLabel = selectedChoice
       ? resumeChoiceLabel(selectedChoice, run.checkpoint)
       : undefined;
@@ -1009,7 +1025,7 @@ async function commitAnswerRunInput(
                 autoStarted: input.autoStart,
               })
             : locationAnswer
-              ? locationAnswerPrompt(locationAnswer)
+              ? locationAnswerTaskPrompt(locationAnswer)
               : selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
         ),
       },
@@ -1130,7 +1146,10 @@ export async function retireWaitingQuestionInTransaction(
       questions.push({
         id: message.id,
         blocks: parsed.data.map((block) =>
-          pending.includes(block) ? { ...block, status: "answered" as const, answer } : block,
+          pending.includes(block)
+            ? // A retired location card keeps no text and no outcome: it shows as no longer active.
+              { ...block, status: "answered" as const, answer: isLocationAskBlock(block) ? "" : answer }
+            : block,
         ),
       });
     }
@@ -1193,7 +1212,14 @@ export async function answerWaitingRunWithTextInTransaction(
   if (!answer) return null;
   const found = await findPendingAsk(tx, input);
   if (!found) return null;
-  if (isApprovalAskBlock(found.pendingAsk) || isSecretAskBlock(found.pendingAsk)) return null;
+  // A location card answers only on the card; a composer message is an ordinary message and
+  // retires the card instead.
+  if (
+    isApprovalAskBlock(found.pendingAsk) ||
+    isSecretAskBlock(found.pendingAsk) ||
+    isLocationAskBlock(found.pendingAsk)
+  )
+    return null;
   if (input.messageId !== undefined) {
     if (input.messageId !== found.messageId) return null;
   } else {

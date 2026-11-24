@@ -4139,8 +4139,8 @@ describe("stopThreadRuns", () => {
     expect(transaction.secret.deleteMany).toHaveBeenCalledWith({
       where: {
         OR: [
-          { userId: "user-1", spaceId: "workspace-1", kind: "run-secret:run-a" },
-          { userId: "user-1", spaceId: "workspace-1", kind: "run-secret:run-b" },
+          { userId: "user-1", spaceId: "workspace-1", kind: { in: ["run-secret:run-a", "run-location:run-a"] } },
+          { userId: "user-1", spaceId: "workspace-1", kind: { in: ["run-secret:run-b", "run-location:run-b"] } },
         ],
       },
     });

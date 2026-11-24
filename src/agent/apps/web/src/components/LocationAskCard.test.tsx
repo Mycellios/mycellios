@@ -19,6 +19,7 @@ vi.mock("../lib/rpc", () => ({ rpc: {} }));
 
 import type { AskBlock } from "./AskCard";
 import { AskCard } from "./AskCard";
+import { LocationAskCard } from "./LocationAskCard";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -165,4 +166,22 @@ it("offers only typing where the browser has no geolocation, and nothing to othe
 it("shows an answered card without the location", async () => {
   await render({ ...pending, status: "answered", answer: "", location: { outcome: "typed" } });
   expect(container.textContent).toBe("To find restaurants near you.Location shared");
+});
+
+it("shows a card retired by a new message as no longer active", async () => {
+  await render({ ...pending, status: "answered", answer: "" });
+  expect(container.textContent).toBe("To find restaurants near you.No longer active");
+});
+
+it("never sends a location for a card the server did not mark as a location request", async () => {
+  const geolocation = stubGeolocation(() => undefined);
+  const onAnswer = vi.fn(async (_text: string) => undefined);
+  const { location: _omitted, ...plain } = pending;
+  await act(async () =>
+    root.render(<LocationAskCard block={plain} canAnswer isRunUser onAnswer={onAnswer} />),
+  );
+  expect(container.querySelector("input")).toBeNull();
+  expect(container.querySelectorAll("button")).toHaveLength(0);
+  expect(onAnswer).not.toHaveBeenCalled();
+  expect(geolocation.getCurrentPosition).not.toHaveBeenCalled();
 });

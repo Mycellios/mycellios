@@ -147,7 +147,7 @@ describe("finalizeRun", () => {
       expect(publish).toHaveBeenCalledOnce();
       // A finished run never resumes to read a waiting secret answer.
       expect(tx.secret.deleteMany).toHaveBeenCalledWith({
-        where: { OR: [{ userId: "user-1", spaceId: "space-1", kind: "run-secret:run-1" }] },
+        where: { OR: [{ userId: "user-1", spaceId: "space-1", kind: { in: ["run-secret:run-1", "run-location:run-1"] } }] },
       });
     },
   );
@@ -3949,7 +3949,7 @@ describe("clearThread", () => {
     expect(publish).toHaveBeenCalledWith("thread:thread-1", JSON.stringify({ cursor: 0 }));
     // A cleared chat never resumes its run to read a waiting secret answer.
     expect(tx.secret.deleteMany).toHaveBeenCalledWith({
-      where: { OR: [{ userId: "user-1", spaceId: "workspace-1", kind: "run-secret:run-1" }] },
+      where: { OR: [{ userId: "user-1", spaceId: "workspace-1", kind: { in: ["run-secret:run-1", "run-location:run-1"] } }] },
     });
   });
 

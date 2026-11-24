@@ -5,6 +5,7 @@ import {
   BACKGROUND_RUN_TRIGGERS,
   botMessageContext,
   displayName,
+  isLocationAnswerPrompt,
 } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
 
@@ -21,6 +22,14 @@ export function activityPreview(
   input: { trigger: string; prompt: string; sourceBlocks?: unknown },
   max = 120,
 ): Pick<RunActivityRow, "promptSnippet" | "agentMessage"> {
+  // A location card's note is internal: show the request that started the turn instead.
+  if (isLocationAnswerPrompt(input.prompt)) {
+    const source = MessageBlock.array().safeParse(input.sourceBlocks);
+    const request = (source.data ?? [])
+      .flatMap((block) => (block.kind === "text" ? [block.text] : []))
+      .join(" ");
+    return { promptSnippet: promptSnippet(request.trim() || "Location request", max), agentMessage: null };
+  }
   if (input.trigger !== "bot_message")
     return { promptSnippet: promptSnippet(input.prompt, max), agentMessage: null };
   const parsed = MessageBlock.array().safeParse(input.sourceBlocks);

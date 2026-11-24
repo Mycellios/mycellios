@@ -140,7 +140,9 @@ import {
   userTurnMessageForRun,
   desktopSetupInterruptedMessage,
   ASK_LOCATION_TOOL,
-  withoutLocationAnswer,
+  isLocationAnswerPrompt,
+  locationRedactionValues,
+  withLocationAnswer,
 } from "@mycellios/core";
 import {
   isSiteFetchTool,
@@ -460,6 +462,7 @@ import { renderRoutineHandoff } from "./routine-context.js";
 import { lazyRunComputer } from "./run-computer.js";
 import {
   commitConsumedRunSecret,
+  loadRunLocation,
   normalizeSecretAskPurpose,
   reconcileManagedConnection,
   resolveCompletedSecretLeftover,
@@ -4065,6 +4068,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
       };
 
       const runSecrets = [...deps.secrets];
+      // A location card's answer stays readable for the model and its tools; only the activity
+      // this run keeps in the chat (tool labels, commands, output, notes) hides it.
+      const locationRedactions: string[] = [];
+      const hideLocation = (text: string) =>
+        locationRedactions.length ? redactSecrets(text, locationRedactions) : text;
       let dispatchHandedOff = false;
       try {
         // Durable run ownership and its heartbeat now carry recovery. Model,
@@ -4156,15 +4164,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               )?.seq ??
               thread.nextMessageSeq)
             : thread.nextMessageSeq;
-        // A location the person shared reaches only this attempt: the stored task keeps a note
-        // that it was answered, and memory searches never receive it.
-        const storedPrompt = withoutLocationAnswer(task.prompt);
-        if (storedPrompt !== task.prompt) {
-          await deps.prisma.task.updateMany({
-            where: { id: task.id, prompt: task.prompt },
-            data: { prompt: storedPrompt },
-          });
-        }
+        // A location card's position or place waits encrypted with the run, never in the task:
+        // only the model prompt of this run's attempts receives it, and the tool activity kept
+        // in the chat hides it.
+        const runLocation = isLocationAnswerPrompt(task.prompt)
+          ? await loadRunLocation(deps.prisma, deps.secretStore, run)
+          : null;
+        if (runLocation) locationRedactions.push(...locationRedactionValues(runLocation));
         const agentEnvironment = await decryptAgentEnvironment(agentSecretRows, deps.secretStore);
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
@@ -4349,7 +4355,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           thread.historyCompactedUpToSeq != null
             ? semanticMemory.recall(
                 {
-                  query: storedPrompt,
+                  query: task.prompt,
                   scope: memoryScope,
                   botId: bot.id,
                   historyGeneration: thread.historyCompactionGeneration,
@@ -4363,7 +4369,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const personalRecallPromise =
           personalMemory && threadContext.includeSemanticRecall
             ? personalMemory
-                .search(storedPrompt, {
+                .search(task.prompt, {
                   limit: PERSONAL_MEMORY_AUTO_RECALL_LIMIT,
                   automatic: true,
                   signal: context.signal,
@@ -4383,7 +4389,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           messagingChannelRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:storedPrompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
           messagingChannelRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
@@ -4394,7 +4400,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? Promise.resolve(undefined)
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
-                text: storedPrompt,
+                text: task.prompt,
               }),
           recallPromise,
           personalRecallPromise,
@@ -6374,7 +6380,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 botId: bot.id,
                 runId,
                 type: "computer.command",
-                payload,
+                // Commands and output are kept as the turn's tool steps.
+                payload: {
+                  ...payload,
+                  command: hideLocation(payload.command),
+                  cwd: hideLocation(payload.cwd),
+                  output: hideLocation(payload.output),
+                },
               })
               // The Activity feed is a view; losing an entry must not fail the tool.
               // Output that arrives after the run was cancelled has no history to join.
@@ -8872,7 +8884,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           currentTurnImages,
         );
         const taskPrompt = expandSkillReferencesInPrompt(
-          [task.prompt, attachedFilesPrompt, missingImagesInstruction].filter(Boolean).join("\n\n"),
+          [withLocationAnswer(task.prompt, runLocation), attachedFilesPrompt, missingImagesInstruction]
+            .filter(Boolean)
+            .join("\n\n"),
           agentSkills,
         );
         const invokedSkill = savedSkills.find((skill) =>
@@ -9323,7 +9337,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     runId,
                   },
                   completion,
-                  runSecrets,
+                  [...runSecrets, ...locationRedactions],
                 );
               },
               // Read only: a message sent into this turn that it has not taken yet.
@@ -9471,7 +9485,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 type: "thread.progress",
                 runId,
                 payload: {
-                  text: redactSecrets(event.text, runSecrets),
+                  // Activity lines become the kept tool step details.
+                  text: hideLocation(redactSecrets(event.text, runSecrets)),
                   ...(event.activity ? { activity: true } : {}),
                   ...(event.waiting ? { waiting: event.waiting, since: new Date().toISOString() } : {}),
                 },
@@ -9621,7 +9636,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return;
             } else if (event.type === "tool") {
               if (event.name === WORK_PLAN_TOOL) {
-                latestPlan = workPlanBlock(event.args, (text) => redactSecrets(text, runSecrets)) ?? latestPlan;
+                latestPlan =
+                  workPlanBlock(event.args, (text) => hideLocation(redactSecrets(text, runSecrets))) ??
+                  latestPlan;
               }
               // Preserve event ordering when the throttle still holds recent narration: the
               // client must see that text before the tool call it describes.
@@ -9632,9 +9649,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 await publishMidTurnNarration();
               }
               assistantTurnBreakPending = true;
-              const toolLabel = redactSecrets(
-                describeToolActivity(event.name, event.args),
-                runSecrets,
+              const toolLabel = hideLocation(
+                redactSecrets(describeToolActivity(event.name, event.args), runSecrets),
               );
               await deps.events.append({
                 spaceId: run.spaceId,
@@ -9677,7 +9693,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       },
                       result,
                     ),
-                    runSecrets,
+                    [...runSecrets, ...locationRedactions],
                   );
                   if (isToolPauseResult(result)) return;
                 } catch (error) {
@@ -9695,7 +9711,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       durationMs: Date.now() - startedAt,
                       error,
                     },
-                    runSecrets,
+                    [...runSecrets, ...locationRedactions],
                   );
                   throw error;
                 }

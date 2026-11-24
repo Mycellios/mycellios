@@ -1,38 +1,74 @@
 import { describe, expect, it } from "vitest";
 import { dismissableAskMessageIds } from "./answerable-ask.js";
 import { blocksToAgentHistoryText } from "./attachments.js";
+import { redactSecrets } from "./events.js";
 import {
+  isLocationAnswerPrompt,
   isLocationAskBlock,
   LOCATION_ANSWER_MARKER,
+  LOCATION_ANSWER_NOTE,
+  LOCATION_DECLINED_PROMPT,
   locationAnswerPrompt,
-  withoutLocationAnswer,
+  locationAnswerTaskPrompt,
+  locationRedactionValues,
+  withLocationAnswer,
 } from "./location-request.js";
 
+const position = {
+  kind: "position" as const,
+  latitude: 40.417,
+  longitude: -3.704,
+  accuracyMeters: 100,
+};
+
 describe("location request prompts", () => {
-  it("tells the turn the shared position once and keeps it out of later use", () => {
-    const prompt = locationAnswerPrompt({
-      kind: "position",
-      latitude: 40.417,
-      longitude: -3.704,
-      accuracyMeters: 100,
-    });
-    expect(prompt.startsWith(LOCATION_ANSWER_MARKER)).toBe(true);
-    expect(prompt).toContain("latitude 40.417, longitude -3.704 (within about 100 m)");
-    expect(prompt).toContain("Do not save it");
+  it("stores only a note in the task and gives the turn the location in its place", () => {
+    expect(locationAnswerTaskPrompt(position)).toBe(LOCATION_ANSWER_NOTE);
+    expect(locationAnswerTaskPrompt({ kind: "place", place: "Madrid" })).toBe(LOCATION_ANSWER_NOTE);
+    expect(locationAnswerTaskPrompt({ kind: "declined" })).toBe(LOCATION_DECLINED_PROMPT);
+    expect(LOCATION_ANSWER_NOTE).not.toMatch(/\d/);
+
+    const turn = withLocationAnswer(`${LOCATION_ANSWER_NOTE}\n\nAttached files: none`, position);
+    expect(turn).toContain("latitude 40.417, longitude -3.704 (within about 100 m)");
+    expect(turn).toContain("Do not save it");
+    expect(turn).not.toContain(LOCATION_ANSWER_NOTE);
+    expect(turn.endsWith("Attached files: none")).toBe(true);
     expect(locationAnswerPrompt({ kind: "place", place: 'Gran "Via"' })).toContain(
       '"Gran \\"Via\\""',
     );
-    expect(locationAnswerPrompt({ kind: "declined" })).not.toContain(LOCATION_ANSWER_MARKER);
   });
 
-  it("stores the prompt without the location, once and idempotently", () => {
-    const shared = locationAnswerPrompt({ kind: "place", place: "Madrid" });
-    const stored = withoutLocationAnswer(`Earlier task\n\nWhere?\nAnswer: ${shared}`);
-    expect(stored.startsWith("Earlier task\n\nWhere?\nAnswer: ")).toBe(true);
-    expect(stored).not.toContain("Madrid");
-    expect(stored).toContain("not kept");
-    expect(withoutLocationAnswer(stored)).toBe(stored);
-    expect(withoutLocationAnswer("restaurants near me")).toBe("restaurants near me");
+  it("leaves other prompts and a lost answer as they are", () => {
+    expect(withLocationAnswer("restaurants near me", position)).toBe("restaurants near me");
+    expect(withLocationAnswer(LOCATION_ANSWER_NOTE, null)).toBe(LOCATION_ANSWER_NOTE);
+    expect(isLocationAnswerPrompt(LOCATION_ANSWER_NOTE)).toBe(true);
+    expect(isLocationAnswerPrompt(LOCATION_DECLINED_PROMPT)).toBe(true);
+    expect(isLocationAnswerPrompt(`Please look up ${LOCATION_ANSWER_MARKER}`)).toBe(false);
+  });
+
+  it("hides the answer in kept tool activity", () => {
+    const hide = (text: string, answer: Parameters<typeof locationRedactionValues>[0]) =>
+      redactSecrets(text, locationRedactionValues(answer));
+    expect(hide("Searching the web: restaurants near 40.417,-3.704", position)).toBe(
+      "Searching the web: restaurants near [redacted]",
+    );
+    expect(hide("Running: curl wttr.in/40.417, -3.704?format=3", position)).not.toMatch(
+      /40\.417|-3\.704/,
+    );
+    expect(hide("lat=40.417&lon=-3.704", position)).toBe("lat=[redacted]&lon=[redacted]");
+    expect(
+      hide("Searching the web: tapas Gran Via, Madrid", {
+        kind: "place",
+        place: "Gran Via, Madrid",
+      }),
+    ).toBe("Searching the web: tapas [redacted]");
+    // Short coordinates alone would hide unrelated numbers; only the pair is hidden.
+    expect(locationRedactionValues({ kind: "position", latitude: 1.5, longitude: 0 })).toEqual([
+      "1.5,0",
+      "1.5, 0",
+      "1.5 0",
+    ]);
+    expect(locationRedactionValues({ kind: "declined" })).toEqual([]);
   });
 
   it("lets later turns know only how a location card was answered", () => {
