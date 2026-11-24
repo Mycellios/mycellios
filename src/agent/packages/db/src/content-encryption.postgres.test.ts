@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { MessageBlock } from "@mycellios/contracts";
+import { getLogContext, runWithLogContext } from "@mycellios/logging";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "./client.js";
 import { createDb } from "./client.js";
@@ -117,6 +118,23 @@ describePostgres("content encryption (PostgreSQL)", () => {
         select: { messages: { select: { blocks: true }, where: { id: message.id } } },
       });
       expect(nested?.messages).toEqual([{ blocks }]);
+    }));
+
+  it("counts the rows and ciphertext bytes it opens in the log context", () =>
+    runAsSystem("test fixture", async () => {
+      const message = await createThreadMessage(prisma, {
+        threadId,
+        role: "user",
+        blocks: [{ kind: "text", text: "Counted content" }],
+      });
+      const counted = await runWithLogContext({}, async () => {
+        await prisma.message.findUniqueOrThrow({ where: { id: message.id } });
+        await prisma.message.findUniqueOrThrow({ where: { id: message.id } });
+        return getLogContext();
+      });
+      expect(counted["db.decrypt.rows"]).toBe(2);
+      expect(Number(counted["db.decrypt.bytes"])).toBeGreaterThan(0);
+      expect(JSON.stringify(counted)).not.toContain("Counted content");
     }));
 
   it("keeps sealed routine run markers out of model history", () =>

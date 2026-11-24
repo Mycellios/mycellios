@@ -1,3 +1,4 @@
+import { enrichLogContext, getLogContext } from "@mycellios/logging";
 import type { ContentLocation, DataKey, SearchTokenDomain } from "./content-crypto.js";
 import {
   ContentDecryptionError,
@@ -16,6 +17,20 @@ import type { PrismaClient } from "./generated/prisma/client.js";
 import { Prisma } from "./generated/prisma/client.js";
 import { historyMessageText } from "./history-text.js";
 import { createRowId } from "./row-id.js";
+
+/**
+ * Adds the rows and ciphertext bytes just decrypted to the current request's or job's log
+ * context, so its completion record shows how much content it had to open. Counts only.
+ */
+function recordDecryption(rows: number, bytes: number) {
+  const context = getLogContext();
+  const previousRows = Number(context["db.decrypt.rows"]) || 0;
+  const previousBytes = Number(context["db.decrypt.bytes"]) || 0;
+  enrichLogContext({
+    "db.decrypt.rows": previousRows + rows,
+    "db.decrypt.bytes": previousBytes + bytes,
+  });
+}
 
 /**
  * Scalars that stay readable beside each sealed block because queries filter on
@@ -329,6 +344,7 @@ export function withContentEncryption(prisma: PrismaClient, ring: ContentKeyRing
 
   async function open(pending: Pending[]) {
     const encrypted = pending.filter((entry) => keyIdsOf(entry).length);
+    let decryptedBytes = 0;
     const ids = [...new Set(encrypted.flatMap(keyIdsOf))];
     const keys = new Map(
       await Promise.all(ids.map(async (id) => [id, await ring.byId(id)] as const)),
@@ -351,15 +367,20 @@ export function withContentEncryption(prisma: PrismaClient, ring: ContentKeyRing
             throw new ContentDecryptionError("Encrypted content belongs to another space");
           return decryptText(key, location, ciphertext);
         };
+        const counted = (ciphertext: string) => {
+          decryptedBytes += ciphertext.length;
+          return decrypt(ciphertext);
+        };
         const value = row[field];
         row[field] = fieldSpec.plainKeys
-          ? openJson(value, decrypt)
+          ? openJson(value, counted)
           : ciphertextKeyId(value)
-            ? decrypt(value as string)
+            ? counted(value as string)
             : value;
       }
       ring.remember(spec.table, rowId, { spaceId: keys.get(rowKeyIds[0]!)!.spaceId, owner });
     }
+    if (encrypted.length) recordDecryption(encrypted.length, decryptedBytes);
   }
 
   async function seal(spec: ModelSpec, data: RecordValue, rowId: string, context: RowContext) {
