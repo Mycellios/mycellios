@@ -17,8 +17,28 @@ function appWith(logger: Logger) {
   });
   app.get("/bad", (c) => c.json({ error: "nope" }, 400));
   app.get("/crash", (c) => c.json({ error: "down" }, 500));
+  app.post("/rpc/*", (c) => c.json({ ok: true }));
   return app;
 }
+
+describe("rpc procedure logging", () => {
+  it("names the procedure of an rpc call and leaves out anything else", async () => {
+    const sink = createTestSink();
+    const app = appWith(createLogger({ service: "rakazo-api", sinks: [sink] }));
+    await app.request("/rpc/threads/snapshot?input=secret", { method: "POST" });
+    await app.request("/rpc/threads/abc%20def", { method: "POST" });
+    await app.request("/rpc/a/b/c/d", { method: "POST" });
+    await app.request("/health");
+    expect(sink.events.map((event) => event["rpc.procedure"])).toEqual([
+      "threads/snapshot",
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(sink.events[0]).toMatchObject({ "http.route": "/rpc/*" });
+    expect(JSON.stringify(sink.events)).not.toContain("secret");
+  });
+});
 
 describe("hono request logging", () => {
   it("validates or generates request ids and returns them", async () => {
