@@ -74,6 +74,39 @@ describe("automatic compatible-model distribution", () => {
       .toThrow(/model_is_not_automatically_distributable:no certified selective-stage adapter/);
   });
 
+  it("refuses a cross-machine route whose return endpoint is not on the chosen root", () => {
+    const value = twoMachineFixture();
+    value.nodes[0] = { ...value.nodes[0]!, stageRoles: ["tail"] };
+    value.nodes[1] = { ...value.nodes[1]!, stageRoles: ["head"] };
+    // The root lands on the remote node-b, but the return still names node-a:
+    // the tail would dial itself and time out instead of failing at planning.
+    expect(() => compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture()))
+      .toThrow(/auto_distribute_root_endpoint_mismatch:node-b:returnEndpoint\.host=192\.168\.1\.10/);
+
+    value.runtime.returnEndpoint.host = "192.168.1.11";
+    expect(() => compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture()))
+      .toThrow(/auto_distribute_root_endpoint_mismatch:node-b:apiAdvertiseHost=127\.0\.0\.1/);
+
+    value.runtime.apiAdvertiseHost = "192.168.1.11";
+    value.runtime.apiEndpoint.host = "192.168.1.11";
+    const remoteRoot = compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture());
+    expect(remoteRoot.manifest.plans.decode.stages[0]!.anchor.memberId).toBe("node-b");
+  });
+
+  it("accepts a cross-machine route when the root is pinned to the node that owns the return", () => {
+    const value = twoMachineFixture();
+    value.nodes[0] = { ...value.nodes[0]!, stageRoles: ["head"] };
+    value.nodes[1] = { ...value.nodes[1]!, stageRoles: ["tail"] };
+    const compiled = compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture());
+    expect(compiled.manifest.plans.decode.stages.map((stage) => stage.anchor.memberId))
+      .toEqual(["node-a", "node-b"]);
+
+    // A loopback return cannot be reached from the remote stage.
+    value.runtime.returnEndpoint.host = "127.0.0.1";
+    expect(() => compileAutoDistribution(parseAutoDistributionConfig(value), profileFixture()))
+      .toThrow(/auto_distribute_root_endpoint_mismatch:node-a:returnEndpoint\.host=127\.0\.0\.1/);
+  });
+
   it("rejects duplicate nodes and impossible minimum stage counts at config load", () => {
     const value = configFixture();
     value.nodes[1]!.id = "node-a";
@@ -193,6 +226,20 @@ describe("automatic compatible-model distribution", () => {
     expect("canaryEvidence" in worker.deployment).toBe(false);
   });
 });
+
+/** node-a runs locally on 192.168.1.10; node-b is a remote launch agent on 192.168.1.11. */
+function twoMachineFixture(): AutoDistributionConfig {
+  const value = configFixture();
+  value.nodes[0] = { ...value.nodes[0]!, endpoint: { host: "192.168.1.10", port: 21_001 } };
+  value.nodes[1] = {
+    ...value.nodes[1]!,
+    endpoint: { host: "192.168.1.11", port: 21_002 },
+    agent: { kind: "http", endpoint: "http://192.168.1.11:9750", authTokenEnv: "REMOTE_TOKEN", requestTimeoutMs: 30_000 },
+  };
+  value.runtime.returnEndpoint = { host: "192.168.1.10", port: 30_000 };
+  value.runtime.returnBindHost = "0.0.0.0";
+  return value;
+}
 
 function configFixture(): AutoDistributionConfig {
   return {
