@@ -714,9 +714,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }
   const overlay = readShellOverlay(searchParams);
   // Overlays replace the URL rather than adding history, so opening and closing never race a navigation.
-  function setOverlay(next: ShellOverlay) {
+  const setOverlay = useCallback((next: ShellOverlay) => {
     navigate({ search: searchString(withShellOverlay(searchParams, next)) }, { replace: true });
-  }
+  }, [navigate, searchParams]);
   const messagingStatus = useQuery({
     ...queries.messaging.status.queryOptions(),
     enabled: Boolean(session.data?.user),
@@ -834,7 +834,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const [bootingBotId, setBootingBotId] = useState<string | null>(null);
   const booting = bootingBotId !== null && bootingBotId === computer?.botId;
   const bootsInFlight = useRef(new Map<string, symbol>());
-  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [loadingOlderThreadId, setLoadingOlderThreadId] = useState<string | null>(null);
+  const olderRequest = useRef<{ epoch: number; threadId: string } | null>(null);
   const [initialBotsLoaded, setInitialBotsLoaded] = useState(Boolean(seed));
   // A failed first load falls back to the shell, whose polling and footer can still recover.
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
@@ -1202,6 +1203,23 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     },
     [readInOrder, updateBotUnread],
   );
+  const markTranscriptMessageUnread = useCallback((message: ThreadMessage) => {
+    const groupId = activeGroupId.current;
+    if (groupId) {
+      manuallyUnread.current.add(groupId);
+      const visit = readVisit.current.visit;
+      void readInOrder(`group:${groupId}`, () =>
+        rpc.threads.markUnread({ groupId, messageId: message.id }),
+      )
+        .then(() => {
+          if (readVisit.current.visit === visit) setMarkedUnread({ visit, messageId: message.id });
+          setGroups(current => current.map(group => group.id === groupId ? { ...group, unread: true } : group));
+        })
+        .catch(() => manuallyUnread.current.delete(groupId));
+    } else if (activeBotId.current) {
+      void markBotUnread(activeBotId.current, message.id).catch(() => undefined);
+    }
+  }, [markBotUnread, readInOrder, rpc]);
   // A bot the user marked unread by hand stays unread until they open it again,
   // otherwise the auto-read below would undo the action on the next window focus.
   const markBotReadIfVisible = useCallback(
@@ -1645,17 +1663,19 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const snapshotMatchesTarget = targetGroupId
       ? snapshot?.groupId === targetGroupId
       : snapshot?.botId === targetBotId;
+    const epoch = historyEpoch.current;
     if (
       (!targetBotId && !targetGroupId) ||
       !snapshotMatchesTarget ||
       snapshot?.olderCursor == null ||
-      loadingOlder
+      (olderRequest.current?.epoch === epoch && olderRequest.current.threadId === snapshot.threadId)
     )
       return;
     pinnedAroundRef.current = null;
-    const epoch = historyEpoch.current;
     const before = snapshot.olderCursor;
-    setLoadingOlder(true);
+    const request = { epoch, threadId: snapshot.threadId };
+    olderRequest.current = request;
+    setLoadingOlderThreadId(request.threadId);
     try {
       const page = await rpc.threads.messages({
         ...(targetGroupId ? { groupId: targetGroupId } : { botId: targetBotId! }),
@@ -1681,7 +1701,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         }
       });
     } finally {
-      setLoadingOlder(false);
+      if (olderRequest.current === request) {
+        olderRequest.current = null;
+        setLoadingOlderThreadId(null);
+      }
     }
   }
 
@@ -3090,12 +3113,26 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, [active, groupId, inGroup, snapshot?.botId, snapshot?.groupId, snapshot?.threadId]);
 
   const showBot = useCallback((id: string) => navigate(`/app/${id}`), [navigate]);
+  const replyToMessage = useCallback((message: ThreadMessage) => {
+    setReplyTarget(message);
+    setReplyQuote(null);
+  }, []);
+  const quoteMessage = useCallback((message: ThreadMessage, quote: string) => {
+    setReplyTarget(message);
+    setReplyQuote(quote);
+  }, []);
+  const openPeerMessages = useCallback((peer: { peerBotId: string; peerBotName: string }) => {
+    setPeerConversation(peer);
+  }, []);
   const loadOlder = useCallback(() => loadOlderMessagesRef.current(), []);
   const jumpToReplyMessage = useCallback((replyId: string) => {
-    const messageId = jumpTargetId(transcriptRef.current, replyId);
+    const loaded = transcriptRef.current;
+    const messageId = jumpTargetId(loaded, replyId);
     const inTranscript =
-      transcriptRef.current.markerOf.has(messageId) ||
-      document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+      loaded.markerOf.has(messageId) ||
+      messageScroll.current?.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`) ||
+      loaded.messages.some(message => message.id === messageId &&
+        message.blocks.some(block => block.kind === "routine_run"));
     if (inTranscript) {
       // Cancel any in-flight around-fetch so it cannot overwrite this scroll.
       jumpGeneration.current += 1;
@@ -4384,6 +4421,21 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     setImportFromDialog(fromDialog);
     setPanel("import-agent");
   }
+  const openTranscriptImport = useCallback(() => {
+    setDroppedAgent(null);
+    setImportFromDialog(false);
+    setPanel("import-agent");
+  }, []);
+  const openTranscriptImportSetup = useCallback((target: import("./shell/import-setup-card").ImportSetupTarget) => {
+    importSetupOpen.current = true;
+    if (target.kind === "models") setOverlay({ kind: "settings", section: "models", spaceId: null });
+    else if (target.kind === "mcp") setOverlay({ kind: "mcp", serverId: target.serverId });
+    else {
+      const next = new URLSearchParams(searchParams);
+      next.set("routine", target.routineId);
+      setSearchParams(next);
+    }
+  }, [searchParams, setOverlay, setSearchParams]);
   const storeAvailable = hifaStoreEnabled();
   const appsEnabled = storeAvailable && videoStudioEnabled(import.meta.env.VITE_MYCELLIOS_VIDEO_STUDIO);
   const requestedMarketplaceTab = marketplaceTab(searchParams.get("market"));
@@ -4471,9 +4523,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const branching = useRef(false);
   const [messageDelete, setMessageDelete] = useState<{ scope: string; taskId?: string; id: string } | null>(null);
   const deletingMessage = messageDelete?.scope === conversationScope && messageDelete?.taskId === taskScope?.taskThreadId ? messageDelete : null;
-  function requestMessageDeletion(message: ThreadMessage) {
+  const requestMessageDeletion = useCallback((message: ThreadMessage) => {
     if (conversationScope) setMessageDelete({ scope: conversationScope, taskId: taskScope?.taskThreadId, id: message.id });
-  }
+  }, [conversationScope, taskScope?.taskThreadId]);
   async function confirmMessageDeletion() {
     setMessageDelete(null);
     if (!active || !deletingMessage) return;
@@ -5116,7 +5168,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               unreadAfterSeq={
                 readBoundary?.visit === readVisit.current.visit ? readBoundary.seq : null
               }
-              loadingOlder={loadingOlder}
+              loadingOlder={loadingOlderThreadId === activeSnapshot?.threadId}
               answerableAskIds={answerableAskIds}
               dismissableAskIds={dismissableAskIds}
               running={transcriptRunning}
@@ -5137,46 +5189,16 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               onLoadOlder={loadOlder}
               onShowBot={showBot}
               onAnswer={answerMessage}
-              onReply={(message) => {
-                setReplyTarget(message);
-                setReplyQuote(null);
-              }}
-              onMarkUnread={(message) => {
-                // The next open of this chat starts the New divider at this message.
-                if (groupId) {
-                  manuallyUnread.current.add(groupId);
-                  const visit = readVisit.current.visit;
-                  void readInOrder(`group:${groupId}`, () =>
-                    rpc.threads.markUnread({ groupId, messageId: message.id }),
-                  )
-                    .then(() => {
-                      if (readVisit.current.visit === visit) {
-                        setMarkedUnread({ visit, messageId: message.id });
-                      }
-                      setGroups((current) =>
-                        current.map((group) =>
-                          group.id === groupId ? { ...group, unread: true } : group,
-                        ),
-                      );
-                    })
-                    .catch(() => manuallyUnread.current.delete(groupId));
-                } else if (active) {
-                  void markBotUnread(active.id, message.id).catch(() => undefined);
-                }
-              }}
-              onQuote={(message, quote) => {
-                setReplyTarget(message);
-                setReplyQuote(quote);
-              }}
+              onReply={replyToMessage}
+              onMarkUnread={markTranscriptMessageUnread}
+              onQuote={quoteMessage}
               onReact={reactToMessage}
               onBranch={branchingOffered ? onBranchMessage : undefined}
               onDeleteMessage={active && !inGroup && !activeProject && !newConversation && !composerRunning ? requestMessageDeletion : undefined}
               branchDisabled={composerRunning}
               renderBranchOrigin={renderBranchOrigin}
               onJumpToMessage={jumpToReplyMessage}
-              onOpenPeerMessages={(peer) => {
-                setPeerConversation(peer);
-              }}
+              onOpenPeerMessages={openPeerMessages}
               memberName={resolveTranscriptMemberName}
               peerBot={resolveTranscriptBot}
               onRefresh={refreshActiveThread}
@@ -5186,22 +5208,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               speakingMessageId={speakingMessageId}
               onSpeak={speakMessage}
               onOpenComputer={onOpenComputer}
-              onOpenImport={() => {
-                setDroppedAgent(null);
-                setImportFromDialog(false);
-                setPanel("import-agent");
-              }}
-              onOpenImportSetup={(target) => {
-                importSetupOpen.current = true;
-                if (target.kind === "models") openSettings("models");
-                else if (target.kind === "mcp")
-                  setOverlay({ kind: "mcp", serverId: target.serverId });
-                else {
-                  const next = new URLSearchParams(searchParams);
-                  next.set("routine", target.routineId);
-                  setSearchParams(next);
-                }
-              }}
+              onOpenImport={openTranscriptImport}
+              onOpenImportSetup={openTranscriptImportSetup}
             /></SendToGroupContext.Provider></MessagePinsContext.Provider></ResponseStyleContext.Provider>
           )}
           <AlertDialog open={Boolean(deletingMessage)} onOpenChange={open => { if (!open) setMessageDelete(null); }}>

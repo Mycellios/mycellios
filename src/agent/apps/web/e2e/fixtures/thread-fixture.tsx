@@ -56,6 +56,8 @@ export function FixtureTranscript({
   header,
   footer,
   pendingMessages,
+  scrollRequest = null,
+  onScrollRequestHandled = noop,
 }: {
   messages: readonly ThreadMessage[];
   running: boolean;
@@ -65,6 +67,8 @@ export function FixtureTranscript({
   footer?: ReactNode;
   pendingMessages?: readonly PendingThreadSend[];
   unreadAfterSeq?: number | null;
+  scrollRequest?: { messageId: string; nonce: number } | null;
+  onScrollRequestHandled?: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const transcript = useMemo(
@@ -76,8 +80,8 @@ export function FixtureTranscript({
       {header}
       <Transcript
         scrollRef={scrollRef}
-        scrollRequest={null}
-        onScrollRequestHandled={noop}
+        scrollRequest={scrollRequest}
+        onScrollRequestHandled={onScrollRequestHandled}
         artifactTarget={ARTIFACT_TARGET}
         transcript={transcript}
         pendingMessages={pendingMessages}

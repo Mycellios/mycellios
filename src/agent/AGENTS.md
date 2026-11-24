@@ -396,7 +396,10 @@
   order and update the authoritative reference immediately. Flush structural,
   terminal, navigation and preference changes without waiting for a frame.
   New-reply/send/control motion must preserve reduced motion and history scroll
-  ownership. Run focused composer/thread/pending/frame tests and
+  ownership. Loading an earlier page belongs to the current conversation visit.
+  Message links into folded routine history reveal the exact run, and completed
+  natural replies retain visible symbols such as emoji. Run focused
+  composer/thread/pending/frame tests and
   `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
   with synthetic delivery/progress. This does not measure a live model's latency.
 

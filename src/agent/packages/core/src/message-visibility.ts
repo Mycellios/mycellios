@@ -138,7 +138,9 @@ export function foldPeerReplies<T extends PresentableMessage>(
   const folded = new Map<string, T[]>();
   const markerOf = new Map<string, string>();
   const fold = (markerId: string, message: T) => {
-    folded.set(markerId, [...(folded.get(markerId) ?? []), message]);
+    const replies = folded.get(markerId);
+    if (replies) replies.push(message);
+    else folded.set(markerId, [message]);
     markerOf.set(message.id, markerId);
     return false;
   };

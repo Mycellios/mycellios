@@ -3,9 +3,11 @@ import type { ProductEvent, ThreadSnapshot } from "@mycellios/contracts";
 import { desktopDiagnosticMessage } from "@mycellios/contracts";
 import { Profiler, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { createFramePublisher } from "../../src/lib/frame-publisher";
 import { bootstrapI18n, i18n } from "../../src/lib/i18n";
 import type { RpcClient } from "../../src/lib/rpc";
+import { ResponseStyleContext } from "../../src/lib/response-style";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
 import { deferThreadProgressPresentation, reduceThreadSnapshot } from "../../src/lib/thread-events";
 import { Composer } from "../../src/pages/shell/composer";
@@ -15,6 +17,7 @@ import "../../src/styles.css";
 
 const immediate = new URLSearchParams(location.search).has("immediate");
 const diagnostic = new URLSearchParams(location.search).has("diagnostic");
+const natural = new URLSearchParams(location.search).has("natural");
 const noop = () => {};
 const client = { threads: { queue: async () => [] } } as unknown as RpcClient;
 const initial: ThreadSnapshot = {
@@ -40,6 +43,7 @@ function ChatFixture() {
   const [scope, setScope] = useState("account/space");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [scrollRequest, setScrollRequest] = useState<{ messageId: string; nonce: number } | null>(null);
   const metrics = useRef({ paints: 0, commits: 0, renderMs: 0, events: 0, sends: 0 });
   const pending = usePendingThreadSends(scope, snapshot);
   const queued = useRef<{
@@ -142,6 +146,7 @@ function ChatFixture() {
         changeScope: () => setScope("another-account/space"),
         burst,
         emit,
+        jump: (messageId: string) => setScrollRequest({ messageId, nonce: ++seq.current }),
         metrics: () => ({ ...metrics.current }),
         pending: () => pending.visible,
       },
@@ -187,6 +192,8 @@ function ChatFixture() {
         running={false}
         showToolActivity={false}
         pendingMessages={pending.visible}
+        scrollRequest={scrollRequest}
+        onScrollRequestHandled={() => setScrollRequest(null)}
         footer={footer}
       />
     </Profiler>
@@ -195,7 +202,11 @@ function ChatFixture() {
 void bootstrapI18n("en").then(() =>
   createRoot(document.getElementById("root")!).render(
     <I18nProvider i18n={i18n}>
-      <ChatFixture />
+      <MemoryRouter>
+        <ResponseStyleContext.Provider value={natural ? "natural" : "classic"}>
+          <ChatFixture />
+        </ResponseStyleContext.Provider>
+      </MemoryRouter>
     </I18nProvider>,
   ),
 );

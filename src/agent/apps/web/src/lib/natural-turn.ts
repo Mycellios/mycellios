@@ -48,9 +48,9 @@ export function naturalTurnLayout(
   const isText = (block: MessageBlock): block is TextBlock =>
     (block.kind === "text" || (block.kind === "progress" && !block.activity)) && block.text.trim().length > 0;
   const narration = blocks.slice(0, Math.max(lastSteps, 0)).filter(isText);
-  // An answer with no letter or digit at all, such as "∅", is a placeholder, not an answer.
+  // Drop the empty-answer sentinel without dropping symbol-only replies, such as emoji.
   const after = blocks.slice(lastSteps + 1).filter(isText)
-    .filter((block) => (block.text.match(LETTER_OR_DIGIT)?.length ?? 0) > 0);
+    .filter((block) => block.text.trim() !== "∅");
   // Join the pieces of a sentence that a step interrupted, as the agent wrote it.
   const pieces: string[] = [];
   for (const block of narration) {
@@ -95,12 +95,13 @@ export function naturalTurnLayout(
 export function earlierProgressNotes(
   messages: readonly { id: string; role: string; runId?: string; progress?: true; blocks: readonly MessageBlock[] }[],
 ): Map<string, readonly string[]> {
-  const byRun = new Map<string, string[]>();
+  const byRun = new Map<string, readonly string[]>();
   const result = new Map<string, readonly string[]>();
   for (const message of messages) {
     if (message.role !== "bot" || !message.runId) continue;
     const seen = byRun.get(message.runId);
-    if (seen?.length) result.set(message.id, [...seen]);
+    // The array is replaced on append, so messages can share the same note history.
+    if (seen?.length) result.set(message.id, seen);
     if (!message.progress) continue;
     const texts = message.blocks
       .filter((block): block is TextBlock => block.kind === "text" && block.text.trim().length > 0)
