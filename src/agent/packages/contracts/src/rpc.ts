@@ -443,6 +443,8 @@ export const appContract = {
     forBot: oc.input(z.object({ botId: Id })).output(z.object({
       computer: z.enum(["desktop", "server"]),
       engines: z.array(z.enum(["codex", "claude", "opencode"])),
+      /** Installed engines whose CLI reported nobody signed in. Older servers omit it. */
+      signedOut: z.array(z.enum(["codex", "claude", "opencode"])).optional(),
     })),
     codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
     codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),
@@ -452,6 +454,8 @@ export const appContract = {
           id: z.enum(["pi", "codex", "claude", "acp", "opencode"]),
           name: z.string(),
           available: z.boolean(),
+          /** Absent when the CLI could not say (older host, timeout or unsupported engine). */
+          signedIn: z.boolean().optional(),
           managedVersion: z.string().optional(),
           canInstall: z.boolean().optional(),
         }),

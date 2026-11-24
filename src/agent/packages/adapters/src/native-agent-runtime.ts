@@ -24,6 +24,7 @@ import { steeringToolContent, watchSteeringDuringTool } from "./steering-deliver
 import { isToolPauseResult } from "./approval-effect.js";
 import type { NativeCommand } from "./native-agent-process.js";
 import { findNativeCommand, nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
+import { nativeSignInState } from "./native-signin.js";
 import { MANAGED_OPENCODE_VERSION, managedOpenCodeCommand, supportsManagedOpenCode } from "./managed-opencode.js";
 import {
   restoreTurnCheckpoint,
@@ -191,17 +192,28 @@ export async function discoverNativeEngines(dataDir?: string) {
   const host = await readNativeConfig(dataDir);
   const configured = configuredCommands(host);
   const managedOpenCode = configured.opencode ? null : managedOpenCodeCommand(dataDir);
+  const codex = configured.codex ?? findNativeCommand("codex");
+  const claude = configured.claude ?? findNativeCommand("claude");
+  const codexAvailable = nativeCommandAvailable(codex);
+  const claudeAvailable = nativeCommandAvailable(claude);
+  // Only an installed CLI is asked; an unknown answer is left out rather than guessed.
+  const [codexSignedIn, claudeSignedIn] = await Promise.all([
+    codex && codexAvailable ? nativeSignInState("codex", codex) : undefined,
+    claude && claudeAvailable ? nativeSignInState("claude", claude) : undefined,
+  ]);
   return [
     { id: "pi" as const, name: "Pi", available: true },
     {
       id: "codex" as const,
       name: "Codex",
-      available: nativeCommandAvailable(configured.codex ?? findNativeCommand("codex")),
+      available: codexAvailable,
+      ...(codexSignedIn === undefined ? {} : { signedIn: codexSignedIn }),
     },
     {
       id: "claude" as const,
       name: "Claude Code",
-      available: nativeCommandAvailable(configured.claude ?? findNativeCommand("claude")),
+      available: claudeAvailable,
+      ...(claudeSignedIn === undefined ? {} : { signedIn: claudeSignedIn }),
     },
     { id: "acp" as const, name: "ACP", available: nativeCommandAvailable(configured.acp) },
     {
@@ -213,6 +225,13 @@ export async function discoverNativeEngines(dataDir?: string) {
         host.allowOpenCodeInstall === true && supportsManagedOpenCode(dataDir),
     },
   ];
+}
+
+/** The installed engines whose CLI reported that nobody is signed in. */
+export function signedOutEngines(engines: Awaited<ReturnType<typeof discoverNativeEngines>>) {
+  return engines.flatMap(engine =>
+    engine.available && "signedIn" in engine && engine.signedIn === false &&
+    (engine.id === "codex" || engine.id === "claude") ? [engine.id] : []);
 }
 
 const openCodeFileTools = new Set(["list_files", "read_file", "write_file", "edit_file"]);

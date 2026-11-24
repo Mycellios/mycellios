@@ -464,11 +464,13 @@ export async function startHostComputerServer(options: {
       };
     }
     switch (input.method) {
-      case "environment":
+      case "environment": {
+        const engineState = await options.agentRuntime?.nativeEngineState?.();
         yield {
           ...(await provider.environment()),
           chunkedWrites: true,
-          nativeEngines: await options.agentRuntime?.nativeEngines?.(),
+          nativeEngines: engineState?.engines ?? await options.agentRuntime?.nativeEngines?.(),
+          ...(engineState?.signedOut.length ? { signedOutEngines: engineState.signedOut } : {}),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
@@ -477,6 +479,7 @@ export async function startHostComputerServer(options: {
           ...(input.groupId && !input.projectSessionId ? { groupFolders: groupGrants(input) } : {}),
         };
         break;
+      }
       case "appControl":
         yield appControlOffered(input.projectSessionId)
           ? await appControl!.run(input.request, context.signal)

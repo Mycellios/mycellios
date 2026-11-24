@@ -2,6 +2,7 @@ import type { AdapterContext } from "@mycellios/adapter-kit";
 import {
   deploymentModelRole,
   discoverNativeEngines,
+  signedOutEngines,
   findConnectedModelCredential,
   hasHostedModelCredits,
   hostCredentialSource,
@@ -33,12 +34,18 @@ export async function codingEnginesForComputer(
   if (bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated") {
     const probe = computerContext(actor, bot.id, "engine-discovery");
     const combined = AbortSignal.any([signal ?? probe.signal, AbortSignal.timeout(4_000)]);
-    const engines = await deps.sandbox.nativeEngines?.({ ...probe, signal: combined }).catch(() => undefined);
+    const context = { ...probe, signal: combined };
+    const state = deps.sandbox.nativeEngineState
+      ? await deps.sandbox.nativeEngineState(context).catch(() => undefined)
+      : { engines: await deps.sandbox.nativeEngines?.(context).catch(() => undefined), signedOut: [] };
+    const known = (ids: unknown) => (Array.isArray(ids) ? ids : []).filter(
+      (id): id is "codex" | "claude" | "opencode" => id === "codex" || id === "claude" || id === "opencode",
+    );
+    const engines = known(state?.engines);
     return {
       computer: "desktop" as const,
-      engines: (Array.isArray(engines) ? engines : []).filter(
-        id => id === "codex" || id === "claude" || id === "opencode",
-      ),
+      engines,
+      signedOut: known(state?.signedOut).filter(id => engines.includes(id)),
     };
   }
   const engines = await nativeHostAccess(deps.dataDir, actor) ? await discoverNativeEngines(deps.dataDir) : [];
@@ -47,6 +54,7 @@ export async function codingEnginesForComputer(
     engines: engines.flatMap(({ id, available }) =>
       available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
     ),
+    signedOut: signedOutEngines(engines) as Array<"codex" | "claude" | "opencode">,
   };
 }
 
