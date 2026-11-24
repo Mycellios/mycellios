@@ -330,7 +330,7 @@ import {
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { nativeWorkProjectSession } from "@mycellios/core";
 import { projectExecutionLeaseKey, PROJECT_SHARED_SCREEN_TOOLS } from "./project-execution.js";
-import { delegateWork, workStatus, saveWorkState, settleObservedShell, openEventWait, listEventWaits, closeEventWait, IsolationError, type EventWaitView } from "@mycellios/db";
+import { delegateWork, workStatus, workReturnWillRecover, saveWorkState, settleObservedShell, openEventWait, listEventWaits, closeEventWait, IsolationError, type EventWaitView } from "@mycellios/db";
 import type { NativeCommandReceipt } from "./native-command-journal.js";
 import { connectApp } from "./connect-app.js";
 import { connectedContext, selectRunConnections } from "./connection-context.js";
@@ -10197,7 +10197,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             await backOffRoutineAfterAccountError(deps, run.routineId);
           }
           const retrying =
-            !failed.continuationRunId && (await scheduleRoutineRetry(deps, run, error));
+            !failed.continuationRunId &&
+            ((await scheduleRoutineRetry(deps, run, error)) || (await returnWillRecover(deps, run)));
           if (runSendsFinishNotification(run.trigger) && !failed.continuationRunId && !retrying) {
             await notifyRun(deps, run, {
               ...failureNotice(bot.name, message, { trigger: run.trigger }),
@@ -10477,6 +10478,20 @@ async function scheduleRoutineRetry(
   }
 }
 
+/**
+ * A turn taking delegated work back that a deploy or a lost PC connection stopped starts again
+ * from the work reconciler; only a failure that ends the request alerts the person.
+ */
+async function returnWillRecover(deps: ExecutorDeps, run: { id: string; trigger: string }): Promise<boolean> {
+  if (run.trigger !== "task_return") return false;
+  try {
+    return await workReturnWillRecover(deps.prisma, run.id);
+  } catch (error) {
+    getLogger().error("work return recovery check", error);
+    return false;
+  }
+}
+
 async function notifyFailedRoutineRun(
   deps: ExecutorDeps,
   failed: Parameters<typeof notifyRun>[1] & { error: string | null },
@@ -10575,7 +10590,7 @@ async function failRunBeforeTurn(
       { forceUnread: true },
     ).catch((error) => getLogger().error("bot message failure return", error));
   }
-  if (!failed.continuationRunId) {
+  if (!failed.continuationRunId && !(await returnWillRecover(deps, run))) {
     await notifyRun(deps, run, {
       ...failureNotice(botName, message, { trigger: run.trigger, kind: noticeKind }),
       botId: run.botId,

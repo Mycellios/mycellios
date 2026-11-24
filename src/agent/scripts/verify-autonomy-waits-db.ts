@@ -8,7 +8,8 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import EmbeddedPostgres from 'embedded-postgres';
 import { archiveSideThreadInTransaction, asSystem, closeEventWait, createDb, listEventWaits, listSideThreads, openEventWait,
-  reconcileWork, workStatus, controlWorkTree, delegateWork } from '@mycellios/db';
+  reconcileWork, workStatus, controlWorkTree, delegateWork, workReturnWillRecover, WORK_RECOVERY_MARKER, WORK_RETURN_RECOVERY_DELAYS_MS } from '@mycellios/db';
+import { DESKTOP_OWNER_UNRESOLVED_ERROR, DESKTOP_RUN_INTERRUPTED_ERROR } from '@mycellios/core';
 import { reconcileWorkStops } from '../packages/adapters/src/work-stop-reconciler.js';
 import { stopWorkForThread } from '../apps/api/src/work-controls.js';
 
@@ -324,6 +325,47 @@ try {
   await stopWorkForThread(stopDeps, scope as never, side.id);
   assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: stoppedWait.waitId } })).delegationState, 'cancelled');
   checks.push('composer Stop still cancels a parked wait');
+
+  // A teammate that cannot start says why, and a return cut off by an update still answers.
+  const helper = await prisma.bot.create({ data: { ...scope, name: 'Synthetic helper', color: 'blue', thread: { create: { ...scope } } }, include: { thread: true } });
+  const asking = await source('Ask a teammate for a short synthetic video');
+  const delegated = await delegateWork(prisma, asking, { key: 'interrupted-return', botId: helper.id,
+    instruction: 'Render the synthetic video', expectedResult: 'A rendered synthetic video', resources: ['none'] });
+  await finish(asking.id); await reconcileWork(prisma);
+  const helperRun = (await prisma.task.findUniqueOrThrow({ where: { id: delegated.taskId } })).delegatedRunId;
+  assert.ok(helperRun, 'the teammate starts');
+  await prisma.run.update({ where: { id: helperRun }, data: { status: 'failed', error: DESKTOP_OWNER_UNRESOLVED_ERROR, completedAt: new Date() } });
+  await reconcileWork(prisma); await reconcileWork(prisma);
+  let request = await prisma.task.findUniqueOrThrow({ where: { id: asking.taskId } });
+  assert.ok(request.returnRunId, 'the failure returns to the asking Mico');
+  assert.ok(request.prompt.includes(`<run_error>${DESKTOP_OWNER_UNRESOLVED_ERROR}</run_error>`), 'the return says why the teammate failed');
+  assert.equal((await workStatus(prisma, { ...scope, taskId: asking.taskId })).find(task => task.id === delegated.taskId)?.executionError,
+    DESKTOP_OWNER_UNRESOLVED_ERROR, 'work_status says why the teammate failed');
+  checks.push('a teammate that fails gives the asking Mico its reason, in the work return and in work_status');
+
+  let returnRun = request.returnRunId!;
+  await prisma.run.update({ where: { id: returnRun }, data: { status: 'failed', error: 'Synthetic model refusal', completedAt: new Date() } });
+  assert.equal(await workReturnWillRecover(prisma, returnRun), false, 'a model failure is not an interruption');
+  for (const [attempt, delay] of WORK_RETURN_RECOVERY_DELAYS_MS.entries()) {
+    const failedAt = new Date();
+    await prisma.run.update({ where: { id: returnRun }, data: { status: 'failed', error: DESKTOP_RUN_INTERRUPTED_ERROR, completedAt: failedAt } });
+    assert.equal(await workReturnWillRecover(prisma, returnRun), true, 'an interrupted return will start again');
+    await Promise.all([reconcileWork(prisma), reconcileWork(prisma)]);
+    request = await prisma.task.findUniqueOrThrow({ where: { id: asking.taskId } });
+    assert.equal(request.delegationState, 'running', 'the request is still being answered');
+    const recovery = await prisma.run.findUniqueOrThrow({ where: { id: request.returnRunId! } });
+    assert.deepEqual([recovery.status, recovery.trigger, recovery.threadId, recovery.clientNonce],
+      ['queued', 'task_return', bot.thread!.id, `work-recovery:${returnRun}`], 'one fresh turn in the same conversation');
+    assert.equal(recovery.wakeAt?.getTime(), failedAt.getTime() + delay, 'the new turn waits for the update or the connection');
+    assert.equal(request.prompt.split(WORK_RECOVERY_MARKER).length - 1, attempt + 1, 'the turn is told to check what already happened');
+    returnRun = recovery.id;
+  }
+  await prisma.run.update({ where: { id: returnRun }, data: { status: 'failed', error: DESKTOP_RUN_INTERRUPTED_ERROR, completedAt: new Date() } });
+  assert.equal(await workReturnWillRecover(prisma, returnRun), false, 'the recovery budget is spent');
+  await reconcileWork(prisma);
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: asking.taskId } })).delegationState, 'failed');
+  assert.equal(await prisma.run.count({ where: { taskId: asking.taskId, trigger: 'task_return' } }), 1 + WORK_RETURN_RECOVERY_DELAYS_MS.length);
+  checks.push('a work return cut off by an update or a lost PC connection starts again after growing delays, a bounded number of times, never after a model failure');
 
   const result = { ok: true, isolatedPostgres: true, paidModelCalls: 0, productionAccess: false,
     verification: 'Real PostgreSQL scheduling and recovery; synthetic execution receipts, not live model inference', checks };

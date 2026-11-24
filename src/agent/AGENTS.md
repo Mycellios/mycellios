@@ -1199,7 +1199,12 @@
   to the admitted host/Mico and are observed with command_status; a lost observer or
   missing exit is never success or authorization to replay. Preserve native Windows
   Job ownership, consent, Stop, bounded budgets and exact run/fence teardown. Plans
-  and continuation counters are fenced Task metadata, not new instructions. Verify
+  and continuation counters are fenced Task metadata, not new instructions.
+  A work return that an update or lost PC connection cut off (isInterruptedRunError) never
+  ends the request silently: reconcileWork queues one fresh task_return run (nonce
+  work-recovery:<failed run>, wakeAt 30 s, 2 min, then 5 min, WORK_RECOVERY_MARKER note to
+  check before acting), never a replay; only the failure that ends recovery alerts. A failed
+  child's normalized reason (≤500) travels as data in the receipt and work_status. Verify
   native-command-journal/recovery, work-continuation, work-resources, work-stop-reconciler
   and API work-controls tests plus scripts/verify-resilient-work-db.ts through the
   shared scheduler. Keep production and existing user accounts out of these fixtures.
