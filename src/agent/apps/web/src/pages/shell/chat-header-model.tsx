@@ -142,7 +142,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   ])];
   // A CLI that reported nobody signed in would fail its first turn: say why instead.
   // The Mico's current engine stays selectable so its saved choice is never hidden.
-  const signedOut = new Set(enginesQuery.data?.signedOut ?? []);
+  const signedOut = new Set<string>(enginesQuery.data?.signedOut ?? []);
   const signInRequired = (engine: NativeProvider) => signedOut.has(engine) && engine !== nativeEngine
     ? { unavailable: true, unavailableLabel: t`Sign in required` } : {};
   const nativeChoices = nativeProviders.filter(engine => engine !== "codex" || !nativeModels.length).map(engine => ({
