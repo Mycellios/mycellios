@@ -16,17 +16,15 @@ the session exists. Identity pages are never framed.
 
 The hosted app sends `frame-ancestors 'none'` except for the origins in
 `BROWSER_EXTENSION_ORIGINS` (`packages/contracts/src/content-security-policy.ts`). The manifest
-`key` pins the extension ID that origin names, so an unpacked copy and future builds keep the same
-ID. Only the public key is in the repository. A Chrome Web Store listing gets its own ID, which
-must be added to that list before the listed build can open the app.
+`key` pins the unpacked extension ID to `bnbdbnbloaeblmjpoknddcffkmpfhmgg`. The Chrome Web
+Store listing uses `nohdakjpcmhfgoaemmhkjkmobhenfcpf`. The hosted app allows both exact origins.
 
 ## Chrome Web Store package
 
-The Store refuses a manifest with a `key` field. Build the upload ZIP from this folder with the
-`key` field removed and the extension's private key at the ZIP root as `key.pem`, so the first
-upload keeps the ID that `BROWSER_EXTENSION_ORIGINS` names. The private key never goes into the
-repository. If the Store assigns a different ID anyway, add that origin to the list and deploy
-before publishing the listing. Raise `version` in the manifest for each upload.
+Build the upload ZIP from this folder with the manifest's `key` field removed. Keep signing
+keys out of the ZIP and the repository. Upload new versions to the existing Store item to
+preserve its ID, and raise `version` in the manifest for each new version. Verify the signed-in
+panel against the hosted app before publishing.
 
 ## Permissions
 
