@@ -700,11 +700,15 @@
 - Group shared folders follow specs/group-shared-folders/spec.md (the reference product is a
   behavior reference only): up to 8 folders per group, chosen only with Desktop's native picker
   after the server confirms the owner/Space owns the group; the server keeps an opaque HMAC id
-  and a name (additive `20261124120000` migration, RLS), never a path. Grants stay in memory on
-  the PC like ordinary folder grants. Only a This PC (`dedicated`) member's turn in the group's
-  own thread carries the ids, re-read before each computer tool; the PC serves only ids it holds
-  for that group, as `group/<label>/`. Never mount them on server or Team computers. Shared
-  edit_file writes carry the read SHA-256 and are serialized per file. Verify adapters
+  (keyed by a private per-profile key, not the host token), a name and a label it assigns once
+  (additive `20261124120000` migration, RLS), never a path. Grants stay in memory on the PC like
+  ordinary folder grants, are pruned to the server's list and cleared for another account. Only
+  a person-started turn (own message/call/reaction, or a same-thread handoff chain back to one)
+  of a This PC (`dedicated`) member in the group's own thread carries them; never routines,
+  webhooks, channels, Mico requests or background work. Re-read before each computer tool; the
+  PC serves only ids it holds for that group, as `group/<label>/`. Never mount them on server or
+  Team computers. Shared edit_file writes carry the read SHA-256 and are serialized per real,
+  case-folded file. Shells keep OS permissions; ids gate file tools only. Verify adapters
   host-group-folders and group-folders, desktop group-folder-ipc, web GroupFolders tests and
   `node --import tsx scripts/verify-group-folders-db.ts`.
 

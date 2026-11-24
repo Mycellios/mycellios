@@ -8,12 +8,19 @@ type Host = {
   grantGroupFolder(groupId: string, folderId: string, folder: string): Promise<Grant>;
   groupFolders(groupId: string): Grant[];
   revokeGroupFolder(groupId: string, folderId: string): void;
+  pruneGroupFolders(groupId: string, keep: readonly string[]): void;
 };
+/** What the server says about the group: the caller's scope and the folder ids it keeps. */
+type OwnedGroup = { scope: string; folderIds: string[] };
 
 const GROUP_ID = /^[a-zA-Z0-9_-]{1,256}$/;
 const FOLDER_ID = /^[a-f0-9]{64}$/;
 
-/** Opaque, stable id of a folder granted to a group; the native path never leaves this PC. */
+/**
+ * Opaque id of a folder granted to a group, stable across sessions on this PC. It reveals
+ * nothing about the path to the server; the path itself is shown to the owner's own renderer
+ * and to the members' runs (their environment), as the spec documents.
+ */
 export function groupFolderId(secret: string, scope: string, groupId: string, folder: string) {
   return createHmac("sha256", secret)
     .update(JSON.stringify(["group-folder", scope, groupId, folder]))
@@ -35,16 +42,24 @@ export function installGroupFolderIpc(deps: {
   /** The configured app's own main frame. */
   trusted(event: IpcMainInvokeEvent): boolean;
   host(): Host | undefined;
-  /** Throws unless the current account owns this group; resolves to its server/account/Space scope. */
-  ownsGroup(event: IpcMainInvokeEvent, groupId: string): Promise<string>;
+  /** Throws unless the current account owns this group; resolves to its scope and folder ids. */
+  ownsGroup(event: IpcMainInvokeEvent, groupId: string): Promise<OwnedGroup>;
   /** The native folder picker; null when cancelled. */
   pick(): Promise<string | null>;
-  /** This PC's private host credential, which keys the folder ids. */
+  /** This PC's private, persisted key for folder ids. */
   secret(): string;
 }) {
   // Which account/Space scope granted each folder, so another scope never sees it.
   const scopes = new Map<string, string>();
   const key = (groupId: string, folderId: string) => JSON.stringify([groupId, folderId]);
+  /**
+   * Grants of folders the server no longer has (removed from another device) are withdrawn, so
+   * they stay unreachable and stop counting toward this PC's limit. Only the group's owner gets
+   * the server's list, so another account cannot prune them.
+   */
+  function prune(host: Host, groupId: string, owned: OwnedGroup) {
+    host.pruneGroupFolders(groupId, owned.folderIds);
+  }
 
   deps.ipcMain.handle("desktop.computer.chooseGroupFolder", async (event, groupId, expected) => {
     const host = deps.host();
@@ -56,22 +71,24 @@ export function installGroupFolderIpc(deps: {
       (expected !== undefined && (typeof expected !== "string" || !FOLDER_ID.test(expected)))
     )
       throw new Error("Allow access to this PC first.");
-    const scope = await deps.ownsGroup(event, groupId);
+    const owned = await deps.ownsGroup(event, groupId);
     const picked = await deps.pick();
     if (!picked) return null;
     const folder = await realpath(picked);
-    const folderId = groupFolderId(deps.secret(), scope, groupId, folder);
+    const folderId = groupFolderId(deps.secret(), owned.scope, groupId, folder);
     if (expected !== undefined && folderId !== expected)
       throw new Error("Choose the same folder as before.");
+    const current = await deps.ownsGroup(event, groupId);
     if (
       !deps.trusted(event) ||
       host !== deps.host() ||
       !host.isEnabled() ||
-      (await deps.ownsGroup(event, groupId)) !== scope
+      current.scope !== owned.scope
     )
       throw new Error("The application session changed.");
+    prune(host, groupId, current);
     const grant = await host.grantGroupFolder(groupId, folderId, folder);
-    scopes.set(key(groupId, folderId), scope);
+    scopes.set(key(groupId, folderId), owned.scope);
     return { folderId: grant.folderId, name: grant.name, path: grant.path };
   });
 
@@ -85,10 +102,11 @@ export function installGroupFolderIpc(deps: {
         !GROUP_ID.test(groupId)
       )
         return [];
-      const scope = await deps.ownsGroup(event, groupId);
+      const owned = await deps.ownsGroup(event, groupId);
+      prune(host, groupId, owned);
       return host
         .groupFolders(groupId)
-        .filter((grant) => scopes.get(key(groupId, grant.folderId)) === scope)
+        .filter((grant) => scopes.get(key(groupId, grant.folderId)) === owned.scope)
         .map(({ folderId, name, path }) => ({ folderId, name, path }));
     } catch {
       return [];

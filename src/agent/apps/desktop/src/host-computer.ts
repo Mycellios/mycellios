@@ -60,8 +60,15 @@ export async function prepareHostComputer(
     if (error.code === "EADDRINUSE") token = randomBytes(32).toString("hex");
     server = await startHostComputerServer({ ...options, token });
   }
+  // Group folder ids derive from this key rather than the host token, which a busy port renews.
+  const groupFolderKeyFile = path.join(userDataDir, "group-folder-key");
+  let groupFolderSecret = (await readPrivateFile(groupFolderKeyFile, 128)) ?? "";
   try {
     await writePrivateFile(configFile, JSON.stringify({ token, port: server.port }));
+    if (!/^[a-f0-9]{64}$/.test(groupFolderSecret)) {
+      groupFolderSecret = randomBytes(32).toString("hex");
+      await writePrivateFile(groupFolderKeyFile, groupFolderSecret);
+    }
   } catch (error) {
     await server.close();
     throw error;
@@ -105,6 +112,9 @@ export async function prepareHostComputer(
     grantGroupFolder: server.grantGroupFolder,
     groupFolders: server.groupFolders,
     revokeGroupFolder: server.revokeGroupFolder,
+    pruneGroupFolders: server.pruneGroupFolders,
+    /** Private per-profile key for group folder ids, so they stay stable across sessions. */
+    groupFolderSecret: () => groupFolderSecret,
     isEnabled: server.isEnabled,
     executionScope: () => server.isEnabled() && /^[a-f0-9]{64}$/.test(rememberedAccount ?? "") ? rememberedAccount! : undefined,
     hasActiveWork: server.hasActiveWork,
@@ -122,6 +132,8 @@ export async function prepareHostComputer(
     async grant(scope?: string) {
       if (scope !== undefined && !/^[a-f0-9]{64}$/.test(scope)) throw new Error("Invalid computer consent scope");
       const intent = ++consentIntent;
+      // Another account's folder grants (ordinary and group) never carry over to this one.
+      if (scope !== undefined && rememberedAccount && rememberedAccount !== scope) server.clearProjects();
       await persistConsent(token, scope);
       if (intent === consentIntent) {
         if (scope !== undefined) rememberedAccount = scope;

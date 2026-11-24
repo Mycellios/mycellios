@@ -82,7 +82,7 @@ export class HostComputerSandbox implements SandboxProvider {
     // Read at send time: the run refreshes the group's folder ids before each tool call.
     const shared = context.groupFolders;
     if (shared && !context.projectSessionId)
-      input = { ...input, groupId: shared.groupId, groupFolderIds: shared.folderIds.slice(0, HOST_GROUP_FOLDER_MAX) };
+      input = { ...input, groupId: shared.groupId, groupFolders: shared.folders.slice(0, HOST_GROUP_FOLDER_MAX) };
     if ((!this.url || !this.token) && !this.transport)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
     const ownedInput = { ...input, ...(context.runId ? { runId: context.runId } : {}) };

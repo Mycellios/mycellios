@@ -13,7 +13,13 @@ afterEach(async () => {
 });
 
 async function setup(
-  options: { enabled?: boolean; scopes?: string[]; picked?: string | null } = {},
+  options: {
+    enabled?: boolean;
+    scopes?: string[];
+    picked?: string | null;
+    /** Folder ids the server lists; by default every grant this PC holds. */
+    serverFolders?: string[];
+  } = {},
 ) {
   const folder = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-group-ipc-")));
   dirs.push(folder);
@@ -28,9 +34,15 @@ async function setup(
     }),
     groupFolders: () => [...grants.values()],
     revokeGroupFolder: vi.fn((_groupId: string, folderId: string) => void grants.delete(folderId)),
+    pruneGroupFolders: vi.fn((_groupId: string, keep: readonly string[]) => {
+      for (const id of [...grants.keys()]) if (!keep.includes(id)) grants.delete(id);
+    }),
   };
   const scopes = [...(options.scopes ?? [])];
-  const ownsGroup = vi.fn(async () => scopes.shift() ?? "scope-a");
+  const ownsGroup = vi.fn(async () => ({
+    scope: scopes.shift() ?? "scope-a",
+    folderIds: options.serverFolders ?? [...grants.keys()],
+  }));
   const pick = vi.fn(async () => (options.picked === undefined ? folder : options.picked));
   installGroupFolderIpc({
     ipcMain: { handle: (channel, listener) => void handlers.set(channel, listener) },
@@ -119,5 +131,29 @@ describe("group folder IPC", () => {
     ).rejects.toThrow();
     await call("desktop.computer.removeGroupFolder", trustedEvent, "group-1", chosen.folderId);
     expect(host.revokeGroupFolder).toHaveBeenCalledWith("group-1", chosen.folderId);
+  });
+
+  it("withdraws grants of folders removed on another device, so they stop counting", async () => {
+    const serverFolders: string[] = [];
+    const { call, host, grants } = await setup({ serverFolders });
+    const first = (await call("desktop.computer.chooseGroupFolder", trustedEvent, "group-1")) as {
+      folderId: string;
+    };
+    // The server keeps it, so listing leaves it granted.
+    serverFolders.push(first.folderId);
+    await expect(
+      call("desktop.computer.groupFolders", trustedEvent, "group-1"),
+    ).resolves.toHaveLength(1);
+    // Removed from the web: the next listing on this PC withdraws the grant.
+    serverFolders.length = 0;
+    await expect(call("desktop.computer.groupFolders", trustedEvent, "group-1")).resolves.toEqual(
+      [],
+    );
+    expect(host.pruneGroupFolders).toHaveBeenLastCalledWith("group-1", []);
+    expect(grants.size).toBe(0);
+    // Adding a folder also prunes first, then grants the new one.
+    grants.set("b".repeat(64), { folderId: "b".repeat(64), name: "orphan", path: "/orphan" });
+    await call("desktop.computer.chooseGroupFolder", trustedEvent, "group-1");
+    expect([...grants.keys()]).toEqual([first.folderId]);
   });
 });

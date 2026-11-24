@@ -6,7 +6,12 @@ import type { AdapterContext } from "@mycellios/adapter-kit";
 import { afterEach, expect, it } from "vitest";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
-import { groupFolderLabel, startHostComputerServer } from "./host-computer-server.js";
+import { startHostComputerServer } from "./host-computer-server.js";
+
+const named = (groupId: string, ...folders: Array<[string, string]>) => ({
+  groupId,
+  folders: folders.map(([folderId, label]) => ({ folderId, label })),
+});
 
 const roots: string[] = [];
 const servers: Awaited<ReturnType<typeof startHostComputerServer>>[] = [];
@@ -53,13 +58,6 @@ async function setup() {
   return { root, shared, other, server, client, context };
 }
 
-it("names each shared folder once, as a safe path segment", () => {
-  expect(groupFolderLabel("site", new Set())).toBe("site");
-  expect(groupFolderLabel("Site", new Set(["site"]))).toBe("Site 2");
-  expect(groupFolderLabel("a/b:c", new Set())).toBe("a-b-c");
-  expect(groupFolderLabel("...", new Set())).toBe("folder");
-});
-
 it("grants a group's folders only to the group's turns that name them, and revokes them at once", async () => {
   const { shared, other, server, client, context } = await setup();
   const siteId = id("site");
@@ -70,7 +68,7 @@ it("grants a group's folders only to the group's turns that name them, and revok
     server.grantGroupFolder("group-1", siteId, path.parse(shared).root),
   ).rejects.toThrow();
   expect(await server.grantGroupFolder("group-1", siteId, shared)).toMatchObject({
-    label: "site",
+    name: "site",
     path: shared,
   });
   await server.grantGroupFolder("group-1", notesId, other);
@@ -78,10 +76,31 @@ it("grants a group's folders only to the group's turns that name them, and revok
   await server.grantGroupFolder("group-1", siteId, shared);
   await expect(server.grantGroupFolder("group-1", siteId, other)).rejects.toThrow();
 
-  const member = context("ana", { groupId: "group-1", folderIds: [siteId] });
+  // The label is the one the server assigned, whatever the folder is called on disk.
+  const member = context("ana", named("group-1", [siteId, "site"]));
   const computer = await client.provision({ botId: "ana", homePath: "" }, member);
-  const environment = await client.environment(computer, member);
+  const relabelled = context("ana", named("group-1", [siteId, "web"]));
   // Only ids the server names reach the run: notes is granted on the PC but not named.
+  expect((await client.environment(computer, relabelled)).groupFolders).toEqual([
+    { folderId: siteId, label: "web", path: shared },
+  ]);
+  const web = new TextDecoder().decode(
+    await client.readFile(computer, "group/web/index.html", relabelled),
+  );
+  expect(web).toBe("<h1>Before</h1>");
+  // Duplicate labels in one request reach only the first folder.
+  expect(
+    (
+      await client.environment(
+        computer,
+        context("ana", named("group-1", [siteId, "x"], [notesId, "x"])),
+      )
+    ).groupFolders,
+  ).toEqual([{ folderId: siteId, label: "x", path: shared }]);
+  const environment = await client.environment(
+    computer,
+    context("ana", named("group-1", [siteId, "site"])),
+  );
   expect(environment.groupFolders).toEqual([{ folderId: siteId, label: "site", path: shared }]);
   expect(await client.listFiles(computer, "group", member)).toEqual([
     { path: "group/site", kind: "dir", size: 0 },
@@ -132,8 +151,24 @@ it("grants a group's folders only to the group's turns that name them, and revok
     })(),
   ).rejects.toThrow();
 
+  // The native path of a folder this run may use works as a working directory too.
+  const native = [];
+  for await (const event of client.execute(
+    computer,
+    {
+      argv: [process.execPath, "-e", "require('node:fs').writeFileSync('native.txt','ok')"],
+      cwd: shared,
+      env: node,
+      timeoutMs: 10000,
+    },
+    member,
+  ))
+    native.push(event);
+  expect(native).toContainEqual({ type: "exit", code: 0 });
+  expect(await readFile(path.join(shared, "native.txt"), "utf8")).toBe("ok");
+
   // Another group, no group, or a Mico's own chat: the folder is not there.
-  const otherGroup = context("ana", { groupId: "group-2", folderIds: [siteId] });
+  const otherGroup = context("ana", named("group-2", [siteId, "site"]));
   expect((await client.environment(computer, otherGroup)).groupFolders).toEqual([]);
   await expect(client.readFile(computer, "group/site/index.html", otherGroup)).rejects.toThrow(
     "not available",
@@ -145,11 +180,7 @@ it("grants a group's folders only to the group's turns that name them, and revok
 
   // The server stops naming a removed folder: the next request no longer reaches it.
   await expect(
-    client.readFile(
-      computer,
-      "group/site/index.html",
-      context("ana", { groupId: "group-1", folderIds: [] }),
-    ),
+    client.readFile(computer, "group/site/index.html", context("ana", named("group-1"))),
   ).rejects.toThrow("not available");
   // Removing it on the PC revokes it even for a request that still names it.
   server.revokeGroupFolder("group-1", siteId);
@@ -168,8 +199,8 @@ it("lands an edit only over the content it was made from", async () => {
   const siteId = id("site");
   server.setEnabled(true);
   await server.grantGroupFolder("group-1", siteId, shared);
-  const ana = context("ana", { groupId: "group-1", folderIds: [siteId] });
-  const ben = context("ben", { groupId: "group-1", folderIds: [siteId] });
+  const ana = context("ana", named("group-1", [siteId, "site"]));
+  const ben = context("ben", named("group-1", [siteId, "site"]));
   const anaComputer = await client.provision({ botId: "ana", homePath: "" }, ana);
   const benComputer = await client.provision({ botId: "ben", homePath: "" }, ben);
   const before = createHash("sha256").update("<h1>Before</h1>").digest("hex");
@@ -212,7 +243,37 @@ it("lands an edit only over the content it was made from", async () => {
     ),
   );
   expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+
+  // Different spellings of one file on a case-insensitive file system (Windows, macOS) take
+  // turns, so only one edit made from the same content lands. Where names are case-sensitive
+  // the second spelling is another, missing file, so its edit is refused as well.
+  const landed = await readFile(path.join(shared, "index.html"), "utf8");
+  const spelled = await Promise.allSettled(
+    ["group/site/index.html", "group/site/INDEX.HTML"].map((file, index) =>
+      client.writeFile(
+        anaComputer,
+        {
+          path: file,
+          content: text(`spelling ${index}`),
+          expectedSha256: createHash("sha256").update(landed).digest("hex"),
+        },
+        ana,
+      ),
+    ),
+  );
+  expect(spelled.filter((result) => result.status === "fulfilled")).toHaveLength(1);
 }, 30000);
+
+it("withdraws grants of folders the server no longer has", async () => {
+  const { shared, other, server } = await setup();
+  server.setEnabled(true);
+  await server.grantGroupFolder("group-1", id("site"), shared);
+  await server.grantGroupFolder("group-1", id("notes"), other);
+  server.pruneGroupFolders("group-1", [id("notes")]);
+  expect(server.groupFolders("group-1").map((grant) => grant.folderId)).toEqual([id("notes")]);
+  server.pruneGroupFolders("group-1", []);
+  expect(server.groupFolders("group-1")).toEqual([]);
+});
 
 it("runs a command in a shared folder outside the Mico's allowed roots only when that command is granted it", async () => {
   // The host's own roots are the OS home; a shared folder can live elsewhere (another drive,

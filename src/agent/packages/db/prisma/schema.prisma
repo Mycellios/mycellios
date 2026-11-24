@@ -1007,9 +1007,12 @@ model ChatGroupFolder {
   /// HMAC the granting PC derived from its own credential, the scope, the group and the path.
   folderId  String
   name      String
+  /// Mount name under group/, assigned once and unique in the group (case-insensitively).
+  label     String
   createdAt DateTime  @default(now())
 
   @@unique([groupId, folderId])
+  @@unique([groupId, label])
   @@index([spaceId, userId])
   @@map("chat_group_folders")
 }

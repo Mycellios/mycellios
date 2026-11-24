@@ -132,8 +132,8 @@ export function GroupFolders({
               <li key={folder.folderId} className="flex min-w-0 items-center gap-2 text-sm">
                 <Folder size={15} aria-hidden="true" className="shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate" title={here?.path ?? folder.name}>
-                    {folder.name}
+                  <span className="block truncate" title={here?.path ?? folder.label}>
+                    {folder.label}
                   </span>
                   {canChoose && !here ? (
                     <span className="block text-xs text-muted-foreground">
@@ -155,7 +155,7 @@ export function GroupFolders({
                   size="icon-sm"
                   variant="ghost"
                   disabled={busy}
-                  aria-label={t`Remove ${folder.name}`}
+                  aria-label={t`Remove ${folder.label}`}
                   onClick={() => void remove(folder)}
                 >
                   <X size={15} aria-hidden="true" />

@@ -33,12 +33,19 @@ owner's folders, and Mycellios never moves a grant between computers. So:
 Additive migration `20261124120000_group_shared_folders`:
 
 - New table `chat_group_folders` (`id`, `groupId` → `chat_groups` ON DELETE CASCADE,
-  `spaceId`, `userId`, `folderId`, `name`, `createdAt`), unique on (`groupId`, `folderId`),
-  indexed on (`spaceId`, `userId`), with the usual tenant and system row-level security
-  policies.
-- `folderId` is `HMAC-SHA256(host credential, ["group-folder", scope, groupId, realpath])`
-  computed by native main, where scope is (server, account, Space). It reveals nothing about the
-  path and is stable when the same folder is chosen again on the same PC.
+  `spaceId`, `userId`, `folderId`, `name`, `label`, `createdAt`), unique on (`groupId`,
+  `folderId`) and (`groupId`, `label`), indexed on (`spaceId`, `userId`), with the usual tenant
+  and system row-level security policies.
+- `folderId` is `HMAC-SHA256(key, ["group-folder", scope, groupId, realpath])` computed by
+  native main, where scope is (server, account, Space) and the key is a private random value
+  kept in the Desktop profile (`group-folder-key`), independent of the host transport
+  credential, which a busy port can renew. It reveals nothing about the path to the server and
+  stays the same when the same folder is chosen again on the same PC, across restarts.
+- `label` is the folder's mount name under `group/`: the folder name made into one safe path
+  segment, numbered when the group already uses it (case-insensitively). The server assigns it
+  once, when the folder is added, so it never changes while the folder stays in the group and
+  every member's turn and every restart sees the same `group/<label>`. After a folder is removed,
+  a folder added later may receive its label again.
 - No existing column changes. The previous release never reads the table, so both releases
   run side by side; rolling back leaves only unused rows.
 
@@ -63,30 +70,44 @@ Desktop (native main, `group-folder-ipc.ts`):
   same folder again (Connect after a restart).
 - The host refuses the file-system root and the home folder, and keeps at most 8 grants per
   group. Grants live in memory like the existing ordinary folder grants: Desktop restarts,
-  account changes and revoking PC access clear them. A revoked or removed grant is gone at once.
-- `groupFolders(groupId)` lists only grants made for the current server/account/Space scope.
+  consent for another account and revoking PC access clear them. A revoked or removed grant is
+  gone at once.
+- Listing (`groupFolders(groupId)`) and adding first withdraw the PC's grants of folders the
+  server no longer lists (removed from another device), so they neither stay reachable nor count
+  toward the PC's limit. Listing shows only grants made for the current server/account/Space.
 
 Runs (`packages/adapters/src/group-folders.ts`, executor):
 
-- A member's turn carries the group's folder ids to its PC only when it runs in the group's own
-  thread, the run's owner/Space own the unarchived group, the Mico is an active member, the run
-  is not a project task conversation, and its computer is This PC (`desktop`, `dedicated`).
-  A Mico's own chat, routines, side tasks and other groups never carry them.
+- A member's turn carries the group's folders (ids and labels) to its PC only when it runs in
+  the group's own thread, the run's owner/Space own the unarchived group, the Mico is an active
+  member, the run is not a project task conversation, its computer is This PC (`desktop`,
+  `dedicated`), and the person started it. The person started a turn when it answers their own
+  message, call or reaction, or when it is a handoff in the same group thread whose chain of
+  handing-off turns (at most 8) leads back to one of those. Routines and workflows (also when
+  they run in the group), webhooks, messaging channels, Mico-to-Mico requests, side tasks,
+  delegated and background work never carry them, and neither does a brief sent into the group
+  with `send_to_group` from a Mico's own chat. A Mico's own chat and other groups never do either.
 - The ids are read again before every computer tool call, so removing a folder, removing the
   member or archiving the group takes effect inside a running turn. Removing a member already
   cancels its running turns in the group.
 - The PC grants a request only the intersection of the ids the server names and the ids it holds
   for that group. Unknown, removed or foreign ids are unreachable; paths never come from the
   server or the renderer.
+- These ids gate the file tools and the shared-folder working directories only. Shell commands
+  keep the OS user's permissions: a This PC Mico's commands can already reach folders under the
+  user's home without any grant, exactly as before this feature. Group folders do not isolate a
+  folder from other This PC Micos' shells.
 
 ## Tools and paths
 
 - `environment` reports `groupFolders` (id, label, native path) for the granted folders. Each
-  folder is mounted in file tools as `group/<label>/…`, where the label is the folder name made
-  into one safe path segment and numbered on collision. `list_files group` lists them.
-- Commands may use `group/<label>` (or the native path) as their working directory; the host
-  resolves it inside that folder and refuses a working directory that escapes it. Shell commands
-  keep the OS user's permissions: this is not an OS sandbox, exactly as for ordinary folders.
+  folder is mounted in file tools as `group/<label>/…`, with the label the server assigned.
+  `list_files group` lists them.
+- Commands may use `group/<label>` or the native path of a folder the run may use as their
+  working directory, also when that folder is outside the OS home (another drive, `/srv`); that
+  one folder is allowed for that command only. A `group/` working directory that escapes its
+  folder is refused. Shell commands keep the OS user's permissions: this is not an OS sandbox,
+  exactly as for ordinary folders.
 - Members read a short instruction naming the folders they can use and the ones they cannot
   reach. A member that cannot reach a folder is told to say so instead of looking elsewhere.
 - Native coding engines (Codex, Claude Code, OpenCode) running on the PC get the same
@@ -101,6 +122,9 @@ the shared-draft idea of `specs/mico-team-build/spec.md`:
   write only while the file still has that content, serializing writes per file, so two edits
   made from the same version cannot both land. The refused member is told to read the file again.
   Text is never merged automatically.
+- A file is identified by its real parent folder and its name, folded to lower case on Windows
+  and macOS, whose file systems usually ignore case, so `Index.html` and `index.html` take turns.
+  Large files written in pieces (`writeFileChunk`) take the same turns.
 - `write_file` replaces a whole file and is serialized per file but has no content check.
 - Commands are not serialized. The instruction asks members to agree who edits which files (the
   lead assigns them), to prefer `edit_file` for existing files and never to undo another
@@ -132,6 +156,10 @@ Group settings shows a Folders section below Save (folder changes apply at once)
   ordinary folder grants; Connect restores them. Persisting them is a later decision.
 - Team (Shared) mode on This PC, and project task conversations, keep their own workspaces.
 - Command-level locking, automatic merges, per-file ownership enforcement.
+- Folder access for routines run in the group, and for briefs sent with `send_to_group`: both
+  could act on the folders without the person in the turn, so they need their own consent.
+- Isolating a shared folder from This PC Micos' shell commands, which keep the OS user's
+  permissions.
 
 ## Remaining slices
 
@@ -142,18 +170,22 @@ Group settings shows a Folders section below Save (folder changes apply at once)
 ## Verification
 
 - `packages/adapters/src/host-group-folders.test.ts`: real host server over HTTP — grants,
-  labels, ids the server names, other group/no group/own chat refused, revocation, PC access
-  revocation, the 8-folder limit, command working directory and escape, and the content check
-  with concurrent edits.
-- `packages/adapters/src/group-folders.test.ts`: which runs carry folder ids, refresh before
-  tool calls, instruction text.
+  server labels, ids the server names, duplicate labels, other group/no group/own chat refused,
+  revocation, pruning, PC access revocation, the 8-folder limit, `group/` and native working
+  directories (including a folder outside the allowed roots) and escape, and the content check
+  with concurrent edits, also through two spellings of one file name.
+- `packages/adapters/src/group-folders.test.ts`: which runs carry folders (person-started turns
+  and handoff chains only; routines, webhooks, channels, Mico requests, background work and
+  failed reads never), refresh before tool calls, labels, instruction text.
 - `apps/desktop/src/group-folder-ipc.test.ts`: IPC admission, scope change, same-folder
-  reconnect, cancelled picker, scope-filtered listing, removal.
+  reconnect, cancelled picker, scope-filtered listing, removal, pruning of folders removed
+  elsewhere. `apps/desktop/src/host-computer.test.ts`: consent for another account clears the
+  grants, and the folder id key survives a restart.
 - `apps/web/src/components/GroupFolders.test.tsx`: web and Desktop states, add/connect/remove,
   withdrawal when the server refuses, consent declined, limit.
 - `node --import tsx scripts/verify-group-folders-db.ts` on a disposable loopback PostgreSQL
   cluster: the migration applies on the published schema without drift, row-level security,
-  owner/Space/group isolation, the limit under concurrency, idempotent add, member and archive
+  owner/Space/group isolation, unique labels, the limit under concurrency, idempotent add, member and archive
   rules for runs, and cascade on group deletion.
 - Physical installed-Desktop acceptance (picking real folders on Windows, macOS and Linux, two
   This PC Micos editing one folder in a real group turn, a second PC) is separate and not

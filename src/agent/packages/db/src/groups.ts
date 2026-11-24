@@ -6,6 +6,7 @@ import {
   GROUP_MEMBER_MIN,
   type Group,
   type GroupFolder,
+  groupFolderLabel,
   type GroupMember,
   type SpaceGroup,
 } from "@mycellios/contracts";
@@ -735,15 +736,24 @@ export function createGroupRepos(prisma: PrismaClient) {
           where: { groupId_folderId: { groupId: input.groupId, folderId: input.folderId } },
         });
         if (existing) return mapGroupFolder(existing);
-        const count = await tx.chatGroupFolder.count({ where: { groupId: input.groupId } });
-        if (count >= GROUP_FOLDER_MAX) throw new GroupFolderLimitError();
+        const current = await tx.chatGroupFolder.findMany({
+          where: { groupId: input.groupId },
+          select: { label: true },
+        });
+        if (current.length >= GROUP_FOLDER_MAX) throw new GroupFolderLimitError();
+        const name = input.name.trim().slice(0, GROUP_FOLDER_NAME_MAX_LENGTH) || "Folder";
         const created = await tx.chatGroupFolder.create({
           data: {
             groupId: input.groupId,
             spaceId: actor.spaceId,
             userId: actor.userId,
             folderId: input.folderId,
-            name: input.name.trim().slice(0, GROUP_FOLDER_NAME_MAX_LENGTH) || "Folder",
+            name,
+            // Fixed for the folder's life, so paths in earlier turns keep naming the same folder.
+            label: groupFolderLabel(
+              name,
+              current.map((row) => row.label),
+            ),
           },
         });
         return mapGroupFolder(created);
@@ -776,8 +786,18 @@ export class GroupFolderLimitError extends Error {
   }
 }
 
-function mapGroupFolder(row: { folderId: string; name: string; createdAt: Date }): GroupFolder {
-  return { folderId: row.folderId, name: row.name, createdAt: row.createdAt.toISOString() };
+function mapGroupFolder(row: {
+  folderId: string;
+  name: string;
+  label: string;
+  createdAt: Date;
+}): GroupFolder {
+  return {
+    folderId: row.folderId,
+    name: row.name,
+    label: row.label,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
 /**
@@ -787,7 +807,7 @@ function mapGroupFolder(row: { folderId: string; name: string; createdAt: Date }
 export async function groupFolderAccess(
   prisma: Pick<PrismaClient, "chatGroup">,
   run: { groupId: string; botId: string; userId: string; spaceId: string },
-): Promise<Array<{ folderId: string; name: string }>> {
+): Promise<Array<{ folderId: string; name: string; label: string }>> {
   const group = await prisma.chatGroup.findFirst({
     where: {
       id: run.groupId,
@@ -799,7 +819,7 @@ export async function groupFolderAccess(
     select: {
       folders: {
         where: { userId: run.userId, spaceId: run.spaceId },
-        select: { folderId: true, name: true },
+        select: { folderId: true, name: true, label: true },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         take: GROUP_FOLDER_MAX,
       },

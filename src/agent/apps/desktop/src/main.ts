@@ -2189,7 +2189,9 @@ app.whenReady().then(async () => {
     const [owner, spaceId] = await nativePreviewContext(window);
     const response = await appSessionRpc(window, base, spaceId, "groups/folders", { groupId });
     if (!response.ok) throw new Error("Open this group in its Space first.");
-    const { json: group } = await response.json() as { json?: { spaceId?: string } };
+    const { json: group } = await response.json() as { json?: { spaceId?: string; folders?: Array<{ folderId?: unknown }> } };
+    const folderIds = (Array.isArray(group?.folders) ? group.folders : [])
+      .map(folder => folder?.folderId).filter((id): id is string => typeof id === "string" && /^[a-f0-9]{64}$/.test(id));
     const identity = managed ? null : await getCloudComputer().identity();
     if (!owner || !group?.spaceId ||
       (identity && (JSON.stringify(identity) !== cloudComputerOwner || identity.userId !== owner || identity.spaceId !== group.spaceId)) ||
@@ -2197,7 +2199,7 @@ app.whenReady().then(async () => {
       mainWindow !== window || window.isDestroyed() || projectServer() !== base || !hostComputer.isEnabled() ||
       window.webContents.getURL() !== url || JSON.stringify(await nativePreviewContext(window)) !== JSON.stringify([owner, spaceId]))
       throw new Error("The application session changed.");
-    return JSON.stringify([base, owner, group.spaceId]);
+    return { scope: JSON.stringify([base, owner, group.spaceId]), folderIds };
   }
   installGroupFolderIpc({
     ipcMain,
@@ -2208,7 +2210,7 @@ app.whenReady().then(async () => {
       const selected = await dialog.showOpenDialog(mainWindow!, { properties: ["openDirectory", "createDirectory"] });
       return selected.canceled ? null : selected.filePaths[0] ?? null;
     },
-    secret: () => hostComputer!.connection.token,
+    secret: () => hostComputer!.groupFolderSecret(),
   });
   ipcMain.handle("desktop.computer.connected", async (event, botId: unknown) => {
     if (typeof botId !== "string" || !botId || botId.length > 256 || !hostComputer?.isEnabled()) return false;

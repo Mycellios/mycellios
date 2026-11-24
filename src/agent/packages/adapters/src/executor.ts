@@ -4225,7 +4225,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           isolatedWorkspace: (cloudComputer ?? bot.computer)?.scope === "isolated",
           desktopWorkspace: !cloudComputer && bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated",
           // Set below for a This PC member's turn in its group's thread; refreshed before each tool.
-          groupFolders: undefined as { groupId: string; folderIds: string[] } | undefined,
+          groupFolders: undefined as AdapterContext["groupFolders"],
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
@@ -4730,14 +4730,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
         const pageBrowserAllowed =
           !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
-        // Group shared folders (specs/group-shared-folders/spec.md): a member's turn in the
-        // group's own thread carries the group's folder ids to its PC, only on This PC.
+        // Group shared folders (specs/group-shared-folders/spec.md): a member's own group turn,
+        // started by the person, carries the group's folders to its PC, only on This PC.
         const groupFolders = thread.groupId
-          ? await groupFoldersForRun(deps.prisma, { groupId: thread.groupId, botId: bot.id, userId: run.userId, spaceId: run.spaceId }, {
-              kind: computerKind,
-              mode: computerMode,
-              projectSessionId: context.projectSessionId,
-            })
+          ? await groupFoldersForRun(
+              deps.prisma,
+              { groupId: thread.groupId, botId: bot.id, userId: run.userId, spaceId: run.spaceId },
+              { kind: computerKind, mode: computerMode, projectSessionId: context.projectSessionId },
+              {
+                threadId: thread.id,
+                trigger: run.trigger,
+                routineId: run.routineId,
+                sourceMessageId: run.sourceMessageId,
+                messagingChannel: messagingChannelRun,
+              },
+            )
           : { folders: [], context: undefined };
         context.groupFolders = groupFolders.context;
         const hostEnvironment =

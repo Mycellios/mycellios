@@ -25,22 +25,6 @@ import {
 } from "./host-computer-protocol.js";
 import { workspaceTransferDigest, workspaceTransferPieces } from "./workspace-transfer.js";
 
-/**
- * The mount name of a shared group folder under group/: its folder name as one safe path
- * segment, numbered when another folder of the group already uses it.
- */
-export function groupFolderLabel(name: string, taken: ReadonlySet<string>) {
-  const base =
-    Array.from(name.normalize("NFC").replace(/[\\/:*?"<>|\p{Cc}]/gu, "-").trim())
-      .slice(0, 60)
-      .join("")
-      .replace(/^[.\s]+|[.\s]+$/g, "") || "folder";
-  const lower = new Set([...taken].map((label) => label.toLowerCase()));
-  if (!lower.has(base.toLowerCase())) return base;
-  for (let index = 2; ; index++)
-    if (!lower.has(`${base} ${index}`.toLowerCase())) return `${base} ${index}`;
-}
-
 /** A shared group folder refusal the Mico should read as is. */
 class SharedFolderError extends Error {}
 
@@ -115,10 +99,10 @@ export async function startHostComputerServer(options: {
     }
   >();
   const projectLocks = new Set<string>();
-  // Group shared folders (specs/group-shared-folders/spec.md): group id -> folder id -> grant.
+  // Group shared folders (specs/group-shared-folders/spec.md): group id -> folder id -> path.
   // Only the native folder picker adds to it; a run reaches a grant only when the server
   // names both its group and the folder id, so a dangling or removed folder is unreachable.
-  const groupFolders = new Map<string, Map<string, { path: string; label: string }>>();
+  const groupFolders = new Map<string, Map<string, string>>();
   // Writes to one shared file run one after another, so a content check holds until the write.
   const sharedWrites = new Map<string, Promise<unknown>>();
   function sharedWrite<T>(key: string, write: () => Promise<T>): Promise<T> {
@@ -131,13 +115,35 @@ export async function startHostComputerServer(options: {
     });
     return next;
   }
-  function groupGrants(input: Pick<HostComputerRequest, "groupId" | "groupFolderIds" | "projectSessionId">) {
-    if (!input.groupId || input.projectSessionId || !input.groupFolderIds?.length) return [];
+  /**
+   * One key per file on disk: the real parent folder plus the name, folded where the file
+   * system ignores case (Windows, and macOS by default), so Index.html and index.html share it.
+   */
+  async function sharedFileKey(root: string, relative: string) {
+    const file = path.resolve(root, relative);
+    const parent = await realpath(path.dirname(file)).catch(() => path.dirname(file));
+    const name = path.basename(file);
+    const folded = process.platform === "win32" || process.platform === "darwin";
+    return JSON.stringify([folded ? parent.toLowerCase() : parent, folded ? name.toLowerCase() : name]);
+  }
+  /** The server-named folders of this request that this PC granted to its group, with their labels. */
+  function groupGrants(input: Pick<HostComputerRequest, "groupId" | "groupFolders" | "projectSessionId">) {
+    if (!input.groupId || input.projectSessionId || !input.groupFolders?.length) return [];
     const granted = groupFolders.get(input.groupId);
     if (!granted) return [];
-    return [...new Set(input.groupFolderIds)].flatMap((folderId) => {
-      const grant = granted.get(folderId);
-      return grant ? [{ folderId, ...grant }] : [];
+    const seen = new Set<string>();
+    return input.groupFolders.flatMap(({ folderId, label }) => {
+      const folder = granted.get(folderId);
+      if (!folder || seen.has(folderId) || seen.has(`label:${label}`)) return [];
+      seen.add(folderId).add(`label:${label}`);
+      return [{ folderId, label, path: folder }];
+    });
+  }
+  /** The granted folder of this request that contains an absolute path, if any. */
+  function groupGrantContaining(input: Parameters<typeof groupGrants>[0], target: string) {
+    return groupGrants(input).find((grant) => {
+      const relative = path.relative(grant.path, path.resolve(target));
+      return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
     });
   }
   const active = new Map<
@@ -497,15 +503,25 @@ export async function startHostComputerServer(options: {
         )
           throw new Error("The selected project changed. Open it again.");
         const projectRoot = projects.get(input.botId);
-        // A group turn may start a command in group/<label>/…, which runs in that shared folder.
-        const sharedCwd = input.command.cwd ? await groupTarget(input.command.cwd) : undefined;
-        if (sharedCwd) {
-          const cwd = path.resolve(sharedCwd.shared.root, sharedCwd.path || ".");
-          const relative = path.relative(sharedCwd.shared.root, cwd);
+        // A group turn may start a command in group/<label>/… or at the native path of one of
+        // the shared folders this run may use; either way it runs in that folder.
+        const sharedTarget = input.command.cwd ? await groupTarget(input.command.cwd) : undefined;
+        let sharedRoot = sharedTarget?.shared.root;
+        if (sharedTarget) {
+          const cwd = path.resolve(sharedTarget.shared.root, sharedTarget.path || ".");
+          const relative = path.relative(sharedTarget.shared.root, cwd);
           if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative))
             throw new SharedFolderError("Command working directory must stay in the shared folder.");
           input = { ...input, command: { ...input.command, cwd } };
+        } else if (input.command.cwd && path.isAbsolute(input.command.cwd)) {
+          const grant = groupGrantContaining(input, input.command.cwd);
+          if (grant) {
+            if ((await realpath(grant.path)) !== grant.path)
+              throw new SharedFolderError("The shared folder changed. Add it again in Group settings.");
+            sharedRoot = grant.path;
+          }
         }
+        const sharedCwd = Boolean(sharedRoot);
         const commandCwd =
           projectRoot && projectGuards.has(input.botId) && !sharedCwd
             ? path.resolve(projectRoot, input.command.cwd ?? ".")
@@ -553,7 +569,7 @@ export async function startHostComputerServer(options: {
           context,
           // A shared folder may live outside the OS home (another drive, /srv, /tmp): this
           // command may start in the one granted folder it named, and nowhere else new.
-          sharedCwd ? { grantedRoots: [sharedCwd.shared.root] } : {},
+          sharedRoot ? { grantedRoots: [sharedRoot] } : {},
         );
         break;
       }
@@ -607,7 +623,7 @@ export async function startHostComputerServer(options: {
         if ("shared" in target && target.shared) {
           // Members share these files: one write at a time per file, and an edit lands only
           // over the content it was made from.
-          await sharedWrite(JSON.stringify([target.shared.root, path.normalize(target.path)]), async () => {
+          await sharedWrite(await sharedFileKey(target.shared.root, target.path), async () => {
             if (expectedSha256) {
               const current = await target.provider
                 .readFile(target.computer, target.path, context, { maxBytes: HOST_COMPUTER_MAX_FILE_BYTES })
@@ -629,11 +645,17 @@ export async function startHostComputerServer(options: {
       }
       case "writeFileChunk": {
         const target = await fileTarget(input.file.path);
-        await target.provider.writeFileChunk(target.computer, {
-          ...input.file,
-          path: target.path,
-          content: Buffer.from(input.file.content, "base64"),
-        });
+        const piece = input.file;
+        const writeChunk = () =>
+          target.provider.writeFileChunk(target.computer, {
+            ...piece,
+            path: target.path,
+            content: Buffer.from(piece.content, "base64"),
+          });
+        // Pieces of a shared file wait for, and hold off, other writes to the same file.
+        if ("shared" in target && target.shared)
+          await sharedWrite(await sharedFileKey(target.shared.root, target.path), writeChunk);
+        else await writeChunk();
         yield null;
         break;
       }
@@ -791,28 +813,40 @@ export async function startHostComputerServer(options: {
       if (directory === path.parse(directory).root || directory === homedir())
         throw new Error("Choose a project folder, rather than your entire computer");
       if (!enabled) throw new Error("Local computer access is disabled");
-      const granted = groupFolders.get(groupId) ?? new Map<string, { path: string; label: string }>();
+      const granted = groupFolders.get(groupId) ?? new Map<string, string>();
       const existing = granted.get(folderId);
-      if (existing?.path === directory) return { folderId, name: path.basename(directory), ...existing };
+      if (existing === directory) return { folderId, name: path.basename(directory), path: directory };
       if (existing) throw new Error("This folder id belongs to another folder");
       if (granted.size >= HOST_GROUP_FOLDER_MAX)
         throw new Error(`A group can have up to ${HOST_GROUP_FOLDER_MAX} folders.`);
-      const label = groupFolderLabel(path.basename(directory), new Set([...granted.values()].map((item) => item.label)));
-      granted.set(folderId, { path: directory, label });
+      granted.set(folderId, directory);
       groupFolders.set(groupId, granted);
-      return { folderId, name: path.basename(directory), path: directory, label };
+      return { folderId, name: path.basename(directory), path: directory };
     },
     /** The group's folders granted on this PC, oldest first. */
     groupFolders(groupId: string) {
-      return [...(groupFolders.get(groupId) ?? new Map<string, { path: string; label: string }>())].map(
-        ([folderId, grant]) => ({ folderId, name: path.basename(grant.path), ...grant }),
-      );
+      return [...(groupFolders.get(groupId) ?? new Map<string, string>())].map(([folderId, folder]) => ({
+        folderId,
+        name: path.basename(folder),
+        path: folder,
+      }));
     },
     /** Withdraws one grant at once: the next request of a running member no longer reaches it. */
     revokeGroupFolder(groupId: string, folderId: string) {
       const granted = groupFolders.get(groupId);
       granted?.delete(folderId);
       if (granted && !granted.size) groupFolders.delete(groupId);
+    },
+    /**
+     * Withdraws the grants the server no longer lists for the group (a folder removed from
+     * another device), so they neither stay reachable nor count toward the limit.
+     */
+    pruneGroupFolders(groupId: string, keep: readonly string[]) {
+      const granted = groupFolders.get(groupId);
+      if (!granted) return;
+      const listed = new Set(keep);
+      for (const folderId of [...granted.keys()]) if (!listed.has(folderId)) granted.delete(folderId);
+      if (!granted.size) groupFolders.delete(groupId);
     },
     isEnabled: () => enabled && !updating,
     setAppControlAllowed(value: boolean) {

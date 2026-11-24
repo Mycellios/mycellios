@@ -42,11 +42,14 @@ beforeEach(() => {
   state.bridge = undefined;
   folders.mockResolvedValue({
     spaceId: "space",
-    folders: [{ folderId: SITE, name: "site", createdAt: "2026-11-24T00:00:00.000Z" }],
+    folders: [
+      { folderId: SITE, name: "site", label: "site", createdAt: "2026-11-24T00:00:00.000Z" },
+    ],
   });
   addFolder.mockResolvedValue({
     folderId: NOTES,
     name: "notes",
+    label: "notes",
     createdAt: "2026-11-24T00:00:00.000Z",
   });
   removeFolder.mockResolvedValue({ ok: true });
@@ -142,6 +145,7 @@ it("does not ask the picker when the person declines PC access, and stops adding
     folders: Array.from({ length: 8 }, (_, index) => ({
       folderId: String(index).repeat(64),
       name: `f${index}`,
+      label: `f${index}`,
       createdAt: "2026-11-24T00:00:00.000Z",
     })),
   });

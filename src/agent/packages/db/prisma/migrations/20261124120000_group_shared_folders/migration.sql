@@ -12,6 +12,7 @@ CREATE TABLE "chat_group_folders" (
     "userId" TEXT NOT NULL,
     "folderId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "chat_group_folders_pkey" PRIMARY KEY ("id")
@@ -19,6 +20,9 @@ CREATE TABLE "chat_group_folders" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "chat_group_folders_groupId_folderId_key" ON "chat_group_folders"("groupId", "folderId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "chat_group_folders_groupId_label_key" ON "chat_group_folders"("groupId", "label");
 
 -- CreateIndex
 CREATE INDEX "chat_group_folders_spaceId_userId_idx" ON "chat_group_folders"("spaceId", "userId");

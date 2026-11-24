@@ -1,3 +1,4 @@
+import { GroupFolderLabel } from "@mycellios/contracts";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
 import type { NativeCodingEngine } from "@mycellios/adapter-kit";
@@ -10,6 +11,8 @@ export const HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES = 100 * 1024 * 1024;
 /** Shared group folders a run may use at most (specs/group-shared-folders/spec.md). */
 export const HOST_GROUP_FOLDER_MAX = 8;
 export const hostGroupFolderId = z.string().regex(/^[a-f0-9]{64}$/);
+/** A folder the server names for this run, with the label it assigned to the folder. */
+const hostGroupFolder = z.object({ folderId: hostGroupFolderId, label: GroupFolderLabel });
 const file = z.object({
   path: z.string().max(4096),
   content: z.string().max(HOST_COMPUTER_MAX_BYTES),
@@ -45,9 +48,9 @@ const base = {
   runId: z.string().min(1).max(256).optional(),
   /** The Mico's display name; names its PC folder only when that folder is first created. */
   botName: z.string().min(1).max(200).optional(),
-  /** The group whose thread this run works in, with the shared folder ids it may use now. */
+  /** The group whose thread this run works in, with the shared folders it may use now. */
   groupId: z.string().min(1).max(256).optional(),
-  groupFolderIds: z.array(hostGroupFolderId).max(HOST_GROUP_FOLDER_MAX).optional(),
+  groupFolders: z.array(hostGroupFolder).max(HOST_GROUP_FOLDER_MAX).optional(),
 };
 export const hostComputerRequest = z.discriminatedUnion("method", [
   z.object({ ...base, method: z.literal("agentRun"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), segmentId: z.string().regex(/^[a-f0-9]{64}$/).optional(), request: z.unknown() }),

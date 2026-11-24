@@ -90,14 +90,14 @@ try {
   );
   await assert.rejects(
     legacy.query(
-      `INSERT INTO chat_group_folders (id, "groupId", "spaceId", "userId", "folderId", name) VALUES ('x','missing','s','u','f','n')`,
+      `INSERT INTO chat_group_folders (id, "groupId", "spaceId", "userId", "folderId", name, label) VALUES ('x','missing','s','u','f','n','n')`,
     ),
   );
   // Row-level security as the migration creates it. The superuser bypasses RLS, so the reads use
   // an ordinary login role; the synthetic row skips its foreign key only for this check.
   await legacy.query("SET session_replication_role = replica");
   await legacy.query(
-    `INSERT INTO chat_group_folders (id, "groupId", "spaceId", "userId", "folderId", name) VALUES ('rls','g','space','owner','f','n')`,
+    `INSERT INTO chat_group_folders (id, "groupId", "spaceId", "userId", "folderId", name, label) VALUES ('rls','g','space','owner','f','n','n')`,
   );
   await legacy.query("SET session_replication_role = DEFAULT");
   const tenantPassword = randomBytes(24).toString("hex");
@@ -249,9 +249,33 @@ try {
     );
   }
   assert.equal((await groups.listGroupFolders(actor, group.id)).folders.length, 1);
+  assert.equal(first.label, "site");
+  // Labels are assigned once, unique in the group, and listed unchanged afterwards.
+  const web = await groups.addGroupFolder(actor, {
+    groupId: other.id,
+    folderId: folderId(40),
+    name: "web",
+  });
+  const web2 = await groups.addGroupFolder(actor, {
+    groupId: other.id,
+    folderId: folderId(41),
+    name: "Web",
+  });
+  assert.deepEqual([web.label, web2.label], ["web", "Web 2"]);
+  assert.deepEqual(
+    (await groups.listGroupFolders(actor, other.id)).folders.map((folder) => folder.label),
+    ["web", "Web 2"],
+  );
+  await assert.rejects(
+    prisma.chatGroupFolder.create({
+      data: { groupId: other.id, ...scope, folderId: folderId(42), name: "web", label: "web" },
+    }),
+  );
+  for (const id of [40, 41])
+    await groups.removeGroupFolder(actor, { groupId: other.id, folderId: folderId(id) });
   assert.equal((await groups.listGroupFolders(actor, other.id)).folders.length, 0);
   checks.push(
-    "only the group's owner in its Space lists, adds or removes its folders; adding the same id again is idempotent",
+    "only the group's owner in its Space lists, adds or removes its folders; adding the same id again is idempotent; labels are assigned once and unique per group",
   );
 
   // 2. The repositories also work under a request's own tenant context.

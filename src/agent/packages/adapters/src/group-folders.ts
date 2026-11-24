@@ -7,23 +7,76 @@ import { groupFolderAccess, type PrismaClient } from "@mycellios/db";
  */
 export type GroupFolderRun = { groupId: string; botId: string; userId: string; spaceId: string };
 
-/** The folder ids a run carries to its PC: only a This PC member's turn in the group's thread. */
+/** What decides whether a group turn is the person's own conversation. */
+export type GroupTurn = {
+  threadId: string;
+  trigger: string;
+  routineId?: string | null;
+  sourceMessageId?: string | null;
+};
+
+const PERSON_TRIGGERS = new Set(["user", "call_end", "reaction"]);
+/** Handoffs from one member to the next are bounded the same way in group-handoff. */
+const MAX_HANDOFF_HOPS = 8;
+
+/**
+ * True only for a conversational turn the person started in the group: their own message, call
+ * or reaction, or a handoff in the same group thread whose chain of handing-off turns starts at
+ * one of those. Routines, workflows, webhooks, messaging channels, Mico-to-Mico requests, side
+ * tasks and background work never qualify, and neither does a failed read.
+ */
+export async function personStartedGroupTurn(
+  prisma: Pick<PrismaClient, "message" | "run">,
+  turn: GroupTurn,
+): Promise<boolean> {
+  try {
+    let current = turn;
+    for (let hop = 0; hop <= MAX_HANDOFF_HOPS; hop++) {
+      if (current.routineId || current.trigger === "routine" || current.trigger === "workflow")
+        return false;
+      if (PERSON_TRIGGERS.has(current.trigger)) return true;
+      if (current.trigger !== "follow_up" || !current.sourceMessageId) return false;
+      const message = await prisma.message.findUnique({
+        where: { id: current.sourceMessageId },
+        select: { threadId: true, role: true, runId: true },
+      });
+      if (!message || message.threadId !== turn.threadId) return false;
+      if (message.role === "user") return true;
+      if (!message.runId) return false;
+      const previous = await prisma.run.findUnique({
+        where: { id: message.runId },
+        select: { threadId: true, trigger: true, routineId: true, sourceMessageId: true },
+      });
+      if (!previous || previous.threadId !== turn.threadId) return false;
+      current = previous;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/** The folders a run carries to its PC: only a This PC member's own group turn. */
 export async function groupFoldersForRun(
-  prisma: Pick<PrismaClient, "chatGroup">,
+  prisma: Pick<PrismaClient, "chatGroup" | "message" | "run">,
   run: GroupFolderRun,
   computer: { kind: string; mode: string; projectSessionId?: string },
+  turn: GroupTurn & { messagingChannel?: boolean },
 ) {
-  if (computer.projectSessionId) return { folders: [], context: undefined };
+  const none = { folders: [], context: undefined };
+  if (computer.projectSessionId || turn.messagingChannel) return none;
+  if (!(await personStartedGroupTurn(prisma, turn))) return none;
   // Optional for the turn: a failed read gives no access rather than failing the turn.
   const folders = await groupFolderAccess(prisma, run).catch(() => []);
   const onPc = folders.length > 0 && computer.kind === "desktop" && computer.mode === "dedicated";
   return {
     folders,
-    context: onPc
-      ? { groupId: run.groupId, folderIds: folders.map((folder) => folder.folderId) }
-      : undefined,
+    context: onPc ? { groupId: run.groupId, folders: carried(folders) } : undefined,
   };
 }
+
+const carried = (folders: ReadonlyArray<{ folderId: string; label: string }>) =>
+  folders.map(({ folderId, label }) => ({ folderId, label }));
 
 /**
  * Re-reads the group's folders before a tool call, so a removed folder, a member who left or an
@@ -35,9 +88,9 @@ export async function refreshGroupFolders(
   context: Pick<AdapterContext, "groupFolders">,
 ) {
   if (!context.groupFolders) return;
-  // A failed read withdraws access for this call instead of keeping stale ids.
+  // A failed read withdraws access for this call instead of keeping stale folders.
   const folders = await groupFolderAccess(prisma, run).catch(() => []);
-  context.groupFolders.folderIds = folders.map((folder) => folder.folderId);
+  context.groupFolders.folders = carried(folders);
 }
 
 /** A path in a shared folder, where an edit must land over the content it was made from. */

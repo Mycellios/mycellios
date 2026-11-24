@@ -25,7 +25,7 @@ export interface AdapterContext {
    * Server-derived for a member's turn in its group's thread: the shared folder ids the group
    * has now (specs/group-shared-folders/spec.md). The PC grants only ids it holds for that group.
    */
-  groupFolders?: { groupId: string; folderIds: string[] };
+  groupFolders?: { groupId: string; folders: Array<{ folderId: string; label: string }> };
   /** Resolved by the local Desktop host only, never received in a run request. */
   resolveOpenCodeProject?: () => Promise<string | undefined>;
   /** Server-selected workspace for this run, including after Desktop reconnects. */
