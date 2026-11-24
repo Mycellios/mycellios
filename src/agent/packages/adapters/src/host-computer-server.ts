@@ -551,6 +551,9 @@ export async function startHostComputerServer(options: {
             env: { ...projectGuards.get(input.botId)?.environment, ...input.command.env },
           },
           context,
+          // A shared folder may live outside the OS home (another drive, /srv, /tmp): this
+          // command may start in the one granted folder it named, and nowhere else new.
+          sharedCwd ? { grantedRoots: [sharedCwd.shared.root] } : {},
         );
         break;
       }

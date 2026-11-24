@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { AdapterContext } from "@mycellios/adapter-kit";
 import { afterEach, expect, it } from "vitest";
+import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { groupFolderLabel, startHostComputerServer } from "./host-computer-server.js";
 
@@ -211,6 +212,48 @@ it("lands an edit only over the content it was made from", async () => {
     ),
   );
   expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+}, 30000);
+
+it("runs a command in a shared folder outside the Mico's allowed roots only when that command is granted it", async () => {
+  // The host's own roots are the OS home; a shared folder can live elsewhere (another drive,
+  // /srv, /tmp). Here no extra roots are configured, so the folder is outside on every platform.
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-group-roots-")));
+  roots.push(root);
+  const shared = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-group-shared-")));
+  roots.push(shared);
+  const desktop = new DesktopSandboxProvider({ root });
+  const context = {
+    operationId: "roots",
+    traceId: "roots",
+    spaceId: "s",
+    userId: "u",
+    signal: new AbortController().signal,
+  };
+  const computer = await desktop.provision({ botId: "ana", homePath: "" }, context);
+  const command = {
+    argv: [process.execPath, "-e", "require('node:fs').writeFileSync('ran.txt','ok')"],
+    cwd: shared,
+    env: node,
+    timeoutMs: 10000,
+  };
+  const refused = [];
+  for await (const event of desktop.execute(computer, command, context)) refused.push(event);
+  expect(refused).toContainEqual({ type: "exit", code: 1 });
+  const granted = [];
+  for await (const event of desktop.execute(computer, command, context, { grantedRoots: [shared] }))
+    granted.push(event);
+  expect(granted).toContainEqual({ type: "exit", code: 0 });
+  expect(await readFile(path.join(shared, "ran.txt"), "utf8")).toBe("ok");
+  // A grant for one folder does not reach its parent.
+  const parent = [];
+  for await (const event of desktop.execute(
+    computer,
+    { ...command, cwd: path.dirname(shared) },
+    context,
+    { grantedRoots: [shared] },
+  ))
+    parent.push(event);
+  expect(parent).toContainEqual({ type: "exit", code: 1 });
 }, 30000);
 
 it("refuses a ninth folder for one group", async () => {

@@ -311,6 +311,8 @@ export class DesktopSandboxProvider implements SandboxProvider {
     computer: ComputerRef,
     request: CommandRequest,
     context: AdapterContext,
+    /** Folders granted to this one command only, such as a group's shared folder it starts in. */
+    options: { grantedRoots?: readonly string[] } = {},
   ): AsyncIterable<ProcessEvent> {
     const box = this.boxFor(computer);
     if (!box) {
@@ -319,7 +321,7 @@ export class DesktopSandboxProvider implements SandboxProvider {
       return;
     }
     const cwd = resolveExecuteCwd(request.cwd, box.home);
-    if (!isAllowedDesktopPath(cwd, this.allowedRoots(box.home))) {
+    if (!isAllowedDesktopPath(cwd, [...this.allowedRoots(box.home), ...(options.grantedRoots ?? [])])) {
       yield { type: "stderr", data: "path is outside this computer's home" };
       yield { type: "exit", code: 1 };
       return;
