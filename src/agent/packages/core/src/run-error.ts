@@ -246,6 +246,22 @@ export function isUncertainDesktopRun(details: string | null | undefined): boole
     (fallback?.backups.some(backup => uncertain(backup.reason)) ?? false);
 }
 
+/** The relay gave no answer about the PC before the turn reached it (an update or a lost connection). */
+export const DESKTOP_UNREACHABLE_ERROR =
+  "Your PC did not answer in time. Check that Mycellios Desktop is open and online, then try again.";
+
+/**
+ * The turn stopped because of the infrastructure (a deploy or a lost PC connection), not the
+ * model or the person. Its outcome is unknown, so it is never replayed; a fresh turn told to
+ * check what already happened may continue the work instead.
+ */
+export function isInterruptedRunError(details: string | null | undefined): boolean {
+  if (!details) return false;
+  const trimmed = details.trim();
+  return /^Backend maintenance in progress\b/i.test(trimmed) || trimmed === DESKTOP_UNREACHABLE_ERROR ||
+    isUncertainDesktopRun(details);
+}
+
 /** A support copy contains correlation and fixed categories, never provider text or prompts. */
 export function desktopRunDiagnosticText(details: string, runId: string | null): string | undefined {
   if (!isUncertainDesktopRun(details)) return;
