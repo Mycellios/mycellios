@@ -1,21 +1,51 @@
 import { COMPUTER_UPDATE_STAGES, type ComputerUpdate } from "@mycellios/contracts";
 import { isRetryableError, retryDelayMs } from "./retry-policy.js";
 
+/** While an operation moves, its progress follows it closely. */
+export const COMPUTER_UPDATES_ACTIVE_POLL_MS = 1_500;
+/**
+ * Otherwise nothing changes on its own: operations start only from an explicit action, this
+ * client's own starts show at once, and a failed one waits for Dismiss or Recover. The slow check
+ * only picks up operations started from another device or by a teammate.
+ */
+export const COMPUTER_UPDATES_IDLE_POLL_MS = 60_000;
+/** A failed check with nothing moving retries sooner than the idle check. */
+export const COMPUTER_UPDATES_RETRY_MS = 15_000;
+
+/** How long to wait before the next check, from the operations just shown. */
+export function computerUpdatesPollInterval(
+  updates: readonly Pick<ComputerUpdate, "status">[],
+): number {
+  // An interrupted operation still settles on the server, so it is followed like a running one.
+  return updates.some((item) => item.status !== "failed" && item.status !== "completed")
+    ? COMPUTER_UPDATES_ACTIVE_POLL_MS
+    : COMPUTER_UPDATES_IDLE_POLL_MS;
+}
+
 /** Shared polling and local presentation state; the server owns operation lifetime. */
 export function createComputerUpdates(client: {
   list: () => Promise<ComputerUpdate[]>;
   start: (botId: string, action: "update" | "recover") => Promise<ComputerUpdate>;
   dismiss: (id: string) => Promise<unknown>;
+  /** Checks wait while the app is hidden and resume as soon as it is shown again. */
+  visibility?: { hidden: () => boolean; subscribe: (listener: () => void) => () => void };
 }) {
   let state: { updates: ComputerUpdate[]; openId: string | null } = { updates: [], openId: null };
   const listeners = new Set<() => void>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let generation = 0;
   let revision = 0;
+  // A check came due while hidden; the next show runs it.
+  let parked = false;
   const emit = () => {
     for (const listener of listeners) listener();
   };
   const poll = async (epoch: number) => {
+    if (client.visibility?.hidden()) {
+      parked = true;
+      return;
+    }
+    parked = false;
     const stamp = revision;
     let failure: unknown;
     try {
@@ -35,7 +65,11 @@ export function createComputerUpdates(client: {
       if (epoch === generation) {
         clearTimeout(timer);
         if (failure === undefined || isRetryableError(failure)) {
-          const delay = retryDelayMs(failure, state.updates.length ? 1500 : 15000);
+          const interval = computerUpdatesPollInterval(state.updates);
+          const delay =
+            failure === undefined
+              ? interval
+              : retryDelayMs(failure, Math.min(interval, COMPUTER_UPDATES_RETRY_MS));
           timer = setTimeout(() => void poll(epoch), delay);
         }
       }
@@ -51,9 +85,14 @@ export function createComputerUpdates(client: {
     },
     watch() {
       const epoch = ++generation;
+      parked = false;
+      const unsubscribe = client.visibility?.subscribe(() => {
+        if (parked && epoch === generation) void poll(epoch);
+      });
       void poll(epoch);
       return () => {
         generation++;
+        unsubscribe?.();
         clearTimeout(timer);
         state = { updates: [], openId: null };
       };
@@ -73,7 +112,7 @@ export function createComputerUpdates(client: {
       };
       emit();
       clearTimeout(timer);
-      timer = setTimeout(() => void poll(epoch), 1500);
+      timer = setTimeout(() => void poll(epoch), COMPUTER_UPDATES_ACTIVE_POLL_MS);
     },
     async dismiss(id: string) {
       const epoch = generation;
