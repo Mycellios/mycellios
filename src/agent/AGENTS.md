@@ -405,6 +405,9 @@
 - Chat routine mentions are a single owner- and Space-scoped summary read, triggered
   by the composer mention search. Do not fetch routine lists for the entire roster
   on chat entry. Check composer/query tests and `scripts/verify-routine-isolation-db.ts`.
+- The chat task menu shares its in-flight and recent overview poll across chats in
+  the same account and Space. Preserve the periodic refresh and the per-thread
+  notification filter. Check the query-scope tests when changing this path.
 
 - Production English messages with interpolated values must exist in
   `apps/web/src/locales/en/messages.po`; production macros omit development text.
