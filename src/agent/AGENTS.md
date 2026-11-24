@@ -928,6 +928,17 @@
 - Continuous voice keeps its immutable Space/task client and stops its owned audio
   resources on close. Track the accepted turn by run and task ID so an older
   chat failure cannot stop the microphone or speak an unrelated reply.
+  Groups get the same voice conversation, as the reference app's channels do
+  (behavior reference only): it sends to the group target, so the server's
+  deterministic routing picks the members, and tracks every run id the send
+  returned. Each member's reply is read in that member's voice once its own run
+  ends (lib/group-voice.ts); one member failing stops voice only when nobody
+  answered. The panel shows the member speaking or working, else the lead, and
+  dictation is authorized for the lead. "Read new replies aloud" (or a member's
+  autoSpeak) reads, once, the first finished answer to the person's newest group
+  message, preferring a member that message named; never member-to-member turns,
+  and not while a voice conversation is open. Verify group-voice
+  and VoiceConversation tests.
   Native speech preparation is explicit and verifies pinned
   files. Keep standalone Node, its license, optional native modules and Windows
   Job ownership in packaging; never replace them with a renderer-selected runtime.

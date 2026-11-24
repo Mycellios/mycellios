@@ -1,6 +1,6 @@
 import { desktopBridge } from "../../lib/desktop";
 import { getGeneralPreferences, useGeneralPreferences } from "../../lib/general-preferences";
-import type { LocalVoiceStatus } from "@mycellios/contracts";
+import type { GroupMember, LocalVoiceStatus } from "@mycellios/contracts";
 import { useLingui } from "@lingui/react/macro";
 import { isEchoOfSpeech, isRunWorking, isSecretAskBlock, normalizeRunError, speakable, speechFromBlocks, toUtterances } from "@mycellios/core";
 import { BotAvatar, Button } from "@mycellios/ui-web";
@@ -14,14 +14,26 @@ import { endCall } from "../../lib/call-session";
 import { isAndroidHost } from "../../lib/android-host";
 import { translateRunError } from "../../lib/run-error";
 import { errorText } from "../../lib/user-error";
+import { finishedGroupReplies, groupRepliesBySpeaker, groupVoiceMember, workingRunIds } from "../../lib/group-voice";
 
-export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, taskThreadId, bot, transcribe, voiceReady, onClose, onSettings }: {
+type VoiceMico = { id: string; name: string; color: string };
+export type VoiceGroup = { id: string; name: string; members: GroupMember[]; leadBotId?: string | null };
+
+/**
+ * A spoken conversation with one Mico, or with a group: words go to the group like a typed
+ * message, and each member that answers is read in its own voice. `bot` is the Mico shown
+ * first (a group's lead).
+ */
+export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, taskThreadId, bot, group, transcribe, voiceReady, onClose, onSettings }: {
   hidden?: boolean; rpc: RpcClient; accountId?: string; spaceId?: string | null; taskThreadId?: string;
-  bot: { id: string; name: string; color: string }; transcribe?: boolean; voiceReady?: boolean;
+  bot: VoiceMico; group?: VoiceGroup; transcribe?: boolean; voiceReady?: boolean;
   onClose: () => void; onSettings: () => void;
 }) {
   const { t, i18n } = useLingui();
-  const target = { botId: bot.id, taskThreadId };
+  const target = group ? { groupId: group.id } : { botId: bot.id, taskThreadId };
+  const [voice, setVoice] = useState<VoiceMico>(bot);
+  const speakers = useRef(new Set(group ? group.members.map(member => member.botId) : [bot.id]));
+  const showMember = (member: GroupMember | undefined) => { if (member) setVoice({ id: member.botId, name: member.name, color: member.color }); };
   const [phase, setPhase] = useState("ready");
   const [caption, setCaption] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +70,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
     })();
     const stop = dictation.subscribe(s => { if (!alive.current) return; setLevel(s.level ?? 0); if (s.transcript) setCaption(s.transcript); if (s.error && enabled.current) stopWithError(errorText(s.error, t`Could not use the microphone. Check its permission and try again.`)); });
     const stopSpeaker = speaker.subscribe(s => {
-      if (!alive.current || s.botId !== bot.id) return;
+      if (!alive.current || !s.botId || !speakers.current.has(s.botId)) return;
       if (s.level !== undefined) setLevel(s.level);
       if (s.status === "speaking") {setPhase("speaking"); if(s.caption) setCaption(s.caption);}
       else if (s.status === "preparing") setPhase("thinking");
@@ -89,7 +101,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
       onFinal: text => { if (background) { generation.current++; speaker.stop(); void output.current?.close().catch(() => {}); output.current = null; } void send(text); } }); }
     catch { if (alive.current && enabled.current) stopWithError(t`Could not use the microphone. Check its permission and try again.`); }
   }
-  async function speak(text: string, own: number) {
+  async function speak(text: string, own: number, speakerId = bot.id) {
     if (!alive.current || own !== generation.current) return;
     spoken.current = speakable(text); setCaption(text); setPhase("thinking");
     if (native && localReplies) {
@@ -121,7 +133,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
       const failure = await speaker.speak(speakable(text), {
         browser: !networkReplies && (preferences.speechEngine === "device" || !voiceReady) && browserSpeechAvailable(),
         networkLanguage: networkReplies ? language as "en" | "es" : undefined,
-        botId: bot.id,
+        botId: speakerId,
         spaceId,
         speed: rate.current,
       });
@@ -144,6 +156,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
       const runIds = new Set([sent.runId, ...(sent.runIds ?? [])]);
       failureMessage = t`Could not follow the Mico’s response. Check the chat.`;
       const deadline = Date.now() + 5 * 60_000;
+      let spoke = false;
       void listen(true);
       while (alive.current && own === generation.current && Date.now() < deadline) {
         const snapshot = await rpc.threads.get(target, { signal: abort.current.signal });
@@ -152,25 +165,45 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
           runIds.has(run.id) || run.taskId === sent.taskId;
         const run = snapshot.run && matchesRun(snapshot.run) ? snapshot.run : null;
         const activeRuns = snapshot.activeRuns?.filter(matchesRun) ?? [];
-        if (run?.status === "failed" || run?.status === "cancelled") {
-          stopWithError(run.error
-            ? normalizeRunError(run.error, translateRunError, i18n.locale).summary
-            : t`The Mico stopped responding. Check the chat.`);
-          return;
-        }
         for (const active of activeRuns) runIds.add(active.id);
         if (run) runIds.add(run.id);
         const messages = snapshot.messages.filter(m =>
           m.role === "bot" && !seen.current.has(m.id) && m.runId && runIds.has(m.runId),
         );
+        const waitingForInput = run?.status === "waiting_input" || activeRuns.some(active => active.status === "waiting_input");
+        const stillWorking = isRunWorking(run?.status) || activeRuns.some(active => isRunWorking(active.status));
+        // In a group one member can fail while another answers; stop only when nobody did.
+        if ((run?.status === "failed" || run?.status === "cancelled") && (!group || (!stillWorking && !spoke && !messages.length))) {
+          stopWithError(run.error
+            ? normalizeRunError(run.error, translateRunError, i18n.locale).summary
+            : t`The Mico stopped responding. Check the chat.`);
+          return;
+        }
         if (messages.some(m => m.blocks.some(b => b.kind === "ask" && b.status !== "answered" && isSecretAskBlock(b)))) {
           silence(); enabled.current = false; setPhase("ready"); setCaption(t`Enter the requested secret on screen, then restart voice.`); return;
         }
-        const waitingForInput = run?.status === "waiting_input" || activeRuns.some(active => active.status === "waiting_input");
-        const stillWorking = isRunWorking(run?.status) || activeRuns.some(active => isRunWorking(active.status));
-        if (snapshot.cursor >= sent.seq && (waitingForInput || (!stillWorking && (run?.status === "completed" || messages.length)))) {
+        if (group) {
+          // Read each member's answer as soon as its own turn ends, in that member's voice.
+          const ready = finishedGroupReplies(snapshot.messages, runIds, seen.current, workingRunIds([run, ...activeRuns]));
+          ready.forEach(m => seen.current.add(m.id));
+          for (const part of groupRepliesBySpeaker(ready)) {
+            showMember(group.members.find(member => member.botId === part.botId));
+            failureMessage = t`Could not play the reply. You can read it in the chat.`;
+            await speak(part.text, own, part.botId);
+            if (!alive.current || own !== generation.current) return;
+            spoke = true;
+          }
+          failureMessage = t`Could not follow the Mico’s response. Check the chat.`;
+          showMember(groupVoiceMember(group.members, group.leadBotId, stillWorking ? activeRuns : []));
+          if (ready.length && stillWorking) {
+            setPhase("thinking"); setLevel(0);
+            // Local synthesis stopped capture; listen again so the person can still interrupt.
+            if (native && localReplies) void listen(true);
+          }
+        }
+        if (snapshot.cursor >= sent.seq && (waitingForInput || (!stillWorking && (run?.status === "completed" || messages.length || spoke)))) {
           messages.forEach(m => seen.current.add(m.id));
-          const text = messages.map(m => speechFromBlocks(m.blocks)).filter(Boolean).join("\n\n");
+          const text = group ? "" : messages.map(m => speechFromBlocks(m.blocks)).filter(Boolean).join("\n\n");
           failureMessage = t`Could not play the reply. You can read it in the chat.`;
           if (text) await speak(text, own);
           if (own === generation.current) { setCaption(""); setLevel(0); await listen(); }
@@ -211,11 +244,12 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
   const canStart = native ? modelsReady(model) : canCapture;
   const download = localReplies ? model : model?.models?.asr ?? model;
   return <aside style={{ display: hidden ? "none" : undefined }} aria-hidden={hidden || undefined} role="dialog" data-continuous-voice aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background md:w-[400px]">
-    <header data-testid="voice-panel-header" className="flex h-[50px] shrink-0 items-center justify-between border-b border-border px-4"><span className="text-sm font-medium">{bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
+    <header data-testid="voice-panel-header" className="flex h-[50px] shrink-0 items-center justify-between border-b border-border px-4"><span className="text-sm font-medium">{group?.name ?? bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6">
     <p aria-live="polite" className="mt-2 text-center text-sm text-muted-foreground">{phase === "listening" ? t`Listening` : phase === "speaking" ? t`Speaking` : phase === "thinking" ? t`Thinking` : phase === "preparing" ? t`Preparing local voice…` : t`Voice`}</p>
     <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6">
-      <div style={{ transform: `scale(${1 + level * .12})` }}><BotAvatar identity={bot.id} color={bot.color} size={112} /></div>
+      <div style={{ transform: `scale(${1 + level * .12})` }}><BotAvatar identity={voice.id} color={voice.color} size={112} /></div>
+      {group ? <p data-testid="voice-member" className="-mt-3 text-sm font-medium">{voice.name}</p> : null}
       <div className="flex h-6 items-center gap-1" aria-hidden="true">{Array.from({length: 24}, (_, i) => <span key={i} className="w-0.5 rounded-full bg-muted-foreground" style={{ height: 2 + level * 24 * (1 - Math.abs(i-11.5)/24) }} />)}</div>
       <p className="max-h-40 overflow-y-auto text-center text-sm text-muted-foreground" dir="auto">{caption || (phase === "listening" ? t`Speak now` : "")}</p>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}

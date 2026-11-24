@@ -285,6 +285,30 @@ test("create group from + and see two bots in one transcript", async ({ page }, 
   await expect(page.getByRole("combobox", { name: /Message/ })).toBeVisible();
 });
 
+test("a group opens a voice conversation on its lead", async ({ page }, testInfo) => {
+  const stamp = Date.now();
+  await signup(page, `group-voice-${stamp}@mycellios.test`, "password12", "Group E2E");
+  await completeOnboarding(page);
+  await page.goto("/app");
+  await page.waitForURL(/\/app\/[^/]+$/);
+  const researcherId = await createBot(page, "Researcher");
+  const writerId = await createBot(page, "Research Writer");
+  const group = await rpc<{ id: string }>(page, "groups/create", {
+    name: "Voice room",
+    botIds: [researcherId, writerId],
+    leadBotId: writerId,
+  });
+  await page.goto(`/app/g/${group.id}`);
+  await expect(page.getByRole("combobox", { name: "Message Voice room" })).toBeVisible();
+  await page.getByRole("button", { name: "Start voice conversation" }).click();
+  const voice = page.getByRole("dialog", { name: "Voice conversation" });
+  await expect(voice.getByTestId("voice-panel-header")).toContainText("Voice room");
+  await expect(voice.getByTestId("voice-member")).toHaveText("Research Writer");
+  await captureScreenshot(page, testInfo, "group-voice-conversation");
+  await voice.getByRole("button", { name: "End voice conversation" }).click();
+  await expect(voice).toHaveCount(0);
+});
+
 test("group names stop at the length limit when creating and renaming", async ({
   page,
 }, testInfo) => {

@@ -52,6 +52,41 @@ it("ignores a previous failed turn and reads only the new reply in the owned tas
   expect(audio.silence).toHaveBeenCalled();
 });
 
+it("talks to a group and reads each member's answer in its own voice as it finishes", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const chief = { botId: "chief", name: "Chief", color: "#3F9F78" }, sales = { botId: "sales", name: "Sales", color: "#9B5CF6" };
+  const first = { id: "a", runId: "r1", botId: "chief", role: "bot", blocks: [{ kind: "text", text: "Reparto las tareas." }] };
+  const second = { id: "b", runId: "r2", botId: "sales", role: "bot", blocks: [{ kind: "text", text: "Cerró un 12% por encima." }] };
+  const get = vi.fn().mockResolvedValue({ cursor: 3, messages: [] });
+  const send = vi.fn(async (_input: unknown) => {
+    get.mockResolvedValueOnce({ cursor: 3, messages: [] })
+      .mockResolvedValueOnce({ cursor: 6, run: null, messages: [first],
+        activeRuns: [{ id: "r2", taskId: "t2", botId: "sales", status: "running" }] })
+      .mockResolvedValue({ cursor: 8, run: null, activeRuns: [], messages: [first, second] });
+    return { taskId: "t1", runId: "r1", runIds: ["r1", "r2"], seq: 4 };
+  });
+  const host = document.createElement("div");
+  root = createRoot(host);
+  await act(async () => root!.render(<VoiceConversation rpc={{ threads: { get, send } } as unknown as RpcClient} spaceId="owned-space"
+    bot={{ id: "chief", name: "Chief", color: "#3F9F78" }} group={{ id: "team", name: "Project room", members: [chief, sales], leadBotId: "chief" }}
+    onClose={() => {}} onSettings={() => {}} transcribe />));
+  expect(host.querySelector("[data-testid=voice-panel-header]")?.textContent).toContain("Project room");
+  expect(host.querySelector("[data-testid=voice-member]")?.textContent).toBe("Chief");
+  expect(get.mock.calls[0]![0]).toEqual({ groupId: "team" });
+  const turn = audio.listen.mock.calls[0]![0] as { onFinal: (text: string) => void };
+  await act(async () => { turn.onFinal("Empezad por los números"); });
+  expect(send.mock.calls[0]![0]).toEqual({ groupId: "team", text: "Empezad por los números", clientNonce: expect.any(String) });
+  await act(async () => {
+    await vi.waitFor(() => expect(audio.speak).toHaveBeenCalledTimes(2), { timeout: 3000 });
+  });
+  expect(audio.speak.mock.calls[0]).toEqual(["Reparto las tareas.", expect.objectContaining({ botId: "chief" })]);
+  expect(audio.speak.mock.calls[1]).toEqual(["Cerró un 12% por encima.", expect.objectContaining({ botId: "sales" })]);
+  expect(host.querySelector("[role=alert]")).toBeNull();
+  // Opening, background capture while the group works, then listening for the next turn.
+  await act(async () => { await vi.waitFor(() => expect(audio.listen).toHaveBeenCalledTimes(3)); });
+  expect(send).toHaveBeenCalledOnce();
+});
+
 it("shows a microphone error and restarts capture without resending a message", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   audio.listen.mockRejectedValueOnce(new Error("Microphone denied"));
