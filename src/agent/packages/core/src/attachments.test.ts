@@ -1,3 +1,4 @@
+import { ATTACHMENT_DOCX_MIME_TYPE } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import {
   AttachmentValidationError,
@@ -130,6 +131,15 @@ describe("attachment helpers", () => {
     expect(inferAttachmentMimeType("archive.ZIP", reportedType)).toBe("application/zip");
     expect(attachmentExtensionForMimeType("application/zip")).toBe(".zip");
   });
+
+  it.each(["", "application/octet-stream", ATTACHMENT_DOCX_MIME_TYPE])(
+    "accepts Word documents reported as %s",
+    (reportedType) => {
+      expect(inferAttachmentMimeType("Report.DOCX", reportedType)).toBe(ATTACHMENT_DOCX_MIME_TYPE);
+      expect(() => validateAttachmentMimeType(ATTACHMENT_DOCX_MIME_TYPE)).not.toThrow();
+      expect(attachmentExtensionForMimeType(ATTACHMENT_DOCX_MIME_TYPE)).toBe(".docx");
+    },
+  );
 
   it("scopes current-turn images to user-triggered runs", () => {
     const messages = [
