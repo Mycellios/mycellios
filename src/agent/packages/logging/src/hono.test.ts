@@ -24,7 +24,7 @@ function appWith(logger: Logger) {
 describe("rpc procedure logging", () => {
   it("names the procedure of an rpc call and leaves out anything else", async () => {
     const sink = createTestSink();
-    const app = appWith(createLogger({ service: "rakazo-api", sinks: [sink] }));
+    const app = appWith(createLogger({ service: "api", sinks: [sink] }));
     await app.request("/rpc/threads/snapshot?input=secret", { method: "POST" });
     await app.request("/rpc/threads/abc%20def", { method: "POST" });
     await app.request("/rpc/a/b/c/d", { method: "POST" });

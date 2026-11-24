@@ -30,7 +30,7 @@ describe("startEventLoopDelayReport", () => {
     const sink = createTestSink();
     const histogram = fakeHistogram([40, 1_800, 120]);
     let cpu = 0;
-    const stop = startEventLoopDelayReport(createLogger({ service: "rakazo-api", sinks: [sink] }), {
+    const stop = startEventLoopDelayReport(createLogger({ service: "api", sinks: [sink] }), {
       intervalMs: 1_000,
       thresholdMs: 500,
       histogram,
