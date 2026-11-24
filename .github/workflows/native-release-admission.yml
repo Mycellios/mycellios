@@ -8,6 +8,7 @@ on:
       - tests/release-admission.postgres.test.ts
       - tests/coordinator-release-standby.postgres.test.ts
       - tests/e2e.test.ts
+      - tests/fixtures/coordinator-postgres-schema.ts
       - .github/workflows/native-release-admission.yml
   workflow_dispatch:
 permissions:
@@ -50,6 +51,8 @@ jobs:
           tests/release-admission.postgres.test.ts tests/coordinator-release-standby.postgres.test.ts
           --maxWorkers=1
       - name: Exercise overlapping inference with coordinator and worker runtimes
+        env:
+          MYCELLIOS_RELEASE_TEST_POSTGRES_URL: postgres://asr_test:ephemeral_fixture_only@127.0.0.1:5432/asr_test
         run: >-
           node node_modules/vitest/vitest.mjs run tests/e2e.test.ts
           -t "keeps the incumbent worker and deadline"

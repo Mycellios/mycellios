@@ -12,6 +12,11 @@ import {
 } from "../src/worker/admission-credential.js";
 import { verifyExecutionReceipt } from "../src/contracts/execution-receipt.js";
 import { MockAdapter } from "../src/adapters/mock.js";
+import { randomBytes } from "node:crypto";
+import postgres from "postgres";
+import { readNativeRuntimeBuildMetadata } from "../src/core/native-build-identity.js";
+import { NativeReleaseAdmission } from "../src/coordinator/release-admission.js";
+import { createCoordinatorPostgresFixture } from "./fixtures/coordinator-postgres-schema.js";
 
 describe("inference-only coordinator and worker", () => {
   const cleanup: Array<() => Promise<void> | void> = [];
@@ -166,21 +171,37 @@ describe("inference-only coordinator and worker", () => {
     expect(stream).toContain("data: [DONE]");
   });
 
-  it("keeps the incumbent worker and deadline while a candidate serves new inference", async () => {
+  const postgresUrl = process.env.MYCELLIOS_RELEASE_TEST_POSTGRES_URL;
+  const storageCases = postgresUrl ? ["SQLite", "PostgreSQL"] : ["SQLite"];
+  it.each(storageCases)("keeps the incumbent worker and deadline during handoff (%s)", async (storage) => {
     const generate = MockAdapter.prototype.generate;
-    const canFinish = Promise.withResolvers<void>();
-    let incumbentGenerating = false;
+    const incumbentPause = Promise.withResolvers<void>();
+    const candidatePause = Promise.withResolvers<void>();
+    const started = new Set<string>();
     const mock = vi.spyOn(MockAdapter.prototype, "generate").mockImplementation(async function* (
       this: MockAdapter, request, signal,
     ) {
-      if (request.request.messages.some(message => message.content === "incumbent inference")) {
-        incumbentGenerating = true;
-        await canFinish.promise;
+      const content = request.request.messages.at(-1)?.content;
+      if (content === "incumbent inference" || (content === "candidate inference" && storage === "PostgreSQL")) {
+        started.add(content);
+        await (content === "incumbent inference" ? incumbentPause.promise : candidatePause.promise);
       }
       yield* generate.call(this, request, signal);
     });
-    const start = async () => {
-      const network = await startNetwork();
+    const originalRevision = "a".repeat(40);
+    const candidateRevision = "b".repeat(40);
+    const schema = `handoff_${randomBytes(8).toString("hex")}`;
+    const sql = storage === "PostgreSQL" ? postgres(postgresUrl!, { onnotice: () => {} }) : null;
+    const gate = sql ? new NativeReleaseAdmission(sql, schema) : null;
+    if (sql) cleanup.push(async () => {
+      try { await sql.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); }
+      finally { await sql.end(); }
+    });
+    const start = async (revision: string) => {
+      const network = await startNetwork({
+        workerIdentity: `handoff-cell-${revision[0]}`,
+        ...(sql ? { handoffDatabase: { url: postgresUrl!, schema, revision } } : {}),
+      });
       cleanup.push(async () => {
         await network.agent.stop();
         await network.run;
@@ -193,36 +214,65 @@ describe("inference-only coordinator and worker", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model: "distributed-small", messages: [{ role: "user", content }],
-        stream: true, max_tokens: 40, deadline_ms: 10_000,
+        stream: true, max_tokens: 40, deadline_ms: 20_000,
       }),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(22_000),
     });
     try {
-      const incumbent = await start();
-      const candidate = await start();
+      if (sql) {
+        await createCoordinatorPostgresFixture(sql, schema);
+        await gate!.close(originalRevision);
+      }
+      const incumbent = await start(originalRevision);
       const oldResponse = submit(incumbent.address, "incumbent inference");
       void oldResponse.catch(() => {});
-      await waitUntil(() => incumbentGenerating, 5_000);
+      await waitUntil(() => started.has("incumbent inference"), 5_000);
       const [original] = await incumbent.runtime.store.listJobs();
       expect(original?.deadlineAt).toBeGreaterThan(Date.now());
       expect(incumbent.runtime.service.releaseWorkStatus().jobs).toBe(1);
-      const nextResponse = await submit(candidate.address, "candidate inference");
-      expect(nextResponse.status).toBe(200);
-      expect(await nextResponse.text()).toContain("data: [DONE]");
-      expect((await candidate.runtime.store.listJobs())[0]?.status).toBe("completed");
+      const candidate = await start(candidateRevision);
+      if (gate) {
+        expect((await candidate.runtime.store.getJob(original!.id))?.status).toBe(original?.status);
+        await gate.transfer(originalRevision, candidateRevision);
+        expect(await gate.currentRevision()).toBe(candidateRevision);
+      }
+      const nextRequest = submit(candidate.address, "candidate inference");
+      void nextRequest.catch(() => {});
+      if (gate) {
+        await waitUntil(() => started.has("candidate inference"), 5_000);
+        const [newJob] = await candidate.runtime.store.listJobs();
+        expect(newJob?.id).not.toBe(original?.id);
+        expect(candidate.runtime.service.releaseWorkStatus().jobs).toBe(1);
+        await gate.transfer(candidateRevision, originalRevision);
+        expect(await gate.currentRevision()).toBe(originalRevision);
+        const restored = await submit(incumbent.address, "inference after rollback");
+        expect(restored.status).toBe(200);
+        expect(await restored.text()).toContain("data: [DONE]");
+        candidatePause.resolve();
+        expect(await (await nextRequest).text()).toContain("data: [DONE]");
+        expect(await candidate.runtime.store.getJob(newJob!.id)).toMatchObject({
+          deadlineAt: newJob?.deadlineAt, status: "completed",
+        });
+      } else {
+        const nextResponse = await nextRequest;
+        expect(nextResponse.status).toBe(200);
+        expect(await nextResponse.text()).toContain("data: [DONE]");
+        expect((await candidate.runtime.store.listJobs())[0]?.status).toBe("completed");
+      }
       expect(incumbent.runtime.service.releaseWorkStatus().jobs).toBe(1);
-      canFinish.resolve();
+      incumbentPause.resolve();
       const oldResult = await oldResponse;
       expect(oldResult.status).toBe(200);
       expect(await oldResult.text()).toContain("data: [DONE]");
-      expect((await incumbent.runtime.store.listJobs())[0]).toMatchObject({
+      expect(await incumbent.runtime.store.getJob(original!.id)).toMatchObject({
         id: original?.id, deadlineAt: original?.deadlineAt, status: "completed",
       });
     } finally {
-      canFinish.resolve();
+      incumbentPause.resolve();
+      candidatePause.resolve();
       mock.mockRestore();
     }
-  }, 15_000);
+  }, 30_000);
 
   it("removes a worker from the visible inventory after a voluntary stop", async () => {
     const { runtime, agent, run } = await startNetwork();
@@ -395,17 +445,20 @@ async function startNetwork(options: {
   networkToken?: string;
   signedPublic?: boolean;
   releaseDownloadsPath?: string;
+  workerIdentity?: string;
+  handoffDatabase?: { url: string; schema: string; revision: string };
 } = {}): Promise<{
   runtime: CoordinatorRuntime;
   address: string;
   agent: WorkerAgent;
   run: Promise<void>;
 }> {
+  const handoff = options.handoffDatabase;
   const runtime = await createCoordinator({
     host: "127.0.0.1",
     port: 0,
     databasePath: ":memory:",
-    requestTimeoutMs: 10_000,
+    requestTimeoutMs: handoff ? 20_000 : 10_000,
     allowDevelopmentAdapters: true,
     mobileAssetsPath: resolve("tests/fixtures/mobile-assets"),
     landingAssetsPath: resolve("tests/fixtures/landing-assets"),
@@ -413,7 +466,11 @@ async function startNetwork(options: {
     ...(options.networkToken
       ? { networkToken: options.networkToken, mobileJoinToken: options.networkToken }
       : {}),
-  });
+    ...(handoff ? { storageBackend: "postgres", databaseUrl: handoff.url, databaseSchema: handoff.schema } : {}),
+  }, handoff ? {
+    releaseAdmissionRevision: handoff.revision,
+    runtimeMetadata: { ...readNativeRuntimeBuildMetadata(resolve(".")), revision: handoff.revision },
+  } : {});
   const address = await runtime.app.listen({ host: "127.0.0.1", port: 0 });
   const agent = new WorkerAgent(
     workerConfigSchema.parse({
@@ -457,7 +514,7 @@ async function startNetwork(options: {
         : {}),
       // Every execution fixture uses the same signed cell identity required
       // for sensitive input/output boundaries; loopback is not a trust root.
-      identity: { kind: "cell" as const, id: "signed-e2e-worker" },
+      identity: { kind: "cell" as const, id: options.workerIdentity ?? "signed-e2e-worker" },
       admissionSigner: workerAdmissionSigner(generateWorkerAdmissionCredential()),
     },
   );
