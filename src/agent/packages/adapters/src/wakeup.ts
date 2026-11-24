@@ -175,6 +175,10 @@ export function databaseCapacityBackoffMs(attempt: number): number {
   return Math.min(30_000, 200 * 2 ** Math.min(attempt, 8));
 }
 
+function isRunnerAlreadyStopped(error: unknown): boolean {
+  return error instanceof Error && /runner is already stopped/i.test(error.message);
+}
+
 export class GraphileJobWorkerHost implements JobWorkerHost {
   private runner: Runner | undefined;
   private handlers: BackgroundJobHandlers | undefined;
@@ -213,7 +217,11 @@ export class GraphileJobWorkerHost implements JobWorkerHost {
     this.wakeSleep?.();
     const draining = this.executions.stop();
     try {
-      await this.runner?.stop();
+      // Another shutdown path may have stopped this runner first; that is the outcome we
+      // want, so it must not abort closing the rest of the worker.
+      await this.runner?.stop().catch((error: unknown) => {
+        if (!isRunnerAlreadyStopped(error)) throw error;
+      });
     } finally {
       // The queue has stopped accepting deliveries. Handed-off runs still own
       // leases and must finish before their database and providers are closed.
@@ -326,6 +334,10 @@ export function createReservedGraphileJobWorkerHost(
   const hosts = (["interactive", "background", "maintenance"] as const).map(
     (workload) =>
       new GraphileJobWorkerHost(pool, {
+        // The worker process owns SIGTERM/SIGINT: it drains handed-off runs and closes its
+        // providers in order. Graphile's own handlers would stop the runners first and
+        // re-send the signal, cutting that shutdown short.
+        noHandleSignals: true,
         ...options,
         concurrency: workload === "interactive" ? options.concurrency : 1,
         workload,
