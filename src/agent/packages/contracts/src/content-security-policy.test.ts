@@ -64,9 +64,12 @@ describe("app content security policy", () => {
       .toEqual(["'self'", "blob:"]);
   });
 
-  it("lets only the official browser extension frame the hosted app when enabled", () => {
+  it("lets only the unpacked and Store versions frame the hosted app when enabled", () => {
     const framed = directives(appContentSecurityPolicy({ browserExtensionFrames: true }));
-    expect(framed.get("frame-ancestors")).toEqual([...BROWSER_EXTENSION_ORIGINS]);
+    expect(framed.get("frame-ancestors")).toEqual([
+      "chrome-extension://bnbdbnbloaeblmjpoknddcffkmpfhmgg",
+      "chrome-extension://nohdakjpcmhfgoaemmhkjkmobhenfcpf",
+    ]);
     for (const origin of BROWSER_EXTENSION_ORIGINS) {
       expect(origin).toMatch(/^chrome-extension:\/\/[a-p]{32}$/);
     }

@@ -56,11 +56,12 @@ export interface ContentSecurityPolicyExtensions {
 }
 
 /**
- * Origins of the official Mycellios browser extension (apps/browser-extension). Its manifest key
- * pins this ID, so only that extension's side panel may frame the app; no page or other extension.
+ * Origins of the official Mycellios browser extension (apps/browser-extension).
+ * The unpacked manifest key and the Chrome Web Store listing have separate IDs.
  */
 export const BROWSER_EXTENSION_ORIGINS = [
   "chrome-extension://bnbdbnbloaeblmjpoknddcffkmpfhmgg",
+  "chrome-extension://nohdakjpcmhfgoaemmhkjkmobhenfcpf",
 ] as const;
 
 // An https origin with an optional port and no path. A wildcard covers subdomains of a base with at
