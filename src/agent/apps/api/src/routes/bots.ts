@@ -434,6 +434,8 @@ export function botsRoutes(ctx: RouterContext) {
             const available = await codingEnginesForComputer(deps, context.actor, existing, context.signal);
             if (!available.engines.includes(input.agentEngine))
               throw new ORPCError("BAD_REQUEST", { message: "This coding engine is unavailable on the selected computer." });
+            if (available.signedOut.includes(input.agentEngine))
+              throw new ORPCError("BAD_REQUEST", { message: "Sign in to this coding engine on the selected computer first." });
           }
         }
         const thinkingLevel = input.thinkingLevel;

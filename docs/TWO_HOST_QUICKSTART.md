@@ -30,6 +30,13 @@ set:
 - the Python executable used on each host;
 - a unique authentication environment variable for the remote agent.
 
+The template pins the root (stage 0, which serves the API) to host A with
+`stageRoles: ["head"]` and gives host B `["tail"]`. Without those roles the
+planner may put the root on either host. `runtime.returnEndpoint.host`
+(and `apiAdvertiseHost` when the root is remote) must name the root node's
+address. Compilation refuses a cross-machine route that does not, and names the
+node that holds the root.
+
 Run the non-mutating preflight before profiling or launching anything:
 
 ```bash

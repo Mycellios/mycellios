@@ -3,15 +3,17 @@ const fixtures = vi.hoisted(() => ({ allowed: true, read: vi.fn(), access: vi.fn
 vi.mock("@mycellios/adapters", () => ({
   nativeHostAccess: (...args: unknown[]) => { fixtures.access(...args); return fixtures.allowed; },
   discoverNativeCodexQuota: () => fixtures.read(),
-  canInstallNativeOpenCode: vi.fn(), discoverNativeCodexModels: vi.fn(), discoverNativeEngines: () => fixtures.engines(), installManagedOpenCode: vi.fn(), reconcileWorkStops: vi.fn(),
+  canInstallNativeOpenCode: vi.fn(), discoverNativeCodexModels: vi.fn(), discoverNativeEngines: () => fixtures.engines(),
+  signedOutEngines: (engines: Array<{ id: string; signedIn?: boolean }>) => engines.flatMap(engine => engine.signedIn === false ? [engine.id] : []),
+  installManagedOpenCode: vi.fn(), reconcileWorkStops: vi.fn(),
 }));
 import { localCapabilityRoutes } from "./routes/local-capabilities.js";
 import type { RouterContext } from "./routes/context.js";
 beforeEach(() => { fixtures.allowed = true; fixtures.read.mockReset().mockResolvedValue(null); fixtures.access.mockClear(); });
-function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines: ReturnType<typeof vi.fn> }) {
+function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn> }) {
   const procedure = { handler: (handler: unknown) => handler };
   const authed = { engines: { forBot: procedure, codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
-  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
+  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
 }
 function route() {
   return routes().engines.codexQuota as unknown as (input: { context: { actor: { userId: string; spaceId: string } } }) => Promise<unknown>;
@@ -41,15 +43,26 @@ it("queries only the owned Mico's selected Desktop and never substitutes server 
   const list = routes({ getBot, nativeEngines }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
   const actor = { userId: "user", spaceId: "space" };
   const request = { context: { actor }, input: { botId: "mico" } };
-  expect(await list(request)).toEqual({ computer: "desktop", engines: ["opencode"] });
+  expect(await list(request)).toEqual({ computer: "desktop", engines: ["opencode"], signedOut: [] });
   expect(getBot).toHaveBeenCalledWith(actor, "mico");
   expect(nativeEngines).toHaveBeenCalledWith(expect.objectContaining({ ...actor, botId: "mico" }));
-  expect(await list(request)).toEqual({ computer: "desktop", engines: [] });
+  expect(await list(request)).toEqual({ computer: "desktop", engines: [], signedOut: [] });
   expect(fixtures.engines).not.toHaveBeenCalled();
   getBot.mockRejectedValueOnce(new Error("Mico is outside this Space"));
   await expect(list(request)).rejects.toThrow("outside this Space");
   expect(nativeEngines).toHaveBeenCalledTimes(2);
   getBot.mockResolvedValueOnce({ id: "mico", computer: { kind: "docker", scope: "isolated" } });
-  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"] });
+  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"], signedOut: [] });
   expect(nativeEngines).toHaveBeenCalledTimes(2);
+});
+
+it("reports installed engines whose CLI is signed out, only among the installed ones", async () => {
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const nativeEngineState = vi.fn().mockResolvedValue({ engines: ["claude", "opencode"], signedOut: ["claude", "codex"] });
+  const list = routes({ getBot, nativeEngineState }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
+  const request = { context: { actor: { userId: "user", spaceId: "space" } }, input: { botId: "mico" } };
+  expect(await list(request)).toEqual({ computer: "desktop", engines: ["claude", "opencode"], signedOut: ["claude"] });
+  fixtures.engines.mockReset().mockResolvedValue([{ id: "codex", available: true, signedIn: false }]);
+  getBot.mockResolvedValueOnce({ id: "mico", computer: { kind: "docker", scope: "isolated" } });
+  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"], signedOut: ["codex"] });
 });

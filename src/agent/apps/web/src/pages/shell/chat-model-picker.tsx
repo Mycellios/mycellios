@@ -45,7 +45,8 @@ export function ChatModelPicker({
   onExplore,
 }: {
   id: string;
-  choices: readonly (ChatModelChoice & { unavailable?: boolean })[];
+  /** unavailableLabel replaces the generic Unavailable when the reason is known. */
+  choices: readonly (ChatModelChoice & { unavailable?: boolean; unavailableLabel?: string })[];
   value: string;
   onChange: (key: string) => void;
   inline?: boolean;
@@ -72,7 +73,7 @@ export function ChatModelPicker({
     initialProvider ?? choices.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? null,
   );
   const activeProvider = provider && providers.includes(provider) ? provider : providers[0];
-  const unavailableKeys = new Set(choices.filter(choice => choice.unavailable).map(choice => choice.key));
+  const unavailableKeys = new Map(choices.filter(choice => choice.unavailable).map(choice => [choice.key, choice.unavailableLabel] as const));
   const inheritedProvider = choices.find(choice => choice.key === defaultKey)?.providerLabel;
   const grouped = useMemo(() => groupModelChoices(
     inline && activeProvider ? choices.filter((choice) => choice.providerLabel ? choice.providerLabel === activeProvider : !defaultKey || !inheritedProvider || activeProvider === inheritedProvider) : choices,
@@ -194,7 +195,7 @@ export function ChatModelPicker({
                 {choice.listing === "new" ? (
                   <span className="shrink-0 rounded-full bg-accent px-1.5 text-[11px] text-muted-foreground">{t`New`}</span>
                 ) : null}
-                {unavailableKeys.has(choice.key) ? <span className="shrink-0 text-xs text-muted-foreground">{t`Unavailable`}</span> : null}
+                {unavailableKeys.has(choice.key) ? <span className="shrink-0 text-xs text-muted-foreground">{unavailableKeys.get(choice.key) ?? t`Unavailable`}</span> : null}
                 {choice.images === false ? (
                   <span className="shrink-0 text-muted-foreground">
                     <TextOnlyMark />

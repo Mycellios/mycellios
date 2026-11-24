@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-24
+
+### Added
+
+- Word documents (.docx) open in the file preview, with headings, lists, tables, and bold,
+  italic, underlined and struck text. You can attach them to a chat, and a Mico can send them
+  back. Before, Word files could not be attached and opened only in another app. Shared links
+  to a Word file still download it.
+- Groups can share up to 8 folders from your PC. In Group settings → Folders, add folders with Mycellios Desktop; the group's Micos on This PC can change files and run commands in them during group turns, and the list shows which members can't reach them.
+- A Mico can ask for your location when a request needs it, such as "restaurants near me".
+  It shows a card in the chat and nothing is sent until you answer it. Share location sends
+  your current position once, rounded to about 100 m, in the web app, the installed phone app
+  and the Android app; anywhere, including Desktop, you can type a place instead or choose not
+  to share. The Mico receives the location only while it works on that request, and it is
+  deleted when the request ends. The card and your activity list never show it and the
+  Mico's steps in the chat hide it, but the Mico's own reply, and a notification quoting
+  that reply, can still mention the place.
+
+### Fixed
+
+- When you connect a Mico on one computer while it is still working on another, Mycellios Desktop
+  now says so and asks you to wait or stop it there. Before, it asked you to sign in again or
+  reconnect the project, which did not help.
+- Generate AI can always be paused while your computer is contributing, even after the
+  contribution status could not be read. Before, the button only offered Retry and could
+  not stop the contribution.
+- The card that opens when you rest on a Mico in the sidebar keeps long messages and
+  conversation titles inside it instead of spilling over the chat.
+- In the natural response style, the short notes a Mico writes while it works no longer show up cut
+  in pieces, such as "Sigo" and "dond" on separate lines. A note appears once it is complete, and a
+  note the Mico already showed in the same turn is not shown again.
+- When a program a Mico runs on your computer needs its own AI, the Mico first checks whether
+  Claude Code, Codex or OpenCode is already signed in there and only asks you when none is.
+  Before, it asked which AI to use even when one was ready.
+- Creating a Mico shows the model picker directly. Before, it sat inside a second
+  "Model · automatic" section that never changed after you picked a model.
+- Micos that work on your PC answer, write files and run commands much sooner. Before, a
+  reply reached the PC a few words per round trip to the server, writing a long file could
+  take minutes, and every step waited for extra confirmations from the server.
+- During the closed beta, creating an account without an invitation now says that new accounts need
+  an invitation and that you should open your invitation link in the same browser. Before, it only
+  said that the account could not be created.
+- A Mico that hands work to another Mico now comes back to you with the result even when an
+  update or a lost PC connection stops the turn in which it reads that result. That turn starts
+  again on its own, up to three times over about eight minutes, and the Mico checks what it
+  already did before going on.
+  Before, the conversation stopped there without an answer.
+- When the other Mico could not do the work, the Mico that asked now knows why, for example
+  that several PCs are connected and none was chosen for that Mico, and can tell you. Before, it
+  only knew that the work had failed.
+
 ## [0.23.0] - 2026-11-24
 
 ### Added
