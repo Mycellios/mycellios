@@ -49,6 +49,14 @@ export class AuthServiceError extends Error {
   }
 }
 
+/** New accounts need an invitation link (closed beta), and this browser has none. */
+export class InvitationRequired extends Error {
+  constructor() {
+    super("Sign-up needs an invitation.");
+    this.name = "InvitationRequired";
+  }
+}
+
 export class EmailConfirmationRequired extends Error {
   constructor() {
     super("Check your email to confirm the account, then sign in.");
@@ -334,7 +342,14 @@ export async function signUp(
   });
   if (response.status === 404) {
     // The identity database decides whether signups without an invitation are allowed.
-    return authRequest(config, "/auth/v1/signup", { email, password });
+    try {
+      return await authRequest(config, "/auth/v1/signup", { email, password });
+    } catch (error) {
+      // A closed beta refuses the new account inside the database, which the account service
+      // reports as a server error. Without an invitation in this browser, that is the reason.
+      if (error instanceof AuthServiceError && error.status >= 500) throw new InvitationRequired();
+      throw error;
+    }
   }
   const payload: unknown = await response.json().catch(() => null);
   if (

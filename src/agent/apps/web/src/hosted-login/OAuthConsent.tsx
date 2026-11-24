@@ -11,6 +11,7 @@ import {
   completePasswordReset,
   consumeRecoveryRedirect,
   EmailConfirmationRequired,
+  InvitationRequired,
   isDefinitiveAuthFailure,
   loadAuthConfig,
   requestPasswordReset,
@@ -384,6 +385,13 @@ export function OAuthConsent() {
                       text(
                         "This email already has a Mycellios account. Choose Sign in below to continue.",
                         "Este correo ya tiene una cuenta de Mycellios. Pulsa Iniciar sesión debajo para continuar.",
+                      ),
+                    );
+                  } else if (mode === "sign-up" && error instanceof InvitationRequired) {
+                    setError(
+                      text(
+                        "During the beta, new accounts need an invitation. Open the invitation link you received in this browser, then create your account.",
+                        "Durante la beta, las cuentas nuevas necesitan invitación. Abre en este navegador el enlace de invitación que te han enviado y vuelve a crear la cuenta.",
                       ),
                     );
                   } else if (

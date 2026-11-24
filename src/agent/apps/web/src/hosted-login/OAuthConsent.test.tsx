@@ -7,6 +7,7 @@ import {
   completePasswordReset,
   consumeRecoveryRedirect,
   EmailConfirmationRequired,
+  InvitationRequired,
   loadAuthConfig,
   requestPasswordReset,
   restoreAuthSession,
@@ -179,6 +180,14 @@ it("explains duplicate registration and preserves the email for sign-in", async 
   await click("Sign in");
   expect(host.querySelector<HTMLInputElement>('[name="email"]')!.value).toBe("new@example.test");
   expect(getOAuthAuthorization).not.toHaveBeenCalled();
+});
+it("says sign-up needs an invitation when the beta refuses an account without one", async () => {
+  vi.mocked(signUp).mockRejectedValue(new InvitationRequired());
+  await render();
+  await click("Create account");
+  await submit();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("new accounts need an invitation");
+  expect(host.textContent).not.toContain("Could not create your account");
 });
 it("says when the identity service rejects a weak password", async () => {
   vi.mocked(signUp).mockRejectedValue(new AuthServiceError("private detail", 422, "weak_password"));
