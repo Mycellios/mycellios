@@ -395,6 +395,8 @@ describe("createRepos.listSpaceBotsForSpaces", () => {
       $queryRaw: vi
         .fn()
         .mockResolvedValueOnce([{ id: "run-failed", threadId: "thread-2", status: "failed" }])
+        // The preview window fingerprint, read before the newest message itself.
+        .mockResolvedValueOnce([{ threadId: "thread-2", fingerprint: "unit-test-window" }])
         .mockResolvedValueOnce([
           {
             id: "message-2",

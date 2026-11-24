@@ -46,7 +46,8 @@ function trackMessageReads(pool: Pool): MessageRead[] {
     if (!result || typeof (result as Promise<unknown>).then !== "function") return result;
     return (result as Promise<QueryResult>).then((queryResult) => {
       const text = sqlText(args[0]);
-      if (/^\s*select\b/i.test(text) && MESSAGE_FROM.test(text)) {
+      // The window fingerprint reads one hash per thread, not message rows.
+      if (/^\s*select\b/i.test(text) && MESSAGE_FROM.test(text) && !/\bmd5\(/i.test(text)) {
         reads.push({ text, values: sqlValues(args), rowCount: queryResult.rowCount ?? 0 });
       }
       return queryResult;
@@ -255,6 +256,36 @@ describePostgres("cross-space bot sidebar previews (PostgreSQL)", () => {
       })),
     ).toEqual(expected);
     expect(rowCount).toBe(MESSAGE_BOTS.length);
+  });
+
+  it("reuses unchanged previews without reading messages and rereads an edited thread", async () => {
+    const list = () =>
+      runAsSystem("space navigation across the member's Spaces", () =>
+        createRepos(prisma).listSpaceBotsForSpaces(actor, [spaceB]),
+      );
+    await list();
+    const { result: again, rowCount } = await messageRowsDuring("listSpaceBotsForSpaces again", list);
+    expect(rowCount).toBe(0);
+    expect(again.map((bot) => bot.preview)).toEqual(expected.map((bot) => bot.preview));
+
+    const ada = await asSystem(prisma).bot.findFirstOrThrow({
+      where: { spaceId: spaceB, name: "Ada" },
+      include: { thread: true },
+    });
+    const newest = await asSystem(prisma).message.findFirstOrThrow({
+      where: { threadId: ada.thread!.id },
+      orderBy: { seq: "desc" },
+    });
+    await asSystem(prisma).message.update({
+      where: { id: newest.id },
+      data: { blocks: [{ kind: "text", text: "Edited preview" }] },
+    });
+    const { result: edited, rowCount: editedRows } = await messageRowsDuring(
+      "listSpaceBotsForSpaces after an edit",
+      list,
+    );
+    expect(editedRows).toBe(1);
+    expect(edited.find((bot) => bot.name === "Ada")?.preview).toBe("Edited preview");
   });
 
   it("reads no messages when the member has no other spaces", async () => {

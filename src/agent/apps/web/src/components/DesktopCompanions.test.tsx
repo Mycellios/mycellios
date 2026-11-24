@@ -57,3 +57,23 @@ it("re-reads the owned pending question before submitting and ignores a stale ac
     expect(fixture.answer).not.toHaveBeenCalled(); expect(questionResult).toHaveBeenCalledWith({ scope, nonce: "nonce", outcome: "stale" });
   } finally { await act(async () => root.unmount()); delete window.mycelliosDesktop; vi.unstubAllGlobals(); }
 });
+
+it("reads a waiting Mico's questions once until its roster state changes", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const scope = JSON.stringify(["owner", "space"]);
+  const snapshot = { botId: "mico", messages: [{ id: "message", runId: "run", blocks: [{ kind: "ask", text: "Where?", actions: [{ id: "a", label: "Paris" }], status: "pending" }] }], run: { id: "run", status: "waiting_input" } };
+  fixture.get.mockReset(); fixture.get.mockResolvedValue(snapshot); fixture.avatar.mockResolvedValue(undefined);
+  window.mycelliosDesktop = { companions: { publish: vi.fn(async () => {}), state: vi.fn(async () => ({ island: { shown: true } })),
+    onQuestion: () => () => {}, questionResult: vi.fn(async () => undefined), onSelect: () => () => {} } } as unknown as MycelliosDesktop;
+  const bot = { id: "mico", spaceId: "space", name: "Mico", color: "#3f9f78", status: "waiting_input", preview: "Where?", unread: false, updatedAt: "2026-01-01T00:00:00.000Z" } as Bot;
+  const div = document.createElement("div"); const root = createRoot(div);
+  try {
+    await act(async () => root.render(<DesktopCompanions bots={[bot]} spaceId="space" scope={scope} />));
+    // Each roster refresh hands over a new array with the same state.
+    await act(async () => root.render(<DesktopCompanions bots={[{ ...bot }]} spaceId="space" scope={scope} />));
+    await act(async () => root.render(<DesktopCompanions bots={[{ ...bot }]} spaceId="space" scope={scope} />));
+    expect(fixture.get).toHaveBeenCalledTimes(1);
+    await act(async () => root.render(<DesktopCompanions bots={[{ ...bot, updatedAt: "2026-01-01T00:01:00.000Z" }]} spaceId="space" scope={scope} />));
+    expect(fixture.get).toHaveBeenCalledTimes(2);
+  } finally { await act(async () => root.unmount()); delete window.mycelliosDesktop; vi.unstubAllGlobals(); }
+});
