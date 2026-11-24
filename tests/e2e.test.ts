@@ -17,6 +17,7 @@ import postgres from "postgres";
 import { readNativeRuntimeBuildMetadata } from "../src/core/native-build-identity.js";
 import { NativeReleaseAdmission } from "../src/coordinator/release-admission.js";
 import { createCoordinatorPostgresFixture } from "./fixtures/coordinator-postgres-schema.js";
+import { coordinatorHandoffIngress } from "./fixtures/coordinator-handoff-ingress.js";
 
 describe("inference-only coordinator and worker", () => {
   const cleanup: Array<() => Promise<void> | void> = [];
@@ -193,6 +194,8 @@ describe("inference-only coordinator and worker", () => {
     const schema = `handoff_${randomBytes(8).toString("hex")}`;
     const sql = storage === "PostgreSQL" ? postgres(postgresUrl!, { onnotice: () => {} }) : null;
     const gate = sql ? new NativeReleaseAdmission(sql, schema) : null;
+    const ingressKit = process.env.MYCELLIOS_RELEASE_TEST_INGRESS_KIT;
+    const ingress = gate && ingressKit ? coordinatorHandoffIngress(ingressKit, originalRevision) : null;
     if (sql) cleanup.push(async () => {
       try { await sql.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); }
       finally { await sql.end(); }
@@ -224,7 +227,12 @@ describe("inference-only coordinator and worker", () => {
         await gate!.close(originalRevision);
       }
       const incumbent = await start(originalRevision);
-      const oldResponse = submit(incumbent.address, "incumbent inference");
+      let ingressAddress: string | undefined;
+      if (ingress) {
+        await ingress.register(originalRevision, incumbent.address);
+        ingressAddress = await ingress.start();
+      }
+      const oldResponse = submit(ingressAddress ?? incumbent.address, "incumbent inference");
       void oldResponse.catch(() => {});
       // The worker can enter generation before the coordinator commits the
       // lease acknowledgement. Sample the stable running state on both sides.
@@ -238,10 +246,16 @@ describe("inference-only coordinator and worker", () => {
         expect(await candidate.runtime.store.getJob(original!.id)).toMatchObject({
           status: "running", deadlineAt: original?.deadlineAt,
         });
-        await gate.transfer(originalRevision, candidateRevision);
+        if (ingress) {
+          await ingress.register(candidateRevision, candidate.address);
+          await ingress.ready(candidateRevision);
+          await ingress.transfer(originalRevision, candidateRevision, () => gate.transfer(originalRevision, candidateRevision));
+        } else {
+          await gate.transfer(originalRevision, candidateRevision);
+        }
         expect(await gate.currentRevision()).toBe(candidateRevision);
       }
-      const nextRequest = submit(candidate.address, "candidate inference");
+      const nextRequest = submit(ingressAddress ?? candidate.address, "candidate inference");
       void nextRequest.catch(() => {});
       if (gate) {
         await waitUntil(async () => started.has("candidate inference")
@@ -249,9 +263,13 @@ describe("inference-only coordinator and worker", () => {
         const [newJob] = await candidate.runtime.store.listJobs();
         expect(newJob?.id).not.toBe(original?.id);
         expect(candidate.runtime.service.releaseWorkStatus().jobs).toBe(1);
-        await gate.transfer(candidateRevision, originalRevision);
+        if (ingress) {
+          await ingress.transfer(candidateRevision, originalRevision, () => gate.transfer(candidateRevision, originalRevision));
+        } else {
+          await gate.transfer(candidateRevision, originalRevision);
+        }
         expect(await gate.currentRevision()).toBe(originalRevision);
-        const restored = await submit(incumbent.address, "inference after rollback");
+        const restored = await submit(ingressAddress ?? incumbent.address, "inference after rollback");
         expect(restored.status).toBe(200);
         expect(await restored.text()).toContain("data: [DONE]");
         candidatePause.resolve();
@@ -277,8 +295,9 @@ describe("inference-only coordinator and worker", () => {
       incumbentPause.resolve();
       candidatePause.resolve();
       mock.mockRestore();
+      ingress?.close();
     }
-  }, 30_000);
+  }, 60_000);
 
   it("removes a worker from the visible inventory after a voluntary stop", async () => {
     const { runtime, agent, run } = await startNetwork();

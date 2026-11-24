@@ -510,7 +510,8 @@ These rules apply to the complete repository.
 - The overlapping inference case in `tests/e2e.test.ts` uses independent
   signed workers for the two coordinators. With the disposable PostgreSQL CI
   fixture it also transfers and reverses database admission during active work.
-  That exercise supplies dedicated worker capacity and bypasses the ingress.
+  The scoped CI exercise supplies dedicated worker capacity and sends inference
+  over the pinned Docker ingress kit during both route changes.
 - The optional embedding ingress proxy protects only its configured HTTP route,
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
