@@ -14,6 +14,7 @@ import {
 import { ListTodo } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
+import { readTaskOverview } from "../lib/query";
 import { notificationPreferences } from "../lib/notification-preferences";
 import { useBoundSpaceId, useSpaceRpc } from "../lib/space-rpc";
 import { TaskControls } from "../pages/TaskControls";
@@ -56,7 +57,7 @@ export function MicoWorkMenu({
       if (pending || (document.visibilityState !== "visible" && !ready)) return;
       pending = true;
       try {
-        const rows = await rpc.tasks.overview();
+        const rows = await readTaskOverview(userId ?? null, spaceId, rpc.tasks);
         if (!current) return;
         setWork(rows);
         for (const row of rows) {

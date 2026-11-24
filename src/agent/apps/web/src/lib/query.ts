@@ -103,6 +103,21 @@ export function routineMentionOptions(userId: string | null, spaceId: string | n
   };
 }
 
+/** All chats in one Space show the same task overview. A new chat can use a recent poll. */
+export function readTaskOverview(
+  userId: string | null,
+  spaceId: string | null,
+  tasks: Pick<RpcClient["tasks"], "overview">,
+) {
+  return queryClient.fetchQuery({
+    queryKey: spaceQueries(userId, spaceId).tasks.overview.queryKey(),
+    queryFn: ({ signal }) => tasks.overview(undefined, { signal }),
+    // Shorter than the menu's five-second poll so its next tick still refreshes.
+    staleTime: 2_500,
+    retry: false,
+  });
+}
+
 /** Paint navigation immediately, retaining the destination's own snapshot only.
  * The scoped shell still refreshes/subscribes with its immutable client. Sharing
  * sidebar metadata must never copy the departing conversation into another task.

@@ -21,6 +21,7 @@ import {
   queryClient,
   primeConversationSeed,
   routineMentionOptions,
+  readTaskOverview,
   seedOnLeave,
   setQueryUser,
   spaceQueries,
@@ -32,6 +33,30 @@ afterEach(() => {
 });
 
 describe("query scopes", () => {
+  it("shares an in-flight and fresh task overview only within the same account and Space", async () => {
+    let finish!: (value: []) => void;
+    const pending = new Promise<[]>((resolve) => { finish = resolve; });
+    const overview = vi.fn().mockReturnValueOnce(pending).mockResolvedValue([]);
+    const tasks = { overview };
+
+    const first = readTaskOverview("owner", "one", tasks);
+    const fromAnotherChat = readTaskOverview("owner", "one", tasks);
+    expect(overview).toHaveBeenCalledTimes(1);
+    finish([]);
+    await Promise.all([first, fromAnotherChat]);
+    await readTaskOverview("owner", "one", tasks);
+    expect(overview).toHaveBeenCalledTimes(1);
+
+    const key = spaceQueries("owner", "one").tasks.overview.queryKey();
+    queryClient.setQueryData(key, [], { updatedAt: Date.now() - 3_000 });
+    await readTaskOverview("owner", "one", tasks);
+    expect(overview).toHaveBeenCalledTimes(2);
+
+    await readTaskOverview("owner", "two", tasks);
+    await readTaskOverview("other", "one", tasks);
+    expect(overview).toHaveBeenCalledTimes(4);
+  });
+
   it("shares routine suggestions across conversations while isolating accounts and Spaces", () => {
     const first = routineMentionOptions("user-a", "space-a").queryKey;
     const rows = [{ id: "routine-a", botId: "bot-a", name: "Checklist", crons: [] }];
