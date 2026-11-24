@@ -30,8 +30,9 @@ const POLL_RETRY_MAX_MS = 5_000;
  * doubling up to 5 s, instead of retrying at once; every Desktop doing that at the same
  * moment floods the server while it starts. The cap stays far inside RELAY_STALL_MS.
  */
-export function pollRetryDelayMs(failures: number, agentExecution: boolean): number {
-  const idle = agentExecution ? 0 : 2_000;
+export function pollRetryDelayMs(failures: number, held: boolean): number {
+  // A held poll already waits on the server; a plain one asks every 2 s.
+  const idle = held ? 0 : 2_000;
   if (failures <= 0) return idle;
   return Math.max(idle, Math.min(POLL_RETRY_MAX_MS, POLL_RETRY_BASE_MS * 2 ** (failures - 1)));
 }
@@ -58,6 +59,8 @@ export class DesktopRelayClient {
   private lastContact = 0;
   private pollFailures = 0;
   private lastBindingCheck = 0;
+  /** The last poll listed every grant of this PC, so the server can hold the next one open. */
+  private serverHolds = false;
   private owner?: string;
   private accountGeneration?: string;
   private accountIdentity?: {userId:string;spaceId:string;connectionId:string};
@@ -246,6 +249,7 @@ export class DesktopRelayClient {
     this.accountGeneration=undefined;
     this.accountIdentity=undefined;
     this.reportWorkspaces=false;
+    this.serverHolds=false;
   }
   private ownedWorkspaces() {
     if (!this.accountGeneration || !this.reportWorkspaces || !this.options.workspaces) return undefined;
@@ -260,9 +264,11 @@ export class DesktopRelayClient {
     const pollController = new AbortController(); this.pollController = pollController;
     const previousActive = new Set(this.active.keys());
     const workspaces = this.ownedWorkspaces();
+    // A held poll returns at once when work arrives, so idle PCs ask about four times a minute.
+    const wait = Boolean(this.lastContact) && (Boolean(this.options.agentExecution) || this.serverHolds);
     try {
       const state = (await (
-        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {}),...(workspaces ? {workspaces} : {})} : {}),...(this.options.agentExecution && this.lastContact ? {wait:true,active:[...previousActive]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
+        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {}),...(workspaces ? {workspaces} : {})} : {}),...(wait ? {wait:true,active:[...previousActive]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
       ).json()) as DesktopExecutorPoll & { identity?: unknown };
       if(this.stopped)return;
       // Report Mico folders only to a server that asked for them, from its next poll on.
@@ -281,12 +287,22 @@ export class DesktopRelayClient {
       // Bindings are volatile on the API. Reassert only the same owner-approved
       // generation after a restart; commands/results are never resubmitted here.
       const now = (this.options.now ?? Date.now)();
-      if (!this.accountGeneration && now - this.lastBindingCheck >= 15_000) {
-        for (const [botId, grant] of this.grants) {
-          await this.post("bind", { deviceId: this.deviceId, botId, generation: grant.generation });
-          if (this.stopped) return;
+      if (!this.accountGeneration) {
+        // A server that lists this PC's bindings shows exactly which ones a restart lost;
+        // without that list, keep reasserting every grant periodically.
+        const listed = Array.isArray(state.bindings) && state.bindings.length <= 128
+          ? new Set(state.bindings.filter(b => b?.deviceId === this.deviceId).map(b => `${b.botId}\n${b.generation}`))
+          : undefined;
+        const missing = [...this.grants].filter(([botId, grant]) => !listed?.has(`${botId}\n${grant.generation}`));
+        this.serverHolds = false;
+        if (listed ? missing.length > 0 : now - this.lastBindingCheck >= 15_000) {
+          for (const [botId, grant] of missing) {
+            await this.post("bind", { deviceId: this.deviceId, botId, generation: grant.generation });
+            if (this.stopped) return;
+          }
+          this.lastBindingCheck = now;
         }
-        this.lastBindingCheck = now;
+        this.serverHolds = Boolean(listed) && this.grants.size > 0;
       }
       if(this.accountGeneration){
         if(!Array.isArray(state.bindings)||state.bindings.length>128)throw Error("Invalid account bindings");
@@ -346,6 +362,8 @@ export class DesktopRelayClient {
       // An older API behind the same address refuses the extra field; the next poll
       // goes without it until a server offers the report again.
       if (workspaces) this.reportWorkspaces = false;
+      // After a failure (often an API restart) poll without waiting so lost bindings are listed first.
+      this.serverHolds = false;
       if (!this.stopped && !pollController.signal.aborted) {
         this.pollFailures++;
         recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
@@ -362,7 +380,7 @@ export class DesktopRelayClient {
       }
     }
     if (!this.stopped) {
-      this.timer = setTimeout(() => void this.poll(), pollRetryDelayMs(this.pollFailures, Boolean(this.options.agentExecution)));
+      this.timer = setTimeout(() => void this.poll(), pollRetryDelayMs(this.pollFailures, Boolean(this.options.agentExecution) || this.serverHolds));
       this.timer.unref();
     }
   }

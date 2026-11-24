@@ -23,6 +23,65 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it("holds project polls open while the server lists the PC's bindings, and rebinds only what it lost", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const polls: (boolean | undefined)[] = [];
+  const binds: string[] = [];
+  const bound = new Set<string>();
+  let generation: string | undefined;
+  let fail = false;
+  let failedAt = -1;
+  const client = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "http://127.0.0.1:1234", localToken: "unused", revoked: vi.fn(),
+    deviceId: "11111111-1111-4111-8111-111111111111",
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      const payload = JSON.parse(String(init?.body ?? "{}"));
+      if (action === "identity") return Response.json(identity);
+      if (action === "bind") {
+        binds.push(payload.botId);
+        bound.add(payload.botId);
+        generation = payload.generation;
+        return Response.json({ ok: true });
+      }
+      if (action === "poll") {
+        polls.push(payload.wait);
+        // The server holds a waiting poll until work arrives or its window ends.
+        if (payload.wait) await new Promise(resolve => setTimeout(resolve, 20));
+        if (fail) {
+          fail = false;
+          failedAt = polls.length - 1;
+          return new Response(null, { status: 409 });
+        }
+        return Response.json({
+          identity, active: [], operations: [],
+          bindings: [...bound].map(botId => ({ deviceId: payload.deviceId, botId, generation })),
+        });
+      }
+      throw new Error(`unexpected ${action}`);
+    },
+  });
+  try {
+    await client.bind("bot");
+    await vi.waitFor(() => expect(polls.filter(Boolean).length).toBeGreaterThanOrEqual(3));
+    // The first poll learns the server's bindings; later ones wait without rebinding.
+    expect(polls[0]).toBeUndefined();
+    expect(binds).toEqual(["bot"]);
+    // An API restart lost the binding: reassert that one grant once, then wait again.
+    bound.clear();
+    await vi.waitFor(() => expect(binds).toEqual(["bot", "bot"]));
+    const afterRebind = polls.length;
+    await vi.waitFor(() => expect(polls.slice(afterRebind).some(Boolean)).toBe(true));
+    // After a failure the next poll does not wait, so lost bindings are listed first.
+    fail = true;
+    await vi.waitFor(() => {
+      expect(failedAt).toBeGreaterThanOrEqual(0);
+      expect(polls.length).toBeGreaterThan(failedAt + 1);
+    }, { timeout: 4_000 });
+    expect(polls[failedAt + 1]).toBeUndefined();
+  } finally { client.stop(); }
+});
+
 it("tells the server once that a connected PC is going offline, without treating a refusal as revocation", async () => {
   const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
   const released: unknown[] = [];
