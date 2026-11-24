@@ -211,6 +211,7 @@ const OWN_STATE_RESULT_TOOLS = new Set([
   "acknowledge_request",
   "app_write",
   "ask_user",
+  "ask_location",
   "connect_app",
   "attach_file",
   "close_task",

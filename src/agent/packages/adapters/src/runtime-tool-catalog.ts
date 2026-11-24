@@ -10,6 +10,7 @@ export const RUNTIME_TOOL_GUIDANCE =
 const CORE_TOOL_NAMES = new Set([
   "acknowledge_request",
   "ask_user",
+  "ask_location",
   "remember",
   "list_fleet",
   "read_file",

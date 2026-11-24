@@ -1958,6 +1958,7 @@ msgid "Could not stop computer"
 msgstr "Could not stop computer"
 
 #: src/components/AskCard.tsx
+#: src/components/LocationAskCard.tsx
 msgid "Could not submit this answer"
 msgstr "Could not submit this answer"
 
@@ -3569,6 +3570,7 @@ msgid "No bots match"
 msgstr "No Micos match"
 
 #: src/components/AskCard.tsx
+#: src/components/LocationAskCard.tsx
 msgid "No longer active"
 msgstr "No longer active"
 
@@ -4625,6 +4627,7 @@ msgid "Self-hosted"
 msgstr "Self-hosted"
 
 #: src/pages/shell/composer.tsx
+#: src/components/LocationAskCard.tsx
 msgid "Send"
 msgstr "Send"
 
@@ -4661,6 +4664,7 @@ msgid "Send with Enter"
 msgstr "Send with Enter"
 
 #: src/components/AskCard.tsx
+#: src/components/LocationAskCard.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -14961,10 +14965,46 @@ msgstr "Can forget what it saved"
 msgid "Could not change which Micos can use this memory"
 msgstr "Could not change which Micos can use this memory"
 
+#: src/components/LocationAskCard.tsx
+msgid "Don't share"
+msgstr "Don't share"
+
+#: src/components/LocationAskCard.tsx
+msgid "Locating…"
+msgstr "Locating…"
+
+#: src/components/LocationAskCard.tsx
+msgid "Location access is off. Type a place instead."
+msgstr "Location access is off. Type a place instead."
+
+#: src/components/LocationAskCard.tsx
+msgid "Location shared"
+msgstr "Location shared"
+
 #: src/lib/native-computer-execution.ts
 msgid "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
 msgstr "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
 
+#: src/components/LocationAskCard.tsx
+msgid "Not shared"
+msgstr "Not shared"
+
+#: src/components/LocationAskCard.tsx
+msgid "Place"
+msgstr "Place"
+
 #: src/lib/run-error.ts
 msgid "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
 msgstr "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
+
+#: src/components/LocationAskCard.tsx
+msgid "Share location"
+msgstr "Share location"
+
+#: src/components/LocationAskCard.tsx
+msgid "Type a place"
+msgstr "Type a place"
+
+#: src/components/LocationAskCard.tsx
+msgid "Your location is unavailable. Type a place instead."
+msgstr "Your location is unavailable. Type a place instead."

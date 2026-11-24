@@ -691,6 +691,8 @@ export const MessageView = memo(function MessageView({
                   block={block}
                   canAnswer={canAnswer}
                   canDismiss={canDismiss}
+                  // dismissableAskMessageIds marks the asks of the viewer's own waiting runs.
+                  isRunUser={canDismiss}
                   onAnswer={(text, username) => onAnswer(message, text, username)}
                   onDismiss={() => onAnswer(message, "", undefined, true)}
                 />

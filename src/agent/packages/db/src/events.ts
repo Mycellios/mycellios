@@ -6,7 +6,9 @@ import {
   BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
   LoginSecretValue,
+  locationAskOutcome,
   MessageBlock as MessageBlockSchema,
+  parseLocationAnswer,
 } from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
@@ -17,7 +19,9 @@ import {
   instructionUpdateDiff,
   isApprovalAskBlock,
   isConversationalRun,
+  isLocationAskBlock,
   isSecretAskBlock,
+  locationAnswerPrompt,
   messageReaction,
   messagingChannelId,
   planCardResumeText,
@@ -812,6 +816,12 @@ async function commitAnswerRunInput(
   if (login && !login.success) return null;
   if (secretAsk && input.answer.length > BOT_SECRET_VALUE_MAX_LENGTH)
     throw new AnswerTooLongError();
+  // A location card is answered only by its run's user: a rounded position, a typed place or a
+  // refusal. The answer reaches the resumed turn and is never written on the card.
+  const locationAsk = !approvalAsk && !secretAsk && isLocationAskBlock(pendingAsk);
+  const locationAnswer = locationAsk ? parseLocationAnswer(input.answer) : null;
+  if (locationAsk && (!locationAnswer || dismissed || run.userId !== input.answeredByUserId))
+    return null;
   let approvalEffect: { id: string; kind: string; request: Prisma.JsonValue } | null = null;
   let editedInstructions: string | undefined;
   let approvalAnswer = input.answer;
@@ -877,9 +887,9 @@ async function commitAnswerRunInput(
   });
   if (queued.count !== 1) return null;
 
-  const recordedAnswer = secretAsk ? "" : (selectedChoice?.id ?? approvalAnswer);
+  const recordedAnswer = secretAsk || locationAsk ? "" : (selectedChoice?.id ?? approvalAnswer);
   const callId = callIdFromClientNonce(input.clientNonce);
-  const recordsCallUtterance = Boolean(callId && !secretAsk);
+  const recordsCallUtterance = Boolean(callId && !secretAsk && !locationAsk);
 
   // Give spoken answers the same durable, call-scoped user utterance as other voice turns.
   // Secret asks stay out of message history; the call UI requires those answers on screen.
@@ -998,7 +1008,9 @@ async function commitAnswerRunInput(
                 answer: input.answer,
                 autoStarted: input.autoStart,
               })
-            : selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
+            : locationAnswer
+              ? locationAnswerPrompt(locationAnswer)
+              : selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
         ),
       },
     });
@@ -1012,6 +1024,7 @@ async function commitAnswerRunInput(
           status: "answered" as const,
           answer: recordedAnswer,
           ...(dismissed ? { dismissed: true as const } : {}),
+          ...(locationAnswer ? { location: { outcome: locationAskOutcome(locationAnswer) } } : {}),
           ...(input.autoStart && block.kind === "ask" && block.plan
             ? { plan: { ...block.plan, autoStarted: true as const } }
             : {}),

@@ -17,6 +17,10 @@ public final class NavigationPolicy {
     if (path==null || path.contains("%") || path.contains("..") || path.contains("\\")) return false;
     return path.equals("/agent/") || path.equals("/agent/app") || path.equals("/agent/auth") || path.equals("/agent/sign-in") || path.equals("/agent/sign-up") || path.equals("/agent/sso/callback") || path.equals("/agent/onboarding") || path.equals("/agent/welcome") || path.startsWith("/agent/artifacts/") || path.equals("/agent/board") || path.startsWith("/agent/app/") || path.startsWith("/agent/onboarding/") || path.equals("/agent/forgot-password") || path.equals("/agent/reset-password") || path.equals("/agent/mcp/oauth/callback") || path.equals("/agent/integrations/setup") || path.equals("/agent/integrations/callback");
   }
+  /** The chat's one-time location card: the same packaged chat routes as the microphone. */
+  public static boolean mayLocate(String value) {
+    return mayRecord(value);
+  }
   public static boolean mayRecord(String value) {
     return appRoute(value) && (URI.create(value).getRawPath().equals("/agent/app") || URI.create(value).getRawPath().matches("/agent/app/(?!artifacts$|board$|g$)[a-zA-Z0-9_-]+"));
   }

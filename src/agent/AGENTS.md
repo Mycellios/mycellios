@@ -2314,6 +2314,19 @@
   (a side conversation's card mirrored into the main chat answers through that same operation).
   Skip supplies no authorization. Credentials and protected actions keep their
   dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.
+- `ask_location` follows the reference app's location request (behavior reference only, our
+  own words): a pausing ask with a `location` field, offered only to person-started turns
+  (never routines, webhooks, background or Mico-started work, outside chats, calls or
+  call_end). Only the run's user answers, through the same fenced answer operation: Share
+  location reads the browser position once on that click (no watch), rounded to three
+  decimals (~100 m) on the device and again on the server; typing a place or declining works
+  everywhere, and Desktop offers only typing. The card keeps only the outcome
+  (shared/typed/declined), never coordinates or the place; the resumed turn gets it in its
+  task prompt behind LOCATION_ANSWER_MARKER, which the executor replaces in the stored task
+  before memory searches. Never log the answer. The Android host grants WebView geolocation
+  only to packaged chat routes, without retaining the grant; the Expo preview answers by
+  typing. Verify location-request (contracts/core), location-answer, ask-location and
+  LocationAskCard tests and NavigationPolicyTest.
 
 - Mycellios creation keeps the authenticated viewer pinned for quote, execute,
   status, content and checkout. Keep stable purchase keys, quote-before-confirm,

@@ -139,6 +139,8 @@ import {
   userRunError,
   userTurnMessageForRun,
   desktopSetupInterruptedMessage,
+  ASK_LOCATION_TOOL,
+  withoutLocationAnswer,
 } from "@mycellios/core";
 import {
   isSiteFetchTool,
@@ -4154,6 +4156,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
               )?.seq ??
               thread.nextMessageSeq)
             : thread.nextMessageSeq;
+        // A location the person shared reaches only this attempt: the stored task keeps a note
+        // that it was answered, and memory searches never receive it.
+        const storedPrompt = withoutLocationAnswer(task.prompt);
+        if (storedPrompt !== task.prompt) {
+          await deps.prisma.task.updateMany({
+            where: { id: task.id, prompt: task.prompt },
+            data: { prompt: storedPrompt },
+          });
+        }
         const agentEnvironment = await decryptAgentEnvironment(agentSecretRows, deps.secretStore);
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
@@ -4338,7 +4349,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           thread.historyCompactedUpToSeq != null
             ? semanticMemory.recall(
                 {
-                  query: task.prompt,
+                  query: storedPrompt,
                   scope: memoryScope,
                   botId: bot.id,
                   historyGeneration: thread.historyCompactionGeneration,
@@ -4352,7 +4363,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const personalRecallPromise =
           personalMemory && threadContext.includeSemanticRecall
             ? personalMemory
-                .search(task.prompt, {
+                .search(storedPrompt, {
                   limit: PERSONAL_MEMORY_AUTO_RECALL_LIMIT,
                   automatic: true,
                   signal: context.signal,
@@ -4372,7 +4383,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           messagingChannelRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:storedPrompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
           messagingChannelRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
@@ -4383,7 +4394,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? Promise.resolve(undefined)
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
-                text: task.prompt,
+                text: storedPrompt,
               }),
           recallPromise,
           personalRecallPromise,
@@ -9516,6 +9527,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     actions: safeActions,
                     ...(safeQuestions ? { questions: safeQuestions } : {}),
                     ...(safePlan ? { plan: safePlan } : {}),
+                    ...(event.location ? { location: {} } : {}),
                   },
                 ],
                 // Keep unredacted labels on the run for resume; message blocks stay redacted.
@@ -10727,6 +10739,13 @@ export function selectBuiltinToolsForRun(options: {
           "generate_video",
         ].includes(tool.name)) &&
       (options.voiceCall || tool.name !== "end_call") &&
+      // A location card needs the person in this chat: never routines, webhooks, background
+      // or Mico-started work, outside chats or calls.
+      (tool.name !== ASK_LOCATION_TOOL ||
+        (fleetToolsAllowed &&
+          options.trigger !== "call_end" &&
+          !options.messagingChannelRun &&
+          !options.voiceCall)) &&
       // Already on a call, or reached through a messaging channel that cannot ring.
       ((options.phoneCallsEnabled &&
         !options.groupId &&
