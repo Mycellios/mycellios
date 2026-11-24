@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   APP_CONTENT_SECURITY_POLICY,
   appContentSecurityPolicy,
+  BROWSER_EXTENSION_ORIGINS,
   CSP_REPORT_PATH,
   CSP_REPORTING_ENDPOINTS,
   contentSecurityPolicyFor,
@@ -61,6 +62,22 @@ describe("app content security policy", () => {
     }
     expect(directives(appContentSecurityPolicy({ localProjectPreview: false })).get("frame-src"))
       .toEqual(["'self'", "blob:"]);
+  });
+
+  it("lets only the official browser extension frame the hosted app when enabled", () => {
+    const framed = directives(appContentSecurityPolicy({ browserExtensionFrames: true }));
+    expect(framed.get("frame-ancestors")).toEqual([...BROWSER_EXTENSION_ORIGINS]);
+    for (const origin of BROWSER_EXTENSION_ORIGINS) {
+      expect(origin).toMatch(/^chrome-extension:\/\/[a-p]{32}$/);
+    }
+    for (const [name, sources] of policy) {
+      if (name !== "frame-ancestors") expect(framed.get(name)).toEqual(sources);
+    }
+    expect(
+      directives(appContentSecurityPolicy({ browserExtensionFrames: false })).get(
+        "frame-ancestors",
+      ),
+    ).toEqual(["'none'"]);
   });
 
   it("does not apply to proxied responses that carry their own policy", () => {

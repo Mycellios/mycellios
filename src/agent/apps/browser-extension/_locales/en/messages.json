@@ -1,0 +1,10 @@
+{
+  "extensionName": { "message": "Mycellios Agent" },
+  "extensionDescription": { "message": "Your Micos in Chrome's side panel." },
+  "actionTitle": { "message": "Open Mycellios Agent" },
+  "signInTitle": { "message": "Sign in to Mycellios" },
+  "signIn": { "message": "Sign in" },
+  "unavailableTitle": { "message": "Mycellios is not reachable" },
+  "retry": { "message": "Try again" },
+  "openInTab": { "message": "Open in a tab" }
+}

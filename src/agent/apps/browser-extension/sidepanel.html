@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mycellios Agent</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+    <script type="module" src="sidepanel.js"></script>
+  </head>
+  <body>
+    <main id="notice" hidden>
+      <img src="icons/icon-192.png" alt="" width="56" height="56" />
+      <h1 id="notice-title">Mycellios Agent</h1>
+      <div class="actions">
+        <button id="primary" type="button"></button>
+        <button id="secondary" type="button" class="secondary"></button>
+      </div>
+    </main>
+    <iframe
+      id="app"
+      title="Mycellios Agent"
+      allow="clipboard-read; clipboard-write; microphone; autoplay"
+      hidden
+    ></iframe>
+  </body>
+</html>
