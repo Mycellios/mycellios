@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-24
+
+### Added
+
+- Open Mycellios Agent in Chrome's side panel with the new Mycellios browser extension. It uses
+  your existing Mycellios sign-in. The extension is not in the Chrome Web Store yet; load it from
+  `apps/browser-extension` as an unpacked extension.
+
+### Changed
+
+- The Mycellios browser extension uses icons at the exact sizes Chrome expects, so the toolbar and
+  extension pages show a sharp icon.
+
 ## [0.21.3] - 2026-11-24
 
 ### Fixed
