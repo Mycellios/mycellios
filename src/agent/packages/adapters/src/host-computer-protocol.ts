@@ -50,12 +50,17 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
       "provision",
       "prepare",
       "isRunning",
-      "exportWorkspace",
       "snapshot",
       "stop",
       "destroy",
       "environment",
     ]),
+  }),
+  z.object({
+    ...base,
+    method: z.literal("exportWorkspace"),
+    /** The caller reassembles large files from verified pieces. Older hosts ignore it. */
+    pieces: z.boolean().optional(),
   }),
   z.object({ ...base, method: z.literal("execute"), command }),
   z.object({ ...base, method: z.literal("commandStatus"), commandId: z.string().min(1).max(256).optional() }),
@@ -104,6 +109,21 @@ export interface HostComputerEnvironment {
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
 }
+/**
+ * One exportWorkspace value: a whole file, an ordered piece of a larger one, or a file
+ * too large to copy. Pieces and skips are sent only when the caller asked for pieces.
+ */
+export type HostComputerExportFrame =
+  | { path: string; content: string; executable?: boolean }
+  | {
+      path: string;
+      content: string;
+      executable?: boolean;
+      offset: number;
+      size: number;
+      sha256: string;
+    }
+  | { skipped: { size: number } };
 export type HostComputerFrame<T> =
   | { value: T }
   | { done: true }

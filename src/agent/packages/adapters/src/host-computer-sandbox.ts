@@ -15,6 +15,7 @@ import { describeDesktopSandbox } from "./desktop-sandbox.js";
 import { projectLeaseOwner } from "./project-execution.js";
 import type {
   HostComputerEnvironment,
+  HostComputerExportFrame,
   HostComputerFrame,
   HostComputerRequest,
 } from "./host-computer-protocol.js";
@@ -272,16 +273,80 @@ export class HostComputerSandbox implements SandboxProvider {
       context,
     );
   }
+  /**
+   * Copies a PC workspace. Large files arrive as ordered pieces that must add up to their
+   * checksum; files beyond the transfer limit are left out. Older PCs send whole files only.
+   */
   async *exportWorkspace(
     computer: ComputerRef,
     context: AdapterContext,
   ): AsyncIterable<PortableFile> {
-    for await (const file of this.request<{ path: string; content: string; executable?: boolean }>(
-      { method: "exportWorkspace", botId: computer.botId },
+    let partial:
+      | { path: string; size: number; sha256: string; executable?: boolean; content: Buffer; received: number }
+      | undefined;
+    const skipped = { count: 0, largestBytes: 0 };
+    for await (const frame of this.request<HostComputerExportFrame>(
+      { method: "exportWorkspace", botId: computer.botId, pieces: true },
       context,
     )) {
-      yield { ...file, content: new Uint8Array(Buffer.from(file.content, "base64")) };
+      if ("skipped" in frame) {
+        skipped.count++;
+        skipped.largestBytes = Math.max(skipped.largestBytes, frame.skipped.size);
+        continue;
+      }
+      const content = Buffer.from(frame.content, "base64");
+      if (!("offset" in frame)) {
+        if (partial) throw new Error("The computer interrupted a large file in its workspace copy");
+        const { path, executable } = frame;
+        yield { path, content: new Uint8Array(content), ...(executable === undefined ? {} : { executable }) };
+        continue;
+      }
+      if (frame.offset === 0 && !partial) {
+        if (
+          !Number.isSafeInteger(frame.size) ||
+          frame.size <= 0 ||
+          frame.size > HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES ||
+          !/^[0-9a-f]{64}$/.test(frame.sha256)
+        )
+          throw new Error("The computer sent an invalid large file in its workspace copy");
+        partial = {
+          path: frame.path,
+          size: frame.size,
+          sha256: frame.sha256,
+          executable: frame.executable,
+          content: Buffer.alloc(frame.size),
+          received: 0,
+        };
+      }
+      if (
+        !partial ||
+        frame.path !== partial.path ||
+        frame.size !== partial.size ||
+        frame.sha256 !== partial.sha256 ||
+        frame.offset !== partial.received ||
+        !content.byteLength ||
+        partial.received + content.byteLength > partial.size
+      )
+        throw new Error("The computer sent the pieces of a large file out of order");
+      content.copy(partial.content, partial.received);
+      partial.received += content.byteLength;
+      if (partial.received < partial.size) continue;
+      const file = partial;
+      partial = undefined;
+      if (workspaceTransferDigest(file.content) !== file.sha256)
+        throw new Error("A large file from the computer did not match its checksum");
+      yield {
+        path: file.path,
+        content: new Uint8Array(file.content.buffer, file.content.byteOffset, file.size),
+        ...(file.executable === undefined ? {} : { executable: file.executable }),
+      };
     }
+    if (partial) throw new Error("The computer ended its workspace copy inside a large file");
+    if (skipped.count)
+      getLogger().warn("computer.workspace_export_skipped", {
+        "workspace.skipped.too_large": skipped.count,
+        "workspace.skipped.largest_bytes": skipped.largestBytes,
+      });
   }
   /** Sends one file larger than a single request as ordered, checksummed pieces. */
   private async writeFileInPieces(computer: ComputerRef, file: PortableFile, context: AdapterContext) {

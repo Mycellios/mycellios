@@ -11,18 +11,57 @@ import { AppControlRunner } from "./app-control-runner.js";
 import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { safeNativeCommandError } from "./native-command-journal.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
+import type { DesktopWorkspaceFile } from "./desktop-sandbox.js";
 import { MicoFolders } from "./mico-folders.js";
-import type { HostComputerRequest } from "./host-computer-protocol.js";
+import type { HostComputerExportFrame, HostComputerRequest } from "./host-computer-protocol.js";
 import {
   HOST_COMPUTER_MAX_BYTES,
   HOST_COMPUTER_MAX_FILE_BYTES,
+  HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES,
   hostComputerDeadlineMs,
   hostComputerRequest,
 } from "./host-computer-protocol.js";
+import { workspaceTransferDigest, workspaceTransferPieces } from "./workspace-transfer.js";
 
 export { appControlBinary } from "./app-control-runner.js";
 
 const isFileWrite = (method: string | undefined) => method === "writeFile" || method === "writeFileChunk";
+
+/**
+ * Workspace export for a caller that reassembles pieces: a file larger than one frame
+ * travels as ordered, checksummed pieces, and one beyond the transfer limit is left out
+ * instead of failing the whole copy.
+ */
+export async function* exportWorkspaceFrames(
+  files: AsyncIterable<DesktopWorkspaceFile>,
+): AsyncIterable<HostComputerExportFrame> {
+  for await (const file of files) {
+    if (file.size > HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES) {
+      yield { skipped: { size: file.size } };
+      continue;
+    }
+    const content = await file.read();
+    const executable = file.executable ? { executable: true } : {};
+    if (content.byteLength > HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES) {
+      yield { skipped: { size: content.byteLength } };
+      continue;
+    }
+    if (content.byteLength <= HOST_COMPUTER_MAX_FILE_BYTES) {
+      yield { path: file.path, content: Buffer.from(content).toString("base64"), ...executable };
+      continue;
+    }
+    const sha256 = workspaceTransferDigest(content);
+    for (const piece of workspaceTransferPieces(content))
+      yield {
+        path: file.path,
+        offset: piece.offset,
+        size: content.byteLength,
+        sha256,
+        content: Buffer.from(piece.content).toString("base64"),
+        ...executable,
+      };
+  }
+}
 
 /** No renderer receives the credential. Docker reaches this listener through its host gateway. */
 export async function startHostComputerServer(options: {
@@ -489,11 +528,15 @@ export async function startHostComputerServer(options: {
         break;
       }
       case "exportWorkspace":
-        for await (const file of provider.exportWorkspace(computer)) {
-          if (file.content.byteLength > HOST_COMPUTER_MAX_FILE_BYTES)
-            throw new Error(`computer file exceeds ${HOST_COMPUTER_MAX_FILE_BYTES} bytes`);
-          yield { ...file, content: Buffer.from(file.content).toString("base64") };
+        if (!input.pieces) {
+          for await (const file of provider.exportWorkspace(computer)) {
+            if (file.content.byteLength > HOST_COMPUTER_MAX_FILE_BYTES)
+              throw new Error(`computer file exceeds ${HOST_COMPUTER_MAX_FILE_BYTES} bytes`);
+            yield { ...file, content: Buffer.from(file.content).toString("base64") };
+          }
+          break;
         }
+        yield* exportWorkspaceFrames(provider.workspaceFiles(computer));
         break;
       case "snapshot":
         yield await provider.snapshot(computer, context);
