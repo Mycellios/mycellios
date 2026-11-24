@@ -10,6 +10,8 @@ import {
   agentTaskStartNonce,
   agentTaskThreadKey,
   botMessageContext,
+  isInterruptedRunError,
+  isTaskReportNonce,
   TASK_REPORT_RUNNING_LIST_MAX,
   TASK_REPORT_VISUAL_LIMIT,
   TASK_REPORTING_TRIGGERS,
@@ -22,6 +24,7 @@ import {
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import { Prisma, type PrismaClient } from "./client.js";
 import { appendEventInTransaction } from "./events.js";
+import { INTERRUPTED_TURN_RECOVERY_DELAYS_MS, INTERRUPTED_TURN_RECOVERY_NOTE, WORK_RECOVERY_MARKER } from "./event-waits.js";
 import { createThreadMessageInTransaction } from "./messages.js";
 import { recordThreadTurnOutcome, reopenSideThreadForSend } from "./thread-lifecycle.js";
 import { withTransactionRetry } from "./transaction-retry.js";
@@ -578,6 +581,58 @@ export async function queueTaskReportInTransaction(
     payload: { messageId: message.id, role: "user", blocks },
   });
   return { runId: reportRun.id, threadId: mainThreadId, seq: event.seq };
+}
+
+const TASK_REPORT_RECOVERY_SEPARATOR = ":recovery:";
+
+/**
+ * A report turn that an update or a lost PC connection cut off starts again from the commit
+ * that ends it: a fresh run on the same report message, told to check what already happened,
+ * after a growing delay and at most once per delay. The cut-off run is never replayed. The
+ * nonce keeps the conversation's report prefix, so a teammate waiting on the report waits on.
+ */
+export async function queueTaskReportRecoveryInTransaction(
+  tx: Tx,
+  input: { runId: string; error: string | null | undefined; now: Date },
+): Promise<string | null> {
+  if (!isInterruptedRunError(input.error)) return null;
+  const run = await tx.run.findUnique({
+    where: { id: input.runId },
+    select: {
+      id: true, trigger: true, status: true, spaceId: true, userId: true, botId: true, threadId: true,
+      sourceMessageId: true, clientNonce: true, task: { select: { prompt: true } },
+    },
+  });
+  if (!run || run.trigger !== "task_report" || run.status !== "failed" || !run.sourceMessageId ||
+      !run.clientNonce || !isTaskReportNonce(run.clientNonce)) return null;
+  // The first report run and every recovery share the report message.
+  const attempts = await tx.run.count({
+    where: { threadId: run.threadId, sourceMessageId: run.sourceMessageId, trigger: "task_report" },
+  });
+  const delay = INTERRUPTED_TURN_RECOVERY_DELAYS_MS[attempts - 1];
+  if (delay === undefined) return null;
+  const scope = { spaceId: run.spaceId, userId: run.userId };
+  const bot = await tx.bot.findFirst({
+    where: { id: run.botId, ...scope, archivedAt: null },
+    select: { thread: { select: { id: true } } },
+  });
+  if (bot?.thread?.id !== run.threadId) return null;
+  const task = await tx.task.create({
+    data: { ...scope, botId: run.botId, threadId: run.threadId, status: "queued",
+      prompt: `${run.task.prompt}${WORK_RECOVERY_MARKER}${INTERRUPTED_TURN_RECOVERY_NOTE}` },
+    select: { id: true },
+  });
+  const recovery = await tx.run.create({
+    data: {
+      ...scope, botId: run.botId, threadId: run.threadId, taskId: task.id, status: "queued",
+      trigger: "task_report", sourceMessageId: run.sourceMessageId,
+      clientNonce: `${run.clientNonce.split(TASK_REPORT_RECOVERY_SEPARATOR)[0]}${TASK_REPORT_RECOVERY_SEPARATOR}${run.id}`,
+      wakeAt: new Date(input.now.getTime() + delay),
+    },
+    select: { id: true },
+  });
+  await tx.message.update({ where: { id: run.sourceMessageId }, data: { runId: recovery.id } });
+  return recovery.id;
 }
 
 /**

@@ -218,6 +218,14 @@ test('event waits qualify the deployed CHECK upgrade and automatic return on a r
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts')));
 });
 
+test('Mico-opened conversations qualify their reports and report recovery on a real isolated database',()=>{
+ for (const file of ['src/agent/packages/db/src/agent-tasks.ts','src/agent/packages/core/src/agent-tasks.ts','src/agent/scripts/verify-agent-tasks-db.ts']) {
+  const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-agent-tasks-db.ts'));
+  assert.deepEqual(check?.args,['node_modules/tsx/dist/cli.mjs','scripts/verify-agent-tasks-db.ts'], file);
+ }
+ assert.ok(!planChecks(['src/agent/packages/adapters/src/executor-agent-tasks.test.ts'],[]).some(c=>c.args.includes('scripts/verify-agent-tasks-db.ts')));
+});
+
 test('deployments are requested only from main pushes after the exact commit passes CI, with OIDC and no stored secret', () => {
   const deploy = readFileSync('.github/workflows/deploy.yml', 'utf8');
   assert.match(deploy, /^on:\n {2}push:\n {4}branches: \[main\]\n/m);

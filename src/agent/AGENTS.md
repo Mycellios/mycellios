@@ -686,7 +686,11 @@
   a waiting teammate, delegation-parked or deleting turns). Report turns are ordinary paid
   turns: normal Credit admission and observers, tainted from the start. A bot_message turn
   that opened tasks replies to its teammate only once they settle (auto-outcome key; the
-  reconciler retries). Verify core/adapters agent-tasks, executor-agent-tasks, bot-messages,
+  reconciler retries). A report turn that an update or lost PC connection cut off
+  (isInterruptedRunError) starts again from finalizeRun's own commit: a fresh task_report run
+  on the same report message (nonce <report nonce>:recovery:<failed run>, so teammates keep
+  waiting), INTERRUPTED_TURN_RECOVERY_DELAYS_MS and the recovery note; never a replay, and only
+  the failure that ends recovery alerts. Verify core/adapters agent-tasks, executor-agent-tasks, bot-messages,
   db events/messages, message-view and peer-exchange-groups tests and
   `node --import tsx scripts/verify-agent-tasks-db.ts`; fakes do not qualify a live model.
 
