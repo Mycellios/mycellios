@@ -51,6 +51,17 @@ export function routinesRoutes(ctx: RouterContext) {
   return {
     routines: {
       calendar: authed.routines.calendar.handler(({ context, input }) => routineCalendar(deps.prisma, context.actor, input)),
+      mentions: authed.routines.mentions.handler(({ context: { actor } }) =>
+        deps.prisma.routine.findMany({
+          where: {
+            userId: actor.userId,
+            spaceId: actor.spaceId,
+            bot: { userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+          },
+          select: { id: true, botId: true, name: true, crons: true },
+          orderBy: { id: "asc" },
+        }),
+      ),
       history: authed.routines.history.handler(async ({ context, input }) =>
         listRoutineRuns(deps.prisma, context.actor, input.routineId, input.before),
       ),

@@ -402,6 +402,9 @@
   composer/thread/pending/frame tests and
   `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
   with synthetic delivery/progress. This does not measure a live model's latency.
+- Chat routine mentions are a single owner- and Space-scoped summary read, triggered
+  by the composer mention search. Do not fetch routine lists for the entire roster
+  on chat entry. Check composer/query tests and `scripts/verify-routine-isolation-db.ts`.
 
 - Production English messages with interpolated values must exist in
   `apps/web/src/locales/en/messages.po`; production macros omit development text.

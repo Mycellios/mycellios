@@ -96,7 +96,7 @@ import {
   toast,
 } from "@mycellios/ui-web";
 import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Bell,
@@ -227,6 +227,7 @@ import {
   primeConversationSeed,
   queryClient,
   readConversationHistory,
+  routineMentionOptions,
   seedOnLeave,
   spaceQueries,
   spaceSeedKey,
@@ -2861,16 +2862,23 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       ? t`You`
       : (resolveTranscriptMemberName(activeReplyTarget.botId) ?? active?.name ?? t`Bot`)
     : undefined;
-  const routineLists = useQueries({
-    queries: bots.map((bot) => queries.routines.list.queryOptions({ input: { botId: bot.id } })),
-    combine: routineListData,
-  });
+  const routineMentions = useMemo(
+    () => routineMentionOptions(userId ?? null, shellSpaceId),
+    [userId, shellSpaceId],
+  );
+  const { data: routineRows } = useQuery({ ...routineMentions, enabled: false });
+  const loadMentionRoutines = useCallback(() => {
+    if (userId && !newConversation) void queryClient.fetchQuery(routineMentions).catch(() => undefined);
+  }, [userId, newConversation, routineMentions]);
   const mentionRoutines = useMemo(
-    () =>
-      bots.flatMap((bot, index) =>
-        (routineLists[index] ?? []).map((routine) => ({ ...routine, botName: bot.name })),
-      ),
-    [bots, routineLists],
+    () => {
+      const names = new Map(bots.map(bot => [bot.id, bot.name]));
+      return (routineRows ?? []).flatMap(routine => {
+        const botName = names.get(routine.botId);
+        return botName === undefined ? [] : [{ ...routine, botName }];
+      });
+    },
+    [bots, routineRows],
   );
   const composerConnections = useQuery({
     queryKey: [...queries.connections.catalog.queryKey({ input: {} }), "with-connections"],
@@ -5314,6 +5322,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               replyTargetName={replyTargetName}
               onClearReply={clearReply}
               mentionTargets={composerMentionTargets}
+              onMentionOpen={loadMentionRoutines}
               agentSkills={agentSkills}
               onSlashOpen={refreshAgentSkills}
               onSlashAction={(action) => {
@@ -5942,10 +5951,6 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
 type TabView = { botId: string; runId: string; ready: boolean; url?: string; issuedAt?: number };
 /** Screen capabilities are sealed for an hour; reuse a tab view URL for less than that. */
 const TAB_VIEW_REUSE_MS = 50 * 60_000;
-
-function routineListData(results: Array<{ data?: Routine[] }>) {
-  return results.map((result) => result.data);
-}
 
 function connectedAppMarksOf(
   data: { catalog: ConnectionCatalogItem[] | null; connections: Connection[] | null } | undefined,

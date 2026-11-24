@@ -1,5 +1,6 @@
 import type { RouterUtils } from "@orpc/tanstack-query";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { ORPCError } from "@orpc/client";
 import type { AppBootstrap } from "@mycellios/contracts";
 import { anySignal, isRetryableError } from "@mycellios/core";
 import type { DataTag, QueryFunction, QueryKey } from "@tanstack/react-query";
@@ -75,6 +76,31 @@ export function readConversationHistory(
     retry: false,
     staleTime: 0,
   });
+}
+
+/** Routine suggestions are owned by the Space, independent of the open conversation. */
+export function routineMentionOptions(userId: string | null, spaceId: string | null) {
+  const queryKey = spaceQueries(userId, spaceId).routines.mentions.queryKey({ input: {} });
+  return {
+    queryKey,
+    staleTime: 30_000,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const client = createSpaceRpc(spaceId);
+      try {
+        return await client.routines.mentions({}, { signal });
+      } catch (error) {
+        if (!(error instanceof ORPCError) || error.code !== "NOT_FOUND") throw error;
+        // An older Agent already offers all the routine summaries in its calendar.
+        // Use a past interval so there are no future occurrences to generate.
+        const to = Date.now() - 86_400_000;
+        const { routines } = await client.routines.calendar({
+          from: new Date(to - 1).toISOString(),
+          to: new Date(to).toISOString(),
+        }, { signal });
+        return routines.map(({ id, botId, name, crons }) => ({ id, botId, name, crons }));
+      }
+    },
+  };
 }
 
 /** Paint navigation immediately, retaining the destination's own snapshot only.

@@ -995,6 +995,9 @@ export const appContract = {
   },
   routines: {
     calendar: oc.input(RoutineCalendarInputSchema).output(RoutineCalendarSchema),
+    mentions: oc.input(z.object({})).output(z.array(RoutineSchema.pick({
+      id: true, botId: true, name: true, crons: true,
+    }))),
     list: oc.input(botId).output(z.array(RoutineSchema)),
     history: oc
       .input(z.object({ routineId: Id, before: RoutineRunCursorSchema.optional() }))
