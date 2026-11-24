@@ -488,8 +488,16 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   async *exportWorkspace(computer: ComputerRef): AsyncIterable<PortableFile> {
-    const box = this.requiredBox(computer);
-    yield* walkDesktopWorkspace(box.home, "", this.opts.maxFileBytes);
+    for await (const file of this.workspaceFiles(computer)) {
+      if (this.opts.maxFileBytes !== undefined && file.size > this.opts.maxFileBytes)
+        throw new Error(`computer file exceeds ${this.opts.maxFileBytes} bytes`);
+      yield { path: file.path, content: await file.read(), executable: file.executable };
+    }
+  }
+
+  /** The files a workspace copy carries, read only on demand so large ones can travel in pieces. */
+  workspaceFiles(computer: ComputerRef): AsyncIterable<DesktopWorkspaceFile> {
+    return walkDesktopWorkspace(this.requiredBox(computer).home, "");
   }
 
   async importWorkspace(
@@ -929,11 +937,18 @@ async function removeAbandonedTransferPieces(staging: string) {
   }
 }
 
+export interface DesktopWorkspaceFile {
+  path: string;
+  /** Size when listed; read() returns the content as it is when read. */
+  size: number;
+  executable: boolean;
+  read(): Promise<Uint8Array>;
+}
+
 async function* walkDesktopWorkspace(
   home: string,
   directory: string,
-  maxFileBytes?: number,
-): AsyncIterable<PortableFile> {
+): AsyncIterable<DesktopWorkspaceFile> {
   const target = await localWorkspaceTarget(home, directory, true);
   for (const entry of await readdir(target, { withFileTypes: true })) {
     const relative = normalizeWorkspacePath(directory ? `${directory}/${entry.name}` : entry.name);
@@ -942,14 +957,13 @@ async function* walkDesktopWorkspace(
     const child = await localWorkspaceTarget(home, relative, true).catch(() => null);
     if (!child) continue;
     const info = await stat(child);
-    if (info.isDirectory()) yield* walkDesktopWorkspace(home, relative, maxFileBytes);
+    if (info.isDirectory()) yield* walkDesktopWorkspace(home, relative);
     else if (info.isFile()) {
-      if (maxFileBytes !== undefined && info.size > maxFileBytes)
-        throw new Error(`computer file exceeds ${maxFileBytes} bytes`);
       yield {
         path: relative,
-        content: new Uint8Array(await readFile(child)),
+        size: info.size,
         executable: Boolean(info.mode & 0o100),
+        read: async () => new Uint8Array(await readFile(child)),
       };
     }
   }
