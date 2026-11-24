@@ -7,6 +7,7 @@ on:
       - 'src/coordinator/release-standby*.ts'
       - tests/release-admission.postgres.test.ts
       - tests/coordinator-release-standby.postgres.test.ts
+      - tests/e2e.test.ts
       - .github/workflows/native-release-admission.yml
   workflow_dispatch:
 permissions:
@@ -48,3 +49,7 @@ jobs:
           node node_modules/vitest/vitest.mjs run
           tests/release-admission.postgres.test.ts tests/coordinator-release-standby.postgres.test.ts
           --maxWorkers=1
+      - name: Exercise overlapping inference with coordinator and worker runtimes
+        run: >-
+          node node_modules/vitest/vitest.mjs run tests/e2e.test.ts
+          -t "keeps the incumbent worker and deadline"

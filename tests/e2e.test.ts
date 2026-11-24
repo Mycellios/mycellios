@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,6 +11,7 @@ import {
   workerAdmissionSigner,
 } from "../src/worker/admission-credential.js";
 import { verifyExecutionReceipt } from "../src/contracts/execution-receipt.js";
+import { MockAdapter } from "../src/adapters/mock.js";
 
 describe("inference-only coordinator and worker", () => {
   const cleanup: Array<() => Promise<void> | void> = [];
@@ -164,6 +165,64 @@ describe("inference-only coordinator and worker", () => {
     expect(stream).toContain('"execution_trace":{"schema":"mycellios-network-execution-trace/1"');
     expect(stream).toContain("data: [DONE]");
   });
+
+  it("keeps the incumbent worker and deadline while a candidate serves new inference", async () => {
+    const generate = MockAdapter.prototype.generate;
+    const canFinish = Promise.withResolvers<void>();
+    let incumbentGenerating = false;
+    const mock = vi.spyOn(MockAdapter.prototype, "generate").mockImplementation(async function* (
+      this: MockAdapter, request, signal,
+    ) {
+      if (request.request.messages.some(message => message.content === "incumbent inference")) {
+        incumbentGenerating = true;
+        await canFinish.promise;
+      }
+      yield* generate.call(this, request, signal);
+    });
+    const start = async () => {
+      const network = await startNetwork();
+      cleanup.push(async () => {
+        await network.agent.stop();
+        await network.run;
+        await network.runtime.close();
+      });
+      return network;
+    };
+    const submit = (address: string, content: string) => fetch(new URL("/v1/chat/completions", address), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "distributed-small", messages: [{ role: "user", content }],
+        stream: true, max_tokens: 40, deadline_ms: 10_000,
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    try {
+      const incumbent = await start();
+      const candidate = await start();
+      const oldResponse = submit(incumbent.address, "incumbent inference");
+      void oldResponse.catch(() => {});
+      await waitUntil(() => incumbentGenerating, 5_000);
+      const [original] = await incumbent.runtime.store.listJobs();
+      expect(original?.deadlineAt).toBeGreaterThan(Date.now());
+      expect(incumbent.runtime.service.releaseWorkStatus().jobs).toBe(1);
+      const nextResponse = await submit(candidate.address, "candidate inference");
+      expect(nextResponse.status).toBe(200);
+      expect(await nextResponse.text()).toContain("data: [DONE]");
+      expect((await candidate.runtime.store.listJobs())[0]?.status).toBe("completed");
+      expect(incumbent.runtime.service.releaseWorkStatus().jobs).toBe(1);
+      canFinish.resolve();
+      const oldResult = await oldResponse;
+      expect(oldResult.status).toBe(200);
+      expect(await oldResult.text()).toContain("data: [DONE]");
+      expect((await incumbent.runtime.store.listJobs())[0]).toMatchObject({
+        id: original?.id, deadlineAt: original?.deadlineAt, status: "completed",
+      });
+    } finally {
+      canFinish.resolve();
+      mock.mockRestore();
+    }
+  }, 15_000);
 
   it("removes a worker from the visible inventory after a voluntary stop", async () => {
     const { runtime, agent, run } = await startNetwork();
