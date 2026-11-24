@@ -11,7 +11,8 @@ or label is copied; every text here is written for Mycellios.
 
 ## Kept as it is
 
-- Routines keep running in their own conversation; nothing moves them to the main chat.
+- Routines run in their own conversation by default; only the per-routine setting below moves
+  them to the main chat.
 - Routine runs keep excluding screen, browser and PC app control tools at offering and
   execution.
 - A fresh routine session keeps receiving only the bounded, redacted handoff from its own
@@ -105,6 +106,35 @@ grows by one (plus any skipped times) and its reason is `busy` unless it already
 - The Routines UI stays paused by default (`VITE_MYCELLIOS_ROUTINES`); the server behavior is
   the same either way.
 
+## Where a routine runs
+
+A run in the main chat waits behind anything pending there (an unanswered question, a computer
+takeover, a long turn), so a routine can stay queued for as long as that lasts. Each routine
+therefore says where it runs, as `runIn` on the routine (derived from `routines.threadId`, no
+new column):
+
+- `thread`: its own conversation (the default). No thread yet means the next run creates it.
+- `chat`: the Mico's main chat (`threadId` is the main chat's id).
+- `group`: the group it was created in. It keeps that place and cannot be moved.
+
+`routines.create` and `routines.update` take an optional `runIn` of `thread` or `chat`; older
+clients that send none keep the current place (create: its own conversation). Moving to the
+main chat keeps the routine's conversation and its history; new runs simply stop using it.
+Moving back points the routine at that same conversation again, found by its key
+(`routine:<id>`, archived ones too; the next run reopens it as usual), or clears `threadId` so
+the next run creates one. `ensureRoutineThread` also adopts an existing conversation with that key
+when `threadId` is null, so it never collides with the unique key. Deleting a routine archives its
+conversation by key, so one that runs in the main chat still archives it. A group routine refuses
+the move.
+
+`schedule_create` and `schedule_update` take the same optional `runIn`. A routine a Mico creates
+outside a group runs in its own conversation unless it asks for `chat`; one created in a group
+runs in that group (and `runIn` there is refused), and the fleet tools' explicit target keeps its
+thread. Duplicate names are matched per group thread in a group and across all non-group
+routines elsewhere, which is what `schedule_update` reaches from each place. The routine editor
+shows one switch, "Run in its own conversation", hidden for group routines and for servers that
+do not report the place. Existing routines are not moved; that is a separate decision.
+
 ## Migration
 
 `20261122180000_routine_run_markers` adds `runs.quiet` (default false), `runs.missedRuns`
@@ -117,7 +147,8 @@ run. Older releases ignore the columns.
 
 `node --import tsx --test scripts/verify-routine-isolation-db.ts` on a fresh loopback
 PostgreSQL cluster (migration, markers, unread/preview, failure, self-pause, model history,
-rename, reopen and archive on delete); core routine-runs, adapters executor-routine-runs,
-routine-scheduling, routine-lateness and schedule-tools tests; API routine-runs tests; web
-RoutineRunMarker, routine-run-groups, message-view, RoutineRunHistory and RoutinesAvailability
-tests. Fixtures do not qualify a live model's use of the tools.
+rename, reopen, moving to the main chat and back, and archive on delete); core routine-runs,
+adapters executor-routine-runs, routine-scheduling, routine-lateness and schedule-tools tests;
+API routine-runs and router (routine run place) tests; contracts index tests; web
+RoutineRunMarker, routine-run-groups, message-view, RoutineRunHistory, routine-watch-draft and
+RoutinesAvailability tests. Fixtures do not qualify a live model's use of the tools.

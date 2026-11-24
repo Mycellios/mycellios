@@ -5,6 +5,7 @@ import type {
   ModelCatalogEntry,
   ModelCredential,
   Routine,
+  RoutineRunInChoice,
   RoutineWatch,
   RoutineWatchInput,
 } from "@mycellios/contracts";
@@ -108,6 +109,8 @@ export type RoutineDraftState = {
   thinkingLevel: string;
   /** Null unless the routine starts when something changes. */
   watch: RoutineWatchDraft | null;
+  /** Undefined for a group routine, or from a server that does not say. */
+  runIn?: RoutineRunInChoice;
 };
 
 /** The change trigger as the editor holds it: free text until saved. */
@@ -202,6 +205,7 @@ export function emptyRoutineDraft(): RoutineDraftState {
     modelKey: "",
     thinkingLevel: "",
     watch: null,
+    runIn: "thread",
   };
 }
 
@@ -222,6 +226,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
         : "",
     thinkingLevel: routine.thinkingLevel ?? "",
     watch: watchDraftFromRoutine(routine.watch),
+    runIn: routine.runIn === "thread" || routine.runIn === "chat" ? routine.runIn : undefined,
   };
 }
 
@@ -479,6 +484,15 @@ export function RoutineEditor({
         <Switch checked={draft.notify ?? true} onCheckedChange={notify => onChange({ ...draft, notify })} />
         {t`Notify me when there are results or a problem`}
       </label>
+      {draft.runIn ? (
+        <label className="mt-5 flex items-center gap-2 text-sm">
+          <Switch
+            checked={draft.runIn === "thread"}
+            onCheckedChange={(own) => onChange({ ...draft, runIn: own ? "thread" : "chat" })}
+          />
+          {t`Run in its own conversation`}
+        </label>
+      ) : null}
       <label htmlFor={`${fieldId}-prompt`} className="mt-5 block text-sm text-muted-foreground">
         <Trans>Instruction</Trans>
         <Textarea

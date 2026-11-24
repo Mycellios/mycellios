@@ -14,7 +14,7 @@ const fixtures = vi.hoisted(() => ({
   mycelliosCatalog: [] as ModelCatalogEntry[],
   catalog: [{ provider: "opencode-go", providerName: "OpenCode Go", id: "gpt-6-luna", label: "GPT-6 Luna", thinkingLevels: ["medium"] }],
   nativeModels: [] as Array<{id:string;label:string;isDefault:boolean;thinkingLevels:string[];fast:boolean}>,
-  engines: [{ id: "codex", name: "Codex", available: true }, { id: "opencode", name: "OpenCode", available: true }],
+  engines: { computer: "server", engines: ["codex", "opencode"] },
 }));
 const connect = vi.hoisted(() => vi.fn());
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
@@ -22,7 +22,7 @@ vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
 }) }));
 vi.mock("../../lib/query", () => {
   const query = (key: string) => ({ queryOptions: () => ({ queryKey: [key] }), queryKey: () => [key] });
-  return { writeSaved: async (_client: unknown, _key: unknown, apply: () => unknown) => apply(), useSpaceQueries: () => ({ me: query("me"), models: { credentials: query("credentials"), list: query("catalog") }, engines: { list: query("engines"), codexModels: query("nativeModels") } }) };
+  return { writeSaved: async (_client: unknown, _key: unknown, apply: () => unknown) => apply(), useSpaceQueries: () => ({ me: query("me"), models: { credentials: query("credentials"), list: query("catalog") }, engines: { forBot: query("engines"), codexModels: query("nativeModels") } }) };
 });
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect } }) }));
 vi.mock("@tanstack/react-query", () => ({
@@ -51,6 +51,7 @@ beforeEach(() => {
   save.mockClear();
   connect.mockReset().mockImplementation(async (input: { credentialId: string }) => ({ ...fixtures.credentials.find(entry => entry.id === input.credentialId), ...input }));
   fixtures.nativeModels = [];
+  fixtures.engines = { computer: "server", engines: ["codex", "opencode"] };
   fixtures.mycelliosCatalog = [];
   fixtures.credentials.splice(1);
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
@@ -64,7 +65,7 @@ it("shows the installed provider instead of the unrelated general model", async 
   await render();
   expect(container.querySelector("[data-trigger]")?.textContent).toBe("ChatGPT");
   expect(container.querySelector('[aria-label="Thinking"]')).toBeNull();
-  expect(container.querySelector('[data-choice="native-opencode::default"]')).toBeNull();
+  expect(container.querySelector('[data-choice="native-opencode::default"]')).not.toBeNull();
 });
 it.each(["pi", "codex"] as const)("explores credits without saving or connecting from %s", async engine => {
   await render(engine);
@@ -161,7 +162,17 @@ it("selects the installed account provider in the same menu", async () => {
   await act(async () => container.querySelector<HTMLButtonElement>('[data-choice="native-codex::default"]')!.click());
   expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "codex", nativeConfig: { modelId: null, fastMode: false, thinkingLevel: null }, modelProvider: null, modelId: null, thinkingLevel: null });
 });
-it("preserves a legacy native provider as a visible recoverable selection", async () => {
+it("offers only the selected Desktop's native engines, and saves the engine without moving the Mico", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["opencode"] };
+  fixtures.nativeModels = [{ id: "server-only", label: "Server only", isDefault: true, thinkingLevels: [], fast: false }];
+  await render("pi");
+  expect(container.querySelector('[data-choice^="native-codex::"]')).toBeNull();
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::default"]')!.click());
+  expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "opencode", nativeConfig: null, modelProvider: null, modelId: null, thinkingLevel: null });
+});
+
+it("preserves a saved native provider when the selected Desktop is offline", async () => {
+  fixtures.engines = { computer: "desktop", engines: [] };
   await render("opencode");
   expect(container.querySelector("[data-trigger]")?.textContent).toBe("OpenCode");
   expect(container.querySelector('[data-choice="native-opencode::default"]')).not.toBeNull();

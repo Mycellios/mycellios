@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { MycelliosDesktop } from "@mycellios/contracts";
 
 type Computer = NonNullable<MycelliosDesktop["computer"]>;
@@ -59,7 +60,7 @@ export function nativeComputerAdmission(
       pending = admission.then(async () => {
         if (!(await computer.projectAvailable?.()))
           throw new Error("Local computer access is unavailable. Reconnect Desktop first.");
-        if (!(await computer.requestAccess()))
+        if (!(await requestAccess(computer)))
           throw new Error("Local computer access was not allowed. The message was not sent.");
         // Prepare owned instructions before native provisioning. This admission
         // preserves the saved Team/dedicated assignment.
@@ -75,4 +76,24 @@ export function nativeComputerAdmission(
     }
     return pending;
   };
+}
+
+/**
+ * The bridge rejects (rather than refusing) when native main could not confirm the
+ * account with the server in time, for example while the server restarts. Say so
+ * plainly: the draft stays, so sending again retries once the server answers.
+ */
+async function requestAccess(computer: Computer): Promise<boolean> {
+  try {
+    return await computer.requestAccess();
+  } catch (cause) {
+    if (!isTransientBridgeFailure(cause)) throw cause;
+    throw new Error(t`Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment.`, { cause });
+  }
+}
+
+/** Electron flattens main-process errors into the message text, so only that survives. */
+function isTransientBridgeFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /TimeoutError|aborted due to timeout|temporarily unavailable|net::ERR_|Failed to fetch/i.test(message);
 }

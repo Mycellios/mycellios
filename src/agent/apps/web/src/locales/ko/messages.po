@@ -6484,6 +6484,10 @@ msgid "{title} deleted"
 msgstr "{title} 삭제됨"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title} 보관됨"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "대화를 삭제하지 못했습니다. 다시 시도해 주세요."
 

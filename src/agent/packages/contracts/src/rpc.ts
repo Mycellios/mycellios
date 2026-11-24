@@ -142,6 +142,7 @@ import {
   OPENAI_COMPATIBLE_PROVIDER_ID,
   REPLY_QUOTE_MAX_LENGTH,
   ReorderBotsInput,
+  RoutineRunInChoiceSchema,
   RoutineSchema,
   ScratchpadItemSchema,
   ScratchpadItemStatusSchema,
@@ -436,6 +437,10 @@ export const appContract = {
     apply: oc.input(ServerUpdateRequestSchema).output(ServerUpdateRunSchema),
   },
   engines: {
+    forBot: oc.input(z.object({ botId: Id })).output(z.object({
+      computer: z.enum(["desktop", "server"]),
+      engines: z.array(z.enum(["codex", "claude", "opencode"])),
+    })),
     codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
     codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),
     list: oc.output(
@@ -1012,6 +1017,8 @@ export const appContract = {
             runAt: IsoDate.optional(),
             /** Null removes the change trigger. */
             watch: RoutineWatchSchema.nullable().optional(),
+            /** Moves the routine's runs; a group routine keeps its group. */
+            runIn: RoutineRunInChoiceSchema.optional(),
           })
           .superRefine((value, ctx) => {
             if (

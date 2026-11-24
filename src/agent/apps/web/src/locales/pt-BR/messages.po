@@ -6484,6 +6484,10 @@ msgid "{title} deleted"
 msgstr "{title} excluída"
 
 #: src/components/MicoTaskTabs.tsx
+msgid "{title} archived"
+msgstr "{title} arquivada"
+
+#: src/components/MicoTaskTabs.tsx
 msgid "Could not delete the conversation. Try again."
 msgstr "Não foi possível excluir a conversa. Tente novamente."
 

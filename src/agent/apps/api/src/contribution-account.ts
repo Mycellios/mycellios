@@ -74,7 +74,9 @@ export function contributionAccount(token: string, transport: typeof fetch = fet
         schema: "mycellios-node-command/1", id: randomUUID(), nodeId,
         actor: { kind: "account", id: owner, scopes: ["node:control"] }, generation: node.generation,
         issuedAt: new Date(now).toISOString(), expiresAt: new Date(now + 300_000).toISOString(),
-        nonce: `nonce_${randomUUID().replaceAll("-", "")}`, type: action, payload: {},
+        nonce: `nonce_${randomUUID().replaceAll("-", "")}`, type: action,
+        // The coordinator's node-command contract requires a versioned payload; `{}` is a 400.
+        payload: { version: 1 },
       });
       return this.status(nodeId);
     },

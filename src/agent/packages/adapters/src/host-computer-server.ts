@@ -256,7 +256,29 @@ export async function startHostComputerServer(options: {
         await agentHost.message(input.sessionId, input.message, input.botId, input.runId, input.projectSessionId);
         yield { accepted: true }; return;
       }
-      yield* agentHost.run(input.sessionId, input.request, input.botId, input.runId, { ...context, projectSessionId: input.projectSessionId });
+      yield* agentHost.run(input.sessionId, input.request, input.botId, input.runId, {
+        ...context,
+        projectSessionId: input.projectSessionId,
+        resolveOpenCodeProject: async () => {
+          const sessionId = input.projectSessionId;
+          const task = sessionId ? taskProjects.get(sessionId) : undefined;
+          if (sessionId && (!task?.active || task.botId !== input.botId))
+            throw new Error("Link this task on this computer before continuing.");
+          const key = task?.key ?? input.botId;
+          const folder = projects.get(key);
+          const guard = projectGuards.get(key);
+          if (projectLocks.has(key)) throw new Error("Project link in progress");
+          if (!folder && !sessionId) return undefined;
+          await guard?.validate();
+          const current = folder && await realpath(folder);
+          if (!enabled || context.signal.aborted || projectLocks.has(key) ||
+              projects.get(key) !== folder || projectGuards.get(key) !== guard ||
+              (sessionId && (!task?.active || taskProjects.get(sessionId) !== task)) ||
+              !current || current !== folder)
+            throw new Error("The selected project changed. Open it again.");
+          return current;
+        },
+      });
       return;
     }
     if (
@@ -329,6 +351,7 @@ export async function startHostComputerServer(options: {
         yield {
           ...(await provider.environment()),
           chunkedWrites: true,
+          nativeEngines: await options.agentRuntime?.nativeEngines?.(),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,

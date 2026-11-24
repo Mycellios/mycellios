@@ -531,6 +531,16 @@ export function routineModelIssues(
   }
 }
 
+/**
+ * Where a routine's runs happen: its own conversation, the Mico's main chat, or the group it
+ * was created in (a group routine keeps its place).
+ */
+export const RoutineRunInSchema = z.enum(["thread", "chat", "group"]);
+export type RoutineRunIn = z.infer<typeof RoutineRunInSchema>;
+/** The places a person or a Mico can choose; a group is never chosen, only kept. */
+export const RoutineRunInChoiceSchema = z.enum(["thread", "chat"]);
+export type RoutineRunInChoice = z.infer<typeof RoutineRunInChoiceSchema>;
+
 export const RoutineSchema = z.object({
   id: Id,
   botId: Id,
@@ -560,6 +570,8 @@ export const RoutineSchema = z.object({
   createdAt: z.string(),
   /** When the routine is paused because one of its own runs paused it: that run's time. */
   pausedByRunAt: z.string().nullable().optional(),
+  /** Absent from older servers. */
+  runIn: RoutineRunInSchema.optional(),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
 
@@ -585,6 +597,8 @@ export const CreateRoutineInput = z
     modelId: z.string().trim().min(1).max(200).nullable().default(null),
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
     watch: RoutineWatchSchema.nullable().default(null),
+    /** Omitted: the routine's own conversation. */
+    runIn: RoutineRunInChoiceSchema.optional(),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);

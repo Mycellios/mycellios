@@ -466,14 +466,41 @@ describe("tab keyboard, mouse and menu", () => {
     expect(rpc.development.remove).not.toHaveBeenCalled();
   });
 
-  it("archives from the tab menu, which stops it on the server, and closes the tab", async () => {
-    const { host, select, rpc } = await setup("archive");
+  it("archives from the tab menu, which stops it on the server, closes the tab and offers Undo", async () => {
+    const changed = vi.fn();
+    const { host, select, rpc } = await setup("archive", "b", { onConversationsChanged: changed });
     await openMenu(host.querySelector('[data-thread-tab="b"]')!);
     await act(() => menuItem("Archive").click());
     await flush();
     expect(rpc.development.archive).toHaveBeenCalledWith({ botId: "mico", taskThreadId: "b" });
     expect(readConversationTabs("archive").ids).toEqual(["a", "c"]);
     expect(select).toHaveBeenLastCalledWith("a");
+    // The sidebar reads the Mico again, so a cancelled question leaves "Needs you".
+    expect(changed).toHaveBeenCalledOnce();
+    expect(toast).toHaveBeenCalledOnce();
+    const [message, options] = toast.mock.calls[0] as [string, { action: { label: string; onClick: () => void } }];
+    // Tests run the uncompiled macro, which drops a leading placeholder; the build keeps "{title} archived".
+    expect(message).toMatch(/archived$/);
+    expect(options.action.label).toBe("Undo");
+    await act(async () => { options.action.onClick(); await Promise.resolve(); });
+    await flush();
+    expect(rpc.development.restore).toHaveBeenCalledWith({ botId: "mico", taskThreadId: "b" });
+    expect(readConversationTabs("archive").ids).toContain("b");
+    expect(select).toHaveBeenLastCalledWith("b");
+    expect(changed).toHaveBeenCalledTimes(2);
+  });
+
+  it("deletes a conversation that only waits for an answer", async () => {
+    const { host, root, rpc } = await setup("waiting-delete", "a");
+    rpc.development.list!.mockResolvedValue(rows.map(row => row.threadId === "b" ? { ...row, state: "waiting" } : row));
+    await act(() => root.render(<MicoTaskTabs botId="mico" scope="waiting-delete" taskThreadId="a" rpc={rpc as unknown as RpcClient} onSelect={vi.fn()} refreshKey="1" />));
+    await flush();
+    expect(host.querySelector('[data-thread-tab="b"] [data-thread-status]')!.getAttribute("data-thread-status")).toBe("waiting");
+    await openMenu(host.querySelector('[data-thread-tab="b"]')!);
+    expect(menuItem("Delete").hasAttribute("data-disabled")).toBe(false);
+    await act(() => menuItem("Delete").click());
+    await flush();
+    expect(rpc.development.remove).toHaveBeenCalledWith({ botId: "mico", taskThreadId: "b" });
   });
 
   it("deletes at once with Undo that restores the tab at its place, and never while it works", async () => {

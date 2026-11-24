@@ -65,9 +65,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const me = meQuery.data ?? initialMe;
   const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: Boolean(me) });
   const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: Boolean(me) });
-  const enginesQuery = useQuery(queries.engines.list.queryOptions({ enabled: open }));
-  const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({ enabled: open && (enginesQuery.data ?? []).some(engine => engine.id === "codex" && engine.available) }));
-  const nativeModels = nativeCatalog.data ?? [];
+  const enginesQuery = useQuery(queries.engines.forBot.queryOptions({ input: { botId: bot.id }, enabled: open }));
+  const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({
+    enabled: open && enginesQuery.data?.computer === "server" && enginesQuery.data.engines.includes("codex"),
+  }));
+  const nativeModels = enginesQuery.data?.computer === "server" ? nativeCatalog.data ?? [] : [];
   const nativeModel = nativeModels.find(model => bot.nativeConfig?.modelId ? model.id === bot.nativeConfig.modelId : model.isDefault);
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
   const mycelliosConnection = credentials.find(connection => isMycelliosBaseUrl(connection.baseUrl));
@@ -133,11 +135,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   // A saved first-party model identifies Mycellios even before discovery returns.
   const currentProvider = nativeName ?? (model?.startsWith("mycellios/") || credential && isMycelliosBaseUrl(credential.baseUrl)
     ? "Mycellios" : connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? entry?.providerName ?? provider);
-  // Installed account providers live beside API connections in the same picker.
-  // OpenCode/ACP legacy selections stay visible, but new key connections never
-  // ask the user to select the implementation that executes their model.
-  const nativeProviders = [...new Set([
-    ...(enginesQuery.data ?? []).filter(engine => engine.available && (engine.id === "codex" || engine.id === "claude")).map(engine => engine.id as NativeProvider),
+  // The saved engine remains visible when its host is temporarily unavailable.
+  const nativeProviders = [...new Set<NativeProvider>([
+    ...(enginesQuery.data?.engines ?? []),
     ...(nativeEngine ? [nativeEngine] : []),
   ])];
   const nativeChoices = nativeProviders.filter(engine => engine !== "codex" || !nativeModels.length).map(engine => ({

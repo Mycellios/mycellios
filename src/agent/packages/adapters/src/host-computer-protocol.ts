@@ -1,5 +1,6 @@
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
+import type { NativeCodingEngine } from "@mycellios/adapter-kit";
 import { appControlRequest } from "./app-control.js";
 
 export const HOST_COMPUTER_MAX_BYTES = 12 * 1024 * 1024;
@@ -99,6 +100,7 @@ export interface HostComputerEnvironment {
   projectRoot?:boolean;
   projectSessionId?:string;
   taskIsolation?: "worktree-v1";
+  nativeEngines?: NativeCodingEngine[];
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
 }

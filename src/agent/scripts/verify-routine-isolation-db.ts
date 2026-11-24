@@ -301,6 +301,13 @@ try {
   await ensureRoutineThread(prisma, scope, brief.id);
   assert.equal((await prisma.thread.findUniqueOrThrow({ where: { id: briefThread.id } })).archivedAt, null);
   checks.push("a run brings an archived routine conversation back; a change check that starts no run does not");
+  await prisma.routine.update({ where: { id: brief.id }, data: { threadId: null } });
+  assert.equal((await ensureRoutineThread(prisma, scope, brief.id)).id, briefThread.id);
+  assert.equal((await prisma.routine.findUniqueOrThrow({ where: { id: brief.id } })).threadId, briefThread.id);
+  await prisma.routine.update({ where: { id: brief.id }, data: { threadId: mainId } });
+  assert.equal((await ensureRoutineThread(prisma, scope, brief.id)).id, mainId);
+  checks.push("a routine moved to the main chat runs there; moved back it reuses its own conversation, never a second one");
+  // Deleted while it runs in the main chat: its own conversation is still archived.
   const briefRow = await prisma.routine.findUniqueOrThrow({ where: { id: brief.id } });
   assert.equal(await prisma.$transaction(tx => archiveRoutineThreadInTransaction(tx, { ...briefRow, userId: "foreign" })), false);
   await prisma.$transaction(async tx => {

@@ -304,10 +304,12 @@ export function computerRoutes(ctx: RouterContext) {
           deps.prisma, context.actor, computer.id, bot.id, "browser.handoff", input.runId,
         );
         if (!screenContext.screenLeaseId) return { state: "unavailable" as const };
+        // A loaded host takes several seconds for one browser command; a timeout here sends the
+        // person to the whole desktop instead of the tab, so allow for it.
         const result = await deps.sandbox.pageBrowser(
           toComputerRef(computer),
           { command: "focus" },
-          { ...screenContext, browserThreadId: run.threadId, signal: AbortSignal.timeout(5_000) },
+          { ...screenContext, browserThreadId: run.threadId, signal: AbortSignal.timeout(BROWSER_FOCUS_TIMEOUT_MS) },
         ).catch(() => null);
         return { state: result?.ok === true ? "focused" as const : "unavailable" as const };
       }),
@@ -898,6 +900,7 @@ export function computerRoutes(ctx: RouterContext) {
   };
 }
 
+const BROWSER_FOCUS_TIMEOUT_MS = 20_000;
 const BOOT_LEASE_RETRY_MS = 250;
 const BOOT_LEASE_ATTEMPTS = 20;
 

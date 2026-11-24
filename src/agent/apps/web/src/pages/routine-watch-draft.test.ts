@@ -8,7 +8,26 @@ vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (strings: TemplateStringsArray) => strings.join("") }),
 }));
 
-import { emptyWatchDraft, watchFromDraft } from "./RoutineEditor";
+import type { Routine } from "@mycellios/contracts";
+import { draftFromRoutine, emptyRoutineDraft, emptyWatchDraft, watchFromDraft } from "./RoutineEditor";
+
+describe("routine run place in the editor", () => {
+  const routine: Routine = {
+    id: "routine-1", botId: "bot-1", name: "Brief", prompt: "Summarize", crons: [], timezone: "UTC",
+    active: true, notify: true, webhookEnabled: true, githubEnabled: false, messageProvider: null,
+    modelProvider: null, modelId: null, thinkingLevel: null, watch: null, watchState: null,
+    lastRunAt: null, nextRunAt: null, createdAt: "2026-11-01T00:00:00.000Z",
+  };
+
+  it("offers the switch only for a place a person can choose", () => {
+    expect(emptyRoutineDraft().runIn).toBe("thread");
+    expect(draftFromRoutine({ ...routine, runIn: "thread" }).runIn).toBe("thread");
+    expect(draftFromRoutine({ ...routine, runIn: "chat" }).runIn).toBe("chat");
+    expect(draftFromRoutine({ ...routine, runIn: "group" }).runIn).toBeUndefined();
+    // An older server does not say where its routines run.
+    expect(draftFromRoutine(routine).runIn).toBeUndefined();
+  });
+});
 
 describe("watchFromDraft", () => {
   it("splits paths by line and drops blanks", () => {

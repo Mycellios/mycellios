@@ -1352,6 +1352,7 @@ describeJourneys("required product journeys", () => {
         botId: bot.id,
         userId: me.userId,
         threadId: group.threadId,
+        inGroup: true,
         name: "Group ping",
         prompt: "say group-reminder-ok",
         schedule: { delaySeconds: 30 },
@@ -1410,6 +1411,8 @@ describeJourneys("required product journeys", () => {
         botId: bot.id,
         userId: me.userId,
         threadId: dmThread.id,
+        // A routine in the main chat, as chosen; by default it would get its own conversation.
+        runIn: "chat",
         name: "DM ping",
         prompt: "say dm-reminder-ok",
         schedule: { delaySeconds: 30 },
