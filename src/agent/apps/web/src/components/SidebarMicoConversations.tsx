@@ -64,7 +64,7 @@ export function HoverConversations({ rows, summary, onOpen }: {
   const open = total || summary?.open || 0;
   const count = summary?.waiting ?? 0;
   const unread = summary?.unread ?? 0;
-  return <div data-testid="hover-conversations" className="mt-1 flex flex-col gap-0.5 border-t border-border pt-1.5">
+  return <div data-testid="hover-conversations" className="mt-1 flex min-w-0 flex-col gap-0.5 border-t border-border pt-1.5">
     <p className="text-[11px] font-medium text-muted-foreground">{t`Conversations: ${open}`}</p>
     {shown.length ? shown.map(row => <ConversationLine key={row.threadId} row={row} active={false} compact onOpen={onOpen} />)
       : <p className="text-xs text-muted-foreground">
