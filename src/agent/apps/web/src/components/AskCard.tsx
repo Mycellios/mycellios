@@ -7,6 +7,7 @@ import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@m
 import { Button, Input, Textarea } from "@mycellios/ui-web";
 import { useState } from "react";
 import { rpc } from "../lib/rpc";
+import { LocationAskCard } from "./LocationAskCard";
 import { PlanCard } from "./PlanCard";
 import { QuestionnaireCard } from "./QuestionnaireCard";
 import { QuestionOption } from "./QuestionOption";
@@ -58,12 +59,15 @@ export function AskCard({
   block,
   canAnswer,
   canDismiss,
+  isRunUser = true,
   onAnswer,
   onDismiss,
 }: {
   block: AskBlock;
   canAnswer: boolean;
   canDismiss: boolean;
+  /** False when another member of a shared chat views the card: a location comes only from the person asked. */
+  isRunUser?: boolean;
   onAnswer: (text: string, username?: string) => Promise<void>;
   /** Turns down a secret request without a value. */
   onDismiss: () => Promise<void>;
@@ -142,6 +146,9 @@ export function AskCard({
     }
   }
 
+  if (block.location) {
+    return <LocationAskCard block={block} canAnswer={canAnswer} isRunUser={isRunUser} onAnswer={text => onAnswer(text, undefined)} />;
+  }
   if (block.plan) {
     return <PlanCard block={block} canAnswer={canAnswer} onAnswer={text => onAnswer(text, undefined)} />;
   }

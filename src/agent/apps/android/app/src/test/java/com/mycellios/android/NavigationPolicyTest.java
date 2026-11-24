@@ -6,6 +6,10 @@ public class NavigationPolicyTest {
   assertTrue(NavigationPolicy.mayRecord("https://www.mycellios.com/agent/app?m=owned"));
   for(String s:new String[]{"http://www.mycellios.com/agent/app","https://www.mycellios.com.evil/agent/app","https://evil@www.mycellios.com/agent/app","https://www.mycellios.com:444/agent/app","https://www.mycellios.com/agent/auth/v1/login","https://www.mycellios.com/agent/api/auth","https://www.mycellios.com/agent/%61pp","https://www.mycellios.com/agent/app/../api"}) assertFalse(s,NavigationPolicy.mayRecord(s));
  }
+ @Test public void admitsOnlyPackagedChatForLocation() {
+  assertTrue(NavigationPolicy.mayLocate("https://www.mycellios.com/agent/app/bot_1?task=t"));
+  for(String s:new String[]{"http://www.mycellios.com/agent/app","https://www.mycellios.com.evil/agent/app","https://www.mycellios.com/agent/auth","https://www.mycellios.com/agent/app/artifacts","https://www.mycellios.com/agent/app/../api",NavigationPolicy.BOOTSTRAP}) assertFalse(s,NavigationPolicy.mayLocate(s));
+ }
  @Test public void authenticationNeverReceivesMicrophone() {
   assertTrue(NavigationPolicy.appRoute("https://www.mycellios.com/agent/auth"));
   assertFalse(NavigationPolicy.mayRecord("https://www.mycellios.com/agent/auth"));

@@ -24,7 +24,10 @@ export function createSecretMigrationRepository(prisma: PrismaClient): SecretMig
               ref: row.ciphertext,
               recordId:
                 label === "integrationProviderConfig" ? `integration-provider:${row.id}` : row.id,
-              ephemeral: row.kind?.startsWith("run-secret:"),
+              // One-time run answers (secrets and location cards) end with their run and are
+              // deleted only from this database, so they never move to an external store.
+              ephemeral:
+                row.kind?.startsWith("run-secret:") || row.kind?.startsWith("run-location:"),
             };
           if (batch.length < 100) break;
           cursor = batch.at(-1)?.id;

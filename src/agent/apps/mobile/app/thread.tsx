@@ -4947,7 +4947,8 @@ function AskBlock({
         >
           {secretInput
             ? t(dismissed || ask.dismissed ? "Dismissed" : "Saved")
-            : t("Answered: {answer}", { answer: ask.answer ?? t("Done") })}
+            : // A location card stores no answer; this preview answers it by typing a place.
+              t("Answered: {answer}", { answer: ask.answer || t("Done") })}
         </Text>
       ) : canAnswer && ownerOnly ? null : canAnswer && loginInput ? (
         <View style={askInputStyles.buttons}>

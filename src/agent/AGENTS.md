@@ -2339,6 +2339,27 @@
   (a side conversation's card mirrored into the main chat answers through that same operation).
   Skip supplies no authorization. Credentials and protected actions keep their
   dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.
+- `ask_location` follows the reference app's location request (behavior reference only, our
+  own words): a pausing ask with a `location` field, offered only to person-started turns
+  (never routines, webhooks, background or Mico-started work, outside chats, calls or
+  call_end). Only the run's user answers, on the card, through the same fenced answer
+  operation (a composer message retires the card with no text or outcome): Share location
+  reads the browser position once on that click (no watch), rounded to three decimals
+  (~100 m) on the device and again on the server; typing a place or declining works
+  everywhere, and Desktop offers only typing. A position or place never enters the task
+  prompt, the card or events: the run secret writer encrypts it under runLocationKind (local
+  only; secret-store migration treats it as ephemeral), every path that ends a run deletes it
+  with the run's other one-time answers, and the task keeps LOCATION_ANSWER_NOTE, which the
+  executor replaces in the model prompt only. An unreadable answer gives the turn the note,
+  never a failure. Run previews show the source request instead of that note. Tool labels,
+  commands, output, activity notes, plans, completion errors, ask_user and approval card text
+  and their notifications hide the answer through locationRedactionPatterns (case-insensitive,
+  URL-encoded spaces/commas, never inside a longer word or number; places and parts under
+  five letters stay visible). The model's reply, narration and helper summaries are not
+  redacted, nor are other spellings. Never log the answer. The Android host grants WebView
+  geolocation only to packaged chat routes, without retaining the grant; the Expo preview
+  answers by typing. Verify location-request (contracts/core), location-answer, run-location,
+  ask-location, runs and LocationAskCard tests and NavigationPolicyTest.
 
 - Mycellios creation keeps the authenticated viewer pinned for quote, execute,
   status, content and checkout. Keep stable purchase keys, quote-before-confirm,

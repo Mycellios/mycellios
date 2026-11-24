@@ -8,8 +8,17 @@ export function runSecretKind(runId: string): string {
 }
 
 /**
- * An ended run never reads its waiting answer, so drop it with the run. The answer is stored
- * under the run's user and space, which also keeps this delete on the secrets index.
+ * A location card's position or place waits encrypted under this kind for the run's attempts,
+ * and goes with the run's other one-time answers when the run ends.
+ */
+export function runLocationKind(runId: string): string {
+  return `run-location:${runId}`;
+}
+
+/**
+ * An ended run never reads its waiting answers (a secret or a location), so drop them with the
+ * run. They are stored under the run's user and space, which also keeps this delete on the
+ * secrets index.
  */
 export async function deleteRunSecretsInTransaction(
   tx: Pick<Prisma.TransactionClient, "secret">,
@@ -21,7 +30,7 @@ export async function deleteRunSecretsInTransaction(
       OR: runs.map((run) => ({
         userId: run.userId,
         spaceId: run.spaceId,
-        kind: runSecretKind(run.id),
+        kind: { in: [runSecretKind(run.id), runLocationKind(run.id)] },
       })),
     },
   });

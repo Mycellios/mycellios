@@ -1,4 +1,5 @@
 import { isSecretAskBlock } from "./action-approval.js";
+import { isLocationAskBlock } from "./location-request.js";
 
 type AskSnapshot = {
   messages: readonly {
@@ -27,7 +28,10 @@ export function answerableAskMessageIds(snapshot: AskSnapshot | null): Set<strin
   return answerable;
 }
 
-/** Secret requests can only be dismissed by the user of their run. */
+/**
+ * Secret requests can only be dismissed by the user of their run, and only that user answers a
+ * location request.
+ */
 export function dismissableAskMessageIds(
   snapshot: AskSnapshot | null,
   userId?: string,
@@ -44,7 +48,10 @@ export function dismissableAskMessageIds(
     if (
       message.runId &&
       ownedRunIds.has(message.runId) &&
-      message.blocks.some((block) => isSecretAskBlock(block) && block.status !== "answered")
+      message.blocks.some(
+        (block) =>
+          (isSecretAskBlock(block) || isLocationAskBlock(block)) && block.status !== "answered",
+      )
     ) {
       dismissable.add(message.id);
     }

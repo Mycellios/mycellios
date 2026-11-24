@@ -9,6 +9,7 @@ import {
   abortableDelay,
   BOT_MESSAGE_WAKE_CUE,
   inferHandoffTargetName,
+  LOCATION_ANSWER_MARKER,
   MODEL_CONTEXT_TOO_SMALL_ERROR,
   MODEL_OUTPUT_CUT_ERROR,
   modelFallbackFailure,
@@ -130,6 +131,7 @@ export class ScriptedAgentRuntime implements AgentRuntime {
             text: turn.ask.text,
             detail: turn.ask.detail,
             actions: turn.ask.actions,
+            ...(turn.ask.location ? { location: true as const } : {}),
           };
           return;
         }
@@ -363,6 +365,18 @@ code-a
 code-b
 \`\`\``,
         complete: true,
+      },
+    ];
+  }
+  // A location card (ask_location); the resumed turn never repeats the place it received.
+  if (prompt.includes(LOCATION_ANSWER_MARKER)) {
+    return [{ assistant: "thanks. i have the place for this request.", complete: true }];
+  }
+  if (lower.includes("restaurants near me")) {
+    return [
+      {
+        assistant: "i need your location first.",
+        ask: { text: "Where should I look for restaurants?", location: true },
       },
     ];
   }

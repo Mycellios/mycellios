@@ -172,7 +172,7 @@ describe("expireStuckRun", () => {
       data: { status: "cancelled" },
     });
     expect(client.secret.deleteMany).toHaveBeenCalledWith({
-      where: { OR: [{ userId: "user-1", spaceId: "space-1", kind: "run-secret:run-1" }] },
+      where: { OR: [{ userId: "user-1", spaceId: "space-1", kind: { in: ["run-secret:run-1", "run-location:run-1"] } }] },
     });
   });
 

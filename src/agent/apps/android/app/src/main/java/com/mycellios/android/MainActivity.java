@@ -42,6 +42,9 @@ public class MainActivity extends Activity {
   private boolean foreground, awaitingPermission, permissionReady, chatReady;
   private ValueCallback<Uri[]> files;
   private PermissionRequest webPermission;
+  // One pending page request for the position, answered after Android's location permission.
+  private GeolocationPermissions.Callback locationCallback;
+  private String locationOrigin;
   private String pushRequest,pushAccount,pendingNotification,pendingNotificationOwner;
   private long pushEpoch;
   private final java.util.concurrent.ExecutorService pushExecutor=java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -64,6 +67,9 @@ public class MainActivity extends Activity {
     WebSettings s=web.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);
     s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
     s.setMediaPlaybackRequiresUserGesture(true);
+    // The chat's location card reads the position once on a tap; the prompt below admits only
+    // packaged chat routes on the first-party origin and never remembers the grant.
+    s.setGeolocationEnabled(true);
     CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
     WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
     try {
@@ -146,6 +152,14 @@ public class MainActivity extends Activity {
         else {webPermission=request;requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},2);}
       });}
       @Override public void onPermissionRequestCanceled(PermissionRequest request){if(webPermission==request)webPermission=null;}
+      @Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback callback){runOnUiThread(()->{
+        if(!foreground || !NavigationPolicy.mayLocate(web.getUrl()) || !NavigationPolicy.trustedOrigin(origin)){callback.invoke(origin,false,false);return;}
+        if(hasLocationPermission()){callback.invoke(origin,true,false);return;}
+        if(locationCallback!=null)locationCallback.invoke(locationOrigin,false,false);
+        locationCallback=callback;locationOrigin=origin;
+        requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION},5);
+      });}
+      @Override public void onGeolocationPermissionsHidePrompt(){locationCallback=null;locationOrigin=null;}
       @Override public boolean onShowFileChooser(WebView v,ValueCallback<Uri[]> result,FileChooserParams params){
         if(!foreground || !NavigationPolicy.mayRecord(web.getUrl()))return false;
         if(files!=null)files.onReceiveValue(null);files=result;
@@ -258,7 +272,16 @@ public class MainActivity extends Activity {
   @Override protected void onDestroy(){pushRequest=null;pushExecutor.shutdownNow();NativePush.foreground(false);stopSpeech();if(web!=null){web.removeAllViews();web.destroy();}super.onDestroy();}
   @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);web.saveState(state);}
   @Override public void onBackPressed(){if(captureId!=null){finishSpeech();return;}if(web.canGoBack())web.goBack();else super.onBackPressed();}
-  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==4){finishPushPermission();return;}awaitingPermission=false;
+  private boolean hasLocationPermission(){
+    return checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+  }
+  // The permission dialog pauses the activity, so the route check stands in for foreground here.
+  private void finishLocationPermission(){
+    if(locationCallback==null)return;
+    locationCallback.invoke(locationOrigin,hasLocationPermission() && NavigationPolicy.mayLocate(web.getUrl()),false);
+    locationCallback=null;locationOrigin=null;
+  }
+  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==4){finishPushPermission();return;}if(request==5){finishLocationPermission();return;}awaitingPermission=false;
     boolean granted=grants.length>0 && grants[0]==PackageManager.PERMISSION_GRANTED;
     if(request==1 && captureId!=null){if(granted){if(foreground)startSpeech();else permissionReady=true;}else speechError("Microphone permission is required. Try again after allowing it.");}
     if(request==2 && webPermission!=null){if(granted && foreground && NavigationPolicy.mayRecord(web.getUrl()))webPermission.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});else webPermission.deny();webPermission=null;}

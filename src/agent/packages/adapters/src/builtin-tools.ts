@@ -8,6 +8,7 @@ import {
   BotSecretName,
   botSecretDestinationSchema,
   FLEET_TOOL_NAMES,
+  LOCATION_REASON_MAX_LENGTH,
   SecretAskPurpose,
   SecretHttpRequest,
   TICKET_COMMENT_MAX_LENGTH,
@@ -584,6 +585,24 @@ export const builtinAgentTools: ConnectorTool[] = [
         }, required: ["question"], additionalProperties: false } },
       },
       required: ["question"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "ask_location",
+    description:
+      "Ask the person where they are when the request depends on it (for example \"restaurants near me\" or \"weather here\") and no place is known from the conversation. Shows a card and waits: the person can share their current location once, type a place, or decline. Nothing is sent until they answer. Give a short reason in their language. The answer is for this request only: never save it to memory, files, notes or schedules. Do not use it when the person already named a place.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          minLength: 1,
+          maxLength: LOCATION_REASON_MAX_LENGTH,
+          description: "One short sentence shown on the card: what the location is for.",
+        },
+      },
+      required: ["reason"],
       additionalProperties: false,
     },
   },

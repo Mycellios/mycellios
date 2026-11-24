@@ -2,6 +2,7 @@ import * as z from "zod";
 import { AgentImportSetupItemSchema } from "./agent-import-setup.js";
 import { botSecretDestinationSchema } from "./bot-secrets.js";
 import { AgentQuestions } from "./questionnaire.js";
+import { LocationAskOutcome } from "./location-request.js";
 import { Id } from "./ids.js";
 import { McpTransportSchema } from "./mcp.js";
 
@@ -165,6 +166,11 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     answer: z.string().optional(),
     /** A secret request the user dismissed instead of answering. */
     dismissed: z.literal(true).optional(),
+    /**
+     * A one-time location request (ask_location). The card keeps only how it was answered;
+     * the coordinates or typed place reach that turn and are never stored on the card.
+     */
+    location: z.object({ outcome: LocationAskOutcome.optional() }).optional(),
     /**
      * A plan card (acknowledge_request): the steps the Mico will take, shown under the ask text.
      * The server answers "start" by itself at autoStartAt when nobody answers first.

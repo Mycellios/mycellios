@@ -1080,7 +1080,9 @@ export class PiAgentRuntime implements AgentRuntime {
               !restored.restartInterrupted &&
               request.resumeToolResult?.content.some((part) => part.text.trim()) &&
               unresolvedCalls.some(
-                (call) => call.id === restored.pendingToolCallId && call.name === "ask_user",
+                (call) =>
+                  call.id === restored.pendingToolCallId &&
+                  (call.name === "ask_user" || call.name === "ask_location"),
               )
             ) {
               // The executor only resumes an ask_user checkpoint after the answer is

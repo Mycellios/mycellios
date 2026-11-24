@@ -139,6 +139,11 @@ import {
   userRunError,
   userTurnMessageForRun,
   desktopSetupInterruptedMessage,
+  ASK_LOCATION_TOOL,
+  isLocationAnswerPrompt,
+  hideLocationValues,
+  locationRedactionPatterns,
+  withLocationAnswer,
 } from "@mycellios/core";
 import {
   isSiteFetchTool,
@@ -464,6 +469,7 @@ import { renderRoutineHandoff } from "./routine-context.js";
 import { lazyRunComputer } from "./run-computer.js";
 import {
   commitConsumedRunSecret,
+  loadRunLocation,
   normalizeSecretAskPurpose,
   reconcileManagedConnection,
   resolveCompletedSecretLeftover,
@@ -3085,15 +3091,19 @@ export async function appendToolCompletionAudit(
   target: { spaceId: string; threadId: string; botId: string; runId: string },
   completion: AgentToolCompletion,
   secrets: string[] = [],
+  /** Hides further values (a location card's answer) in the kept error text. */
+  hide?: (text: string) => string,
 ): Promise<void> {
   try {
+    const payload = toolCompletionAuditPayload(completion, secrets);
+    if (hide && typeof payload.error === "string") payload.error = hide(payload.error);
     await deps.events.append({
       spaceId: target.spaceId,
       threadId: target.threadId,
       botId: target.botId,
       runId: target.runId,
       type: "agent.tool.completed",
-      payload: toolCompletionAuditPayload(completion, secrets),
+      payload,
     });
   } catch (error) {
     // A tool that finishes after its run was cancelled has no history to join.
@@ -4069,6 +4079,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
       };
 
       const runSecrets = [...deps.secrets];
+      // A location card's answer stays readable for the model and its tools; only the activity
+      // this run keeps in the chat (tool labels, commands, output, notes) hides it.
+      const locationRedactions: RegExp[] = [];
+      const hideLocation = (text: string) =>
+        locationRedactions.length ? hideLocationValues(text, locationRedactions) : text;
+      // An approval card shows the action (a fetch URL with lat/lon, say): hide the answer in what
+      // it shows, never in the effect it approves or an instruction edit it carries.
+      const hideLocationInApprovalCard = (block: MessageBlock): MessageBlock =>
+        block.kind === "ask" && locationRedactions.length && !block.instructionUpdate
+          ? {
+              ...block,
+              text: hideLocation(block.text),
+              ...(block.detail ? { detail: hideLocation(block.detail) } : {}),
+            }
+          : block;
       let dispatchHandedOff = false;
       try {
         // Durable run ownership and its heartbeat now carry recovery. Model,
@@ -4160,6 +4185,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               )?.seq ??
               thread.nextMessageSeq)
             : thread.nextMessageSeq;
+        // A location card's position or place waits encrypted with the run, never in the task:
+        // only the model prompt of this run's attempts receives it, and the tool activity kept
+        // in the chat hides it.
+        const runLocation = isLocationAnswerPrompt(task.prompt)
+          ? await loadRunLocation(deps.prisma, deps.secretStore, run)
+          : null;
+        if (runLocation) locationRedactions.push(...locationRedactionPatterns(runLocation));
         const agentEnvironment = await decryptAgentEnvironment(agentSecretRows, deps.secretStore);
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
@@ -6269,12 +6301,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               leaseOwner: workerId,
               leaseFence: fence,
               blocks: [
-                buildApprovalAskBlock(
-                  applied!.effect.id,
-                  name,
-                  name === "propose_instructions_update" ? { ...args, botId: bot.id } : args,
-                  runSecrets,
-                  { reviewReason, summary: fleetSummary },
+                hideLocationInApprovalCard(
+                  buildApprovalAskBlock(
+                    applied!.effect.id,
+                    name,
+                    name === "propose_instructions_update" ? { ...args, botId: bot.id } : args,
+                    runSecrets,
+                    { reviewReason, summary: fleetSummary },
+                  ),
                 ),
               ],
             });
@@ -6401,7 +6435,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 botId: bot.id,
                 runId,
                 type: "computer.command",
-                payload,
+                // Commands and output are kept as the turn's tool steps.
+                payload: {
+                  ...payload,
+                  command: hideLocation(payload.command),
+                  cwd: hideLocation(payload.cwd),
+                  output: hideLocation(payload.output),
+                },
               })
               // The Activity feed is a view; losing an entry must not fail the tool.
               // Output that arrives after the run was cancelled has no history to join.
@@ -8908,7 +8948,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           currentTurnImages,
         );
         const taskPrompt = expandSkillReferencesInPrompt(
-          [task.prompt, attachedFilesPrompt, missingImagesInstruction].filter(Boolean).join("\n\n"),
+          [withLocationAnswer(task.prompt, runLocation), attachedFilesPrompt, missingImagesInstruction]
+            .filter(Boolean)
+            .join("\n\n"),
           agentSkills,
         );
         const invokedSkill = savedSkills.find((skill) =>
@@ -9360,6 +9402,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   },
                   completion,
                   runSecrets,
+                    hideLocation,
                 );
               },
               // Read only: a message sent into this turn that it has not taken yet.
@@ -9507,26 +9550,29 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 type: "thread.progress",
                 runId,
                 payload: {
-                  text: redactSecrets(event.text, runSecrets),
+                  // Activity lines become the kept tool step details.
+                  text: hideLocation(redactSecrets(event.text, runSecrets)),
                   ...(event.activity ? { activity: true } : {}),
                   ...(event.waiting ? { waiting: event.waiting, since: new Date().toISOString() } : {}),
                 },
               });
             } else if (event.type === "ask") {
               if (!(await renewRunLease(deps, runId, workerId, fence))) return;
-              const safeText = redactSecrets(event.text, runSecrets);
+              // Ask cards and their notifications are kept: hide a location card answer there too.
+              const safeAskText = (text: string) => hideLocation(redactSecrets(text, runSecrets));
+              const safeText = safeAskText(event.text);
               const safeDetail = event.detail
-                ? redactSecrets(event.detail, runSecrets)
+                ? safeAskText(event.detail)
                 : event.detail;
               const safeActions = event.actions?.map((action) => ({
                 id: action.id,
-                label: redactSecrets(action.label, runSecrets),
+                label: safeAskText(action.label),
               }));
               const safeQuestions = event.questions?.map(question => ({
-                ...question, id: redactSecrets(question.id, runSecrets), question: redactSecrets(question.question, runSecrets),
+                ...question, id: redactSecrets(question.id, runSecrets), question: safeAskText(question.question),
                 options: question.options.map(option => ({ ...option,
-                  label: redactSecrets(option.label, runSecrets),
-                  ...(option.description ? { description: redactSecrets(option.description, runSecrets) } : {}),
+                  label: safeAskText(option.label),
+                  ...(option.description ? { description: safeAskText(option.description) } : {}),
                 })),
               }));
               // A plan card starts by itself when nobody answers within the owner's wait;
@@ -9537,8 +9583,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               const safePlan = event.plan
                 ? {
                     steps: event.plan.steps.map((step) => ({
-                      label: redactSecrets(step.label, runSecrets),
-                      text: redactSecrets(step.text, runSecrets),
+                      label: safeAskText(step.label),
+                      text: safeAskText(step.text),
                     })),
                     ...(planAutoStartAt ? { autoStartAt: planAutoStartAt.toISOString() } : {}),
                   }
@@ -9563,6 +9609,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     actions: safeActions,
                     ...(safeQuestions ? { questions: safeQuestions } : {}),
                     ...(safePlan ? { plan: safePlan } : {}),
+                    ...(event.location ? { location: {} } : {}),
                   },
                 ],
                 // Keep unredacted labels on the run for resume; message blocks stay redacted.
@@ -9656,7 +9703,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return;
             } else if (event.type === "tool") {
               if (event.name === WORK_PLAN_TOOL) {
-                latestPlan = workPlanBlock(event.args, (text) => redactSecrets(text, runSecrets)) ?? latestPlan;
+                latestPlan =
+                  workPlanBlock(event.args, (text) => hideLocation(redactSecrets(text, runSecrets))) ??
+                  latestPlan;
               }
               // Preserve event ordering when the throttle still holds recent narration: the
               // client must see that text before the tool call it describes.
@@ -9667,9 +9716,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 await publishMidTurnNarration();
               }
               assistantTurnBreakPending = true;
-              const toolLabel = redactSecrets(
-                describeToolActivity(event.name, event.args),
-                runSecrets,
+              const toolLabel = hideLocation(
+                redactSecrets(describeToolActivity(event.name, event.args), runSecrets),
               );
               await deps.events.append({
                 spaceId: run.spaceId,
@@ -9713,6 +9761,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       result,
                     ),
                     runSecrets,
+                    hideLocation,
                   );
                   if (isToolPauseResult(result)) return;
                 } catch (error) {
@@ -9731,6 +9780,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       error,
                     },
                     runSecrets,
+                    hideLocation,
                   );
                   throw error;
                 }
@@ -10774,6 +10824,13 @@ export function selectBuiltinToolsForRun(options: {
           "generate_video",
         ].includes(tool.name)) &&
       (options.voiceCall || tool.name !== "end_call") &&
+      // A location card needs the person in this chat: never routines, webhooks, background
+      // or Mico-started work, outside chats or calls.
+      (tool.name !== ASK_LOCATION_TOOL ||
+        (fleetToolsAllowed &&
+          options.trigger !== "call_end" &&
+          !options.messagingChannelRun &&
+          !options.voiceCall)) &&
       // Already on a call, or reached through a messaging channel that cannot ring.
       ((options.phoneCallsEnabled &&
         !options.groupId &&

@@ -7,7 +7,7 @@ function fixture() {
     secret: Array.from({ length: 101 }, (_, i) => ({
       id: `row-${String(i).padStart(3, "0")}`,
       ciphertext: `fake-ref-${i}`,
-      kind: i === 0 ? "run-secret:run" : "model",
+      kind: i === 0 ? "run-secret:run" : i === 1 ? "run-location:run" : "model",
     })),
     botSecret: [{ id: "bot-row", ciphertext: "fake-bot-ref" }],
     integrationProviderConfig: [{ id: "composio", ciphertext: "fake-config-ref" }],
@@ -57,6 +57,9 @@ describe("migration persistence", () => {
     for await (const row of f.repository.rows()) rows.push(row);
     expect(rows).toHaveLength(103);
     expect(rows[0]).toMatchObject({ ephemeral: true, id: "row-000", label: "secret" });
+    // A location card's answer stays local like a one-time secret.
+    expect(rows[1]).toMatchObject({ ephemeral: true, id: "row-001", label: "secret" });
+    expect(rows[2]?.ephemeral).toBe(false);
     expect(rows.at(-1)).toMatchObject({
       id: "composio",
       recordId: "integration-provider:composio",

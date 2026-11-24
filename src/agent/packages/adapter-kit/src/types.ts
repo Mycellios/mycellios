@@ -610,7 +610,7 @@ export interface AgentRunRequest {
 export interface ScriptedTurn {
   assistant?: string;
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-  ask?: { text: string; detail?: string; actions?: Array<{ id: string; label: string }> };
+  ask?: { text: string; detail?: string; actions?: Array<{ id: string; label: string }>; location?: true };
   takeover?: { reason: string };
   files?: Array<{ path: string; content: string }>;
   memory?: Array<{ scope: "bot" | "user"; path: string; content: string }>;
@@ -683,6 +683,8 @@ export type AgentRuntimeEvent =
       actions?: Array<{ id: string; label: string }>;
       /** A plan card's steps (acknowledge_request); the executor adds its auto-start time. */
       plan?: { steps: Array<{ label: string; text: string }> };
+      /** A one-time location request (ask_location): the card asks for a place, not a reply. */
+      location?: true;
     }
   | { type: "takeover"; reason: string; executionId?: string }
   | ({

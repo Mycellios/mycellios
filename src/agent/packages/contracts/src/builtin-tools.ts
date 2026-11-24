@@ -38,6 +38,7 @@ export const BUILTIN_TOOL_NAMES = [
   "launch_app",
   "request_takeover",
   "ask_user",
+  "ask_location",
   "await_event",
   "list_waits",
   "close_wait",

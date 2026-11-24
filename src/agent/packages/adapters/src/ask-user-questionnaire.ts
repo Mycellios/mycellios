@@ -1,5 +1,5 @@
-import { AgentQuestions } from "@mycellios/contracts";
-import { PLAN_CARD_TOOL } from "@mycellios/core";
+import { AgentQuestions, LOCATION_REASON_MAX_LENGTH } from "@mycellios/contracts";
+import { ASK_LOCATION_TOOL, PLAN_CARD_TOOL } from "@mycellios/core";
 import { planCardQuestionnaire } from "./plan-card.js";
 
 /** Same form payload for API and native models; old string choices remain compatible. */
@@ -37,14 +37,23 @@ function normalizeOptions(value: unknown) {
   });
 }
 
-const PAUSING_ASK_TOOLS = new Set(["ask_user", PLAN_CARD_TOOL]);
+const PAUSING_ASK_TOOLS = new Set(["ask_user", ASK_LOCATION_TOOL, PLAN_CARD_TOOL]);
 
 /** Tools that pause the turn on a card until the user answers. */
 export function isPausingAskTool(name: string): boolean {
   return PAUSING_ASK_TOOLS.has(name);
 }
 
-/** The ask event for a pausing tool: an ask_user form or a plan card. */
+/** The card ask_location pauses on: why the Mico needs the place, and nothing else. */
+export function askLocationQuestionnaire(args: Record<string, unknown>) {
+  const reason = typeof args.reason === "string" ? args.reason.trim() : "";
+  if (!reason) throw new Error("ask_location requires a short reason");
+  return { text: reason.slice(0, LOCATION_REASON_MAX_LENGTH), location: true as const };
+}
+
+/** The ask event for a pausing tool: an ask_user form, a location card or a plan card. */
 export function pausingQuestionnaire(name: string, args: Record<string, unknown>) {
-  return name === PLAN_CARD_TOOL ? planCardQuestionnaire(args) : askUserQuestionnaire(args);
+  if (name === PLAN_CARD_TOOL) return planCardQuestionnaire(args);
+  if (name === ASK_LOCATION_TOOL) return askLocationQuestionnaire(args);
+  return askUserQuestionnaire(args);
 }
