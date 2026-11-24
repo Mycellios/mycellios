@@ -370,6 +370,34 @@ describe("Mycellios account RPC authorization", () => {
       message: "Mycellios credits are temporarily unavailable.",
     });
   });
+  it("shares a short-lived balance read per owner and reads again on refresh or for another account", async () => {
+    const f = fixture(true);
+    await expect(f.signedInClient.models.mycelliosAccount()).resolves.toEqual(f.account);
+    await expect(f.signedInClient.models.mycelliosAccount()).resolves.toEqual(f.account);
+    expect(f.transport).toHaveBeenCalledOnce();
+    expect(f.accountToken).toHaveBeenCalledTimes(2);
+    await expect(f.signedInClient.models.mycelliosAccount({ refresh: true })).resolves.toEqual(f.account);
+    expect(f.transport).toHaveBeenCalledTimes(2);
+    const other = createRouterClient(f.router, {
+      context: { actor: { ...f.actor, userId: "other-user" }, requestHeaders: new Headers() } as never,
+    });
+    await expect(other.models.mycelliosAccount()).resolves.toEqual(f.account);
+    expect(f.transport).toHaveBeenCalledTimes(3);
+  });
+  it("does not cache an unavailable balance", async () => {
+    const f = fixture(true);
+    f.transport.mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+    await expect(f.signedInClient.models.mycelliosAccount()).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    await expect(f.signedInClient.models.mycelliosAccount()).resolves.toEqual(f.account);
+    expect(f.transport).toHaveBeenCalledTimes(2);
+  });
+  it("rechecks SSO authorization before serving a cached balance", async () => {
+    const f = fixture(true);
+    await expect(f.signedInClient.models.mycelliosAccount()).resolves.toEqual(f.account);
+    f.accountToken.mockResolvedValue(null);
+    await expect(f.signedInClient.models.mycelliosAccount()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(f.transport).toHaveBeenCalledOnce();
+  });
   it.each([401, 403] as const)("passes authority access denial %s to the sidebar without diagnostics", async status => {
     const f = fixture(true);
     f.transport.mockResolvedValue(new Response("private upstream fixture-session-token", { status }));

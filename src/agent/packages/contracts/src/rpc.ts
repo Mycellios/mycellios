@@ -469,7 +469,7 @@ export const appContract = {
     discoverLocal: oc.output(
       z.array(z.object({ name: z.string(), baseUrl: z.string(), modelIds: z.array(z.string()) })),
     ),
-    mycelliosAccount: oc.output(MycelliosAccountSchema.nullable()),
+    mycelliosAccount: oc.input(z.object({ refresh: z.boolean().optional() }).optional()).output(MycelliosAccountSchema.nullable()),
     connectMycellios: oc.output(ModelCredentialSchema),
     mycelliosModels: oc.output(z.array(ModelCatalogEntrySchema)),
     mycelliosVideoEdit:oc.input(z.object({action:z.enum(["info","quote","execute","status","content"]),payload:z.string().max(34_000_000)})).output(z.unknown()),
