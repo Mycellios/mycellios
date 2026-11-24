@@ -37,6 +37,19 @@ export function pollRetryDelayMs(failures: number, held: boolean): number {
   return Math.max(idle, Math.min(POLL_RETRY_MAX_MS, POLL_RETRY_BASE_MS * 2 ** (failures - 1)));
 }
 
+const RELAY_CONFLICT_MESSAGE = "The PC connection changed. Try again.";
+
+/** The server's short reason for a 409, or a neutral sentence; never asks to sign in again. */
+export async function relayConflictMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    const text = typeof body.error === "string" ? body.error.trim() : "";
+    return text && text.length <= 200 && !/[\r\n]/.test(text) ? text : RELAY_CONFLICT_MESSAGE;
+  } catch {
+    return RELAY_CONFLICT_MESSAGE;
+  }
+}
+
 /** A delivery the broker has already accepted must be forgotten, never aborted or replayed. */
 export function missingOperationAction(
   id: string,
@@ -105,7 +118,11 @@ export class DesktopRelayClient {
       throw Object.assign(new Error(response.status >= 500
         // A server restart or overload, not an account problem: signing in again would not help.
         ? "The server is temporarily unavailable."
-        : "Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
+        : response.status === 409
+          // The PC connection changed (another PC runs this Mico, or this PC reconnected).
+          // The server's own short sentence says which; signing in again would not help.
+          ? await relayConflictMessage(response)
+          : "Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
     return response;
   }
   async identity() {

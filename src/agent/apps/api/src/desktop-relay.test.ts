@@ -419,6 +419,39 @@ it("routes a Mico to the PC that reports its folder and reports an unchosen one 
   expect((await call("session-b", "account", { ...mac, workspaces: Array.from({ length: 257 }, (_, n) => createHash("sha256").update(String(n)).digest("hex")) })).status).toBe(409);
 });
 
+it("says a Mico is working on another PC instead of asking to sign in again", async () => {
+  const app = new Hono();
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes"
+      ? { actor: owner, sessionId: request.headers.get("x-test-session") ?? "session-a" }
+      : null,
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const call = (session: string, action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "x-test-session": session, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const windows = { deviceId: randomUUID(), generation: randomUUID() };
+  const mac = { deviceId: randomUUID(), generation: randomUUID() };
+  expect((await call("session-a", "bind", { ...windows, botId: "test-bot" })).status).toBe(200);
+  // Windows is running this Mico's work.
+  const body = JSON.stringify({ request: { method: "environment", botId: "test-bot" }, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+  const time = String(Date.now());
+  const running = app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const refused = await call("session-b", "bind", { ...mac, botId: "test-bot" });
+  expect(refused.status).toBe(409);
+  const answer = await refused.json() as { error: string; code: string };
+  expect(answer.code).toBe("busy_elsewhere");
+  expect(answer.error).toContain("working on another computer");
+  expect(answer.error).not.toContain("Sign in");
+  close();
+  await running.catch(() => undefined);
+});
+
 it("remembers the PC the owner chose for a Mico after the API forgets the binding", async () => {
   const chosen = new Map<string, string>();
   let failLookup = false;

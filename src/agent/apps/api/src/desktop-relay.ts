@@ -197,13 +197,17 @@ export function mountDesktopRelay(
         : message === "Desktop session changed while waiting" ? "session_changed"
         : message === "Operation unavailable" ? "operation_unavailable"
         : message === "Invalid Desktop result" ? "invalid_result"
-        : message === "Slow consumer" ? "slow_consumer" : "request_rejected";
-      if (!c.req.raw.signal.aborted && (action === "account" || action === "poll" || resultId)) {
+        : message === "Slow consumer" ? "slow_consumer"
+        : message === "Agent busy on another computer" ? "busy_elsewhere" : "request_rejected";
+      if (!c.req.raw.signal.aborted && (action === "account" || action === "poll" || action === "bind" || resultId)) {
         getLogger().warn("desktop.relay.request_rejected", {
           "desktop.action": action, "desktop.operation.id": resultId, "desktop.reason": reason,
         });
       }
       if (reason === "session_changed") return c.json({error:"Sign in again"},403);
+      // Another of the person's PCs is running this Mico now: not an account or project problem.
+      if (reason === "busy_elsewhere")
+        return c.json({ error: "This Mico is working on another computer. Wait for it to finish there, or stop it, then try again.", code: reason }, 409);
       return c.json({ error: "PC connection changed. Reconnect the paired computer." }, 409);
     }
   });
