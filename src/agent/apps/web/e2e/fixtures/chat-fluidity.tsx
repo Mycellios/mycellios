@@ -18,6 +18,7 @@ import "../../src/styles.css";
 const immediate = new URLSearchParams(location.search).has("immediate");
 const diagnostic = new URLSearchParams(location.search).has("diagnostic");
 const natural = new URLSearchParams(location.search).has("natural");
+const emptyFailure = new URLSearchParams(location.search).has("empty-failure");
 const noop = () => {};
 const client = { threads: { queue: async () => [] } } as unknown as RpcClient;
 const initial: ThreadSnapshot = {
@@ -25,8 +26,12 @@ const initial: ThreadSnapshot = {
   threadId: "thread-1",
   cursor: 0,
   olderCursor: null,
-  run: null,
-  messages: Array.from({ length: 120 }, (_, index) => ({
+  run: emptyFailure ? {
+    id: "fixture-failed-run", botId: "bot-1", threadId: "thread-1", taskId: "fixture-task",
+    status: "failed", trigger: "user", routineId: null, modelProvider: null, modelId: null,
+    error: "Synthetic run failed", startedAt: null, completedAt: null, createdAt: "2026-11-11T00:00:00.000Z",
+  } : null,
+  messages: Array.from({ length: emptyFailure ? 0 : 120 }, (_, index) => ({
     id: `history-${index}`,
     threadId: "thread-1",
     seq: index + 1,
@@ -163,8 +168,8 @@ function ChatFixture() {
         sendError={sendError}
         onOpenModels={noop}
         onOpenConnections={noop}
-        runError={diagnostic ? desktopDiagnosticMessage({code:"desktop_disconnected",phase:"run",stage:"native_stream",operationId:"12345678-1234-4321-8765-123456789abc"}) : null}
-        runErrorId={diagnostic ? "cm00000000000000000000002" : null}
+        runError={diagnostic ? desktopDiagnosticMessage({code:"desktop_disconnected",phase:"run",stage:"native_stream",operationId:"12345678-1234-4321-8765-123456789abc"}) : snapshot.run?.error ?? null}
+        runErrorId={diagnostic ? "cm00000000000000000000002" : snapshot.run?.id ?? null}
         onRetryError={() => { metrics.current.sends++; }}
         onRunErrorPresented={noop}
         onDismissError={noop}
@@ -190,6 +195,7 @@ function ChatFixture() {
       <FixtureTranscript
         messages={snapshot.messages}
         running={false}
+        lastRun={snapshot.run}
         showToolActivity={false}
         pendingMessages={pending.visible}
         scrollRequest={scrollRequest}

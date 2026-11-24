@@ -52,6 +52,7 @@ export function FixtureTranscript({
   running,
   showToolActivity,
   activeRun,
+  lastRun,
   unreadAfterSeq = null,
   header,
   footer,
@@ -63,6 +64,7 @@ export function FixtureTranscript({
   running: boolean;
   showToolActivity: boolean;
   activeRun?: Run;
+  lastRun?: Run | null;
   header?: ReactNode;
   footer?: ReactNode;
   pendingMessages?: readonly PendingThreadSend[];
@@ -93,6 +95,7 @@ export function FixtureTranscript({
         dismissableAskIds={NO_IDS}
         running={running}
         activeRun={activeRun}
+        lastRun={lastRun}
         workingBots={running ? [BOT] : []}
         onLoadOlder={noop}
         onShowBot={noop}
