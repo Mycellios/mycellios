@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-11-24
+
+### Fixed
+
+- OpenCode in Desktop can use Mycellios tools to read and edit files in a linked project.
+
 ## [0.21.1] - 2026-11-24
 
 ### Fixed
