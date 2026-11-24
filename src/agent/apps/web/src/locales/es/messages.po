@@ -15351,3 +15351,27 @@ msgstr "Mycellios no ha respondido al comprobar el acceso a este ordenador. El m
 #: src/lib/run-error.ts
 msgid "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
 msgstr "Tienes varios PCs conectados y aún no has elegido cuál ejecuta este Mico. En Mycellios Desktop, desde el PC que debe ejecutarlo, vuelve a enviar el mensaje o elige ese PC en los ajustes de ordenador del Mico."
+
+#: src/components/GroupFolders.tsx
+msgid "Micos of this group on This PC can change files and run commands in these folders."
+msgstr "Los Micos de este grupo en Este PC pueden cambiar archivos y ejecutar comandos en estas carpetas."
+
+#: src/components/GroupFolders.tsx
+msgid "Not connected on this PC"
+msgstr "No conectada en este PC"
+
+#: src/components/GroupFolders.tsx
+msgid "Add folders from Mycellios Desktop."
+msgstr "Añade carpetas desde Mycellios Desktop."
+
+#: src/components/GroupFolders.tsx
+msgid "Can use them: {reach}"
+msgstr "Pueden usarlas: {reach}"
+
+#: src/components/GroupFolders.tsx
+msgid "Can't reach them (not on This PC): {away}"
+msgstr "No pueden usarlas (no están en Este PC): {away}"
+
+#: src/lib/user-error.ts
+msgid "A group can have up to 8 folders."
+msgstr "Un grupo puede tener hasta 8 carpetas."
