@@ -84,7 +84,7 @@ describe("native agent protocol integration", () => {
     const direct = await realpath(await mkdtemp(join(tmpdir(), "mycellios-opencode-direct-")));
     roots.push(direct);
     const log = join(projects, "fixture.jsonl");
-    const test = await setup("opencode", ["--fixture-load-acp", "--workspace-log", log]);
+    const test = await setup("opencode", ["--fixture-load-acp", "--named-file-tool", "write_file", "--workspace-log", log]);
     await writeFile(join(test.dataDir, "native-agents.json"), JSON.stringify({
       authorizedScopes: [{ userId: "local", spaceId: "local" }],
     }));
@@ -113,7 +113,10 @@ describe("native agent protocol integration", () => {
         await computer.writeFile(ref, { path: projectSessionId ? fileName : "project/" + fileName, content: Buffer.from(runId) }, projectContext);
         return { content: "Written" };
       });
-      const tools = test.request.tools.map(tool => ({ ...tool, name: "write_file" }));
+      const tools = [
+        ...test.request.tools.map(tool => ({ ...tool, name: "write_file" })),
+        builtinAgentTools.find(tool => tool.name === "schedule_create")!,
+      ];
       const events: AgentRuntimeEvent[] = [];
       for await (const event of runtime.run({ ...test.request, runId, tools, executeTool }, {
         ...test.context, projectSessionId,
@@ -206,7 +209,7 @@ describe("native agent protocol integration", () => {
   it.each(["codex", "claude", "acp", "opencode"] as const)(
     "bridges %s tools through the app executor and preserves unknown billing",
     async (engine) => {
-      const test = await setup(engine);
+      const test = await setup(engine, engine === "opencode" ? ["--named-file-tool", "read_file"] : []);
       const events: AgentRuntimeEvent[] = [];
       for await (const event of test.runtime.run(test.request, test.context)) events.push(event);
       expect(test.executeTool).toHaveBeenCalledOnce();
