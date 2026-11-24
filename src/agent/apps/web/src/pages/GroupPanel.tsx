@@ -9,6 +9,8 @@ import {
 import { BotAvatar, Button, Checkbox, Input, NativeSelect, Textarea } from "@mycellios/ui-web";
 import { X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { GroupFolders } from "../components/GroupFolders";
+import type { RpcClient } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { DeleteItemDialog } from "./shell/dialogs";
 
@@ -312,9 +314,12 @@ export function GroupSettings({
   onClose,
   onShowBot,
   covered = false,
+  rpc,
 }: {
   group: Group;
   bots: Bot[];
+  /** Shows Folders (specs/group-shared-folders/spec.md); absent in fixtures without a server. */
+  rpc?: Pick<RpcClient, "groups">;
   onSave: (input: {
     name?: string;
     botIds?: string[];
@@ -452,6 +457,9 @@ export function GroupSettings({
       >
         {saving ? <Trans>Saving…</Trans> : <Trans>Save</Trans>}
       </Button>
+      {rpc ? (
+        <GroupFolders groupId={group.id} members={group.members} bots={bots} rpc={rpc} />
+      ) : null}
       <Button
         variant="destructive"
         className="mt-4 w-full"

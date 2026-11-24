@@ -47,6 +47,7 @@ import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
 import { installMicoFolderIpc } from "./mico-folder-ipc.js";
+import { installGroupFolderIpc } from "./group-folder-ipc.js";
 import { createDesktopAgentEngine } from "@mycellios/adapters/desktop-agent-engine";
 import { appControlBinary } from "@mycellios/adapters/host-computer-server";
 import { startDesktopExecutor } from "./executor-startup.js";
@@ -2091,6 +2092,14 @@ app.whenReady().then(async () => {
     return isCloudComputerRequest(event) && hostComputer !== undefined;
   });
   const attachedFolders = new Map<string, { scope: string; folder: DesktopMicoFolder }>();
+  /** One RPC with the app's own signed-in session, in the Space the app has selected. */
+  const appSessionRpc = (window: BrowserWindow, base: string, spaceId: string | null, route: string, json: unknown) =>
+    window.webContents.session.fetch(`${base}/rpc/${route}`, {
+      method: "POST", credentials: "include", redirect: "error", bypassCustomProtocolHandlers: true,
+      headers: { "content-type": "application/json", origin: new URL(base).origin,
+        ...(spaceId ? { "x-rakazo-space-id": spaceId } : {}) },
+      body: JSON.stringify({ json }), signal: AbortSignal.timeout(10000),
+    });
   async function micoFolderScope(event: Electron.IpcMainInvokeEvent, botId: string) {
     const managed = isManagedComputerRequest(event);
     const window = mainWindow, base = projectServer();
@@ -2098,12 +2107,7 @@ app.whenReady().then(async () => {
       throw new Error("Allow local computer access first.");
     const url = event.senderFrame!.url;
     const [owner, spaceId] = await nativePreviewContext(window);
-    const response = await window.webContents.session.fetch(`${base}/rpc/bots/get`, {
-      method: "POST", credentials: "include", redirect: "error", bypassCustomProtocolHandlers: true,
-      headers: { "content-type": "application/json", origin: new URL(base).origin,
-        ...(spaceId ? { "x-rakazo-space-id": spaceId } : {}) },
-      body: JSON.stringify({ json: { botId } }), signal: AbortSignal.timeout(10000),
-    });
+    const response = await appSessionRpc(window, base, spaceId, "bots/get", { botId });
     if (!response.ok) throw new Error("Open this Mico in its Space first.");
     const { json: bot } = await response.json() as { json?: { id?: string; spaceId?: string } };
     const identity = managed ? null : await getCloudComputer().identity();
@@ -2174,6 +2178,37 @@ app.whenReady().then(async () => {
     host: () => hostComputer,
     owns: micoFolderScope,
     open: folder => shell.openPath(folder),
+  });
+  // Group shared folders: the server confirms the account owns the group in the selected Space.
+  async function groupFolderScope(event: Electron.IpcMainInvokeEvent, groupId: string) {
+    const managed = isManagedComputerRequest(event);
+    const window = mainWindow, base = projectServer();
+    if (!window || !base || (!managed && !isCloudComputerRequest(event)) || !hostComputer?.isEnabled())
+      throw new Error("Allow local computer access first.");
+    const url = event.senderFrame!.url;
+    const [owner, spaceId] = await nativePreviewContext(window);
+    const response = await appSessionRpc(window, base, spaceId, "groups/folders", { groupId });
+    if (!response.ok) throw new Error("Open this group in its Space first.");
+    const { json: group } = await response.json() as { json?: { spaceId?: string } };
+    const identity = managed ? null : await getCloudComputer().identity();
+    if (!owner || !group?.spaceId ||
+      (identity && (JSON.stringify(identity) !== cloudComputerOwner || identity.userId !== owner || identity.spaceId !== group.spaceId)) ||
+      (managed && !await localStack.matchesDesiredStack()) ||
+      mainWindow !== window || window.isDestroyed() || projectServer() !== base || !hostComputer.isEnabled() ||
+      window.webContents.getURL() !== url || JSON.stringify(await nativePreviewContext(window)) !== JSON.stringify([owner, spaceId]))
+      throw new Error("The application session changed.");
+    return JSON.stringify([base, owner, group.spaceId]);
+  }
+  installGroupFolderIpc({
+    ipcMain,
+    trusted: event => isManagedComputerRequest(event) || isCloudComputerRequest(event),
+    host: () => hostComputer,
+    ownsGroup: groupFolderScope,
+    pick: async () => {
+      const selected = await dialog.showOpenDialog(mainWindow!, { properties: ["openDirectory", "createDirectory"] });
+      return selected.canceled ? null : selected.filePaths[0] ?? null;
+    },
+    secret: () => hostComputer!.connection.token,
   });
   ipcMain.handle("desktop.computer.connected", async (event, botId: unknown) => {
     if (typeof botId !== "string" || !botId || botId.length > 256 || !hostComputer?.isEnabled()) return false;

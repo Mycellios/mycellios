@@ -21,6 +21,11 @@ export interface AdapterContext {
   browserThreadId?: string;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
+  /**
+   * Server-derived for a member's turn in its group's thread: the shared folder ids the group
+   * has now (specs/group-shared-folders/spec.md). The PC grants only ids it holds for that group.
+   */
+  groupFolders?: { groupId: string; folderIds: string[] };
   /** Resolved by the local Desktop host only, never received in a run request. */
   resolveOpenCodeProject?: () => Promise<string | undefined>;
   /** Server-selected workspace for this run, including after Desktop reconnects. */
@@ -98,6 +103,8 @@ export interface PortableFile {
   path: string;
   content: Uint8Array;
   executable?: boolean;
+  /** Only the PC host honors it, for shared group folders: write only over this content. */
+  expectedSha256?: string;
 }
 
 export interface ComputerRef {

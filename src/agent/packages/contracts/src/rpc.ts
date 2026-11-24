@@ -165,6 +165,9 @@ import {
   UpdateBotInput,
   UpdateExternalConversationPolicyInput,
   UpdateGroupInput,
+  AddGroupFolderInput,
+  GroupFolderSchema,
+  RemoveGroupFolderInput,
   UsageRecordSchema,
   UsageSummarySchema,
   VoiceCatalogEntrySchema,
@@ -623,6 +626,10 @@ export const appContract = {
     archive: oc.input(groupId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(groupId).output(z.object({ ok: z.literal(true) })),
     remove: oc.input(groupId).output(z.object({ ok: z.literal(true) })),
+    /** Shared folders (specs/group-shared-folders/spec.md): ids and names, never paths. */
+    folders: oc.input(groupId).output(z.object({ spaceId: Id, folders: z.array(GroupFolderSchema) })),
+    addFolder: oc.input(AddGroupFolderInput).output(GroupFolderSchema),
+    removeFolder: oc.input(RemoveGroupFolderInput).output(z.object({ ok: z.literal(true) })),
   },
   botSections: {
     list: oc.output(z.array(BotSectionSchema)),

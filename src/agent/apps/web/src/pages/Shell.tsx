@@ -5502,6 +5502,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 onClose={() => setPanel(null)}
                 onShowBot={showBot}
                 covered={computerOpen}
+                rpc={rpc}
               />
             ) : null}
             {panel === "import-agent" ? (

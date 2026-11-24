@@ -919,6 +919,7 @@ model ChatGroup {
   leadBotId  String?
   leadBot    Bot?              @relation("ChatGroupLead", fields: [leadBotId], references: [id], onDelete: SetNull)
   members    ChatGroupMember[]
+  folders    ChatGroupFolder[]
   thread     Thread?
   artifacts  Artifact[]
 
@@ -992,6 +993,25 @@ model ChatGroupMember {
   @@unique([groupId, botId])
   @@index([botId])
   @@map("chat_group_members")
+}
+
+/// A folder on the owner's PC that the group's members on that PC may use in the group's turns
+/// (specs/group-shared-folders/spec.md). Opaque id and display name only: the native path stays
+/// on the PC that granted it.
+model ChatGroupFolder {
+  id        String    @id @default(cuid())
+  groupId   String
+  group     ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  spaceId   String
+  userId    String
+  /// HMAC the granting PC derived from its own credential, the scope, the group and the path.
+  folderId  String
+  name      String
+  createdAt DateTime  @default(now())
+
+  @@unique([groupId, folderId])
+  @@index([spaceId, userId])
+  @@map("chat_group_folders")
 }
 
 model DevelopmentProject {

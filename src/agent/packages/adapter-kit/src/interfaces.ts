@@ -112,7 +112,7 @@ export interface SandboxProvider {
   environment?(
     computer: ComputerRef,
     context: AdapterContext,
-  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean; nativeEngines?: NativeCodingEngine[] } | undefined>;
+  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean; nativeEngines?: NativeCodingEngine[]; groupFolders?: Array<{ folderId: string; label: string; path: string }> } | undefined>;
   /** Optional live browser on the same leased screen as observe/act. */
   pageBrowser?(
     computer: ComputerRef,

@@ -697,6 +697,17 @@
   AwaitingReplies, CollaborationMarker, GroupPanel and SendToGroup tests and
   `node --import tsx scripts/verify-mico-requests-db.ts`.
 
+- Group shared folders follow specs/group-shared-folders/spec.md (the reference product is a
+  behavior reference only): up to 8 folders per group, chosen only with Desktop's native picker
+  after the server confirms the owner/Space owns the group; the server keeps an opaque HMAC id
+  and a name (additive `20261124120000` migration, RLS), never a path. Grants stay in memory on
+  the PC like ordinary folder grants. Only a This PC (`dedicated`) member's turn in the group's
+  own thread carries the ids, re-read before each computer tool; the PC serves only ids it holds
+  for that group, as `group/<label>/`. Never mount them on server or Team computers. Shared
+  edit_file writes carry the read SHA-256 and are serialized per file. Verify adapters
+  host-group-folders and group-folders, desktop group-folder-ipc, web GroupFolders tests and
+  `node --import tsx scripts/verify-group-folders-db.ts`.
+
 - "Branch in new conversation" (specs/conversation-branching/spec.md; behavior reference only)
   sits in the More menu of the last Mico message of each finished turn, main chat or side
   conversation, on desktop/web only (not phones, groups, projects or floating chats); disabled
