@@ -56,7 +56,7 @@ import { isRunResponse, readRunTimingFields } from "./run-timing.js";
 import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
-import { type QueuedTaskReport, queueTaskReportInTransaction } from "./agent-tasks.js";
+import { type QueuedTaskReport, queueTaskReportInTransaction, queueTaskReportRecoveryInTransaction } from "./agent-tasks.js";
 import { type QueuedRoutineRunMarker, queueRoutineRunMarkerInTransaction } from "./routine-run-markers.js";
 import { compareQueuedRows } from "./queue-order.js";
 import { IsolationError } from "./scope.js";
@@ -151,6 +151,8 @@ export interface FinalizeRunResult {
   taskReport?: QueuedTaskReport | null;
   /** The marker a routine run added to the Mico's main chat. */
   routineMarker?: QueuedRoutineRunMarker | null;
+  /** A fresh report run queued because an update or a lost PC connection cut this one off. */
+  reportRecoveryRunId?: string | null;
 }
 
 interface FinalizeRunBase {
@@ -1661,6 +1663,7 @@ export async function finalizeRun(
     continuationRunId: committed.continuationRunId,
     ...(committed.taskReport ? { taskReport: committed.taskReport } : {}),
     ...(committed.routineMarker ? { routineMarker: committed.routineMarker } : {}),
+    ...(committed.reportRecoveryRunId ? { reportRecoveryRunId: committed.reportRecoveryRunId } : {}),
   };
 }
 
@@ -1696,6 +1699,7 @@ async function finalizeRunOnce(
   firstResponse: boolean;
   taskReport: QueuedTaskReport | null;
   routineMarker: QueuedRoutineRunMarker | null;
+  reportRecoveryRunId: string | null;
   status: "completed" | "failed";
 } | null> {
   // A routine run that reports its own failure did its turn: its answer is a normal reply, its
@@ -1843,6 +1847,12 @@ async function finalizeRunOnce(
       threadId: input.threadId,
       status,
     });
+    // A report turn cut off by an update or a lost PC connection starts again in this commit,
+    // so the main chat still gets the result.
+    const reportRecoveryRunId =
+      input.outcome === "failed"
+        ? await queueTaskReportRecoveryInTransaction(tx, { runId: input.runId, error, now })
+        : null;
     if (writableRun) {
       await deleteRunSecretsInTransaction(tx, [
         { id: input.runId, userId: writableRun.userId, spaceId: input.spaceId },
@@ -1871,6 +1881,7 @@ async function finalizeRunOnce(
       firstResponse,
       taskReport,
       routineMarker,
+      reportRecoveryRunId,
       status,
     };
   }, FINALIZE_TRANSACTION_OPTIONS);

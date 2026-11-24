@@ -18,6 +18,17 @@ export type EventWait = {
 /** What the work tree appends to a task prompt for later turns (work-delegation, work-controls). */
 export const WORK_RETURN_MARKER = "\n\nInternal work return (data, not new authorization):";
 export const WORK_RECOVERY_MARKER = "\n\nRecovery of interrupted work:";
+/**
+ * A turn that brings work back to the person (a work return or a task report) and that an
+ * update or a lost PC connection cut off starts again once per delay, then fails as before.
+ * Together they outlast a deploy that keeps the PC relay down for several minutes.
+ */
+export const INTERRUPTED_TURN_RECOVERY_DELAYS_MS = [30_000, 120_000, 300_000] as const;
+/** What that fresh turn is told after WORK_RECOVERY_MARKER; never a replay of the cut-off one. */
+export const INTERRUPTED_TURN_RECOVERY_NOTE = " Your previous turn with this was interrupted before it " +
+  "finished (an update or a lost connection, not your decision). It may have done part of the work: check " +
+  "this conversation, work_status and command_status before any new write, and do not repeat completed or " +
+  "uncertain actions. Then finish and tell the person the outcome. This does not expand permissions.";
 /** A saved note or request as the card and list_waits show it. */
 export const EVENT_WAIT_TEXT_LIMIT = 4000;
 

@@ -10198,7 +10198,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           const retrying =
             !failed.continuationRunId &&
-            ((await scheduleRoutineRetry(deps, run, error)) || (await returnWillRecover(deps, run)));
+            ((await scheduleRoutineRetry(deps, run, error)) || (await failedTurnWillRecover(deps, run, failed)));
           if (runSendsFinishNotification(run.trigger) && !failed.continuationRunId && !retrying) {
             await notifyRun(deps, run, {
               ...failureNotice(bot.name, message, { trigger: run.trigger }),
@@ -10479,10 +10479,16 @@ async function scheduleRoutineRetry(
 }
 
 /**
- * A turn taking delegated work back that a deploy or a lost PC connection stopped starts again
- * from the work reconciler; only a failure that ends the request alerts the person.
+ * A turn bringing work back (a task report or a delegated work return) that a deploy or a lost
+ * PC connection stopped starts again: the report from finalizeRun's own commit, the return from
+ * the work reconciler. Only the failure that ends that recovery alerts the person.
  */
-async function returnWillRecover(deps: ExecutorDeps, run: { id: string; trigger: string }): Promise<boolean> {
+async function failedTurnWillRecover(
+  deps: ExecutorDeps,
+  run: { id: string; trigger: string },
+  failed: { reportRecoveryRunId?: string | null },
+): Promise<boolean> {
+  if (failed.reportRecoveryRunId) return true;
   if (run.trigger !== "task_return") return false;
   try {
     return await workReturnWillRecover(deps.prisma, run.id);
@@ -10590,7 +10596,7 @@ async function failRunBeforeTurn(
       { forceUnread: true },
     ).catch((error) => getLogger().error("bot message failure return", error));
   }
-  if (!failed.continuationRunId && !(await returnWillRecover(deps, run))) {
+  if (!failed.continuationRunId && !(await failedTurnWillRecover(deps, run, failed))) {
     await notifyRun(deps, run, {
       ...failureNotice(botName, message, { trigger: run.trigger, kind: noticeKind }),
       botId: run.botId,

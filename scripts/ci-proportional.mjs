@@ -151,6 +151,7 @@ export function planChecks(files, availableAgentTests) {
     }
     for (const [pattern, script, label] of [
       [/event-waits?[-.]|verify-autonomy-waits|event_wait_delegation_state|packages\/db\/src\/work-delegation/, 'verify-autonomy-waits-db.ts', 'event wait migration and automatic return on isolated PostgreSQL'],
+      [/agent-tasks\.ts$|verify-agent-tasks-db/, 'verify-agent-tasks-db.ts', 'Mico-opened conversations, their reports and report recovery on isolated PostgreSQL'],
       [/sidebar.fold|bot-folders|20261115130000_sidebar_folders/, 'verify-sidebar-folders-db.ts', 'folder migration, isolation and hierarchy'],
       [/message-pins|20261115160000_message_pins|20261122200000_message_pin_authors/, 'verify-message-pins-db.ts', 'message pin migrations, Mico pins and account/thread isolation'],
       [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],
