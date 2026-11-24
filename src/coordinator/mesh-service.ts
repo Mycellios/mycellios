@@ -131,12 +131,14 @@ interface MeshServiceEvents {
 export class MeshService extends EventEmitter<MeshServiceEvents> {
   private eventTail: Promise<void> = Promise.resolve();
   private readonly eventErrors: unknown[] = [];
+  private pendingEvents = 0;
 
   private enqueueEvent(action: () => Promise<void>): Promise<void> {
+    this.pendingEvents += 1;
     this.eventTail = this.eventTail.then(action).catch(error => {
       this.eventErrors.push(error);
       console.error("mycellios_runtime_event_failed", error);
-    });
+    }).finally(() => { this.pendingEvents -= 1; });
     return this.eventTail;
   }
 
@@ -150,6 +152,10 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
   private readonly runtimes = new Map<string, RuntimeJob>();
   private readonly splitRuns = new Map<string, MemoryEmbeddingSplitRun>();
   private readonly activeSessions = new Map<string, string>();
+  releaseWorkStatus() {
+    return { sessions: this.activeSessions.size, jobs: this.runtimes.size,
+      splitRuns: this.splitRuns.size, pendingEvents: this.pendingEvents, eventErrors: this.eventErrors.length };
+  }
   // Nodes see a per-worker session pseudonym, never the client's session id.
   private readonly workerRequestView = new WorkerRequestView();
   private readonly leaseRejections: LeaseRejectionMonitor;

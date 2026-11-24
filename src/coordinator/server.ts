@@ -165,6 +165,7 @@ import {
   DevelopmentLabStoreError,
 } from "./development-lab-store.js";
 import { WorkerHub } from "./worker-hub.js";
+import { registerReleaseWorkStatus } from "./release-work-status.js";
 import { ActivationCheckpointTransferAuthority } from "./activation-checkpoint-transfer.js";
 import { ActivationCheckpointStore } from "../distribution/activation-checkpoint-store.js";
 import { ExecutionReceiptStore } from "./execution-receipt-store.js";
@@ -1590,6 +1591,10 @@ export async function createCoordinator(
   service.on("lease_rejection_anomaly", (anomaly) => app.log.warn({ event: "lease_rejection_anomaly", ...anomaly },
     "A worker rejected an anomalous share of offers after receiving their content"));
   if (admissionRevision === undefined) await apiAccess.reconcileRestartedZeroTokenUsage();
+  else registerReleaseWorkStatus(app, admissionRevision, isTrustedLocalRequest, () => ({
+    mesh: service.releaseWorkStatus(), transport: hub.releaseTransportStatus(),
+    mobile: mobileHub.releaseWorkStatus(),
+  }));
   const attachExecutionReceipt = async (
     event: Extract<JobStreamEvent, { type: "completed" }>,
     modelId: string,

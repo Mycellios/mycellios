@@ -499,6 +499,10 @@ These rules apply to the complete repository.
   inserts and preserves jobs and unsettled usage during startup. Do not enable
   it for ordinary crash recovery or use it by itself to run two live coordinators.
   Validate both generations with `tests/release-admission.postgres.test.ts`.
+- The handoff runtime reports process-local job and transport counts at
+  `/internal/release/work` over unforwarded loopback. This observation does not
+  certify a global drain. The controller must also verify admission ownership,
+  database work and traffic routing before retiring the source.
 - The optional embedding ingress proxy protects only its configured HTTP route,
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
