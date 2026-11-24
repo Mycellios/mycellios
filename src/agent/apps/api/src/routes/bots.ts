@@ -32,6 +32,7 @@ import {
   ComputerLimitError,
   commitBotUpdate,
   computerKindForMode,
+  GroupFolderLimitError,
   InstructionConflictError,
   IsolationError,
   parseComputerMode,
@@ -815,6 +816,22 @@ export function botsRoutes(ctx: RouterContext) {
           if (result.status === "rejected")
             getLogger().error("group artifact cleanup", result.reason);
         }
+        return { ok: true as const };
+      }),
+      folders: authed.groups.folders.handler(async ({ context, input }) =>
+        groupRepos.listGroupFolders(context.actor, input.groupId),
+      ),
+      addFolder: authed.groups.addFolder.handler(async ({ context, input }) => {
+        try {
+          return await groupRepos.addGroupFolder(context.actor, input);
+        } catch (error) {
+          if (error instanceof GroupFolderLimitError)
+            throw new ORPCError("BAD_REQUEST", { message: error.message });
+          throw error;
+        }
+      }),
+      removeFolder: authed.groups.removeFolder.handler(async ({ context, input }) => {
+        await groupRepos.removeGroupFolder(context.actor, input);
         return { ok: true as const };
       }),
     },

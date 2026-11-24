@@ -1,8 +1,12 @@
 import {
   type Actor,
+  GROUP_FOLDER_MAX,
+  GROUP_FOLDER_NAME_MAX_LENGTH,
   GROUP_MEMBER_MAX,
   GROUP_MEMBER_MIN,
   type Group,
+  type GroupFolder,
+  groupFolderLabel,
   type GroupMember,
   type SpaceGroup,
 } from "@mycellios/contracts";
@@ -695,8 +699,133 @@ export function createGroupRepos(prisma: PrismaClient) {
       });
     },
 
+    /** The group's shared folders: opaque ids and names, oldest first. */
+    async listGroupFolders(
+      actor: Actor,
+      groupId: string,
+    ): Promise<{ spaceId: string; folders: GroupFolder[] }> {
+      const group = await prisma.chatGroup.findFirst({
+        where: { id: groupId, spaceId: actor.spaceId, userId: actor.userId, archivedAt: null },
+        select: { id: true },
+      });
+      if (!group) throw new IsolationError();
+      const rows = await prisma.chatGroupFolder.findMany({
+        where: { groupId, spaceId: actor.spaceId, userId: actor.userId },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: GROUP_FOLDER_MAX,
+      });
+      return { spaceId: actor.spaceId, folders: rows.map(mapGroupFolder) };
+    },
+
+    /**
+     * Records a folder a PC granted to this group. Adding the same folder again returns the
+     * existing row; a ninth folder is refused under the group's row lock.
+     */
+    async addGroupFolder(
+      actor: Actor,
+      input: { groupId: string; folderId: string; name: string },
+    ): Promise<GroupFolder> {
+      return prisma.$transaction(async (tx) => {
+        await lockOwnedGroup(tx, actor, input.groupId);
+        const group = await tx.chatGroup.findFirst({
+          where: { id: input.groupId, archivedAt: null },
+          select: { id: true },
+        });
+        if (!group) throw new IsolationError();
+        const existing = await tx.chatGroupFolder.findUnique({
+          where: { groupId_folderId: { groupId: input.groupId, folderId: input.folderId } },
+        });
+        if (existing) return mapGroupFolder(existing);
+        const current = await tx.chatGroupFolder.findMany({
+          where: { groupId: input.groupId },
+          select: { label: true },
+        });
+        if (current.length >= GROUP_FOLDER_MAX) throw new GroupFolderLimitError();
+        const name = input.name.trim().slice(0, GROUP_FOLDER_NAME_MAX_LENGTH) || "Folder";
+        const created = await tx.chatGroupFolder.create({
+          data: {
+            groupId: input.groupId,
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+            folderId: input.folderId,
+            name,
+            // Fixed for the folder's life, so paths in earlier turns keep naming the same folder.
+            label: groupFolderLabel(
+              name,
+              current.map((row) => row.label),
+            ),
+          },
+        });
+        return mapGroupFolder(created);
+      });
+    },
+
+    /** Forgets a shared folder. The next tool call of every member loses it. */
+    async removeGroupFolder(actor: Actor, input: { groupId: string; folderId: string }) {
+      await prisma.$transaction(async (tx) => {
+        await lockOwnedGroup(tx, actor, input.groupId);
+        await tx.chatGroupFolder.deleteMany({
+          where: {
+            groupId: input.groupId,
+            folderId: input.folderId,
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+          },
+        });
+      });
+    },
+
     mapGroup,
   };
+}
+
+export class GroupFolderLimitError extends Error {
+  constructor() {
+    super(`A group can have up to ${GROUP_FOLDER_MAX} folders.`);
+    this.name = "GroupFolderLimitError";
+  }
+}
+
+function mapGroupFolder(row: {
+  folderId: string;
+  name: string;
+  label: string;
+  createdAt: Date;
+}): GroupFolder {
+  return {
+    folderId: row.folderId,
+    name: row.name,
+    label: row.label,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * The shared folder ids a run may use: only in the group's own thread, for an active member of
+ * an unarchived group of the run's owner and Space. Anything else gets none.
+ */
+export async function groupFolderAccess(
+  prisma: Pick<PrismaClient, "chatGroup">,
+  run: { groupId: string; botId: string; userId: string; spaceId: string },
+): Promise<Array<{ folderId: string; name: string; label: string }>> {
+  const group = await prisma.chatGroup.findFirst({
+    where: {
+      id: run.groupId,
+      userId: run.userId,
+      spaceId: run.spaceId,
+      archivedAt: null,
+      members: { some: { botId: run.botId, bot: { archivedAt: null } } },
+    },
+    select: {
+      folders: {
+        where: { userId: run.userId, spaceId: run.spaceId },
+        select: { folderId: true, name: true, label: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: GROUP_FOLDER_MAX,
+      },
+    },
+  });
+  return group?.folders ?? [];
 }
 
 export async function lockOwnedGroup(

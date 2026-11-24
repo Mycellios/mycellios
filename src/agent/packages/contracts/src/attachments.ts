@@ -28,6 +28,10 @@ export const ATTACHMENT_AUDIO_MIME_TYPES = [
   "audio/mp4",
 ] as const;
 
+/** Word documents (.docx). The web previews them as sanitized HTML converted in the browser. */
+export const ATTACHMENT_DOCX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 export const ATTACHMENT_FILE_MIME_TYPES = [
   ...ATTACHMENT_AUDIO_MIME_TYPES,
   "video/mp4",
@@ -38,6 +42,7 @@ export const ATTACHMENT_FILE_MIME_TYPES = [
   "text/html",
   "application/json",
   "application/zip",
+  ATTACHMENT_DOCX_MIME_TYPE,
 ] as const;
 
 export const ATTACHMENT_ALLOWED_MIME_TYPES = [

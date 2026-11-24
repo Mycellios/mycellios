@@ -353,6 +353,12 @@ import {
   updateFleetGroup,
 } from "./fleet-tools.js";
 import { handoffToGroupBot, loadBotGroupDirectory, loadGroupContext } from "./group-handoff.js";
+import {
+  groupFolderInstruction,
+  groupFoldersForRun,
+  isGroupFolderPath,
+  refreshGroupFolders,
+} from "./group-folders.js";
 import { sendToGroup, settleGroupRequestRun } from "./group-requests.js";
 import { interruptAgent, listAgents } from "./team-awareness.js";
 import {
@@ -4250,6 +4256,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           cloudWorkspace: cloudComputer ? { workerId, runFence: fence } : undefined,
           isolatedWorkspace: (cloudComputer ?? bot.computer)?.scope === "isolated",
           desktopWorkspace: !cloudComputer && bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated",
+          // Set below for a This PC member's turn in its group's thread; refreshed before each tool.
+          groupFolders: undefined as AdapterContext["groupFolders"],
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
@@ -4603,6 +4611,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let copyingTurnFiles = Promise.resolve();
         // Serialize copies before each tool, including attachments received while a boot is in flight.
         const getRunComputer = async (reason: "tool" | "takeover" | "script", tool?: string) => {
+          if (context.groupFolders && thread.groupId)
+            await refreshGroupFolders(
+              deps.prisma,
+              { groupId: thread.groupId, botId: bot.id, userId: run.userId, spaceId: run.spaceId },
+              context,
+            );
           if (computerUseReason === "none") {
             computerUseReason = reason;
             computerUseTool = tool && BUILTIN_AGENT_TOOL_NAMES.has(tool) ? tool : undefined;
@@ -4748,6 +4762,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
         const pageBrowserAllowed =
           !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
+        // Group shared folders (specs/group-shared-folders/spec.md): a member's own group turn,
+        // started by the person, carries the group's folders to its PC, only on This PC.
+        const groupFolders = thread.groupId
+          ? await groupFoldersForRun(
+              deps.prisma,
+              { groupId: thread.groupId, botId: bot.id, userId: run.userId, spaceId: run.spaceId },
+              { kind: computerKind, mode: computerMode, projectSessionId: context.projectSessionId },
+              {
+                threadId: thread.id,
+                trigger: run.trigger,
+                routineId: run.routineId,
+                sourceMessageId: run.sourceMessageId,
+                messagingChannel: messagingChannelRun,
+              },
+            )
+          : { folders: [], context: undefined };
+        context.groupFolders = groupFolders.context;
         const hostEnvironment =
           computerKind === "desktop"
             ? await deps.sandbox
@@ -5065,6 +5096,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : dockerToolInstruction
                   ? `${baseComputerInstruction} ${dockerToolInstruction}`
                   : baseComputerInstruction,
+              ...(() => {
+                const text = groupFolderInstruction(
+                  groupFolders.folders,
+                  context.groupFolders ? (hostEnvironment?.groupFolders ?? []) : [],
+                );
+                return text ? [text] : [];
+              })(),
               ...(computerKind === "desktop"
                 ? [
                     "This run has been admitted to the user's connected PC independently of the chat client. For requested PC work, use the provided tools to verify access before claiming it is unavailable. Earlier chat messages are not a current connectivity check.",
@@ -6636,8 +6674,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (!result.ok) return { error: result.error, path: filePath };
             workspaceCheckpoint.markDirty();
             const encoded = new TextEncoder().encode(result.content);
+            // In a shared group folder another member may have written since this read.
+            const expectedSha256 =
+              context.groupFolders && isGroupFolderPath(storedPath)
+                ? createHash("sha256").update(bytes).digest("hex")
+                : undefined;
             try {
-              await deps.sandbox.writeFile(computer, { path: storedPath, content: encoded }, context);
+              await deps.sandbox.writeFile(
+                computer,
+                { path: storedPath, content: encoded, ...(expectedSha256 ? { expectedSha256 } : {}) },
+                context,
+              );
             } catch (error) {
               await recordComputerAction("edit_file", filePath, {
                 error: error instanceof Error ? error.message : "could not edit file",

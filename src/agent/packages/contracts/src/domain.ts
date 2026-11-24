@@ -252,6 +252,53 @@ export const UpdateGroupInput = z.object({
 });
 export type UpdateGroupInput = z.infer<typeof UpdateGroupInput>;
 
+/**
+ * Folders on the owner's PC that the group's members on that PC may use in the group's turns
+ * (specs/group-shared-folders/spec.md). The server keeps an opaque id and a display name only;
+ * the native path stays on the PC that granted it.
+ */
+export const GROUP_FOLDER_MAX = 8;
+export const GROUP_FOLDER_NAME_MAX_LENGTH = 100;
+export const GroupFolderId = z.string().regex(/^[a-f0-9]{64}$/);
+/**
+ * The folder's mount name under group/, assigned once by the server and unique in its group,
+ * so it stays the same across PC restarts and on every member's turn.
+ */
+export const GroupFolderLabel = z
+  .string()
+  .min(1)
+  .max(72)
+  .refine((value) => !/[\\/:*?"<>|\p{Cc}]/u.test(value) && !/^[.\s]|[.\s]$/.test(value), {
+    error: "Invalid folder label",
+  });
+
+/** One safe path segment from a folder name, numbered when the group already uses it. */
+export function groupFolderLabel(name: string, taken: Iterable<string>): string {
+  const base =
+    Array.from(name.normalize("NFC").replace(/[\\/:*?"<>|\p{Cc}]/gu, "-").trim())
+      .slice(0, 60)
+      .join("")
+      .replace(/^[.\s]+|[.\s]+$/g, "") || "folder";
+  const used = new Set(Array.from(taken, (label) => label.toLowerCase()));
+  if (!used.has(base.toLowerCase())) return base;
+  for (let index = 2; ; index++)
+    if (!used.has(`${base} ${index}`.toLowerCase())) return `${base} ${index}`;
+}
+
+export const GroupFolderSchema = z.object({
+  folderId: GroupFolderId,
+  name: z.string(),
+  label: GroupFolderLabel,
+  createdAt: z.string(),
+});
+export type GroupFolder = z.infer<typeof GroupFolderSchema>;
+export const AddGroupFolderInput = z.object({
+  groupId: Id,
+  folderId: GroupFolderId,
+  name: z.string().trim().min(1).max(GROUP_FOLDER_NAME_MAX_LENGTH),
+});
+export const RemoveGroupFolderInput = z.object({ groupId: Id, folderId: GroupFolderId });
+
 export const GroupDetailSchema = GroupSchema.extend({
   messages: z.array(ThreadMessageSchema).optional(),
 });

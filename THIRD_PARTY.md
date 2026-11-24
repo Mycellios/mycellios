@@ -90,6 +90,14 @@ The web Agent bundles Geist Variable 5.3.0 from `@fontsource-variable/geist`.
 Copyright 2024 The Geist Project Authors. Its SIL Open Font License 1.1 is
 shipped at `src/agent/apps/web/public/licenses/geist-OFL.txt`.
 
+## Word document preview
+
+The web Agent previews Word (.docx) files with mammoth (BSD-2-Clause) and its JSZip
+dependency (MIT, chosen from MIT OR GPL-3.0),
+then sanitizes the result with DOMPurify (Apache-2.0, chosen from MPL-2.0 OR
+Apache-2.0). Their license texts ship inside the installed npm packages and are
+reported by the release SBOM.
+
 ## Platform brand icons
 
 `landing/src/rebrand/PlatformLogo.tsx` includes the Apple, Windows, Linux and

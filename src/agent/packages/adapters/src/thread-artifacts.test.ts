@@ -218,6 +218,7 @@ describe("current-turn thread files", () => {
     ["audio/mp4", ".m4a"],
     ["application/pdf", ".pdf"],
     ["application/zip", ".zip"],
+    ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"],
   ])(
     "copies %s attachments into the bot workspace and describes their paths",
     async (mimeType, extension) => {

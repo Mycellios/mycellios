@@ -10,6 +10,7 @@ export function errorText(error: unknown, fallback = t`Something went wrong. Try
   if (message === "Folders support up to three levels.") return t`Folders support up to three levels.`;
   if (message === "A folder cannot be moved into itself or one of its subfolders.") return t`A folder cannot be moved into itself or one of its subfolders.`;
   if (message === "Folder name already used") return t`Folder name already used`;
+  if (message === "A group can have up to 8 folders.") return t`A group can have up to 8 folders.`;
   return (
     voiceAccountErrorText(error) ??
     userErrorMessage(error, {

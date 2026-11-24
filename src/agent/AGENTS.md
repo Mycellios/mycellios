@@ -92,6 +92,16 @@
   safe types; everything else downloads. Verify artifact-shares and
   ArtifactShareButton tests plus scripts/verify-artifact-shares-db.ts.
 
+- Word (.docx) attachments preview in the chat file card, review workspace and
+  Library, as the reference app's file preview does (behavior reference only; no
+  copied code). `lib/docx-preview.ts` bounds the file (20 MiB, declared ZIP
+  expansion), converts it with the pinned mammoth in a terminable module worker,
+  keeps only embedded raster images and sanitizes the HTML with a private DOMPurify
+  allowlist before DocxViewer renders it with app tokens. Never fetch linked
+  resources or run document content; failures show the existing error with the
+  download kept. Shared links keep downloading .docx. Verify docx-preview,
+  DocxViewer and the media-preview E2E.
+
 - PC app control (`pc_windows`, `pc_snapshot`, `pc_act`) follows
   specs/desktop-accessibility-control/spec.md. Desktop runs the pinned agent-desktop
   CLI (`app-control-runner.ts`, SHA-256 verified before every call, Windows x64 only)
@@ -696,6 +706,21 @@
   Verify adapters/core bot-messages, group-mentions, message-visibility, thread-target,
   AwaitingReplies, CollaborationMarker, GroupPanel and SendToGroup tests and
   `node --import tsx scripts/verify-mico-requests-db.ts`.
+
+- Group shared folders follow specs/group-shared-folders/spec.md (the reference product is a
+  behavior reference only): up to 8 folders per group, chosen only with Desktop's native picker
+  after the server confirms the owner/Space owns the group; the server keeps an opaque HMAC id
+  (keyed by a private per-profile key, not the host token), a name and a label it assigns once
+  (additive `20261124120000` migration, RLS), never a path. Grants stay in memory on the PC like
+  ordinary folder grants, are pruned to the server's list and cleared for another account. Only
+  a person-started turn (own message/call/reaction, or a same-thread handoff chain back to one)
+  of a This PC (`dedicated`) member in the group's own thread carries them; never routines,
+  webhooks, channels, Mico requests or background work. Re-read before each computer tool; the
+  PC serves only ids it holds for that group, as `group/<label>/`. Never mount them on server or
+  Team computers. Shared edit_file writes carry the read SHA-256 and are serialized per real,
+  case-folded file. Shells keep OS permissions; ids gate file tools only. Verify adapters
+  host-group-folders and group-folders, desktop group-folder-ipc, web GroupFolders tests and
+  `node --import tsx scripts/verify-group-folders-db.ts`.
 
 - "Branch in new conversation" (specs/conversation-branching/spec.md; behavior reference only)
   sits in the More menu of the last Mico message of each finished turn, main chat or side

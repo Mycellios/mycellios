@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@mycellios/chat-ui/web";
-import { isAttachmentAudioMimeType } from "@mycellios/contracts";
+import { ATTACHMENT_DOCX_MIME_TYPE, isAttachmentAudioMimeType } from "@mycellios/contracts";
 import { Button, Dialog, DialogClose, DialogContent, DialogTitle, Spinner } from "@mycellios/ui-web";
 import { Code2, Download, FileText, Play, X } from "lucide-react";
 import type { RefObject } from "react";
@@ -13,6 +13,7 @@ import { downloadArtifact, downloadArtifactBytes, fetchArtifactBytes } from "../
 import { errorText } from "../lib/user-error";
 import { useReviewWorkspace } from "../lib/review-workspace";
 import { BuiCard } from "./ai/primitives";
+import { DocxViewer } from "./DocxViewer";
 import { IconTooltip } from "./IconTooltip";
 import { PdfViewer } from "./PdfViewer";
 import { SandboxedHtmlViewer } from "./SandboxedHtmlViewer";
@@ -32,6 +33,7 @@ const PREVIEWABLE_MIME_TYPES = new Set([
   "text/html",
   "application/pdf",
   "video/mp4",
+  ATTACHMENT_DOCX_MIME_TYPE,
 ]);
 const TEXT_MIME_TYPES = new Set(["text/markdown", "text/html"]);
 
@@ -247,6 +249,8 @@ function FilePreview({
           <VideoPreview bytes={state.bytes} name={name} />
         ) : mimeType === "application/pdf" ? (
           <PdfViewer bytes={state.bytes} title={name} />
+        ) : mimeType === ATTACHMENT_DOCX_MIME_TYPE ? (
+          <DocxViewer bytes={state.bytes} />
         ) : state.text !== undefined ? (
           <article className="mx-auto w-full max-w-[760px] px-8 py-10 text-[16px] leading-7 text-foreground sm:px-12 sm:py-12">
             <ChatMarkdown>{state.text}</ChatMarkdown>

@@ -15391,3 +15391,27 @@ msgstr "Escribe un lugar"
 #: src/components/LocationAskCard.tsx
 msgid "Your location is unavailable. Type a place instead."
 msgstr "Tu ubicación no está disponible. Escribe un lugar."
+
+#: src/components/GroupFolders.tsx
+msgid "Micos of this group on This PC can change files and run commands in these folders."
+msgstr "Los Micos de este grupo en Este PC pueden cambiar archivos y ejecutar comandos en estas carpetas."
+
+#: src/components/GroupFolders.tsx
+msgid "Not connected on this PC"
+msgstr "No conectada en este PC"
+
+#: src/components/GroupFolders.tsx
+msgid "Add folders from Mycellios Desktop."
+msgstr "Añade carpetas desde Mycellios Desktop."
+
+#: src/components/GroupFolders.tsx
+msgid "Can use them: {reach}"
+msgstr "Pueden usarlas: {reach}"
+
+#: src/components/GroupFolders.tsx
+msgid "Can't reach them (not on This PC): {away}"
+msgstr "No pueden usarlas (no están en Este PC): {away}"
+
+#: src/lib/user-error.ts
+msgid "A group can have up to 8 folders."
+msgstr "Un grupo puede tener hasta 8 carpetas."
