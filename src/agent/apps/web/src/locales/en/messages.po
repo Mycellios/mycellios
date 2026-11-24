@@ -7088,7 +7088,7 @@ msgstr "Agent follows the latest version"
 
 #: src/pages/HostComputerPrompt.tsx
 msgid "Allow bots to work with your local files and tools, or continue with chat only."
-msgstr "Allow bots to work with your local files and tools, or continue with chat only."
+msgstr "Allow Micos to work with your local files and tools, or continue with chat only."
 
 #: src/pages/TaskControls.tsx
 msgid "Assign to agent"
