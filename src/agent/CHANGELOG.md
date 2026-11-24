@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-11-24
+
+### Fixed
+
+- When a Mico needs you on its computer, the top bar no longer overlaps: the
+  "Needs you" label keeps its place and the bar shows one main action, "I'm done".
+  Skip, Show desktop and Stop are in the "…" menu, and Teach a task waits until
+  the request is answered.
+- While the computer's screen is still starting, the view says it is connecting
+  instead of showing an empty page.
+- Mycellios uses much less server time while it sits open: the list of Micos refreshes every
+  3 seconds only while one is working (every 15 seconds otherwise), and the Desktop dock no
+  longer reloads a waiting Mico's whole chat on every refresh.
+
 ## [0.21.2] - 2026-11-24
 
 ### Fixed
