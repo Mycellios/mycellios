@@ -205,7 +205,7 @@ lines.on("line", (line) => {
           name = process.argv[namedTool + 1];
           if (!listed.result.tools.every(tool => tool.inputSchema.type === "object") ||
             !listed.result.tools.some(tool => tool.name === name) ||
-            !message.params.prompt[0].text.includes(`rakazo_${name}`))
+            !message.params.prompt[0].text.includes(`${bridge.name}_${name}`))
             throw new Error("The file tool must be registered and named in the OpenCode prompt");
         }
         const called = await mcp(1, "tools/call", { name, arguments: toolArguments });

@@ -216,6 +216,7 @@ export async function discoverNativeEngines(dataDir?: string) {
 }
 
 const openCodeFileTools = new Set(["list_files", "read_file", "write_file", "edit_file"]);
+const nativeMcpServerName = "rakazo";
 
 /** A short-lived, authenticated MCP bridge exposes only this run's authorized catalog. */
 async function toolBridge(
@@ -267,7 +268,7 @@ async function toolBridge(
         result = {
           protocolVersion: "2025-03-26",
           capabilities: { tools: {} },
-          serverInfo: { name: "rakazo", version: "1" },
+          serverInfo: { name: nativeMcpServerName, version: "1" },
         };
       else if (message.method === "ping") result = {};
       else if (message.method === "tools/list")
@@ -401,7 +402,7 @@ export class NativeAgentRuntime implements AgentRuntime {
     request = withWorkContinuation({ ...request, instructions: withConversationStyle(request.instructions ?? "") }, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
     const openCodeFileToolNames = engine === "opencode"
-      ? tools.filter(({ name }) => openCodeFileTools.has(name)).map(({ name }) => `rakazo_${name}`)
+      ? tools.filter(({ name }) => openCodeFileTools.has(name)).map(({ name }) => `${nativeMcpServerName}_${name}`)
       : [];
     const baseBinding = [engine, request.model.id, request.instructions, tools,
       ...(openCodeProject ? [openCodeProject] : []), ...openCodeFileToolNames];
@@ -921,7 +922,7 @@ export class NativeAgentRuntime implements AgentRuntime {
               mcpServers: [
                 {
                   type: "http",
-                  name: "rakazo",
+                  name: nativeMcpServerName,
                   url: bridge.url,
                   headers: [{ name: "Authorization", value: `Bearer ${bridge.token}` }],
                 },
