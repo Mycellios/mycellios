@@ -462,7 +462,10 @@
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
-  permissions outside the approved MCP bridge. For Desktop OpenCode, resolve a
+  permissions outside the approved MCP bridge. Keep the explicit MCP object
+  schema root even for union schemas and expose the authorized file tools with
+  descriptive bridge names so OpenCode can discover and call them.
+  For Desktop OpenCode, resolve a
   project or task worktree on the native host from the existing local grant.
   Use it for the CLI and ACP working directory, keeping the private profile and
   session on the host outside the repo. Resume only with the same project binding

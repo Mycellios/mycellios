@@ -6,6 +6,7 @@ loadRootEnv();
 import { serve } from "@hono/node-server";
 import { SERVICE_NAMES } from "@mycellios/logging";
 import { createRootLogger } from "@mycellios/logging/axiom";
+import { startEventLoopDelayReport } from "@mycellios/logging/event-loop";
 import { createApp } from "./app.js";
 import { loadEnv } from "./env.js";
 
@@ -17,6 +18,7 @@ try {
   const server = serve({ fetch: app.fetch, port: env.port, hostname: env.apiHost }, () => {
     logger.info("api listening", { "http.host": env.apiHost, "http.port": env.port });
   });
+  const stopEventLoopReport = startEventLoopDelayReport(logger);
 
   // Long-lived connections (threads.subscribe SSE streams) never end on their
   // own, so server.close() alone waits forever for them. Track sockets and
@@ -32,6 +34,7 @@ try {
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
+    stopEventLoopReport();
     const closed = new Promise<void>((resolve) => server.close(() => resolve()));
     const grace = setTimeout(() => {
       for (const socket of sockets) socket.destroy();
