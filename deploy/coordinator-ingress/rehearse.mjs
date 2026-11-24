@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { configuration as config, hostname as alias } from "./route-state.mjs";
 
 const run = promisify(execFile);
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -23,8 +24,6 @@ let stopTraffic = false;
 let traffic;
 
 const docker = (...args) => execFileSync("docker", args, { encoding: "utf8", timeout: 60_000 }).trim();
-const alias = (sha) => `coordinator-release-${sha}`;
-const config = (sha) => `set $coordinator_backend ${alias(sha)}:4174;\n`;
 const launch = (suffix, args) => {
   const name = `${network}-${suffix}`;
   docker("run", "-d", "--network", network, "--name", name, ...args);
@@ -161,7 +160,16 @@ exec "${dockerBin}" "$@"
   await traffic;
   assert.ok(revisions.includes(old) && revisions.includes(candidate));
   assert.deepEqual(errors, []);
+  await gate("hold", old);
+  await change(old, candidate);
+  docker("stop", "-t", "0", `${network}-b`);
+  assert.deepEqual(await observe(), { route: candidate, ingressRevision: old, hold: operation });
+  await assert.rejects(change(old, candidate));
+  await change(candidate, old);
+  await gate("release", old);
+  assert.equal(await health(), old);
   console.log(JSON.stringify({ candidateRejected: true, failedReloadRecovered: true, rollback: true,
+    exitedCandidateRolledBackBeforePublicAdmission: true,
     stableAddress: true, previousStreamSurvived: true, previousWebSocketSurvived: true,
     newRequestWaitedForCandidate: true, foreignHoldRejected: true,
     requests: revisions.length, requestErrors: errors.length }));

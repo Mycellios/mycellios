@@ -5,7 +5,8 @@ import { dirname } from "node:path";
 export const revision = /^[a-f0-9]{40}$/;
 export const operation = /^[a-f0-9]{64}$/;
 export const hostname = (sha) => `coordinator-release-${sha}`;
-export const configuration = (sha) => `set $coordinator_backend ${hostname(sha)}:4174;\n`;
+export const configuration = (sha) =>
+  `set $coordinator_backend ${hostname(sha)}:4174;\nset $coordinator_revision ${sha};\n`;
 
 export function parseGate(raw) {
   const gate = JSON.parse(raw);

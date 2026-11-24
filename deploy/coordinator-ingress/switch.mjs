@@ -36,11 +36,17 @@ function health(host, port = 4174) {
   return body.revision;
 }
 
+function liveRoute() {
+  const value = docker("exec", gateway, "wget", "-T", "2", "-qO-", "http://127.0.0.1:4175/revision").trim();
+  if (!revision.test(value)) throw new Error("gateway route revision is invalid");
+  return value;
+}
+
 async function reloadTo(sha) {
   docker("exec", gateway, "nginx", "-t");
   docker("exec", gateway, "nginx", "-s", "reload");
   for (let i = 0; i < 8; i += 1) {
-    try { if (health("127.0.0.1", 4175) === sha) return; }
+    try { if (liveRoute() === sha && health("127.0.0.1", 4175) === sha) return; }
     catch { /* A new worker may not be accepting connections yet. */ }
     await setTimeout(250);
   }
@@ -59,7 +65,7 @@ if (!mounts.some((mount) => mount.Type === "bind" && mount.Source === state
 }
 const gate = parseGate(readFileSync(join(state, "gate.json"), "utf8"));
 if (observing) {
-  const route = health("127.0.0.1", 4175);
+  const route = liveRoute();
   if (exists(pending) !== null || readFileSync(active, "utf8") !== configuration(route)
       || (gate.hold === null && gate.revision !== route)) {
     throw new Error("route transition requires recovery before observation");
@@ -80,12 +86,12 @@ async function switchRoute() {
   if (journal !== null && journal !== transition) throw new Error("another route transition requires recovery");
   if (onDisk !== configuration(previous) && onDisk !== configuration(candidate)) throw new Error("unexpected route configuration");
   let live = null;
-  try { live = health("127.0.0.1", 4175); }
+  try { live = liveRoute(); }
   catch (error) { if (journal === null) throw error; }
   if (live && live !== previous && live !== candidate) throw new Error("unexpected serving revision");
 
-  if (onDisk === configuration(candidate) && live === candidate) {
-    if (journal !== null) finish();
+  if (journal === null && onDisk === configuration(candidate) && live === candidate) {
+    if (health("127.0.0.1", 4175) !== candidate) throw new Error("candidate revision mismatch");
   } else {
     if (journal === null) {
       if (onDisk !== configuration(previous) || live !== previous || health(hostname(candidate)) !== candidate) {
