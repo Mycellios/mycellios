@@ -288,6 +288,8 @@ import {OpenMycelliosDev} from "../components/OpenMycelliosDev";
 import { DeveloperContextLink } from "../components/DeveloperContextLink";
 import {DevelopmentIdentity} from "../components/DevelopmentIdentity";
 import { VoiceConversation } from "../components/call/VoiceConversation";
+import type { VoiceGroup } from "../components/call/VoiceConversation";
+import { groupReplyToRead, groupVoiceMember } from "../lib/group-voice";
 import { ProviderQuota } from "../components/ProviderQuota";
 import { HelpMenu } from "../components/HelpMenu";
 import { unsafeRunRetryText } from "../lib/retry-error";
@@ -459,7 +461,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const pushPublicKey = useWebPushPresence(userId);
   const chatHistory = useChatHistory();
   const [taskAgentsOpen, setTaskAgentsOpen] = useState(false);
-  const [voiceConversation, setVoiceConversation] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [voiceConversation, setVoiceConversation] = useState<{ id: string; name: string; color: string; group?: VoiceGroup } | null>(null);
   const [sideQuestionTargets, setSideQuestionTargets] = useState<Record<string, SideQuestionTarget>>({});
   useEffect(() => setSideQuestionTargets({}), [userId]);
   const projectCollection = useProjects(rpc, userId ?? null, shellSpaceId);
@@ -1901,6 +1903,25 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     call?.botId,
   ]);
 
+  // In a group, read the first answer to the person's newest message, in its Mico's voice.
+  const voiceOpen = Boolean(voiceConversation);
+  useEffect(() => {
+    if (!activeGroup || !snapshot || snapshot.groupId !== activeGroup.id) return;
+    const reply = groupReplyToRead(snapshot.messages, snapshot.members ?? activeGroup.members, snapshot.activeRuns);
+    const key = `group:${activeGroup.id}`;
+    if (autoSpokenBotId.current !== key) {
+      autoSpokenBotId.current = key;
+      autoSpoken.current = reply?.id ?? null;
+      return;
+    }
+    if (!reply || reply.id === autoSpoken.current) return;
+    autoSpoken.current = reply.id;
+    // An open voice conversation owns the speaker and reads its own replies.
+    if (voiceOpen || !(getGeneralPreferences().readReplies || bots.some(bot => bot.id === reply.botId && bot.autoSpeak))) return;
+    const text = speechFromBlocks(reply.blocks);
+    if (text) readAloud(text, { botId: reply.botId, messageId: reply.id });
+  }, [snapshot?.messages, snapshot?.activeRuns, snapshot?.groupId, activeGroup, bots, voiceOpen]);
+
   useEffect(() => {
     // A task conversation is read once its own snapshot loads, like the main chat on open.
     if (!active || !taskThreadLoaded) return;
@@ -2635,6 +2656,14 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       : active && !searchParams.has("m")
         ? queryClient.getQueryData(cachedThreadKey({ botId: active.id })) ?? null
         : null;
+  // A group's voice conversation opens on its lead; each member that answers then speaks.
+  const groupVoiceTarget = useMemo(() => {
+    if (!activeGroup) return null;
+    const members = activeSnapshot?.members?.length ? activeSnapshot.members : activeGroup.members;
+    const lead = groupVoiceMember(members, activeGroup.leadBotId);
+    return lead ? { id: lead.botId, name: lead.name, color: lead.color,
+      group: { id: activeGroup.id, name: activeGroup.name, members, leadBotId: activeGroup.leadBotId } } : null;
+  }, [activeGroup, activeSnapshot?.members]);
   const pendingSendScope = JSON.stringify([userId, currentSpaceId]);
   const {
     visible: pendingMessages, begin: beginPendingSend, accept: acceptPendingSend,
@@ -4318,7 +4347,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     onBrowser: () => { hideAside(); setVoiceConversation(null); setPanel(null); reviewWorkspace?.show(); },
     onFiles: () => showLibrary(),
     onSettings: () => { hideAside(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(inGroup ? "group-settings" : "settings"); },
-    onVoice: !inGroup && active ? () => { hideAside(); reviewWorkspace?.hide(); setPanel(null); setVoiceConversation({ id: active.id, name: active.name, color: active.color }); } : undefined,
+    onVoice: inGroup ? (groupVoiceTarget ? () => { hideAside(); reviewWorkspace?.hide(); setPanel(null); setVoiceConversation(groupVoiceTarget); } : undefined)
+      : active ? () => { hideAside(); reviewWorkspace?.hide(); setPanel(null); setVoiceConversation({ id: active.id, name: active.name, color: active.color }); } : undefined,
   };
   const openComputerWorkspace = () => {
     hideAside(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel("computer");
@@ -5259,7 +5289,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               onRemoveAttachment={removeAttachment}
               onSend={newConversation ? sendNewConversation : sendMessage}
               onStop={stopRun}
-              onOpenVoice={!inGroup && active && !newConversation ? chatTools.onVoice : undefined}
+              onOpenVoice={!newConversation ? chatTools.onVoice : undefined}
               onAskAside={!inGroup && active && !newConversation ? openAside : undefined}
               voiceConversationActive={Boolean(voiceConversation)}
               onCloseVoice={() => setVoiceConversation(null)}
@@ -5301,7 +5331,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       {Object.entries(sideQuestionTargets).map(([key, target]) => <SideQuestion key={key} {...target} enterToSend={enterToSend}
         active={key === asideKey && target.visible && !libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
         onClose={() => closeAside(key)} onBrowser={chatTools.onBrowser} onFiles={chatTools.onFiles} onSettings={chatTools.onSettings} onVoice={chatTools.onVoice}/>) }
-      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} accountId={userId} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
+      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.group?.id ?? voiceConversation.id,voiceConversation.group ? null : taskScope?.taskThreadId])} rpc={rpc} accountId={userId} spaceId={currentSpaceId} taskThreadId={voiceConversation.group ? undefined : taskScope?.taskThreadId} bot={voiceConversation} group={voiceConversation.group} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
 
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall
