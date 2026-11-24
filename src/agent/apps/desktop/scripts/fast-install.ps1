@@ -16,6 +16,10 @@ $installationPath=[IO.Path]::GetFullPath($Installation).TrimEnd('\')
 $parent=[IO.Path]::GetDirectoryName($installationPath)
 $backupRoot=Join-Path $parent 'mycellios-desktop-upgrade-backups'
 $exeName='Mycellios Desktop.exe'
+# Settled recovery copies (a committed update, or one already rolled back) only serve a manual
+# rollback. Keep the newest ones so each successful update does not leave another full copy of
+# the application (about 1.5-2 GB) behind.
+$retainedRecoveries=2
 $reg=Join-Path $env:SystemRoot 'System32\reg.exe'
 
 function Hash-File([string]$file) {
@@ -81,6 +85,35 @@ function Restore-Previous {
   if(!(Test-Path -LiteralPath $shortcut.path)){Copy-Item -LiteralPath $from -Destination $shortcut.path}
  }
  $script:state.phase='restored';Save-State
+}
+
+# Only settled receipts for this installation are removed; a 'prepared' or 'preparing' one may still
+# be needed to recover an interrupted extraction, so it always stays.
+function Remove-SettledRecoveries {
+ if(!(Test-Path -LiteralPath $backupRoot -PathType Container) -or
+    ((Get-Item -LiteralPath $backupRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){return}
+ $settled=@(foreach($folder in Get-ChildItem -LiteralPath $backupRoot -Directory -Force){
+  if($folder.Name -notmatch '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' -or
+     ($folder.Attributes -band [IO.FileAttributes]::ReparsePoint)){continue}
+  $file=Join-Path $folder.FullName 'receipt.json'
+  if(!(Test-Path -LiteralPath $file -PathType Leaf)){continue}
+  try{$saved=Get-Content -LiteralPath $file -Raw -Encoding UTF8|ConvertFrom-Json}catch{continue}
+  if($saved.schema -eq 'mycellios-fast-install/1' -and $saved.phase -in @('committed','restored') -and
+     $saved.installation -eq $installationPath -and
+     $saved.backup -eq (Join-Path $folder.FullName 'installation')){
+   [pscustomobject]@{Path=$folder.FullName;At=(Get-Item -LiteralPath $file).LastWriteTimeUtc}
+  }
+ })
+ foreach($old in @($settled|Sort-Object At -Descending|Select-Object -Skip $retainedRecoveries)){
+  # Directory.Delete removes links without following them, unlike Remove-Item -Recurse in
+  # Windows PowerShell 5.1. The application copy goes first and the receipt last, so a copy that
+  # cannot be removed now is still recognised and retried on the next update.
+  try{
+   $copy=Join-Path $old.Path 'installation'
+   if(Test-Path -LiteralPath $copy){[IO.Directory]::Delete($copy,$true)}
+   [IO.Directory]::Delete($old.Path,$true)
+  }catch{}
+ }
 }
 
 function Read-Manifest {
@@ -196,6 +229,8 @@ try {
       ([Version](Get-Item -LiteralPath $newExe).VersionInfo.ProductVersion).ToString(3) -ne $script:state.target){throw 'New installation is incomplete'}
    $script:state.phase='committed';Save-State
    if($script:state.backup){Copy-Item -LiteralPath $Journal -Destination (Join-Path ([IO.Path]::GetDirectoryName($script:state.backup)) 'receipt.json')}
+   # The update is in place; tidying old copies must never turn it into a failure.
+   try{Remove-SettledRecoveries}catch{}
   }
  }
  exit 0

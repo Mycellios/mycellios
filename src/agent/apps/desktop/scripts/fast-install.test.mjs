@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,link,copyFile,access,rm,readdir,unlink,cp} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,link,copyFile,access,rm,readdir,unlink,cp,utimes} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
@@ -88,6 +88,55 @@ test('refuses paths outside the named installation without moving data',{skip:!w
     assert.equal(await readFile(path.join(target,'keep'),'utf8'),'preserved');
   }finally{
     assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir())+path.sep+'mycellios-fast-install-scope-'));
+    await rm(root,{recursive:true,force:true});
+  }
+});
+
+test('Windows commit keeps the two newest settled recovery copies and every unsettled one',{skip:!windows,timeout:60000},async()=>{
+  const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-retention-'));
+  const installation=path.join(root,'mycellios-desktop'),journal=path.join(root,'journal.json'),guid=randomUUID();
+  const backups=path.join(root,'mycellios-desktop-upgrade-backups');
+  const keys=['Software\\'+guid,'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\'+guid];
+  const reg=(...args)=>execFileSync('reg.exe',args,{windowsHide:true,stdio:'pipe'}).toString();
+  const invoke=(operation,extra=[])=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation',operation,'-Installation',installation,'-Journal',journal,...extra],{windowsHide:true,stdio:'pipe'});
+  const version=execFileSync(ps,['-NoProfile','-NonInteractive','-Command',"(Get-Item -LiteralPath '"+source.replaceAll("'","''")+"').VersionInfo.ProductVersion"]).toString().trim().split('.').slice(0,3).join('.');
+  const writeApp=async()=>{
+    const target=path.join(installation,'Mycellios Desktop.exe');await link(source,target).catch(()=>copyFile(source,target));
+    await mkdir(path.join(installation,'resources'),{recursive:true});
+    await writeFile(path.join(installation,'resources/desktop-build.json'),JSON.stringify({schema:'mycellios-desktop-build/1',platform:'windows-x64',version}));
+  };
+  // A recovery folder as an earlier update left it, dated `daysAgo` by its receipt.
+  const seed=async(phase,daysAgo,{scope=installation,receipt=true}={})=>{
+    const folder=path.join(backups,randomUUID());await mkdir(path.join(folder,'installation'),{recursive:true});
+    await writeFile(path.join(folder,'installation','Mycellios Desktop.exe'),'previous version');
+    if(receipt){
+      const file=path.join(folder,'receipt.json');
+      await writeFile(file,JSON.stringify({schema:'mycellios-fast-install/1',installation:scope,backup:path.join(folder,'installation'),target:'0.0.1',phase,registry:[],shortcuts:[]}));
+      const at=new Date(Date.now()-daysAgo*86_400_000);await utimes(file,at,at);
+    }
+    return path.basename(folder);
+  };
+  try {
+    for(const key of keys){reg('add','HKCU\\'+key,'/v','InstallLocation','/t','REG_SZ','/d',installation,'/f');}
+    await mkdir(installation,{recursive:true});await writeApp();
+    await writeFile(path.join(installation,'Uninstall Mycellios Desktop.exe'),'Uninstaller fixture; never executed');
+    const oldest=await seed('committed',3),older=await seed('committed',2),newest=await seed('restored',1);
+    const interrupted=await seed('prepared',5),foreign=await seed('committed',4,{scope:path.join(root,'other','mycellios-desktop')});
+    const unlabeled=await seed('committed',6,{receipt:false});
+    invoke('prepare',['-Uninstaller','Uninstall Mycellios Desktop.exe','-InstallRegistryKey',keys[0],'-UninstallRegistryKey',keys[1],'-TargetVersion',version]);
+    const current=path.basename(path.dirname(JSON.parse((await readFile(journal,'utf8')).replace(/^\uFEFF/,'')).backup));
+    // The installer extracts the new version next to the preserved uninstaller.
+    await writeApp();
+    invoke('commit');
+    const left=new Set(await readdir(backups));
+    assert.deepEqual([...left].sort(),[current,newest,interrupted,foreign,unlabeled].sort());
+    assert.ok(!left.has(oldest)&&!left.has(older));
+    await access(path.join(backups,current,'installation','Mycellios Desktop.exe'));
+    const committed=JSON.parse((await readFile(path.join(backups,current,'receipt.json'),'utf8')).replace(/^\uFEFF/,''));
+    assert.equal(committed.phase,'committed');
+  } finally {
+    for(const key of keys){try{reg('delete','HKCU\\'+key,'/f')}catch{}}
+    assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir())+path.sep+'mycellios-fast-install-retention-'));
     await rm(root,{recursive:true,force:true});
   }
 });
