@@ -20,7 +20,8 @@ export const CLIENT_UPDATE_CHECK_SPACING_MS = 30_000;
 export const CLIENT_UPDATE_REQUIRED_RETRIES = 10;
 const INPUT_EVENTS = ["keydown", "pointerdown", "input", "wheel", "touchstart"] as const;
 
-type Moment = "hidden" | "navigation" | "idle" | "manual";
+type Moment = "hidden" | "navigation" | "idle" | "manual" | "required";
+type UpdateResult = "reloading" | "work-pending" | "unavailable";
 
 export type ClientUpdateDeps = {
   build: string;
@@ -105,12 +106,14 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
   };
   const safe = (moment: Moment): boolean => {
     if (editing() || deps.holdsUnsavedWork()) return false;
-    if (deps.hasUnsentDraft()) return false;
+    // An explicit update can restore text already persisted by the composer.
+    // Automatic updates still wait for all unsent drafts.
+    if (moment !== "manual" && deps.hasUnsentDraft()) return false;
     if (deps.document.querySelector('[role="dialog"], [role="alertdialog"], dialog[open]')) {
       return false;
     }
     if (moment !== "idle") return true;
-    return deps.now() - lastInput >= CLIENT_UPDATE_IDLE_MS && !deps.hasUnsentDraft();
+    return deps.now() - lastInput >= CLIENT_UPDATE_IDLE_MS;
   };
 
   const remember = (value: string | null) => {
@@ -126,15 +129,15 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
    * Reload only onto a build the server already serves, and only once per build pair. A soft
    * update and refused build both re-check that the moment is still safe after the fetch.
    */
-  const reloadOntoServedBuild = async (moment: Moment | null): Promise<boolean> => {
+  const reloadOntoServedBuild = async (moment: Moment): Promise<UpdateResult> => {
     checking = true;
     lastCheck = deps.now();
     try {
       const served = await deps.servedBuild().catch(() => null);
-      if (!newer(served) || attempted(served)) return false;
+      if (!newer(served) || attempted(served)) return "unavailable";
       // Even a required upgrade must not discard an attachment, a recording,
       // an in-flight send or a form edited while the version request was pending.
-      if (!safe(moment ?? "manual")) return false;
+      if (!safe(moment)) return "work-pending";
       let previous: string | null = null;
       try {
         previous = deps.storage?.getItem(ATTEMPT_KEY) ?? null;
@@ -142,10 +145,10 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
         // Nothing to restore.
       }
       remember(JSON.stringify({ from: deps.build, to: served }));
-      if (deps.reload()) return true;
+      if (deps.reload()) return "reloading";
       // The recovery guard refused (offline, or cooling down): this pair was never tried.
       remember(previous);
-      return false;
+      return "unavailable";
     } finally {
       checking = false;
     }
@@ -165,8 +168,9 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
       void probe();
       return () => { subscribers.delete(notify); };
     },
-    async applyUpdate(): Promise<boolean> {
-      if (checking || !ready || !safe("manual")) return false;
+    async applyUpdate(): Promise<UpdateResult> {
+      if (checking || !ready) return "unavailable";
+      if (!safe("manual")) return "work-pending";
       return reloadOntoServedBuild("manual");
     },
     /** Every API reply names the deployed build. */
@@ -184,7 +188,7 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
     updateRequired() {
       if (!deps.build) return;
       requiredRetries = CLIENT_UPDATE_REQUIRED_RETRIES;
-      if (!checking) void reloadOntoServedBuild(null);
+      if (!checking) void reloadOntoServedBuild("required");
     },
     navigated() {
       tryAt("navigation");
@@ -208,7 +212,7 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
       const idle = deps.setInterval(() => {
         if (requiredRetries > 0 && !checking) {
           requiredRetries--;
-          void reloadOntoServedBuild(null);
+          void reloadOntoServedBuild("required");
         } else {
           void probe();
           tryAt("idle");

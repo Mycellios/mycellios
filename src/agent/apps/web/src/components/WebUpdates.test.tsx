@@ -31,7 +31,7 @@ async function mounted(check: (refresh: () => Promise<void>) => Promise<void> | 
 }
 const update = () => [...document.querySelectorAll("button")].find(b => b.textContent === "Update")!;
 it("shows a persistent PWA prompt and updates only when clicked", async () => {
-  mock.apply.mockResolvedValue(true);
+  mock.apply.mockResolvedValue("reloading");
   await mounted(async () => {
     expect(document.body.textContent).toContain("New version available");
     expect(document.body.textContent).toContain("Tasks running on the server will continue");
@@ -64,14 +64,18 @@ it("waits for a verified version before showing the notice", async () => {
     expect(document.querySelector("aside")).not.toBeNull();
   });
 });
-it.each([false, "reject"])("keeps the update retryable when local work or network blocks it (%s)", async (outcome) => {
+it.each([
+  ["work-pending", "send or remove pending attachments"],
+  ["unavailable", "Could not complete the update"],
+  ["reject", "Could not complete the update"],
+])("keeps the update retryable and explains the blocker (%s)", async (outcome, message) => {
   if (outcome === "reject") mock.apply.mockRejectedValue(new Error("offline"));
-  else mock.apply.mockResolvedValue(false);
+  else mock.apply.mockResolvedValue(outcome);
   await mounted(async () => {
     await act(async () => update().click());
-    expect(document.querySelector('[role="status"]')?.textContent).toContain("Send your draft and attachments");
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(message);
     expect(update().disabled).toBe(false);
-    mock.apply.mockResolvedValue(true);
+    mock.apply.mockResolvedValue("reloading");
     await act(async () => update().click());
     expect(mock.apply).toHaveBeenCalledTimes(2);
   });
