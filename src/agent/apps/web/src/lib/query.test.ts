@@ -20,6 +20,7 @@ import {
   lastChatOf,
   queryClient,
   primeConversationSeed,
+  routineMentionOptions,
   seedOnLeave,
   setQueryUser,
   spaceQueries,
@@ -31,6 +32,15 @@ afterEach(() => {
 });
 
 describe("query scopes", () => {
+  it("shares routine suggestions across conversations while isolating accounts and Spaces", () => {
+    const first = routineMentionOptions("user-a", "space-a").queryKey;
+    const rows = [{ id: "routine-a", botId: "bot-a", name: "Checklist", crons: [] }];
+    queryClient.setQueryData(first, rows);
+    expect(queryClient.getQueryData(routineMentionOptions("user-a", "space-a").queryKey)).toEqual(rows);
+    expect(queryClient.getQueryData(routineMentionOptions("user-b", "space-a").queryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(routineMentionOptions("user-a", "space-b").queryKey)).toBeUndefined();
+  });
+
   it("separates private task snapshots from the main chat and other tasks", () => {
     const a = { botId: "mico", taskThreadId: "one" };
     const b = { botId: "mico", taskThreadId: "two" };

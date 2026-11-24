@@ -657,8 +657,11 @@ export const Transcript = memo(function Transcript({
                   <TimeSeparator createdAt={message.createdAt} locale={i18n.locale || "en"} />
                 ) : null}
                 {holdsUnread ? <UnreadDivider afterSeparator={separatorIds.has(message.id)} /> : null}
-                <div data-message-id={message.id} data-message-role={message.role} className="relative py-0.5">
-                  <RoutineRunMarker runs={routineGroup.runs} locale={i18n.locale || "en"} />
+                <div data-message-id={routineGroup.runs.length === 1 ? message.id : undefined}
+                  data-message-role={message.role} className="relative py-0.5">
+                  <RoutineRunMarker runs={routineGroup.runs} locale={i18n.locale || "en"}
+                    revealMessageId={scrollRequest && routineGroupOf.get(scrollRequest.messageId) === routineGroup
+                      ? scrollRequest.messageId : undefined} />
                 </div>
               </Fragment>
             );

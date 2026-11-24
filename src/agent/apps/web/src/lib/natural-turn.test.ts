@@ -28,6 +28,11 @@ it("keeps a turn without tools as a plain answer and holds it while live", () =>
   expect(naturalTurnLayout([{ kind: "progress", text: "Ho" }], true).answer).toEqual([]);
 });
 
+it("keeps a completed emoji-only answer in natural style", () => {
+  const answer = { kind: "text" as const, text: "✅" };
+  expect(naturalTurnLayout([steps("Check"), answer], false).answer).toEqual([answer]);
+});
+
 it("leaves provider tool status lines out of the notes", () => {
   const layout = naturalTurnLayout([{ kind: "progress", text: "Running shell", activity: true }, steps("Shell"), { kind: "text", text: "Ok." }], false);
   expect(layout.notes).toEqual([]);

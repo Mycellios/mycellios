@@ -18,6 +18,13 @@ queue/steering semantics and authoritative event reducer.
 - Motion acknowledges pending send, first live reply and control changes. Do not
   replay a streamed reply on completion or animate history loads and token updates.
   Preserve scroll ownership, reduced motion, keyboard and assistive feedback.
+- Completed natural replies retain meaningful symbols, including emoji-only replies.
+  A jump into a folded routine opens the group and scrolls to the exact run.
+- Keep a single history-page read in flight for the selected conversation visit.
+  A read finishing after navigation must not clear another conversation's loader.
+  Reuse unchanged message render inputs while the live tail updates.
+- Fetch routine mention summaries once per account and Space when the composer
+  opens its mention search. Opening a chat must not load every Mico's routines.
 - Measure real components in a deterministic browser fixture at desktop and mobile
   widths, including slow acknowledgements, SSE-first delivery, rejection, navigation,
   long transcripts and progress bursts. This is UI evidence, not a live model's

@@ -94,6 +94,7 @@ export const Composer = memo(function Composer({
   replyTargetName,
   onClearReply,
   mentionTargets,
+  onMentionOpen,
   agentSkills,
   onSlashOpen,
   onSlashAction,
@@ -146,6 +147,7 @@ export const Composer = memo(function Composer({
   replyTargetName?: string;
   onClearReply?: () => void;
   mentionTargets?: ComposerMention[];
+  onMentionOpen?: () => void;
   agentSkills?: AgentSkillCatalogEntry[];
   onSlashOpen?: () => void;
   onSlashAction?: (action: SlashActionId) => void;
@@ -351,6 +353,7 @@ export const Composer = memo(function Composer({
     scheduleComposerDraft(draftKey, value);
     setDraft(value);
     const mentionMatch = /(?:^|\s)@([\w-]*)$/.exec(value);
+    if (mentionMatch && mentionQuery === null) onMentionOpen?.();
     setMentionQuery(mentionMatch ? (mentionMatch[1] ?? "") : null);
     // `/` only at the start of the draft so forced skills expand (`Use skill:` / `/Name` prefix).
     const slashMatch = selectedSkill === null ? /^\/([^\n]*)$/.exec(value) : null;
@@ -932,6 +935,7 @@ export const Composer = memo(function Composer({
             value={voiceDraft}
             readOnly={voice.state !== null}
             onChange={(event) => updateDraft(event.target.value)}
+            onFocus={() => { if (mentionQuery !== null) onMentionOpen?.(); }}
             onPaste={handlePaste}
             onKeyDown={(event) => {
               if (voice.state) {
