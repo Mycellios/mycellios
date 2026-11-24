@@ -20,9 +20,13 @@ vi.mock("@mycellios/ui-web", () => ({
   }: ComponentProps<"button"> & { variant?: string; size?: string }) => (
     <button type="button" {...props} />
   ),
+  DropdownMenuItem: (props: ComponentProps<"button">) => <button type="button" {...props} />,
 }));
+// The menu is mocked open, so its items can be found and clicked directly.
 vi.mock("../../components/ComputerMaintenanceActions", () => ({
-  ComputerMaintenanceActions: () => null,
+  ComputerMaintenanceActions: ({ leadingItems }: { leadingItems?: ReactNode }) => (
+    <div data-testid="computer-more-menu">{leadingItems}</div>
+  ),
 }));
 vi.mock("../../components/teach/TeachCaptureOverlay", () => ({ TeachCaptureOverlay: () => null }));
 vi.mock("../../components/teach/TeachComputerOverlay", () => ({
@@ -121,6 +125,63 @@ it("offers Start for an asleep computer", async () => {
   await render("suspended");
   expect(container.textContent).toContain("Computer is asleep");
   expect(startButton()).toBeDefined();
+});
+
+it("says it is connecting while a running computer's screen is not ready yet", async () => {
+  await render("running");
+  expect(container.querySelector("[data-testid=computer-connecting]")?.textContent).toBe(
+    "Connecting…",
+  );
+});
+
+it("answers a waiting request with one primary action and keeps the rest in the menu", async () => {
+  const onRelease = vi.fn(async () => undefined);
+  const onStopRun = vi.fn();
+  await act(async () =>
+    root.render(
+      <ComputerOverlay
+        bot={bot}
+        computer={{
+          ...computer("running"),
+          controlHolder: "user",
+          controlBotId: "bot-1",
+          takeoverRequested: true,
+        }}
+        computerViewport={null}
+        recordingSkill={null}
+        teachBusy={false}
+        hasControl
+        composerRunning
+        sending={false}
+        booting={false}
+        sendError={null}
+        embeddedScreenUrl={null}
+        screenFrameRef={() => undefined}
+        computerScreenError={null}
+        computerBooting={null}
+        onStopTeaching={() => undefined}
+        onStopRun={onStopRun}
+        onRelease={onRelease}
+        onTakeControl={() => undefined}
+        onStart={() => undefined}
+        onRefreshTeaching={async () => undefined}
+        onRefreshComputer={async () => undefined}
+        onClose={() => undefined}
+      />,
+    ),
+  );
+  const actions = container.querySelector("[data-testid=computer-chrome-actions]");
+  const menu = container.querySelector("[data-testid=computer-more-menu]");
+  const visible = [...(actions?.querySelectorAll("button") ?? [])]
+    .filter((button) => !menu?.contains(button))
+    .map((button) => button.textContent || button.getAttribute("aria-label"));
+  expect(visible).toEqual(["I’m done", "Close computer"]);
+  await act(async () => (menu?.querySelector("[data-testid=computer-skip]") as HTMLButtonElement).click());
+  expect(onRelease).toHaveBeenCalledWith("skipped");
+  await act(async () =>
+    (menu?.querySelector("[data-testid=computer-overlay-stop]") as HTMLButtonElement).click(),
+  );
+  expect(onStopRun).toHaveBeenCalledOnce();
 });
 
 it("offers Show desktop only while a held handoff shows the waiting tab", async () => {

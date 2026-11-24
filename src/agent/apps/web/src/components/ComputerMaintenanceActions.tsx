@@ -13,9 +13,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@mycellios/ui-web";
 import { MoreHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { computerUpdates } from "../lib/computer-updates";
 import { rpc } from "../lib/rpc";
@@ -28,11 +30,14 @@ export function ComputerMaintenanceActions({
   computer,
   onChanged,
   visibleRecover = false,
+  leadingItems,
 }: {
   botId: string;
   computer: ComputerStatus | null;
   onChanged: () => Promise<void>;
   visibleRecover?: boolean;
+  /** Secondary actions of the current view, listed above the computer's own. */
+  leadingItems?: ReactNode;
 }) {
   const { t } = useLingui();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,8 +56,8 @@ export function ComputerMaintenanceActions({
   const showReset = showRecover;
   const showStop = computer.state === "running";
   const showUpdate = computer.canUpdate;
-  const hasActions = showStop || showRecover || showReset || showUpdate;
-  if (!hasActions) return null;
+  const hasMaintenance = showStop || showRecover || showReset || showUpdate;
+  if (!hasMaintenance && !leadingItems) return null;
 
   async function run(action: Action) {
     setPending(action);
@@ -163,7 +168,8 @@ export function ComputerMaintenanceActions({
         <DropdownMenuTrigger
           data-testid="computer-more-button"
           aria-label={t`More computer actions`}
-          disabled={busy && pending === null}
+          // A computer busy with another Mico still offers the view's own actions.
+          disabled={busy && pending === null && !leadingItems}
           render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" />}
         >
           <MoreHorizontal />
@@ -173,6 +179,8 @@ export function ComputerMaintenanceActions({
           data-testid="computer-more-menu"
           className="w-auto min-w-44"
         >
+          {leadingItems}
+          {leadingItems && hasMaintenance ? <DropdownMenuSeparator /> : null}
           {showStop ? (
             <DropdownMenuItem
               closeOnClick={false}

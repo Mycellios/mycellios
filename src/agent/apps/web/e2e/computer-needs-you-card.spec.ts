@@ -86,6 +86,7 @@ test("Open focuses the waiting Mico’s browser tab and takes control in one cli
   expect(requests.filter(method => method === "tabViewUrl")).toHaveLength(1);
   await captureScreenshot(page, testInfo, "browser-handoff-direct");
 
+  await page.getByRole("button", { name: "More computer actions" }).click();
   await page.getByTestId("computer-show-desktop").click();
   await expect(frame.getByText("Whole desktop")).toBeVisible();
   await expect(page.getByTestId("computer-show-desktop")).toHaveCount(0);
