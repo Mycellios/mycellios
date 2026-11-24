@@ -335,7 +335,13 @@ describe("native host computer transport", () => {
     await expect(
       client.readFile(computer, "large.bin", context, { maxBytes: 10 * 1024 * 1024 }),
     ).rejects.toThrow("exceeds");
-    await expect(collect(client.exportWorkspace(computer, context))).rejects.toThrow("exceeds");
+    // A caller that cannot reassemble pieces still gets the old whole-file refusal.
+    const request = (
+      client as unknown as { request(input: unknown, context: unknown): AsyncIterable<unknown> }
+    ).request.bind(client);
+    await expect(
+      collect(request({ method: "exportWorkspace", botId: computer.botId }, context)),
+    ).rejects.toThrow("exceeds");
     await expect(client.readFile(computer, "../../outside", context)).rejects.toThrow();
     await expect(
       client.writeFile(computer, { path: "../outside", content }, context),
@@ -345,33 +351,17 @@ describe("native host computer transport", () => {
     ).rejects.toThrow();
   });
 
-  it("preserves the saved workspace when a native file grows beyond the transfer limit", async () => {
+  it("saves a PC workspace whose files are larger than one transfer frame", async () => {
     const home = new LocalAgentHomeStore(path.join(root, "saved"));
-    const filePath = path.join(
-      root,
-      "desktop-computers",
-      computer.id.slice("desktop-".length),
-      "result.bin",
-    );
-    await client.writeFile(
-      computer,
-      { path: "result.bin", content: new TextEncoder().encode("saved result") },
-      context,
-    );
+    const pcHome = path.join(root, "desktop-computers", computer.id.slice("desktop-".length));
+    const video = Buffer.from(new Uint8Array(17 * 1024 * 1024 + 5).map((_, index) => index % 253));
+    await mkdir(path.join(pcHome, "artifacts"), { recursive: true });
+    await writeFile(path.join(pcHome, "artifacts/video.mp4"), video);
+    await writeFile(path.join(pcHome, "notes.md"), "notes");
     await checkpointComputerWorkspace(home, client, "test-bot", computer, context);
-    await writeFile(filePath, Buffer.alloc(8 * 1024 * 1024 + 1));
-    await client.writeFile(
-      computer,
-      { path: "a-partial.txt", content: new TextEncoder().encode("unsaved change") },
-      context,
-    );
-    await expect(
-      checkpointComputerWorkspace(home, client, "test-bot", computer, context),
-    ).rejects.toThrow("exceeds 8388608 bytes");
-    expect(await readFile(path.join(home.pathFor("test-bot"), "result.bin"), "utf8")).toBe(
-      "saved result",
-    );
-    expect(await readdir(home.pathFor("test-bot"))).toEqual(["result.bin"]);
+    const saved = await readFile(path.join(home.pathFor("test-bot"), "artifacts/video.mp4"));
+    expect(Buffer.compare(saved, video)).toBe(0);
+    expect(await readFile(path.join(home.pathFor("test-bot"), "notes.md"), "utf8")).toBe("notes");
   });
 
   it("seeds a PC workspace with large files in verified pieces and never sends excluded paths", async () => {

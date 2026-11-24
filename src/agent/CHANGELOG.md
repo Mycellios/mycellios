@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-11-24
+
+### Fixed
+
+- Pause and resume on "Generate AI" now reach the computer. Before, the network refused the
+  command and the button kept showing Pause.
+- Work a Mico does on your PC is saved again when its folder holds a file larger than 8 MB,
+  such as a video it made. Before, one large file stopped the whole folder from being saved.
+  Files over 100 MB stay on the PC only.
+
 ## [0.21.0] - 2026-11-23
 
 ### Added
