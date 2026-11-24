@@ -1,4 +1,6 @@
-// First: copies storage saved under the legacy key names before any module reads it.
+// Before any schema module: keeps Zod from probing eval, which the CSP reports.
+import "./lib/zod-config";
+// Before other modules read storage: copies storage saved under the legacy key names before any module reads it.
 import "./lib/legacy-storage";
 // Before monitoring: removes an identity provider's return (and any session it carries) from the address.
 import "./lib/identity-link-return";
