@@ -1,6 +1,7 @@
 import { PeerExchangeSummary } from "../../components/ai/PeerExchangeSummary";
 import { joinMessageBubbles } from "../../lib/message-bubble-group";
 import { peerExchanges } from "../../lib/peer-exchange-groups";
+import { earlierProgressNotes } from "../../lib/natural-turn";
 import { routineRunGroups } from "../../lib/routine-run-groups";
 import { RoutineRunMarker } from "../../components/RoutineRunMarker";
 import { useGeneralPreferences } from "../../lib/general-preferences";
@@ -226,6 +227,7 @@ export const Transcript = memo(function Transcript({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
+  const earlierNotes = useMemo(() => earlierProgressNotes(messages), [messages]);
   // A reply the reader watched arrive must not shrink when its durable message replaces progress.
   // Keys include the thread; the bounded set never changes another conversation's presentation.
   const [streamedTextRuns, setStreamedTextRuns] = useState<ReadonlySet<string>>(() => new Set());
@@ -785,6 +787,7 @@ export const Transcript = memo(function Transcript({
                       runEnded={Boolean(message.runId) && (!running || Boolean(activeRun && activeRun.id !== message.runId))}
                       showFullText={scrollRequest?.messageId === message.id}
                       textWasStreamed={Boolean(message.runId && streamedTextRuns.has(`${message.threadId}:${message.runId}`))}
+                      earlierNotes={earlierNotes.get(message.id)}
                       hideHoverActions={compactMessages}
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}
