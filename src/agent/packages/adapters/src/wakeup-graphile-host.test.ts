@@ -333,6 +333,42 @@ describe("reserved Graphile workloads", () => {
     for (const { runner } of runners) expect(runner.stop).toHaveBeenCalled();
   });
 
+  it("leaves process signals to the worker that owns the shutdown", async () => {
+    for (let i = 0; i < 3; i++) run.mockResolvedValueOnce(mockRunner().runner);
+    const host = createReservedGraphileJobWorkerHost({} as Pool, { concurrency: 4 });
+    await host.start(handlers());
+    expect(run.mock.calls.map(([options]) => options.noHandleSignals)).toEqual([true, true, true]);
+    await host.stop();
+  });
+
+  it("finishes stopping when the runner was already stopped elsewhere", async () => {
+    const runners = [mockRunner(), mockRunner(), mockRunner()];
+    for (const { runner } of runners) run.mockResolvedValueOnce(runner);
+    // Graphile's own signal handler stopped this runner first: its life is over and a
+    // second stop reports that.
+    vi.mocked(runners[0]!.runner.stop).mockImplementationOnce(async () => {
+      runners[0]!.rejectLife(new Error("runner stopped"));
+      throw new Error("Runner is already stopped");
+    });
+    const host = createReservedGraphileJobWorkerHost({} as Pool);
+    await host.start(handlers());
+    await expect(host.stop()).resolves.toBeUndefined();
+    for (const { runner } of runners) expect(runner.stop).toHaveBeenCalled();
+  });
+
+  it("still reports other failures while stopping a runner", async () => {
+    const runners = [mockRunner(), mockRunner(), mockRunner()];
+    for (const { runner } of runners) run.mockResolvedValueOnce(runner);
+    const failure = new Error("connection terminated");
+    vi.mocked(runners[1]!.runner.stop).mockImplementationOnce(async () => {
+      runners[1]!.rejectLife(failure);
+      throw failure;
+    });
+    const host = createReservedGraphileJobWorkerHost({} as Pool);
+    await host.start(handlers());
+    await expect(host.stop()).rejects.toBe(failure);
+  });
+
   it("stops runners already started if another workload cannot start", async () => {
     const first = mockRunner();
     run.mockResolvedValueOnce(first.runner).mockRejectedValueOnce(tooMany);
