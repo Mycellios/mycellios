@@ -14,7 +14,7 @@ const fixtures = vi.hoisted(() => ({
   mycelliosCatalog: [] as ModelCatalogEntry[],
   catalog: [{ provider: "opencode-go", providerName: "OpenCode Go", id: "gpt-6-luna", label: "GPT-6 Luna", thinkingLevels: ["medium"] }],
   nativeModels: [] as Array<{id:string;label:string;isDefault:boolean;thinkingLevels:string[];fast:boolean}>,
-  engines: { computer: "server", engines: ["codex", "opencode"] },
+  engines: { computer: "server", engines: ["codex", "opencode"] } as { computer: string; engines: string[]; signedOut?: string[] },
 }));
 const connect = vi.hoisted(() => vi.fn());
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
@@ -169,6 +169,14 @@ it("offers only the selected Desktop's native engines, and saves the engine with
   expect(container.querySelector('[data-choice^="native-codex::"]')).toBeNull();
   await act(async () => container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::default"]')!.click());
   expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "opencode", nativeConfig: null, modelProvider: null, modelId: null, thinkingLevel: null });
+});
+
+it("disables an engine whose CLI is signed out, but keeps the Mico's current engine selectable", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["claude", "opencode"], signedOut: ["claude", "opencode"] };
+  await render("opencode");
+  expect(container.querySelector<HTMLButtonElement>('[data-choice="native-claude::default"]')?.disabled).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::default"]')?.disabled).toBe(false);
+  expect(save).not.toHaveBeenCalled();
 });
 
 it("preserves a saved native provider when the selected Desktop is offline", async () => {

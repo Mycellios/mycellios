@@ -140,12 +140,19 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     ...(enginesQuery.data?.engines ?? []),
     ...(nativeEngine ? [nativeEngine] : []),
   ])];
+  // A CLI that reported nobody signed in would fail its first turn: say why instead.
+  // The Mico's current engine stays selectable so its saved choice is never hidden.
+  const signedOut = new Set(enginesQuery.data?.signedOut ?? []);
+  const signInRequired = (engine: NativeProvider) => signedOut.has(engine) && engine !== nativeEngine
+    ? { unavailable: true, unavailableLabel: t`Sign in required` } : {};
   const nativeChoices = nativeProviders.filter(engine => engine !== "codex" || !nativeModels.length).map(engine => ({
     key: modelOptionKey(`native-${engine}`, "default"), provider: `native-${engine}`,
     providerLabel: NATIVE_PROVIDERS[engine], label: NATIVE_PROVIDERS[engine] as string, title: t`Use this account`,
+    ...signInRequired(engine),
   }));
   if (nativeProviders.includes("codex")) nativeChoices.push(...nativeModels.map(model => ({
     key: modelOptionKey("native-codex", model.id), provider: "native-codex", providerLabel: NATIVE_PROVIDERS.codex, label: model.label, title: model.label,
+    ...signInRequired("codex"),
   })));
   const choices = [...chatModelChoices(
     connected,

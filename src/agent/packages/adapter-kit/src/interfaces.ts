@@ -108,6 +108,8 @@ export interface SandboxProvider {
   ): Promise<string[]>;
   /** Read the installed coding engines from the owned Desktop without starting a workspace. */
   nativeEngines?(context: AdapterContext): Promise<NativeCodingEngine[] | undefined>;
+  /** Same read as nativeEngines, plus the engines that need their CLI signed in again. */
+  nativeEngineState?(context: AdapterContext): Promise<{ engines: NativeCodingEngine[]; signedOut: NativeCodingEngine[] } | undefined>;
   /** Native command environment; omitted for providers with a fixed container environment. */
   environment?(
     computer: ComputerRef,
@@ -319,6 +321,8 @@ export interface SemanticMemoryProvider {
 export interface AgentRuntime {
   /** Installed coding engines on this account-authorized native host. */
   nativeEngines?(): Promise<NativeCodingEngine[]>;
+  /** The installed engines, and those among them whose CLI reported nobody signed in. */
+  nativeEngineState?(): Promise<{ engines: NativeCodingEngine[]; signedOut: NativeCodingEngine[] }>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,

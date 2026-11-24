@@ -188,6 +188,10 @@ export class HostAwareSandbox implements SandboxProvider {
     return this.host.nativeEngines?.(context);
   }
 
+  async nativeEngineState(context: AdapterContext) {
+    return this.host.nativeEngineState?.(context);
+  }
+
   async environment(computer: ComputerRef, context: AdapterContext) {
     const provider = this.route(computer);
     return provider.environment?.(computer, context);

@@ -117,6 +117,8 @@ export interface HostComputerEnvironment {
   projectSessionId?:string;
   taskIsolation?: "worktree-v1";
   nativeEngines?: NativeCodingEngine[];
+  /** Installed engines whose CLI reported nobody signed in (older Desktops omit it). */
+  signedOutEngines?: NativeCodingEngine[];
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
   /** Shared group folders this PC grants to this run, mounted under group/<label>. */
