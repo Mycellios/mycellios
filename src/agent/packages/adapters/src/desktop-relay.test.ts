@@ -58,7 +58,8 @@ describe("outbound Desktop relay", () => {
   it("expires disconnected work and never moves an active agent to a different PC", async () => {
     let now = 0; broker = new DesktopRelayBroker(() => now); broker.bind(owner, binding);
     const response = broker.dispatch({ method: "environment", botId: "bot" }, context());
-    expect(() => broker.bind(owner, { ...binding, deviceId: "other" })).toThrow();
+    // The API turns this exact reason into "working on another computer", not "sign in again".
+    expect(() => broker.bind(owner, { ...binding, deviceId: "other" })).toThrow("Agent busy on another computer");
     expect(broker.poll(owner, "device").operations).toHaveLength(1);
     now = 91_000;
     expect(broker.available(owner, "bot")).toBe(false);

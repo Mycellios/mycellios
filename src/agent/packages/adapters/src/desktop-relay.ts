@@ -164,7 +164,7 @@ export class DesktopRelayBroker {
     if (existing && !sameAccount) throw new Error("This agent is already connected to a computer. Disconnect it first.");
     if (existing && (!sameOwner(owner, existing) || existing.deviceId !== input.deviceId || existing.generation !== input.generation)) {
       const busy = [...this.operations.values()].some(op => op.binding === existing && !op.closed);
-      if (busy) throw new Error("This agent is already connected to a computer. Disconnect it first.");
+      if (busy) throw new Error("Agent busy on another computer");
       this.bindings.set(id, { ...owner, ...input, seen: this.now() });
       return existing.deviceId !== input.deviceId;
     }

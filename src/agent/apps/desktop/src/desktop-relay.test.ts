@@ -1,5 +1,28 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { DesktopRelayClient, missingOperationAction, pollRetryDelayMs } from "./desktop-relay.js";
+import { DesktopRelayClient, missingOperationAction, pollRetryDelayMs, relayConflictMessage } from "./desktop-relay.js";
+
+it("explains a relay conflict with the server's sentence, never by asking to sign in again", async () => {
+  const busy = "This Mico is working on another computer. Wait for it to finish there, or stop it, then try again.";
+  expect(await relayConflictMessage(Response.json({ error: busy }, { status: 409 }))).toBe(busy);
+  const neutral = "The PC connection changed. Try again.";
+  expect(await relayConflictMessage(new Response("not json", { status: 409 }))).toBe(neutral);
+  expect(await relayConflictMessage(Response.json({ error: "x".repeat(201) }, { status: 409 }))).toBe(neutral);
+  expect(await relayConflictMessage(Response.json({ error: "line\nbreak" }, { status: 409 }))).toBe(neutral);
+});
+
+it("shows the server's reason when connecting a Mico another PC is running", async () => {
+  const busy = "This Mico is working on another computer. Wait for it to finish there, or stop it, then try again.";
+  const client = new DesktopRelayClient({
+    base: "https://example.test",
+    localUrl: "http://127.0.0.1:1234",
+    localToken: "unused",
+    revoked: vi.fn(),
+    fetch: async () => Response.json({ error: busy, code: "busy_elsewhere" }, { status: 409 }),
+  });
+  try {
+    await expect(client.identity()).rejects.toThrow(busy);
+  } finally { client.stop(); }
+});
 
 it("forgets a settled delivery and still aborts an unsettled orphan", () => {
   const settled = new Set(["done"]);
