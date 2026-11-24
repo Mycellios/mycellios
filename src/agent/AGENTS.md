@@ -409,6 +409,9 @@
 - The chat task menu shares its in-flight and recent overview poll across chats in
   the same account and Space. Preserve the periodic refresh and the per-thread
   notification filter. Check the query-scope tests when changing this path.
+- Space navigation skips a browser transition that cannot capture the old
+  screen. Preserve the single guarded commit, Space-scoped state reset and
+  late-callback regression in `lib/space-switch.test.ts`.
 
 - Production English messages with interpolated values must exist in
   `apps/web/src/locales/en/messages.po`; production macros omit development text.
