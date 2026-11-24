@@ -398,7 +398,8 @@
   New-reply/send/control motion must preserve reduced motion and history scroll
   ownership. Loading an earlier page belongs to the current conversation visit.
   Message links into folded routine history reveal the exact run, and completed
-  natural replies retain visible symbols such as emoji. Run focused
+  natural replies retain visible symbols such as emoji. A failed run with an empty
+  transcript shows its actual state alongside the composer recovery controls. Run focused
   composer/thread/pending/frame tests and
   `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
   with synthetic delivery/progress. This does not measure a live model's latency.

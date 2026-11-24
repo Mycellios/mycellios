@@ -6316,6 +6316,10 @@ msgid "Welcome to Mycellios"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx
+msgid "The last run failed before saving a message."
+msgstr "La última ejecución falló antes de guardar un mensaje."
+
+#: src/pages/shell/transcript.tsx
 msgid "What shall we work on?"
 msgstr "¿En qué trabajamos?"
 

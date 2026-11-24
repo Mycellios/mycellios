@@ -156,6 +156,14 @@ try {
   await page.screenshot({ path: path.join(output, "routine-jump-mobile.png"), animations: "disabled" });
   proof.scenarios.push("natural replies keep emoji and a mobile routine jump reveals the exact failed run");
 
+  await open("?empty-failure");
+  await expect(page.getByRole("heading", { name: "The last run failed before saving a message." })).toBeVisible();
+  await expect(page.getByText("What shall we work on?")).toHaveCount(0);
+  await expect(page.getByTestId("composer-error")).toBeVisible();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: path.join(output, "empty-failed-run-mobile.png"), animations: "disabled" });
+  proof.scenarios.push("a failed run with no messages shows its state and recovery controls on mobile");
+
   for (const [name, width, height, theme, reducedMotion] of [
     ["mobile-light", 390, 844, "light", "no-preference"],
     ["mobile-dark-reduced", 390, 844, "dark", "reduce"],

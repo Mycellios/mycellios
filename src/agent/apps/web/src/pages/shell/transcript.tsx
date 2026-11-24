@@ -609,8 +609,14 @@ export const Transcript = memo(function Transcript({
         {reactionView.visibleMessages.length === 0 && !pendingMessages.length && !running && olderCursor == null ? (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-4 py-12 text-center">
             <TranscriptEmptyAvatar bot={conversationBot} />
-            <h2 className="font-display text-2xl tracking-tight">{t`What shall we work on?`}</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
+            <h2 className="font-display text-2xl tracking-tight">
+              {lastRun?.status === "failed"
+                ? t`The last run failed before saving a message.`
+                : t`What shall we work on?`}
+            </h2>
+            {lastRun?.status !== "failed" ? (
+              <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
+            ) : null}
           </div>
         ) : null}
         {threadItems.map((item, itemIndex) => {
