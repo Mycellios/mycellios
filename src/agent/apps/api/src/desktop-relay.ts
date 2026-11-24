@@ -28,6 +28,12 @@ export function mountDesktopRelay(
     secret: string;
     authenticate(request: Request): Promise<{ actor: Actor; sessionId: string } | null>;
     ownsBot(actor: Pick<Actor,"userId"|"spaceId">, botId: string): Promise<boolean>;
+    /**
+     * The same check for every Mico bound to a PC, in one database round trip. Each
+     * poll and delivery rechecks all of them; one query per Mico made every message
+     * to a PC with many Micos wait for dozens of transactions.
+     */
+    ownedBots?(actor: Pick<Actor,"userId"|"spaceId">, botIds: readonly string[]): Promise<ReadonlySet<string>>;
     spaces?(actor: Actor): Promise<string[]>;
     desktopExecution?(actor: Pick<Actor, "userId" | "spaceId">, enabled?: boolean): Promise<boolean>;
     /**
@@ -43,6 +49,20 @@ export function mountDesktopRelay(
 ) {
   const broker = new DesktopRelayBroker();
   const replay = new Map<string, number>();
+  const ownedOf = async (actor: Pick<Actor, "userId" | "spaceId">, botIds: readonly string[]): Promise<ReadonlySet<string>> => {
+    if (!botIds.length) return new Set();
+    if (deps.ownedBots) return deps.ownedBots(actor, botIds);
+    const owned = new Set<string>();
+    for (const botId of botIds) if (await deps.ownsBot(actor, botId)) owned.add(botId);
+    return owned;
+  };
+  /** Drops this PC's bindings to Micos the account no longer owns; returns the ones it does. */
+  const recheckBindings = async (actor: Pick<Actor, "userId" | "spaceId">, owner: Parameters<typeof broker.revokeBot>[0], deviceId: string) => {
+    const bound = broker.ownedBindings(owner, deviceId);
+    const owned = await ownedOf(actor, bound);
+    for (const botId of bound) if (!owned.has(botId)) broker.revokeBot(owner, botId);
+    return new Set(bound.filter(botId => owned.has(botId)));
+  };
   const secret = desktopRelayKey(deps.secret);
   app.post("/api/desktop-relay/internal", async (c) => {
     const body = await readBoundedBody(c.req.raw, HOST_COMPUTER_MAX_BYTES);
@@ -132,12 +152,7 @@ export function mountDesktopRelay(
           if (!current || current.sessionId !== owner.sessionId || current.actor.userId !== owner.userId || current.actor.spaceId !== owner.spaceId) {
             broker.revoke(owner,value.deviceId); throw Error("Desktop session changed while waiting");
           }
-          const verifiedBots = new Set<string>();
-          for (const botId of broker.ownedBindings(owner, value.deviceId)) {
-            if (await deps.ownsBot(current.actor, botId)) verifiedBots.add(botId);
-            else broker.revokeBot(owner, botId);
-          }
-          return verifiedBots;
+          return recheckBindings(current.actor, owner, value.deviceId);
         } : undefined);
       switch (action) {
         case "identity":
@@ -150,8 +165,7 @@ export function mountDesktopRelay(
             return c.json({error:"The account session changed"},403);
           if (value.agentExecution === 1 && broker.needsExecutionPreference(owner, value)) await deps.desktopExecution?.(session.actor, true);
           broker.register(owner,value);
-          for(const botId of broker.ownedBindings(owner,value.deviceId))
-            if(!await deps.ownsBot(session.actor,botId))broker.revokeBot(owner,botId);
+          await recheckBindings(session.actor, owner, value.deviceId);
           // ownership: this server accepts the PC's Mico folder keys in later registrations.
           return c.json({...await poll(value),identity,ownership:1});
         }
@@ -168,8 +182,7 @@ export function mountDesktopRelay(
         }
         case "poll": {
           const value = parseDesktopPoll(input);
-          for (const botId of broker.ownedBindings(owner, value.deviceId))
-            if (!(await deps.ownsBot(session.actor, botId))) broker.revokeBot(owner, botId);
+          await recheckBindings(session.actor, owner, value.deviceId);
           // Membership/session was freshly checked above on every heartbeat.
           return c.json({ ...await poll(value), identity });
         }

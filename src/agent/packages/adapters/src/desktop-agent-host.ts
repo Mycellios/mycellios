@@ -41,9 +41,12 @@ export class DesktopAgentHost {
     }
     // onCheckpoint's capture is synchronous. Serialize it at the producer, preserving the exact
     // per-call transcript, then reconstruct that cheap capture on the durable worker.
+    // The tool's own call travels after it on the same ordered stream, so the worker
+    // stores the checkpoint first; waiting for its reply only cost a relay round trip
+    // before every tool. A failed delivery still ends the session.
     if (request.onCheckpoint) {
       const checkpoint = request.onCheckpoint as unknown as (blob: string, id: string) => Promise<void>;
-      request.onCheckpoint = (capture, id) => checkpoint(capture(), id);
+      request.onCheckpoint = async (capture, id) => { void checkpoint(capture(), id).catch(error => fail(error)); };
     }
     // The engine's steering watch would hand each tool call an AbortSignal, which cannot cross
     // back to the server; an older server still sends steeringPending, so ignore it here.

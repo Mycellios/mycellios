@@ -228,6 +228,9 @@ export class DesktopRelayBroker {
     const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed);
     const lane = (op: Operation) => op.request.method === "agentMessage" ? "control" : op.request.method === "agentRun" ? "agent" : "computer";
     const limits = { control: 8, agent: 4, computer: MAX_OPERATIONS };
+    // A callback reply stays claimed until the PC acknowledges it, so two per Mico made a
+    // third reply wait a whole round trip. Control matches its dispatch bound per Mico.
+    const perMico = { control: 4, agent: 2, computer: 2 };
     const claimed = { control: 0, agent: 0, computer: 0 };
     for (const op of this.operations.values()) if (op.claimed && !op.closed) claimed[lane(op)]++;
     const pending: Operation[] = [];
@@ -242,7 +245,7 @@ export class DesktopRelayBroker {
       const group = lane(op);
       if (op.claimed || (verifiedBots && !verifiedBots.has(op.binding.botId)) || claimed[group] >= limits[group]) continue;
       const slots = perBinding.get(op.binding) ?? { control: 0, agent: 0, computer: 0 };
-      if (slots[group] >= 2) continue;
+      if (slots[group] >= perMico[group]) continue;
       if (claim) op.claimed = true;
       claimed[group]++;
       slots[group]++;

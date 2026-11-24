@@ -483,9 +483,14 @@ export interface AgentRunModel {
   /** Scoped inference stream only; the owned Desktop never receives provider credentials. */
   desktopTransport?: {
     model: Record<string, unknown>;
-    open(context: unknown, options: Record<string, unknown>): Promise<{
+    /**
+     * `accept.firstBatch` asks the cloud to answer with the first events already read,
+     * saving one relay round trip per model call. Older servers ignore it and omit `first`.
+     */
+    open(context: unknown, options: Record<string, unknown>, accept?: { firstBatch?: boolean }): Promise<{
       read(): Promise<{ events: unknown[]; done: boolean; result?: unknown }>;
       cancel(): Promise<void>;
+      first?: { events: unknown[]; done: boolean; result?: unknown };
     }>;
   };
   /** Server-side spending authorization, carried with the resolved credential. */

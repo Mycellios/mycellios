@@ -518,3 +518,40 @@ it("remembers the PC the owner chose for a Mico after the API forgets the bindin
   expect((await api.call("session-b", "account", { ...mac, workspaces: [folder] })).status).toBe(200);
   expect(await api.probe("test-bot")).toMatchObject({ available: false, unresolved: true });
 });
+
+it("rechecks every Mico bound to a PC in one ownership read and drops the ones no longer owned", async () => {
+  const app = new Hono();
+  const owned = new Set(["test-bot", "other-bot", "third-bot"]);
+  const batches: string[][] = [];
+  let single = 0;
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    desktopExecution: async () => true,
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes" ? { actor: owner, sessionId: "session-a" } : null,
+    ownsBot: async (_actor, id) => { single++; return owned.has(id); },
+    ownedBots: async (_actor, ids) => { batches.push([...ids].sort()); return new Set(ids.filter(id => owned.has(id))); },
+  });
+  const call = (action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const probe = async (botId: string) => {
+    const body = JSON.stringify({ probe: botId, agentExecution: 1, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+    const time = String(Date.now());
+    return (await app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body })).json();
+  };
+  const pc = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await call("identity", {})).json(), agentExecution: 1 };
+  expect((await call("account", pc)).status).toBe(200);
+  for (const botId of owned) expect(await probe(botId)).toMatchObject({ available: true });
+  batches.length = 0;
+  single = 0;
+  owned.delete("other-bot");
+  expect((await call("account", pc)).status).toBe(200);
+  // One read for all three Micos, never one per Mico.
+  expect(batches).toEqual([["other-bot", "test-bot", "third-bot"]]);
+  expect(single).toBe(0);
+  expect((await call("account", pc)).status).toBe(200);
+  expect(batches.at(-1)).toEqual(["test-bot", "third-bot"]);
+});
