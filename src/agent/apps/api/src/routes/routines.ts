@@ -29,6 +29,7 @@ import {
 import { getLogger } from "@mycellios/logging";
 import { assertRoutineModel } from "../model-pins.js";
 import {
+  revealRoutineWebhookSecret,
   revokeRoutineWebhookSecrets,
   RoutineTestEventError,
   rotateRoutineWebhookSecret,
@@ -65,12 +66,13 @@ export function routinesRoutes(ctx: RouterContext) {
       select: {
         id: true,
         botId: true,
+        name: true,
         spaceId: true,
         userId: true,
         webhookEnabled: true,
         webhookEventType: true,
         webhookFilters: true,
-        webhookSecrets: { select: { id: true, ciphertext: true, createdAt: true, expiresAt: true } },
+        webhookSecrets: { select: { id: true, ciphertext: true, createdAt: true, expiresAt: true, revealUntil: true } },
       },
     });
     if (!routine) throw new ORPCError("NOT_FOUND");
@@ -521,6 +523,22 @@ export function routinesRoutes(ctx: RouterContext) {
         const routine = await ownedWebhookRoutine(context.actor, input.routineId);
         await revokeRoutineWebhookSecrets(deps.prisma, routine);
         return { webhook: await webhookStateOf(routine.id) };
+      }),
+      webhookCard: authed.routines.webhookCard.handler(async ({ context, input }) => {
+        const routine = await ownedWebhookRoutine(context.actor, input.routineId);
+        return {
+          routineId: routine.id,
+          botId: routine.botId,
+          name: routine.name,
+          webhookEnabled: routine.webhookEnabled,
+          webhook: routineWebhookState(routine, routine.webhookSecrets),
+        };
+      }),
+      revealWebhookSecret: authed.routines.revealWebhookSecret.handler(async ({ context, input }) => {
+        const routine = await ownedWebhookRoutine(context.actor, input.routineId);
+        const secret = await revealRoutineWebhookSecret(deps, routine);
+        if (!secret) throw new ORPCError("NOT_FOUND");
+        return { secret };
       }),
       sendTestEvent: authed.routines.sendTestEvent.handler(async ({ context, input }) => {
         const routine = await ownedWebhookRoutine(context.actor, input.routineId);

@@ -119,9 +119,11 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
      7-day receipts, event type and filters, rotation, Revoke, Send test event and
      the hourly limit, in the routine editor. A routine with its own secret no
      longer takes the per-Mico route, and the UI issues per-Mico keys only for
-     GitHub events. Creating a webhook routine from a person's message, with the
-     secret card, is still to come; a real Standard Webhooks sender is still to be
-     reported.
+     GitHub events. The owner can create a signed webhook routine in the Mico's
+     direct chat. The routine, encrypted secret and card commit together. A
+     replay reuses that routine, and the owner can reveal the secret once within
+     24 hours. Hosted delivery from a real Standard Webhooks sender remains to
+     be verified.
 3. Phase 3 — run a Mico from a script and wait.
    - Scripts is off by default for each Mico. Only the owner turns it on, never a
      Mico. It creates a token scoped to that Mico, account and Space, shown once,
