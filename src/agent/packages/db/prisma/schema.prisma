@@ -803,6 +803,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  scriptSettings MicoScriptSettings?
   memoryGrants MicoMemoryGrant[]
   desktopDevices DesktopBotDevice[]
   ledGroups ChatGroup[] @relation("ChatGroupLead")
@@ -1493,6 +1494,34 @@ model Routine {
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
   @@map("routines")
+}
+
+model MicoScriptSettings {
+  botId           String @id
+  spaceId         String
+  userId          String
+  bot             Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  enabled         Boolean @default(false)
+  requestsPerHour Int @default(60)
+  tokens          MicoScriptToken[]
+
+  @@unique([botId, spaceId, userId])
+  @@map("mico_script_settings")
+}
+
+model MicoScriptToken {
+  id         String   @id @default(cuid())
+  botId      String
+  spaceId    String
+  userId     String
+  settings   MicoScriptSettings @relation(fields: [botId, spaceId, userId], references: [botId, spaceId, userId], onDelete: Cascade)
+  digest     String   @unique
+  hint       String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+
+  @@index([botId])
+  @@map("mico_script_tokens")
 }
 
 /// A routine's own Standard Webhooks secret, encrypted like other credentials. The current one
