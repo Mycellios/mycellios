@@ -8,9 +8,10 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NativeEngineLock, NativeEngineTarget } from "./native-engine-store.js";
+import { NativeEngineUpdates } from "./native-engine-updates.js";
 import {
   compareVersions, installNativeEngine, managedNativeEngine, nativeCliVersion, nativeEngineInstalls, nativeEngineLock,
-  NativeEngineLockSchema, nativeEngineRelease, NATIVE_ENGINE_TARGETS, parseCliVersion, resetNativeEngineStore,
+  NativeEngineLockSchema, nativeEngineRelease, NATIVE_ENGINE_TARGETS, parseCliVersion, resetNativeEngineStore, useNativeEngineBlocklist,
 } from "./native-engine-store.js";
 import { resetNativeEngineVersions, resolveNativeEngine } from "./native-engine-resolve.js";
 import { loginShellPath, resetLoginShellPath } from "./native-login-path.js";
@@ -62,11 +63,12 @@ const PACKAGE: Entry[] = [
 ];
 
 /** A lock whose Codex entry pins `archive`, the way scripts/native-engine-lock.mjs records it. */
-function lockFor(archive: Buffer, entries = PACKAGE, overrides: Record<string, unknown> = {}): NativeEngineLock {
+function lockFor(archive: Buffer, entries = PACKAGE, overrides: Record<string, unknown> = {}, version = "9.9.9"): NativeEngineLock {
   const files = entries.filter(entry => !entry.type || entry.type === "0");
   const release = {
     package: "@openai/codex",
-    url: `${URL_PREFIX}codex-9.9.9-linux-x64.tgz`,
+    url: `${URL_PREFIX}codex-${version}-linux-x64.tgz`,
+    versionSuffix: "-linux-x64",
     integrity: `sha512-${createHash("sha512").update(archive).digest("base64")}`,
     bytes: archive.length,
     unpackedBytes: files.reduce((total, entry) => total + Buffer.byteLength(entry.content ?? ""), 0),
@@ -74,8 +76,11 @@ function lockFor(archive: Buffer, entries = PACKAGE, overrides: Record<string, u
     executable: "package/vendor/bin/codex",
     ...overrides,
   };
-  const none = { version: "1.0.0", source: "npm" as const, targets: {} };
-  return { schemaVersion: 1, engines: { codex: { version: "9.9.9", source: "npm", targets: { [TARGET]: release } }, claude: none, opencode: none } };
+  const locked = { version: "1.0.0", source: "npm" as const, channel: { package: "@openai/codex", tag: "latest" }, targets: {} };
+  return {
+    schemaVersion: 1,
+    engines: { codex: { ...locked, version, targets: { [TARGET]: release } }, claude: locked, opencode: locked },
+  };
 }
 
 const servers: Server[] = [];
@@ -343,6 +348,125 @@ describe("starting a managed copy", () => {
     // Install replaces the damaged copy with a verified one.
     await installNativeEngine(root, "codex", options);
     expect((await managedNativeEngine(root, "codex", options))?.ready).toBe(true);
+  });
+
+  it("keeps the working copy when a newer verified archive fails its start check", async () => {
+    const { root, options } = await installed();
+    const archive = tarball(PACKAGE);
+    const lock = lockFor(archive, PACKAGE, {}, "10.0.0");
+    await expect(installNativeEngine(root, "codex", { ...options, lock }))
+      .rejects.toThrow("Codex did not start on this computer.");
+    await expect(readdir(join(root, "codex"))).resolves.toEqual(["9.9.9"]);
+    await expect(managedNativeEngine(root, "codex", options)).resolves.toMatchObject({ version: "9.9.9", ready: true });
+  });
+});
+
+describe("checking versions before a first install", () => {
+  it("never downloads or starts a pin withdrawn for this computer", async () => {
+    const root = await store();
+    const blocklistUrl = "https://example.test/blocklist.json";
+    const fetcher = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === blocklistUrl) {
+        return Response.json({
+          schemaVersion: 1,
+          blocked: [{ engine: "codex", version: "9.9.9", targets: [TARGET], reason: "Failed validation" }],
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
+    const updates = new NativeEngineUpdates(root, {
+      lock: lockFor(tarball(PACKAGE)),
+      target: TARGET,
+      version,
+      fetch: fetcher,
+      blocklistUrl,
+    });
+    expect(updates.installable("codex")?.version).toBe("9.9.9");
+    const authorize = vi.fn();
+    await expect(updates.install("codex", authorize)).rejects.toThrow("Codex 9.9.9 was withdrawn.");
+    expect(updates.installable("codex")).toBeUndefined();
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
+      blocklistUrl,
+      "https://registry.npmjs.org/@openai%2Fcodex/latest",
+    ]);
+    expect(version).not.toHaveBeenCalled();
+    expect(authorize).not.toHaveBeenCalled();
+  });
+
+  it("does not run a package withdrawn after the download started", async () => {
+    const root = await store();
+    const archive = tarball(PACKAGE);
+    await expect(installNativeEngine(root, "codex", {
+      lock: lockFor(archive),
+      target: TARGET,
+      fetch: await serve(archive),
+      version,
+      onChecking: () => useNativeEngineBlocklist(root, {
+        schemaVersion: 1,
+        blocked: [{ engine: "codex", version: "9.9.9", reason: "Failed validation" }],
+      }),
+    })).rejects.toThrow("Codex 9.9.9 was withdrawn.");
+    expect(version).not.toHaveBeenCalled();
+    await expect(readdir(join(root, "codex"))).resolves.toEqual([]);
+  });
+});
+
+it("holds new turns during an update check and lets a running turn finish on its original copy", async () => {
+  const root = await store();
+  const archive = tarball(PACKAGE);
+  const lock = lockFor(archive);
+  const newer = lockFor(archive, PACKAGE, {}, "10.0.0").engines.codex.targets[TARGET]!;
+  const blocklistUrl = "https://example.test/blocklist.json";
+  const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    switch (String(url)) {
+      case blocklistUrl:
+        return Response.json({ schemaVersion: 1, blocked: [] });
+      case "https://registry.npmjs.org/@openai%2Fcodex/latest":
+        return Response.json({ name: "@openai/codex", version: "10.0.0" });
+      case "https://registry.npmjs.org/@openai%2Fcodex/10.0.0-linux-x64":
+        return Response.json({
+          name: newer.package,
+          version: "10.0.0-linux-x64",
+          dist: {
+            tarball: newer.url,
+            integrity: newer.integrity,
+            unpackedSize: newer.unpackedBytes,
+            fileCount: newer.files,
+          },
+        });
+      default:
+        return new Headers(init?.headers).has("range")
+          ? new Response(null, { status: 206, headers: { "content-range": `bytes 0-0/${archive.length}` } })
+          : new Response(new Uint8Array(archive), { headers: { "content-length": String(archive.length) } });
+    }
+  });
+  const options = { lock, target: TARGET, fetch: fetcher, version, blocklistUrl };
+  await installNativeEngine(root, "codex", options);
+  const updates = new NativeEngineUpdates(root, options);
+  await updates.check();
+  expect(updates.offers({ codex: "9.9.9" })).toMatchObject([{ version: "10.0.0", current: "9.9.9" }]);
+
+  const signal = new AbortController().signal;
+  const endOldTurn = await updates.enter("codex", signal);
+  let answerVersion!: (value: string) => void;
+  version.mockReturnValueOnce(new Promise(resolve => { answerVersion = resolve; }));
+  await updates.update("codex", "10.0.0", () => {});
+  await vi.waitFor(() => expect(updates.held("codex")).toBe(true));
+  const started = vi.fn();
+  const nextTurn = updates.enter("codex", signal).then((end) => {
+    started();
+    return end;
+  });
+  expect(started).not.toHaveBeenCalled();
+  await expect(readdir(join(root, "codex"))).resolves.toContain("9.9.9");
+  answerVersion("10.0.0");
+  const endNextTurn = await nextTurn;
+  expect((await readdir(join(root, "codex"))).sort()).toEqual(["10.0.0", "9.9.9"]);
+  await expect(managedNativeEngine(root, "codex", options)).resolves.toMatchObject({ version: "10.0.0" });
+  endNextTurn();
+  endOldTurn();
+  await vi.waitFor(async () => {
+    await expect(readdir(join(root, "codex"))).resolves.toEqual(["10.0.0"]);
   });
 });
 

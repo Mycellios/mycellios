@@ -16,7 +16,7 @@ import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-cata
 import { ProviderLogo } from "../../components/ProviderLogo";
 import { MycelliosProvider } from "../model-settings/mycellios-provider";
 import { NativeEngineAccount } from "./native-engine-account";
-import { NativeEngineInstall } from "./native-engine-install";
+import { NativeEngineInstall, NativeEngineUpdateOffer } from "./native-engine-install";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
@@ -166,6 +166,10 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     : undefined;
   const installRelease = installable.find(release => NATIVE_PROVIDERS[release.engine] === (lastProvider ?? currentProvider));
   const installProgress = installRelease && engineState?.installing?.find(item => item.engine === installRelease.engine);
+  const updateEngine = engineState?.computer === "desktop" && engineState.install && !installRelease
+    ? (["codex", "claude", "opencode"] as const).find(engine =>
+      NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider))
+    : undefined;
   // An engine whose CLI listed its models offers each one; otherwise its account default.
   const listed = (engine: NativeProvider) => engine === "codex" || engine === "claude" ? engineModels(engine) : [];
   const nativeChoices = nativeProviders.filter(engine => !listed(engine).length).map(engine => ({
@@ -333,6 +337,10 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             signedOut={signedOut.has(accountEngine)} onChanged={refreshEngines} /> : null}
           {!recovery && installRelease ? <NativeEngineInstall botId={bot.id} release={installRelease}
             progress={installProgress} onChanged={refreshEngines} /> : null}
+          {!recovery && updateEngine ? <NativeEngineUpdateOffer key={updateEngine} botId={bot.id}
+            engine={updateEngine} release={engineState?.updates?.find(item => item.engine === updateEngine)}
+            progress={engineState?.installing?.find(item => item.engine === updateEngine)}
+            onChanged={refreshEngines} /> : null}
           {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
           {!recovery && me && !queryError && (lastProvider ?? currentProvider) !== "Mycellios" ? <div className="border-t border-border px-4 py-3">
             <Button variant="ghost" size="sm" disabled={saving} onClick={() => {
