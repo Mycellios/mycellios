@@ -32,12 +32,14 @@ const LIST_LIMIT = 1000;
 /** The navigation of the tab row on screen per Mico, for actions that end after a remount (Undo). */
 const mountedSelectors = new Map<string, (target?: string) => void>();
 /** Below these widths the tab row turns into a switcher, then into the picker button alone. */
-export const COMPACT_TABS_WIDTH = 200;
+// Leave room for the main chat, labeled picker, and new-conversation action.
+const DESKTOP_CONTROLS_WIDTH = 360;
+export const COMPACT_TABS_WIDTH = 440;
 export const MINIMAL_TABS_WIDTH = 48;
 
 /** Keep readable tabs; the picker retains every conversation, including closed tabs. */
 export function fitConversationTabs<T extends { threadId: string }>(tabs: T[], activeId: string | undefined, width: number): T[] {
-  const capacity = Math.max(1, Math.floor((width - 80) / 176));
+  const capacity = Math.max(1, Math.floor((width - DESKTOP_CONTROLS_WIDTH) / 176));
   if (tabs.length <= capacity) return tabs;
   const recent = tabs.slice(-capacity);
   const active = tabs.find(tab => tab.threadId === activeId);
@@ -228,10 +230,10 @@ export function MicoTaskTabs({
   const picker = pickerConversations(listed);
   const unread = picker.open.filter(row => row.unread);
   const read = inMenu ? picker.open.filter(row => !row.unread) : [];
-  const hiddenReplies = unread.some(row => inMenu || !displayedIds.has(row.threadId));
-  const showPicker = inMenu || loadFailed || listed.length > 0;
   const compact = !inMenu && availableWidth > 0 && availableWidth < COMPACT_TABS_WIDTH;
   const minimal = compact && availableWidth < MINIMAL_TABS_WIDTH;
+  const hiddenReplies = unread.some(row => row.threadId !== current && (inMenu || compact || !displayedIds.has(row.threadId)));
+  const showPicker = inMenu || loadFailed || listed.length > 0;
   const titleOf = (tab: TaskTab) => tab.threadId === NEW_CONVERSATION_TAB ? t`New conversation` : tab.title || t`New conversation`;
   const currentTitle = current ? titleOf(visibleTabs.find(tab => tab.threadId === current) ?? { threadId: current, title: "" }) : t`Main chat`;
 
@@ -292,8 +294,8 @@ export function MicoTaskTabs({
     leave(id, { ...before, ids: before.ids.includes(id) ? before.ids : [...before.ids, id] });
   }
 
-  function closeOthers(id: string) {
-    update(state => closeOtherTabs(state, id));
+  function closeOthers(id?: string) {
+    update(state => closeOtherTabs(state, id ?? null));
     if (currentRef.current !== id) select(id);
   }
 
@@ -515,7 +517,7 @@ export function MicoTaskTabs({
         }}
         onDrop={event => { event.preventDefault(); dropOn(tab.threadId, dropMark?.id === tab.threadId ? dropMark.after : false); }}
         onDragEnd={() => { setDragged(null); setDropMark(null); }}
-        className="app-no-drag group/task-tab relative flex h-7 min-w-0 max-w-64 flex-1 items-center overflow-hidden rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[active]:bg-muted data-[active]:text-foreground data-[drop=before]:shadow-[inset_2px_0_0_var(--primary)] data-[drop=after]:shadow-[inset_-2px_0_0_var(--primary)]">
+        className="app-no-drag group/task-tab relative flex h-7 min-w-0 max-w-64 flex-auto items-center overflow-hidden rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[active]:bg-muted data-[active]:text-foreground data-[drop=before]:shadow-[inset_2px_0_0_var(--primary)] data-[drop=after]:shadow-[inset_-2px_0_0_var(--primary)]">
         {editing ? titleEditor() : <Button ref={node => { if (node) tabButtons.current.set(tab.threadId, node); else tabButtons.current.delete(tab.threadId); }}
           size="sm" variant="ghost"
           className={`h-full min-w-0 flex-1 shrink justify-start gap-1.5 overflow-hidden bg-transparent px-2 font-normal hover:bg-transparent ${draft ? "italic" : ""}`}
@@ -560,7 +562,10 @@ export function MicoTaskTabs({
         onPointerEnter={() => warmThread(tab.threadId)} onPointerDown={() => warmThread(tab.threadId)} onFocus={() => warmThread(tab.threadId)}
         onClick={() => closed ? void restore(tab) : select(tab.threadId)}>
         {status ? <ThreadStatusMark status={status} /> : null}
-        <span className="line-clamp-2 min-w-0 whitespace-normal break-words" title={titleOf(tab)} dir="auto">{titleOf(tab)}</span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 whitespace-normal break-words" title={titleOf(tab)} dir="auto">{titleOf(tab)}</span>
+          {!closed && tabIds.includes(tab.threadId) ? <span data-open-tab className="block text-xs text-muted-foreground"><Trans>Open tab</Trans></span> : null}
+        </span>
         {inMenu && !closed && tab.unread && status !== "unread" ? <ThreadStatusMark status="unread" /> : null}
         {kind ? <span data-thread-kind={tab.kind} className="ms-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{kind}</span> : null}
         {when ? <time dateTime={tab.updatedAt ?? undefined} data-thread-time className={`${kind ? "" : "ms-auto "}shrink-0 text-xs text-muted-foreground`}>{when}</time> : null}
@@ -584,16 +589,21 @@ export function MicoTaskTabs({
     </ContextMenu>;
   }
 
-  const pickerLabel = hiddenReplies ? t`Conversations, new replies` : t`Conversations`;
+  const allConversationsLabel = t`All conversations`;
+  const pickerLabel = inMenu
+    ? (hiddenReplies ? t`Conversations, new replies` : t`Conversations`)
+    : (hiddenReplies ? t`All conversations, new replies` : allConversationsLabel);
   const replyDot = hiddenReplies ? <span aria-hidden="true" data-testid="conversations-new-replies" className="absolute end-1 top-1 size-1.5 rounded-full bg-primary" /> : null;
 
   const pickerElement = showPicker || minimal || (compact && current) ? <Popover open={threadPickerOpen} onOpenChange={setThreadPickerOpen}>
       <PopoverTrigger render={compact && !minimal
-        ? <Button size="sm" variant="ghost" aria-label={pickerLabel} title={currentTitle} className="relative h-7 min-w-0 flex-1 justify-between gap-1 px-2 font-normal" />
-        : <Button size="icon-sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative" data-mobile-chat-action={inMenu || undefined} />}>
+        ? <Button size="sm" variant="ghost" aria-label={`${currentTitle} · ${pickerLabel}`} title={currentTitle} className="relative h-7 min-w-0 flex-1 justify-between gap-1 px-2 font-normal" />
+        : minimal || inMenu
+          ? <Button size="icon-sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative" data-mobile-chat-action={inMenu || undefined} />
+          : <Button size="sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative h-7 max-w-52 shrink-0 gap-1 px-2 font-normal" />}>
         {inMenu ? <><MessageCircle aria-hidden /><Trans>Conversations</Trans></>
           : compact && !minimal ? <><span className="min-w-0 truncate" dir="auto">{currentTitle}</span><ChevronDown size={15} aria-hidden="true" className="shrink-0" /></>
-          : <ChevronDown size={15} aria-hidden="true" />}
+          : <>{!minimal ? <span className="min-w-0 truncate">{allConversationsLabel}</span> : null}<ChevronDown size={15} aria-hidden="true" className="shrink-0" /></>}
         {replyDot}
       </PopoverTrigger>
       <PopoverContent align="end" className="max-h-[60dvh] w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-y-auto p-1 [&_button]:font-normal">
@@ -630,10 +640,19 @@ export function MicoTaskTabs({
 
   return <nav ref={nav} aria-label={t`Conversations`} data-tabs-layout={inMenu ? "menu" : minimal ? "minimal" : compact ? "compact" : "tabs"}
     className={inMenu ? "min-w-0" : "flex min-w-0 flex-1 items-center gap-1 md:ms-1 md:border-s md:border-border md:ps-3"}>
-    {!inMenu && !compact ? <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-      {displayedTabs.map(tabItem)}
-    </div> : null}
-    {compact ? <>{pickerElement}{addElement}</> : <>{addElement}{pickerElement}</>}
+    {!inMenu && !compact ? <>
+      <MainTabMenu enabled label={t`Main chat`} onCloseAll={closeOthers}>
+        <Button size="sm" variant="ghost" data-main-chat-tab aria-current={!current ? "page" : undefined}
+          className="h-7 max-w-28 shrink-0 px-2 font-normal aria-[current=page]:bg-muted"
+          onClick={() => select()}>
+          <span className="min-w-0 truncate"><Trans>Main chat</Trans></span>
+        </Button>
+      </MainTabMenu>
+      {displayedTabs.length ? <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+        {displayedTabs.map(tabItem)}
+      </div> : null}
+    </> : null}
+    {pickerElement}{addElement}
     {error && !threadPickerOpen ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
     {renameError ? <p role="alert" className="max-w-52 text-xs text-destructive">{renameError}</p> : null}
     <DeleteConversationDialog open={Boolean(deleteTarget)} title={deleteTarget ? titleOf(deleteTarget) : ""}
@@ -642,7 +661,7 @@ export function MicoTaskTabs({
   </nav>;
 }
 
-/** The Mico name is the main tab: its menu only closes the conversation tabs, never the chat. */
+/** The main chat tab's menu controls the side tabs. */
 export function MainTabMenu({ enabled, label, onCloseAll, children }: {
   enabled: boolean; label: string; onCloseAll: () => void; children: ReactNode;
 }) {

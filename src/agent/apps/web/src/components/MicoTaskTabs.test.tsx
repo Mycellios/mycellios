@@ -98,10 +98,10 @@ describe("Mico task navigation", () => {
     const list = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([{ threadId: "a", title: "Plan" }]);
     const rpc = { development: { list } } as unknown as RpcClient;
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="empty" rpc={rpc} onSelect={vi.fn()} />));
-    expect(button("Conversations", host)).toBeNull();
+    expect(button("All conversations", host)).toBeNull();
     expect(button("New conversation", host)).not.toBeNull();
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="empty" rpc={rpc} onSelect={vi.fn()} messageCount={1} />));
-    expect(button("Conversations", host)).not.toBeNull();
+    expect(button("All conversations", host)).not.toBeNull();
   });
 
   it("offers New conversation first in the phone menu even without any history", async () => {
@@ -134,7 +134,7 @@ describe("Mico task navigation", () => {
     const restore = vi.fn(async () => { oldArchived = false; return { ok: true, restored: "archive" }; });
     const rpc = { development: { list, restore } } as unknown as RpcClient;
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="kinds" rpc={rpc} onSelect={select} />));
-    await act(() => button("Conversations", host).click());
+    await act(() => button("All conversations", host).click());
     const rows = Array.from(picker().querySelectorAll<HTMLButtonElement>("button:not([aria-label])")).map(item => item.textContent);
     expect(rows).toEqual(["New conversation", "Main chat", "Plan", "Daily digestRoutine", "Publish stepWorkflow",
       "Check pricesDelegated", "Legacy", "Compare offers", "Old budget", "Nightly reportRoutine"]);
@@ -154,7 +154,7 @@ describe("Mico task navigation", () => {
   it("shows status marks on tabs and picker rows, newest activity first, with a dot for hidden replies", async () => {
     const { host, root } = mount();
     updateConversationTabs("marks", state => ({ ...state, ids: ["run", "wait"] }));
-    queryClient.setQueryData(["conversation-tabs", "marks", "width"], 520);
+    queryClient.setQueryData(["conversation-tabs", "marks", "width"], 740);
     const list = vi.fn().mockResolvedValue([
       { threadId: "run", title: "Working one", state: "running", updatedAt: "2026-11-20T10:00:00.000Z" },
       { threadId: "wait", title: "Asks you", state: "waiting", updatedAt: "2026-11-21T10:00:00.000Z" },
@@ -166,7 +166,7 @@ describe("Mico task navigation", () => {
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="marks" rpc={rpc} onSelect={vi.fn()} />));
     expect(host.querySelector('[data-thread-tab="run"] [data-thread-status]')!.getAttribute("data-thread-status")).toBe("working");
     expect(host.querySelector('[data-thread-tab="wait"] [data-thread-status]')!.getAttribute("data-thread-status")).toBe("waiting");
-    const chevron = button("Conversations, new replies", host);
+    const chevron = button("All conversations, new replies", host);
     expect(chevron.querySelector('[data-testid="conversations-new-replies"]')).not.toBeNull();
     await act(() => chevron.click());
     const rows = Array.from(picker().querySelectorAll("[data-thread-status]")).map(mark => mark.getAttribute("data-thread-status"));
@@ -253,7 +253,7 @@ describe("Mico task navigation", () => {
     title = "Preparar presupuesto";
     await act(() => render(1));
     expect(host.querySelector('button[title="Preparar presupuesto"]')).not.toBeNull();
-    await act(() => button("Conversations", host).click());
+    await act(() => button("All conversations", host).click());
     await act(() => button("Rename conversation").click());
     const input = document.querySelector<HTMLInputElement>("input")!;
     await act(() => {
@@ -277,14 +277,16 @@ describe("Mico task navigation", () => {
     expect(list).toHaveBeenCalledWith({ botId: "mico" });
     const task = host.querySelector<HTMLButtonElement>('button[aria-current="page"]')!;
     expect(task.textContent).toBe("Independent work");
+    expect(host.querySelector("[data-main-chat-tab]")?.textContent).toBe("Main chat");
     await act(() => task.click());
     expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
     expect(select).not.toHaveBeenCalled();
     await act(() => button("Close tab", host).click());
     expect(select).toHaveBeenLastCalledWith(undefined);
     await act(() => render());
+    expect(host.querySelector("[data-main-chat-tab]")?.getAttribute("aria-current")).toBe("page");
     expect(host.querySelector('button[title="Independent work"]')).toBeNull();
-    await act(() => button("Conversations", host).click());
+    await act(() => button("All conversations", host).click());
     const reopen = Array.from(document.querySelectorAll("button")).find(item => item.textContent === "Independent work")!;
     await act(() => reopen.click());
     expect(select).toHaveBeenLastCalledWith("task-1");
@@ -299,7 +301,7 @@ describe("Mico task navigation", () => {
     await act(() => root.render(<MicoTaskTabs key="a" scope="test-a" botId="a" rpc={rpc} onSelect={vi.fn()} />));
     await act(() => root.render(<MicoTaskTabs key="b" scope="test-b" botId="b" rpc={rpc} onSelect={vi.fn()} />));
     await act(() => finish([{ threadId: "a-task", title: "Stale Mico A work" }]));
-    await act(() => button("Conversations", host).click());
+    await act(() => button("All conversations", host).click());
     expect(document.body.textContent).toContain("Mico B work");
     expect(document.body.textContent).not.toContain("Stale Mico A work");
   });
@@ -316,7 +318,7 @@ describe("Mico task navigation", () => {
     await act(() => render("b", "b"));
     expect(JSON.parse(localStorage.getItem("mycellios:open-task-tabs:persist")!).ids).toEqual(["a", "b"]);
     // History is present before this new task's first list request resolves.
-    await act(() => button("Conversations", host).click());
+    await act(() => button("All conversations", host).click());
     expect(document.body.textContent).toContain("Existing title");
     await act(() => resolveList([{ threadId: "a", title: "Existing title" }, { threadId: "b", title: "" }]));
   });
@@ -548,7 +550,7 @@ describe("tab keyboard, mouse and menu", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it("turns into a switcher with the current title below 200 px and into the picker button below 48 px", async () => {
+  it("turns into a switcher with the current title below 440 px and into the picker button below 48 px", async () => {
     const compact = await setup("compact", "b");
     expect(compact.host.querySelector("nav")!.getAttribute("data-tabs-layout")).toBe("tabs");
     queryClient.setQueryData(["conversation-tabs", "narrow", "width"], 160);
@@ -556,25 +558,25 @@ describe("tab keyboard, mouse and menu", () => {
     const rpc = { development: { list: vi.fn().mockResolvedValue(rows) } } as unknown as RpcClient;
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="narrow" taskThreadId="b" rpc={rpc} onSelect={vi.fn()} />));
     expect(host.querySelector("nav")!.getAttribute("data-tabs-layout")).toBe("compact");
-    expect(button("Conversations", host).textContent).toBe("Beta");
+    expect(button("Beta · All conversations", host).textContent).toBe("Beta");
     expect(button("New conversation", host)).not.toBeNull();
     queryClient.setQueryData(["conversation-tabs", "tiny", "width"], 40);
     const tiny = mount();
     await act(() => tiny.root.render(<MicoTaskTabs botId="mico" scope="tiny" taskThreadId="b" rpc={rpc} onSelect={vi.fn()} />));
     expect(tiny.host.querySelector("nav")!.getAttribute("data-tabs-layout")).toBe("minimal");
     expect(button("New conversation", tiny.host)).toBeNull();
-    expect(button("Conversations", tiny.host)).not.toBeNull();
+    expect(button("All conversations", tiny.host)).not.toBeNull();
   });
 });
 
 describe("readable conversation tabs", () => {
   const tabs = Array.from({ length: 8 }, (_, index) => ({ threadId: String(index), title: `Conversation ${index}` }));
   it("keeps the active conversation visible when many tabs are open", () => {
-    expect(fitConversationTabs(tabs, "1", 560).map(tab => tab.threadId)).toEqual(["1", "7"]);
+    expect(fitConversationTabs(tabs, "1", 740).map(tab => tab.threadId)).toEqual(["1", "7"]);
     expect(fitConversationTabs(tabs, "1", 280).map(tab => tab.threadId)).toEqual(["1"]);
   });
   it("shows recent tabs on the main chat and restores more only when space allows", () => {
-    expect(fitConversationTabs(tabs, undefined, 560).map(tab => tab.threadId)).toEqual(["6", "7"]);
+    expect(fitConversationTabs(tabs, undefined, 740).map(tab => tab.threadId)).toEqual(["6", "7"]);
     expect(fitConversationTabs(tabs, "1", 2000)).toEqual(tabs);
     expect(fitConversationTabs([], undefined, 0)).toEqual([]);
     expect(fitConversationTabs(tabs, "1", 0).map(tab => tab.threadId)).toEqual(["1"]);

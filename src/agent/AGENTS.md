@@ -672,7 +672,7 @@
   closes (its open view leaves for the tab on the left) and returns on restore. A
   conversation the Mico started (startedBy agent) joins the end of the tabs in the
   background without navigating, shows "{Mico} opened this conversation" and can be
-  renamed and deleted like the person's own. Below 200 px the row is a title
+  renamed and deleted like the person's own. Below 440 px the row is a title
   switcher; below 48 px only the picker button. Side threads use the placeholder
   "Message {Mico} in this conversation", show the thread's lastError card until the
   next turn and load older messages by themselves near the top. A "thread" mention
@@ -728,8 +728,10 @@
   `node --import tsx scripts/verify-thread-lifecycle-db.ts` (migration backfill, archive,
   delete/undo/purge, lock races), verify-task-conversations(-route)-db.ts and
   `node scripts/verify-mico-tasks-ui.mjs`.
-  The Mico name returns to the main chat; do not duplicate it with a General tab. Closing a
-  tab never deletes its history. Keep Create Mico separate from these actions.
+  In the wide header, Main chat has a fixed tab, the Mico name opens its
+  settings, and All conversations sits beside the tabs. The picker marks open
+  tabs independently of routine and unread status. Closing a tab keeps its
+  history. Keep Create Mico separate from these actions.
   Reset context is a confirmed secondary action for the main chat only; never
   expose that endpoint from an independent task or label it New conversation.
   Verify the task navigation and NewChatControl regression tests.
