@@ -1297,6 +1297,16 @@
   it with its history. Verify with verify-routine-isolation-db.ts and the routine tests above.
   `runIn` (thread default/chat; group is kept, never moved) is set by the editor switch and the
   schedule tools; moving back reuses the conversation found by key, never a second one.
+- Signed webhook routines (specs/mico-automation phase 2): `/api/v1/routines/<id>/events` takes
+  Standard Webhooks events (`v1,` HMAC-SHA256 of `id.timestamp.body`, `whsec_` secret, ±5 min),
+  verified on the raw bytes before parsing; every refusal is the same 401. Secrets stay encrypted
+  in `routine_webhook_secrets`, never in logs or prompts; a rotation keeps the previous one 24 h,
+  Revoke or turning the webhook off ends both. `claimRoutineEvent` locks the routine: delivery-id
+  digests dedupe for 7 days (runs keep their nonce, so never a second run), 60 events an hour then
+  429, and type/filters/paused decide before any run (202, shown in the history). Send test event
+  starts a `routine-test:event:` run, also while paused. The per-Mico Bearer route skips routines
+  with their own secret; the UI issues per-Mico keys only for GitHub. Verify routine-events tests
+  and `node --import tsx scripts/verify-routine-events-db.ts` (fresh loopback cluster).
 
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong

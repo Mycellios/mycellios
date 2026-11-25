@@ -8,7 +8,7 @@ import {
   stableStringify,
   validateRoutineWatch,
 } from "@mycellios/adapters";
-import { canonicalPiProviderId } from "@mycellios/contracts";
+import { canonicalPiProviderId, routineEventsPath } from "@mycellios/contracts";
 import {
   expandSkillReferencesInPrompt,
   hasMixedOneShotSchedule,
@@ -21,12 +21,21 @@ import {
   findRoutineOwnThread,
   followRoutineRenameInTransaction,
   IsolationError,
+  listRoutineIgnoredEvents,
   Prisma,
   routineRunIn,
   routineRunInInclude,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 import { assertRoutineModel } from "../model-pins.js";
+import {
+  revokeRoutineWebhookSecrets,
+  RoutineTestEventError,
+  rotateRoutineWebhookSecret,
+  routineWebhookSecretsSelect,
+  routineWebhookState,
+  sendRoutineTestEvent,
+} from "../routine-events.js";
 import { listRoutineRuns } from "../routine-runs.js";
 import {
   assertRoutineSchedule,
@@ -34,6 +43,7 @@ import {
   listRoutinesDto,
   mapRoutine,
   nextRoutineDate,
+  routineDtoInclude,
   routineNextRunAt,
   routineRowData,
 } from "../routines.js";
@@ -48,6 +58,31 @@ function mainChatId(bot: { thread: { id: string } | null }): string {
 
 export function routinesRoutes(ctx: RouterContext) {
   const { deps, repos, announceRoutine, codexCatalog, agentSkills, authed } = ctx;
+  /** The person's own routine with its webhook secrets, or NOT_FOUND. */
+  const ownedWebhookRoutine = async (actor: { spaceId: string; userId: string }, routineId: string) => {
+    const routine = await deps.prisma.routine.findFirst({
+      where: { id: routineId, spaceId: actor.spaceId, userId: actor.userId, bot: { archivedAt: null } },
+      select: {
+        id: true,
+        botId: true,
+        spaceId: true,
+        userId: true,
+        webhookEnabled: true,
+        webhookEventType: true,
+        webhookFilters: true,
+        webhookSecrets: { select: { id: true, ciphertext: true, createdAt: true, expiresAt: true } },
+      },
+    });
+    if (!routine) throw new ORPCError("NOT_FOUND");
+    return routine;
+  };
+  const webhookStateOf = async (routineId: string) => {
+    const routine = await deps.prisma.routine.findUniqueOrThrow({
+      where: { id: routineId },
+      select: { webhookEventType: true, webhookFilters: true, webhookSecrets: routineWebhookSecretsSelect },
+    });
+    return routineWebhookState(routine, routine.webhookSecrets);
+  };
   return {
     routines: {
       calendar: authed.routines.calendar.handler(({ context, input }) => routineCalendar(deps.prisma, context.actor, input)),
@@ -62,9 +97,17 @@ export function routinesRoutes(ctx: RouterContext) {
           orderBy: { id: "asc" },
         }),
       ),
-      history: authed.routines.history.handler(async ({ context, input }) =>
-        listRoutineRuns(deps.prisma, context.actor, input.routineId, input.before),
-      ),
+      history: authed.routines.history.handler(async ({ context, input }) => {
+        const page = await listRoutineRuns(deps.prisma, context.actor, input.routineId, input.before);
+        if (input.before) return page;
+        // Signed events that started nothing show beside the runs, with their reason.
+        const events = await listRoutineIgnoredEvents(deps.prisma, {
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+          routineId: input.routineId,
+        });
+        return events.length ? { ...page, events } : page;
+      }),
       list: authed.routines.list.handler(async ({ context, input }) => {
         await repos.getBot(context.actor, input.botId);
         return listRoutinesDto(deps, context.actor, input.botId);
@@ -91,7 +134,7 @@ export function routinesRoutes(ctx: RouterContext) {
         const threadId = input.runIn === "chat" ? mainChatId(bot) : null;
         const row = await deps.prisma.routine.create({
           data: { ...routineRowData(context.actor, input, routineNextRunAt(input)), threadId },
-          include: routineRunInInclude,
+          include: routineDtoInclude,
         });
         await announceRoutine(context.actor, bot, row);
         return mapRoutine(row);
@@ -282,9 +325,19 @@ export function routinesRoutes(ctx: RouterContext) {
                     ...(watchChanged ? { watchState: Prisma.DbNull } : {}),
                   }),
               ...(threadId === undefined ? {} : { threadId }),
+              ...(input.webhookEventType === undefined
+                ? {}
+                : { webhookEventType: input.webhookEventType }),
+              ...(input.webhookFilters === undefined
+                ? {}
+                : {
+                    webhookFilters: input.webhookFilters.length
+                      ? (input.webhookFilters as Prisma.InputJsonValue)
+                      : Prisma.DbNull,
+                  }),
               nextRunAt,
             },
-            include: routineRunInInclude,
+            include: routineDtoInclude,
           })
           .catch(async (error: unknown) => {
             if (isRecordNotFound(error)) {
@@ -334,6 +387,11 @@ export function routinesRoutes(ctx: RouterContext) {
           } else {
             await deps.jobs.cancel(routineJobKey(row.id));
           }
+        }
+        // Turning the webhook off ends its secrets, so turning it on again needs a new one.
+        if (!row.webhookEnabled && row.webhookSecrets.length > 0) {
+          await revokeRoutineWebhookSecrets(deps.prisma, row);
+          return mapRoutine({ ...row, webhookSecrets: [] });
         }
         return mapRoutine(row);
       }),
@@ -439,6 +497,66 @@ export function routinesRoutes(ctx: RouterContext) {
           getLogger().error("routine testRun enqueue", error);
         });
         return runReply(run);
+      }),
+      rotateWebhookSecret: authed.routines.rotateWebhookSecret.handler(async ({ context, input }) => {
+        const routine = await ownedWebhookRoutine(context.actor, input.routineId);
+        if (!routine.webhookEnabled) {
+          throw new ORPCError("BAD_REQUEST", { message: "Add a webhook trigger to this routine first." });
+        }
+        // Shown in this answer only; stored encrypted like the Mico's other credentials.
+        const secret = await rotateRoutineWebhookSecret(deps, routine, {
+          operationId: "routines.rotateWebhookSecret",
+          traceId: "routines.rotateWebhookSecret",
+          spaceId: context.actor.spaceId,
+          userId: context.actor.userId,
+          signal: context.signal ?? new AbortController().signal,
+        });
+        return {
+          secret,
+          path: routineEventsPath(routine.id),
+          webhook: await webhookStateOf(routine.id),
+        };
+      }),
+      revokeWebhookSecret: authed.routines.revokeWebhookSecret.handler(async ({ context, input }) => {
+        const routine = await ownedWebhookRoutine(context.actor, input.routineId);
+        await revokeRoutineWebhookSecrets(deps.prisma, routine);
+        return { webhook: await webhookStateOf(routine.id) };
+      }),
+      sendTestEvent: authed.routines.sendTestEvent.handler(async ({ context, input }) => {
+        const routine = await ownedWebhookRoutine(context.actor, input.routineId);
+        const current = routine.webhookSecrets.find((secret) => secret.expiresAt === null);
+        let runId: string;
+        try {
+          runId = await sendRoutineTestEvent(
+            deps,
+            {
+              id: routine.id,
+              webhookEnabled: routine.webhookEnabled,
+              webhookEventType: routine.webhookEventType,
+              secret: current ? { id: current.id, ciphertext: current.ciphertext } : null,
+            },
+            input.clientNonce,
+          );
+        } catch (error) {
+          if (error instanceof RoutineTestEventError) {
+            throw new ORPCError(error.code === "RATE_LIMITED" ? "TOO_MANY_REQUESTS" : "BAD_REQUEST", {
+              message: error.message,
+            });
+          }
+          throw error;
+        }
+        const run = await deps.prisma.run.findFirst({
+          where: { id: runId, spaceId: context.actor.spaceId, userId: context.actor.userId },
+          select: { threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
+        });
+        return {
+          runId,
+          ...(run?.thread.groupId
+            ? { groupId: run.thread.groupId }
+            : run?.thread.taskBotId === routine.botId
+              ? { taskThreadId: run.threadId }
+              : {}),
+        };
       }),
     },
   };

@@ -52,6 +52,16 @@ export const AUDITED_PROCEDURES: Record<string, AuditedProcedure> = {
     fields: ["botId", "name"],
   },
   "bots.rotateWebhookSecret": { type: "credential.changed", kind: "webhook", fields: ["botId"] },
+  "routines.rotateWebhookSecret": {
+    type: "credential.changed",
+    kind: "routine_webhook",
+    fields: ["routineId"],
+  },
+  "routines.revokeWebhookSecret": {
+    type: "credential.deleted",
+    kind: "routine_webhook",
+    fields: ["routineId"],
+  },
   "bots.resetBrowser": { type: "credential.deleted", kind: "browser_session", fields: ["botId"] },
   "voice.connect": { type: "credential.created", kind: "voice", fields: ["provider"] },
   "voice.disconnect": { type: "credential.deleted", kind: "voice", fields: ["provider"] },

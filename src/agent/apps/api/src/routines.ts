@@ -10,7 +10,14 @@ import {
 } from "@mycellios/core";
 import type { Prisma } from "@mycellios/db";
 import { routineRunIn, routineRunInInclude } from "@mycellios/db";
+import { routineWebhookSecretsSelect, routineWebhookState } from "./routine-events.js";
 import type { RouterDeps } from "./router.js";
+
+/** What mapRoutine reads besides the routine's own columns. */
+export const routineDtoInclude = {
+  ...routineRunInInclude,
+  webhookSecrets: routineWebhookSecretsSelect,
+} as const;
 
 export function assertRoutineSchedule(input: CreateRoutineInput): void {
   if (hasMixedOneShotSchedule(input.crons)) {
@@ -55,6 +62,10 @@ export function routineRowData(actor: Actor, input: CreateRoutineInput, nextRunA
     modelId: input.modelId,
     thinkingLevel: input.thinkingLevel,
     ...(input.watch ? { watch: input.watch as Prisma.InputJsonValue } : {}),
+    ...(input.webhookEventType ? { webhookEventType: input.webhookEventType } : {}),
+    ...(input.webhookFilters?.length
+      ? { webhookFilters: input.webhookFilters as Prisma.InputJsonValue }
+      : {}),
     nextRunAt,
   };
 }
@@ -98,6 +109,9 @@ export function mapRoutine(row: {
   pausedByRunAt?: Date | null;
   threadId?: string | null;
   thread?: { botId: string | null; groupId: string | null } | null;
+  webhookEventType: string | null;
+  webhookFilters: unknown;
+  webhookSecrets: ReadonlyArray<{ createdAt: Date; expiresAt: Date | null }>;
 }): Routine {
   return {
     id: row.id,
@@ -121,13 +135,14 @@ export function mapRoutine(row: {
     createdAt: row.createdAt.toISOString(),
     pausedByRunAt: !row.active && row.pausedByRunAt ? row.pausedByRunAt.toISOString() : null,
     runIn: routineRunIn(row),
+    webhook: routineWebhookState(row, row.webhookSecrets),
   };
 }
 
 export async function listRoutinesDto(deps: RouterDeps, actor: Actor, botId: string) {
   const rows = await deps.prisma.routine.findMany({
     where: { botId, spaceId: actor.spaceId },
-    include: routineRunInInclude,
+    include: routineDtoInclude,
   });
   return rows.map(mapRoutine);
 }

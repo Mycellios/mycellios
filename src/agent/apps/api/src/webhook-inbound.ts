@@ -23,6 +23,7 @@ export type WebhookEvents = {
     clientNonce?: string;
     routineId?: string;
     routineWebhookSource?: "webhook" | "github";
+    routineTestEvent?: true;
     allowParallelRun?: boolean;
     modelPin?: {
       modelProvider: string;
@@ -106,7 +107,10 @@ type WebhookSecretCacheEntry = {
   expires: number;
 };
 
-/** Webhook secrets by bot id; the decrypt promise is shared so concurrent misses decrypt once. */
+/**
+ * Decrypted webhook secrets by bot id (or by secret id for routine secrets); the decrypt promise
+ * is shared so concurrent misses decrypt once.
+ */
 export type WebhookSecretCache = Map<string, WebhookSecretCacheEntry>;
 
 const subscribedWebhookCaches = new WeakMap<SecretStore, WeakSet<WebhookSecretCache>>();
@@ -168,22 +172,22 @@ function decryptWebhookSecret(
   return entry;
 }
 
-// One decrypt per bot; v2 scrypt runs off the event loop.
-function loadWebhookSecret(
+// One decrypt per key (a bot, or a routine's secret); v2 scrypt runs off the event loop.
+export function loadWebhookSecret(
   secrets: WebhookDeps["secrets"],
   cache: WebhookSecretCache,
-  botId: string,
+  key: string,
   secret: { id: string; ciphertext: string },
 ): Promise<string | null> {
   subscribeWebhookCache(secrets, cache);
-  const cached = cache.get(botId);
+  const cached = cache.get(key);
   const entry =
     cached?.secretId === secret.id &&
     cached.ciphertext === secret.ciphertext &&
     cached.expires > Date.now()
       ? cached
-      : decryptWebhookSecret(secrets, cache, botId, secret);
-  touchWebhookSecret(cache, botId, entry);
+      : decryptWebhookSecret(secrets, cache, key, secret);
+  touchWebhookSecret(cache, key, entry);
   return entry.plaintext;
 }
 
@@ -263,7 +267,7 @@ export function inboundDeliveryClientNonce(
   return `${source}:${botId}:${createHash("sha256").update(idempotencyKey).digest("base64url")}`;
 }
 
-async function deliverOneWebhookEvent(
+export async function deliverOneWebhookEvent(
   deps: Pick<WebhookDeps, "events" | "jobs">,
   target: InboundTarget,
   input: {
@@ -278,6 +282,10 @@ async function deliverOneWebhookEvent(
     }>;
     source: "webhook" | "github" | "messaging";
     idempotencyKey?: string;
+    /** A signed routine event names its own delivery identity instead of the Mico-wide one. */
+    clientNonce?: string;
+    /** The person's Send test event, which also runs a paused routine. */
+    routineTestEvent?: true;
     /** Messaging wakes share the live chat thread; keep a separate webhook run. */
     allowParallelRun?: boolean;
   },
@@ -297,9 +305,11 @@ async function deliverOneWebhookEvent(
         ].join("\n")
       : input.prompt;
 
-  const clientNonce = input.idempotencyKey
-    ? inboundDeliveryClientNonce(input.source, target.bot.id, input.idempotencyKey)
-    : undefined;
+  const clientNonce =
+    input.clientNonce ??
+    (input.idempotencyKey
+      ? inboundDeliveryClientNonce(input.source, target.bot.id, input.idempotencyKey)
+      : undefined);
   const pin = inboundRoutineModelPin(input.routines);
 
   const sent = await deps.events.sendUserMessage({
@@ -315,6 +325,7 @@ async function deliverOneWebhookEvent(
     trigger: "webhook",
     clientNonce,
     ...(routine ? { routineId: routine.id, routineWebhookSource: routine.source, allowParallelRun: true } : {}),
+    ...(routine && input.routineTestEvent ? { routineTestEvent: true as const } : {}),
     ...(input.allowParallelRun ? { allowParallelRun: true } : {}),
     ...(pin.modelProvider && pin.modelId
       ? {
@@ -374,7 +385,8 @@ export async function deliverWebhookEvent(
   }
   const current = await prisma.routine.findMany({ where: {
     ...scope, id: { in: routing.routineIds }, active: true,
-    ...(input.source === "github" ? { githubEnabled: true } : { webhookEnabled: true }),
+    // A routine with its own secret takes only events signed for it.
+    ...(input.source === "github" ? { githubEnabled: true } : { webhookEnabled: true, webhookSecrets: { none: {} } }),
   }, select: { id: true, name: true, prompt: true, modelProvider: true, modelId: true, thinkingLevel: true } });
   const deliveries = [];
   for (const routineId of routing.routineIds) {

@@ -59,6 +59,7 @@ export * from "./contribution.js";
 export * from "./app-release-policy.js";
 
 export * from "./routine-calendar.js";
+export * from "./routine-events.js";
 
 export * from "./task-inbox.js";
 export * from "./side-threads.js";

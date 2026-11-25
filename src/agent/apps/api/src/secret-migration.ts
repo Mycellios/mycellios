@@ -1,7 +1,7 @@
 import type { SecretMigrationRepository, SecretMigrationRow } from "@mycellios/adapters";
 import type { PrismaClient } from "@mycellios/db";
 
-const tables = ["secret", "botSecret", "integrationProviderConfig"] as const;
+const tables = ["secret", "botSecret", "integrationProviderConfig", "routineWebhookSecret"] as const;
 
 export function createSecretMigrationRepository(prisma: PrismaClient): SecretMigrationRepository {
   return {
@@ -45,7 +45,8 @@ export function createSecretMigrationRepository(prisma: PrismaClient): SecretMig
       return Boolean(
         (await prisma.secret.count({ where: { ciphertext: ref } })) ||
           (await prisma.botSecret.count({ where: { ciphertext: ref } })) ||
-          (await prisma.integrationProviderConfig.count({ where: { ciphertext: ref } })),
+          (await prisma.integrationProviderConfig.count({ where: { ciphertext: ref } })) ||
+          (await prisma.routineWebhookSecret.count({ where: { ciphertext: ref } })),
       );
     },
   };

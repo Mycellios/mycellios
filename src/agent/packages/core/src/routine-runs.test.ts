@@ -3,6 +3,7 @@ import {
   isPersonRequestedRoutineRun,
   missedRoutineOccurrences,
   ROUTINE_MISSED_COUNT_LIMIT,
+  ROUTINE_TEST_EVENT_NONCE_PREFIX,
   routineRunSource,
   routineTestRunNonce,
   routineTimerScheduledAt,
@@ -27,6 +28,9 @@ describe("routineRunSource", () => {
     expect(routineRunSource(run("webhook", "webhook:bot:digest"))).toBe("webhook");
     expect(routineRunSource(run("webhook", null))).toBe("webhook");
     expect(routineRunSource(run("webhook", "github:bot:digest"))).toBe("github");
+    // A signed routine event, and the sample one a person sends from the editor.
+    expect(routineRunSource(run("webhook", "routine-event:r1:digest"))).toBe("webhook");
+    expect(routineRunSource(run("webhook", `${ROUTINE_TEST_EVENT_NONCE_PREFIX}r1:digest`))).toBe("manual");
     expect(routineRunSource(run("routine", null, "failed-run"))).toBe("retry");
     expect(routineRunSource(run("routine", null))).toBe("schedule");
     expect(routineRunSource(run("routine", null), { watch: { kind: "files" } })).toBe("watch");
