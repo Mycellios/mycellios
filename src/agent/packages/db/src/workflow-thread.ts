@@ -1,5 +1,23 @@
 import type { PrismaClient } from "./client.js";
 
+/** Called only after the thread and its workflow run were verified as owned. */
+export async function isSignedWorkflowThread(
+  prisma: PrismaClient,
+  actor: { userId: string; spaceId: string },
+  thread: { taskKey?: string | null; projectKey?: string | null },
+): Promise<boolean> {
+  if (!thread.taskKey?.startsWith("workflow:") || !thread.projectKey?.startsWith("workflow:")) return false;
+  const executionId = thread.taskKey.split(":")[1];
+  if (!executionId) return false;
+  return Boolean(await prisma.workflowExecution.findFirst({
+    where: {
+      id: executionId, workflowId: thread.projectKey.slice(9), userId: actor.userId, spaceId: actor.spaceId,
+      clientNonce: { startsWith: "workflow-event:" },
+    },
+    select: { id: true },
+  }));
+}
+
 export async function isOwnedWorkflowThread(
   prisma: PrismaClient,
   actor: { userId: string; spaceId: string },

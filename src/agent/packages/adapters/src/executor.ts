@@ -16,7 +16,7 @@ import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
-import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, micoRunsLanes } from "@mycellios/db";
+import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, isSignedWorkflowThread, micoRunsLanes } from "@mycellios/db";
 import { createHash, randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -4278,10 +4278,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           storedConnections,
           connectedComposio.map((connection) => connection.provider),
         );
+        const ownedRoutine = await isOwnedRoutineThread(deps.prisma, run, thread);
+        const ownedWorkflow = !ownedRoutine && await isOwnedWorkflowThread(deps.prisma, run, thread);
+        const externalWebhook = run.trigger === "webhook" ||
+          (ownedWorkflow && await isSignedWorkflowThread(deps.prisma, run, thread));
         const context = {
           operationId: runId,
-          projectSessionId: (await isOwnedRoutineThread(deps.prisma, run, thread)) || (await isOwnedWorkflowThread(deps.prisma, run, thread))
-            ? undefined : nativeWorkProjectSession(thread, task),
+          projectSessionId: ownedRoutine || ownedWorkflow ? undefined : nativeWorkProjectSession(thread, task),
           traceId: runId,
           spaceId: run.spaceId,
           userId: run.userId,
@@ -4327,7 +4330,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : null;
         // An external webhook's text could choose what gets saved, so those runs only read.
         const personalWriteTarget =
-          personalMemory && run.trigger !== "webhook" ? personalMemory.writeTarget : null;
+          personalMemory && !externalWebhook ? personalMemory.writeTarget : null;
         // Ids recalled from personal memory in this run, so forget_memory reaches the same memory.
         const personalMemoryIds = new Set<string>();
         const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
@@ -5793,10 +5796,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const declaredReadOnlyFor = (toolName: string) =>
             toolName === name ? declaredReadOnly : connectorTools.get(toolName)?.readOnly;
           const requiresUnattendedApproval =
-            (unidentifiedAction && run.trigger === "webhook") ||
+            (unidentifiedAction && externalWebhook) ||
             approvalToolNames.some((toolName) =>
               unattendedTriggerToolRequiresApproval(
-                run.trigger,
+                externalWebhook ? "webhook" : run.trigger,
                 toolName,
                 viaConnector,
                 declaredReadOnlyFor(toolName),
