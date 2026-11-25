@@ -5,10 +5,14 @@ import { ChevronDown, Folder, MessageSquare, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 
-export function SidebarProjects({ projects, rpc, bots, activeThread, creating, onCreating, onRefresh, onSelect, failed }: {
+const PROJECT_HISTORY_PRELOAD_LIMIT = 5;
+
+export function SidebarProjects({ projects, rpc, bots, activeThread, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
   projects: ProjectSummary[]; rpc: RpcClient; bots: { id: string; name: string }[];
   activeThread?: string; creating: boolean; onCreating(value: boolean): void; onRefresh(): void;
-  onSelect(botId: string, threadId: string): void; failed: boolean;
+  onSelect(botId: string, threadId: string): void;
+  onWarm?(botId: string, threadId: string): Promise<void>;
+  failed: boolean;
 }) {
   const { t } = useLingui();
   const activeProjectId = projects.find(p => p.conversations.some(c => c.threadId === activeThread))?.id;
@@ -19,10 +23,44 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
   const projectId = useRef(crypto.randomUUID());
   const alive = useRef(true);
   const saving = useRef(false);
+  const preloadTail = useRef(Promise.resolve());
+  const warmingIntent = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
     if (activeProjectId) expand(ids => ids.includes(activeProjectId) ? ids : [...ids, activeProjectId]);
   }, [activeProjectId, activeThread]);
+  const currentProject = projects.find(project => project.id === expanded.at(-1) && project.conversations.length)
+    ?? projects.find(project => project.conversations.length);
+  const warmTargets = JSON.stringify((currentProject?.conversations ?? [])
+    .filter(chat => chat.threadId !== activeThread)
+    .slice(0, PROJECT_HISTORY_PRELOAD_LIMIT)
+    .map(({ botId, threadId }) => [botId, threadId]));
+  useEffect(() => {
+    if (!onWarm) return;
+    let cancelled = false;
+    let scheduled = false;
+    const pending = JSON.parse(warmTargets) as [string, string][];
+    const resume = () => {
+      if (scheduled || cancelled || !pending.length || document.visibilityState !== "visible") return;
+      scheduled = true;
+      // Changing folders stops the old sequence after its current read.
+      preloadTail.current = preloadTail.current.then(async () => {
+        while (!cancelled && pending.length && document.visibilityState === "visible") {
+          const [botId, threadId] = pending.shift()!;
+          await onWarm(botId, threadId).catch(() => undefined);
+        }
+        scheduled = false;
+      });
+    };
+    resume();
+    document.addEventListener("visibilitychange", resume);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", resume); };
+  }, [onWarm, warmTargets]);
+  function warmFromIntent(botId: string, threadId: string) {
+    if (!onWarm || threadId === activeThread || warmingIntent.current) return;
+    warmingIntent.current = true;
+    void onWarm(botId, threadId).catch(() => undefined).finally(() => { warmingIntent.current = false; });
+  }
   if (!projects.length && !creating) return null;
   return <section aria-label={t`Projects`} className="min-w-0 py-2">
     <div className="flex items-center justify-between px-2 text-xs font-medium text-muted-foreground">
@@ -54,6 +92,7 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
       </div>
       {expanded.includes(project.id) ? <div className="ms-4 space-y-0.5 border-s border-border ps-1">
         {project.conversations.map(chat => <Button key={chat.threadId} variant={chat.threadId === activeThread ? "secondary" : "ghost"} size="sm" className="w-full min-w-0 justify-start gap-2"
+          onPointerEnter={() => warmFromIntent(chat.botId, chat.threadId)} onFocus={() => warmFromIntent(chat.botId, chat.threadId)}
           aria-current={chat.threadId === activeThread ? "page" : undefined} onClick={() => onSelect(chat.botId, chat.threadId)} title={chat.title}>
           <MessageSquare size={14} className="shrink-0" /><span className="truncate">{chat.title}</span>{chat.unread ? <span aria-label={t`Unread`} className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
         </Button>)}

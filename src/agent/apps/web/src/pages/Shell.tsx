@@ -2268,14 +2268,17 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           : [],
     [bootstrapMe, botSections, bots, groups, spaces],
   );
-  const warmConversation = useCallback(async (id: string, threadId?: string, pendingQuestion = false) => {
+  const warmConversation = useCallback(async (id: string, threadId?: string, pendingQuestion = false, spaceId = shellSpaceId) => {
     if (!userId || document.visibilityState !== "visible") return;
     const scope = threadId ? { botId: id, taskThreadId: threadId } : undefined;
-    const key = spaceQueries(userId, shellSpaceId, scope).threads.get.queryKey({ input: { botId: id } });
+    const key = spaceQueries(userId, spaceId, scope).threads.get.queryKey({ input: { botId: id } });
     const cached = queryClient.getQueryData(key);
     if (cached && (!pendingQuestion || answerableAskMessageIds(cached).size > 0)) return;
-    await readConversationHistory(userId, shellSpaceId, id, scope).catch(() => undefined);
+    await readConversationHistory(userId, spaceId, id, scope).catch(() => undefined);
   }, [userId, shellSpaceId]);
+  const warmProjectConversation = useCallback(async (id: string, threadId: string) => {
+    if (currentSpaceId) await warmConversation(id, threadId, false, currentSpaceId);
+  }, [currentSpaceId, warmConversation]);
   const waitingChats = JSON.stringify(bots.filter(bot => bot.status === "waiting_input" &&
     (bot.id !== active?.id || bot.waitingTaskThreadId !== taskScope?.taskThreadId))
     .slice(0, 2).map(bot => [bot.id, bot.waitingTaskThreadId ?? null]));
@@ -4997,6 +5000,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               {!miniSidebar && !activityMode && !showSpaceSearch ? <NeedsYouGroup groups={sidebarGroups} mobile={isMobileSidebar} openSpaceChat={openSpaceChat} /> : null}
               {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, currentSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
                 activeThread={taskScope?.taskThreadId} creating={creatingProject} onCreating={setCreatingProject} onRefresh={projectCollection.refresh} failed={projectCollection.error}
+                onWarm={readingFirstHistory ? undefined : warmProjectConversation}
                 onSelect={(botId, threadId) => {
                   if (currentSpaceId) openSpaceChat(currentSpaceId, `/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}`);
                 }} /> : null}

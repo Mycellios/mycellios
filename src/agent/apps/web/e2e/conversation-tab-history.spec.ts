@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { ThreadMessage } from "@mycellios/contracts";
-import { activeBotId, completeOnboarding, rpc, signup } from "./helpers";
+import { activeBotId, completeOnboarding, createNamedBot, rpc, signup } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -75,8 +75,7 @@ test("conversation tabs render a slow first history read and reopen from cache",
 
 test("project conversations keep the workspace visible while their own history loads", async ({ page }) => {
   await signup(page, `project-history-${Date.now()}@example.test`, "password12", "Project history");
-  await completeOnboarding(page);
-  const botId = activeBotId(page);
+  const botId = await createNamedBot(page, "Mico");
   const projectId = randomUUID();
   await rpc(page, "development/saveProject", { id: projectId, name: "Example app" });
   const { threadId } = await rpc<{ threadId: string }>(page, "development/open", {
@@ -85,12 +84,9 @@ test("project conversations keep the workspace visible while their own history l
     taskKey: `project-task:${randomUUID()}`,
     title: "Project acceptance",
   });
-  await page.reload();
   const projects = page.getByRole("region", { name: "Projects", exact: true });
   const roster = page.getByTestId("bots-sidebar");
   const transcript = page.getByTestId("transcript");
-  await expect(transcript).toBeVisible();
-  await projects.getByRole("button", { name: "Example app", exact: true }).click();
   const projectChat = projects.getByRole("button", { name: "Project acceptance", exact: true });
 
   let releaseHistory!: () => void;
@@ -98,8 +94,6 @@ test("project conversations keep the workspace visible while their own history l
   let historyReads = 0;
   let bootstrapReads = 0;
   let documentNavigations = 0;
-  page.on("request", request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documentNavigations += 1; });
-  await page.route("**/rpc/bootstrap", route => { bootstrapReads += 1; return route.continue(); });
   const text = "Message from the selected project conversation";
   const message: ThreadMessage = {
     id: "fixture-project-message", threadId, seq: 0, role: "user",
@@ -115,6 +109,12 @@ test("project conversations keep the workspace visible while their own history l
   });
 
   try {
+    await page.reload();
+    await expect(transcript).toBeVisible();
+    await expect.poll(() => historyReads).toBe(1);
+    page.on("request", request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documentNavigations += 1; });
+    await page.route("**/rpc/bootstrap", route => { bootstrapReads += 1; return route.continue(); });
+    await projects.getByRole("button", { name: "Example app", exact: true }).click();
     await projectChat.click();
     await expect(page).toHaveURL(new RegExp(`[?&]task=${threadId}(?:&|$)`));
     await expect(page.getByRole("status", { name: "Loading…" })).toBeVisible();
@@ -127,6 +127,58 @@ test("project conversations keep the workspace visible while their own history l
     releaseHistory();
   }
   await expect(transcript.getByText(text, { exact: true })).toBeVisible();
+});
+
+test("a project chat shows its own preloaded messages on its first opening", async ({ page }) => {
+  await signup(page, `project-preload-${Date.now()}@example.test`, "password12", "Project preload");
+  const botId = await createNamedBot(page, "Mico");
+  const projectId = randomUUID();
+  await rpc(page, "development/saveProject", { id: projectId, name: "Preloaded project" });
+  const sibling = await rpc<{ threadId: string }>(page, "development/open", {
+    botId, projectKey: `project:${projectId}`, taskKey: `project-task:${randomUUID()}`, title: "Other chat",
+  });
+  const { threadId } = await rpc<{ threadId: string }>(page, "development/open", {
+    botId, projectKey: `project:${projectId}`, taskKey: `project-task:${randomUUID()}`, title: "First project chat",
+  });
+  const text = "Message available before opening this project chat";
+  const message: ThreadMessage = { id: "warm-project-message", threadId, seq: 0, role: "user",
+    blocks: [{ kind: "text", text }], createdAt: new Date().toISOString() };
+  let historyReads = 0;
+  let siblingReads = 0;
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/rpc/threads/get", async route => {
+    const input = route.request().postDataJSON()?.json;
+    if (input?.taskThreadId === sibling.threadId) {
+      siblingReads += 1;
+      await held;
+    }
+    if (input?.taskThreadId !== threadId) return route.continue();
+    historyReads += 1;
+    const response = await route.fetch();
+    const payload = await response.json();
+    if (historyReads > 1) await held;
+    await route.fulfill({ response, json: { ...payload, json: { ...payload.json, messages: [message] } } });
+  });
+  const project = page.getByRole("region", { name: "Projects", exact: true });
+  const transcript = page.getByTestId("transcript");
+  try {
+    await page.reload();
+    // The second automatic request only starts after the first snapshot is in memory.
+    await expect.poll(() => siblingReads).toBe(1);
+    expect(historyReads).toBe(1);
+    await expect(transcript.getByText(text, { exact: true })).toHaveCount(0);
+    await project.getByRole("button", { name: "Preloaded project", exact: true }).click();
+    const row = project.getByRole("button", { name: "First project chat", exact: true });
+    const started = Date.now();
+    await row.click();
+    await expect(transcript.getByText(text, { exact: true })).toBeVisible({ timeout: 1_500 });
+    test.info().annotations.push({ type: "project-preloaded-open-ms", description: String(Date.now() - started) });
+    await expect(row).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("status", { name: "Loading…" })).toHaveCount(0);
+  } finally {
+    release();
+  }
 });
 
 test("Answer opens the exact task and uses its preloaded question", async ({ page }) => {
