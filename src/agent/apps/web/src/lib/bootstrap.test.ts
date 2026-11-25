@@ -207,7 +207,7 @@ describe("primed space isolation", () => {
     );
     await primeSpaceBootstrap("space-b");
     await expect(takeInitialBootstrap()).resolves.toBe(current);
-    expect(rpc.bootstrap).toHaveBeenLastCalledWith({});
+    expect(vi.mocked(rpc.bootstrap).mock.lastCall).toStrictEqual([{ history: "recent" }]);
     expect(rpc.bootstrap).toHaveBeenCalledTimes(2);
     expect(getTicketBoardEnabled()).toBe(false);
   });

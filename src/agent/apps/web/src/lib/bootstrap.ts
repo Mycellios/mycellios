@@ -103,7 +103,7 @@ export function discardPrimedBootstrap(promise: Promise<AppBootstrap>): void {
 
 function requestBootstrap(botId?: string, spaceId?: string) {
   markOnce("rk:renderer:bootstrap-request-start");
-  const input = { botId, history: "recent" as const };
+  const input = { history: "recent" as const, ...(botId ? { botId } : {}) };
   const request = spaceId ? rpc.bootstrap(input, { context: { spaceId } }) : rpc.bootstrap(input);
   return request.then((bootstrap) => {
     markOnce("rk:renderer:bootstrap-response");
