@@ -3884,14 +3884,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
         },
       });
       const turnModel = readTurnModelSelection(current.modelExecution);
-      const agentEngine = (turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
+      let agentEngine = (turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
       }
       const cloudSelection = await selectOfflineCloudWorkspace(
         deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
-        { agentEngine: leaseTarget.agentEngine, dataDir: deps.dataDir },
+        {
+          agentEngine, dataDir: deps.dataDir,
+          // The Mico's own Pi model, else the account's main model, can stand in for its PC's CLI.
+          piFallback: async () => Boolean(leaseTarget.modelProvider && leaseTarget.modelId) ||
+            Boolean(await resolveMemberMainModel(deps, run).catch(() => null)),
+        },
       ).catch((error: unknown) => {
         if (error instanceof ComputerLimitError || error instanceof DesktopUnreachableError) return error;
         throw error;
@@ -3904,6 +3909,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
       }
       const cloudLimitReached = cloudSelection instanceof ComputerLimitError;
       const cloudComputer = cloudLimitReached ? undefined : cloudSelection;
+      // This turn runs on the server's Pi model; the capture below keeps it there on resume.
+      const enginePiFallback = Boolean(cloudComputer && "piFallback" in cloudComputer && cloudComputer.piFallback);
+      if (enginePiFallback) agentEngine = "pi";
       const assignedComputerId = cloudComputer?.id ?? leaseTarget.computerId;
       if (!assignedComputerId || cloudLimitReached) {
         // An unavailable assignment or exhausted quota must settle instead of retrying.
@@ -3945,7 +3953,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ? await projectExecutionLeaseKey(deps.prisma, deps.sandbox, run, leaseTarget.computer)
         : undefined;
       const isolatedProjectRun = Boolean(projectLeaseKey);
-      const privateLane = !isolatedProjectRun && (turnModel?.agentEngine ?? leaseTarget.agentEngine) === "pi" && Boolean(await deps.prisma.thread.findFirst({
+      const privateLane = !isolatedProjectRun && (enginePiFallback || (turnModel?.agentEngine ?? leaseTarget.agentEngine) === "pi") && Boolean(await deps.prisma.thread.findFirst({
         where: { id: run.threadId, taskBotId: run.botId, spaceId: run.spaceId, userId: run.userId }, select: { id: true },
       }));
       let pendingComputerReservation: Promise<void> | undefined;
