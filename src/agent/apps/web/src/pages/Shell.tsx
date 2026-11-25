@@ -469,9 +469,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const [voiceConversation, setVoiceConversation] = useState<{ id: string; name: string; color: string; group?: VoiceGroup } | null>(null);
   const [sideQuestionTargets, setSideQuestionTargets] = useState<Record<string, SideQuestionTarget>>({});
   useEffect(() => setSideQuestionTargets({}), [userId]);
-  const projectCollection = useProjects(rpc, userId ?? null, shellSpaceId);
   const [creatingProject, setCreatingProject] = useState(false);
-  const activeProject = projectCollection.projects.find(project => project.conversations.some(chat => chat.threadId === taskScope?.taskThreadId));
   const [createMenuOpen, setCreateMenuOpen] = useCreateMenu();
   // A revisited space, or the shell reopened from another page, starts from what it showed
   // last time while its fresh bootstrap loads.
@@ -856,6 +854,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     callsEnabledRef.current = bootstrapMe?.phoneCallsEnabled === true;
   }, [bootstrapMe?.phoneCallsEnabled]);
   const currentSpaceId = shellSpaceId ?? bootstrapMe?.spaceId ?? null;
+  const projectCollection = useProjects(rpc, userId ?? null, currentSpaceId);
+  const activeProject = projectCollection.projects.find(project => project.conversations.some(chat => chat.threadId === taskScope?.taskThreadId));
   // null: settings follow the space the app is showing.
   const settingsSpaceId = overlay?.kind === "settings" ? overlay.spaceId : null;
   // A Space someone else owns opens only its people (specs/space-members).
@@ -5000,9 +5000,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 />
               ) : null}
               {!miniSidebar && !activityMode && !showSpaceSearch ? <NeedsYouGroup groups={sidebarGroups} mobile={isMobileSidebar} openSpaceChat={openSpaceChat} /> : null}
-              {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, shellSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
+              {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, currentSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
                 activeThread={taskScope?.taskThreadId} creating={creatingProject} onCreating={setCreatingProject} onRefresh={projectCollection.refresh} failed={projectCollection.error}
-                onSelect={(botId, threadId) => { setMobileSidebarOpen(false); navigate(`/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}`); }} /> : null}
+                onSelect={(botId, threadId) => {
+                  if (currentSpaceId) openSpaceChat(currentSpaceId, `/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}`);
+                }} /> : null}
               <SidebarRoster
                 mini={miniSidebar}
                 mobile={isMobileSidebar}
