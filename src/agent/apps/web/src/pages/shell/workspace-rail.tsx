@@ -47,6 +47,8 @@ type WorkspaceRailProps = {
   footer?: ReactNode;
   onNavigate?: () => void;
   scope: string;
+  /** The open Mico: a This PC Mico's plan usage comes from its own PC's Codex. */
+  activeBotId?: string;
   activity: boolean;
   library?: boolean;
   usage?: boolean;
@@ -320,7 +322,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
         </DropdownMenu>
       </div>
       <div className="mt-auto flex flex-col items-center gap-1 pb-2">
-        {props.onModels ? <ProviderQuota scope={props.scope} onModels={props.onModels} onUsage={props.onUsage} /> : null}
+        {props.onModels ? <ProviderQuota scope={props.scope} botId={props.activeBotId} onModels={props.onModels} onUsage={props.onUsage} /> : null}
         {props.onApps ? (
           <IconTooltip label={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}>
             <Button

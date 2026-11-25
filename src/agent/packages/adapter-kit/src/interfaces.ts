@@ -1,4 +1,4 @@
-import type { ConnectionIdentity, NativeEngineAccountRequest, NativeEngineAccountResult } from "@mycellios/contracts";
+import type { AccountPlanLimit, ConnectionIdentity, NativeEngineAccountRequest, NativeEngineAccountResult } from "@mycellios/contracts";
 import type {
   AdapterContext,
   AdapterDescriptor,
@@ -113,6 +113,8 @@ export interface SandboxProvider {
   nativeEngineState?(context: AdapterContext): Promise<NativeEngineState | undefined>;
   /** Signs one of the PC's CLIs in or out for the person; only hosts reporting `account` serve it. */
   nativeEngineAccount?(context: AdapterContext, request: NativeEngineAccountRequest): Promise<NativeEngineAccountResult>;
+  /** Plan usage of the PC's signed-in CLIs (allowlisted limit fields only); older hosts refuse it. */
+  nativeEngineUsage?(context: AdapterContext): Promise<{ codex?: AccountPlanLimit }>;
   /** Native command environment; omitted for providers with a fixed container environment. */
   environment?(
     computer: ComputerRef,
@@ -328,6 +330,8 @@ export interface AgentRuntime {
   nativeEngineState?(): Promise<NativeEngineState>;
   /** Starts the CLI's own sign-in, or signs it out, on this host for the person. */
   nativeEngineAccount?(request: NativeEngineAccountRequest): Promise<NativeEngineAccountResult>;
+  /** Plan usage of this host's signed-in CLIs, read without a model call. */
+  nativeEngineUsage?(): Promise<{ codex?: AccountPlanLimit }>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,

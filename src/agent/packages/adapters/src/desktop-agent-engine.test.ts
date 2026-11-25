@@ -72,3 +72,28 @@ it("signs a CLI in only under the PC's account scope, with the command discovery
     await resetNativeAccountLogins();
   }
 });
+
+it("reads Codex plan usage only under the PC's account scope and once the CLI confirmed a sign-in", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-engine-test-")); roots.push(root);
+  let scope: string | undefined;
+  const engine = createDesktopAgentEngine(root, () => scope);
+  expect(await engine.nativeEngineUsage!()).toEqual({});
+  scope = "d".repeat(64);
+  const directory = path.join(root, "agent-executor", scope);
+  await mkdir(directory, { recursive: true });
+  const cli = fileURLToPath(new URL("./fixtures/native-agent.mjs", import.meta.url));
+  await writeFile(path.join(directory, "native-agents.json"), JSON.stringify({ codex: { command: process.execPath, args: [cli, "codex"] } }));
+  // The first reads may answer before the CLI does; a later read returns the cached reading.
+  let usage: Awaited<ReturnType<NonNullable<typeof engine.nativeEngineUsage>>> = {};
+  for (let attempt = 0; attempt < 40 && !usage.codex; attempt++) {
+    usage = await engine.nativeEngineUsage!();
+    if (!usage.codex) await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  expect(usage.codex).toMatchObject({ credentialId: "native:codex", windows: [{ usedPercent: 8 }] });
+  await writeFile(path.join(directory, "native-agents.json"), JSON.stringify({ codex: { command: process.execPath, args: [cli, "codex", "--fixture-signed-out"] } }));
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (!(await engine.nativeEngineUsage!()).codex) break;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  expect(await engine.nativeEngineUsage!()).toEqual({});
+}, 30_000);

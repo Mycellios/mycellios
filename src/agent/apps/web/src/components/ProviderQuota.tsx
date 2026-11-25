@@ -18,6 +18,8 @@ import {
 
 export function ProviderQuota(props: {
   scope: string;
+  /** The open Mico: when it runs on This PC, its PC's Codex usage shows instead of the server's. */
+  botId?: string;
   onModels: () => void;
   onUsage: () => void;
   compact?: boolean;
@@ -26,11 +28,13 @@ export function ProviderQuota(props: {
 }
 function QuotaContent({
   scope,
+  botId,
   onModels,
   onUsage,
   compact = true,
 }: {
   scope: string;
+  botId?: string;
   onModels: () => void;
   onUsage: () => void;
   compact?: boolean;
@@ -56,7 +60,7 @@ function QuotaContent({
       try {
         const [value, native] = await Promise.all([
           rpc.models.planLimits({ refresh }, { signal: abort.signal }),
-          rpc.engines.codexQuota(undefined, { signal: abort.signal }).catch(() => null),
+          rpc.engines.codexQuota(botId ? { botId } : undefined, { signal: abort.signal }).catch(() => null),
         ]);
         if (native) value.accounts = [...value.accounts, native];
         if (alive.current && !abort.signal.aborted) {
@@ -71,7 +75,7 @@ function QuotaContent({
         if (alive.current && !abort.signal.aborted) setBusy(false);
       }
     },
-    [rpc],
+    [rpc, botId],
   );
   useEffect(() => {
     alive.current = true;

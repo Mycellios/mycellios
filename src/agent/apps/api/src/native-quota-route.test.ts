@@ -14,10 +14,10 @@ import type { RouterContext } from "./routes/context.js";
 import { localEngineForNewMico } from "./routes/shared.js";
 import type { RouterDeps } from "./router.js";
 beforeEach(() => { fixtures.allowed = true; fixtures.read.mockReset().mockResolvedValue(null); fixtures.access.mockClear(); });
-function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn>; nativeEngineAccount?: ReturnType<typeof vi.fn> }) {
+function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn>; nativeEngineAccount?: ReturnType<typeof vi.fn>; nativeEngineUsage?: ReturnType<typeof vi.fn> }) {
   const procedure = { handler: (handler: unknown) => handler };
   const authed = { engines: { forBot: procedure, account: procedure, codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
-  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState, nativeEngineAccount: dependencies?.nativeEngineAccount } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
+  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState, nativeEngineAccount: dependencies?.nativeEngineAccount, nativeEngineUsage: dependencies?.nativeEngineUsage } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
 }
 function route() {
   return routes().engines.codexQuota as unknown as (input: { context: { actor: { userId: string; spaceId: string } } }) => Promise<unknown>;
@@ -97,6 +97,27 @@ it("starts a new This PC Mico only on an installed CLI that confirmed a sign-in 
   expect(await pick({ engines: ["opencode"], signedOut: [], signedIn: ["opencode"] })).toBeUndefined();
   const offline = { sandbox: { nativeEngineState: vi.fn().mockRejectedValue(Error("PC offline")) } } as unknown as RouterDeps;
   expect(await localEngineForNewMico(offline, actor, "mico")).toBeUndefined();
+});
+
+it("reads a This PC Mico's plan usage from its own PC and keeps the server's grant for others", async () => {
+  const actor = { userId: "user", spaceId: "space" };
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const reading = { credentialId: "native:codex" };
+  const nativeEngineUsage = vi.fn().mockResolvedValue({ codex: reading });
+  const quota = routes({ getBot, nativeEngineUsage }).engines.codexQuota as unknown as (arg: unknown) => Promise<unknown>;
+  const request = { context: { actor }, input: { botId: "mico" } };
+  expect(await quota(request)).toBe(reading);
+  expect(getBot).toHaveBeenCalledWith(actor, "mico");
+  expect(nativeEngineUsage).toHaveBeenCalledWith(expect.objectContaining({ ...actor, botId: "mico" }));
+  expect(fixtures.read).not.toHaveBeenCalled();
+  nativeEngineUsage.mockRejectedValueOnce(new Error("PC disconnected"));
+  expect(await quota(request)).toBeNull();
+  // Another computer keeps the server's own Codex behind the operator grant.
+  getBot.mockResolvedValueOnce({ id: "mico", computer: { kind: "docker", scope: "isolated" } });
+  fixtures.allowed = false;
+  expect(await quota(request)).toBeNull();
+  expect(nativeEngineUsage).toHaveBeenCalledTimes(2);
+  expect(fixtures.read).not.toHaveBeenCalled();
 });
 
 it("says when the owner's PC can sign its CLIs in from here", async () => {

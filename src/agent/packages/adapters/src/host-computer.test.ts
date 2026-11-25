@@ -627,6 +627,10 @@ it("signs the PC's CLIs in only with local consent and passes on only a checked 
     abort: vi.fn(), async *run() {},
     nativeEngineState: async () => ({ engines: ["codex" as const], signedOut: ["codex" as const], account: true }),
     nativeEngineAccount,
+    nativeEngineUsage: vi.fn().mockResolvedValueOnce({ codex: { credentialId: "native:codex", provider: "openai-codex", label: "ChatGPT",
+      authKind: "oauth", status: "available", plan: null, windows: [], checkedAt: "2026-11-25T08:00:00.000Z",
+      measuredAt: "2026-11-25T08:00:00.000Z", retryAt: null, reason: null } })
+      .mockResolvedValueOnce({ codex: { credentialId: "native:codex", accountId: "private" } }),
   };
   const server = await startHostComputerServer({ root, token, hostname: "127.0.0.1", agentRuntime });
   const client = new HostComputerSandbox(`http://127.0.0.1:${server.port}`, token);
@@ -642,6 +646,9 @@ it("signs the PC's CLIs in only with local consent and passes on only a checked 
     expect(nativeEngineAccount).toHaveBeenCalledWith(signIn);
     nativeEngineAccount.mockResolvedValueOnce({ status: "device", userCode: "x", verificationUrl: "http://plain.example.test" });
     await expect(client.nativeEngineAccount(scoped, signIn)).rejects.toThrow("invalid sign-in answer");
+    // Plan usage passes on only a well-formed allowlisted reading.
+    expect((await client.nativeEngineUsage(scoped)).codex).toMatchObject({ credentialId: "native:codex", label: "ChatGPT" });
+    expect(await client.nativeEngineUsage(scoped)).toEqual({});
   } finally {
     await server.close();
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
