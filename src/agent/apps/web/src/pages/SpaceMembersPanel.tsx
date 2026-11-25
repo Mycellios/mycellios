@@ -30,6 +30,7 @@ import { useSpaceQueries, writeSaved } from "../lib/query";
 import { spaceLabel } from "../lib/space-label";
 import { useSpaceRpc } from "../lib/space-rpc";
 import { errorText } from "../lib/user-error";
+import { SpaceMicosPanel } from "./SpaceMicosPanel";
 
 /**
  * The people in the bound Space (specs/space-members). Its owner and admins invite by email or
@@ -155,6 +156,8 @@ export function SpaceMembersPanel({
           );
         })}
       </SettingsGroup>
+
+      <SpaceMicosPanel members={data} />
 
       {manages ? (
         <SettingsGroup data-testid="space-invite">

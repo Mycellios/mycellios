@@ -109,8 +109,11 @@ a member. Five phases, each shipping alone; phases 2 to 5 need phase 1.
      tenant. Member turns get the restricted policy on Pi and hosted Credits only,
      holding against a per-member UTC-day allowance (default 1 Credit; 0 pauses).
      The owner reads, never writes, those conversations; unsharing, removal and
-     leaving cancel queued turns; the invitation says the owner can read them. The
-     sharing and conversation screens, the audit view and the deletion count follow.
+     leaving cancel queued turns; the invitation says the owner can read them.
+     The Members settings expose the sharing audience, per-person allowance and a
+     member's text conversations. The remaining web work includes earlier messages,
+     question and attachment controls, the owner's read-only transcript, the audit
+     view and the deletion count.
 2. Phase 2 — work tools for members.
    - A member's turns on a shared Mico get their own home on that Mico's server
      computer (a home key per Mico and member), so their files never meet the

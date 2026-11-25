@@ -15281,3 +15281,35 @@ msgstr "Ignored: a filter did not match"
 #: src/pages/RoutineRunHistory.tsx
 msgid "Ignored: routine paused"
 msgstr "Ignored: routine paused"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Shared Micos"
+msgstr "Shared Micos"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Who can chat with this Mico"
+msgstr "Who can chat with this Mico"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Everyone in this Space"
+msgstr "Everyone in this Space"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Selected people"
+msgstr "Selected people"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Daily Credits per person, paid by the Mico owner"
+msgstr "Daily Credits per person, paid by the Mico owner"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Save sharing"
+msgstr "Save sharing"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "No Micos have been shared with you."
+msgstr "No Micos have been shared with you."
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Close conversation"
+msgstr "Close conversation"

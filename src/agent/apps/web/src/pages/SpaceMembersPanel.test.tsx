@@ -77,6 +77,8 @@ vi.mock("@mycellios/ui-web", () => {
   };
 });
 
+vi.mock("./SpaceMicosPanel", () => ({ SpaceMicosPanel: () => null }));
+
 import { SpaceMembersPanel } from "./SpaceMembersPanel";
 
 const ownerView: SpaceMembers = {
