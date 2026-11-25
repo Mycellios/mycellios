@@ -32,15 +32,30 @@ class PageBrowserTest(unittest.TestCase):
         with patch.dict(os.environ, {"LD_PRELOAD": "/opt/libnss_wrapper.so"}):
             self.assertNotIn("LD_PRELOAD", helper.routine_chromium_environment())
 
+    def test_routine_endpoint_uses_the_private_profile_and_loopback(self):
+        with TemporaryDirectory() as directory:
+            scope = Path(directory)
+            profile = scope / "profile"
+            profile.mkdir()
+            marker = profile / "DevToolsActivePort"
+            endpoint = "/devtools/browser/61b990ee-310c-44ae-9a00-5438b182a9cb"
+            marker.write_text(f"34115\n{endpoint}\n", encoding="ascii")
+            with patch.object(helper, "discover_ws_url") as discover:
+                self.assertEqual(helper.routine_browser_endpoint(scope), f"ws://127.0.0.1:34115{endpoint}")
+                discover.assert_not_called()
+            marker.write_text("34115\nws://192.0.2.1:34115/browser\n", encoding="ascii")
+            with self.assertRaisesRegex(RuntimeError, "Invalid routine browser endpoint"):
+                helper.routine_browser_endpoint(scope)
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "managed browser runs on Linux")
     def test_isolated_browser_real(self):
         if os.environ.get("MYCELLIOS_REQUIRE_CHROMIUM") != "1":
             self.skipTest("selected separately on the hosted Chromium runner")
-        cache = Path.home() / ".cache" / "ms-playwright"
-        chrome = (os.environ.get("MYCELLIOS_ROUTINE_CHROMIUM") or shutil.which("chromium")
-                  or shutil.which("google-chrome")
-                  or next((str(path) for path in cache.glob("chromium-*/chrome-linux64/chrome")), None))
-        self.assertTrue(chrome, "this qualification requires a real Chromium binary")
+        chrome = os.environ.get("MYCELLIOS_ROUTINE_CHROMIUM") or subprocess.check_output(
+            ["node", "-p", "require('playwright').chromium.executablePath()"],
+            cwd=Path(__file__).resolve().parents[3], text=True,
+        ).strip()
+        self.assertTrue(os.access(chrome, os.X_OK), "this qualification requires the installed Chromium binary")
 
         class Site(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -68,7 +83,7 @@ document.body.textContent = 'cookie=' + (document.cookie || 'empty') +
             thread.start()
             root = helper.scope_directory(scope_port)
             try:
-                with patch.dict(os.environ, {"MYCELLIOS_ROUTINE_CHROMIUM": chrome, helper.CDP_PORT_ENV: str(scope_port)}):
+                with patch.dict(os.environ, {"MYCELLIOS_ROUTINE_CHROMIUM": chrome}):
                     base = f"http://127.0.0.1:{server.server_port}"
                     def run(key, command, path="/probe", **args):
                         return helper.run_isolated(scope_port, command, {"conversationKey": key, "url": base + path, **args})

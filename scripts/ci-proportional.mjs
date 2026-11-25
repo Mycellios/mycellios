@@ -140,8 +140,8 @@ export function planChecks(files, availableAgentTests) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
     if (files.some(pageBrowserFile)) {
       add('src/agent', 'npm', ['run', 'check', '--workspace', '@mycellios/sandbox-supervisor'], 'sandbox supervisor types');
-      add('src/agent', 'npm', ['exec', '--', 'playwright', 'install', 'chromium'], 'Managed routine browser Chromium');
-      add('src/agent', 'env', ['MYCELLIOS_REQUIRE_CHROMIUM=1', 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'infra/sandboxes/computer', '-p', 'test_page_browser.py', '-k', 'isolated_browser_real'], 'real Chromium routine cookies, storage and cleanup');
+      add('src/agent', 'npm', ['exec', '--', 'playwright', 'install', 'chromium', '--no-shell'], 'Managed routine browser Chromium');
+      add('src/agent', 'env', ['MYCELLIOS_REQUIRE_CHROMIUM=1', 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'infra/sandboxes/computer', '-p', 'test_page_browser.py', '-k', 'isolated_browser_real', '-k', 'test_routine_'], 'real Chromium routine cookies, storage and cleanup');
     }
     for (const file of agentScriptTests) add('.', 'node', ['--test',file], `test: ${file}`);
     add('src/agent', 'npm', ['run', 'generate', '--workspace', '@mycellios/db'], 'Prisma client generation (no database connection)');

@@ -534,23 +534,26 @@ def routine_browser_keeper(directory: Path) -> None:
         (directory / "closed").touch(mode=0o600)
 
 
-def routine_browser_endpoint(directory: Path) -> str:
+def routine_browser_endpoint(directory: Path, keeper: subprocess.Popen | None = None) -> str:
     marker = directory / "profile" / "DevToolsActivePort"
     end = time.monotonic() + 8
     while time.monotonic() < end:
-        if (directory / "closed").exists() or (directory / "stop").exists():
+        if (directory / "stop").exists():
+            raise RuntimeError("The routine browser has closed.")
+        if keeper is not None and keeper.poll() not in (None, 0):
+            raise RuntimeError("The routine browser launcher exited before startup.")
+        if (directory / "closed").exists():
             raise RuntimeError("The routine browser has closed.")
         try:
             port, endpoint = marker.read_text(encoding="ascii").splitlines()[:2]
             if not port.isdecimal() or not 0 < int(port) <= 65535 or not re.fullmatch(r"/devtools/browser/[a-f0-9-]{36}", endpoint):
                 raise RuntimeError("Invalid routine browser endpoint.")
-            url = discover_ws_url(int(port))
-            if urlsplit(url).path != endpoint:
-                raise RuntimeError("The routine browser endpoint changed.")
-            return url
+            # Chromium writes the endpoint into its private profile after binding.
+            # Connect directly without using the host's HTTP proxy settings.
+            return f"ws://127.0.0.1:{int(port)}{endpoint}"
         except (FileNotFoundError, ValueError, OSError):
             time.sleep(0.15)
-    raise RuntimeError("The routine browser did not start.")
+    raise RuntimeError("Chromium did not expose its local debugging endpoint in time.")
 
 
 def run_isolated(port: int, command: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -585,6 +588,7 @@ def run_isolated(port: int, command: str, args: dict[str, Any]) -> dict[str, Any
             if not (directory / "closed").exists() or (directory / "profile").exists():
                 return {"ok": False, "error": "Routine browser cleanup is still pending."}
             return {"ok": True}
+        keeper = None
         if not directory.exists():
             if command != "navigate":
                 return {"ok": False, "error": "Open a page in this routine first."}
@@ -600,7 +604,8 @@ def run_isolated(port: int, command: str, args: dict[str, Any]) -> dict[str, Any
             directory.mkdir(mode=0o700)
             try:
                 child_env = {k: v for k, v in os.environ.items() if k not in (WATCH_STDIN_ENV, ARGS_STDIN_ENV)}
-                subprocess.Popen(
+                child_env[CDP_PORT_ENV] = str(port)
+                keeper = subprocess.Popen(
                     [sys.executable, str(Path(__file__).resolve()), "isolated-keeper", str(directory)],
                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True, env=child_env,
@@ -611,7 +616,7 @@ def run_isolated(port: int, command: str, args: dict[str, Any]) -> dict[str, Any
         info = directory.lstat()
         if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
             raise RuntimeError("Invalid routine browser directory.")
-        client = CdpClient(routine_browser_endpoint(directory))
+        client = CdpClient(routine_browser_endpoint(directory, keeper))
         try:
             client.connect()
             client.call("Browser.setDownloadBehavior", {"behavior": "deny"})
