@@ -9,14 +9,19 @@ import { nativeCodexUsageState } from "./native-usage.js";
 import { discoverNativeEngines, NativeAgentRuntime, nativeEngineCommand, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
+import { NATIVE_PROCESS_LIMIT, NativeProcessSlots } from "./native-process-slots.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-/** One owned native engine; account/server scopes and uncertain starts survive a restart. */
+/**
+ * One owned native engine; account/server scopes and uncertain starts survive a restart.
+ * `processSlots` bounds the CLI processes this PC runs for turns at once: every run shares it.
+ */
 export function createDesktopAgentEngine(profile: string, accessScope: () => string | undefined,
-  createRuntime?: (directory: string, authorized: () => boolean) => AgentRuntime,
-  accountHost: NativeAccountHost = {}): AgentRuntime {
+  createRuntime?: (directory: string, authorized: () => boolean, processSlots: NativeProcessSlots) => AgentRuntime,
+  accountHost: NativeAccountHost = {}, processSlots = new NativeProcessSlots(NATIVE_PROCESS_LIMIT)): AgentRuntime {
   const active = new Map<string, { runtime: AgentRuntime; localId: string }>();
-  const makeRuntime = createRuntime ?? ((dataDir, authorized) => new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized }));
+  const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) =>
+    new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots }));
   async function engineState(): Promise<NativeEngineState> {
     const scope = accessScope();
     if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return { engines: [], signedOut: [] };
@@ -82,7 +87,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
         throw Error("Desktop could not record ownership of this run");
       }
       if (accessScope() !== scope || context?.signal?.aborted) throw Error("Desktop account changed before execution");
-      const runtime = makeRuntime(directory, () => accessScope() === scope), localId = hash([scope, request.runId]);
+      const runtime = makeRuntime(directory, () => accessScope() === scope, processSlots), localId = hash([scope, request.runId]);
       active.set(request.runId, { runtime, localId });
       let completed = false;
       try {
