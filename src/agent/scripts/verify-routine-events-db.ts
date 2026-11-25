@@ -55,6 +55,7 @@ const postgres = new EmbeddedPostgres({
 });
 const prismaCli = path.resolve("node_modules/prisma/build/index.js");
 const migration = "packages/db/prisma/migrations/20261125120000_routine_signed_webhooks/migration.sql";
+const revealMigration = "packages/db/prisma/migrations/20261125160000_routine_webhook_secret_reveal/migration.sql";
 let db: ReturnType<typeof createDb> | undefined;
 const checks: string[] = [];
 const HOUR = 60 * 60 * 1000;
@@ -77,6 +78,7 @@ try {
     await sql.query('DROP TABLE "routine_event_receipts"; DROP TABLE "routine_webhook_secrets"');
     await sql.query('ALTER TABLE "routines" DROP COLUMN "webhookEventType", DROP COLUMN "webhookFilters"');
     await sql.query(await readFile(migration, "utf8"));
+    await sql.query(await readFile(revealMigration, "utf8"));
     const columns = await sql.query(`SELECT column_name, is_nullable, column_default FROM information_schema.columns
       WHERE table_name = 'routines' AND column_name IN ('webhookEventType', 'webhookFilters') ORDER BY 1`);
     assert.deepEqual(
@@ -336,7 +338,7 @@ try {
     (input: { context: { actor: typeof scope; signal?: AbortSignal }; input: Record<string, unknown> }) => Promise<Record<string, unknown>>
   >;
   const foreign = { ...scope, userId: "foreign" };
-  for (const name of ["rotateWebhookSecret", "revokeWebhookSecret", "sendTestEvent", "history"]) {
+  for (const name of ["rotateWebhookSecret", "revokeWebhookSecret", "sendTestEvent", "history", "webhookCard", "revealWebhookSecret"]) {
     await assert.rejects(routes[name]!({ context: { actor: foreign }, input: { routineId } }), /NOT_FOUND|Not Found/i);
   }
   const rotated = await routes.rotateWebhookSecret!({ context: { actor: scope }, input: { routineId } });
@@ -345,9 +347,27 @@ try {
   assert.ok((rotated.webhook as { previousSecretExpiresAt: string | null }).previousSecretExpiresAt);
   const history = await routes.history!({ context: { actor: scope }, input: { routineId } });
   assert.ok(Array.isArray(history.events) && history.events.length >= 4);
+  const ownerRequest = { context: { actor: scope }, input: { routineId } };
+  await assert.rejects(routes.revealWebhookSecret!(ownerRequest), /NOT_FOUND|Not Found/i);
+  const revealUntil = new Date(Date.now() + HOUR);
+  await prisma.routineWebhookSecret.updateMany({
+    where: { routineId, expiresAt: null },
+    data: { revealUntil },
+  });
+  const card = await routes.webhookCard!(ownerRequest);
+  assert.equal((card.webhook as { revealUntil: string }).revealUntil, revealUntil.toISOString());
+  assert.doesNotMatch(JSON.stringify(card), /whsec_/);
+  const attempts = await Promise.allSettled([
+    routes.revealWebhookSecret!(ownerRequest),
+    routes.revealWebhookSecret!(ownerRequest),
+  ]);
+  const reveals = attempts.filter((result) => result.status === "fulfilled");
+  assert.equal(reveals.length, 1);
+  assert.deepEqual(reveals[0]!.value, { secret: rotated.secret });
+  await assert.rejects(routes.revealWebhookSecret!(ownerRequest), /NOT_FOUND|Not Found/i);
   const revoked = await routes.revokeWebhookSecret!({ context: { actor: scope }, input: { routineId } });
-  assert.deepEqual(revoked.webhook, { secretCreatedAt: null, previousSecretExpiresAt: null, eventType: "invoice.paid", filters: [{ pointer: "/status", value: "paid" }, { pointer: "/amount", value: 42 }] });
-  checks.push("rotate, revoke, test event and history act only on the owner's routine");
+  assert.deepEqual(revoked.webhook, { secretCreatedAt: null, previousSecretExpiresAt: null, eventType: "invoice.paid", filters: [{ pointer: "/status", value: "paid" }, { pointer: "/amount", value: 42 }], revealUntil: null });
+  checks.push("the owner can reveal an eligible secret only once, even across simultaneous requests");
 
   // 10. Row-level security: the receipts and secrets of one owner stay invisible to another.
   await rotateRoutineWebhookSecret(deps, routine, context());
