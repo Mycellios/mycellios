@@ -10,6 +10,7 @@ import type { DesktopAgentFrame } from "./desktop-agent-host.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
 import { desktopModelAccess } from "./desktop-model-access.js";
+import { desktopToolModelAccess } from "./desktop-tool-model-bridge.js";
 import { ComputerUpdatingError } from "./computer-errors.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 import { isSubagentToolExecution } from "./pi-tool-execution.js";
@@ -205,7 +206,18 @@ export class DesktopAgentRuntime implements AgentRuntime {
     const nativeEngine = Boolean(request.agentEngine && request.agentEngine !== "pi");
     const trustedUsage: AgentRuntimeEvent[] = [];
     const accounting = { runId: request.runId, userId: context.userId, operationKind: request.usageOperationKind, onUsage: request.onUsage, push: (event: AgentRuntimeEvent) => trustedUsage.push(event) };
-    const encodeRequest = (input: AgentRunRequest = request) => rpc.encode({ ...input,
+    let toolModel: AgentRunRequest["desktopToolModel"];
+    if (request.desktopToolGrant) {
+      try {
+        toolModel = desktopToolModelAccess(request.desktopToolGrant, signal, cleanup, accounting);
+      } catch {
+        // The account model can become unavailable before dispatch.
+      }
+    }
+    const encodeRequest = (input: AgentRunRequest = request) => rpc.encode({
+      ...input,
+      desktopToolGrant: undefined,
+      desktopToolModel: toolModel,
       // A native client may not self-report paid usage or bypass a reservation. Provider
       // credentials, credit observers and genuine usage stay at the cloud model boundary.
       onUsage: async () => undefined,

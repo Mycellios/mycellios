@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CREDIT_MICROUNITS,
+  readMicoDefaults,
   SHARED_MICO_ALLOWANCE_ERROR,
   SHARED_MICO_PAUSED_ERROR,
   usdCentsToCreditMicrounits,
@@ -100,6 +101,65 @@ export async function reconcileCreditPurchase(
   });
 }
 
+type ModelCreditAttribution = {
+  callId?: string;
+  userId?: string;
+  spaceId?: string;
+  runId?: string;
+  provider?: string;
+  model?: string;
+  requestedByUserId?: string;
+  desktopTool?: { botId: string; leaseOwner: string; leaseFence: number };
+};
+
+async function checkDesktopToolCredits(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  attribution: ModelCreditAttribution,
+  amountMicros: bigint,
+  now: Date,
+) {
+  const { runId, userId, spaceId, desktopTool } = attribution;
+  if (!runId || !userId || !spaceId || !desktopTool || !attribution.callId) {
+    throw new Error("Invalid Desktop model credit scope");
+  }
+  // The wallet lock is held by the caller. A worker replacement, stop or
+  // purpose change cannot authorize a second reservation against this grant.
+  await tx.$queryRaw`SELECT id FROM runs WHERE id = ${runId} FOR UPDATE`;
+  const run = await tx.run.findFirst({
+    where: {
+      id: runId, userId, spaceId, status: "running", trigger: "user", requestedByUserId: null,
+      botId: desktopTool.botId, leaseOwner: desktopTool.leaseOwner, leaseFence: desktopTool.leaseFence,
+      leaseExpiresAt: { gt: now }, cloudComputerId: null,
+      thread: { userId, spaceId, groupId: null, externalConversationId: null, archivedAt: null, memberUserId: null },
+      bot: { userId, spaceId, archivedAt: null, computer: { kind: "desktop", scope: "dedicated", userId, spaceId } },
+      space: { organizationId, deletingAt: null, memberships: { some: { userId } } },
+    },
+    select: { desktopToolCreditLimitMicros: true },
+  });
+  if (!run) throw new Error("Desktop model run is no longer authorized");
+  const member = await tx.member.findUnique({
+    where: { organizationId_userId: { organizationId, userId } }, select: { role: true },
+  });
+  if (!member?.role.split(",").some(role => role.trim() === "owner")) {
+    throw new Error("Only the billing account owner can approve Desktop model credits");
+  }
+  const user = await tx.user.findUnique({ where: { id: userId }, select: { micoDefaults: true } });
+  const approved = readMicoDefaults(user?.micoDefaults).desktopToolCreditLimitMicros ?? 0;
+  if (!approved) throw new Error("Desktop model credit approval is disabled");
+  const limit = Math.min(approved, run.desktopToolCreditLimitMicros ?? approved);
+  const used = await tx.modelCreditEntry.aggregate({
+    where: { organizationId, runId, userId, spaceId, desktopTool: true },
+    _sum: { amountMicros: true },
+  });
+  if (amountMicros - (used._sum.amountMicros ?? 0n) > BigInt(limit)) {
+    throw new Error("Desktop tool model call exceeds the approved run budget");
+  }
+  if (run.desktopToolCreditLimitMicros === null) {
+    await tx.run.update({ where: { id: runId }, data: { desktopToolCreditLimitMicros: approved } });
+  }
+}
+
 /** A Space member's turns on a shared Mico went past what its owner allows them per UTC day. */
 export class SharedMicoAllowanceError extends Error {
   constructor(readonly paused: boolean) {
@@ -144,15 +204,7 @@ export async function reserveModelCredits(
   prisma: PrismaClient,
   organizationId: string,
   maxCostUsd: number,
-  attribution?: {
-    callId?: string;
-    userId?: string;
-    spaceId?: string;
-    runId?: string;
-    provider?: string;
-    model?: string;
-    requestedByUserId?: string;
-  },
+  attribution?: ModelCreditAttribution,
   now = new Date(),
   allowance?: MemberAllowance,
 ) {
@@ -160,15 +212,18 @@ export async function reserveModelCredits(
     throw new Error("This model has no reliable price. Connect your own API key to use it.");
   const amountMicros = BigInt(Math.ceil(maxCostUsd * MICROS_PER_DOLLAR));
   const callId = attribution?.callId ?? randomUUID();
-  const source = `call:${callId}`;
+  const source = "call:" + callId;
+  const { desktopTool, ...entryAttribution } = attribution ?? {};
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "organizationId" FROM model_credit_accounts WHERE "organizationId"=${organizationId} FOR UPDATE`;
     const existing = await tx.modelCreditEntry.findUnique({ where: { callId } });
     if (existing) {
       if (existing.organizationId !== organizationId)
         throw new Error("Model call belongs to another account");
+      if (desktopTool || existing.desktopTool) throw new Error("Desktop tool model call already admitted");
       return existing.id;
     }
+    if (desktopTool && attribution) await checkDesktopToolCredits(tx, organizationId, attribution, amountMicros, now);
     if (allowance) {
       if (allowance.limitMicros <= 0n) throw new SharedMicoAllowanceError(true);
       const spent = await memberSpentMicros(tx, allowance);
@@ -188,7 +243,8 @@ export async function reserveModelCredits(
     return (
       await tx.modelCreditEntry.create({
         data: {
-          ...attribution,
+          ...entryAttribution,
+          ...(desktopTool ? { desktopTool: true } : {}),
           id: callId,
           callId,
           source,
