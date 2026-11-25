@@ -495,6 +495,22 @@ app.post("/computers/:id/exec", async (c) => {
   });
 });
 
+const pageRef = z.string().min(1).max(200);
+
+/**
+ * How long one page-browser command may run in the computer. Waits in one call share 15 s, and
+ * answering a held dialog takes a few seconds, on top of the ordinary 25 s; a navigation also
+ * reads its first snapshot.
+ */
+export function pageBrowserTimeoutMs(
+  body: { command: string; actions?: Array<{ kind: string }> },
+) {
+  if (body.command === "capabilities") return 10_000;
+  if (body.command === "navigate") return 30_000;
+  const waits = body.actions?.some((step) => step.kind === "wait" || step.kind === "dialog");
+  return body.command === "act" && waits ? 45_000 : 25_000;
+}
+
 app.post("/computers/:id/browser/:mode?", async (c) => {
   // Read eagerly so the Node HTTP adapter observes disconnects during screen setup too.
   const signal = c.req.raw.signal;
@@ -519,30 +535,62 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
             return /^https?:$/.test(url.protocol) && !url.username && !url.password;
           }),
       }),
-      z.object({ command: z.literal("snapshot") }),
+      // A later part of a long page; the helper keeps at most 25 parts.
+      z.object({ command: z.literal("snapshot"), from: z.number().int().min(1).max(24).optional() }),
       z.object({ command: z.literal("focus") }),
+      // What the helper of this computer's image supports; it touches no tab.
+      z.object({ command: z.literal("capabilities") }),
       z.object({
         command: z.literal("act"),
         actions: z
           .array(
             z.discriminatedUnion("kind", [
-              z.object({ kind: z.literal("click"), ref: z.string().min(1).max(200) }),
+              z.object({ kind: z.literal("click"), ref: pageRef }),
               z.object({
                 kind: z.literal("upload"),
-                ref: z.string().min(1).max(200),
+                ref: pageRef,
                 paths: z.array(z.string().min(1).max(1024)).min(1).max(10),
                 roots: z.array(z.string().min(1).max(1024)).max(2).optional(),
               }),
               z
                 .object({
                   kind: z.enum(["fill", "type"]),
-                  ref: z.string().min(1).max(200),
+                  ref: pageRef,
                   text: z.string().max(32_000),
                   origin: z.string().url().max(2048).optional(),
                   field: z.enum(["username", "password"]).optional(),
                 })
                 // The field decides which input types the helper accepts for a saved login.
                 .refine((step) => !step.origin || step.field, "A saved login fill needs its field"),
+              z.object({
+                kind: z.literal("press"),
+                key: z.string().min(1).max(40).regex(/^[A-Za-z0-9]+(\+[A-Za-z0-9]+){0,4}$/),
+                ref: pageRef.optional(),
+              }),
+              z
+                .object({
+                  kind: z.literal("scroll"),
+                  ref: pageRef.optional(),
+                  direction: z.enum(["up", "down", "left", "right"]).optional(),
+                })
+                .refine((step) => step.ref || step.direction, "A scroll needs a ref or a direction"),
+              z.object({ kind: z.literal("hover"), ref: pageRef }),
+              z
+                .object({
+                  kind: z.literal("wait"),
+                  until: z.enum(["text", "gone", "url", "quiet"]),
+                  text: z.string().min(1).max(500).optional(),
+                  timeout: z.number().positive().max(15).optional(),
+                })
+                .refine(
+                  (step) => !["text", "gone"].includes(step.until) || step.text,
+                  "A wait for text needs the text",
+                ),
+              z.object({
+                kind: z.literal("dialog"),
+                accept: z.boolean(),
+                text: z.string().max(10_000).optional(),
+              }),
             ]),
           )
           .min(1)
@@ -585,7 +633,7 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
             ? [`RAKAZO_BROWSER_UPLOAD_MAX_BYTES=${process.env.RAKAZO_BROWSER_UPLOAD_MAX_BYTES}`]
             : []),
         ],
-        timeoutMs: 25_000,
+        timeoutMs: pageBrowserTimeoutMs(body),
         signal,
         stdin: `${browserArgs}\n`,
       },
