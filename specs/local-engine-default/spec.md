@@ -87,6 +87,11 @@ it is not, and let programs on the PC use the Mico's AI in both cases.
      fallback model in the server workspace and says so in the chat (extends the
      #448 notice). Without a saved fallback model it keeps today's offline
      message. An admitted local run is never silently moved (existing rule).
+     Implemented (3b): when the server has no native grant for the owner,
+     selectOfflineCloudWorkspace moves the fresh turn only if the Mico has a
+     saved Pi model or the account a main model; the turn is captured as engine
+     `pi` (so a resume stays there) and the chat note names the replaced engine.
+     A server with the grant still runs the CLI itself, as before.
    - Business note: subscription users spend fewer Credits on these Micos.
      Server fallback turns, Pi Micos and phase 4 keep Credit metering.
 4. Phase 4 — the Mico's AI for programs on the PC. Desktop opens a loopback

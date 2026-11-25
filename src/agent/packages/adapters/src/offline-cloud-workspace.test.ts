@@ -8,7 +8,7 @@ import { appendEventInTransaction, createThreadMessageInTransaction } from "@myc
 import { DesktopUnreachableError } from "./computer-errors.js";
 import { desktopRelayAvailable, desktopRelayKey } from "./desktop-relay.js";
 import { HostAwareSandbox } from "./host-aware-sandbox.js";
-import { OFFLINE_CLOUD_NOTICE, selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
+import { OFFLINE_CLOUD_NOTICE, offlineEngineFallbackNotice, selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
 
 vi.mock("@mycellios/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mycellios/db")>()),
@@ -180,6 +180,41 @@ describe("offline cloud workspaces", () => {
       const unreadable = fixture("docker", "offline");
       await expect(selectOfflineCloudWorkspace(unreadable.prisma, unreadable.sandbox, run, desktop, lease, codex))
         .resolves.toBeUndefined();
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("answers an offline PC's CLI Mico with its saved model on the server and says so", async () => {
+    const dataDir = await mkdtemp(path.join(tmpdir(), "offline-native-fallback-"));
+    try {
+      const withModel = { agentEngine: "claude", dataDir, piFallback: vi.fn().mockResolvedValue(true) };
+      const moved = fixture("docker", "offline");
+      vi.mocked(createThreadMessageInTransaction).mockClear();
+      await expect(selectOfflineCloudWorkspace(moved.prisma, moved.sandbox, run, desktop, lease, withModel))
+        .resolves.toMatchObject({ id: "cloud", piFallback: true });
+      const blocks = [{ kind: "meta", text: offlineEngineFallbackNotice("claude") }];
+      expect(blocks[0]!.text).toContain("Claude Code");
+      expect(createThreadMessageInTransaction).toHaveBeenCalledWith(moved.database, expect.objectContaining({ blocks }));
+      // Without a saved or main model the turn keeps the PC's offline message.
+      const none = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(none.prisma, none.sandbox, run, desktop, lease,
+        { ...withModel, piFallback: vi.fn().mockResolvedValue(false) })).resolves.toBeUndefined();
+      expect(none.hostPresence).not.toHaveBeenCalled();
+      // A PC that is online keeps its own CLI.
+      const online = fixture("docker", "connected");
+      await expect(selectOfflineCloudWorkspace(online.prisma, online.sandbox, run, desktop, lease, withModel))
+        .resolves.toBeUndefined();
+      // A turn already moved resumes on the same fallback, and a granted server runs the CLI itself.
+      const resumed = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(resumed.prisma, resumed.sandbox,
+        { ...run, cloudComputerId: "cloud", startedAt: new Date() }, desktop, lease, withModel))
+        .resolves.toMatchObject({ id: "cloud", piFallback: true });
+      await writeFile(path.join(dataDir, "native-agents.json"),
+        JSON.stringify({ authorizedScopes: [{ userId: run.userId, spaceId: run.spaceId }] }));
+      const granted = fixture("docker", "offline");
+      await expect(selectOfflineCloudWorkspace(granted.prisma, granted.sandbox, run, desktop, lease, withModel))
+        .resolves.toMatchObject({ id: "cloud", piFallback: false });
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
