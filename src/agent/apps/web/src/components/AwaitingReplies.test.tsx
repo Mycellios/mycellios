@@ -11,15 +11,28 @@ vi.mock("@lingui/react/macro", () => ({
     t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw(strings, ...values),
   }),
 }));
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@mycellios/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => viewport.mobile }));
 vi.mock("@mycellios/ui-web", () => ({
-  Button: (props: ComponentProps<"button">) => <button type="button" {...props} />,
+  DEFAULT_BOT_AVATAR_COLOR: "#000000",
+  BotAvatar: () => null,
+  Button: ({
+    variant: _variant,
+    size: _size,
+    ...props
+  }: ComponentProps<"button"> & { variant?: string; size?: string }) => (
+    <button type="button" {...props} />
+  ),
   NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
 }));
 
 import { AwaitingReplies } from "./AwaitingReplies";
 
 const roots: ReturnType<typeof createRoot>[] = [];
-beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
+beforeEach(() => {
+  viewport.mobile = false;
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+});
 afterEach(async () => {
   for (const root of roots.splice(0)) await act(() => root.unmount());
   document.body.innerHTML = "";
@@ -60,7 +73,7 @@ const settled: AwaitingRepliesData = {
   work: [],
 };
 
-function render(lists: AwaitingRepliesData[]) {
+function render(lists: AwaitingRepliesData[], mobileQueue?: { preview: string; messages: ReactNode }) {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -89,6 +102,7 @@ function render(lists: AwaitingRepliesData[]) {
           botId="mico"
           bots={bots}
           refreshKey={refreshKey}
+          mobileQueue={mobileQueue}
         />,
       ),
     );
@@ -114,24 +128,69 @@ describe("Waiting for replies", () => {
     await flush();
     const list = view.host.querySelector("[data-testid=awaiting-replies]")!;
     expect(list.getAttribute("aria-label")).toBe("Waiting for replies");
-    expect(list.textContent).toContain("1 of 4 replies in");
-    const rows = [...list.querySelectorAll("[data-recipient]")];
-    expect(rows.map((row) => row.textContent?.replace(/Stop$/, ""))).toEqual([
-      "Analyst replied",
-      "Writer is working on it",
-      "Scout picks it up next",
-      "Lawyer needs you",
+    const trigger = button(list, "Waiting for replies")!;
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    const popup = list;
+    expect(popup.textContent).toContain("1 of 4 replies in");
+    const rows = [...popup.querySelectorAll("[data-recipient]")];
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "AnalystAnswered",
+      "WriterWorking",
+      "ScoutQueued",
+      "LawyerNeeds you",
     ]);
-    expect(rows.map((row) => Boolean(button(row, "Stop")))).toEqual([false, true, true, false]);
-    expect(button(list, "Hide this list")).toBeUndefined();
+    expect(rows.map((row) => Boolean(row.querySelector("button")))).toEqual([false, true, true, false]);
+    expect(button(popup, "Hide this list")).toBeUndefined();
+    await act(async () => trigger.click());
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.textContent).toContain("Lawyer needs you");
+  });
+
+  it("keeps the mobile replies and queued messages together in a bottom sheet", async () => {
+    viewport.mobile = true;
+    const view = render([open], {
+      preview: "Next message",
+      messages: <div data-testid="queue-content">Queued payload</div>,
+    });
+    await view.draw();
+    await flush();
+    const trigger = button(view.host, "Messages waiting to send")!;
+    expect(trigger.textContent).toBe("Next message");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelector("[data-recipient]")).toBeNull();
+    expect(document.querySelector("[data-testid=queue-content]")).toBeNull();
+
+    await act(async () => trigger.click());
+    const sheet = document.querySelector("[data-slot=sheet-content]")!;
+    expect(sheet.getAttribute("data-side")).toBe("bottom");
+    expect(sheet.textContent).toContain("Waiting for replies");
+    expect(sheet.querySelector("[data-recipient=writer]")).toBeTruthy();
+    expect(sheet.querySelector("[data-testid=queue-content]")?.textContent).toBe("Queued payload");
+
+    await act(async () => button(sheet, "Close")!.click());
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("shows the mobile reply button without opening a list when the queue is empty", async () => {
+    viewport.mobile = true;
+    const view = render([open]);
+    await view.draw();
+    await flush();
+    const trigger = button(view.host, "Waiting for replies")!;
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(view.host.querySelector("[data-recipient]")).toBeNull();
+
+    await act(async () => trigger.click());
+    expect(document.querySelector("[data-slot=sheet-content] [data-recipient=writer]")).toBeTruthy();
   });
 
   it("stops one teammate through the server and reads the list again", async () => {
     const view = render([open, open]);
     await view.draw();
     await flush();
+    const popup = view.host;
     await act(async () =>
-      button(view.host.querySelector("[data-recipient=writer]")!, "Stop")!.click(),
+      button(popup.querySelector("[data-recipient=writer]")!, "Stop Writer")!.click(),
     );
     await flush();
     expect(view.tasks.stopAwaitingReply).toHaveBeenCalledWith({
@@ -141,7 +200,7 @@ describe("Waiting for replies", () => {
     expect(view.tasks.awaitingReplies).toHaveBeenCalledTimes(2);
   });
 
-  it("shrinks to one Replies in line once every answer is in, and hides it at once", async () => {
+  it("keeps results available until they are dismissed, and hides them at once", async () => {
     const view = render([settled]);
     let finish: (value: unknown) => void = () => {};
     view.tasks.hideAwaitingReplies.mockReturnValueOnce(
@@ -153,7 +212,8 @@ describe("Waiting for replies", () => {
     await flush();
     const list = view.host.querySelector("[data-testid=awaiting-replies]")!;
     expect(list.getAttribute("aria-label")).toBe("Replies in");
-    expect(list.textContent).toContain("Analyst replied · Writer was stopped");
+    expect(list.querySelector("[data-recipient=analyst]")?.textContent).toBe("AnalystAnswered");
+    expect(list.querySelector("[data-recipient=writer]")?.textContent).toBe("WriterStopped");
     expect(list.textContent).not.toContain("Waiting for replies");
     await act(async () => button(list, "Hide this list")!.click());
     expect(view.tasks.hideAwaitingReplies).toHaveBeenCalledWith({ requestIds: ["request-1"] });
@@ -162,7 +222,7 @@ describe("Waiting for replies", () => {
     await act(async () => finish({ ok: true }));
   });
 
-  it("brings the line back and says so when hiding fails", async () => {
+  it("brings the results back and says so when hiding fails", async () => {
     const view = render([settled]);
     view.tasks.hideAwaitingReplies.mockRejectedValueOnce(new Error("offline"));
     await view.draw();
@@ -194,8 +254,9 @@ describe("Waiting for replies", () => {
     await view.draw();
     await flush();
     const list = view.host.querySelector("[data-testid=awaiting-replies]")!;
-    expect(list.textContent).not.toContain("replies in");
-    expect(list.textContent).toContain("Writer is working on it");
+    const popup = list;
+    expect(popup.textContent).not.toContain("replies in");
+    expect(popup.querySelector("[data-recipient=writer]")?.textContent).toBe("WriterWorking");
   });
 
   it("stops a delegated task with the revisioned controls and offers Continue, Reassign and Cancel once stopped", async () => {
@@ -230,15 +291,16 @@ describe("Waiting for replies", () => {
     const view = render([running, stopped]);
     await view.draw();
     await flush();
-    expect(view.host.textContent).toContain("Writer is working on a delegated task");
-    await act(async () => button(view.host, "Stop Writer")!.click());
+    const popup = view.host;
+    expect(popup.textContent).toContain("Writer is working on a delegated task");
+    await act(async () => button(popup, "Stop Writer")!.click());
     await flush();
     expect(view.tasks.controlWork).toHaveBeenCalledWith({
       taskId: "task-1",
       expectedRevision: 3,
       action: "pause",
     });
-    const card = view.host.querySelector("[data-awaiting-work=task-1]")!;
+    const card = popup.querySelector("[data-awaiting-work=task-1]")!;
     expect(card.getAttribute("data-state")).toBe("stopped");
     expect(card.textContent).toContain("The task for Writer is stopped");
     await act(async () => button(card, "Continue")!.click());
@@ -248,7 +310,7 @@ describe("Waiting for replies", () => {
       expectedRevision: 4,
       action: "resume",
     });
-    const select = view.host.querySelector("select")!;
+    const select = popup.querySelector("select")!;
     expect([...select.options].map((option) => option.value)).toEqual(["", "mico", "analyst"]);
     await act(async () => {
       select.value = "analyst";
@@ -262,7 +324,7 @@ describe("Waiting for replies", () => {
       botId: "analyst",
     });
     expect(
-      button(view.host.querySelector("[data-awaiting-work=task-1]")!, "Cancel task"),
+      button(popup.querySelector("[data-awaiting-work=task-1]")!, "Cancel task"),
     ).toBeTruthy();
   });
 
@@ -271,11 +333,12 @@ describe("Waiting for replies", () => {
     view.tasks.stopAwaitingReply.mockRejectedValueOnce(new Error("offline"));
     await view.draw();
     await flush();
+    const popup = view.host;
     await act(async () =>
-      button(view.host.querySelector("[data-recipient=scout]")!, "Stop")!.click(),
+      button(popup.querySelector("[data-recipient=scout]")!, "Stop Scout")!.click(),
     );
     await flush();
-    expect(view.host.querySelector("[role=alert]")?.textContent).toBe(
+    expect(popup.querySelector("[role=alert]")?.textContent).toBe(
       "The list could not be updated. Try again.",
     );
     expect(view.host.querySelector("[data-testid=awaiting-replies]")).not.toBeNull();
