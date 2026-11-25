@@ -555,3 +555,45 @@ it("rechecks every Mico bound to a PC in one ownership read and drops the ones n
   expect((await call("account", pc)).status).toBe(200);
   expect(batches.at(-1)).toEqual(["test-bot", "third-bot"]);
 });
+
+it("hands the relay to a new server version only on a signed request from inside the deployment", async () => {
+  const app = new Hono();
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    revision: "test-revision",
+    authenticate: async () => ({ actor: owner, sessionId: "test-session" }),
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const signed = (path: string, payload: unknown, headers: Record<string, string> = {}) => {
+    const body = JSON.stringify(payload);
+    const time = String(Date.now());
+    return app.request(path, {
+      method: "POST",
+      headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body), ...headers },
+      body,
+    });
+  };
+  const handoff = (action: unknown, headers?: Record<string, string>) =>
+    signed("/internal/desktop-relay/handoff", { action }, headers);
+  expect((await app.request("/internal/desktop-relay/handoff", { method: "POST", body: JSON.stringify({ action: "start" }) })).status).toBe(401);
+  expect((await handoff("start", { "x-forwarded-for": "203.0.113.7" })).status).toBe(404);
+  expect((await handoff("drop")).status).toBe(400);
+  const idle = await (await handoff("status")).json();
+  expect(idle).toMatchObject({ revision: "test-revision", handingOff: false, openOperations: 0, connectedComputers: 0 });
+  expect(idle.instance).toMatch(/^[0-9a-f-]{36}$/);
+  expect(await (await handoff("start")).json()).toMatchObject({ instance: idle.instance, handingOff: true });
+  // While it hands off, a check or new work waits for the new version instead of reading
+  // the PC as offline; nothing is dispatched.
+  const scope = { userId: owner.userId, spaceId: owner.spaceId };
+  for (const payload of [
+    { probe: "test-bot", scope, nonce: randomUUID() },
+    { request: { method: "environment", botId: "test-bot" }, scope, nonce: randomUUID() },
+  ]) {
+    const refused = await signed("/api/desktop-relay/internal", payload);
+    expect(refused.status).toBe(503);
+    expect(refused.headers.get("x-mycellios-desktop-error")).toBe("desktop_updating");
+  }
+  expect(await (await handoff("cancel")).json()).toMatchObject({ instance: idle.instance, handingOff: false });
+  expect((await signed("/api/desktop-relay/internal", { probe: "test-bot", scope, nonce: randomUUID() })).status).toBe(200);
+});

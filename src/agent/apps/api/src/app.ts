@@ -919,6 +919,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       (await prisma.spaceMember.findMany({where:{userId:actor.userId},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",
     secret: env.screenProxySecret,
+    revision: env.gitSha,
     authenticate: requestSession,
     ownsBot: ownsActiveBot,
     ownedBots: (actor, botIds) =>

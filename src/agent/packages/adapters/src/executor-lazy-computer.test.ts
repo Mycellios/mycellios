@@ -5,7 +5,7 @@ import type { MessageBlock } from "@mycellios/contracts";
 import { createLogger, createTestSink, installLogger } from "@mycellios/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
-import { DesktopUnreachableError } from "./computer-errors.js";
+import { ComputerUpdatingError, DesktopUnreachableError } from "./computer-errors.js";
 import { createRunExecutor } from "./executor.js";
 
 const sink = createTestSink();
@@ -49,6 +49,8 @@ async function runRoutine(
     desktopDispatched?: boolean;
     /** Where a Desktop availability check gets no answer. */
     desktopUnanswered?: "offline-check" | "turn-start" | "after-tools";
+    /** The relay is handing its PCs to a new server version when the turn starts. */
+    desktopHandingOff?: boolean;
   } = {},
 ) {
   const unanswered = () => new DesktopUnreachableError({
@@ -83,6 +85,7 @@ async function runRoutine(
   ) {
     if (options.desktopDispatched) context?.onDesktopRunDispatched?.();
     if (options.desktopUnanswered === "turn-start") throw unanswered();
+    if (options.desktopHandingOff) throw new ComputerUpdatingError(false);
     if (options.steering && !options.steeringAfterFirst) {
       steeringInputs.push(...((await request.claimSteering?.([])) ?? []));
     }
@@ -714,6 +717,18 @@ describe("run computer provisioning", () => {
       expect.objectContaining({ outcome: "failed", error: DESKTOP_UNANSWERED }),
     );
     expect(continueJobs(enqueue)).toEqual([]);
+  });
+
+  it("waits for a relay handing its PCs to a new server version, past the setup limit", async () => {
+    const { finalizeRun, enqueue, run, prisma } = await runRoutine([], {
+      desktopHandingOff: true, onRunStarted: vi.fn(), priorSetupFailures: 7,
+    });
+    expect(finalizeRun).not.toHaveBeenCalled();
+    expect(run.status).toBe("queued");
+    expect(prisma.attempt.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "setup_failed", error: null }),
+    }));
+    expect(continueJobs(enqueue)).toHaveLength(1);
   });
 
   it.each([

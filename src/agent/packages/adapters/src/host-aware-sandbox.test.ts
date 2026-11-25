@@ -5,7 +5,7 @@ import type { ComputerRef, SandboxProvider } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "@mycellios/db";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ComputerBrowserProvider } from "./computer-browser.js";
-import { DesktopUnreachableError } from "./computer-errors.js";
+import { ComputerUpdatingError, DesktopUnreachableError } from "./computer-errors.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { DockerSandboxProvider } from "./docker-sandbox.js";
 import { FakeSandboxProvider } from "./fake-sandbox.js";
@@ -252,6 +252,23 @@ describe("host-aware sandbox", () => {
     await expect(
       sandbox.isRunning({ id: "pc", kind: "desktop" } as ComputerRef, ctx),
     ).rejects.toBeInstanceOf(DesktopUnreachableError);
+  });
+  it("keeps server work going while the relay hands its PCs to a new version, and pauses PC work", async () => {
+    const isolated = new FakeSandboxProvider();
+    const handingOff = async (): Promise<boolean> => {
+      throw new ComputerUpdatingError(false);
+    };
+    const sandbox = new HostAwareSandbox(isolated, new DesktopSandboxProvider(), handingOff);
+    const onComputerUpdate = vi.fn();
+    const computer = await sandbox.provision({ botId: "server", homePath: "/tmp/server" }, { ...ctx, onComputerUpdate });
+    expect(computer.kind).toBe("fake");
+    expect(onComputerUpdate).not.toHaveBeenCalled();
+    await sandbox.destroy(computer, ctx);
+    await expect(
+      sandbox.provision({ botId: "pc", homePath: "", providerKind: "desktop" }, { ...ctx, onComputerUpdate }),
+    ).rejects.toBeInstanceOf(ComputerUpdatingError);
+    // Nothing reached the PC, so the turn can pause and continue without uncertain results.
+    expect(onComputerUpdate).toHaveBeenCalledExactlyOnceWith(false);
   });
   it("never replaces a disconnected local project with a cloud computer", async () => {
     const isolated = new FakeSandboxProvider();

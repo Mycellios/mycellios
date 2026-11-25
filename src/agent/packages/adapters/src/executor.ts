@@ -10100,8 +10100,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         } catch (caughtError) {
           if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
           // A Desktop check that got no answer before the turn started or reached the PC is
-          // a setup failure: retry it with the others instead of failing the message.
-          if (caughtError instanceof DesktopUnreachableError && !turnStarted && !desktopRunDispatched) {
+          // a setup failure: retry it with the others instead of failing the message. A relay
+          // handing its PCs to a new server version is a busy computer: the run waits for it.
+          if ((caughtError instanceof DesktopUnreachableError ||
+              (caughtError instanceof ComputerUpdatingError && !caughtError.dispatched)) &&
+            !turnStarted && !desktopRunDispatched) {
             throw caughtError;
           }
           let error = caughtError;
