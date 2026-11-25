@@ -15,7 +15,7 @@ export function micoScriptTokenDigest(token: string): string | null {
   return createHash("sha256").update(token).digest("hex");
 }
 
-async function lockOwnedMico(tx: Prisma.TransactionClient, scope: Scope) {
+export async function lockOwnedMico(tx: Prisma.TransactionClient, scope: Scope) {
   const rows = await tx.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM bots WHERE id = ${scope.botId} AND "spaceId" = ${scope.spaceId}
     AND "userId" = ${scope.userId} AND "archivedAt" IS NULL FOR UPDATE
@@ -91,8 +91,11 @@ export async function issueMicoScriptToken(prisma: PrismaClient, scope: Scope) {
 }
 
 export async function revokeMicoScriptToken(prisma: PrismaClient, scope: Scope, id: string) {
-  const result = await prisma.micoScriptToken.deleteMany({ where: { id, ...scope } });
-  return result.count === 1;
+  return prisma.$transaction(async (tx) => {
+    if (!await lockOwnedMico(tx, scope)) return false;
+    const result = await tx.micoScriptToken.deleteMany({ where: { id, ...scope } });
+    return result.count === 1;
+  });
 }
 
 /** Run in the system context for header admission, then use the returned tenant for each request. */

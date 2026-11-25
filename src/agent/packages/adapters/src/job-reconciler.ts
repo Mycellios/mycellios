@@ -125,6 +125,7 @@ export function createJobReconciler(
     reconcileSecurityEventRetention?: () => Promise<void>;
     /** Drops signed routine event receipts after 7 days and rotated secrets after 24 hours. */
     reconcileRoutineEventRetention?: () => Promise<void>;
+    reconcileMicoScriptDeliveryRetention?: () => Promise<void>;
     reconcileHomeStorage?: () => Promise<void>;
     reconcileTaskReminders?: () => Promise<void>;
     reconcileLocalMemoryReviews?: () => Promise<void>;
@@ -164,6 +165,7 @@ export function createJobReconciler(
           deps.reconcileRoutineRetryNotices,
           deps.reconcileSecurityEventRetention,
           deps.reconcileRoutineEventRetention,
+          deps.reconcileMicoScriptDeliveryRetention,
           deps.reconcileHomeStorage,
           deps.reconcileTaskReminders,
           deps.reconcileLocalMemoryReviews,

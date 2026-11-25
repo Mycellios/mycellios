@@ -8,6 +8,7 @@ export * from "./conversation-surfaces.js";
 export * from "./routine-delivery.js";
 export * from "./routine-events.js";
 export * from "./mico-script-credentials.js";
+export * from "./mico-script-deliveries.js";
 export * from "./artifact-shares.js";
 export * from "./artifact-versions.js";
 export * from "./billing.js";

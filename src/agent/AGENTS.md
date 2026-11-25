@@ -1311,6 +1311,13 @@
   with their own secret; the UI issues per-Mico keys only for GitHub. Verify routine-events tests
   and `node --import tsx scripts/verify-routine-events-db.ts` (fresh loopback cluster).
 
+- Mico Scripts (specs/mico-automation phase 3) require
+  `MYCELLIOS_MICO_SCRIPTS_ENABLED=true` plus owner opt-in per Mico. Keep token
+  hashes and delivery receipts bound to the Mico, Space and owner. A token only
+  reads and answers ordinary questions for its own deliveries. Retried deliveries
+  reuse their receipt, and every accepted run keeps the unattended webhook policy.
+  Verify with `node --import tsx scripts/verify-mico-script-credentials-db.ts`.
+
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong
   to the admitted host/Mico and are observed with command_status; a lost observer or

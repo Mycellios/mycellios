@@ -62,6 +62,11 @@ import { type QueuedRoutineRunMarker, queueRoutineRunMarkerInTransaction } from 
 import { compareQueuedRows } from "./queue-order.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
+import {
+  admitMicoScriptRun, findMicoScriptDelivery, lockMicoScriptCredential, MICO_SCRIPT_DELIVERY_NONCE,
+  currentMicoScriptQuestion,
+  type MicoScriptCredentialScope,
+} from "./mico-script-deliveries.js";
 
 /** A one-time answer longer than a saved value may be. Nothing is stored or echoed. */
 export class AnswerTooLongError extends Error {
@@ -283,6 +288,8 @@ export interface AnswerRunInput {
    * on a plan card whose wait has passed.
    */
   autoStart?: boolean;
+  /** An authenticated script can answer an ordinary question of one of its deliveries. */
+  script?: { credential: MicoScriptCredentialScope; deliveryId: string };
 }
 
 /** What request_secret returns to the bot once the user dismissed its card. */
@@ -303,6 +310,11 @@ export interface SendUserMessageInput {
   routineWebhookSource?: "webhook" | "github";
   /** The person's Send test event: runs like Test, also while the routine is paused. */
   routineTestEvent?: true;
+  /** Internal admission for a token-authenticated script message, committed with the message. */
+  script?: {
+    credential: MicoScriptCredentialScope;
+    input: Parameters<typeof admitMicoScriptRun>[2];
+  };
   linkMessageToRun?: boolean;
   /** Internal bot sender: enforce both bots' cross-space policy in the write transaction. */
   crossSpaceSenderBotId?: string;
@@ -323,6 +335,7 @@ export interface SendUserMessageResult {
   seq: number;
   taskId: string | null;
   runId: string | null;
+  scriptDeliveryId?: string;
 }
 
 export interface RunSecretWriter {
@@ -496,6 +509,23 @@ export async function sendUserMessage(
 
   const commit = () =>
     prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (input.script && (
+        input.trigger !== "webhook" || input.routineId || input.clientNonce || input.createRun === false ||
+        input.allowParallelRun || input.script.credential.botId !== input.botId ||
+        input.script.credential.spaceId !== input.spaceId || input.script.credential.userId !== input.userId
+      )) throw new IsolationError();
+      const delivery = input.script
+        ? await admitMicoScriptRun(tx, input.script.credential, input.script.input)
+        : undefined;
+      const threadId = delivery?.threadId ?? input.threadId;
+      const routineId = delivery?.routine?.id ?? input.routineId;
+      const prompt = delivery?.routinePrompt ?? input.prompt;
+      const blocks = delivery?.routinePrompt ? [{ kind: "text" as const, text: prompt }] : input.blocks;
+      const scriptRoutine = delivery?.routine;
+      const modelPin = scriptRoutine?.modelProvider && scriptRoutine.modelId ? {
+        modelProvider: scriptRoutine.modelProvider, modelId: scriptRoutine.modelId,
+        thinkingLevel: scriptRoutine.thinkingLevel,
+      } : input.modelPin;
       if (input.routineId) {
         if (!input.routineWebhookSource) throw new IsolationError();
         const routine = await tx.routine.findFirst({ where: {
@@ -512,10 +542,10 @@ export async function sendUserMessage(
       // window and later repopulate the cleared conversation, and a clear could strand the
       // message without its event.
       const message = await createThreadMessageInTransaction(tx, {
-        threadId: input.threadId,
+        threadId,
         role: "user",
-        blocks: input.blocks,
-        clientNonce: input.clientNonce,
+        blocks,
+        clientNonce: delivery ? MICO_SCRIPT_DELIVERY_NONCE + delivery.id : input.clientNonce,
       });
       if (
         input.crossSpaceSenderBotId &&
@@ -528,10 +558,10 @@ export async function sendUserMessage(
       // second run would overlap it on a dedicated computer. Pending steering waits for the
       // continuation that starts when the intro finishes.
       const activeRuns =
-        createRun && !input.allowParallelRun
+        createRun && !input.allowParallelRun && !scriptRoutine
           ? await tx.run.findMany({
               where: {
-                threadId: input.threadId,
+                threadId,
                 botId: input.botId,
                 status: {
                   in: [...QUEUE_HOLDING_RUN_STATUSES],
@@ -550,9 +580,9 @@ export async function sendUserMessage(
           data: {
             spaceId: input.spaceId,
             botId: input.botId,
-            threadId: input.threadId,
+            threadId,
             userId: input.userId,
-            prompt: input.prompt,
+            prompt,
             status: "queued",
           },
         });
@@ -560,19 +590,19 @@ export async function sendUserMessage(
           data: {
             spaceId: input.spaceId,
             botId: input.botId,
-            threadId: input.threadId,
+            threadId,
             taskId: task.id,
             userId: input.userId,
             status: "queued",
             trigger: input.trigger,
-            routineId: input.routineId,
+            routineId,
             clientNonce: input.clientNonce ? input.routineId ? input.clientNonce : `send:${message.id}` : undefined,
             sourceMessageId: message.id,
-            ...(input.modelPin
+            ...(modelPin
               ? {
-                  modelProvider: input.modelPin.modelProvider,
-                  modelId: input.modelPin.modelId,
-                  thinkingLevel: input.modelPin.thinkingLevel,
+                  modelProvider: modelPin.modelProvider,
+                  modelId: modelPin.modelId,
+                  thinkingLevel: modelPin.thinkingLevel,
                   modelPinned: true,
                 }
               : {}),
@@ -606,20 +636,23 @@ export async function sendUserMessage(
       }
       const event = await appendEventInTransaction(tx, {
         spaceId: input.spaceId,
-        threadId: input.threadId,
+        threadId,
         botId: input.botId,
         type: "thread.message.created",
         runId: run?.id ?? busy?.id,
         payload: {
           messageId: message.id,
           role: "user",
-          blocks: input.blocks,
+          blocks,
           // Carries the call id on the live event so a spoken turn groups into the
           // call card immediately, instead of after a refetch reads the nonce.
           callId: callIdFromClientNonce(message.clientNonce),
         },
       });
-      return { message, task, run, busy, event };
+      if (delivery) await tx.micoScriptDelivery.update({
+        where: { id: delivery.id }, data: { messageId: message.id },
+      });
+      return { message, task, run, busy, event, delivery };
     });
   const committed = await commit().catch(async (error) => {
     const winner = await replay();
@@ -632,7 +665,7 @@ export async function sendUserMessage(
     { name: "message_sent", trigger: input.trigger },
     { id: committed.message.id, at: committed.message.createdAt },
   );
-  await notifyRealtime(realtime, input.threadId, committed.event.seq).catch((error) => {
+  await notifyRealtime(realtime, committed.event.threadId, committed.event.seq).catch((error) => {
     // The event is durable; subscribers recover it from their persisted cursor.
     getLogger().error("user message realtime notification", error);
   });
@@ -641,6 +674,7 @@ export async function sendUserMessage(
     seq: committed.message.seq,
     taskId: committed.task?.id ?? null,
     runId: committed.run?.id ?? committed.busy?.id ?? null,
+    ...(committed.delivery ? { scriptDeliveryId: committed.delivery.id } : {}),
   };
 }
 
@@ -762,6 +796,14 @@ async function commitAnswerRunInput(
   seq: number;
   approval?: { decision: string; effectKind: string };
 } | null> {
+  let scriptDelivery: Awaited<ReturnType<typeof findMicoScriptDelivery>> = null;
+  if (input.script) {
+    if (!await lockMicoScriptCredential(tx, input.script.credential)) return null;
+    scriptDelivery = await findMicoScriptDelivery(tx, input.script.credential, input.script.deliveryId);
+    if (!scriptDelivery?.messageId || scriptDelivery.threadId !== input.threadId ||
+        scriptDelivery.spaceId !== input.spaceId || scriptDelivery.userId !== input.answeredByUserId)
+      return null;
+  }
   // Thread row first, then run rows — the same order as clearThread and finalizeRun, so a
   // concurrent clear cannot deadlock against this transaction.
   await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
@@ -777,10 +819,16 @@ async function commitAnswerRunInput(
       userId: true,
       checkpoint: true,
       trigger: true,
+      sourceMessageId: true,
       task: { select: { prompt: true } },
     },
   });
   if (!run) return null;
+  if (scriptDelivery && (run.botId !== scriptDelivery.botId || run.userId !== scriptDelivery.userId ||
+      run.sourceMessageId !== scriptDelivery.messageId)) return null;
+  if (scriptDelivery &&
+      (await currentMicoScriptQuestion(tx, input.threadId, input.runId))?.id !== input.messageId)
+    return null;
   const message = await tx.message.findFirst({
     where: {
       id: input.messageId,
@@ -1096,7 +1144,7 @@ export async function answerRunInput(
     );
   // A dismissal has no secret to prepare.
   const committed =
-    runSecretWriter?.withPrepared && !input.dismiss
+    runSecretWriter?.withPrepared && !input.dismiss && !input.script
       ? await runSecretWriter.withPrepared(prisma, input, commit)
       : await commit();
 
@@ -1962,7 +2010,7 @@ export async function createPendingSteeringRun(
       runId: null,
       message: { threadId: input.threadId },
     },
-    include: { message: { select: { id: true, blocks: true, seq: true } } },
+    include: { message: { select: { id: true, blocks: true, seq: true, clientNonce: true } } },
     orderBy: [{ message: { seq: "asc" } }, { id: "asc" }],
   });
   if (pending.length === 0) return null;
@@ -1985,6 +2033,7 @@ export async function createPendingSteeringRun(
         : [];
   if (batch.length === 0) return null;
   const origin = steeringOrigin(batch[0]!);
+  const externalDelivery = origin === "webhook" || origin.startsWith(MICO_SCRIPT_DELIVERY_NONCE);
   const source = batch.at(-1)!;
   const modelPin = continuationModelPin(batch);
   const task = await tx.task.create({
@@ -1994,7 +2043,7 @@ export async function createPendingSteeringRun(
       threadId: input.threadId,
       userId: batch[0]!.userId,
       prompt:
-        origin === "webhook"
+        externalDelivery
           ? blocksToAgentHistoryText(source.message.blocks as MessageBlock[])
           : origin === "agent_task"
             ? agentTaskMessagePrompt(batch.map((item) => taskBriefText(item.message.blocks)))
@@ -2014,7 +2063,7 @@ export async function createPendingSteeringRun(
       // from the app; one direct-line delivery keeps it messaging, so it is never owner-started.
       // Rows queued before origins were recorded are recognized by their channel message.
       trigger:
-        origin === "webhook"
+        externalDelivery
           ? "webhook"
           : origin === "agent_task"
             ? "agent_task"
@@ -2070,9 +2119,12 @@ function hasChannelMessage(blocks: unknown): boolean {
 
 function steeringOrigin(item: {
   originTrigger: string | null;
-  message: { blocks: unknown };
+  message: { blocks: unknown; clientNonce?: string | null };
 }): string {
-  if (item.originTrigger === "webhook") return "webhook";
+  if (item.originTrigger === "webhook") {
+    const nonce = item.message.clientNonce;
+    return nonce?.startsWith(MICO_SCRIPT_DELIVERY_NONCE) ? nonce : "webhook";
+  }
   // A message_task follow-up gets its own turn, apart from what the person wrote there.
   if (item.originTrigger === "agent_task") return "agent_task";
   if (item.originTrigger !== "messaging") return "private";

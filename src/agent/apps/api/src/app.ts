@@ -112,6 +112,7 @@ import {
   createDb,
   createPool,
   createRoutineEventPruner,
+  createMicoScriptDeliveryPruner,
   createSecurityEventPruner,
   createThreadEvents,
   describeRowSecurity,
@@ -689,6 +690,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
           securityEventRetentionDays(),
         ),
         reconcileRoutineEventRetention: createRoutineEventPruner(prisma),
+        reconcileMicoScriptDeliveryRetention: createMicoScriptDeliveryPruner(prisma),
         reconcileThreadDeletions: () =>
           reconcileThreadDeletions({ prisma, artifacts, dataDir: env.dataDir }),
       })
@@ -1026,7 +1028,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     return actor;
   });
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
-  if (env.micoScriptsEnabled) mountMicoScriptsHttp(app, prisma);
+  if (env.micoScriptsEnabled) mountMicoScriptsHttp(app, { prisma, events, jobs });
   if (billing && billingProvider) {
     mountBillingRoutes(app, {
       billing,
