@@ -12,7 +12,7 @@ import pg from "pg";
 process.env.NODE_ENV = "test";
 const {
   asSystem, createDb, findMicoScriptCredential, issueMicoScriptToken,
-  revokeMicoScriptToken, setMicoScriptsEnabled,
+  readMicoScriptsSettings, revokeMicoScriptToken, setMicoScriptsEnabled,
 } = await import("@mycellios/db");
 const socket = createServer();
 await new Promise<void>((done) => socket.listen(0, "127.0.0.1", done));
@@ -50,6 +50,10 @@ try {
   const user = await prisma.user.create({ data: { id: "scripts-owner", name: "Owner", email: "owner@example.invalid" } });
   const bot = await prisma.bot.create({ data: { spaceId: space.id, userId: user.id, name: "Synthetic", color: "#10B981" } });
   const scope = { botId: bot.id, spaceId: space.id, userId: user.id };
+  assert.deepEqual(await readMicoScriptsSettings(prisma, scope), {
+    enabled: false, requestsPerHour: 60, tokens: [], path: `/api/v1/micos/${bot.id}`,
+  });
+  assert.equal(await readMicoScriptsSettings(prisma, { ...scope, userId: "other" }), null);
   assert.equal((await issueMicoScriptToken(prisma, scope)).status, "unavailable");
   assert.equal(await setMicoScriptsEnabled(prisma, { ...scope, userId: "other" }, true, 60), null);
   assert.ok(await setMicoScriptsEnabled(prisma, scope, true, 60));
@@ -61,6 +65,9 @@ try {
   const stored = await prisma.micoScriptToken.findUniqueOrThrow({ where: { id: record.id } });
   assert.match(stored.digest, /^[0-9a-f]{64}$/);
   assert.ok(!JSON.stringify(stored).includes(token));
+  const settings = await readMicoScriptsSettings(prisma, scope);
+  assert.equal(settings?.tokens.length, 5);
+  assert.deepEqual(Object.keys(settings!.tokens[0]!).sort(), ["createdAt", "hint", "id", "lastUsedAt"]);
   assert.equal(await findMicoScriptCredential(prisma, "other-mico", token), null);
   assert.equal((await findMicoScriptCredential(prisma, bot.id, token))?.userId, user.id);
   assert.equal(await revokeMicoScriptToken(prisma, { ...scope, spaceId: "other" }, record.id), false);

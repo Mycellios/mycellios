@@ -1,8 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  MICO_SCRIPT_REQUESTS_PER_HOUR,
   MICO_SCRIPT_TOKEN_PREFIX,
   MICO_SCRIPT_TOKENS_MAX,
   MicoScriptRequestsPerHourSchema,
+  micoScriptsPath,
 } from "@mycellios/contracts";
 import type { Prisma, PrismaClient } from "./generated/prisma/client.js";
 
@@ -19,6 +21,41 @@ async function lockOwnedMico(tx: Prisma.TransactionClient, scope: Scope) {
     AND "userId" = ${scope.userId} AND "archivedAt" IS NULL FOR UPDATE
   `;
   return rows.length === 1;
+}
+
+const tokenMetadata = { id: true, hint: true, createdAt: true, lastUsedAt: true } as const;
+
+export async function readMicoScriptsSettings(prisma: PrismaClient, scope: Scope) {
+  const mico = await prisma.bot.findFirst({
+    where: { id: scope.botId, spaceId: scope.spaceId, userId: scope.userId, archivedAt: null },
+    select: {
+      scriptSettings: {
+        select: {
+          enabled: true, requestsPerHour: true,
+          tokens: { select: tokenMetadata, orderBy: { createdAt: "desc" } },
+        },
+      },
+    },
+  });
+  if (!mico) return null;
+  const settings = mico.scriptSettings;
+  return {
+    enabled: settings?.enabled ?? false,
+    requestsPerHour: settings?.requestsPerHour ?? MICO_SCRIPT_REQUESTS_PER_HOUR,
+    tokens: (settings?.tokens ?? []).map(micoScriptTokenMetadata),
+    path: micoScriptsPath(scope.botId),
+  };
+}
+
+export function micoScriptTokenMetadata(record: {
+  id: string; hint: string; createdAt: Date; lastUsedAt: Date | null;
+}) {
+  return {
+    id: record.id,
+    hint: record.hint,
+    createdAt: record.createdAt.toISOString(),
+    lastUsedAt: record.lastUsedAt?.toISOString() ?? null,
+  };
 }
 
 export async function setMicoScriptsEnabled(
@@ -47,7 +84,7 @@ export async function issueMicoScriptToken(prisma: PrismaClient, scope: Scope) {
     const token = MICO_SCRIPT_TOKEN_PREFIX + randomBytes(32).toString("base64url");
     const record = await tx.micoScriptToken.create({
       data: { ...scope, digest: micoScriptTokenDigest(token)!, hint: token.slice(0, 13) },
-      select: { id: true, hint: true, createdAt: true, lastUsedAt: true },
+      select: tokenMetadata,
     });
     return { status: "issued" as const, record, token };
   });

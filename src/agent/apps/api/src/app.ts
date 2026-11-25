@@ -754,6 +754,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       phoneCallRingSeconds: env.phoneCallRingSeconds,
       ticketBoardEnabled,
       spaceMembers: env.spaceMembers,
+      micoScriptsEnabled: env.micoScriptsEnabled,
       agentRuntime: env.agentRuntime,
       defaultProvider: env.defaultProvider,
       defaultModel: env.defaultModel,

@@ -60,6 +60,7 @@ export interface AppEnv {
    * MYCELLIOS_SPACE_MEMBER_LIMIT people per Space. Off by default.
    */
   spaceMembers?: { limit: number };
+  micoScriptsEnabled?: boolean;
   databaseUrl: string;
   realtimeDatabaseUrl: string;
   authSecret: string;
@@ -267,6 +268,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     desktopStackToken: optional(readEnv("DESKTOP_STACK_TOKEN", source)),
     whatsappDeviceEnabled: source.MYCELLIOS_WHATSAPP_DEVICE_ENABLED === "true",
     spaceMembers: spaceMembersFromEnv(source),
+    micoScriptsEnabled: source.MYCELLIOS_MICO_SCRIPTS_ENABLED === "true",
     authSecret,
     authUrl: source.BETTER_AUTH_URL ?? source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
     webOrigin: source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
