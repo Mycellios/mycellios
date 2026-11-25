@@ -14,7 +14,15 @@ const mocks = vi.hoisted(() => ({
     }],
   })),
   open: vi.fn(async () => ({ threadId: "own-thread" })),
-  get: vi.fn(async () => ({ messages: [], run: null })),
+  get: vi.fn(async () => ({
+    messages: [{
+      id: "message", seq: 0, role: "user",
+      blocks: [{ kind: "file", artifactId: "file", name: "Notes.txt" }],
+    }],
+    run: null,
+  })),
+  file: vi.fn(async () => ({ name: "Notes.txt", mimeType: "text/plain", contentBase64: "YQ==" })),
+  download: vi.fn(),
   send: vi.fn(async () => ({ runId: "run" })),
   listShares: vi.fn(async () => []),
   setShare: vi.fn(),
@@ -22,7 +30,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../lib/space-rpc", () => ({
   useBoundSpaceId: () => "space",
   useSpaceRpc: () => ({
-    sharedMicos: { list: mocks.list, open: mocks.open, get: mocks.get, send: mocks.send },
+    sharedMicos: { list: mocks.list, open: mocks.open, get: mocks.get, file: mocks.file, send: mocks.send },
     spaces: { shares: { list: mocks.listShares, set: mocks.setShare } },
   }),
 }));
@@ -30,6 +38,10 @@ vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (parts: TemplateStringsArray) => parts.join("") }),
 }));
 vi.mock("../lib/user-error", () => ({ errorText: () => "Unavailable" }));
+vi.mock("../lib/artifact-open", () => ({
+  decodeArtifactBase64: () => Uint8Array.of(97),
+  downloadArtifactBytes: mocks.download,
+}));
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -61,4 +73,12 @@ it("opens a member's own conversation through the scoped sharing endpoint", asyn
   }));
   expect(mocks.open).toHaveBeenCalledExactlyOnceWith({ botId: "mico", requestKey: expect.any(String) });
   expect(mocks.listShares).not.toHaveBeenCalled();
+  const fileButton = await vi.waitFor(() => {
+    const button = [...host.querySelectorAll("button")].find((item) => item.textContent === "Notes.txt");
+    expect(button).toBeTruthy();
+    return button;
+  });
+  await act(async () => fileButton?.click());
+  expect(mocks.file).toHaveBeenCalledWith({ botId: "mico", taskThreadId: "own-thread", artifactId: "file" });
+  expect(mocks.download).toHaveBeenCalledWith("Notes.txt", "text/plain", Uint8Array.of(97));
 });

@@ -243,6 +243,7 @@ async function memberSpaceNavigation(
     externalConversations,
     contentBots,
     contentGroups,
+    otherMembers,
   ] = await Promise.all([
     repos.listBots(actor),
     groupRepos.listGroups(actor),
@@ -263,8 +264,16 @@ async function memberSpaceNavigation(
       select: { spaceId: true },
       distinct: ["spaceId"],
     }),
+    deps.env.spaceMembers
+      ? deps.prisma.spaceMember.groupBy({
+        by: ["spaceId"],
+        where: { spaceId: { in: spaceIds }, userId: { not: actor.userId } },
+        _count: { _all: true },
+      })
+      : [],
   ]);
   const botCounts = new Map(contentBots.map((row) => [row.spaceId, row._count._all]));
+  const otherMemberCounts = new Map(otherMembers.map((row) => [row.spaceId, row._count._all]));
   const spacesWithContent = new Set([
     ...contentBots.map((row) => row.spaceId),
     ...contentGroups.map((row) => row.spaceId),
@@ -302,6 +311,7 @@ async function memberSpaceNavigation(
         isDefault: membership.space.isDefault,
         hasContent: spacesWithContent.has(membership.spaceId),
         botCount: botCounts.get(membership.spaceId) ?? 0,
+        otherMemberCount: otherMemberCounts.get(membership.spaceId),
         canRename: membership.role === "owner" && membership.space.deletingAt === null,
         canDelete:
           membership.role === "owner" &&

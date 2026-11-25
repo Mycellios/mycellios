@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { SettingsGroup } from "../components/SettingsRows";
 import { AskCard } from "../components/AskCard";
+import { decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
 import { useBoundSpaceId, useSpaceRpc } from "../lib/space-rpc";
 import { readFileAsBase64 } from "../lib/pending-attachments";
 import { errorText } from "../lib/user-error";
@@ -232,6 +233,21 @@ function MemberConversation({ queryScope, target, onClose, readOnly = false }: {
       setBusy(false);
     }
   }
+  async function download(artifactId: string) {
+    if (busy || snapshot.error) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const artifact = readOnly
+        ? await rpc.artifacts.get({ botId: target.botId, artifactId })
+        : await rpc.sharedMicos.file({ ...target, artifactId });
+      downloadArtifactBytes(artifact.name, artifact.mimeType, decodeArtifactBase64(artifact.contentBase64));
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function send() {
     if (readOnly || (!text.trim() && !files.length) || busy || snapshot.error) return;
     const artifactIds = files.map((file) => file.id);
@@ -274,7 +290,10 @@ function MemberConversation({ queryScope, target, onClose, readOnly = false }: {
         {visible.map((message) => <div key={message.id} dir="auto" className="whitespace-pre-wrap break-words text-sm">
           {message.blocks.map((block, index) => {
             if (block.kind === "text") return <p key={index}>{block.text}</p>;
-            if (block.kind === "file" || block.kind === "image") return <p key={index}>{block.name}</p>;
+            if (block.kind === "file" || block.kind === "image") {
+              return <Button type="button" key={index} size="sm" variant="outline" disabled={busy}
+                onClick={() => void download(block.artifactId)}>{block.name}</Button>;
+            }
             const runId = message.runId;
             if (block.kind !== "ask" || message.role !== "bot" || !runId ||
                 isSecretAskBlock(block) || isApprovalAskBlock(block) ||

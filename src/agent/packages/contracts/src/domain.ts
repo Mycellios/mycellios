@@ -507,6 +507,8 @@ export const SpaceSchema = z.object({
   canDelete: z.boolean().optional(),
   /** Every bot deleting the space removes, archived and other members' included. */
   botCount: z.number().int().nonnegative().optional(),
+  /** Other people whose access to this owned Space ends when it is deleted. */
+  otherMemberCount: z.number().int().nonnegative().optional(),
   bots: z.array(SpaceBotSchema),
   groups: z.array(SpaceGroupSchema),
   externalConversations: z.array(ExternalConversationSchema),
