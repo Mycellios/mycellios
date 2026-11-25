@@ -107,6 +107,11 @@ Phases 3 to 5 start only after their open decision is settled.
      upstream release newer than the fork) instead of failing at startup.
    - Correct `desktop-release.md` to describe the real unsigned and ad-hoc release
      until phases 3 and 4 replace it.
+   - Implemented: `self-host-images.yml` publishes `app`, `computer` and `updater` for
+     amd64 and arm64 from main (`sha-<commit>`, `edge`; deploy.yml's amd64 `computer` is
+     extended, never replaced), `installer-release.yml` adds `v<version>` and tags the
+     commit once the Desktop release is public, and `desktop-release.md` describes the
+     real release. The default switch and the move of existing installs follow later.
 2. Phase 2 — a public status page.
    - A scheduled workflow on GitHub-hosted runners (every 5 minutes, which GitHub
      may delay) probes public endpoints only: the site `/`, the Agent app

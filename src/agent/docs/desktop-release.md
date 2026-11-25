@@ -1,55 +1,52 @@
 # Desktop releases
 
-The `release-desktop` workflow builds, signs, notarizes, attests, and publishes
-the Electron app from a `vMAJOR.MINOR.PATCH` tag on `main`. Publishing the
-Docker images triggers from the same tag.
+Mycellios Desktop is released by the workflows in this repository's root
+`.github/workflows`. GitHub does not run workflows under `src/agent/.github`.
+Nobody picks a version or pushes a release tag by hand.
 
-## Repository secrets
+## How a release happens
 
-macOS (required):
+1. Each pull request that changes `src/agent` writes its notes in
+   `src/agent/changelog.d` ([release notes](../../../docs/DEVELOPMENT.md#desktop-release-notes)).
+2. Every day at 05:00 UTC, `desktop-auto-release.yml` turns the waiting notes into
+   the next version (major for a breaking change, patch for fixes only, minor
+   otherwise), merges that version change to `main` and starts
+   `installer-release.yml`.
+3. `installer-release.yml` admits the current `main` revision when its version has
+   no release yet and builds every platform from that one revision: Windows, Linux
+   (DEB and RPM), both Mac architectures and the Android build input.
+4. Its `publish` job checks each platform's receipt against that revision and
+   publishes the `desktop-v<version>-windows-preview` GitHub release with the
+   SHA-256 and size of every file. It never replaces an existing release.
+   `verify-promotion` then checks the public catalogs and downloads.
+5. The same run builds that revision's self-host images. Once the release is
+   public, `self-host-release` adds the `v<version>` tag to its `app`, `computer`
+   and `updater` images and tags the commit `v<version>`: the self-host release of
+   that version ([published images](./self-host.md#published-images-and-tags)).
 
-| Secret | Value |
-| --- | --- |
-| `DESKTOP_MAC_CSC_LINK` | Base64 of the `Developer ID Application` certificate exported as `.p12` |
-| `DESKTOP_MAC_CSC_KEY_PASSWORD` | Password used when exporting the `.p12` |
-| `APPLE_API_KEY_ID` | App Store Connect API key ID (the `XXXXXXXXXX` in `AuthKey_XXXXXXXXXX.p8`) |
-| `APPLE_API_ISSUER` | Issuer ID shown on App Store Connect > Users and Access > Integrations |
-| `APPLE_API_KEY_P8` | Contents of the `AuthKey_*.p8` file |
+`npm run release:patch`, `release:minor` and `release:major` in `src/agent`
+prepare a version by hand when one is needed. They publish nothing.
 
-The API key needs the Developer role. The workflow writes it to a mode 600 file
-in the runner's temp directory for the packaging step and deletes it afterwards.
+A failed job can be re-run from the same workflow run. Publication never replaces
+a published release, file or tag with different content.
 
-`patches/app-builder-lib@26.15.3.patch` carries electron-builder PR #10101:
-without it `CSC_LINK` signing fails while creating the temporary keychain. Drop
-the patch once an electron-builder release includes that fix.
+## Signing and updates
 
-Windows (optional):
+No identity that operating systems trust signs the current previews, and no
+repository secret holds a signing certificate, password or notarization key:
 
-| Secret | Value |
-| --- | --- |
-| `DESKTOP_WIN_CSC_LINK` | Base64 of the Authenticode certificate as `.p12`/`.pfx` |
-| `DESKTOP_WIN_CSC_KEY_PASSWORD` | Its password |
+- Windows installers are unsigned (`signExecutable: false`). Windows names an
+  unknown publisher, and SmartScreen may warn before the first run.
+- Mac apps and DMGs are signed ad hoc (`identity: '-'`) and not notarized.
+  Release qualification runs a strict `codesign --verify` and records Gatekeeper's
+  assessment separately; macOS still asks before opening the app.
+- Linux packages are not signed. The Android build input is signed on the
+  original signing host before the download page links it.
 
-When `DESKTOP_WIN_CSC_LINK` is unset the Windows build and its release assets
-are skipped. macOS and Linux always build, and the release is only published
-when every platform that was built produced its installer and update feed.
+Updates are verified but never installed unattended. Desktop downloads a newer
+package from the official catalog in the background and checks its SHA-256. It
+installs only when the person chooses Restart (the Windows update helper, or a
+writable Mac app that replaces itself) or opens the system installer.
 
-Set a secret from a file without echoing it:
-
-```sh
-base64 -i devid.p12 | gh secret set DESKTOP_MAC_CSC_LINK
-gh secret set APPLE_API_KEY_P8 < AuthKey_XXXXXXXXXX.p8
-```
-
-## Cut a release
-
-1. Bump `version` in `apps/desktop/package.json` on `main`.
-2. Tag that commit `v<version>` and push the tag:
-
-```sh
-git tag v0.1.1
-git push origin v0.1.1
-```
-
-The workflow refuses tags that do not match the desktop version, are not on
-`main`, or are not newer than the latest published release.
+`specs/trusted-distribution/spec.md` plans signed Windows installers and
+notarized Mac builds; until those phases ship, this page describes the release.
