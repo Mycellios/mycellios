@@ -1,7 +1,13 @@
 import type { AwaitingReplies, AwaitingReplyState, MessageBlock } from "@mycellios/contracts";
-import { buildBotRepliesWakePrompt } from "@mycellios/core";
+import { botMessageContext, buildBotRepliesWakePrompt, isInterruptedRunError } from "@mycellios/core";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
 import type { Prisma, PrismaClient } from "./client.js";
+import {
+  INTERRUPTED_REQUEST_RECOVERY_NOTE,
+  INTERRUPTED_TURN_RECOVERY_DELAYS_MS,
+  INTERRUPTED_TURN_RECOVERY_NOTE,
+  WORK_RECOVERY_MARKER,
+} from "./event-waits.js";
 import { appendEventInTransaction } from "./events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
 
@@ -229,6 +235,116 @@ export async function releaseBotMessageRequestInTransaction(
   });
   await markRequestSettledInTransaction(tx, request.id, run.id);
   return { runId: run.id };
+}
+
+export const BOT_MESSAGE_RECOVERY_NONCE_PREFIX = "bot-message-recovery:";
+
+function blocksOf(value: unknown): MessageBlock[] {
+  return Array.isArray(value) ? (value as MessageBlock[]) : [];
+}
+
+/**
+ * A Mico-to-Mico turn that an update or a lost PC connection cut off starts again from the
+ * commit that ends it: a fresh run on the same message, told to check what already happened,
+ * after a growing delay and at most once per delay. The cut-off run is never replayed and
+ * returns no failure: its request (the recipient row, the answers it read) moves to the new
+ * run, so the teammate keeps waiting and Stop still reaches it. Only turns someone waits on
+ * recover: a request or question (the teammate) and a result or status (the person). A turn
+ * that already answered, opened conversations or delegated work keeps its own path.
+ */
+export async function queueBotMessageRecoveryInTransaction(
+  tx: Tx,
+  input: { runId: string; error: string | null | undefined; now: Date },
+): Promise<string | null> {
+  if (!isInterruptedRunError(input.error)) return null;
+  const run = await tx.run.findUnique({
+    where: { id: input.runId },
+    select: {
+      id: true, trigger: true, status: true, spaceId: true, userId: true, botId: true, threadId: true,
+      taskId: true, sourceMessageId: true, botOutcomeReturnedAt: true,
+      task: { select: { prompt: true } },
+      sourceMessage: { select: { blocks: true } },
+    },
+  });
+  if (!run || run.trigger !== "bot_message" || run.status !== "failed" || !run.sourceMessageId ||
+      run.botOutcomeReturnedAt) return null;
+  const context = botMessageContext(blocksOf(run.sourceMessage?.blocks));
+  const intent = context?.intent ?? "request";
+  if (!context || intent === "fyi") return null;
+  const answersTeammate = intent === "request" || intent === "question";
+  // The first turn on this message and every recovery share it.
+  const attempts = await tx.run.count({
+    where: { threadId: run.threadId, sourceMessageId: run.sourceMessageId, trigger: "bot_message" },
+  });
+  const delay = INTERRUPTED_TURN_RECOVERY_DELAYS_MS[attempts - 1];
+  if (delay === undefined) return null;
+  const scope = { spaceId: run.spaceId, userId: run.userId };
+  const bot = await tx.bot.findFirst({ where: { id: run.botId, ...scope, archivedAt: null }, select: { id: true } });
+  const thread = await tx.thread.findFirst({
+    where: { id: run.threadId, ...scope, archivedAt: null, deleteAfter: null },
+    select: { id: true },
+  });
+  if (!bot || !thread) return null;
+  const openedTasks = await tx.externalEffect.count({
+    where: { runId: run.id, kind: "start_task", status: "completed" },
+  });
+  const delegated = await tx.task.count({ where: { parentTaskId: run.taskId } });
+  const recipient = await tx.botMessageRecipient.findUnique({ where: { runId: run.id }, select: { state: true } });
+  if (openedTasks || delegated || (recipient && recipient.state !== "asked")) return null;
+  if (answersTeammate) {
+    const sent = await tx.message.findMany({
+      where: { threadId: run.threadId, runId: run.id, role: "bot" },
+      select: { blocks: true },
+    });
+    const answered = sent.some((message) =>
+      blocksOf(message.blocks).some(
+        (block) => block.kind === "bot_message_sent" && block.toBotId === context.fromBotId && block.intent === "result",
+      ),
+    );
+    if (answered) return null;
+  }
+  const task = await tx.task.create({
+    data: {
+      ...scope, botId: run.botId, threadId: run.threadId, status: "queued",
+      prompt: `${run.task.prompt}${WORK_RECOVERY_MARKER}${
+        answersTeammate ? INTERRUPTED_REQUEST_RECOVERY_NOTE : INTERRUPTED_TURN_RECOVERY_NOTE}`,
+    },
+    select: { id: true },
+  });
+  const recovery = await tx.run.create({
+    data: {
+      ...scope, botId: run.botId, threadId: run.threadId, taskId: task.id, status: "queued",
+      trigger: "bot_message", sourceMessageId: run.sourceMessageId,
+      clientNonce: `${BOT_MESSAGE_RECOVERY_NONCE_PREFIX}${run.id}`,
+      wakeAt: new Date(input.now.getTime() + delay),
+    },
+    select: { id: true },
+  });
+  // The new turn returns the outcome; the reconciler must not send this one's failure.
+  await tx.run.update({ where: { id: run.id }, data: { botOutcomeReturnedAt: input.now } });
+  await tx.botMessageRecipient.updateMany({ where: { runId: run.id, state: "asked" }, data: { runId: recovery.id } });
+  // The answers a released request handed this turn fold under the turn that reads them now.
+  const released = await tx.botMessageRequest.findMany({
+    where: { resumeRunId: run.id, ...scope },
+    select: { recipients: { select: { answerMessageId: true } } },
+  });
+  const markerIds = [
+    run.sourceMessageId,
+    ...released.flatMap((request) =>
+      request.recipients.flatMap((row) => (row.answerMessageId ? [row.answerMessageId] : [])),
+    ),
+  ];
+  await tx.message.updateMany({
+    where: { id: { in: markerIds }, threadId: run.threadId, runId: run.id },
+    data: { runId: recovery.id },
+  });
+  if (released.length) {
+    await tx.botMessageRequest.updateMany({
+      where: { resumeRunId: run.id, ...scope },
+      data: { resumeRunId: recovery.id },
+    });
+  }
+  return recovery.id;
 }
 
 /**

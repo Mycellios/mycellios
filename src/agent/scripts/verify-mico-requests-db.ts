@@ -24,7 +24,12 @@ const {
   loadRunHistoryMessages,
   samePromptPeerRunIds,
   hideAwaitingReplies,
+  finalizeRun,
+  BOT_MESSAGE_RECOVERY_NONCE_PREFIX,
+  INTERRUPTED_TURN_RECOVERY_DELAYS_MS,
+  WORK_RECOVERY_MARKER,
 } = await import("@mycellios/db");
+const { DESKTOP_RUN_INTERRUPTED_ERROR } = await import("@mycellios/core");
 const { messageBot, returnBotMessageOutcome } = await import(
   "../packages/adapters/src/bot-messages.js"
 );
@@ -648,6 +653,174 @@ try {
   assert.ok(!listed.agents.some((agent) => agent.id === lead.id));
   checks.push(
     "list_agents reports each teammate's status, turn start and activity, never the caller itself",
+  );
+
+  // 11. A Mico-to-Mico turn cut off by an update or a lost PC connection starts again on the
+  //     same message after a growing delay, a bounded number of times; the teammate keeps
+  //     waiting meanwhile and hears of the failure only when recovery ends.
+  const cut = async (
+    row: { id: string; threadId: string; botId: string; taskId: string },
+    error: string,
+  ) => {
+    await start(row.id);
+    const attempt = await prisma.attempt.create({
+      data: { runId: row.id, fence: 1, status: "running" },
+    });
+    const ended = await finalizeRun(prisma, {
+      ...scope,
+      threadId: row.threadId,
+      botId: row.botId,
+      runId: row.id,
+      taskId: row.taskId,
+      attemptId: attempt.id,
+      ...lease,
+      outcome: "failed",
+      error,
+    } as Parameters<typeof finalizeRun>[1]);
+    assert.ok(ended, "the cut-off turn ends");
+    return ended;
+  };
+  const ask4 = await running(leadMain, lead.id, "user");
+  await messageBot(
+    deps,
+    sourceOf(ask4),
+    { id: lead.id, name: lead.name },
+    { bot_id: scout.id, message: "Rebuild the index", deliveryKey: "ask-4" },
+  );
+  await prisma.run.update({ where: { id: ask4.id }, data: { status: "completed" } });
+  const request4 = await prisma.botMessageRequest.findFirstOrThrow({
+    where: { senderRunId: ask4.id },
+    include: { recipients: true },
+  });
+  let scoutTurn = await prisma.run.findUniqueOrThrow({
+    where: { id: request4.recipients[0]!.runId! },
+  });
+  const indexMessage = scoutTurn.sourceMessageId!;
+  for (const [attempt, delay] of INTERRUPTED_TURN_RECOVERY_DELAYS_MS.entries()) {
+    const before = Date.now();
+    const ended = await cut(scoutTurn, DESKTOP_RUN_INTERRUPTED_ERROR);
+    assert.ok(ended.recoveryRunId, "an interrupted teammate turn starts again");
+    const recovery = await prisma.run.findUniqueOrThrow({
+      where: { id: ended.recoveryRunId },
+      include: { task: true, botMessageRecipient: true },
+    });
+    assert.deepEqual(
+      [
+        recovery.threadId,
+        recovery.botId,
+        recovery.trigger,
+        recovery.status,
+        recovery.sourceMessageId,
+        recovery.clientNonce,
+      ],
+      [
+        scout.thread!.id,
+        scout.id,
+        "bot_message",
+        "queued",
+        indexMessage,
+        `${BOT_MESSAGE_RECOVERY_NONCE_PREFIX}${scoutTurn.id}`,
+      ],
+    );
+    const wakeAt = recovery.wakeAt?.getTime() ?? 0;
+    assert.ok(
+      wakeAt >= before + delay && wakeAt <= Date.now() + delay,
+      "the new turn waits for the update or the connection",
+    );
+    assert.equal(recovery.task.prompt.split(WORK_RECOVERY_MARKER).length - 1, attempt + 1);
+    assert.match(recovery.task.prompt, /Rebuild the index/, "the turn keeps the request it answers");
+    assert.match(recovery.task.prompt, /goes back to the teammate who asked/);
+    assert.deepEqual(
+      [recovery.botMessageRecipient?.requestId, recovery.botMessageRecipient?.state],
+      [request4.id, "asked"],
+      "the request waits on the new turn",
+    );
+    assert.equal(
+      (await prisma.message.findUniqueOrThrow({ where: { id: indexMessage } })).runId,
+      recovery.id,
+    );
+    assert.ok(
+      (await prisma.run.findUniqueOrThrow({ where: { id: scoutTurn.id } })).botOutcomeReturnedAt,
+      "the cut-off turn sends no failure",
+    );
+    const waiting = await awaitingRepliesForThread(prisma, {
+      ...scope,
+      botId: lead.id,
+      threadId: leadMain,
+    });
+    assert.deepEqual(
+      waiting.requests
+        .find((row) => row.requestId === request4.id)
+        ?.recipients.map((row) => row.state),
+      ["asked"],
+    );
+    scoutTurn = recovery;
+  }
+  const spent = await cut(scoutTurn, DESKTOP_RUN_INTERRUPTED_ERROR);
+  assert.equal(spent.recoveryRunId, undefined, "the recovery budget is spent");
+  assert.equal(
+    await prisma.run.count({ where: { sourceMessageId: indexMessage, trigger: "bot_message" } }),
+    1 + INTERRUPTED_TURN_RECOVERY_DELAYS_MS.length,
+  );
+  assert.equal(
+    await prisma.run.count({
+      where: { sourceMessageId: indexMessage, status: "failed", botOutcomeReturnedAt: null },
+    }),
+    1,
+    "only the last failure is left to return",
+  );
+  assert.equal(
+    await returnBotMessageOutcome(
+      deps,
+      { ...sourceOf(scoutTurn), sourceMessageId: indexMessage },
+      { id: scout.id, name: scout.name },
+      `Could not complete the delegated request: ${DESKTOP_RUN_INTERRUPTED_ERROR}`,
+      "status",
+      { forceUnread: true },
+    ),
+    true,
+  );
+  const failed4 = await prisma.botMessageRequest.findUniqueOrThrow({
+    where: { id: request4.id },
+    include: { recipients: true },
+  });
+  assert.ok(failed4.settledAt && failed4.resumeRunId);
+  assert.deepEqual(
+    failed4.recipients.map((row) => row.state),
+    ["failed"],
+  );
+  checks.push(
+    "a teammate turn cut off by an update or a lost PC connection starts again on the same message after growing delays, keeps the request waiting, and returns the failure only when recovery ends",
+  );
+
+  // 12. The sender's turn that relays held answers is recovered too, with the answers it read;
+  //     a model failure is not an interruption.
+  const relay = await prisma.run.findUniqueOrThrow({ where: { id: settledRequest.resumeRunId! } });
+  const relayed = await cut(relay, DESKTOP_RUN_INTERRUPTED_ERROR);
+  assert.ok(relayed.recoveryRunId, "an interrupted relay turn starts again");
+  const relayRecovery = await prisma.run.findUniqueOrThrow({
+    where: { id: relayed.recoveryRunId },
+    include: { task: true },
+  });
+  assert.deepEqual(
+    [relayRecovery.threadId, relayRecovery.trigger, relayRecovery.sourceMessageId],
+    [leadMain, "bot_message", relay.sourceMessageId],
+  );
+  assert.match(relayRecovery.task.prompt, /numbers match/);
+  assert.match(relayRecovery.task.prompt, /tell the person the outcome/);
+  assert.equal(
+    (await prisma.message.findUniqueOrThrow({ where: { id: held.id } })).runId,
+    relayRecovery.id,
+  );
+  assert.equal(
+    (await prisma.botMessageRequest.findUniqueOrThrow({ where: { id: requestRow.id } }))
+      .resumeRunId,
+    relayRecovery.id,
+  );
+  const modelFailure = await cut(relayRecovery, "Synthetic model refusal");
+  assert.equal(modelFailure.recoveryRunId, undefined, "a model failure is not an interruption");
+  checks.push(
+    "the sender turn that relays held answers starts again with the answers it read, never after a model failure",
   );
 
   const result = { passed: true, checks, productionAccess: false };

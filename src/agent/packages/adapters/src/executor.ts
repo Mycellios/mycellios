@@ -10177,7 +10177,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               .catch((error) => getLogger().error("steering continuation enqueue", error));
           }
           await afterAgentTaskTurn(deps, run, failed);
-          if (run.trigger === "bot_message") {
+          // A recovered turn answers the teammate itself; the cut-off one sends no failure.
+          if (run.trigger === "bot_message" && !failed.recoveryRunId) {
             await returnBotMessageOutcome(
               deps,
               { ...run, sourceMessageId: run.sourceMessageId },
@@ -10479,16 +10480,17 @@ async function scheduleRoutineRetry(
 }
 
 /**
- * A turn bringing work back (a task report or a delegated work return) that a deploy or a lost
- * PC connection stopped starts again: the report from finalizeRun's own commit, the return from
- * the work reconciler. Only the failure that ends that recovery alerts the person.
+ * A turn bringing work back (a task report, a Mico-to-Mico message or a delegated work return)
+ * that a deploy or a lost PC connection stopped starts again: the report and the message from
+ * finalizeRun's own commit, the return from the work reconciler. Only the failure that ends
+ * that recovery alerts the person.
  */
 async function failedTurnWillRecover(
   deps: ExecutorDeps,
   run: { id: string; trigger: string },
-  failed: { reportRecoveryRunId?: string | null },
+  failed: { recoveryRunId?: string | null },
 ): Promise<boolean> {
-  if (failed.reportRecoveryRunId) return true;
+  if (failed.recoveryRunId) return true;
   if (run.trigger !== "task_return") return false;
   try {
     return await workReturnWillRecover(deps.prisma, run.id);
@@ -10586,7 +10588,7 @@ async function failRunBeforeTurn(
       .catch((error) => getLogger().error("steering continuation enqueue", error));
   }
   await afterAgentTaskTurn(deps, run, failed);
-  if (run.trigger === "bot_message") {
+  if (run.trigger === "bot_message" && !failed.recoveryRunId) {
     await returnBotMessageOutcome(
       deps,
       run,
