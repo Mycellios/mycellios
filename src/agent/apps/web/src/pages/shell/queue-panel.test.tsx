@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import type { MessageQueueState } from "@mycellios/contracts";
+import type { RenderAwaitingReplies } from "../../components/AwaitingReplies";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -18,6 +19,8 @@ const { rpc, toast } = vi.hoisted(() => ({ rpc: {
     queueMove: vi.fn(async () => ({ threadId: "new-thread", runId: "run-new", title: "Plan the trip" })),
   },
 }, toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@mycellios/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => viewport.mobile }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => rpc, useBoundSpaceId: () => "space" }));
 vi.mock("../../lib/use-artifact-image", () => ({ useArtifactImage: () => "blob:thumbnail" }));
@@ -63,6 +66,7 @@ const queue = (overrides: Partial<MessageQueueState> = {}): MessageQueueState =>
 let root: ReturnType<typeof createRoot> | undefined;
 let node: HTMLDivElement;
 beforeEach(() => {
+  viewport.mobile = false;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   for (const fn of Object.values(rpc.threads)) fn.mockClear();
   for (const fn of Object.values(toast)) fn.mockClear();
@@ -73,14 +77,14 @@ afterEach(() => {
   root = undefined;
   node?.remove();
 });
-async function mount(state: MessageQueueState, props: { running?: boolean; onMoved?: (id: string, title: string) => void; onUseText?: (text: string) => void } = {}) {
+async function mount(state: MessageQueueState, props: { running?: boolean; onMoved?: (id: string, title: string) => void; onUseText?: (text: string) => void; renderAwaitingReplies?: RenderAwaitingReplies } = {}) {
   rpc.threads.queueState.mockResolvedValue(state);
   node = document.createElement("div");
   document.body.append(node);
   root = createRoot(node);
   await act(async () => {
     root!.render(<QueuePanel target={{ botId: "mico" }} artifactTarget={{ botId: "mico" }} running={props.running ?? true} sending={false}
-      onMoved={props.onMoved} onUseText={props.onUseText} />);
+      onMoved={props.onMoved} onUseText={props.onUseText} renderAwaitingReplies={props.renderAwaitingReplies} />);
   });
   await act(async () => undefined);
 }
@@ -99,6 +103,19 @@ it("lists the waiting messages with why they wait and Steer now while a turn can
   ]);
   await click("Steer now");
   expect(rpc.threads.queueSteer).toHaveBeenCalledWith({ botId: "mico", messageId: "m1" });
+  await click("Send now", 1);
+  expect(rpc.threads.queueSendNow).toHaveBeenCalledWith({ botId: "mico", messageId: "m2" });
+});
+
+it("supplies one mobile queue to the replies surface with the first message preview", async () => {
+  viewport.mobile = true;
+  await mount(queue(), {
+    renderAwaitingReplies: (queue) => <div data-testid="mobile-activity">{queue?.preview}{queue?.messages}</div>,
+  });
+  const activity = node.querySelector("[data-testid=mobile-activity]")!;
+  expect(activity.firstChild?.textContent).toBe("Check the invoices");
+  expect(activity.querySelectorAll("[data-testid=queued-message]")).toHaveLength(2);
+  expect(node.querySelectorAll("[data-testid=message-queue]")).toHaveLength(1);
   await click("Send now", 1);
   expect(rpc.threads.queueSendNow).toHaveBeenCalledWith({ botId: "mico", messageId: "m2" });
 });

@@ -260,7 +260,7 @@ import { ConversationsPane, waitingConversations } from "../components/Conversat
 import { SideConversationView } from "../components/SideConversationView";
 import { MirroredRequests } from "../components/MirroredRequests";
 import { OpenWaits } from "../components/OpenWaits";
-import { AwaitingReplies } from "../components/AwaitingReplies";
+import { AwaitingReplies, type RenderAwaitingReplies } from "../components/AwaitingReplies";
 import { SendToGroupContext } from "../components/SendToGroup";
 import { closeBeside, openBeside, pruneBeside, showBeside, updateBeside, useBeside } from "../lib/conversation-pane";
 import { micoConversationScope } from "../lib/sidebar-conversations";
@@ -3082,9 +3082,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   // Teammates the Mico's requests still wait on, above the main chat's composer.
   const lastMessageId = activeSnapshot?.messages.at(-1)?.id ?? "";
   const awaitingRefresh = `${waitsRefresh}:${lastMessageId}`;
-  const reassignBots = useMemo(() => bots.filter((bot) => !bot.archivedAt).map((bot) => ({ id: bot.id, name: bot.name })), [bots]);
-  const awaitingReplies = useMemo(() => mirrorBotId
-    ? <AwaitingReplies rpc={rpc} botId={mirrorBotId} bots={reassignBots} refreshKey={awaitingRefresh} /> : null,
+  const reassignBots = useMemo(() => bots.filter((bot) => !bot.archivedAt).map((bot) => ({ id: bot.id, name: bot.name, color: bot.color })), [bots]);
+  const awaitingReplies = useMemo<RenderAwaitingReplies | undefined>(() => mirrorBotId
+    ? (queue) => <AwaitingReplies rpc={rpc} botId={mirrorBotId} bots={reassignBots} refreshKey={awaitingRefresh} mobileQueue={queue} /> : undefined,
   [rpc, mirrorBotId, reassignBots, awaitingRefresh]);
   const transcriptFooter = useMemo(() => mirrorBotId ? <>
     {conversationFailure}
@@ -5277,8 +5277,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 <Trans>Teaching in progress. Stop teaching before sending a new message.</Trans>
               </div>
             ) : null}
-            {awaitingReplies ? <div className="px-3 md:px-[max(1.5rem,calc((100%_-_60rem)/2))]">{awaitingReplies}</div> : null}
             <Composer
+              renderAwaitingReplies={awaitingReplies}
               key={inGroup ? `group:${groupId}` : `bot:${active?.id}`}
               draftKey={(floatingChat ? "floating:" : "") + (inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : newConversation ? `bot:${active?.id}:new-conversation` : `bot:${active?.id}`)}
               placeholder={composerPlaceholder}
