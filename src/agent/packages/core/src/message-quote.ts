@@ -172,6 +172,7 @@ function replyBlockText(block: MessageBlock): string {
     case "cloud_agent":
       return block.title;
     case "routine_run":
+    case "routine_webhook":
       return block.routineName;
     case "call_request":
       return block.reason;

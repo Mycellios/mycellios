@@ -15656,3 +15656,19 @@ msgstr "Ignorado: un filtro no coincidió"
 #: src/pages/RoutineRunHistory.tsx
 msgid "Ignored: routine paused"
 msgstr "Ignorado: la rutina estaba en pausa"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Copy webhook URL"
+msgstr "Copiar URL del webhook"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Show secret once"
+msgstr "Mostrar el secreto una vez"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Hide secret"
+msgstr "Ocultar secreto"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "The secret is unavailable. You can rotate it in the routine editor."
+msgstr "El secreto no está disponible. Puedes renovarlo en el editor de rutinas."

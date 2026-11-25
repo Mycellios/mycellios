@@ -332,10 +332,10 @@ export function mountRoutineEventRoutes(
   });
 }
 
-/** What the app shows of a routine's webhook; the secret itself never leaves the server again. */
+/** What the app shows of a routine's webhook without reading the secret. */
 export function routineWebhookState(
   routine: { webhookEventType: string | null; webhookFilters: unknown },
-  secrets: ReadonlyArray<{ createdAt: Date; expiresAt: Date | null }>,
+  secrets: ReadonlyArray<{ createdAt: Date; expiresAt: Date | null; revealUntil?: Date | null }>,
   now = new Date(),
 ): RoutineWebhookState {
   const current = secrets.find((secret) => secret.expiresAt === null);
@@ -347,11 +347,14 @@ export function routineWebhookState(
     previousSecretExpiresAt: previous?.expiresAt?.toISOString() ?? null,
     eventType: routine.webhookEventType,
     filters: routineEventFilters(routine.webhookFilters) ?? [],
+    revealUntil: current?.revealUntil && current.revealUntil > now
+      ? current.revealUntil.toISOString()
+      : null,
   };
 }
 
 export const routineWebhookSecretsSelect = {
-  select: { createdAt: true, expiresAt: true },
+  select: { createdAt: true, expiresAt: true, revealUntil: true },
 } as const;
 
 /**
@@ -375,6 +378,7 @@ export async function rotateRoutineWebhookSecret(
       where: { routineId: routine.id, expiresAt: null },
       data: {
         expiresAt: new Date(now.getTime() + ROUTINE_WEBHOOK_PREVIOUS_SECRET_HOURS * 60 * 60 * 1000),
+        revealUntil: null,
       },
     });
     await tx.routineWebhookSecret.create({
@@ -389,6 +393,39 @@ export async function rotateRoutineWebhookSecret(
     });
   });
   return plaintext;
+}
+
+/** Claim a chat-created secret exactly once for the routine's owner. */
+export async function revealRoutineWebhookSecret(
+  deps: Pick<WebhookDeps, "prisma" | "secrets">,
+  routine: { id: string; spaceId: string; userId: string },
+): Promise<string | null> {
+  return deps.prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM routines WHERE id = ${routine.id} AND "spaceId" = ${routine.spaceId}
+      AND "userId" = ${routine.userId} AND "webhookEnabled" = TRUE FOR UPDATE
+    `;
+    if (!locked.length) return null;
+    const where = {
+      routineId: routine.id,
+      spaceId: routine.spaceId,
+      userId: routine.userId,
+      expiresAt: null,
+      revealUntil: { gt: new Date() },
+    };
+    const secret = await tx.routineWebhookSecret.findFirst({
+      where,
+      select: { id: true, ciphertext: true },
+    });
+    if (!secret) return null;
+    const consumed = await tx.routineWebhookSecret.updateMany({
+      where: { ...where, id: secret.id },
+      data: { revealUntil: null },
+    });
+    if (consumed.count !== 1) return null;
+    // If decryption fails, the transaction rolls back and the user can try again.
+    return deps.secrets.load(secret.ciphertext, secret.id);
+  });
 }
 
 /** End the routine's current and previous secrets at once. */
