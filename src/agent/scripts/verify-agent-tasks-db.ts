@@ -267,8 +267,8 @@ try {
   for (const [attempt, delay] of INTERRUPTED_TURN_RECOVERY_DELAYS_MS.entries()) {
     const before = Date.now();
     const cut = await end(reportTurn, { outcome: "failed", error: DESKTOP_RUN_INTERRUPTED_ERROR });
-    assert.ok(cut?.reportRecoveryRunId, "an interrupted report starts again");
-    const recovery = await prisma.run.findUniqueOrThrow({ where: { id: cut.reportRecoveryRunId }, include: { task: true } });
+    assert.ok(cut?.recoveryRunId, "an interrupted report starts again");
+    const recovery = await prisma.run.findUniqueOrThrow({ where: { id: cut.recoveryRunId }, include: { task: true } });
     assert.deepEqual([recovery.threadId, recovery.trigger, recovery.status, recovery.sourceMessageId, recovery.clientNonce],
       [main, "task_report", "queued", reportA.id, `task-report:${taskA.id}:${runA.id}:recovery:${reportTurn.id}`]);
     const wakeAt = recovery.wakeAt?.getTime() ?? 0;
@@ -280,12 +280,12 @@ try {
   }
   const spent = await end(reportTurn, { outcome: "failed", error: DESKTOP_RUN_INTERRUPTED_ERROR });
   assert.ok(spent);
-  assert.equal(spent.reportRecoveryRunId, undefined, "the recovery budget is spent");
+  assert.equal(spent.recoveryRunId, undefined, "the recovery budget is spent");
   assert.equal(await prisma.run.count({ where: { sourceMessageId: reportA.id, trigger: "task_report" } }),
     1 + INTERRUPTED_TURN_RECOVERY_DELAYS_MS.length);
   const refused = await end(stoppedRun, { outcome: "failed", error: "Synthetic model refusal" });
   assert.ok(refused);
-  assert.equal(refused.reportRecoveryRunId, undefined, "a model failure is not an interruption");
+  assert.equal(refused.recoveryRunId, undefined, "a model failure is not an interruption");
   checks.push("a report turn cut off by an update or a lost PC connection starts again on its report after growing delays, a bounded number of times, never after a model failure");
 
   const result ={ passed: true, checks, productionAccess: false };

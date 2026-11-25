@@ -57,6 +57,7 @@ import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
 import { type QueuedTaskReport, queueTaskReportInTransaction, queueTaskReportRecoveryInTransaction } from "./agent-tasks.js";
+import { queueBotMessageRecoveryInTransaction } from "./bot-message-requests.js";
 import { type QueuedRoutineRunMarker, queueRoutineRunMarkerInTransaction } from "./routine-run-markers.js";
 import { compareQueuedRows } from "./queue-order.js";
 import { IsolationError } from "./scope.js";
@@ -151,8 +152,11 @@ export interface FinalizeRunResult {
   taskReport?: QueuedTaskReport | null;
   /** The marker a routine run added to the Mico's main chat. */
   routineMarker?: QueuedRoutineRunMarker | null;
-  /** A fresh report run queued because an update or a lost PC connection cut this one off. */
-  reportRecoveryRunId?: string | null;
+  /**
+   * A fresh run queued because an update or a lost PC connection cut this one off (a task
+   * report or a Mico-to-Mico turn); it carries the turn, so nobody is told it failed yet.
+   */
+  recoveryRunId?: string | null;
 }
 
 interface FinalizeRunBase {
@@ -1663,7 +1667,7 @@ export async function finalizeRun(
     continuationRunId: committed.continuationRunId,
     ...(committed.taskReport ? { taskReport: committed.taskReport } : {}),
     ...(committed.routineMarker ? { routineMarker: committed.routineMarker } : {}),
-    ...(committed.reportRecoveryRunId ? { reportRecoveryRunId: committed.reportRecoveryRunId } : {}),
+    ...(committed.recoveryRunId ? { recoveryRunId: committed.recoveryRunId } : {}),
   };
 }
 
@@ -1699,7 +1703,7 @@ async function finalizeRunOnce(
   firstResponse: boolean;
   taskReport: QueuedTaskReport | null;
   routineMarker: QueuedRoutineRunMarker | null;
-  reportRecoveryRunId: string | null;
+  recoveryRunId: string | null;
   status: "completed" | "failed";
 } | null> {
   // A routine run that reports its own failure did its turn: its answer is a normal reply, its
@@ -1847,11 +1851,12 @@ async function finalizeRunOnce(
       threadId: input.threadId,
       status,
     });
-    // A report turn cut off by an update or a lost PC connection starts again in this commit,
-    // so the main chat still gets the result.
-    const reportRecoveryRunId =
+    // A report or Mico-to-Mico turn cut off by an update or a lost PC connection starts again
+    // in this commit, so the person or the teammate waiting on it still gets the result.
+    const recoveryRunId =
       input.outcome === "failed"
-        ? await queueTaskReportRecoveryInTransaction(tx, { runId: input.runId, error, now })
+        ? ((await queueTaskReportRecoveryInTransaction(tx, { runId: input.runId, error, now })) ??
+          (await queueBotMessageRecoveryInTransaction(tx, { runId: input.runId, error, now })))
         : null;
     if (writableRun) {
       await deleteRunSecretsInTransaction(tx, [
@@ -1881,7 +1886,7 @@ async function finalizeRunOnce(
       firstResponse,
       taskReport,
       routineMarker,
-      reportRecoveryRunId,
+      recoveryRunId,
       status,
     };
   }, FINALIZE_TRANSACTION_OPTIONS);
