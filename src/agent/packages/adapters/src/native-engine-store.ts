@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
-import { mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { Readable, Transform } from "node:stream";
@@ -13,15 +13,17 @@ import type { NativeEngineInstallable, NativeEngineInstallProgress, NativeInstal
 import { z } from "zod";
 import type { NativeCommand } from "./native-agent-process.js";
 import { nativeEnvironment } from "./native-agent-process.js";
+import bundledBlocklistFile from "./native-engines.blocklist.json" with { type: "json" };
 import lockFile from "./native-engines.lock.json" with { type: "json" };
 
 /**
  * The per-user store of managed CLIs (specs/native-engines/spec.md phase 3):
- * `provider-runtimes/<engine>/<version>`. A download comes only from the URL the repository's lock
- * file pins, is bounded and checked against the vendor's published hash before anything is
- * unpacked, and is unpacked into a staging folder that becomes the version folder only after every
- * file was recorded and the program reported the pinned version. No administrator rights, no
- * global package manager and never the CLI's own updater.
+ * `provider-runtimes/<engine>/<version>`. A download comes only from npm's own tarball of a version
+ * the repository's lock file pins or the engine's npm channel names, is bounded and checked against
+ * the vendor's published hash before anything is unpacked, and is unpacked into a staging folder
+ * that becomes the version folder only after every file was recorded and the program reported its
+ * version. Turns run the newest copy that the blocklist does not withdraw. No administrator rights,
+ * no global package manager and never the CLI's own updater.
  */
 
 export const NATIVE_ENGINE_TARGETS = ["win32-x64", "win32-arm64", "darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64"] as const;
@@ -54,20 +56,36 @@ function storePath(value: string) {
 }
 const packagePath = (value: string) => value.startsWith("package/") && storePath(value);
 
+const REGISTRY = "https://registry.npmjs.org";
+const NPM_PACKAGE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
+/** npm's own tarball address for a package version, the only download the store accepts. */
+const npmTarball = (name: string, version: string) => `${REGISTRY}/${name}/-/${name.split("/").pop()}-${version}.tgz`;
+/** A registry document's address: a scope's slash is encoded. */
+const registryPath = (name: string) => name.replace("/", "%2F");
+/** Update checks read small registry documents, each within this size and time. */
+const METADATA_BYTES = 256 * 1024;
+const METADATA_MS = 15_000;
+
 const ReleaseSchema = z.object({
-  package: z.string().max(214),
-  url: z.string().max(500).refine(url => url.startsWith("https://registry.npmjs.org/") && !url.includes("..")),
+  package: z.string().max(214).regex(NPM_PACKAGE),
+  url: z.string().max(500).refine(url => url.startsWith(`${REGISTRY}/`) && !url.includes("..")),
   integrity: z.string().regex(/^sha512-[A-Za-z0-9+/]{86}==$/),
   bytes: z.number().int().positive().max(1024 ** 3),
   unpackedBytes: z.number().int().positive().max(4 * 1024 ** 3),
   files: z.number().int().positive().max(10_000),
   executable: z.string().refine(packagePath),
+  /** What this target's package version adds to the engine version (Codex publishes `<version>-<target>`). */
+  versionSuffix: z.string().max(40).regex(/^-[a-z0-9-]+$/).optional(),
 });
 const LockedEngineSchema = z.object({
   version: z.string().max(64).regex(VERSION),
   source: z.literal("npm"),
+  /** The dist-tag of the engine's main npm package that Desktop follows for newer versions. */
+  channel: z.object({ package: z.string().max(214).regex(NPM_PACKAGE), tag: z.string().max(64).regex(/^[a-z][a-z0-9.-]*$/) }),
   targets: z.partialRecord(z.enum(NATIVE_ENGINE_TARGETS), ReleaseSchema),
-});
+}).refine(engine => Object.values(engine.targets).every(release => !release ||
+  release.url === npmTarball(release.package, `${engine.version}${release.versionSuffix ?? ""}`)),
+"Each target downloads npm's own tarball of its package version");
 export const NativeEngineLockSchema = z.object({
   schemaVersion: z.literal(1),
   engines: z.object({ codex: LockedEngineSchema, claude: LockedEngineSchema, opencode: LockedEngineSchema }),
@@ -93,6 +111,12 @@ export type ManagedNativeEngine = {
   version: string;
   /** False while discovery stopped waiting for the start check; nothing may start the copy yet. */
   ready: boolean;
+};
+export type NativeEngineInstallOptions = NativeEngineStoreOptions & {
+  /** A release to install instead of the lock's: a newer version that the engine's channel names. */
+  release?: NativeEngineRelease;
+  /** Runs once the download matched its published hash, before it is unpacked, checked and started. */
+  onChecking?: () => void;
 };
 
 const RecordSchema = z.object({
@@ -200,19 +224,47 @@ async function sha256(file: string) {
 }
 
 /** Writes a record for a pre-store copy whose single file has the hash Mycellios pinned for it. */
-async function adoptLegacyCopy(directory: string, release: NativeEngineRelease): Promise<InstallRecord | null> {
-  const legacy = LEGACY_COPIES[release.engine];
-  if (!legacy || legacy.target !== release.target || legacy.version !== release.version) return null;
+async function adoptLegacyCopy(directory: string, engine: NativeInstallEngine, version: string,
+  target: NativeEngineTarget): Promise<InstallRecord | null> {
+  const legacy = LEGACY_COPIES[engine];
+  if (!legacy || legacy.target !== target || legacy.version !== version) return null;
   try {
     const file = await sha256(join(directory, legacy.file));
     if (file.sha256 !== legacy.sha256) return null;
-    const record: InstallRecord = { schemaVersion: 1, engine: release.engine, version: release.version,
-      target: release.target, executable: legacy.file, files: { [legacy.file]: file } };
+    const record: InstallRecord = { schemaVersion: 1, engine, version, target, executable: legacy.file,
+      files: { [legacy.file]: file } };
     await writeFile(join(directory, RECORD), JSON.stringify(record), { flag: "wx", mode: 0o600 });
     return record;
   } catch {
     return null;
   }
+}
+
+type InstalledCopy = { version: string; directory: string; record: InstallRecord };
+
+/** The recorded copy of one engine version for this computer, or null. */
+async function installedCopy(root: string, engine: NativeInstallEngine, version: string,
+  target: NativeEngineTarget): Promise<InstalledCopy | null> {
+  const directory = join(root, engine, version);
+  const record = await readRecord(directory) ?? await adoptLegacyCopy(directory, engine, version, target);
+  return record && record.engine === engine && record.version === version && record.target === target
+    ? { version, directory, record } : null;
+}
+
+/** Every recorded copy of an engine for this computer, newest first. Nothing is hashed or started. */
+async function installedCopies(root: string, engine: NativeInstallEngine, target: NativeEngineTarget) {
+  const names = await readdir(join(root, engine)).catch(() => [] as string[]);
+  const copies = await Promise.all(names.filter(name => name.length <= 64 && VERSION.test(name))
+    .map(name => installedCopy(root, engine, name, target)));
+  return copies.filter((copy): copy is InstalledCopy => copy !== null)
+    .sort((left, right) => compareVersions(right.version, left.version));
+}
+
+/** The versions of an engine this store holds for this computer, newest first (records only). */
+export async function nativeEngineVersions(root: string, engine: NativeInstallEngine,
+  options: NativeEngineStoreOptions = {}): Promise<string[]> {
+  const target = options.target ?? nativeEngineTarget();
+  return target && isAbsolute(root) ? (await installedCopies(root, engine, target)).map(copy => copy.version) : [];
 }
 
 /** Sizes and modification times of every recorded file; null when one is missing or changed size. */
@@ -239,35 +291,70 @@ async function checkCopy(directory: string, record: InstallRecord, executable: s
   }
 }
 
+const managedCopy = (copy: InstalledCopy, ready = true): ManagedNativeEngine => ({
+  command: { command: join(copy.directory, ...copy.record.executable.split("/")), args: ENGINE_ARGS[copy.record.engine] },
+  version: copy.version, ready,
+});
+
 /**
- * The managed copy of an engine, or null. Before its first start in a session, every recorded file
- * is hashed again and the program must report the pinned version; later starts repeat that only
- * when a file's size or modification time changed. `waitMs` bounds how long discovery waits for a
- * check: a copy still being checked comes back with `ready: false`.
+ * Whether a copy passed its start check: every recorded file hashed again and the program reporting
+ * its version, once per session and again only when a file's size or modification time changed.
+ * Undefined while the check is still running after `waitMs`.
  */
-export async function managedNativeEngine(root: string, engine: NativeInstallEngine,
-  options: NativeEngineStoreOptions & { waitMs?: number } = {}): Promise<ManagedNativeEngine | null> {
-  const release = nativeEngineRelease(engine, options);
-  if (!release || !isAbsolute(root)) return null;
-  const directory = join(root, engine, release.version);
-  const record = await readRecord(directory) ?? await adoptLegacyCopy(directory, release);
-  if (!record || record.engine !== engine || record.version !== release.version || record.target !== release.target)
-    return null;
-  const signature = await recordSignature(directory, record);
-  if (!signature) return null;
-  const executable = join(directory, ...record.executable.split("/"));
+async function startCheck(copy: InstalledCopy, options: NativeEngineStoreOptions, waitMs?: number) {
+  const signature = await recordSignature(copy.directory, copy.record);
+  if (!signature) return false;
+  const { directory } = copy;
   let check = checks.get(directory);
   if (check?.signature !== signature) {
-    const current = { signature, result: checkCopy(directory, record, executable, release.version, options) };
+    const executable = managedCopy(copy).command.command;
+    const current = { signature, result: checkCopy(directory, copy.record, executable, copy.version, options) };
     checks.set(directory, current);
     void current.result.then(ok => {
       if (!ok) setTimeout(() => { if (checks.get(directory) === current) checks.delete(directory); }, FAILED_CHECK_MS).unref?.();
     });
     check = current;
   }
-  const ready = await settledWithin(check.result, options.waitMs);
-  if (ready === false) return null;
-  return { command: { command: executable, args: ENGINE_ARGS[engine] }, version: release.version, ready: ready === true };
+  return settledWithin(check.result, waitMs);
+}
+
+/**
+ * The managed copy of an engine that turns start, or null: the newest copy the blocklist does not
+ * withdraw and that passes its start check (a copy that fails it leaves the previous one in use).
+ * `waitMs` bounds how long discovery waits for a check: a copy still being checked comes back with
+ * `ready: false`.
+ */
+export async function managedNativeEngine(root: string, engine: NativeInstallEngine,
+  options: NativeEngineStoreOptions & { waitMs?: number } = {}): Promise<ManagedNativeEngine | null> {
+  const target = options.target ?? nativeEngineTarget();
+  if (!target || !isAbsolute(root)) return null;
+  for (const copy of await installedCopies(root, engine, target)) {
+    if (nativeEngineBlocked(root, engine, copy.version, target)) continue;
+    const ready = await startCheck(copy, options, options.waitMs);
+    if (ready !== false) return managedCopy(copy, ready === true);
+  }
+  return null;
+}
+
+/**
+ * Removes one version of an engine from the store. It is renamed aside first, so a copy whose program
+ * is still running (Windows keeps it busy) stays whole and is tried again later; leftovers of earlier
+ * removals go too. Only the store's own folders are ever removed.
+ */
+export async function removeNativeEngineCopy(root: string, engine: NativeInstallEngine, version: string) {
+  if (!isAbsolute(root) || version.length > 64 || !VERSION.test(version)) return false;
+  const parent = join(root, engine);
+  const directory = join(parent, version);
+  let removed = false;
+  try {
+    await rename(directory, join(parent, `.remove-${randomUUID()}`));
+    checks.delete(directory);
+    removed = true;
+  } catch { /* in use or already gone: the next check tries again */ }
+  const names = await readdir(parent).catch(() => [] as string[]);
+  for (const name of names.filter(entry => entry.startsWith(".remove-")))
+    await rm(join(parent, name), { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }).catch(() => undefined);
+  return removed;
 }
 
 async function download(release: NativeEngineRelease, archive: string, progress: NativeEngineInstallProgress,
@@ -484,9 +571,9 @@ async function renameWhenFree(from: string, to: string) {
 }
 
 async function install(root: string, release: NativeEngineRelease, progress: NativeEngineInstallProgress,
-  options: NativeEngineStoreOptions): Promise<ManagedNativeEngine> {
-  const existing = await managedNativeEngine(root, release.engine, options);
-  if (existing) return existing;
+  options: NativeEngineInstallOptions): Promise<ManagedNativeEngine> {
+  const existing = await installedCopy(root, release.engine, release.version, release.target);
+  if (existing && await startCheck(existing, options)) return managedCopy(existing);
   const name = NAMES[release.engine];
   const parent = join(root, release.engine);
   await mkdir(parent, { recursive: true, mode: 0o700 });
@@ -495,9 +582,12 @@ async function install(root: string, release: NativeEngineRelease, progress: Nat
     const archive = join(staging, "download.tgz");
     await download(release, archive, progress, options.fetch ?? fetch);
     progress.state = "checking";
+    options.onChecking?.();
     const files = await extractPackage(archive, staging, release);
     await rm(archive, { force: true });
     if (!files[release.executable]) throw new NativeEngineInstallError(`The ${name} package has no program for this computer.`);
+    if (nativeEngineBlocked(root, release.engine, release.version, release.target))
+      throw new NativeEngineInstallError(`${name} ${release.version} was withdrawn. Try again later.`);
     // Only now, with every byte verified and recorded, is the program started, to read its version.
     const staged = join(staging, ...release.executable.split("/"));
     if (await (options.version ?? nativeCliVersion)({ command: staged }, INSTALL_CHECK_MS) !== release.version)
@@ -521,15 +611,20 @@ async function install(root: string, release: NativeEngineRelease, progress: Nat
 type InstallState = { root: string; progress: NativeEngineInstallProgress; at: number; promise?: Promise<ManagedNativeEngine> };
 const installs = new Map<string, InstallState>();
 
-/** Installs the pinned copy of an engine into the store; concurrent requests share one install. */
+/**
+ * Installs the pinned copy of an engine, or the given newer release, into the store; one install
+ * or update of an engine runs at a time and concurrent requests share it.
+ */
 export function installNativeEngine(root: string, engine: NativeInstallEngine,
-  options: NativeEngineStoreOptions = {}): Promise<ManagedNativeEngine> {
+  options: NativeEngineInstallOptions = {}): Promise<ManagedNativeEngine> {
   const key = JSON.stringify([root, engine]);
   const running = installs.get(key)?.promise;
   if (running) return running;
-  const release = nativeEngineRelease(engine, options);
-  if (!release || !isAbsolute(root))
+  const release = options.release ?? nativeEngineRelease(engine, options);
+  if (!release || release.engine !== engine || !isAbsolute(root))
     return Promise.reject(new NativeEngineInstallError(`${NAMES[engine]} is not available for this computer.`));
+  if (nativeEngineBlocked(root, engine, release.version, release.target))
+    return Promise.reject(new NativeEngineInstallError(`${NAMES[engine]} ${release.version} was withdrawn. Try again later.`));
   const progress: NativeEngineInstallProgress = { engine, state: "downloading", receivedBytes: 0, totalBytes: release.bytes };
   const state: InstallState = { root, progress, at: Date.now() };
   state.promise = install(root, release, progress, options).then(managed => {
@@ -554,8 +649,145 @@ export function nativeEngineInstalls(root: string, now = Date.now()): NativeEngi
     .map(state => ({ ...state.progress }));
 }
 
+/** Whether an install or update of an engine is running in this store. */
+export function nativeEngineInstalling(root: string, engine: NativeInstallEngine) {
+  return Boolean(installs.get(JSON.stringify([root, engine]))?.promise);
+}
+
+class RegistryAnswer extends Error {
+  constructor(readonly status: number) { super(`The registry answered ${status}`); }
+}
+
+/** A small JSON document: no redirect, no account data, within a deadline and a size bound. */
+async function boundedJson(fetcher: typeof fetch, url: string, maxBytes: number): Promise<unknown> {
+  const response = await fetcher(url, { headers: { accept: "application/json" }, redirect: "error",
+    signal: AbortSignal.timeout(METADATA_MS) });
+  if (!response.ok || !response.body) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new RegistryAnswer(response.status);
+  }
+  if (Number(response.headers.get("content-length") ?? 0) > maxBytes) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error("The document is larger than expected");
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of Readable.fromWeb(response.body as ReadableStream<Uint8Array>) as AsyncIterable<Buffer>) {
+    total += chunk.length;
+    if (total > maxBytes) throw new Error("The document is larger than expected");
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+const fields = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+
+/** The exact size of a tarball, from a one-byte range request (or the length a full answer declares). */
+async function tarballBytes(fetcher: typeof fetch, url: string) {
+  const response = await fetcher(url, { headers: { range: "bytes=0-0" }, redirect: "error",
+    signal: AbortSignal.timeout(METADATA_MS) });
+  await response.body?.cancel().catch(() => undefined);
+  const total = response.status === 206 ? Number(/^bytes 0-0\/(\d+)$/.exec(response.headers.get("content-range") ?? "")?.[1])
+    : response.status === 200 ? Number(response.headers.get("content-length")) : NaN;
+  if (!Number.isSafeInteger(total) || total <= 0) throw new Error("The registry did not give the download size");
+  return total;
+}
+
+/**
+ * The newest release of an engine's vendor channel for this computer: the version its npm dist-tag
+ * names, that version's package for this target (npm's own tarball, dist.integrity, unpacked size and
+ * file count) and the exact download size. Undefined when the vendor publishes no package of that
+ * version for this target; throws when the registry cannot be read. Its requests carry no account
+ * data, and an install of it is verified exactly like a first install.
+ */
+export async function nativeEngineChannelRelease(engine: NativeInstallEngine, options: NativeEngineStoreOptions = {}):
+  Promise<NativeEngineRelease | undefined> {
+  const target = options.target ?? nativeEngineTarget();
+  const locked = (options.lock ?? nativeEngineLock).engines[engine];
+  const pinned = target ? locked.targets[target] : undefined;
+  if (!target || !pinned) return undefined;
+  const fetcher = options.fetch ?? fetch;
+  const tagged = fields(await boundedJson(fetcher,
+    `${REGISTRY}/${registryPath(locked.channel.package)}/${locked.channel.tag}`, METADATA_BYTES));
+  const version = tagged.name === locked.channel.package && typeof tagged.version === "string" &&
+    tagged.version.length <= 64 && VERSION.test(tagged.version) ? tagged.version : undefined;
+  if (!version) throw new Error(`The ${NAMES[engine]} channel names no version`);
+  const packageVersion = `${version}${pinned.versionSuffix ?? ""}`;
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = fields(await boundedJson(fetcher, `${REGISTRY}/${registryPath(pinned.package)}/${packageVersion}`, METADATA_BYTES));
+  } catch (error) {
+    if (error instanceof RegistryAnswer && error.status === 404) return undefined;
+    throw error;
+  }
+  const dist = fields(manifest.dist);
+  const url = npmTarball(pinned.package, packageVersion);
+  if (manifest.name !== pinned.package || manifest.version !== packageVersion || dist.tarball !== url)
+    throw new Error(`The registry described another ${NAMES[engine]} package`);
+  const release = ReleaseSchema.safeParse({
+    package: pinned.package, url, integrity: dist.integrity, bytes: await tarballBytes(fetcher, url),
+    unpackedBytes: dist.unpackedSize, files: dist.fileCount, executable: pinned.executable,
+    ...(pinned.versionSuffix ? { versionSuffix: pinned.versionSuffix } : {}),
+  });
+  if (!release.success) throw new Error(`The registry gave ${NAMES[engine]} ${version} no integrity or bounds`);
+  return { ...release.data, engine, version, target };
+}
+
+const BlockedVersionSchema = z.object({
+  engine: z.string().max(32),
+  version: z.string().max(64).regex(VERSION),
+  /** Only these targets; every target when omitted. Names a PC does not know never match it. */
+  targets: z.array(z.string().max(32)).max(16).optional(),
+  /** Why it was withdrawn, for the pull request that adds it; never shown in the app. */
+  reason: z.string().min(1).max(300),
+});
+/** Versions withdrawn because they break on a target (src/agent/packages/adapters/src/native-engines.blocklist.json). */
+export const NativeEngineBlocklistSchema = z.object({
+  schemaVersion: z.literal(1),
+  blocked: z.array(BlockedVersionSchema).max(500),
+});
+export type NativeEngineBlocklist = z.infer<typeof NativeEngineBlocklistSchema>;
+const bundledBlocklist = NativeEngineBlocklistSchema.parse(bundledBlocklistFile);
+/** The blocklist as main publishes it; a pull request to main is the only way to change it. */
+export const NATIVE_ENGINE_BLOCKLIST_URL =
+  "https://raw.githubusercontent.com/Mycellios/mycellios/main/src/agent/packages/adapters/src/native-engines.blocklist.json";
+const BLOCKLIST_BYTES = 64 * 1024;
+
+/** The published blocklist, or null when it cannot be read or fails its schema: such a list blocks nothing. */
+export async function readNativeEngineBlocklist(fetcher: typeof fetch = fetch, url = NATIVE_ENGINE_BLOCKLIST_URL) {
+  try {
+    const parsed = NativeEngineBlocklistSchema.safeParse(await boundedJson(fetcher, url, BLOCKLIST_BYTES));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a list withdraws a version of an engine on a target. */
+export function blocklistWithdraws(list: NativeEngineBlocklist, engine: NativeInstallEngine, version: string,
+  target: NativeEngineTarget) {
+  return list.blocked.some(entry => entry.engine === engine && entry.version === version &&
+    (!entry.targets || entry.targets.includes(target)));
+}
+
+const blocklists = new Map<string, NativeEngineBlocklist>();
+
+/** The blocklist a store follows from now on, in addition to its bundled entries. */
+export function useNativeEngineBlocklist(root: string, list: NativeEngineBlocklist) {
+  blocklists.set(root, list);
+}
+
+/** Whether the store's blocklist withdraws a version: no turn starts it and no install brings it. */
+export function nativeEngineBlocked(root: string, engine: NativeInstallEngine, version: string, target: NativeEngineTarget) {
+  const list = blocklists.get(root);
+  return blocklistWithdraws(bundledBlocklist, engine, version, target) ||
+    Boolean(list && blocklistWithdraws(list, engine, version, target));
+}
+
 /** Tests only. */
 export function resetNativeEngineStore() {
   installs.clear();
   checks.clear();
+  blocklists.clear();
 }

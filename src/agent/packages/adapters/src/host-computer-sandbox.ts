@@ -203,6 +203,7 @@ export class HostComputerSandbox implements SandboxProvider {
         // The server checks each entry before a client sees it, as it does for model catalogs.
         installable: environment.installableEngines ?? [],
         installs: environment.engineInstalls ?? [],
+        updates: environment.engineUpdates ?? [],
       } : {}) };
   }
   /** Asks the PC to sign one of its CLIs in or out; the answer is checked before it is passed on. */

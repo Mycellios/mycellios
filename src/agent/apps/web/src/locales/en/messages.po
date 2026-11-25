@@ -15283,6 +15283,21 @@ msgstr "Ignored: a filter did not match"
 msgid "Ignored: routine paused"
 msgstr "Ignored: routine paused"
 
+#: src/pages/shell/native-engine-install.tsx
+msgid "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
+msgstr "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "{name} {version} is available. This PC runs {current}."
+msgstr "{name} {version} is available. This PC runs {current}."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Update {name}"
+msgstr "Update {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "This PC keeps {name} {current}."
+msgstr "This PC keeps {name} {current}."
 #: src/components/RoutineWebhookCard.tsx
 msgid "Copy webhook URL"
 msgstr "Copy webhook URL"

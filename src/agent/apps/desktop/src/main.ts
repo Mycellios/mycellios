@@ -1568,9 +1568,10 @@ app.whenReady().then(async () => {
     programFiles: process.env.ProgramFiles ?? "C:\\Program Files",
     programData: process.env.ProgramData ?? "C:\\ProgramData",
   });
-  // A CLI sign-in the person starts from Mycellios opens its page in their own browser.
+  // A CLI sign-in the person starts from Mycellios opens its page in their own browser. Managed CLIs
+  // check their vendor channel and the blocklist from main at startup and daily (no account data).
   const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope(), undefined,
-    { openExternal: (url) => shell.openExternal(url) });
+    { openExternal: (url) => shell.openExternal(url) }, undefined, { checkUpdates: true });
   const nativeRoot = app.isPackaged
     ? path.join(process.resourcesPath, "local-server")
     : path.join(app.getAppPath(), "local-server");

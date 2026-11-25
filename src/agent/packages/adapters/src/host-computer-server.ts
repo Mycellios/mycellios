@@ -491,6 +491,7 @@ export async function startHostComputerServer(options: {
             engineInstall: 1 as const,
             installableEngines: engineState.installable ?? [],
             engineInstalls: engineState.installs ?? [],
+            engineUpdates: engineState.updates ?? [],
           } : {}),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),

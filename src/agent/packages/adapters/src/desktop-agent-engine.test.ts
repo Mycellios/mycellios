@@ -6,7 +6,7 @@ import type { AgentRunRequest, AgentRuntime } from "@mycellios/adapter-kit";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDesktopAgentEngine } from "./desktop-agent-engine.js";
 import { resetNativeAccountLogins } from "./native-account.js";
-import { nativeEngineLock, resetNativeEngineStore } from "./native-engine-store.js";
+import { NATIVE_ENGINE_BLOCKLIST_URL, nativeEngineLock, resetNativeEngineStore } from "./native-engine-store.js";
 import { loginShellPath, resetLoginShellPath } from "./native-login-path.js";
 
 const roots: string[]=[];afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
@@ -131,7 +131,10 @@ it("installs a missing CLI into the PC user's store only under the PC's account 
     await mkdir(directory, { recursive: true });
     await writeFile(path.join(directory, "native-agents.json"), JSON.stringify({ codex: { command: process.execPath } }));
     await expect(engine.nativeEngineInstall!({ engine: "codex" })).resolves.toEqual({ status: "installed" });
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      NATIVE_ENGINE_BLOCKLIST_URL,
+      nativeEngineLock.engines.claude.targets["linux-x64"]!.url,
+    ]);
   } finally {
     vi.unstubAllEnvs();
     resetNativeEngineStore();

@@ -1,3 +1,5 @@
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
+import type { RenderAwaitingReplies } from "../../components/AwaitingReplies";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import type { MessageQueueConflictCode, MessageQueueState, MessageQueueSteerBlock, QueuedMessage } from "@mycellios/contracts";
 import { MESSAGE_QUEUE_CONFLICT_CODES, MESSAGE_QUEUE_REORDER_LIMIT } from "@mycellios/contracts";
@@ -70,7 +72,7 @@ function Thumbnail({ target, message }: { target: ArtifactTarget; message: Queue
  * with each: Steer now, Send now, Edit, Delete, reorder and Move to a new conversation. Queued
  * messages stay in the transcript too; this panel only manages their turn.
  */
-export function QueuePanel({ target, artifactTarget, running, sending, onUseText, onMoved }: {
+export function QueuePanel({ target, artifactTarget, running, sending, onUseText, onMoved, renderAwaitingReplies }: {
   target: QueueTarget;
   artifactTarget: ArtifactTarget;
   running: boolean;
@@ -79,8 +81,11 @@ export function QueuePanel({ target, artifactTarget, running, sending, onUseText
   onUseText?: (text: string) => void;
   /** A message moved to a new conversation: open it as a background tab. */
   onMoved?: (threadId: string, title: string) => void;
+  renderAwaitingReplies?: RenderAwaitingReplies;
 }) {
   const { t } = useLingui();
+  const mobile = useIsMobile();
+  const sharedSheet = mobile && Boolean(renderAwaitingReplies);
   const rpc = useSpaceRpc();
   const spaceId = useBoundSpaceId();
   const headingId = useId();
@@ -305,7 +310,7 @@ export function QueuePanel({ target, artifactTarget, running, sending, onUseText
   const steer = state?.steer ?? { available: false };
   const deleteRow = rows.find(row => row.messageId === confirmDelete);
 
-  return <>{rows.length ? <section aria-labelledby={headingId} className="mx-3 mb-2 min-w-0 rounded-xl border border-border bg-muted/30 text-xs" data-testid="message-queue">
+  const queuedMessages = rows.length ? <section aria-labelledby={headingId} className={sharedSheet ? "min-w-0 rounded-xl border border-border bg-muted/30 text-xs" : "mx-3 mb-2 min-w-0 rounded-xl border border-border bg-muted/30 text-xs"} data-testid="message-queue">
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 px-2 py-1">
       <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls={`${headingId}-list`}
         className="flex min-h-8 shrink-0 items-center gap-1.5 rounded-md px-1 text-start focus-visible:outline-2 focus-visible:outline-ring">
@@ -314,7 +319,7 @@ export function QueuePanel({ target, artifactTarget, running, sending, onUseText
       </button>
       <p className="line-clamp-2 w-full min-w-0 pb-1 ps-6 text-muted-foreground sm:line-clamp-1 sm:w-auto sm:flex-1 sm:pb-0 sm:ps-0" data-testid="message-queue-reason" title={typeof waitText === "string" ? waitText : undefined}>{waitText}</p>
     </div>
-    {open ? <ol id={`${headingId}-list`} aria-label={t`Messages waiting to send`} className="max-h-56 space-y-1 overflow-y-auto px-2 pb-2">
+    {open ? <ol id={`${headingId}-list`} aria-label={t`Messages waiting to send`} className={sharedSheet ? "space-y-1 px-2 pb-2" : "max-h-56 space-y-1 overflow-y-auto px-2 pb-2"}>
       {shown.map((row, index) => {
         const mineEditing = editing?.messageId === row.messageId;
         const elsewhere = Boolean(row.editing && !mineEditing && row.editing.holdId !== storedHold(row.messageId));
@@ -401,7 +406,9 @@ export function QueuePanel({ target, artifactTarget, running, sending, onUseText
       })}
     </ol> : null}
     <p id={`${headingId}-keys`} className="sr-only"><Trans>Use the up and down arrow keys to move a focused message in the queue.</Trans></p>
-  </section> : null}
+  </section> : null;
+  const queueContents = <>
+    {queuedMessages}
     <span className="sr-only" role="status">{announcement}</span>
     <AlertDialog open={Boolean(deleteRow)} onOpenChange={value => { if (!value) setConfirmDelete(null); }}>
       <AlertDialogContent>
@@ -432,5 +439,15 @@ export function QueuePanel({ target, artifactTarget, running, sending, onUseText
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  </>;
+  const next = rows[0];
+  const replyQueue = sharedSheet && next ? {
+    preview: next.text || next.attachment?.name || t`Attachment`,
+    messages: queueContents,
+  } : undefined;
+
+  return <>
+    {renderAwaitingReplies?.(replyQueue)}
+    {replyQueue ? null : queueContents}
   </>;
 }
