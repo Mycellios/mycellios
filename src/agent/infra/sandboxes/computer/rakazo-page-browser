@@ -31,6 +31,11 @@ from typing import Any
 from pathlib import Path
 
 
+CDP_PORT_ENV = "RAKAZO_CDP_PORT"
+ARGS_STDIN_ENV = "RAKAZO_BROWSER_ARGS_STDIN"
+WATCH_STDIN_ENV = "RAKAZO_BROWSER_WATCH_STDIN"
+
+
 def display_num() -> int:
     raw = os.environ.get("DISPLAY", ":1")
     try:
@@ -40,7 +45,7 @@ def display_num() -> int:
 
 
 def cdp_port() -> int:
-    override = os.environ.get("RAKAZO_CDP_PORT")
+    override = os.environ.get(CDP_PORT_ENV)
     if override:
         return int(override)
     # rakazo-browser uses 9221 + display number (:1 -> 9222).
@@ -582,7 +587,7 @@ def run_isolated(port: int, command: str, args: dict[str, Any]) -> dict[str, Any
                 raise RuntimeError("The routine browser session limit was reached.")
             directory.mkdir(mode=0o700)
             try:
-                child_env = {k: v for k, v in os.environ.items() if k not in ("RAKAZO_BROWSER_WATCH_STDIN", "RAKAZO_BROWSER_ARGS_STDIN")}
+                child_env = {k: v for k, v in os.environ.items() if k not in (WATCH_STDIN_ENV, ARGS_STDIN_ENV)}
                 subprocess.Popen(
                     [sys.executable, str(Path(__file__).resolve()), "isolated-keeper", str(directory)],
                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -2437,9 +2442,9 @@ def run(argv: list[str]) -> int:
     if len(argv) == 3 and argv[1] == "hold-dialog" and argv[2].isdigit():
         return keep_dialog(int(argv[2]))
     stdin_args = (
-        read_stdin_line() if os.environ.get("RAKAZO_BROWSER_ARGS_STDIN") == "1" else None
+        read_stdin_line() if os.environ.get(ARGS_STDIN_ENV) == "1" else None
     )
-    if os.environ.get("RAKAZO_BROWSER_WATCH_STDIN") == "1":
+    if os.environ.get(WATCH_STDIN_ENV) == "1":
         threading.Thread(target=exit_when_stdin_closes, daemon=True).start()
     if len(argv) < 2:
         print(

@@ -229,7 +229,7 @@ test('Space members qualify invitations, roles, shared Micos and member isolatio
 });
 
 test('the routine browser qualifies real Chromium and the supervisor',()=>{
- const file='src/agent/infra/sandboxes/computer/rakazo-page-browser';
+ const file='src/agent/infra/sandboxes/computer/test_page_browser.py';
  const checks=planChecks([file],[]);
  assert.ok(checks.some(check=>check.args.includes('isolated_browser_real')));
  assert.ok(checks.some(check=>check.args.includes('chromium')));

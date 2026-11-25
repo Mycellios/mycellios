@@ -61,7 +61,7 @@ document.body.textContent = 'cookie=' + (document.cookie || 'empty') +
             thread.start()
             root = helper.scope_directory(scope_port)
             try:
-                with patch.dict(os.environ, {"MYCELLIOS_ROUTINE_CHROMIUM": chrome, "RAKAZO_CDP_PORT": str(scope_port)}):
+                with patch.dict(os.environ, {"MYCELLIOS_ROUTINE_CHROMIUM": chrome, helper.CDP_PORT_ENV: str(scope_port)}):
                     base = f"http://127.0.0.1:{server.server_port}"
                     def run(key, command, path="/probe", **args):
                         return helper.run_isolated(scope_port, command, {"conversationKey": key, "url": base + path, **args})
