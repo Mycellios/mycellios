@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      SOURCE_REVISION: 77b801d82aaddb5e7d72f26d677df09ede80d705
+      SOURCE_REVISION: 68439ee574a4f72a2cda894d2b3f3ad6ae48f09b
       FIRST_PARTY_CLIENTS_PATH: /oauth/consent-assets/clients-e6175ea3009d3096.json
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          ref: 77b801d82aaddb5e7d72f26d677df09ede80d705
+          ref: 68439ee574a4f72a2cda894d2b3f3ad6ae48f09b
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
