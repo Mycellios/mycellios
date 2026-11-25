@@ -719,6 +719,11 @@
   Start a cold same-Space history read at roster selection and consume its fresh,
   scoped result in the incoming shell. Keep writes, auth recovery and realtime
   direct. Reuse fresh model and account queries within their existing scope.
+  The Projects sidebar warms up to five recent chats of one project serially in
+  the exact destination Space after the visible history settles. Pointer and
+  keyboard intent can warm another row. Reuse the same memory-only snapshot and
+  never mark a conversation read until it is opened. Verify the preload limit
+  and folder changes with SidebarProjects.test.tsx.
   Preload at most two tab/picker destinations independently in the scoped memory
   cache, including when only the active tab fits on mobile; pointer/focus intent
   may warm another destination. Pending asks are preloaded without marking them read. Roster replies target the owned task thread and scroll to its loaded card.
