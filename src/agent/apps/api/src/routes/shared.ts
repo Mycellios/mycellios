@@ -115,6 +115,8 @@ export async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
   return {
     ticketBoardEnabled: deps.env.ticketBoardEnabled === true,
     phoneCallsEnabled: deps.env.phoneCallsEnabled === true,
+    // Present only while on, so clients keep the Space settings they show today.
+    ...(deps.env.spaceMembers ? { spaceMembersEnabled: true } : {}),
     maxUploadSizeBytes: attachmentMaxBytes(deps.env),
     userId: actor.userId,
     email: user.email,

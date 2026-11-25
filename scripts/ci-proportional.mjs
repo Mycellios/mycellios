@@ -167,6 +167,7 @@ export function planChecks(files, availableAgentTests) {
       [/20261123090000_mico_requests_and_group_leads|verify-mico-requests-db|bot-message-requests|group-requests|group-handoff|team-awareness/, 'verify-mico-requests-db.ts', 'Mico request settlement, group leads and migration on isolated PostgreSQL'],
       [/message-queue|queue-order|mico-concurrency|routes\/threads\.ts|20261123090000_message_queue_controls|20261123100000_conversation_turn_model/, 'verify-message-queue-db.ts', 'queue operations and turn model persistence on isolated PostgreSQL'],
       [/conversation-branch|thread-lifecycle|artifact-versions/, 'verify-conversation-branch-db.ts', 'branch copies, encryption, idempotency and isolation on isolated PostgreSQL'],
+      [/space-members|space-invit|routes\/spaces\.ts|packages\/db\/src\/(?:spaces|scope)\.ts|20261125100000_space_members/, 'verify-space-members-db.ts', 'Space invitations, roles, member isolation and audit on isolated PostgreSQL'],
     ]) {
       if (files.some(file => (file.startsWith('src/agent/') || file === primaryAccountBeta) && pattern.test(file)))
         add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);

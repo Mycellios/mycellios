@@ -33,6 +33,7 @@ import type {
   Routine,
   SearchFilter,
   SearchHit,
+  SharedSpace,
   Space,
   SpaceMemoryConfig,
   TaughtSkill,
@@ -544,6 +545,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const savingBotOrderRef = useRef(false);
   const [botSections, setBotSections] = useState<BotSection[]>(seed?.botSections ?? []);
   const [spaces, setSpaces] = useState<Space[]>(seed?.spaces ?? []);
+  const [sharedSpaces, setSharedSpaces] = useState<SharedSpace[]>(seed?.sharedSpaces ?? []);
   const [archivedBots, setArchivedBots] = useState<Bot[]>(seed?.archivedBots ?? []);
   const [archivedGroups, setArchivedGroups] = useState<Group[]>(seed?.archivedGroups ?? []);
   useEffect(() => {
@@ -856,8 +858,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const currentSpaceId = shellSpaceId ?? bootstrapMe?.spaceId ?? null;
   // null: settings follow the space the app is showing.
   const settingsSpaceId = overlay?.kind === "settings" ? overlay.spaceId : null;
+  // A Space someone else owns opens only its people (specs/space-members).
+  const sharedSettingsSpace = sharedSpaces.find((space) => space.id === settingsSpaceId);
   const settingsSpace =
-    spaces.find((space) => space.id === (settingsSpaceId ?? currentSpaceId)) ?? null;
+    spaces.find((space) => space.id === (settingsSpaceId ?? currentSpaceId)) ??
+    (sharedSettingsSpace
+      ? { id: sharedSettingsSpace.id, name: sharedSettingsSpace.name, role: sharedSettingsSpace.role }
+      : null);
   // Never fall back to another space's settings when the edited space goes away.
   const settingsSpaceGone = initialBotsLoaded && settingsSpaceId !== null && !settingsSpace;
   useEffect(() => {
@@ -1515,6 +1522,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         setBotSections(sections);
         setGroups(groupList);
         setSpaces(navigation.spaces);
+        setSharedSpaces(navigation.sharedSpaces ?? []);
         setInitialBotsLoaded(true);
         botsRefreshApplied.current = request;
         const currentGroupId = routeGroupId.current;
@@ -1798,6 +1806,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           setArchivedGroups(bootstrap.archivedGroups);
           setGroups(groupList);
           setSpaces(bootstrap.spaces);
+          setSharedSpaces(bootstrap.sharedSpaces ?? []);
           setInitialBotsLoaded(true);
         }
         // A seeded shell already loads its chat live; this older copy must not replace it.
@@ -4928,6 +4937,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       >
         <SidebarHeader
           spaces={spaces} spaceId={currentSpaceId} onSpace={openRosterChat}
+          sharedSpaces={bootstrapMe?.spaceMembersEnabled ? sharedSpaces : undefined}
+          onSharedSpace={(spaceId) => openSettings("space-members", spaceId)}
           onSpaceSettings={() => currentSpaceId ? openSpaceSettings(currentSpaceId) : openSettings("general")}
           history={chatHistory} onRoutines={showRoutines} onWorkflows={showWorkflows}
           onTasks={showTasks} onSchedule={showSchedule} onUsage={showUsage}
@@ -5886,6 +5897,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             onDeleteSpace={async (spaceId) => {
               await removeSpace(spaceId);
               if (alive.current) setOverlay(null);
+            }}
+            spaceMembersEnabled={bootstrapMe?.spaceMembersEnabled === true}
+            onLeaveSpace={() => {
+              setOverlay(null);
+              void refreshBots();
             }}
             currentSpaceId={currentSpaceId}
             onSpaceChange={(spaceId) => setOverlay({ ...overlay, spaceId })}

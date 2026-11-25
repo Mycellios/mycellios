@@ -205,6 +205,7 @@ model User {
   passkeys                    Passkey[]
   members                     Member[]
   invitations                 Invitation[]
+  spaceInvitations            SpaceInvitation[]            @relation("SpaceInvitationInviter")
   modelCredentials            UserModelCredential[]
   voiceCredentials            UserVoiceCredential[]
   secrets                     Secret[]
@@ -484,6 +485,7 @@ model Space {
   deletingAt                  DateTime?
   deletionClaimId             String?
   memberships                 SpaceMember[]
+  invitations                 SpaceInvitation[]
   bots                        Bot[]
   botSections                 BotSection[]
   developmentProjects         DevelopmentProject[]
@@ -620,6 +622,31 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+/// A one-use invitation to a Space other than Personal (specs/space-members). Only the SHA-256
+/// of its link token is stored. An email invitation can only be accepted by that address.
+model SpaceInvitation {
+  id               String    @id
+  spaceId          String
+  space            Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  inviterUserId    String
+  inviter          User      @relation("SpaceInvitationInviter", fields: [inviterUserId], references: [id], onDelete: Cascade)
+  /// "email" or "link".
+  kind             String
+  /// Lowercased address of an email invitation; null for a link.
+  email            String?
+  tokenHash        String    @unique
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  revokedAt        DateTime?
+  acceptedAt       DateTime?
+  /// No foreign key: the record of who joined outlives that account.
+  acceptedByUserId String?
+
+  @@index([spaceId, createdAt])
+  @@index([inviterUserId, createdAt])
+  @@map("space_invitations")
 }
 
 model DeploymentSettings {

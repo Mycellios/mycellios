@@ -63,6 +63,18 @@ describe("loadEnv", () => {
       expect(loadEnv({ ...base, TICKET_BOARD_ENABLED: value }).ticketBoardEnabled).toBe(false);
     expect(loadEnv({ ...base, TICKET_BOARD_ENABLED: "true" }).ticketBoardEnabled).toBe(true);
   });
+  it("keeps Space members off unless enabled and bounds the people per Space", () => {
+    expect(loadEnv(base).spaceMembers).toBeUndefined();
+    for (const value of ["false", "1", ""])
+      expect(loadEnv({ ...base, MYCELLIOS_SPACE_MEMBERS_ENABLED: value }).spaceMembers).toBeUndefined();
+    const enabled = { ...base, MYCELLIOS_SPACE_MEMBERS_ENABLED: "true" };
+    expect(loadEnv(enabled).spaceMembers).toEqual({ limit: 20 });
+    expect(loadEnv({ ...enabled, MYCELLIOS_SPACE_MEMBER_LIMIT: " 5 " }).spaceMembers).toEqual({ limit: 5 });
+    for (const value of ["1", "101", "2.5", "many"])
+      expect(() => loadEnv({ ...enabled, MYCELLIOS_SPACE_MEMBER_LIMIT: value })).toThrow(
+        "MYCELLIOS_SPACE_MEMBER_LIMIT",
+      );
+  });
   it("defaults the product path to Pi, Docker, and Graphile Worker", () => {
     const env = loadEnv(base);
     expect(env.agentRuntime).toBe("pi");

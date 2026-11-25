@@ -134,6 +134,13 @@ vi.mock("./MemorySettingsOverlay", () => ({
     return null;
   },
 }));
+vi.mock("./SpaceMembersPanel", () => ({
+  SpaceMembersPanel: ({ spaceName, onLeft }: { spaceName: string; onLeft?: () => void }) => (
+    <button type="button" data-testid="space-members-panel" onClick={() => onLeft?.()}>
+      {spaceName}
+    </button>
+  ),
+}));
 vi.mock("./SpaceSettingsPanel", () => ({
   SpaceSettingsPanel: ({
     space,
@@ -596,4 +603,51 @@ it("opens model connections from Micos without leaving the settings flow", async
     await act(async () => row.querySelector<HTMLButtonElement>("button")!.click());
     expect(onSectionChange).toHaveBeenCalledWith("models");
   } finally { await view.cleanup(); }
+});
+
+const navIds = (container: HTMLElement) =>
+  [...container.querySelectorAll("[data-testid^=\"settings-nav-\"]")].map((item) =>
+    item.getAttribute("data-testid"),
+  );
+
+it("adds Members to a Space other than Personal only while the deployment enables it", async () => {
+  const view = await render({ space: acme, spaces, section: "space", spaceMembersEnabled: true });
+  try {
+    expect(navIds(view.container).slice(0, 2)).toEqual([
+      "settings-nav-space",
+      "settings-nav-space-members",
+    ]);
+    await view.rerender({ space: { ...acme, isDefault: true }, spaces, section: "space-members", spaceMembersEnabled: true });
+    expect(navIds(view.container)).not.toContain("settings-nav-space-members");
+    expect(view.container.querySelector("[data-testid=\"space-members-panel\"]")).toBeNull();
+    await view.rerender({ space: acme, spaces, section: "space-members" });
+    expect(navIds(view.container)).not.toContain("settings-nav-space-members");
+    expect(
+      view.container.querySelector("[data-testid=\"user-settings\"]")?.getAttribute("data-settings-section"),
+    ).toBe("space");
+  } finally {
+    await view.cleanup();
+  }
+});
+
+it("opens only the people of a Space someone else owns, without the Space picker", async () => {
+  const onLeaveSpace = vi.fn();
+  const view = await render({
+    space: { id: "space-shared", name: "Launch", role: "member" },
+    spaces,
+    onSpaceChange: vi.fn(),
+    section: "memory",
+    spaceMembersEnabled: true,
+    onLeaveSpace,
+  });
+  try {
+    expect(navIds(view.container)).toEqual(["settings-nav-space-members"]);
+    const panel = view.container.querySelector<HTMLButtonElement>("[data-testid=\"space-members-panel\"]");
+    expect(panel?.textContent).toBe("Launch");
+    expect(view.container.querySelector("[data-testid=\"settings-space\"]")?.tagName).toBe("P");
+    await act(async () => panel?.click());
+    expect(onLeaveSpace).toHaveBeenCalledWith("space-shared");
+  } finally {
+    await view.cleanup();
+  }
 });

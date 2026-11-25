@@ -449,6 +449,20 @@
   Bind each Space panel and its writes to the Space being edited, even when the
   open conversation belongs to another Space. Preserve account model credentials
   and per-Space inheritance for model, voice and approval preferences.
+
+- People in Spaces follow specs/space-members/spec.md behind MYCELLIOS_SPACE_MEMBERS_ENABLED
+  (off by default; MYCELLIOS_SPACE_MEMBER_LIMIT people, 20 by default). The owner or an admin
+  of a Space other than Personal invites by email or a one-use link valid 7 days; store only
+  the token's SHA-256 and keep the token in the link's fragment. Accepting runs as system,
+  binds an email invitation to that verified address and adds a `member` organization and
+  Space membership; the default-Space trigger joins owners only, so nobody reaches a Personal
+  Space. Nobody removes or changes the owner; only the owner changes roles. A non-owner
+  reaches only `spaces.members.*`/`spaces.invites.*` there (`assertSpaceRoleAllows`) and no
+  route outside RPC: their own identity would read Space rows and spend the owner
+  organization's Credits. Membership is read per request, so removal and leaving end access
+  at once. Audit changes in `security_events` with names, never addresses. Verify
+  scripts/verify-space-members-db.ts and the space-members, SpaceMembersPanel, SpaceInvite
+  and switcher tests.
   The chat provider/model selection owns execution: saved API/OAuth connections
   use Pi automatically; installed account providers are selected in the same
   model menu. Do not expose a second Agent engine switch in Mico settings or

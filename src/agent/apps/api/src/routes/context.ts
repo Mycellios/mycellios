@@ -34,6 +34,7 @@ import type {
   ModelRoleSettings,
   ModelRoleView,
   SettingsScope,
+  SpaceRole,
 } from "@mycellios/contracts";
 import {
   appContract,
@@ -81,9 +82,31 @@ export async function asTenant<T extends { output: unknown }>(
   return { ...result, output: scoped };
 }
 
+export const SHARED_SPACE_FORBIDDEN = "Not available in a space someone else owns.";
+
+/**
+ * What a person may call in a Space someone else owns (specs/space-members, phase 1): its
+ * people and invitations, nothing that reads or writes the Space's content. Everything else
+ * would run with their own identity in the owner's organization, whose Credits pay for runs.
+ */
+export function sharedSpaceProcedure(path: readonly string[]): boolean {
+  return path[0] === "spaces" && (path[1] === "members" || path[1] === "invites");
+}
+
+/** Refuses a procedure a non-owner may not call in this Space. Actors without a role are owners. */
+export function assertSpaceRoleAllows(
+  spaceRole: SpaceRole | undefined,
+  path: readonly string[],
+): void {
+  if (spaceRole && spaceRole !== "owner" && !sharedSpaceProcedure(path))
+    throw new ORPCError("FORBIDDEN", { message: SHARED_SPACE_FORBIDDEN });
+}
+
 export function createRouterContext(deps: RouterDeps) {
   const os = implement(appContract).$context<{
     actor: Actor | null;
+    /** The actor's role in the request's Space; absent means the owner, as before Space members. */
+    spaceRole?: SpaceRole;
     /** The signed-in session, so a push token ends with the session that registered it. */
     sessionId?: string;
     requestHeaders?: Headers;
@@ -378,9 +401,10 @@ export function createRouterContext(deps: RouterDeps) {
   const agentSkills = createAgentSkillsService(deps.prisma);
 
   const authed = os
-    .use(async ({ context, next }) => {
+    .use(async ({ context, next, path }) => {
       const actor = context.actor;
       if (!actor) throw new ORPCError("UNAUTHORIZED");
+      assertSpaceRoleAllows(context.spaceRole, path);
       return asTenant(actor, () => next({ context: { ...context, actor } }));
     })
     .use(async ({ context, next, path }) => {
@@ -407,9 +431,10 @@ export function createRouterContext(deps: RouterDeps) {
       if (!deps.env?.ticketBoardEnabled) throw new ORPCError("NOT_FOUND");
       return next();
     })
-    .use(async ({ context, next }) => {
+    .use(async ({ context, next, path }) => {
       const actor = context.actor;
       if (!actor) throw new ORPCError("UNAUTHORIZED");
+      assertSpaceRoleAllows(context.spaceRole, path);
       return asTenant(actor, () => next({ context: { ...context, actor } }));
     });
   const ticketDeps = {
