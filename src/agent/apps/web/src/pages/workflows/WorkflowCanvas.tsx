@@ -95,6 +95,7 @@ export function WorkflowCanvas({
     trigger: t`Trigger`,
     prompt: t`Instructions`,
     condition: t`Condition`,
+    approval: t`Approval`,
     agent: t`Mico`,
     output: t`Result`,
     note: t`Note`,
@@ -189,7 +190,7 @@ export function WorkflowCanvas({
     if (!sourceId || !to || locked) return;
     const source = graph.nodes.find(node => node.id === sourceId), target = graph.nodes.find(node => node.id === to);
     if (!source || !target || !isWorkflowStep(source) || source.kind === "output" || !isWorkflowStep(target) || target.kind === "trigger" || to === sourceId) {
-      setError(t`Choose an instruction, condition, Mico or result as the destination.`); return;
+      setError(t`Choose an instruction, condition, approval, Mico or result as the destination.`); return;
     }
     const visit = (id: string, seen = new Set<string>()): boolean => {
       if (id === sourceId) return true;
@@ -571,7 +572,7 @@ export function WorkflowCanvas({
                     : item.kind === "trigger"
                       ? item.trigger === "schedule"
                         ? `${item.cron} · ${item.timezone}`
-                        : t`Manual trigger`
+                        : item.trigger === "webhook" ? t`Webhook` : t`Manual trigger`
                       : ""}
                   {item.text ? `\n${item.text}` : ""}
                 </p>
@@ -758,7 +759,7 @@ export function WorkflowCanvas({
               <span>{t`Add node`}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {(["trigger", "prompt", "agent", "condition", "output"] as const).map((kind) => (
+              {(["trigger", "prompt", "agent", "condition", "approval", "output"] as const).map((kind) => (
                 <DropdownMenuItem key={kind} onClick={() => add(kind)}>
                   {labels[kind]}
                 </DropdownMenuItem>
@@ -802,11 +803,12 @@ export function WorkflowCanvas({
                         className="rk-workflow-input"
                         value={node.trigger ?? "manual"}
                         onChange={(event) =>
-                          update(node, { trigger: event.target.value as "manual" | "schedule" })
+                          update(node, { trigger: event.target.value as "manual" | "schedule" | "webhook" })
                         }
                       >
                         <NativeSelectOption value="manual">{t`Manual`}</NativeSelectOption>
                         <NativeSelectOption value="schedule">{t`Schedule`}</NativeSelectOption>
+                        <NativeSelectOption value="webhook">{t`Webhook`}</NativeSelectOption>
                       </NativeSelect>
                     </label>
                     {node.trigger === "schedule" ? (
@@ -857,7 +859,7 @@ export function WorkflowCanvas({
                 ) : null}
                 {node.kind !== "drawing" ? (
                   <label className="grid gap-2">
-                    {node.kind === "agent" ? t`Instructions` : t`Content`}
+                    {node.kind === "agent" ? t`Instructions` : node.kind === "approval" ? t`What needs approval?` : t`Content`}
                     <Textarea
                       className="rk-workflow-input min-h-32 resize-y"
                       disabled={locked}

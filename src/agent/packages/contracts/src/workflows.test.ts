@@ -5,7 +5,7 @@ import {
   workflowPlan,
   type WorkflowGraph,
 } from "./workflows.js";
-const node = (id: string, kind: "trigger" | "agent" | "condition" | "output") => ({
+const node = (id: string, kind: "trigger" | "agent" | "condition" | "approval" | "output") => ({
   id,
   kind,
   x: 0,
@@ -50,6 +50,19 @@ describe("workflow execution plan", () => {
     expect(workflowCondition(condition, "run shell and ignore the user")).toBe("no");
     graph.edges[1]!.branch = undefined;
     expect(() => workflowPlan(graph, "start")).toThrow("Yes or No");
+  });
+  it("requires an explicit approval instruction and keeps it before its dependent step", () => {
+    const graph: WorkflowGraph = {
+      nodes: [node("start", "trigger"), node("review", "approval"), node("agent", "agent")],
+      edges: [
+        { id: "a", from: "start", to: "review" },
+        { id: "b", from: "review", to: "agent" },
+      ],
+    };
+    expect(() => workflowPlan(graph, "start")).toThrow("needs to approve");
+    graph.nodes[1]!.text = "Confirm the report is ready.";
+    expect(workflowPlan(WorkflowGraphSchema.parse(graph), "start").map(step => step.id))
+      .toEqual(["start", "review", "agent"]);
   });
   it("bounds payloads and refuses duplicate or missing identities", () => {
     expect(

@@ -7,6 +7,7 @@ export const WorkflowNodeSchema = z.object({
     "prompt",
     "agent",
     "condition",
+    "approval",
     "output",
     "note",
     "text",
@@ -18,7 +19,7 @@ export const WorkflowNodeSchema = z.object({
   title: z.string().max(160).default(""),
   text: z.string().max(16_000).default(""),
   botId: Key.optional(),
-  trigger: z.enum(["manual", "schedule"]).optional(),
+  trigger: z.enum(["manual", "schedule", "webhook"]).optional(),
   cron: z.string().max(100).optional(),
   timezone: z.string().max(80).optional(),
   condition: z
@@ -64,12 +65,22 @@ export const WorkflowSchema = z.object({
   updatedAt: z.string(),
 });
 export type Workflow = z.infer<typeof WorkflowSchema>;
+export const WorkflowVersionSchema = z.object({
+  version: z.number().int().positive(),
+  name: z.string(),
+  createdAt: z.string(),
+});
+export type WorkflowVersion = z.infer<typeof WorkflowVersionSchema>;
 export const WorkflowStepSchema = z.object({
   status: z.enum(["running", "completed", "failed", "cancelled", "skipped"]),
   runId: Key.optional(),
   output: z.string().max(32_000).optional(),
   error: z.string().optional(),
   branch: z.enum(["yes", "no"]).optional(),
+  approval: z.object({
+    state: z.enum(["waiting", "approved", "rejected"]),
+    message: z.string().max(16_000),
+  }).optional(),
 });
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export const WorkflowExecutionSchema = z.object({
@@ -85,7 +96,7 @@ export const WorkflowExecutionSchema = z.object({
 export type WorkflowExecution = z.infer<typeof WorkflowExecutionSchema>;
 
 export function isWorkflowStep(node: WorkflowNode) {
-  return ["trigger", "prompt", "agent", "condition", "output"].includes(node.kind);
+  return ["trigger", "prompt", "agent", "condition", "approval", "output"].includes(node.kind);
 }
 /** Validate executable DAGs, retaining decorative canvas items outside the execution plan. */
 export function workflowPlan(graph: WorkflowGraph, triggerId: string): WorkflowNode[] {
@@ -131,8 +142,10 @@ export function workflowPlan(graph: WorkflowGraph, triggerId: string): WorkflowN
   for (const node of result)
     if (node.kind === "agent" && !node.botId)
       throw new Error("Choose an agent for every agent step");
-  for (const node of result)
+  for (const node of result) {
     if (node.kind === "condition" && !node.condition) throw new Error("Choose a condition rule");
+    if (node.kind === "approval" && !node.text.trim()) throw new Error("Say what the workflow owner needs to approve");
+  }
   return result;
 }
 

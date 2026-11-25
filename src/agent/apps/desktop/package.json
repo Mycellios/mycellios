@@ -54,6 +54,7 @@
       "package.json"
     ],
     "extraResources": [
+      { "from": "../../scripts/mycellios-cli.mjs", "to": "cli/mycellios-cli.mjs" },
       {
         "from": "../web/dist",
         "to": "web"

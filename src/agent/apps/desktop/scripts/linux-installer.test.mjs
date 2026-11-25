@@ -19,6 +19,7 @@ test('Linux packages share the app identity and bundle only a verified runtime, 
     assert.deepEqual(config.linux.target.map(t => t.target), ['AppImage', 'deb']);
     assert.deepEqual(config.publish, []);
     assert.equal(config.extraResources.some(r=>r.to==='development-source'),true);
+    assert.ok(config.extraResources.find(x=>x.to==='cli/mycellios-cli.mjs')?.from.endsWith(path.join('scripts','mycellios-cli.mjs')));
     assert.equal(config.extraResources.some(r=>r.to==='development-tools/npm'),true);
     assert.equal(config.extraResources.some(r => r.to === 'contribution/mycellios-runtime.deb'), true);
     assert.equal(config.extraResources.filter(r => r.to.startsWith('licenses/')).length, 3);

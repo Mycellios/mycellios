@@ -11,7 +11,7 @@ import type {
 import { WorkflowGraphSchema, workflowCondition, workflowPlan } from "@mycellios/contracts";
 import { nextCronDate } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
-import { Prisma } from "@mycellios/db";
+import { Prisma, cancelWorkflowStepRunsInTransaction } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 
 export type WorkflowRow = Omit<Workflow, "updatedAt" | "nextRunAt"> & {
@@ -60,7 +60,7 @@ export function scheduledWorkflow(graph: WorkflowGraph) {
   return trigger;
 }
 export async function ownedWorkflow(
-  prisma: PrismaClient,
+  prisma: Pick<Prisma.TransactionClient, "$queryRaw">,
   actor: Pick<Actor, "userId" | "spaceId">,
   id: string,
 ) {
@@ -72,11 +72,77 @@ export async function ownedWorkflow(
     )[0] ?? null
   );
 }
+/** Save immutable history under the owning workflow's row lock. */
+export async function snapshotWorkflow(
+  tx: Prisma.TransactionClient,
+  row: WorkflowRow,
+  force: boolean,
+) {
+  const where = { workflowId: row.id, spaceId: row.spaceId, userId: row.userId };
+  if (!force && await tx.workflowVersion.findFirst({
+    where: { ...where, createdAt: { gt: new Date(Date.now() - 5 * 60_000) } },
+    select: { version: true },
+  })) return;
+  await tx.workflowVersion.createMany({
+    data: [{ ...where, version: row.version, name: row.name, graph: row.graph }],
+    skipDuplicates: true,
+  });
+  const oldestRetained = await tx.workflowVersion.findFirst({
+    where, orderBy: { version: "desc" }, skip: 49, select: { version: true },
+  });
+  if (oldestRetained)
+    await tx.workflowVersion.deleteMany({ where: { ...where, version: { lt: oldestRetained.version } } });
+}
+
+export async function saveWorkflowRevision(
+  tx: Prisma.TransactionClient,
+  actor: Pick<Actor, "spaceId" | "userId">,
+  input: { id: string; expectedVersion: number; name: string; graph: WorkflowGraph; active: boolean; nextRunAt: Date | null },
+  forceSnapshot = false,
+) {
+  const [saved] = await tx.$queryRaw<WorkflowRow[]>`
+    UPDATE workflows SET name=${input.name}, graph=${JSON.stringify(input.graph)}::jsonb, active=${input.active},
+      "nextRunAt"=${input.nextRunAt}, version=version+1, "updatedAt"=now()
+    WHERE id=${input.id} AND "userId"=${actor.userId} AND "spaceId"=${actor.spaceId}
+      AND version=${input.expectedVersion} AND "archivedAt" IS NULL RETURNING *`;
+  if (saved) await snapshotWorkflow(tx, saved, forceSnapshot);
+  return saved ?? null;
+}
+
+export async function restoreWorkflowVersion(
+  prisma: PrismaClient,
+  actor: Pick<Actor, "spaceId" | "userId">,
+  input: { id: string; version: number; expectedVersion: number },
+) {
+  return prisma.$transaction(async tx => {
+    const [current] = await tx.$queryRaw<WorkflowRow[]>`
+      SELECT * FROM workflows WHERE id=${input.id} AND "userId"=${actor.userId} AND "spaceId"=${actor.spaceId}
+      AND "archivedAt" IS NULL FOR UPDATE`;
+    if (!current) return "missing" as const;
+    if (current.version !== input.expectedVersion) return "conflict" as const;
+    const scope = { spaceId: actor.spaceId, userId: actor.userId };
+    const version = await tx.workflowVersion.findFirst({
+      where: { workflowId: current.id, ...scope, version: input.version },
+    });
+    if (!version) return "missing" as const;
+    const graph = WorkflowGraphSchema.parse(version.graph);
+    const botIds = [...new Set(graph.nodes.flatMap(node => node.botId ? [node.botId] : []))];
+    if (await tx.bot.count({ where: { ...scope, id: { in: botIds }, archivedAt: null } }) !== botIds.length)
+      return "mico_unavailable" as const;
+    await snapshotWorkflow(tx, current, true);
+    const restored = await saveWorkflowRevision(tx, actor, {
+      id: current.id, expectedVersion: current.version, name: version.name, graph, active: false, nextRunAt: null,
+    }, true);
+    return restored ? workflowDto(restored) : "conflict" as const;
+  });
+}
+
 export async function createWorkflowExecution(
   tx: Prisma.TransactionClient,
   workflow: WorkflowRow,
   triggerId: string,
   nonce: string,
+  triggerOutput?: string,
 ): Promise<ExecutionRow> {
   const previous = (
     await tx.$queryRaw<
@@ -93,16 +159,52 @@ export async function createWorkflowExecution(
   >`SELECT id FROM workflow_executions WHERE "workflowId"=${workflow.id} AND status IN ('queued','running') LIMIT 1`;
   if (active.length) throw new Error("This workflow is already running");
   workflowPlan(workflow.graph, triggerId);
+  await snapshotWorkflow(tx, workflow, true);
   const id = randomUUID();
+  const steps = triggerOutput === undefined ? {} : { [triggerId]: { status: "completed", output: triggerOutput } };
   return (
     await tx.$queryRaw<
       ExecutionRow[]
-    >`INSERT INTO workflow_executions (id,"workflowId","spaceId","userId",version,graph,"triggerId","clientNonce") VALUES (${id},${workflow.id},${workflow.spaceId},${workflow.userId},${workflow.version},${JSON.stringify(workflow.graph)}::jsonb,${triggerId},${nonce}) RETURNING *`
+    >`INSERT INTO workflow_executions (id,"workflowId","spaceId","userId",version,graph,"triggerId","clientNonce",steps) VALUES (${id},${workflow.id},${workflow.spaceId},${workflow.userId},${workflow.version},${JSON.stringify(workflow.graph)}::jsonb,${triggerId},${nonce},${JSON.stringify(steps)}::jsonb) RETURNING *`
   )[0]!;
 }
 
+export async function decideWorkflowApproval(
+  prisma: PrismaClient,
+  actor: Pick<Actor, "userId" | "spaceId">,
+  input: { executionId: string; stepId: string; decision: "approved" | "rejected" },
+): Promise<WorkflowExecution | "not_found" | "conflict"> {
+  return prisma.$transaction(async tx => {
+    const [execution] = await tx.$queryRaw<ExecutionRow[]>`SELECT * FROM workflow_executions WHERE id=${input.executionId} AND "userId"=${actor.userId} AND "spaceId"=${actor.spaceId} FOR UPDATE`;
+    if (!execution) return "not_found";
+    const step = Object.hasOwn(execution.steps, input.stepId) ? execution.steps[input.stepId] : undefined;
+    if (step?.approval?.state === input.decision) return workflowExecutionDto(execution);
+    if (execution.status !== "running" || step?.status !== "running" || step.approval?.state !== "waiting")
+      return "conflict";
+
+    const approved = input.decision === "approved";
+    if (!approved) await cancelWorkflowStepRunsInTransaction(tx, actor, execution.steps, "workflow_rejected");
+    const steps: Record<string, WorkflowStep> = {
+      ...execution.steps,
+      [input.stepId]: {
+        ...step,
+        status: approved ? "completed" : "cancelled",
+        approval: { ...step.approval, state: input.decision },
+      },
+    };
+    if (!approved) {
+      for (const [id, other] of Object.entries(steps)) {
+        if (other.status === "running") steps[id] = { ...other, status: "cancelled" };
+      }
+    }
+    const status = approved ? "running" : "cancelled";
+    const [saved] = await tx.$queryRaw<ExecutionRow[]>`UPDATE workflow_executions SET status=${status},steps=${JSON.stringify(steps)}::jsonb,"updatedAt"=now() WHERE id=${execution.id} RETURNING *`;
+    return workflowExecutionDto(saved!);
+  });
+}
+
 async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublisher) {
-  let queued: string | null = null;
+  const queued: string[] = [];
   await prisma.$transaction(async (tx) => {
     const row = (
       await tx.$queryRaw<
@@ -110,7 +212,11 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
       >`SELECT * FROM workflow_executions WHERE id=${id} AND status IN ('queued','running') FOR UPDATE SKIP LOCKED`
     )[0];
     if (!row) return;
-    const steps: Record<string, WorkflowStep> = { ...row.steps };
+    const steps: Record<string, WorkflowStep> = Object.assign(Object.create(null), row.steps);
+    if (Object.values(steps).some(step => step.approval?.state === "waiting" && step.status === "running")) {
+      await tx.$executeRaw`UPDATE workflow_executions SET "updatedAt"=now() WHERE id=${id}`;
+      return;
+    }
     let status: WorkflowExecution["status"] = "running",
       error: string | null = null,
       changed = row.status === "queued";
@@ -138,7 +244,7 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
             };
             throw new Error(run.error || "Agent execution stopped");
           }
-          if (run.status !== "completed") break;
+          if (run.status !== "completed") continue;
           const messages = await tx.message.findMany({
             where: { runId: run.id, threadId: run.threadId, role: "bot" },
             orderBy: { createdAt: "asc" },
@@ -166,6 +272,10 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
           continue;
         }
         const incoming = graph.edges.filter((edge) => edge.to === node.id);
+        if (incoming.some(edge => {
+          const state = steps[edge.from]?.status;
+          return state !== "completed" && state !== "skipped";
+        })) continue;
         const enabled = incoming.filter(
           (edge) =>
             steps[edge.from]?.status !== "skipped" &&
@@ -181,6 +291,15 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
           .filter(Boolean)
           .join("\n\n");
         if (input.length > 30_000) throw new Error("Combined workflow input is too large");
+        if (node.kind === "approval") {
+          steps[node.id] = {
+            status: "running",
+            output: input,
+            approval: { state: "waiting", message: node.text },
+          };
+          changed = true;
+          break;
+        }
         if (node.kind === "agent") {
           const bot = await tx.bot.findFirst({
             where: { id: node.botId, userId: row.userId, spaceId: row.spaceId, archivedAt: null },
@@ -229,9 +348,9 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
             },
           });
           steps[node.id] = { status: "running", runId: run.id };
-          queued = run.id;
+          queued.push(run.id);
           changed = true;
-          break;
+          continue;
         }
         steps[node.id] =
           node.kind === "condition"
@@ -247,6 +366,11 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
     } catch (cause) {
       status = "failed";
       error = cause instanceof Error ? cause.message : "Workflow failed";
+      await cancelWorkflowStepRunsInTransaction(tx, row, steps, "workflow_failed");
+      for (const [id, step] of Object.entries(steps)) {
+        if (step.status === "running") steps[id] = { ...step, status: "cancelled" };
+      }
+      queued.length = 0;
       changed = true;
     }
     if (changed)
@@ -254,7 +378,9 @@ async function advanceWorkflow(prisma: PrismaClient, id: string, jobs: JobPublis
     else await tx.$executeRaw`UPDATE workflow_executions SET "updatedAt"=now() WHERE id=${id}`;
   });
   // The existing run reconciler also recovers queued runs if publication fails after commit.
-  if (queued) await jobs.enqueue(runContinueJob(queued));
+  const publications = await Promise.allSettled(queued.map(runId => jobs.enqueue(runContinueJob(runId))));
+  if (publications.some(result => result.status === "rejected"))
+    getLogger().error("A workflow step wake could not be published", { executionId: id });
 }
 
 export async function reconcileWorkflowExecutions(prisma: PrismaClient, jobs: JobPublisher) {

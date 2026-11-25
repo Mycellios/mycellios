@@ -1183,6 +1183,11 @@
   receipts together. Verify workflow contracts, affected wakeup/control tests and
   the synthetic PostgreSQL/browser acceptance scripts through compilar.ps1; never
   use production accounts, credentials or models in these fixtures.
+  Workflow approvals pause admission of new steps. Independent branches join only after their
+  inputs settle; stop, rejection and failure preserve exact teardown receipts. Workflow
+  history keeps 50 revisions, and restore writes a paused version. Signed workflow webhooks
+  authorize only the revision the owner enabled; secret rotation is immediate and concurrent
+  deliveries share an execution bound to the sender's id.
   Workflow thread ownership queries project only userId/spaceId from a Run actor;
   preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
   Delegation from ordinary Mico tabs uses internal work scope; explicit project

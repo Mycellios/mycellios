@@ -15837,3 +15837,87 @@ msgstr "Cargar actividad anterior"
 #: src/pages/shell/dialogs.tsx
 msgid "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"
 msgstr "{otherMemberCount, plural, one {Otro miembro perderá el acceso. Esta acción no se puede deshacer.} other {# miembros más perderán el acceso. Esta acción no se puede deshacer.}}"
+
+msgid "Prepare morning briefing"
+msgstr "Preparar resumen matinal"
+
+msgid "Read today's calendar and the emails that need a reply using the connected accounts I have authorized. Summarize meetings that need preparation, schedule conflicts, and messages that need a decision. Keep it short and identify the source of each item. If a source is unavailable, state which one. If all selected sources are available and there is nothing I need to act on, finish without posting an update. Read only. Do not send, modify, or delete anything."
+msgstr "Consulta el calendario de hoy y los correos pendientes de respuesta en las cuentas conectadas que he autorizado. Resume las reuniones que requieren preparación, los conflictos de horario y los mensajes que necesitan una decisión. Sé breve e indica la fuente de cada punto. Si alguna fuente no está disponible, indica cuál. Si todas las fuentes seleccionadas están disponibles y no hay nada que requiera mi atención, termina sin publicar un aviso. Solo lectura. No envíes, modifiques ni borres nada."
+
+msgid "Workflow file"
+msgstr "Archivo de workflow"
+
+msgid "Import workflow"
+msgstr "Importar workflow"
+
+msgid "Choose a Mico for each unassigned step before running the workflow."
+msgstr "Elige un Mico para cada paso sin asignar antes de ejecutar el workflow."
+
+msgid "Could not import this workflow file."
+msgstr "No se ha podido importar este archivo de workflow."
+
+msgid "What needs approval?"
+msgstr "¿Qué hay que aprobar?"
+
+msgid "Workflow approval"
+msgstr "Aprobación del workflow"
+
+msgid "Waiting for your approval"
+msgstr "Esperando tu aprobación"
+
+msgid "Choose an instruction, condition, approval, Mico or result as the destination."
+msgstr "Selecciona una instrucción, una condición, una aprobación, un Mico o un resultado como destino."
+
+msgid "Could not load workflow versions."
+msgstr "No se pudieron cargar las versiones del flujo."
+
+msgid "Loading workflow versions…"
+msgstr "Cargando las versiones del flujo…"
+
+msgid "No saved versions yet."
+msgstr "Aún no hay versiones guardadas."
+
+msgid "Save your edits before restoring a version."
+msgstr "Guarda tus cambios antes de restaurar una versión."
+
+msgid "Restore version {target} and pause its schedule?"
+msgstr "¿Restaurar la versión {target} y pausar su programación?"
+
+msgid "Confirm restore"
+msgstr "Confirmar restauración"
+
+msgid "Workflow webhook"
+msgstr "Webhook del flujo"
+
+msgid "Could not load the workflow webhook."
+msgstr "No se pudo cargar el webhook del flujo."
+
+msgid "Could not update the workflow webhook."
+msgstr "No se pudo actualizar el webhook del flujo."
+
+msgid "Active for version {version}"
+msgstr "Activo para la versión {version}"
+
+msgid "Webhook is off"
+msgstr "Webhook desactivado"
+
+msgid "Enable the webhook again for this version."
+msgstr "Vuelve a activar el webhook para esta versión."
+
+msgid "Save your edits before enabling the webhook."
+msgstr "Guarda los cambios antes de activar el webhook."
+
+msgid "Enable webhook"
+msgstr "Activar webhook"
+
+msgid "The current secret will stop working."
+msgstr "La clave actual dejará de funcionar."
+
+msgid "Incoming events will stop starting this workflow."
+msgstr "Los eventos entrantes dejarán de iniciar este flujo."
+
+msgid "Loading webhook…"
+msgstr "Cargando webhook…"
+
+msgid "Copy this signing secret now. It is shown only once."
+msgstr "Copia esta clave de firma ahora. Solo se muestra una vez."

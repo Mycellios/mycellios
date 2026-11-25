@@ -1,7 +1,9 @@
 # Automate Micos with routines, signed events, scripts and workflows
 
-Status: phase 1 implemented; phase 2 implemented except creation from chat; phases 3 to 6
-are a proposed design.
+Status: routines and signed events are implemented. Mico Scripts has an operator gate
+and individual opt-in credentials. Workflow draft transfer, approval, parallel execution,
+revision history, and signed triggers are implemented in the workflow candidate. Typed steps,
+bounded loops, and callbacks remain proposed.
 
 This spec builds on `specs/mico-routine-runs/spec.md` (routine conversations,
 main-chat markers, quiet and failed runs) and on the workflow engine and
@@ -159,8 +161,10 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
    - An approval step pauses the execution and shows Approve and Reject to the
      owner in the workflow's conversation; Reject stops the execution. Automatic
      approval reviewers never answer it.
-   - A webhook trigger uses phase 2's signed URL with the workflow as its owner,
-     with one open execution per workflow, as for cron.
+   - Signed workflow events use Standard Webhooks. The owner enables a saved
+     revision and can rotate or revoke its secret. Saving or restoring a new
+     revision requires enabling its webhook again. Duplicate deliveries return
+     the original execution. One execution per workflow may be open at a time.
    - Independent branches run their agent steps at the same time, within each
      Mico's concurrency.
    - A version is saved when the newest is older than 5 minutes, on restore, and

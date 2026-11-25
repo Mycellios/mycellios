@@ -201,7 +201,20 @@ export function useWorkflows(client: RpcClient, scope: string) {
       select(item.id);
       setError("");
     },
+    importDraft: (draft: Pick<Workflow, "name" | "graph">) => {
+      const item = { ...blank(), ...draft };
+      setDocs(items => [...items, item]);
+      select(item.id);
+      setError("");
+      return item.id;
+    },
     save: () => action(() => persist()),
+    restoreVersion: (version: number) => action(async () => {
+      const source = current.current;
+      if (source.dirty || !source.version) return;
+      const saved = await client.workflows.restoreVersion({ id: source.id, expectedVersion: source.version, version });
+      if (mounted.current) setDocs(items => items.map(item => item.id === source.id ? { ...saved, dirty: false } : item));
+    }),
     activate: () =>
       action(async () => {
         if (!current.current.version)
@@ -256,6 +269,13 @@ export function useWorkflows(client: RpcClient, scope: string) {
         localStorage.removeItem(nonceKey);
         if (mounted.current && current.current.id === source.id)
           setRuns((items) => [result, ...items.filter((item) => item.id !== result.id)]);
+      }),
+    decideApproval: (executionId: string, stepId: string, decision: "approved" | "rejected") =>
+      action(async () => {
+        const result = await client.workflows.decideApproval({ executionId, stepId, decision });
+        if (mounted.current && current.current.id === result.workflowId) {
+          setRuns(items => items.map(item => item.id === result.id ? result : item));
+        }
       }),
     stop: () =>
       action(async () => {
