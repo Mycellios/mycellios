@@ -1666,6 +1666,26 @@ describe("Pi runtime ordered model fallback", () => {
     },
   );
 
+  it("uses a text backup after a rate limit when the primary reasoning level was implicit", async () => {
+    providerState.models.set(`${primary.provider}/${primary.id}`, { ...primary, reasoning: true });
+    providerState.models.set(`${backupA.provider}/${backupA.id}`, { ...backupA, input: ["text"] });
+    const input = request([{ provider: backupA.provider, id: backupA.id, apiKey: "fake-backup-key" }]);
+    input.model.thinkingLevel = null;
+    providerState.stream.mockImplementation((target: Model<"openai-completions">) =>
+      target.provider === primary.provider
+        ? stream(target, message(target, [], "error", "429 rate_limit_error"))
+        : stream(target, message(target, [{ type: "text", text: "recovered" }], "stop")),
+    );
+
+    const events = await run(input);
+
+    expect(providerState.stream.mock.calls.map(([target]) => target.provider)).toEqual([
+      primary.provider,
+      backupA.provider,
+    ]);
+    expect(events.at(-1)).toEqual({ type: "done", text: "recovered" });
+  });
+
   it("records why backups were skipped without exposing credential-resolution errors", async () => {
     providerState.models.set(`${primary.provider}/${primary.id}`, { ...primary, reasoning: true });
     providerState.models.set(`${backupA.provider}/${backupA.id}`, { ...backupA, reasoning: false });

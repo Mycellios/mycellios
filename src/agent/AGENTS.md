@@ -1561,6 +1561,8 @@
   the inherit option in Mico settings and existing saved defaults.
   If its primary slot is empty, chat may start on the first saved backup with
   an owned connection. Preserve the backup order and the existing funding checks.
+  Pi's implicit reasoning default does not constrain the saved backups. Preserve
+  explicit thinking preferences and image requirements, and check pi-runtime-fallback.
   Keep the chat picker compact by connection and list all already authorized
   models directly, without a separate quick-list filter or catalog screen.
   Mycellios reads its live account catalog rather than saved enabled IDs; retain
