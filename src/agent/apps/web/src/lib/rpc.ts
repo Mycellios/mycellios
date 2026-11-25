@@ -1,6 +1,7 @@
 import { desktopBridge } from "./desktop";
 import { eventAgentContext, eventAgentSpace, withEventAgentHeaders } from "./event-demo-agent";
 import { startupFetch } from "./startup-fetch";
+import { waitForSecondaryChatRead } from "./chat-read-priority";
 import { getGeneralPreferences } from "./general-preferences";
 import { shouldRestoreSavedSpace } from "./startup-space";
 import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
@@ -100,6 +101,9 @@ const link = new RPCLink<RpcClientContext>({
     if (i18n.locale) headers.set("x-mycellios-ui-locale", i18n.locale);
     if (CLIENT_BUILD) headers.set(CLIENT_BUILD_HEADER, formatClientBuild("web", CLIENT_BUILD));
     for (const [key, value] of Object.entries(correlation)) headers.set(key, value);
+    const procedure = new URL(request.url).pathname.split("/rpc/")[1];
+    const waiting = waitForSecondaryChatRead(procedure, options.signal ?? request.signal);
+    if (waiting) await waiting;
     let response: Response;
     try {
       response = await startupFetch(request, {
