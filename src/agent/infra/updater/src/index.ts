@@ -261,8 +261,8 @@ export function createUpdaterApp(
 
   app.post("/plan", async (c) => {
     try {
-      if (planInFlight !== null) throw new UpdateRefused("A plan is already running.");
       const request = parseRequest(await body(c.req.raw));
+      if (planInFlight !== null) throw new UpdateRefused("A plan is already running.");
       const work = (async () => {
         const env = await readEnvFile();
         const tags = readTagState(env);
@@ -300,7 +300,7 @@ export function createUpdaterApp(
       planInFlight = work.finally(() => {
         planInFlight = null;
       });
-      return c.json(await work);
+      return c.json(await planInFlight);
     } catch (error) {
       return refusal(c, error);
     }

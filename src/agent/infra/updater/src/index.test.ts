@@ -47,10 +47,23 @@ afterEach(async () => {
 async function deployment(env = "RAKAZO_IMAGE_TAG=v1.0.0\nRAKAZO_IMAGE_TAG_PREVIOUS=v0.9.0\n") {
   const deployDir = await mkdtemp(path.join(os.tmpdir(), "mycellios-updater-test-"));
   temporaryDirectories.push(deployDir);
-  await writeFile(path.join(deployDir, ".env"), env);
+  const envFile = path.join(deployDir, ".env");
+  await writeFile(envFile, env);
+  const configRoot = "/deployment";
+  const config = resolveUpdaterConfig({
+    RAKAZO_DEPLOY_DIR: configRoot,
+    RAKAZO_UPDATER_TOKEN: token,
+  });
   return {
     deployDir,
-    config: resolveUpdaterConfig({ RAKAZO_DEPLOY_DIR: deployDir, RAKAZO_UPDATER_TOKEN: token }),
+    config: {
+      ...config,
+      deployDir,
+      envFile,
+      composeFiles: config.composeFiles.map((file) =>
+        path.join(deployDir, path.posix.relative(configRoot, file)),
+      ),
+    },
   };
 }
 
@@ -500,7 +513,7 @@ describe("moving off the upstream images", () => {
       return ok(releases);
     };
     const subject = createUpdaterApp(fixture.config, { run });
-    for (const route of ["/plan", "/apply"]) {
+    for (const route of ["/plan", "/plan", "/apply"]) {
       const response = await request(subject, route, {
         repoUrl: OFFICIAL_REPO_URL,
         branch: "main",
