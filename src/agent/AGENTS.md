@@ -456,6 +456,11 @@
   (localEngineForNewMico, specs/local-engine-default/spec.md), keeping the
   general model as its server fallback. Unknown sign-in, an older Desktop, no
   answer, OpenCode (no sign-in report) and idempotent spawnKey creates keep Pi.
+  Existing This PC Pi Micos move once the same way (bots.adoptLocalEngine, called
+  by Desktop per account/Space start): only idle ones (no active run or unfinished
+  delegated work, checked under the bot row lock), recorded in
+  bots.localEngineAdoptedAt so a later manual choice is never overridden, with a
+  system note in the main chat. Verify local-engine-adoption tests.
   Conversational turns capture the resolved model, engine and owned connection
   before their first model call, with the Run lease fence. Resume uses that
   selection and rechecks credentials and native consent. A later turn reads the

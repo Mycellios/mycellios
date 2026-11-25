@@ -2911,6 +2911,17 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     () => bots.map((bot) => `${bot.id}:${bot.name}`).join(","),
     [bots],
   );
+  // Once per account and Space on this PC: idle This PC Micos move once to a CLI signed in here.
+  const localEngineAdoption = useRef<string | null>(null);
+  useEffect(() => {
+    const scope = initialBotsLoaded && userId && bootstrapMe?.spaceId ? `${userId}:${bootstrapMe.spaceId}` : null;
+    if (!scope || !desktopBridge() || localEngineAdoption.current === scope) return;
+    localEngineAdoption.current = scope;
+    // An older server has no such call; nothing moves then.
+    void Promise.resolve().then(() => rpc.bots.adoptLocalEngine())
+      .then(({ adopted }) => adopted.length ? refreshBots() : undefined)
+      .catch(() => undefined);
+  }, [initialBotsLoaded, userId, bootstrapMe?.spaceId, rpc, refreshBots]);
   const connectionsRoster = useRef<string | null>(null);
   useEffect(() => {
     if (!initialBotsLoaded) return;
