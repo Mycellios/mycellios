@@ -106,6 +106,40 @@ An accepted signed receipt also requires TTFT, TPOT, tokens/s, peak memory and
 passing assertions for exact output, non-empty ranges, build/model identity and
 complete cleanup.
 
+### Build the signed receipt
+
+Measure the TCP link in both directions; ICMP alone is not enough, since
+hosts often drop it. On the receiving host run
+`python -m distributed_runtime.link_probe serve --host <its address> --port <port>`,
+and on the other `python -m distributed_runtime.link_probe measure --host <address> --port <port>`.
+
+Collect one directory per run with these files:
+
+| File | Content |
+| --- | --- |
+| `run.json` | `mycellios-two-host-run/1`: commit, source identity (`buildNativeSourceProvenance`), power source, `distributed_runtime.physical_probe` output and leftover processes per host; both link probes; the optional SIGKILL result |
+| `python-launch.json` | the generated launch description |
+| `status.json` | the coordinator status once the canary passed |
+| `canary-reference.json` | `distributed_runtime.canary_reference` on one machine with the complete model |
+| `api-benchmark.json` | `distributed_runtime.api_benchmark --json-out` |
+| `memory-samples.csv` | header `timestamp,<node id>,...`, resident bytes per host |
+| `status-after-failure.json` | the status after the failure test, when it ran |
+
+Then, from a checkout at the same commit:
+
+```bash
+npm run evidence:two-host -- build --evidence <run directory> \
+  --key <private key file> --key-id <key id>
+npm run evidence:two-host -- verify --receipt <run directory>/two-host-receipt.json
+```
+
+`build` recomputes every assertion from the files, so a run record cannot
+declare itself passing. Battery power, a one-way link or a different commit on
+either host yields a `fail` receipt. `keygen --out <file>` creates an Ed25519
+lab key and prints only its public SPKI. Keep the private key outside the
+repository. A receipt is trusted only after its public key is listed in
+`config/physical-evidence-trust.json`.
+
 ## Known boundary
 
 The generic automatic range executor is currently the safest first CPU path.
