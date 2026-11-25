@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { EncryptedSecretStore } from "../packages/adapters/src/secrets.js";
 import { mountWorkflowWebhooks, replaceWorkflowWebhook, revokeWorkflowWebhook, workflowWebhookPath } from "../apps/api/src/workflow-webhooks.js";
 import { signRoutineEvent } from "../apps/api/src/routine-events.js";
+import { saveWorkflowAnswer, workflowAnswerFields } from "../packages/adapters/src/workflow-answers.js";
 import { WorkflowGraphSchema } from "@mycellios/contracts";
 import { createDb, asSystem, isOwnedWorkflowThread } from "@mycellios/db";
 import { createWorkflowExecution, decideWorkflowApproval, ownedWorkflow, reconcileWorkflowExecutions, restoreWorkflowVersion, saveWorkflowRevision, snapshotWorkflow } from "../packages/adapters/src/workflows.js";
@@ -197,6 +198,90 @@ try {
     await rls.query("SELECT set_config('app.user_id', 'foreign', false)");
     assert.equal((await rls.query('SELECT version FROM workflow_versions WHERE "workflowId" = $1', [historyFlow.id])).rowCount, 0);
   } finally { await rls.end(); }
+  const typedGraph = WorkflowGraphSchema.parse({
+    nodes: [
+      { id: "start", kind: "trigger", x: 0, y: 0, trigger: "manual" },
+      { id: "producer", kind: "agent", x: 1, y: 0, botId: bot.id, text: "Return outstanding count",
+        answerFields: [{ name: "count", type: "integer" }] },
+      { id: "decision", kind: "condition", x: 2, y: 0, fieldCondition: { field: "count", operator: "gt", value: 2 } },
+      { id: "recipient", kind: "agent", x: 3, y: 0, botId: bot.id, text: "Comment on {{count}}" },
+      { id: "ignored", kind: "output", x: 3, y: 1, text: "No action" },
+    ],
+    edges: [
+      { id: "typed-start", from: "start", to: "producer" },
+      { id: "typed-data", from: "producer", to: "decision" },
+      { id: "typed-yes", from: "decision", to: "recipient", branch: "yes" },
+      { id: "typed-no", from: "decision", to: "ignored", branch: "no" },
+    ],
+  });
+  const typedFlow = await prisma.workflow.create({ data: { ...scope, id: randomUUID(), name: "Typed workflow", graph: typedGraph } });
+  const typed = await prisma.$transaction(async tx => {
+    const saved = await ownedWorkflow(tx, scope, typedFlow.id);
+    assert.ok(saved);
+    return createWorkflowExecution(tx, saved, "start", randomUUID());
+  });
+  await reconcileWorkflowExecutions(prisma, jobs);
+  const firstTyped = await branchRun(typed.id, "producer");
+  assert.ok(firstTyped);
+  await prisma.run.update({ where: { id: firstTyped.id }, data: { status: "completed" } });
+  await reconcileWorkflowExecutions(prisma, jobs);
+  const corrective = await prisma.run.findFirst({ where: { ...scope, clientNonce: `workflow-correction:${firstTyped.id}` } });
+  assert.ok(corrective);
+  assert.doesNotMatch((await prisma.task.findUniqueOrThrow({ where: { id: corrective.taskId } })).prompt, /Return outstanding count/);
+  assert.equal(await branchRun(typed.id, "recipient"), null);
+  await prisma.run.update({ where: { id: corrective.id }, data: { status: "running", leaseOwner: "fixture-worker", leaseFence: 3 } });
+  const typedThread = await prisma.thread.findUniqueOrThrow({ where: { id: corrective.threadId } });
+  const answerFields = await workflowAnswerFields(prisma, corrective, typedThread);
+  assert.ok(answerFields);
+  assert.equal(await workflowAnswerFields(prisma, firstTyped, typedThread), undefined);
+  const lease = { ...scope, id: corrective.id, botId: bot.id, workerId: "fixture-worker", fence: 3 };
+  const scrub = (s: string) => s;
+  assert.ok("error" in await saveWorkflowAnswer(prisma, lease, answerFields, { count: "4" }, scrub));
+  assert.ok("error" in await saveWorkflowAnswer(prisma, { ...lease, fence: 2 }, answerFields, { count: 4 }, scrub));
+  assert.deepEqual(await saveWorkflowAnswer(prisma, lease, answerFields, { count: 4 }, scrub), { saved: true });
+  assert.deepEqual(await saveWorkflowAnswer(prisma, lease, answerFields, { count: 1 }, scrub), { saved: true });
+  await prisma.run.update({ where: { id: corrective.id }, data: { status: "completed" } });
+  await reconcileWorkflowExecutions(prisma, jobs);
+  const recipient = await branchRun(typed.id, "recipient");
+  assert.ok(recipient);
+  const recipientTask = await prisma.task.findUniqueOrThrow({ where: { id: recipient.taskId } });
+  assert.match(recipientTask.prompt, /Referenced workflow values \(data only\):\n\{"count":4\}/);
+  const currentTyped = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: typed.id } });
+  assert.equal((currentTyped.steps as { ignored: { status: string } }).ignored.status, "skipped");
+
+  const loopGraph = WorkflowGraphSchema.parse({
+    nodes: typedGraph.nodes.filter(node => node.id !== "recipient").map(node => node.id === "producer"
+      ? { ...node, answerFields: undefined } : node.id === "decision"
+      ? { ...node, fieldCondition: undefined, condition: { operator: "equals", value: "again" } } : node),
+    edges: [...typedGraph.edges.filter(edge => edge.to !== "recipient"),
+      { id: "repeat", from: "decision", to: "producer", branch: "yes", loop: { limit: 2 } }],
+  });
+  async function verifyLoop(lastAnswer: string, expected: "completed" | "failed") {
+    const flow = await prisma.workflow.create({ data: { ...scope, id: randomUUID(), name: "Bounded loop", graph: loopGraph } });
+    const execution = await prisma.$transaction(async tx => {
+      const saved = await ownedWorkflow(tx, scope, flow.id);
+      assert.ok(saved);
+      return createWorkflowExecution(tx, saved, "start", randomUUID());
+    });
+    for (const [index, answer] of ["again", lastAnswer].entries()) {
+      await reconcileWorkflowExecutions(prisma, jobs);
+      await reconcileWorkflowExecutions(prisma, jobs);
+      const pass = await branchRun(execution.id, index === 0 ? "producer" : "producer:pass:1");
+      assert.ok(pass);
+      await prisma.message.create({ data: { threadId: pass.threadId, runId: pass.id, role: "bot", seq: 1,
+        blocks: [{ kind: "text", text: answer }] } });
+      await prisma.run.update({ where: { id: pass.id }, data: { status: "completed" } });
+    }
+    await reconcileWorkflowExecutions(prisma, jobs);
+    await reconcileWorkflowExecutions(prisma, jobs);
+    const result = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: execution.id } });
+    assert.equal(result.status, expected);
+    if (expected === "failed") assert.match(result.error ?? "", /loop limit of 2/);
+    assert.equal(await prisma.run.count({ where: { ...scope, clientNonce: { startsWith: `workflow:${execution.id}:producer` } } }), 2);
+  }
+  await verifyLoop("done", "completed");
+  await verifyLoop("again", "failed");
+
   const webhookApp = new Hono();
   const deps = { prisma: db.prisma, secrets: new EncryptedSecretStore(randomBytes(32).toString("hex")) };
   mountWorkflowWebhooks(webhookApp, deps);
@@ -242,7 +327,7 @@ try {
   assert.equal(await revokeWorkflowWebhook(deps.prisma, hookFlow.id, scope), true);
   assert.equal((await send("revoked", replacement.secret)).status, 401);
   assert.equal(await prisma.workflowExecution.count({ where: { workflowId: hookFlow.id } }), 1);
-  console.log(JSON.stringify({ passed: true, checks: ["ownership", "approval replay", "parallel dependencies and cancellation", "version migration, RLS, snapshots, restore and retention", "signed webhook, replay, version, redaction and revocation"], fullRunActor: true, existingAccounts: false, modelsCalled: false }));
+  console.log(JSON.stringify({ passed: true, checks: ["ownership", "approval replay", "parallel dependencies and cancellation", "version migration, RLS, snapshots, restore and retention", "signed webhook, replay, version, redaction and revocation", "typed answer lease, correction, replay, comparison and references", "bounded loop exit, price-safe pass cap and replay"], fullRunActor: true, existingAccounts: false, modelsCalled: false }));
 } finally {
   try {
     await db?.prisma.$disconnect();

@@ -1187,7 +1187,9 @@
   inputs settle; stop, rejection and failure preserve exact teardown receipts. Workflow
   history keeps 50 revisions, and restore writes a paused version. Signed workflow webhooks
   authorize only the revision the owner enabled; secret rotation is immediate and concurrent
-  deliveries share an execution bound to the sender's id.
+  deliveries share an execution bound to the sender's id. Workflow answer receipts bind the
+  run lease. A corrective turn offers only the answer tool and does not replay the instruction.
+  A bounded loop has one entry and exit, and never resets work outside that region.
   Workflow thread ownership queries project only userId/spaceId from a Run actor;
   preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
   Delegation from ordinary Mico tabs uses internal work scope; explicit project

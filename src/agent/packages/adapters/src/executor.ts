@@ -15,6 +15,7 @@ import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
+import { saveWorkflowAnswer, workflowAnswerEffect, workflowAnswerFields, workflowAnswerTool } from "./workflow-answers.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
 import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, isSignedWorkflowThread, micoRunsLanes } from "@mycellios/db";
 import { createHash, randomUUID } from "node:crypto";
@@ -3892,7 +3893,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       // conversation, whoever's message started it, gets the member policy below.
       const memberUserId = current.thread?.memberUserId ?? null;
       // Member turns run on the server's Pi model only: never a CLI or sign-in on the owner's PC.
-      let agentEngine = (memberUserId ? "pi" : turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
+      const workflowCorrection = run.trigger === "workflow" && Boolean(run.clientNonce?.startsWith("workflow-correction:"));
+      let agentEngine = (memberUserId || workflowCorrection ? "pi" : turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
@@ -4330,7 +4332,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : null;
         // An external webhook's text could choose what gets saved, so those runs only read.
         const personalWriteTarget =
-          personalMemory && !externalWebhook ? personalMemory.writeTarget : null;
+          personalMemory && !externalWebhook && !workflowCorrection ? personalMemory.writeTarget : null;
         // Ids recalled from personal memory in this run, so forget_memory reaches the same memory.
         const personalMemoryIds = new Set<string>();
         const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
@@ -4916,7 +4918,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const micoOwner = await deps.prisma.user.findUniqueOrThrow({ where: { id: run.userId }, select: { micoDefaults: true } });
         const savedPlanWait = readMicoDefaults(micoOwner.micoDefaults).planAutoStartSeconds;
         const planWaitSeconds = savedPlanWait === undefined ? DEFAULT_PLAN_AUTO_START_SECONDS : savedPlanWait;
+        const answerFields = ownedWorkflow ? await workflowAnswerFields(deps.prisma, run, thread) : undefined;
         const builtins = [
+          ...(answerFields?.length && !disabledBuiltinTools.has(workflowAnswerEffect) ? [workflowAnswerTool(answerFields)] : []),
           ...(canCreateWebhookRoutine && !disabledBuiltinTools.has("schedule_create")
             ? [createWebhookRoutineTool] : []),
           ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).agentNewChat && run.trigger === "user" && thread.botId === bot.id && !thread.groupId && !disabledBuiltinTools.has("start_new_chat") ? [agentNewChatTool] : []),
@@ -5110,7 +5114,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // The creation intro only asks what the bot is for (see selectBuiltinToolsForRun),
         // so it gets no connector tools either.
         const tools =
-          run.trigger === "created" ? builtins : [...builtins, ...exposedConnectorTools];
+          workflowCorrection ? builtins.filter(tool => tool.name === workflowAnswerEffect)
+            : run.trigger === "created" ? builtins : [...builtins, ...exposedConnectorTools];
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
           : undefined;
@@ -8728,6 +8733,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish({ ...delegated, note: "The child task is durable. End this turn; its result will resume this request automatically. Do not send progress acknowledgements or poll." });
           }
           if (name === "work_status") return finish(await workStatus(deps.prisma, { ...run, taskId: run.taskId }));
+          if (name === workflowAnswerEffect) {
+            if (!answerFields?.length || disabledBuiltinTools.has(name))
+              return finish({ error: "This workflow step has no defined answer fields." });
+            return finish(await saveWorkflowAnswer(deps.prisma, { ...run, workerId, fence }, answerFields, args,
+              text => redactSecrets(text, runSecrets)));
+          }
           if ((WORKFLOW_TOOL_NAMES as readonly string[]).includes(name)) {
             if (!workflowToolsAllowed) return finish({ error: "Workflow changes and execution require the owner's direct request in a Mico conversation." });
             return finish(await executeWorkflowTool(deps.prisma, run, name, args, effectKey));

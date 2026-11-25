@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   WorkflowGraphSchema,
+  validateWorkflowAnswer,
   workflowCondition,
   workflowPlan,
   type WorkflowGraph,
@@ -14,6 +15,16 @@ const node = (id: string, kind: "trigger" | "agent" | "condition" | "approval" |
   text: "",
   ...(kind === "agent" ? { botId: "mico" } : {}),
 });
+describe("workflow answer fields", () => {
+  it("does not coerce values or accept extra fields", () => {
+    const fields = [{ name: "count", type: "integer" }, { name: "ready", type: "boolean" }] as const;
+    expect(validateWorkflowAnswer(fields, { count: 4, ready: true })).toEqual({ count: 4, ready: true });
+    expect(validateWorkflowAnswer(fields, { count: "4", ready: true })).toBeNull();
+    expect(validateWorkflowAnswer(fields, { count: 4, ready: 1 })).toBeNull();
+    expect(validateWorkflowAnswer(fields, { count: 4, ready: true, extra: "not declared" })).toBeNull();
+  });
+});
+
 describe("workflow execution plan", () => {
   it("rejects cycles and dependencies outside the selected trigger", () => {
     const graph: WorkflowGraph = {

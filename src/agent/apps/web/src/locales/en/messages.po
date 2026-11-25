@@ -15538,3 +15538,54 @@ msgstr "Loading webhook…"
 
 msgid "Copy this signing secret now. It is shown only once."
 msgstr "Copy this signing secret now. It is shown only once."
+
+msgid "Integer"
+msgstr "Integer"
+
+msgid "Yes or no"
+msgstr "Yes or no"
+
+msgid "Text list"
+msgstr "Text list"
+
+msgid "Fixed labels"
+msgstr "Fixed labels"
+
+msgid "Answer fields"
+msgstr "Answer fields"
+
+msgid "Field name"
+msgstr "Field name"
+
+msgid "Field type"
+msgstr "Field type"
+
+msgid "Labels, separated by commas"
+msgstr "Labels, separated by commas"
+
+msgid "Remove field"
+msgstr "Remove field"
+
+msgid "Add answer field"
+msgstr "Add answer field"
+
+msgid "Compare answer field"
+msgstr "Compare answer field"
+
+msgid "Answer field"
+msgstr "Answer field"
+
+msgid "Comparison"
+msgstr "Comparison"
+
+msgid "Use one loop with a single entry and exit. Repeat from an earlier step."
+msgstr "Use one loop with a single entry and exit. Repeat from an earlier step."
+
+msgid "Repeat from"
+msgstr "Repeat from"
+
+msgid "Do not repeat"
+msgstr "Do not repeat"
+
+msgid "Maximum passes"
+msgstr "Maximum passes"

@@ -15921,3 +15921,54 @@ msgstr "Cargando webhook…"
 
 msgid "Copy this signing secret now. It is shown only once."
 msgstr "Copia esta clave de firma ahora. Solo se muestra una vez."
+
+msgid "Integer"
+msgstr "Entero"
+
+msgid "Yes or no"
+msgstr "Sí o no"
+
+msgid "Text list"
+msgstr "Lista de textos"
+
+msgid "Fixed labels"
+msgstr "Etiquetas fijas"
+
+msgid "Answer fields"
+msgstr "Campos de respuesta"
+
+msgid "Field name"
+msgstr "Nombre del campo"
+
+msgid "Field type"
+msgstr "Tipo de campo"
+
+msgid "Labels, separated by commas"
+msgstr "Etiquetas separadas por comas"
+
+msgid "Remove field"
+msgstr "Quitar campo"
+
+msgid "Add answer field"
+msgstr "Añadir campo de respuesta"
+
+msgid "Compare answer field"
+msgstr "Comparar un campo de respuesta"
+
+msgid "Answer field"
+msgstr "Campo de respuesta"
+
+msgid "Comparison"
+msgstr "Comparación"
+
+msgid "Use one loop with a single entry and exit. Repeat from an earlier step."
+msgstr "Usa un solo bucle con una entrada y una salida. Vuelve a un paso anterior."
+
+msgid "Repeat from"
+msgstr "Repetir desde"
+
+msgid "Do not repeat"
+msgstr "No repetir"
+
+msgid "Maximum passes"
+msgstr "Número máximo de pasadas"

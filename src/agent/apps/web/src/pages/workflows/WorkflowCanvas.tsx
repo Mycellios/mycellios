@@ -2,6 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import {
   type Bot,
   isWorkflowStep,
+  workflowLoop,
   type WorkflowExecution,
   type WorkflowGraph,
   type WorkflowNode,
@@ -35,6 +36,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { PointerEvent } from "react";
+import { WorkflowAnswerFields } from "./WorkflowAnswerFields";
 import { useEffect, useRef, useState } from "react";
 
 type Point = { x: number; y: number };
@@ -196,7 +198,7 @@ export function WorkflowCanvas({
       if (id === sourceId) return true;
       if (seen.has(id)) return false;
       seen.add(id);
-      return graph.edges.filter(edge => edge.from === id).some(edge => visit(edge.to, seen));
+      return graph.edges.filter(edge => edge.from === id && !edge.loop).some(edge => visit(edge.to, seen));
     };
     if (visit(to)) { setError(t`Connections cannot form a cycle.`); return; }
     const selectedBranch = source.kind === "condition" ? branch : undefined;
@@ -204,6 +206,22 @@ export function WorkflowCanvas({
       change({ ...graph, edges: [...graph.edges.filter(edge => !(source.kind === "condition" && edge.from === sourceId && edge.branch === selectedBranch)),
         { id: crypto.randomUUID(), from: sourceId, to, ...(selectedBranch ? { branch: selectedBranch } : {}) }] });
     connectFrom(null); setError("");
+  }
+  function setLoop(source: WorkflowNode, target: string, limit: number) {
+    const existing = graph.edges.find(edge => edge.from === source.id && edge.branch === branch && edge.loop);
+    if (!target && !existing) return;
+    const edges = graph.edges.filter(edge => !(edge.from === source.id && edge.branch === branch && (target || edge.loop)));
+    const next: WorkflowGraph = {
+      ...graph,
+      edges: target ? [...edges, { id: existing?.id ?? crypto.randomUUID(), from: source.id, to: target, branch, loop: { limit } }] : edges,
+    };
+    try {
+      workflowLoop(next);
+      change(next);
+      setError("");
+    } catch {
+      setError(t`Use one loop with a single entry and exit. Repeat from an earlier step.`);
+    }
   }
   function zoom(amount: number) {
     const rect = root.current?.getBoundingClientRect();
@@ -857,6 +875,7 @@ export function WorkflowCanvas({
                     <span className="text-xs text-muted-foreground">{t`Uses this Mico’s model, tools and permissions.`}</span>
                   </label>
                 ) : null}
+                {node.kind === "agent" ? <WorkflowAnswerFields key={node.id} fields={node.answerFields ?? []} disabled={locked} onChange={answerFields => update(node, { answerFields })} /> : null}
                 {node.kind !== "drawing" ? (
                   <label className="grid gap-2">
                     {node.kind === "agent" ? t`Instructions` : node.kind === "approval" ? t`What needs approval?` : t`Content`}
@@ -870,12 +889,52 @@ export function WorkflowCanvas({
                   </label>
                 ) : null}
                 {node.kind === "condition" ? <>
-                  <label className="grid gap-2">{t`Condition`}<NativeSelect aria-label={t`Condition`} value={node.condition?.operator ?? "nonempty"} disabled={locked}
-                    onChange={event => update(node, { condition: { operator: event.target.value as "contains" | "equals" | "nonempty", value: node.condition?.value ?? "" } })}>
+                  <label className="grid gap-2">{t`Condition`}<NativeSelect aria-label={t`Condition`} value={node.fieldCondition ? "field" : node.condition?.operator ?? "nonempty"} disabled={locked}
+                    onChange={event => {
+                      const selected = event.currentTarget.value;
+                      if (selected === "field") {
+                        const field = graph.nodes.flatMap(item => item.answerFields ?? [])[0];
+                        if (field) update(node, { fieldCondition: { field: field.name, operator: "eq", value: "" } });
+                      } else {
+                        update(node, { fieldCondition: undefined, condition: { operator: selected as "contains" | "equals" | "nonempty", value: node.condition?.value ?? "" } });
+                      }
+                    }}>
                     <NativeSelectOption value="nonempty">{t`Has content`}</NativeSelectOption><NativeSelectOption value="contains">{t`Contains`}</NativeSelectOption><NativeSelectOption value="equals">{t`Equals`}</NativeSelectOption>
+                    {graph.nodes.some(item => item.answerFields?.length) ? <NativeSelectOption value="field">{t`Compare answer field`}</NativeSelectOption> : null}
                   </NativeSelect></label>
-                  {node.condition?.operator !== "nonempty" ? <label className="grid gap-2">{t`Compare with`}<Input aria-label={t`Compare with`} maxLength={1000} disabled={locked} value={node.condition?.value ?? ""} onChange={event => update(node, { condition: { operator: node.condition?.operator ?? "nonempty", value: event.target.value } })}/></label> : null}
+                  {node.fieldCondition ? <fieldset disabled={locked} className="grid gap-2">
+                    <label>{t`Answer field`} <NativeSelect value={node.fieldCondition.field} onChange={event => update(node, { fieldCondition: { ...node.fieldCondition!, field: event.currentTarget.value } })}>
+                      {graph.nodes.flatMap(item => (item.answerFields ?? []).map((field, index) => <NativeSelectOption key={`${item.id}:${index}`} value={field.name}>{field.name}</NativeSelectOption>))}
+                    </NativeSelect></label>
+                    <label>{t`Comparison`} <NativeSelect value={node.fieldCondition.operator} onChange={event => update(node, { fieldCondition: { ...node.fieldCondition!, operator: event.currentTarget.value as NonNullable<WorkflowNode["fieldCondition"]>["operator"] } })}>
+                      {([["eq", "="], ["ne", "≠"], ["gt", ">"], ["gte", "≥"], ["lt", "<"], ["lte", "≤"]] as const).map(([value, label]) => <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>)}
+                    </NativeSelect></label>
+                    <label>{t`Compare with`} <Input key={node.id} defaultValue={JSON.stringify(node.fieldCondition.value)} maxLength={500} onBlur={event => {
+                      const raw = event.currentTarget.value;
+                      let value: unknown;
+                      try { value = JSON.parse(raw); } catch { value = raw; }
+                      if (typeof value !== "number" && typeof value !== "boolean" && typeof value !== "string") value = raw;
+                      update(node, { fieldCondition: { ...node.fieldCondition!, value: value as string | number | boolean } });
+                    }} /></label>
+                  </fieldset> : node.condition?.operator !== "nonempty" ? <label className="grid gap-2">{t`Compare with`}<Input aria-label={t`Compare with`} maxLength={1000} disabled={locked} value={node.condition?.value ?? ""} onChange={event => update(node, { condition: { operator: node.condition?.operator ?? "nonempty", value: event.target.value } })}/></label> : null}
                   <label className="grid gap-2">{t`Branch`}<NativeSelect aria-label={t`Branch`} value={branch} disabled={locked} onChange={event => setBranch(event.target.value as "yes" | "no")}><NativeSelectOption value="yes">{t`Yes`}</NativeSelectOption><NativeSelectOption value="no">{t`No`}</NativeSelectOption></NativeSelect></label>
+                  {(() => {
+                    const loop = graph.edges.find(edge => edge.from === node.id && edge.branch === branch && edge.loop);
+                    return <div className="grid gap-2">
+                      <label className="grid gap-2">{t`Repeat from`}<NativeSelect disabled={locked} value={loop?.to ?? ""} onChange={event => setLoop(node, event.currentTarget.value, loop?.loop?.limit ?? 10)}>
+                        <NativeSelectOption value="">{t`Do not repeat`}</NativeSelectOption>
+                        {graph.nodes.filter(item => item.id !== node.id && isWorkflowStep(item) && item.kind !== "trigger" && item.kind !== "output").map(item => (
+                          <NativeSelectOption key={item.id} value={item.id}>{item.title || labels[item.kind]}</NativeSelectOption>
+                        ))}
+                      </NativeSelect></label>
+                      {loop ? <label className="grid gap-2">{t`Maximum passes`}<Input key={loop.id} type="number" min={1} max={50} disabled={locked}
+                        defaultValue={loop.loop?.limit ?? 10} onBlur={event => {
+                          const value = event.currentTarget.valueAsNumber;
+                          if (Number.isInteger(value) && value >= 1 && value <= 50) setLoop(node, loop.to, value);
+                          else event.currentTarget.value = String(loop.loop?.limit ?? 10);
+                        }} /></label> : null}
+                    </div>;
+                  })()}
                 </> : null}
                 {isWorkflowStep(node) && node.kind !== "output" ? (
                   <label className="grid gap-2">

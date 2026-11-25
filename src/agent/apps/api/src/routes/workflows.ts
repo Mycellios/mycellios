@@ -82,6 +82,7 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
         return { ok: true as const };
       }),
       execute: authed.workflows.execute.handler(async ({ context, input }) => {
+        if (input.clientNonce.startsWith("workflow-event:")) throw new ORPCError("BAD_REQUEST", { message: "Reserved execution nonce" });
         return deps.prisma.$transaction(async (tx) => {
           const flow = (
             await tx.$queryRaw<

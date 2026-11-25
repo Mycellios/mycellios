@@ -2,8 +2,8 @@
 
 Status: routines and signed events are implemented. Mico Scripts has an operator gate
 and individual opt-in credentials. Workflow draft transfer, approval, parallel execution,
-revision history, and signed triggers are implemented in the workflow candidate. Typed steps,
-bounded loops, and callbacks remain proposed.
+revision history, signed triggers, typed steps, and bounded loops are implemented in the
+workflow candidate. Optional callbacks remain proposed.
 
 This spec builds on `specs/mico-routine-runs/spec.md` (routine conversations,
 main-chat markers, quiet and failed runs) and on the workflow engine and
@@ -178,13 +178,18 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
      integer, yes/no, list or fixed labels). The Mico returns them with a
      `workflow_answer` tool, checked in the same turn; one corrective turn follows
      when it does not.
-   - Conditions can test declared fields (`priority = high and count > 2`)
-     without a model call, and `{{name}}` in later steps inserts a value as data.
-   - A loop is an edge back to an earlier step, through a condition only, with a
-     pass limit per run (default 10, at most 50); reaching it fails the step with
-     that reason.
+   - A condition can compare one declared field without a model call. Compound
+     expressions remain proposed. References such as `{{name}}` in an agent's
+     instructions pass the resolved value in a separate data section.
+   - A workflow can have one loop with one entry and one exit, through a condition
+     branch back to an earlier step. The run has a total pass limit (default 10,
+     maximum 50). A true repeat branch after the last pass fails with that reason.
+     Other branches and their completed work are preserved.
    - An output step can post its text to a messaging channel that the workflow's
      Mico already uses, or notify the owner.
+   - A managed routine browser requires a separate, revocable browser context.
+     The existing scoped browser route maps conversations to separate tabs in
+     one profile. It cannot serve as the routine isolation boundary.
 6. Phase 6 — run callbacks (optional).
    - A webhook routine, a workflow or a script message can name an HTTPS callback.
      When the run ends or waits for a person, the server sends a Standard Webhooks
