@@ -82,4 +82,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Space roles now decide who may act in a Space, even with Space members off, so an owner's
+-- membership must say so. Older memberships copied their organization role; an owner of the
+-- Space's organization whose membership there says otherwise becomes 'owner'. No other row
+-- changes, and running this again changes nothing.
+UPDATE "space_members" AS membership
+SET "role" = 'owner'
+FROM "member" AS member
+WHERE member."organizationId" = membership."organizationId"
+  AND member."userId" = membership."userId"
+  AND 'owner' = ANY (string_to_array(replace(member."role", ' ', ''), ','))
+  AND NOT ('owner' = ANY (string_to_array(replace(membership."role", ' ', ''), ',')));
+
 COMMIT;
