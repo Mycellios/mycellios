@@ -13,7 +13,74 @@ const primary = document.getElementById("primary");
 const secondary = document.getElementById("secondary");
 const app = document.getElementById("app");
 
-document.documentElement.lang = chrome.i18n.getUILanguage();
+const appearanceKey = "mycellios.panel.appearance";
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
+const designs = new Set(["original", "light", "dark", "system"]);
+const design = document.getElementById("design");
+const discreet = document.getElementById("discreet");
+const root = document.documentElement;
+
+root.lang = chrome.i18n.getUILanguage();
+for (const label of document.querySelectorAll("[data-i18n]")) {
+  label.textContent = t(label.dataset.i18n);
+}
+
+function readAppearance() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(appearanceKey) || "null");
+    return {
+      design: designs.has(saved?.design) ? saved.design : "original",
+      discreet: saved?.discreet === true,
+    };
+  } catch {
+    return { design: "original", discreet: false };
+  }
+}
+
+function loadAppearance() {
+  const saved = readAppearance();
+  design.value = saved.design;
+  discreet.checked = saved.discreet;
+  applyAppearance();
+}
+
+function sendAppearance() {
+  if (!app.getAttribute("src")) return;
+  app.contentWindow?.postMessage({
+    type: "mycellios:browser-panel-appearance",
+    theme: root.dataset.theme,
+    discreet: discreet.checked,
+  }, AGENT_ORIGIN);
+}
+
+function applyAppearance() {
+  root.dataset.theme = design.value === "system" ? (systemDark.matches ? "dark" : "light") : design.value;
+  root.toggleAttribute("data-discreet", discreet.checked);
+  if (title.dataset.message) title.textContent = noticeText(title.dataset.message);
+  sendAppearance();
+}
+
+function saveAppearance() {
+  try {
+    localStorage.setItem(appearanceKey, JSON.stringify({ design: design.value, discreet: discreet.checked }));
+  } catch {
+    // The controls still apply for the open panel if storage is unavailable.
+  }
+  applyAppearance();
+}
+
+function noticeText(key) {
+  return t(discreet.checked ? `${key}Discreet` : key);
+}
+
+design.addEventListener("change", saveAppearance);
+discreet.addEventListener("change", saveAppearance);
+systemDark.addEventListener("change", applyAppearance);
+window.addEventListener("storage", event => {
+  if (event.key === appearanceKey || event.key === null) loadAppearance();
+});
+app.addEventListener("load", sendAppearance);
+loadAppearance();
 
 let pollTimer = null;
 
@@ -36,10 +103,11 @@ function openTab(url) {
   chrome.tabs.create({ url });
 }
 
-function showNotice(text, primaryLabel, onPrimary) {
+function showNotice(message, primaryLabel, onPrimary) {
   app.hidden = true;
   notice.hidden = false;
-  title.textContent = text;
+  title.dataset.message = message;
+  title.textContent = noticeText(message);
   primary.textContent = primaryLabel;
   primary.onclick = onPrimary;
   secondary.textContent = t("openInTab");
@@ -72,13 +140,13 @@ async function start() {
   if (state === "signed-in") {
     showApp();
   } else if (state === "signed-out") {
-    showNotice(t("signInTitle"), t("signIn"), () => {
+    showNotice("signInTitle", t("signIn"), () => {
       openTab(AGENT_URL);
       waitForSignIn();
     });
     secondary.hidden = true;
   } else {
-    showNotice(t("unavailableTitle"), t("retry"), start);
+    showNotice("unavailableTitle", t("retry"), start);
     secondary.hidden = false;
   }
 }
