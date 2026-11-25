@@ -14,10 +14,11 @@ const fixtures = vi.hoisted(() => ({
   mycelliosCatalog: [] as ModelCatalogEntry[],
   catalog: [{ provider: "opencode-go", providerName: "OpenCode Go", id: "gpt-6-luna", label: "GPT-6 Luna", thinkingLevels: ["medium"] }],
   nativeModels: [] as Array<{id:string;label:string;isDefault:boolean;thinkingLevels:string[];fast:boolean}>,
-  engines: { computer: "server", engines: ["codex", "opencode"] } as { computer: string; engines: string[]; signedOut?: string[];
+  engines: { computer: "server", engines: ["codex", "opencode"] } as { computer: string; engines: string[]; signedOut?: string[]; account?: boolean;
     models?: Record<string, Array<{ id: string; label: string; isDefault: boolean; thinkingLevels: string[]; fast: boolean }>> },
 }));
 const connect = vi.hoisted(() => vi.fn());
+const account = vi.hoisted(() => vi.fn());
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
   t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((text, part, i) => `${text}${i ? values[i - 1] : ""}${part}`, ""),
 }) }));
@@ -25,7 +26,7 @@ vi.mock("../../lib/query", () => {
   const query = (key: string) => ({ queryOptions: () => ({ queryKey: [key] }), queryKey: () => [key] });
   return { writeSaved: async (_client: unknown, _key: unknown, apply: () => unknown) => apply(), useSpaceQueries: () => ({ me: query("me"), models: { credentials: query("credentials"), list: query("catalog") }, engines: { forBot: query("engines"), codexModels: query("nativeModels") } }) };
 });
-vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect } }) }));
+vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect }, engines: { account } }) }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey }: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"] }) => ({ data: queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[queryKey[0]], isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
@@ -179,6 +180,32 @@ it("disables an engine whose CLI is signed out, but keeps the Mico's current eng
   expect(container.querySelector<HTMLButtonElement>('[data-choice="native-claude::default"]')?.disabled).toBe(true);
   expect(container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::default"]')?.disabled).toBe(false);
   expect(save).not.toHaveBeenCalled();
+});
+
+it("signs the PC's Codex in with a one-time code when the person is not in Desktop", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["codex"], signedOut: ["codex"], account: true };
+  account.mockReset().mockResolvedValue({ status: "device", userCode: "ABCD-1234", verificationUrl: "https://auth.example.test/device" });
+  await render("codex");
+  const signIn = [...container.querySelectorAll("button")].find(button => button.textContent === "Sign in to ChatGPT");
+  await act(async () => signIn!.click());
+  expect(account).toHaveBeenCalledWith(expect.objectContaining({ action: "signIn", engine: "codex", flow: "device" }));
+  expect(container.querySelector("code")?.textContent).toBe("ABCD-1234");
+  expect(container.querySelector<HTMLAnchorElement>('a[href="https://auth.example.test/device"]')?.rel).toBe("noopener noreferrer");
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("asks to open Mycellios on the PC to sign Claude Code in, and offers nothing on an older Desktop", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["claude"], signedOut: ["claude"], account: true };
+  account.mockReset();
+  await render("claude");
+  expect(container.textContent).toContain("Open Mycellios on that PC to sign in to Claude Code.");
+  expect([...container.querySelectorAll("button")].some(button => button.textContent?.startsWith("Sign in to"))).toBe(false);
+  act(() => root.unmount());
+  root = createRoot(container);
+  fixtures.engines = { computer: "desktop", engines: ["codex"], signedOut: ["codex"] };
+  await render("codex");
+  expect(container.querySelector('[data-testid="native-engine-account"]')).toBeNull();
+  expect(account).not.toHaveBeenCalled();
 });
 
 it("preserves a saved native provider when the selected Desktop is offline", async () => {

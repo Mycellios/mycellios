@@ -108,6 +108,31 @@ export const NativeEngineModelSchema = z.object({
 });
 export type NativeEngineModelInfo = z.infer<typeof NativeEngineModelSchema>;
 
+/** CLIs that a PC can sign in or out for the person (specs/native-engines/spec.md phase 1). */
+export const NativeAccountEngineSchema = z.enum(["codex", "claude"]);
+export type NativeAccountEngine = z.infer<typeof NativeAccountEngineSchema>;
+/**
+ * A sign-in or sign-out the person asked for on the PC that runs a Mico. `browser` opens the
+ * CLI's own sign-in on that PC; `device` asks the CLI for a one-time code to enter elsewhere.
+ */
+export const NativeEngineAccountRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("signIn"), engine: NativeAccountEngineSchema, flow: z.enum(["browser", "device"]) }),
+  z.object({ action: z.literal("signOut"), engine: NativeAccountEngineSchema }),
+]);
+export type NativeEngineAccountRequest = z.infer<typeof NativeEngineAccountRequestSchema>;
+/** What the PC did. A device code is the only sign-in data that leaves the PC, and only to the person. */
+export const NativeEngineAccountResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("browser") }),
+  z.object({ status: z.literal("terminal") }),
+  z.object({
+    status: z.literal("device"),
+    userCode: z.string().regex(/^[A-Za-z0-9-]{4,32}$/),
+    verificationUrl: z.string().url().max(500).refine((url) => url.startsWith("https://"), "HTTPS only"),
+  }),
+  z.object({ status: z.literal("signedOut") }),
+]);
+export type NativeEngineAccountResult = z.infer<typeof NativeEngineAccountResultSchema>;
+
 export const BusyMessageModeSchema =z.enum(["queue", "steer"]);
 export type BusyMessageMode = z.infer<typeof BusyMessageModeSchema>;
 

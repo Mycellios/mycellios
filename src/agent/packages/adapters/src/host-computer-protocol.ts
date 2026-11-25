@@ -1,4 +1,4 @@
-import { GroupFolderLabel } from "@mycellios/contracts";
+import { GroupFolderLabel, NativeEngineAccountRequestSchema } from "@mycellios/contracts";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
 import type { NativeCodingEngine, NativeEngineModels } from "@mycellios/adapter-kit";
@@ -83,6 +83,8 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
   }),
   z.object({ ...base, method: z.literal("listFiles"), path: z.string().max(4096) }),
   z.object({ ...base, method: z.literal("appControl"), request: appControlRequest }),
+  /** Sign one of the PC's CLIs in or out for the person (hosts reporting engineAccount: 1). */
+  z.object({ ...base, method: z.literal("engineAccount"), account: NativeEngineAccountRequestSchema }),
   z.object({
     ...base,
     method: z.literal("readFile"),
@@ -123,6 +125,8 @@ export interface HostComputerEnvironment {
   signedInEngines?: NativeCodingEngine[];
   /** Model catalogs of the signed-in CLIs on this PC (older Desktops omit it). */
   nativeModels?: NativeEngineModels;
+  /** The PC signs its CLIs in and out through engineAccount (older Desktops omit it). */
+  engineAccount?: 1;
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
   /** Shared group folders this PC grants to this run, mounted under group/<label>. */
@@ -152,6 +156,8 @@ export type HostComputerFrame<T> =
 /** Leave time for the command timeout event and final response to cross the bridge. */
 export function hostComputerDeadlineMs(request: HostComputerRequest) {
   if (request.method === "agentRun") return 24 * 60 * 60_000;
+  // A sign-in only starts on the PC; the person finishes it there or with a device code.
+  if (request.method === "engineAccount") return 60_000;
   return request.method === "execute"
     ? Math.max(boundedSandboxCommandTimeoutMs(request.command.timeoutMs), request.command.searchProgress?.maxMs ?? 0) + 30_000
     : 10 * 60_000;

@@ -70,13 +70,22 @@ the store from phase 3.
    - From another device, Sign in asks the PC for a device code where the CLI
      offers one (Codex) and shows only that code and the provider's address.
      Without one it says the engine signs in on the PC.
-   - Sign out lives only in the engine detail. It runs the CLI's own sign-out
-     after a confirmation saying it also signs the person out of that CLI in their
-     own terminal and in every Mico on that PC.
+   - Sign out sits in that provider's section of the model menu. It runs the
+     CLI's own sign-out after a confirmation saying it also signs the person out of
+     that CLI in their own terminal and in every Mico on that PC.
    - OpenCode joins the probe when its pinned version can report sign-in without
      a model call. A sign-in or sign-out drops the cached probe (60 s) so the
      picker updates at once. Commands are confirmed against the pinned versions.
+   - Implemented: `engines.account` and the Desktop `engineAccount` method
+     (`native-account.ts`). Codex uses its app server's `account/login/start`
+     (`chatgpt` or `chatgptDeviceCode`) and `account/logout`; Claude Code opens
+     `auth login` in a terminal on the PC and signs out with `auth logout`. The
+     menu offers device codes outside Desktop and Claude Code only in Desktop.
+     OpenCode stays without a probe until its pinned version can report one.
 2. Phase 2 — settings and plan usage from the PC.
+   - Model, effort and Fast for This PC Micos shipped with local-engine-default
+     phase 2 (#641: Desktops report the Codex and Claude Code catalogs). Plan
+     usage from the PC is still to do.
    - Desktop answers the reads that a server host answers today, over the
      existing host-computer channel and binding: Codex `model/list` and
      `account/rateLimits/read`, and Claude Code's catalog once local-engine-default

@@ -1,4 +1,4 @@
-import type { ConnectionIdentity } from "@mycellios/contracts";
+import type { ConnectionIdentity, NativeEngineAccountRequest, NativeEngineAccountResult } from "@mycellios/contracts";
 import type {
   AdapterContext,
   AdapterDescriptor,
@@ -111,6 +111,8 @@ export interface SandboxProvider {
   nativeEngines?(context: AdapterContext): Promise<NativeCodingEngine[] | undefined>;
   /** Same read as nativeEngines, plus signed-out engines and the CLIs' model catalogs. */
   nativeEngineState?(context: AdapterContext): Promise<NativeEngineState | undefined>;
+  /** Signs one of the PC's CLIs in or out for the person; only hosts reporting `account` serve it. */
+  nativeEngineAccount?(context: AdapterContext, request: NativeEngineAccountRequest): Promise<NativeEngineAccountResult>;
   /** Native command environment; omitted for providers with a fixed container environment. */
   environment?(
     computer: ComputerRef,
@@ -324,6 +326,8 @@ export interface AgentRuntime {
   nativeEngines?(): Promise<NativeCodingEngine[]>;
   /** The installed engines, those whose CLI reported nobody signed in, and their model catalogs. */
   nativeEngineState?(): Promise<NativeEngineState>;
+  /** Starts the CLI's own sign-in, or signs it out, on this host for the person. */
+  nativeEngineAccount?(request: NativeEngineAccountRequest): Promise<NativeEngineAccountResult>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,

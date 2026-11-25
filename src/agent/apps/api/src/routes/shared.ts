@@ -67,6 +67,7 @@ export async function codingEnginesForComputer(
       engines,
       signedOut,
       models: engineModels(state?.models, engines.filter(id => !signedOut.includes(id))),
+      ...(state && "account" in state && state.account === true ? { account: true } : {}),
     };
   }
   const engines = await nativeHostAccess(deps.dataDir, actor) ? await discoverNativeEngines(deps.dataDir) : [];

@@ -510,6 +510,19 @@
   in the host's native-agents.json and the same account/Space grant. Verify
   both artifact digests and preserve operator command overrides, the published
   version directory and the no-fallback model policy.
+  Signing a PC's Codex or Claude Code in or out (specs/native-engines/spec.md phase 1)
+  goes through `engines.account` → the owned Desktop's `engineAccount` method, only
+  for a This PC Mico (never server, Team or isolated computers) and under the PC's
+  account scope and local-access consent; the Desktop reports `engineAccount: 1`.
+  `native-account.ts` runs the CLI's own login: Codex `account/login/start` in its
+  app server (browser on that PC, or a device code for another device), Claude Code
+  `auth login` in a visible terminal (never hidden, never typed by Mycellios).
+  The CLI keeps its credentials and receives the provider's callback itself; only a
+  device code leaves the PC, and sign-in page addresses are HTTPS-checked and never
+  logged. One login per engine, closed after 10 minutes; sign-in and sign-out drop
+  the cached probe and a pending sign-in rereads status every 2 s. Sign out asks for
+  confirmation. Verify native-account, native-signin, desktop-agent-engine, the
+  engines route tests and chat-header-model.
 
 - Ask aside lives in a resizable side pane, with transient state pinned to user,
   Space, Mico and task. Hiding or switching panes preserves pending exchanges;

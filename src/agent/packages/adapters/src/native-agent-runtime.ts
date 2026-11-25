@@ -157,6 +157,11 @@ function configuredCommands(parsed: Record<string, unknown>): NativeConfig {
   return commands;
 }
 
+/** The command discovery reads for one engine: the host's configured path, else the CLI on PATH. */
+export async function nativeEngineCommand(engine: "codex" | "claude", dataDir?: string) {
+  return configuredCommands(await readNativeConfig(dataDir))[engine] ?? findNativeCommand(engine);
+}
+
 export async function canInstallNativeOpenCode(
   dataDir: string | undefined,
   scope: { userId: string; spaceId: string },

@@ -1556,7 +1556,9 @@ app.whenReady().then(async () => {
     programFiles: process.env.ProgramFiles ?? "C:\\Program Files",
     programData: process.env.ProgramData ?? "C:\\ProgramData",
   });
-  const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope());
+  // A CLI sign-in the person starts from Mycellios opens its page in their own browser.
+  const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope(), undefined,
+    { openExternal: (url) => shell.openExternal(url) });
   const nativeRoot = app.isPackaged
     ? path.join(process.resourcesPath, "local-server")
     : path.join(app.getAppPath(), "local-server");

@@ -10,6 +10,7 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@mycellios/adapter-kit";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
+import { NativeEngineAccountResultSchema, type NativeEngineAccountRequest } from "@mycellios/contracts";
 import { getLogger } from "@mycellios/logging";
 import { describeDesktopSandbox } from "./desktop-sandbox.js";
 import { projectLeaseOwner } from "./project-execution.js";
@@ -194,7 +195,16 @@ export class HostComputerSandbox implements SandboxProvider {
     if (!environment) return;
     return { engines: environment.nativeEngines ?? [], signedOut: environment.signedOutEngines ?? [],
       ...(environment.signedInEngines ? { signedIn: environment.signedInEngines } : {}),
-      ...(environment.nativeModels ? { models: environment.nativeModels } : {}) };
+      ...(environment.nativeModels ? { models: environment.nativeModels } : {}),
+      ...(environment.engineAccount === 1 ? { account: true } : {}) };
+  }
+  /** Asks the PC to sign one of its CLIs in or out; the answer is checked before it is passed on. */
+  async nativeEngineAccount(context: AdapterContext, account: NativeEngineAccountRequest) {
+    if (!context.botId) throw new Error("No Mico names this PC.");
+    const answer = await this.one<unknown>({ method: "engineAccount", botId: context.botId, account }, context);
+    const parsed = NativeEngineAccountResultSchema.safeParse(answer);
+    if (!parsed.success) throw new Error("The PC returned an invalid sign-in answer.");
+    return parsed.data;
   }
   environment(computer: ComputerRef, context: AdapterContext) {
     return this.one<HostComputerEnvironment>(

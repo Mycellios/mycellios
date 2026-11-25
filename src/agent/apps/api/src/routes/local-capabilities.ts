@@ -11,7 +11,16 @@ import {
 } from "@mycellios/db";
 import { resolveThreadTarget, stopThreadRuns } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
-import { codingEnginesForComputer } from "./shared.js";
+import { codingEnginesForComputer, computerContext } from "./shared.js";
+
+/** The PC's own short explanation when it gave one, else a plain fallback; never raw diagnostics. */
+export function engineAccountFailure(error: unknown) {
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (/disconnected|offline|unreachable|not connected|timed out|aborted/i.test(message))
+    return "Your PC is not connected. Open Mycellios on it and try again.";
+  if (message && message.length <= 160 && !/[\n{}[\]]|error:|zod|invalid enum|expected/i.test(message)) return message;
+  return "That PC could not sign in. Update Mycellios on it and try again.";
+}
 
 export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
   const acpRegistry = createAcpRegistry();
@@ -22,6 +31,22 @@ export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
       forBot: authed.engines.forBot.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
         return codingEnginesForComputer(deps, context.actor, bot, context.signal);
+      }),
+      account: authed.engines.account.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        // Only the owner's own PC: a server's or Team computer's CLIs belong to their operator.
+        if (bot.computer?.kind !== "desktop" || bot.computer.scope === "isolated" || !deps.sandbox.nativeEngineAccount)
+          throw new ORPCError("BAD_REQUEST", { message: "This Mico does not run on your PC." });
+        const base = computerContext(context.actor, bot.id, "engine-account");
+        const signal = AbortSignal.any([context.signal ?? base.signal, AbortSignal.timeout(45_000)]);
+        const request = input.action === "signIn"
+          ? { action: "signIn" as const, engine: input.engine, flow: input.flow }
+          : { action: "signOut" as const, engine: input.engine };
+        try {
+          return await deps.sandbox.nativeEngineAccount({ ...base, signal }, request);
+        } catch (error) {
+          throw new ORPCError("SERVICE_UNAVAILABLE", { message: engineAccountFailure(error) });
+        }
       }),
       codexQuota: authed.engines.codexQuota.handler(async ({ context }) => {
         // Check on every request, including cached reads, so revocation is immediate.

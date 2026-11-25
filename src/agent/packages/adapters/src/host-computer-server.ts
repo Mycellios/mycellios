@@ -486,6 +486,7 @@ export async function startHostComputerServer(options: {
           ...(engineState?.signedOut.length ? { signedOutEngines: engineState.signedOut } : {}),
           ...(engineState?.signedIn?.length ? { signedInEngines: engineState.signedIn } : {}),
           ...(engineState?.models && Object.keys(engineState.models).length ? { nativeModels: engineState.models } : {}),
+          ...(engineState?.account && options.agentRuntime?.nativeEngineAccount ? { engineAccount: 1 as const } : {}),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
@@ -493,6 +494,13 @@ export async function startHostComputerServer(options: {
           ...(appControlOffered(input.projectSessionId) ? { appControl: true } : {}),
           ...(input.groupId && !input.projectSessionId ? { groupFolders: groupGrants(input) } : {}),
         };
+        break;
+      }
+      case "engineAccount": {
+        // The server already checked the Mico's owner; this host checks its own account scope.
+        if (!options.agentRuntime?.nativeEngineAccount)
+          throw new Error("This PC cannot sign its AI programs in from Mycellios. Update Mycellios on this PC.");
+        yield await options.agentRuntime.nativeEngineAccount(input.account);
         break;
       }
       case "appControl":
