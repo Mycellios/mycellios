@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { ThreadMessage } from "@mycellios/contracts";
 import { activeBotId, completeOnboarding, rpc, signup } from "./helpers";
@@ -70,6 +71,62 @@ test("conversation tabs render a slow first history read and reopen from cache",
   await page.getByRole("button", { name: title, exact: true }).click();
   await expect(transcript.getByText(text)).toBeVisible({ timeout: 1_500 });
   expect(bootstrapReads).toBe(0);
+});
+
+test("project conversations keep the workspace visible while their own history loads", async ({ page }) => {
+  await signup(page, `project-history-${Date.now()}@example.test`, "password12", "Project history");
+  await completeOnboarding(page);
+  const botId = activeBotId(page);
+  const projectId = randomUUID();
+  await rpc(page, "development/saveProject", { id: projectId, name: "Example app" });
+  const { threadId } = await rpc<{ threadId: string }>(page, "development/open", {
+    botId,
+    projectKey: `project:${projectId}`,
+    taskKey: `project-task:${randomUUID()}`,
+    title: "Project acceptance",
+  });
+  await page.reload();
+  const projects = page.getByRole("region", { name: "Projects", exact: true });
+  const roster = page.getByTestId("bots-sidebar");
+  const transcript = page.getByTestId("transcript");
+  await expect(transcript).toBeVisible();
+  await projects.getByRole("button", { name: "Example app", exact: true }).click();
+  const projectChat = projects.getByRole("button", { name: "Project acceptance", exact: true });
+
+  let releaseHistory!: () => void;
+  const waiting = new Promise<void>(resolve => { releaseHistory = resolve; });
+  let historyReads = 0;
+  let bootstrapReads = 0;
+  let documentNavigations = 0;
+  page.on("request", request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documentNavigations += 1; });
+  await page.route("**/rpc/bootstrap", route => { bootstrapReads += 1; return route.continue(); });
+  const text = "Message from the selected project conversation";
+  const message: ThreadMessage = {
+    id: "fixture-project-message", threadId, seq: 0, role: "user",
+    blocks: [{ kind: "text", text }], createdAt: new Date().toISOString(),
+  };
+  await page.route("**/rpc/threads/get", async route => {
+    if (route.request().postDataJSON()?.json?.taskThreadId !== threadId) return route.continue();
+    historyReads += 1;
+    const response = await route.fetch();
+    const payload = await response.json();
+    await waiting;
+    await route.fulfill({ response, json: { ...payload, json: { ...payload.json, messages: [message] } } });
+  });
+
+  try {
+    await projectChat.click();
+    await expect(page).toHaveURL(new RegExp(`[?&]task=${threadId}(?:&|$)`));
+    await expect(page.getByRole("status", { name: "Loading…" })).toBeVisible();
+    await expect(roster).toBeVisible();
+    await expect(projectChat).toHaveAttribute("aria-current", "page");
+    await expect.poll(() => historyReads).toBe(1);
+    expect(bootstrapReads).toBe(0);
+    expect(documentNavigations).toBe(0);
+  } finally {
+    releaseHistory();
+  }
+  await expect(transcript.getByText(text, { exact: true })).toBeVisible();
 });
 
 test("Answer opens the exact task and uses its preloaded question", async ({ page }) => {
