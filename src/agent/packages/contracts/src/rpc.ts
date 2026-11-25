@@ -410,7 +410,9 @@ export const appContract = {
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
   },
-  bootstrap: oc.input(z.object({ botId: Id.optional(), taskThreadId: Id.optional() })
+  bootstrap: oc.input(z.object({
+    botId: Id.optional(), taskThreadId: Id.optional(), history: z.literal("recent").optional(),
+  })
     .refine(input => !input.taskThreadId || Boolean(input.botId), "A task conversation requires its Mico"))
     .output(AppBootstrapSchema),
   deployment: {
@@ -704,7 +706,7 @@ export const appContract = {
         cursor: z.number().int().min(-1),
       }),
     ),
-    get: oc.input(threadTarget).output(ThreadSnapshotSchema),
+    get: oc.input(threadTarget.safeExtend({ history: z.literal("recent").optional() })).output(ThreadSnapshotSchema),
     retry: oc.input(threadTarget.safeExtend({ runId: Id })).output(z.object({ ok: z.literal(true) })),
     messages: oc
       .input(

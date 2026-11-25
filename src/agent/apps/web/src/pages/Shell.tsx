@@ -1533,10 +1533,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     [navigate],
   );
 
-  async function refreshGroupThread(id: string, signal?: AbortSignal) {
+  async function refreshGroupThread(id: string, signal?: AbortSignal, history?: "recent") {
     markOnce("rk:renderer:thread-request-start");
     const request = ++groupRefreshEpoch.current;
-    const snap = await rpc.threads.get({ groupId: id }, signal ? { signal } : undefined);
+    const snap = await rpc.threads.get({ groupId: id, history }, signal ? { signal } : undefined);
     markOnce("rk:renderer:thread-response");
     if (activeGroupId.current !== id || request !== groupRefreshEpoch.current) return snap;
     const reconciled = reconcileRefreshedThread(
@@ -1761,7 +1761,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const bootstrapRequest = seed && conversationSwitch
       ? undefined
       : taskScope
-        ? rpc.bootstrap({ botId: taskScope.botId })
+        ? rpc.bootstrap({ botId: taskScope.botId, history: "recent" })
         : takeInitialBootstrap(botId ?? startChat?.botId);
     void bootstrapRequest
       ?.then((bootstrap) => {
@@ -2166,7 +2166,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       loadInitial: () =>
         pendingJump
           ? rpc.threads.get({ groupId }, { signal: threadSnapshotSignal(abort.signal) })
-          : refreshGroupThread(groupId, threadSnapshotSignal(abort.signal)),
+          : refreshGroupThread(groupId, threadSnapshotSignal(abort.signal), cachedThread ? undefined : "recent"),
       loadHead: () => rpc.threads.head({ groupId }, { signal: threadSnapshotSignal(abort.signal) }),
       refresh: () => refreshGroupThread(groupId, threadSnapshotSignal(abort.signal)),
       currentSnapshot: () => snapshotRef.current,

@@ -45,7 +45,7 @@ describe("switching spaces in place", () => {
     await primeSpaceBootstrap("space-b", "bot-b");
     vi.mocked(selectedSpaceId).mockReturnValue("space-b");
     expect(rpc.bootstrap).toHaveBeenCalledWith(
-      { botId: "bot-b" },
+      { botId: "bot-b", history: "recent" },
       { context: { spaceId: "space-b" } },
     );
     await expect(takeInitialBootstrap("bot-b")).resolves.toBe(other);
@@ -65,7 +65,7 @@ describe("switching spaces in place", () => {
     const primed = primeSpaceBootstrap("space-b", "bot-b");
     discardPrimedBootstrap(primed);
     await takeInitialBootstrap("bot-b");
-    expect(rpc.bootstrap).toHaveBeenLastCalledWith({ botId: "bot-b" });
+    expect(rpc.bootstrap).toHaveBeenLastCalledWith({ botId: "bot-b", history: "recent" });
     expect(rpc.bootstrap).toHaveBeenCalledTimes(2);
   });
 });
@@ -90,7 +90,7 @@ describe("revisiting a space", () => {
     expect(getMaxUploadSizeBytes()).toBe(4321);
     await expect(taken).resolves.toBe(fresh);
     expect(rpc.bootstrap).toHaveBeenCalledWith(
-      { botId: "bot-b" },
+      { botId: "bot-b", history: "recent" },
       { context: { spaceId: "space-b" } },
     );
     expect(peekBootstrapSeed("bot-b")).toBeUndefined();
