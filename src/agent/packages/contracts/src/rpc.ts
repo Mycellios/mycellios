@@ -221,6 +221,7 @@ import {
   MycelliosSignInMethodsSchema,
 } from "./mycellios-identities.js";
 import { MessageReactionSchema } from "./reactions.js";
+import { MicoScriptRequestsPerHourSchema, MicoScriptsStateSchema, MicoScriptTokenSchema } from "./mico-scripts.js";
 import {
   RoutineEventFiltersSchema,
   RoutineEventTypeSchema,
@@ -758,6 +759,15 @@ export const appContract = {
     disconnect: oc
       .input(z.object({ provider: z.string().trim().min(1), credentialId: Id.optional() }))
       .output(z.object({ ok: z.literal(true) })),
+  },
+  micoScripts: {
+    get: oc.input(botId).output(MicoScriptsStateSchema),
+    configure: oc.input(botId.extend({
+      enabled: z.boolean(),
+      requestsPerHour: MicoScriptRequestsPerHourSchema,
+    })).output(z.object({ ok: z.literal(true) })),
+    issue: oc.input(botId).output(z.object({ token: z.string(), metadata: MicoScriptTokenSchema })),
+    revoke: oc.input(botId.extend({ tokenId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   bots: {
     list: oc.output(z.array(BotSchema)),

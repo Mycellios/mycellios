@@ -838,6 +838,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  scriptSettings MicoScriptSettings?
   memoryGrants MicoMemoryGrant[]
   desktopDevices DesktopBotDevice[]
   share MicoShare?
@@ -1537,6 +1538,57 @@ model Routine {
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
   @@map("routines")
+}
+
+model MicoScriptSettings {
+  botId           String @id
+  spaceId         String
+  userId          String
+  bot             Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  enabled         Boolean @default(false)
+  requestsPerHour Int @default(60)
+  tokens          MicoScriptToken[]
+  deliveries      MicoScriptDelivery[]
+
+  @@unique([botId, spaceId, userId])
+  @@map("mico_script_settings")
+}
+
+model MicoScriptToken {
+  id         String   @id @default(cuid())
+  botId      String
+  spaceId    String
+  userId     String
+  settings   MicoScriptSettings @relation(fields: [botId, spaceId, userId], references: [botId, spaceId, userId], onDelete: Cascade)
+  digest     String   @unique
+  hint       String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+
+  @@index([botId])
+  @@map("mico_script_tokens")
+}
+
+model MicoScriptDelivery {
+  id            String   @id @default(cuid())
+  botId         String
+  spaceId       String
+  userId        String
+  settings      MicoScriptSettings @relation(fields: [botId, spaceId, userId], references: [botId, spaceId, userId], onDelete: Cascade)
+  tokenId       String
+  kind          String
+  keyDigest     String?
+  requestDigest String
+  routineId     String?
+  threadId      String
+  messageId     String?
+  createdAt     DateTime @default(now())
+
+  @@unique([botId, keyDigest])
+  @@index([botId, createdAt])
+  @@index([tokenId, createdAt])
+  @@index([createdAt])
+  @@map("mico_script_deliveries")
 }
 
 /// A routine's own Standard Webhooks secret, encrypted like other credentials. The current one

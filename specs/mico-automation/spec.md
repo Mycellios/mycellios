@@ -151,8 +151,10 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
      user in a private profile folder, so local scripts need no copied secret.
    - Bodies are at most 64 KiB. Accepted messages and runs share 60 an hour per
      Mico by default (the owner can raise it to 1,000); reads do not count.
-   - Open decision: ship the tool in Desktop's resources (default), or also as an
-     npm package.
+   - Web and Desktop provide the same CLI download in the Mico's Advanced
+     settings. The hosted API is operator-enabled with
+     `MYCELLIOS_MICO_SCRIPTS_ENABLED=true`, then opt-in on each Mico. Delivery
+     status and ordinary questions are limited to the token that started them.
 4. Phase 4 — workflows that wait for people and events.
    - An approval step pauses the execution and shows Approve and Reject to the
      owner in the workflow's conversation; Reject stops the execution. Automatic

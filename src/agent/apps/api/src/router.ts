@@ -40,6 +40,7 @@ import { mycelliosIdentityRoutes } from "./routes/mycellios-identities.js";
 import { referralRoutes } from "./routes/referrals.js";
 import { boardsRoutes } from "./routes/boards.js";
 import { botsRoutes } from "./routes/bots.js";
+import { micoScriptsRoutes } from "./routes/mico-scripts.js";
 import { computerRoutes } from "./routes/computer.js";
 import { connectionsRoutes } from "./routes/connections.js";
 import { contentRoutes } from "./routes/content.js";
@@ -144,6 +145,7 @@ export interface RouterDeps {
   env: {
     /** People invited to Spaces; absent while the deployment keeps it off (specs/space-members). */
     spaceMembers?: { limit: number };
+    micoScriptsEnabled?: boolean;
     mycelliosSso?: boolean;
     /** The Mycellios identity authority (the OIDC issuer) when Mycellios SSO is on. */
     mycelliosIdentityIssuer?: string;
@@ -190,6 +192,7 @@ export function createRouter(deps: RouterDeps) {
     ...sharedMicoRoutes(ctx),
     ...modelsRoutes(ctx),
     ...botsRoutes(ctx),
+    ...micoScriptsRoutes(ctx),
     ...developmentRoutes(ctx),
     ...threadsRoutes(ctx),
     ...taskInboxRoutes(ctx),

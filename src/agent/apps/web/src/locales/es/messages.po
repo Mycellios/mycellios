@@ -15738,6 +15738,54 @@ msgstr "Ocultar secreto"
 msgid "The secret is unavailable. You can rotate it in the routine editor."
 msgstr "El secreto no está disponible. Puedes renovarlo en el editor de rutinas."
 
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Mico Scripts"
+msgstr "Scripts del Mico"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Allow scripts to call this Mico"
+msgstr "Permitir que los scripts llamen a este Mico"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Command-line tool"
+msgstr "Herramienta de línea de comandos"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Use Node.js 22 or later. Set MYCELLIOS_TOKEN or MYCELLIOS_TOKEN_FILE before running the command."
+msgstr "Usa Node.js 22 o posterior. Define MYCELLIOS_TOKEN o MYCELLIOS_TOKEN_FILE antes de ejecutar el comando."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Download CLI"
+msgstr "Descargar CLI"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Script tokens"
+msgstr "Tokens de scripts"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Script runs use this Mico’s normal billing and approval rules."
+msgstr "Los scripts usan las reglas de facturación y aprobación de este Mico."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Create token"
+msgstr "Crear token"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Copy this token now. It is shown only once."
+msgstr "Copia el token ahora. Solo se muestra una vez."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "New script token"
+msgstr "Nuevo token de script"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Copy token"
+msgstr "Copiar token"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Hide token"
+msgstr "Ocultar token"
+
 #: src/pages/SpaceMembersPanel.tsx
 msgid "Created an invitation"
 msgstr "Creó una invitación"
