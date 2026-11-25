@@ -243,22 +243,29 @@ export interface SideThreadListRow {
   openWaits?: number | null;
   /** Set on branches while the conversation they were copied from still exists. */
   branchedFromThreadId?: string | null;
+  /** A Space member's own conversation with this shared Mico (specs/space-members). */
+  memberUserId?: string | null;
 }
 
 /**
  * A Mico's side threads for this owner and Space, newest first, with the statuses of their
  * unfinished runs (background work only while it waits on the person) and the time of the
- * latest message or archive change.
+ * latest message or archive change. With `memberUserId`, only that Space member's own
+ * conversations with the shared Mico; without it, the owner's and their members' ones.
  */
 export function listSideThreads(
   prisma: Pick<PrismaClient, "$queryRaw">,
   scope: Scope,
-  input: { botId: string; projectKey?: string; limit?: number },
+  input: { botId: string; projectKey?: string; limit?: number; memberUserId?: string },
 ) {
   const project = input.projectKey ? Prisma.sql`AND t."projectKey" = ${input.projectKey}` : Prisma.empty;
+  const member = input.memberUserId
+    ? Prisma.sql`AND t."memberUserId" = ${input.memberUserId} AND t."deleteAfter" IS NULL`
+    : Prisma.empty;
   return prisma.$queryRaw<SideThreadListRow[]>`
     SELECT t.id, t."projectKey", t."taskKey", t."taskBotId", t.title, t."titleSource", t."startedBy",
       t.outcome, t."lastError", t."archivedAt", t."deleteAfter", t."createdAt", t.unread, t."branchedFromThreadId",
+      t."memberUserId",
       GREATEST(t."createdAt", COALESCE(m."createdAt", t."createdAt"), COALESCE(t."archivedAt", t."createdAt")) AS "updatedAt",
       a.statuses AS "activeStatuses",
       (SELECT count(*)::int FROM tasks w WHERE w."spaceId" = t."spaceId" AND w."userId" = t."userId" AND w."threadId" = t.id
@@ -273,7 +280,7 @@ export function listSideThreads(
         AND (r."trigger" NOT IN (${BACKGROUND}) OR r.status IN ('waiting_input', 'waiting_takeover'))
     ) a ON true
     WHERE t."spaceId" = ${scope.spaceId} AND t."userId" = ${scope.userId} AND t."taskBotId" = ${input.botId}
-      ${project}
+      ${project} ${member}
     ORDER BY t."createdAt" DESC, t.id DESC
     LIMIT ${input.limit ?? 1000}`;
 }

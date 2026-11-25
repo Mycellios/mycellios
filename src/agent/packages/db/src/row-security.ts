@@ -131,6 +131,9 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "RoutineDeliveryReceipt",
   "RoutineWebhookSecret",
   "RoutineEventReceipt",
+  "MicoScriptSettings",
+  "MicoScriptToken",
+  "MicoScriptDelivery",
   "Workflow",
   "WorkflowExecution",
   "Connection",
@@ -166,6 +169,8 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "UserActionAutoReviewPreference",
   "SecurityEvent",
   "SpaceInvitation",
+  "MicoShare",
+  "MicoShareMember",
 ]);
 
 /**

@@ -38,7 +38,8 @@ async function call(deps:LocalMemoryReviewDeps,model:AgentRunModel,base:string,p
 }
 /** Scheduling only reads local state and enqueues one replaceable background job. */
 export async function scheduleLocalMemoryReview(deps:Pick<LocalMemoryReviewDeps,"prisma"|"jobs">,threadId:string){
- const thread=await deps.prisma.thread.findUnique({where:{id:threadId}});if(!thread || thread.deleteAfter || !(thread.taskBotId??thread.botId) || thread.groupId || thread.externalConversationId)return;
+ // A Space member's conversation never feeds the owner's memory (specs/space-members).
+ const thread=await deps.prisma.thread.findUnique({where:{id:threadId}});if(!thread || thread.deleteAfter || !(thread.taskBotId??thread.botId) || thread.groupId || thread.externalConversationId || thread.memberUserId)return;
  const user=await deps.prisma.user.findUnique({where:{id:thread.userId},select:{micoDefaults:true}});const settings=policy(user?.micoDefaults);if(!settings.enabled||settings.dailyLimitMicrounits===0)return;
  const previous=await deps.prisma.localMemoryReview.findFirst({where:{threadId,generation:thread.historyCompactionGeneration,status:"completed"},orderBy:{lastSeq:"desc"}});
  const turns=await deps.prisma.message.count({where:{threadId,role:"user",seq:{gt:Math.max(previous?.lastSeq??-1,thread.contextStartSeq-1)}}});
@@ -48,7 +49,7 @@ export async function scheduleLocalMemoryReview(deps:Pick<LocalMemoryReviewDeps,
 }
 /** Single paid intent per batch. Only receipt GET-equivalent reconciliation follows uncertainty. */
 export async function reviewLocalMemory(deps:LocalMemoryReviewDeps,threadId:string):Promise<void>{
- const db=deps.prisma;const thread=await db.thread.findUnique({where:{id:threadId}});if(!thread || !(thread.taskBotId??thread.botId) || thread.groupId || thread.externalConversationId)return;
+ const db=deps.prisma;const thread=await db.thread.findUnique({where:{id:threadId}});if(!thread || !(thread.taskBotId??thread.botId) || thread.groupId || thread.externalConversationId || thread.memberUserId)return;
  const scope={userId:thread.userId,spaceId:thread.spaceId,botId:(thread.taskBotId??thread.botId)!};
  if(!await db.spaceMember.findFirst({where:{spaceId:scope.spaceId,userId:scope.userId},select:{userId:true}}))return;
  const user=await db.user.findUnique({where:{id:scope.userId},select:{micoDefaults:true}});const settings=policy(user?.micoDefaults);if(!settings.enabled||settings.dailyLimitMicrounits===0)return;

@@ -460,12 +460,22 @@
   binds an email invitation to that verified address and adds a `member` organization and
   Space membership; the default-Space trigger joins owners only, so nobody reaches a Personal
   Space. Nobody removes or changes the owner; only the owner changes roles. A non-owner
-  reaches only `spaces.members.*`/`spaces.invites.*` there (`assertSpaceRoleAllows`) and no
-  route outside RPC: their own identity would read Space rows and spend the owner
-  organization's Credits. Membership is read per request, so removal and leaving end access
-  at once. Audit changes in `security_events` with names, never addresses. Verify
-  scripts/verify-space-members-db.ts and the space-members, SpaceMembersPanel, SpaceInvite
-  and switcher tests.
+  reaches only `spaces.members.*`/`spaces.invites.*`/`spaces.shares.*` and `sharedMicos.*`
+  there (`assertSpaceRoleAllows`) and no route outside RPC: their own identity would read Space
+  rows and spend the owner organization's Credits. Membership is read per request, so removal
+  and leaving end access at once. Audit changes in `security_events` with names, never addresses.
+  The owner or an admin shares a Mico (`mico_shares`, default none, chat level) with people
+  or everyone; `sharedMicos.*` resolves that share on every call and runs as the Mico owner's
+  tenant on the member's own side threads (`Thread.memberUserId`) only, never its main chat,
+  settings or computer. Messages and runs name the member (`authorUserId`,
+  `requestedByUserId`). Any run in such a thread is a member turn: Pi only, no computer,
+  memory, reviews, connections, secrets, schedules, other Micos or backups, only
+  `MEMBER_RUN_TOOL_NAMES`, and only hosted Credits; each paid call rechecks the share and holds
+  against the member's UTC-day allowance under the account lock. The owner reads those threads
+  but never writes, answers or marks them read; they stay out of the owner's counts and
+  notifications. Unsharing, removal and leaving cancel the person's queued turns. Verify
+  scripts/verify-space-members-db.ts and the space-members, executor-space-members,
+  model-credit-observer, SpaceMembersPanel, SpaceInvite and switcher tests.
   The chat provider/model selection owns execution: saved API/OAuth connections
   use Pi automatically; installed account providers are selected in the same
   model menu. Do not expose a second Agent engine switch in Mico settings or
@@ -901,7 +911,8 @@
   Phase 4 of specs/local-engine-default/spec.md gives only explicitly requested,
   recoverable owned Desktop shell commands the ephemeral loopback model token.
   Keep it out of the renderer, transcript and logs. The wallet transaction checks
-  current billing ownership, opt-in and lease, pins the approved turn ceiling and
+  current billing ownership, opt-in and lease. It excludes shared Mico member turns,
+  pins the approved turn ceiling and
   counts tagged unsettled and settled entries across segments and restarts.
   Verify desktop-tool-model, desktop-agent-runtime and model-credits.postgres
   tests. SDK and local child fixtures do not qualify an installed Desktop.
@@ -1329,6 +1340,13 @@
   starts a `routine-test:event:` run, also while paused. The per-Mico Bearer route skips routines
   with their own secret; the UI issues per-Mico keys only for GitHub. Verify routine-events tests
   and `node --import tsx scripts/verify-routine-events-db.ts` (fresh loopback cluster).
+
+- Mico Scripts (specs/mico-automation phase 3) require
+  `MYCELLIOS_MICO_SCRIPTS_ENABLED=true` plus owner opt-in per Mico. Keep token
+  hashes and delivery receipts bound to the Mico, Space and owner. A token only
+  reads and answers ordinary questions for its own deliveries. Retried deliveries
+  reuse their receipt, and every accepted run keeps the unattended webhook policy.
+  Verify with `node --import tsx scripts/verify-mico-script-credentials-db.ts`.
 
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong

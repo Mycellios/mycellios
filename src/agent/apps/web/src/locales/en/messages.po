@@ -15167,6 +15167,14 @@ msgstr "Verify your email address to accept this invitation."
 msgid "Too many email invitations today. Try again tomorrow."
 msgstr "Too many email invitations today. Try again tomorrow."
 
+#: src/pages/SpaceInvite.tsx
+msgid "{owner} can read your conversations with their Micos."
+msgstr "{owner} can read your conversations with their Micos."
+
+#: src/lib/user-error.ts
+msgid "Only the person who started this conversation can write in it."
+msgstr "Only the person who started this conversation can write in it."
+
 #: src/pages/shell/native-engine-install.tsx
 msgid "Install {name}"
 msgstr "Install {name}"
@@ -15295,6 +15303,38 @@ msgstr "AI Credits per Mico turn"
 msgid "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
 msgstr "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
 
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Shared Micos"
+msgstr "Shared Micos"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Who can chat with this Mico"
+msgstr "Who can chat with this Mico"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Everyone in this Space"
+msgstr "Everyone in this Space"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Selected people"
+msgstr "Selected people"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Daily Credits per person, paid by the Mico owner"
+msgstr "Daily Credits per person, paid by the Mico owner"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Save sharing"
+msgstr "Save sharing"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "No Micos have been shared with you."
+msgstr "No Micos have been shared with you."
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Close conversation"
+msgstr "Close conversation"
+
 #: src/pages/shell/native-engine-install.tsx
 msgid "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
 msgstr "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
@@ -15326,3 +15366,103 @@ msgstr "Hide secret"
 #: src/components/RoutineWebhookCard.tsx
 msgid "The secret is unavailable. You can rotate it in the routine editor."
 msgstr "The secret is unavailable. You can rotate it in the routine editor."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Mico Scripts"
+msgstr "Mico Scripts"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Allow scripts to call this Mico"
+msgstr "Allow scripts to call this Mico"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Command-line tool"
+msgstr "Command-line tool"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Use Node.js 22 or later. Set MYCELLIOS_TOKEN or MYCELLIOS_TOKEN_FILE before running the command."
+msgstr "Use Node.js 22 or later. Set MYCELLIOS_TOKEN or MYCELLIOS_TOKEN_FILE before running the command."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Download CLI"
+msgstr "Download CLI"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Script tokens"
+msgstr "Script tokens"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Script runs use this Mico’s normal billing and approval rules."
+msgstr "Script runs use this Mico’s normal billing and approval rules."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Create token"
+msgstr "Create token"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Copy this token now. It is shown only once."
+msgstr "Copy this token now. It is shown only once."
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "New script token"
+msgstr "New script token"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Copy token"
+msgstr "Copy token"
+
+#: src/pages/shell/mico-scripts-section.tsx
+msgid "Hide token"
+msgstr "Hide token"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Created an invitation"
+msgstr "Created an invitation"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Revoked an invitation"
+msgstr "Revoked an invitation"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Joined the Space"
+msgstr "Joined the Space"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Left the Space"
+msgstr "Left the Space"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Removed a member"
+msgstr "Removed a member"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Changed a member's role"
+msgstr "Changed a member's role"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Changed Mico sharing"
+msgstr "Changed Mico sharing"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Space activity"
+msgstr "Space activity"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Hide activity"
+msgstr "Hide activity"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Show activity"
+msgstr "Show activity"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "No Space activity yet."
+msgstr "No Space activity yet."
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Load earlier activity"
+msgstr "Load earlier activity"
+
+#: src/pages/shell/dialogs.tsx
+msgid "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"
+msgstr "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"

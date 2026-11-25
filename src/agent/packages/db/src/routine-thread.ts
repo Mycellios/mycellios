@@ -56,11 +56,19 @@ export async function ensureRoutineThread(
   routineId: string,
   options: { reopen?: boolean } = {},
 ) {
+  return prisma.$transaction((tx) => ensureRoutineThreadInTransaction(tx, actor, routineId, options));
+}
+
+export async function ensureRoutineThreadInTransaction(
+  tx: Prisma.TransactionClient,
+  actor: Pick<Actor, "spaceId" | "userId">,
+  routineId: string,
+  options: { reopen?: boolean; botId?: string } = {},
+) {
   const scope = { spaceId: actor.spaceId, userId: actor.userId };
-  return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM routines WHERE id = ${routineId} AND "spaceId" = ${actor.spaceId} AND "userId" = ${actor.userId} FOR UPDATE`;
     const routine = await tx.routine.findFirst({ where: {
-      id: routineId, spaceId: actor.spaceId, userId: actor.userId, bot: { archivedAt: null },
+      id: routineId, spaceId: actor.spaceId, userId: actor.userId, botId: options.botId, bot: { archivedAt: null },
     }, select: { id: true, name: true, botId: true, threadId: true } });
     if (!routine) throw new IsolationError();
     if (routine.threadId) {
@@ -90,7 +98,6 @@ export async function ensureRoutineThread(
       throw new IsolationError("The routine conversation identity is already in use");
     await tx.routine.update({ where: { id: routine.id }, data: { threadId: thread.id } });
     return { id: thread.id, privateRoutine: true };
-  });
 }
 
 /**

@@ -49,6 +49,7 @@ import { AgentImportUndo } from "./agent-import-undo";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
 import { BotCredentialsSection } from "./bot-credentials";
 import { ChatModelPicker } from "./chat-model-picker";
+import { MicoScriptsSection } from "./mico-scripts-section";
 import { isMycelliosBaseUrl, MAX_ENABLED_MODEL_IDS } from "@mycellios/contracts";
 import { useCompatibleRoleCatalog } from "../model-settings/use-compatible-role-catalog";
 import { useSpaceRpc } from "../../lib/space-rpc";
@@ -938,6 +939,7 @@ export function BotSettings({
             </section>
           </SettingsGroup>
           <BotCredentialsSection botId={bot.id} />
+          <MicoScriptsSection key={bot.id} botId={bot.id} />
           <div className="overflow-hidden rounded-xl bg-muted/50 px-4">
             <button
               type="button"

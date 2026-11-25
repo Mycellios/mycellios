@@ -144,6 +144,9 @@ dbTests("model credits ledger", () => {
           where: { id: userId }, data: { micoDefaults: { desktopToolCreditLimitMicros: value } },
         });
         await approve(5000);
+        await prisma.run.update({ where: { id: run.id }, data: { requestedByUserId: "shared-mico-member" } });
+        await expect(reserve("member")).rejects.toThrow("no longer authorized");
+        await prisma.run.update({ where: { id: run.id }, data: { requestedByUserId: null } });
         const attempts = await Promise.allSettled([reserve("one"), reserve("two")]);
         const accepted = attempts.flatMap(attempt => attempt.status === "fulfilled" ? [attempt.value] : []);
         expect(accepted).toHaveLength(1);

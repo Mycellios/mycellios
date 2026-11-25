@@ -103,6 +103,17 @@ a member. Five phases, each shipping alone; phases 2 to 5 need phase 1.
      audit log (`spaces.members.audit`), the switcher's shared Spaces and a Members
      section; a non-owner reaches only `spaces.members.*`/`spaces.invites.*` in a
      shared Space until Mico sharing and member conversations land.
+   - Implemented (1b, server): behind the same flag, `mico_shares` with
+     `spaces.shares.*`, and `sharedMicos.*` for a member's own conversations
+     (`memberUserId`, `authorUserId`, `requestedByUserId`) run as the Mico owner's
+     tenant. Member turns get the restricted policy on Pi and hosted Credits only,
+     holding against a per-member UTC-day allowance (default 1 Credit; 0 pauses).
+     The owner reads, never writes, those conversations; unsharing, removal and
+     leaving cancel queued turns; the invitation says the owner can read them.
+     The Members settings expose the sharing audience, per-person allowance,
+     member conversations with history, attachments and ordinary questions, the
+     owner's read-only transcript, and Space activity for owners and admins.
+     The web deletion confirmation counts other members who will lose access.
 2. Phase 2 — work tools for members.
    - A member's turns on a shared Mico get their own home on that Mico's server
      computer (a home key per Mico and member), so their files never meet the

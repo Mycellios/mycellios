@@ -44,6 +44,11 @@ export const SideThreadSchema = z.object({
    * conversation is gone. Absent for other conversations and on older servers.
    */
   branchedFromThreadId: Id.nullable().optional(),
+  /**
+   * A Space member's own conversation with this shared Mico (specs/space-members): its owner can
+   * read it, only that person writes in it. Absent for the owner's own conversations.
+   */
+  memberUserId: Id.optional(),
 });
 export type SideThread = z.infer<typeof SideThreadSchema>;
 

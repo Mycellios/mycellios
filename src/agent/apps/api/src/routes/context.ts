@@ -86,11 +86,17 @@ export const SHARED_SPACE_FORBIDDEN = "Not available in a space someone else own
 
 /**
  * What a person may call in a Space someone else owns (specs/space-members, phase 1): its
- * people and invitations, nothing that reads or writes the Space's content. Everything else
- * would run with their own identity in the owner's organization, whose Credits pay for runs.
+ * people, invitations and who its Micos are shared with, and their own conversations with the
+ * Micos shared with them (`sharedMicos`, which resolves that access on every call and runs with
+ * the Mico owner's tenant identity). Everything else would run with their own identity in the
+ * owner's organization, whose Credits pay for runs, and stays refused.
  */
 export function sharedSpaceProcedure(path: readonly string[]): boolean {
-  return path[0] === "spaces" && (path[1] === "members" || path[1] === "invites");
+  if (path[0] === "sharedMicos") return true;
+  return (
+    path[0] === "spaces" &&
+    (path[1] === "members" || path[1] === "invites" || path[1] === "shares")
+  );
 }
 
 /** Refuses a procedure a non-owner may not call in this Space. Actors without a role are owners. */
