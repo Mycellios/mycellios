@@ -74,11 +74,6 @@ export function useRoutineEditor({
     setRoutineDraft(routine ? draftFromRoutine(routine) : emptyRoutineDraft());
     setRoutineWebhookSecret(null);
   }
-  function editRoutine(routine: Routine) {
-    setRoutineDraft(draftFromRoutine(routine));
-    setRoutineWebhookSecret(null);
-    setEditingRoutine(routine);
-  }
   function startRoutine(routine?: Routine) {
     setRoutineDraft(routine ? draftFromRoutine(routine) : emptyRoutineDraft());
     setRoutineWebhookSecret(null);
@@ -296,7 +291,6 @@ export function useRoutineEditor({
     deleteDialogProps,
     editingRoutine,
     restoreRoutine,
-    editRoutine,
     startRoutine,
     resetRoutineTarget,
     leaveRoutine,

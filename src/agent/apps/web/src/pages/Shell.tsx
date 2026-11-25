@@ -275,6 +275,7 @@ import { WorkflowsAvailability } from "./workflows/WorkflowsAvailability";
 import { RoutineWorkspace } from "./routines/RoutineWorkspace";
 import { RoutinesAvailability } from "./routines/RoutinesAvailability";
 import { routinesAvailable } from "../lib/routines-availability";
+import { NEW_ROUTINE_LINK, routineLinkTarget } from "../lib/routine-link";
 import { TasksWorkspace } from "./tasks/TasksWorkspace";
 import { ScheduleWorkspace } from "./schedule/ScheduleWorkspace";
 import { UsageWorkspace } from "./usage/UsageWorkspace";
@@ -1129,7 +1130,6 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     deleteDialogProps: deleteRoutineDialogProps,
     editingRoutine,
     restoreRoutine,
-    editRoutine,
     startRoutine,
     resetRoutineTarget,
     leaveRoutine,
@@ -2652,14 +2652,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       return;
     }
     if (!active) return;
-    if (routineId && routinesBotId === active.id) {
-      const routine = routines.find((item) => item.id === routineId);
-      if (routine) {
-        editRoutine(routine);
-        setPanel("routine");
-      } else {
-        setPanel("computer");
-      }
+    const routineLink = routineId
+      ? routineLinkTarget(routineId, routinesBotId === active.id ? routines : null)
+      : null;
+    if (routineLink) {
+      // Calendar and search links open the same editor as the computer panel and Routines page.
+      if (routineLink === "missing") setPanel("computer");
+      else startRoutine(routineLink.routine);
       const next = new URLSearchParams(searchParams);
       next.delete("routine");
       setSearchParams(next, { replace: true });
@@ -5063,7 +5062,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           />
         ) : null}
         <CallReturnBar />
-        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onWhatsAppLink={()=>setOverlay({kind:"messaging"})} onShowBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onShowBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} onOpenConversation={(item, messageId) => navigate(`/app/${encodeURIComponent(item.botId)}?task=${encodeURIComponent(item.threadId)}${messageId ? `&m=${encodeURIComponent(messageId)}` : ""}`)} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowsAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}><WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /></WorkflowsAvailability> : routineView ? <RoutinesAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}>{active && !inGroup ? <RoutineWorkspace
+        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onWhatsAppLink={()=>setOverlay({kind:"messaging"})} onShowBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onShowBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=${NEW_ROUTINE_LINK}`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} onOpenConversation={(item, messageId) => navigate(`/app/${encodeURIComponent(item.botId)}?task=${encodeURIComponent(item.threadId)}${messageId ? `&m=${encodeURIComponent(messageId)}` : ""}`)} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowsAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}><WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /></WorkflowsAvailability> : routineView ? <RoutinesAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}>{active && !inGroup ? <RoutineWorkspace
           key={JSON.stringify([userId, currentSpaceId, active.id])}
           bot={active}
           client={rpc}

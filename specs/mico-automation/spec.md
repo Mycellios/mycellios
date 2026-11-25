@@ -1,6 +1,6 @@
 # Automate Micos with routines, signed events, scripts and workflows
 
-Status: proposed design. No product code changes with this spec.
+Status: phase 1 implemented; phases 2 to 6 are a proposed design.
 
 This spec builds on `specs/mico-routine-runs/spec.md` (routine conversations,
 main-chat markers, quiet and failed runs) and on the workflow engine and
@@ -89,6 +89,8 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
      jobs are untouched either way.
    - Open decision: release Workflows together with Routines (default), or keep
      it paused until phase 4.
+   - Implemented: both gates are opt-out and Workflows ships with Routines; the
+     hosted end-to-end runs are still to be reported.
 2. Phase 2 — signed webhook routines.
    - Each webhook routine gets its own URL (`/api/v1/routines/<routineId>/events`)
      and secret in the Standard Webhooks format: `webhook-id`, `webhook-timestamp`

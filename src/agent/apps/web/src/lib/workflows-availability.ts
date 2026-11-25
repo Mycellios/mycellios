@@ -1,4 +1,4 @@
-/** Temporary UI launch gate; preserves saved workflows and backend execution. */
+/** On unless an operator pauses the UI; saved workflows and backend execution are never touched. */
 export function workflowsAvailable(): boolean {
-  return import.meta.env.VITE_MYCELLIOS_WORKFLOWS === "true";
+  return import.meta.env.VITE_MYCELLIOS_WORKFLOWS !== "false";
 }
