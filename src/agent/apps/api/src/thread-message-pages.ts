@@ -268,6 +268,8 @@ function toThreadMessage(row: {
   } | null;
   runId: string | null;
   clientNonce?: string | null;
+  /** The Space member who wrote it, in their conversation with a shared Mico. */
+  authorUserId?: string | null;
   createdAt: Date;
 }): ThreadMessage {
   const parent = row.replyTo?.threadId === row.threadId ? row.replyTo : null;
@@ -295,6 +297,7 @@ function toThreadMessage(row: {
     runId: row.runId ?? undefined,
     callId: callIdFromClientNonce(row.clientNonce),
     ...(row.role === "bot" && isUserProgressClientNonce(row.clientNonce) ? { progress: true as const } : {}),
+    ...(row.authorUserId ? { authorUserId: row.authorUserId } : {}),
     createdAt: row.createdAt.toISOString(),
   };
 }

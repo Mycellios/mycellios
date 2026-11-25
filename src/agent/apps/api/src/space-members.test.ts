@@ -118,3 +118,51 @@ describe("Space member procedures for the owner", () => {
     await expect(enabled.spaces.members.list()).rejects.toThrow("database touched");
   });
 });
+
+describe("Micos shared with people in a Space (specs/space-members, phase 1b)", () => {
+  const target = { botId: "bot-shared", taskThreadId: "thread-member" };
+
+  it("lets members reach their shared Micos and admins the shares, and nothing else", () => {
+    for (const path of [
+      ["sharedMicos", "list"],
+      ["sharedMicos", "send"],
+      ["sharedMicos", "subscribe"],
+      ["spaces", "shares", "set"],
+    ])
+      expect(sharedSpaceProcedure(path)).toBe(true);
+    for (const path of [
+      ["threads", "get"],
+      ["threads", "send"],
+      ["artifacts", "get"],
+      ["development", "list"],
+      ["spaces", "rename"],
+    ])
+      expect(sharedSpaceProcedure(path)).toBe(false);
+  });
+
+  it("answers NOT_FOUND while the deployment keeps Space members off, before any read", async () => {
+    for (const spaceRole of [undefined, "owner", "member"] as const) {
+      const rpc = client({ spaceRole });
+      expect(await code(rpc.sharedMicos.list())).toBe("NOT_FOUND");
+      expect(await code(rpc.sharedMicos.get(target))).toBe("NOT_FOUND");
+      expect(await code(rpc.sharedMicos.send({ ...target, text: "Hello" }))).toBe("NOT_FOUND");
+      expect(await code(rpc.spaces.shares.list())).toBe("NOT_FOUND");
+    }
+  });
+
+  it("is not the owner's way into their own Micos", async () => {
+    for (const spaceRole of [undefined, "owner"] as const) {
+      const rpc = client({ spaceRole, spaceMembers: { limit: 20 } });
+      expect(await code(rpc.sharedMicos.list())).toBe("NOT_FOUND");
+      expect(await code(rpc.sharedMicos.stop(target))).toBe("NOT_FOUND");
+    }
+  });
+
+  it("resolves the member's access before anything else on every call", async () => {
+    const rpc = client({ spaceRole: "member", spaceMembers: { limit: 20 } });
+    // The share is read first, from the database this fixture forbids.
+    await expect(rpc.sharedMicos.get(target)).rejects.toThrow("database touched");
+    await expect(rpc.spaces.shares.list()).rejects.toThrow("database touched");
+  });
+
+});

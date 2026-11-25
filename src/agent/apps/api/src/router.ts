@@ -52,6 +52,7 @@ import { messagingRoutes } from "./routes/messaging.js";
 import { whatsappRoutes } from "./routes/whatsapp.js";
 import { modelsRoutes } from "./routes/models.js";
 import { routinesRoutes } from "./routes/routines.js";
+import { sharedMicoRoutes } from "./routes/shared-micos.js";
 import { workflowsRoutes } from "./routes/workflows.js";
 import { spacesRoutes } from "./routes/spaces.js";
 import { developmentRoutes } from "./routes/development.js";
@@ -186,6 +187,7 @@ export function createRouter(deps: RouterDeps) {
     ...mycelliosIdentityRoutes(ctx),
     ...referralRoutes(ctx),
     ...spacesRoutes(ctx),
+    ...sharedMicoRoutes(ctx),
     ...modelsRoutes(ctx),
     ...botsRoutes(ctx),
     ...developmentRoutes(ctx),

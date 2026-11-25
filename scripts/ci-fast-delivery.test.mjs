@@ -217,8 +217,8 @@ test('conversation lifecycle changes qualify their migration, archive and delete
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-thread-lifecycle-db.ts')));
 });
 
-test('Space members qualify invitations, roles and member isolation on a real isolated database',()=>{
- for (const file of ['src/agent/packages/db/src/space-members.ts','src/agent/apps/api/src/routes/space-members.ts','src/agent/apps/api/src/routes/spaces.ts','src/agent/packages/db/src/scope.ts','src/agent/scripts/verify-space-members-db.ts','src/agent/packages/db/prisma/migrations/20261125100000_space_members/migration.sql']) {
+test('Space members qualify invitations, roles, shared Micos and member isolation on a real isolated database',()=>{
+ for (const file of ['src/agent/packages/db/src/space-members.ts','src/agent/apps/api/src/routes/space-members.ts','src/agent/apps/api/src/routes/spaces.ts','src/agent/packages/db/src/scope.ts','src/agent/scripts/verify-space-members-db.ts','src/agent/packages/db/prisma/migrations/20261125100000_space_members/migration.sql','src/agent/packages/db/src/space-members-sharing.ts','src/agent/apps/api/src/routes/shared-micos.ts','src/agent/packages/adapters/src/model-credit-observer.ts','src/agent/packages/db/prisma/migrations/20261125120000_space_member_sharing/migration.sql']) {
   const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-space-members-db.ts'));
   assert.deepEqual(check?.args,['node_modules/tsx/dist/cli.mjs','scripts/verify-space-members-db.ts'], file);
  }

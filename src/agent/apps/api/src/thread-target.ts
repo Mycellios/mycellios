@@ -10,7 +10,11 @@ import type {
   ReplyPreview,
   ThreadSnapshot,
 } from "@mycellios/contracts";
-import { GROUP_MEMBER_MIN, MessageBlock as MessageBlockSchema } from "@mycellios/contracts";
+import {
+  GROUP_MEMBER_MIN,
+  MessageBlock as MessageBlockSchema,
+  SHARED_MICO_CONVERSATION_ERROR,
+} from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
   addressedGroupBotIds,
@@ -67,6 +71,8 @@ export type ThreadTarget =
       threadId: string;
       projectSessionId?: string;
       bot: Awaited<ReturnType<ReturnType<typeof createRepos>["getBot"]>>;
+      /** A Space member's own conversation with this shared Mico (specs/space-members). */
+      memberUserId?: string;
     }
   | {
       kind: "group";
@@ -344,13 +350,23 @@ async function lockAndLoadGroup(
   };
 }
 
+/**
+ * A Space member's conversation with a shared Mico stays its owner's thread, but only that
+ * member writes in it: the owner may read it (`"read"`), the member's own procedures name them.
+ * Without this option such a conversation is refused, so no other procedure acts on it.
+ */
+export type MemberConversationAccess = "read" | { memberUserId: string };
+
 export async function resolveThreadTarget(
   prisma: PrismaClient,
   actor: Actor,
   input: { botId?: string; groupId?: string; taskThreadId?: string },
-  options: { includeArchived?: boolean } = {},
+  options: { includeArchived?: boolean; memberConversation?: MemberConversationAccess } = {},
 ): Promise<ThreadTarget> {
   if(input.taskThreadId&&(!input.botId||input.groupId))throw new IsolationError();
+  const member = typeof options.memberConversation === "object" ? options.memberConversation : null;
+  // A member's procedures reach only their own conversation, never a main chat or a group.
+  if (member && (!input.taskThreadId || input.groupId)) throw new IsolationError();
   const repos = createRepos(prisma);
   const groupRepos = createGroupRepos(prisma);
   if (input.botId) {
@@ -358,12 +374,16 @@ export async function resolveThreadTarget(
     if (!bot.thread) throw new IsolationError();
     const taskThread = input.taskThreadId ? await prisma.thread.findFirst({where:{id:input.taskThreadId,taskBotId:bot.id,userId:actor.userId,spaceId:actor.spaceId}}) : null;
     if(input.taskThreadId && !taskThread) throw new IsolationError();
+    if (member && taskThread?.memberUserId !== member.memberUserId) throw new IsolationError();
+    if (taskThread?.memberUserId && !member && options.memberConversation !== "read")
+      throw new ORPCError("FORBIDDEN", { message: SHARED_MICO_CONVERSATION_ERROR });
     return {
       kind: "bot",
       botId: bot.id,
       threadId: taskThread?.id ?? bot.thread.id,
       ...(taskThread && !isMicoTaskThread(taskThread) && !isInternalWorkThread(taskThread) && !(await isOwnedRoutineThread(prisma, actor, taskThread)) && !(await isOwnedWorkflowThread(prisma, actor, taskThread)) ? { projectSessionId: taskThread.id } : {}),
       bot,
+      ...(taskThread?.memberUserId ? { memberUserId: taskThread.memberUserId } : {}),
     };
   }
   if (input.groupId) {
@@ -701,10 +721,16 @@ export async function sendThreadMessage(
     responseLocale?: string;
     taskInstructions?: string;
     delivery?: "queue" | "steer";
+    /**
+     * The Space member writing in their own conversation with a shared Mico: their message and
+     * the turn it starts name them, while `actor` (the Mico's owner) owns and pays for both.
+     */
+    author?: string;
   },
   releaseTakeover?: (runId: string) => Promise<void>,
   beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>,
 ) {
+  const authorUserId = input.author;
   if(input.taskInstructions){const ownTask=await deps.prisma.thread.findFirst({where:{id:target.threadId,taskBotId:target.kind==="bot"?target.botId:"",spaceId:actor.spaceId,userId:actor.userId}});if(!ownTask)throw new IsolationError();}
   const existing = await replayExistingSend(
     deps,
@@ -792,6 +818,7 @@ export async function sendThreadMessage(
           replyToMessageId,
           replyQuote,
           clientNonce: input.clientNonce,
+          authorUserId,
         });
         const activeRuns = await tx.run.findMany({
           where: {
@@ -808,7 +835,7 @@ export async function sendThreadMessage(
               spaceId: actor.spaceId,
               threadId: target.threadId,
               runId: run.id,
-              answeredByUserId: actor.userId,
+              answeredByUserId: authorUserId ?? actor.userId,
               answer: input.text ?? "",
               beforeMessageSeq: message.seq,
             })
@@ -838,6 +865,7 @@ export async function sendThreadMessage(
               seq: message.seq,
               role: "user",
               clientNonce: input.clientNonce,
+              ...(authorUserId ? { authorUserId } : {}),
               blocks,
               callId,
               runIds: answered.map((run) => run.id),
@@ -875,6 +903,7 @@ export async function sendThreadMessage(
               seq: message.seq,
               role: "user",
               clientNonce: input.clientNonce,
+              ...(authorUserId ? { authorUserId } : {}),
               blocks,
               callId,
               replyToMessageId,
@@ -904,6 +933,7 @@ export async function sendThreadMessage(
             threadId: target.threadId,
             taskId: task.id,
             userId: actor.userId,
+            ...(authorUserId ? { requestedByUserId: authorUserId } : {}),
             status: "queued",
             trigger: "user",
             clientNonce: sendRunClientNonce(input.clientNonce, message.id),
@@ -927,6 +957,7 @@ export async function sendThreadMessage(
             seq: message.seq,
             role: "user",
             clientNonce: input.clientNonce,
+            ...(authorUserId ? { authorUserId } : {}),
             blocks,
             callId,
             runIds: [run.id],

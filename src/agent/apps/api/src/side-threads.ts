@@ -63,6 +63,7 @@ export function sideThreadRow(row: SideThreadListRow): SideThread {
     unread: Boolean(row.unread),
     openWaits: row.openWaits ?? 0,
     ...(row.startedBy === "branch" ? { branchedFromThreadId: row.branchedFromThreadId ?? null } : {}),
+    ...(row.memberUserId ? { memberUserId: row.memberUserId } : {}),
   };
 }
 

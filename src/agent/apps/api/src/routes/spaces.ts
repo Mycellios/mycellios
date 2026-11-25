@@ -50,7 +50,7 @@ async function asMemberOf<T>(
 
 export function spacesRoutes(ctx: RouterContext) {
   const { deps, repos, groupRepos, authed } = ctx;
-  const { members, invites } = spaceMemberRoutes(ctx);
+  const { members, invites, shares } = spaceMemberRoutes(ctx);
   return {
     spaceSettings: {
       overrides: authed.spaceSettings.overrides.handler(({ context }) =>
@@ -156,6 +156,7 @@ export function spacesRoutes(ctx: RouterContext) {
       ),
       members,
       invites,
+      shares,
     },
     bootstrap: authed.bootstrap.handler(async ({ context, input }) => {
       const actor = context.actor;
@@ -170,7 +171,9 @@ export function spacesRoutes(ctx: RouterContext) {
       if (input.taskThreadId && (!active || active.id !== input.botId)) throw new IsolationError();
       const [thread, routines] = active
         ? await Promise.all([
-            resolveThreadTarget(deps.prisma, actor, { botId: active.id, taskThreadId: input.taskThreadId }).then((target) =>
+            resolveThreadTarget(deps.prisma, actor, { botId: active.id, taskThreadId: input.taskThreadId }, {
+              memberConversation: "read",
+            }).then((target) =>
               threadSnapshot(deps, target, input.history),
             ),
             listRoutinesDto(deps, actor, active.id),

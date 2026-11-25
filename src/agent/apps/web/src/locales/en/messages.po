@@ -15157,3 +15157,11 @@ msgstr "Verify your email address to accept this invitation."
 #: src/lib/user-error.ts
 msgid "Too many email invitations today. Try again tomorrow."
 msgstr "Too many email invitations today. Try again tomorrow."
+
+#: src/pages/SpaceInvite.tsx
+msgid "{owner} can read your conversations with their Micos."
+msgstr "{owner} can read your conversations with their Micos."
+
+#: src/lib/user-error.ts
+msgid "Only the person who started this conversation can write in it."
+msgstr "Only the person who started this conversation can write in it."

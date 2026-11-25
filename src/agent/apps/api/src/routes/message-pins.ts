@@ -69,7 +69,10 @@ function rejectLimit(error: unknown): never {
 export function messagePinRoutes({ deps, authed }: RouterContext) {
   return {
     pinned: authed.threads.pinned.handler(async ({ context, input }) => {
-      const target = await resolveThreadTarget(deps.prisma, context.actor, input, { includeArchived: true });
+      const target = await resolveThreadTarget(deps.prisma, context.actor, input, {
+        includeArchived: true,
+        memberConversation: "read",
+      });
       const pins = await listMessagePins(deps.prisma, context.actor, target.threadId);
       if (!pins.length) return { threadId: target.threadId, pins: [] };
       const previews = await pinPreviews(
@@ -101,7 +104,10 @@ export function messagePinRoutes({ deps, authed }: RouterContext) {
       return { ok: true as const };
     }),
     searchMessages: authed.threads.searchMessages.handler(async ({ context, input }) => {
-      const target = await resolveThreadTarget(deps.prisma, context.actor, input, { includeArchived: true });
+      const target = await resolveThreadTarget(deps.prisma, context.actor, input, {
+        includeArchived: true,
+        memberConversation: "read",
+      });
       const result = await searchThreadMessages(deps.prisma, context.actor, target.threadId, input.q);
       return { threadId: target.threadId, ...result };
     }),

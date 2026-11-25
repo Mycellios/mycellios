@@ -109,7 +109,8 @@ export function spaceInviteTokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function lockSpace(tx: Tx, spaceId: string) {
+/** The Space's advisory lock, the same one Space deletion and content creation take. */
+export function lockSpace(tx: Tx, spaceId: string) {
   return tx.$queryRaw(Prisma.sql`
     SELECT pg_advisory_xact_lock(hashtextextended(${spaceId}, 0))::text AS "lock"
   `);
@@ -126,7 +127,7 @@ function transaction<T>(prisma: PrismaClient, fn: (tx: Tx) => Promise<T>): Promi
   return withTransactionRetry(() => prisma.$transaction(fn));
 }
 
-async function spaceMembership(db: Tx | PrismaClient, spaceId: string, userId: string) {
+export async function spaceMembership(db: Tx | PrismaClient, spaceId: string, userId: string) {
   const row = await db.spaceMember.findUnique({
     where: { spaceId_userId: { spaceId, userId } },
     select: {
@@ -146,14 +147,18 @@ async function spaceMembership(db: Tx | PrismaClient, spaceId: string, userId: s
     : null;
 }
 
-async function requireSpaceMembership(db: Tx | PrismaClient, spaceId: string, userId: string) {
+export async function requireSpaceMembership(
+  db: Tx | PrismaClient,
+  spaceId: string,
+  userId: string,
+) {
   const membership = await spaceMembership(db, spaceId, userId);
   if (!membership) throw new IsolationError();
   return membership;
 }
 
 /** A Space can take people when it is not the owner's Personal Space and is not being deleted. */
-function assertShareable(space: { isDefault: boolean; deletingAt: Date | null }) {
+export function assertShareable(space: { isDefault: boolean; deletingAt: Date | null }) {
   if (space.isDefault) throw new SpaceNotShareableError();
   if (space.deletingAt) throw new SpaceInvitationUnavailableError();
 }
@@ -708,6 +713,7 @@ export async function listSpaceAuditEvents(
         typeof metadata[key] === "string" ? (metadata[key] as string) : null;
       const role = text("role");
       const kind = text("kind");
+      const audience = text("audience");
       return [
         {
           id: row.id,
@@ -716,6 +722,15 @@ export async function listSpaceAuditEvents(
           targetName: text("targetName"),
           role: role === "admin" || role === "member" ? role : null,
           kind: kind === "email" || kind === "link" ? kind : null,
+          ...(type.data === "space.mico.shared"
+            ? {
+                micoName: text("micoName"),
+                audience:
+                  audience === "none" || audience === "everyone" || audience === "people"
+                    ? audience
+                    : null,
+              }
+            : {}),
           createdAt: row.createdAt.toISOString(),
         },
       ];

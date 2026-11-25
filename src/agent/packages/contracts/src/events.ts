@@ -566,6 +566,8 @@ export const ThreadMessageSchema = z.object({
   callId: z.string().optional(),
   /** Set on a bot's durable mid-turn progress note: not the turn's answer, and it has no actions. */
   progress: z.literal(true).optional(),
+  /** The Space member who wrote this user message in their conversation with a shared Mico. */
+  authorUserId: Id.optional(),
   createdAt: z.string(),
 });
 export type ThreadMessage = z.infer<typeof ThreadMessageSchema>;
