@@ -239,6 +239,29 @@ contribution, questions and the closing scene; topology tests cover resizing and
 expanded answers. Its complete content and animation load before that chapter
 enters the viewport, preserving the existing home bundle limit.
 
+## Public status page
+
+`.github/workflows/public-status.yml` runs `scripts/public-status.mjs` every five
+minutes, which GitHub may delay, on a GitHub-hosted runner. It probes public
+endpoints only, without credentials or an account: `/`, `/agent/`, Agent's
+`/agent/api/v1/status` (`ok` or `degraded` from the `/ready` database probe and
+nothing else), the sessionless `/agent/api/auth/get-session`, the `status` field of
+the coordinator's `/health` and the stable download routes, with the release
+verifier's ranged check. Two failed probes in a row mark a service degraded, four
+mark it down. Each run reads the published `status.json` as its previous state,
+keeps 90 days of hourly summaries and deploys `index.html`, `status.json` and
+`feed.atom` to GitHub Pages without a commit. The page shows no traffic, account
+or usage figures.
+
+Incidents and maintenance are issues with the `status` label (plus `maintenance`
+for planned work) opened by a maintainer. Maintainer comments are their updates,
+and closing the issue resolves it; an issue closed as not planned leaves the page.
+Deploys start once the owner publishes Pages from GitHub Actions and, if wanted,
+points `status.mycellios.com` at it. Until then scheduled runs stop after the
+Pages check with a warning, and a manual run builds the page as an artifact. A
+manual run with `reset_history` starts a new history. Check changes with
+`node --test scripts/public-status.test.mjs scripts/ci-fast-delivery.test.mjs`.
+
 ## Fedora Desktop RPM
 
 `npm run desktop:package:rpm` creates
