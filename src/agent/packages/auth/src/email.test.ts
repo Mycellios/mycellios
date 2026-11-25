@@ -3,6 +3,7 @@ import {
   accountDeletionEmail,
   passwordResetEmail,
   signInCodeEmail,
+  spaceInvitationEmail,
   verificationEmail,
 } from "./email.js";
 
@@ -20,6 +21,21 @@ describe("account email templates", () => {
     expect(message.to).toBe("user@example.test");
     expect(message.text).toContain(url);
     expect(message.html).toContain(`href="${url.replaceAll("&", "&amp;")}"`);
+  });
+
+  it("keeps a Space invitation's names out of the subject and escapes them in the body", async () => {
+    const link = "https://app.example.test/join#fake_token_0123456789abcdefghijklmnopqrstuv";
+    const message = await spaceInvitationEmail("guest@example.test", {
+      inviterName: "<b>Ana</b>",
+      spaceName: "Launch <i>team</i>",
+      url: link,
+    });
+    expect(message.to).toBe("guest@example.test");
+    expect(message.subject).not.toMatch(/Ana|Launch/);
+    expect(message.html).toContain(`href="${link}"`);
+    expect(message.html).toContain("&lt;b&gt;Ana&lt;/b&gt;");
+    expect(message.html).not.toContain("<i>");
+    expect(message.text).toContain(link);
   });
 
   it.each([signInCodeEmail, accountDeletionEmail])(

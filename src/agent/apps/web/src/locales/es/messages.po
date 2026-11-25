@@ -15463,3 +15463,196 @@ msgstr "Abre Mycellios en ese PC para iniciar sesión en Claude Code."
 #: src/pages/shell/native-engine-account.tsx
 msgid "Could not reach the PC. Try again."
 msgstr "No se pudo contactar con el PC. Inténtalo de nuevo."
+
+#: src/pages/SettingsOverlay.tsx
+msgid "Members"
+msgstr "Miembros"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Admin"
+msgstr "Administrador"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Role"
+msgstr "Rol"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Invite"
+msgstr "Invitar"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Invite link"
+msgstr "Enlace de invitación"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Email not sent. Share the link instead."
+msgstr "No se envió el correo. Comparte el enlace."
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Expires {date}"
+msgstr "Caduca el {date}"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Leave space"
+msgstr "Salir del espacio"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Leave {space}?"
+msgstr "¿Salir de {space}?"
+
+#: src/lib/user-error.ts
+#: src/pages/SpaceInvite.tsx
+msgid "This invitation is no longer valid."
+msgstr "Esta invitación ya no es válida."
+
+#: src/pages/SpaceInvite.tsx
+msgid "Sign in to accept this invitation."
+msgstr "Inicia sesión para aceptar esta invitación."
+
+#: src/pages/SpaceInvite.tsx
+msgid "You are already in this space."
+msgstr "Ya estás en este espacio."
+
+#: src/pages/SpaceInvite.tsx
+msgid "Invited by {inviter}"
+msgstr "Te invitó {inviter}"
+
+#: src/pages/SpaceInvite.tsx
+msgid "Join"
+msgstr "Unirme"
+
+#: src/lib/user-error.ts
+msgid "This space is full."
+msgstr "Este espacio está completo."
+
+#: src/lib/user-error.ts
+msgid "Already in this space."
+msgstr "Ya está en este espacio."
+
+#: src/lib/user-error.ts
+msgid "This invitation is for another email address."
+msgstr "Esta invitación es para otra dirección de correo."
+
+#: src/lib/user-error.ts
+msgid "Verify your email address to accept this invitation."
+msgstr "Verifica tu dirección de correo para aceptar esta invitación."
+
+#: src/lib/user-error.ts
+msgid "Too many email invitations today. Try again tomorrow."
+msgstr "Demasiadas invitaciones por correo hoy. Inténtalo mañana."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name}"
+msgstr "Instalar {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name} {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs."
+msgstr "¿Instalar {name} {version} en este PC? Se descargan {size} desde npm ({packageName}) y se comprueban antes de ejecutarlo."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install"
+msgstr "Instalar"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Downloading {name}: {received} of {total}"
+msgstr "Descargando {name}: {received} de {total}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Checking {name}…"
+msgstr "Comprobando {name}…"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Copy the secret now. You will not be able to see it again."
+msgstr "Copia el secreto ahora. No podrás volver a verlo."
+
+#: src/pages/RoutineEditor.tsx
+msgid "Copy secret"
+msgstr "Copiar secreto"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Rotate secret"
+msgstr "Rotar secreto"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Create secret"
+msgstr "Crear secreto"
+
+#: src/pages/RoutineEditor.tsx
+msgid "The previous secret works until {until}."
+msgstr "El secreto anterior funciona hasta el {until}."
+
+#: src/pages/RoutineEditor.tsx
+msgid "Sign events with Standard Webhooks."
+msgstr "Firma los eventos con Standard Webhooks."
+
+#: src/pages/RoutineEditor.tsx
+msgid "Only some events"
+msgstr "Solo algunos eventos"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Event type"
+msgstr "Tipo de evento"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Any type"
+msgstr "Cualquier tipo"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Data field"
+msgstr "Campo de datos"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Remove filter"
+msgstr "Quitar filtro"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Add filter"
+msgstr "Añadir filtro"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Send test event"
+msgstr "Enviar evento de prueba"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Revoke this routine's secrets?"
+msgstr "¿Revocar los secretos de esta rutina?"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Events signed with the current or previous secret are refused from now on."
+msgstr "A partir de ahora se rechazan los eventos firmados con el secreto actual o el anterior."
+
+#: src/pages/routine-webhook-draft.ts
+msgid "Enter the event type as the sender writes it, without spaces."
+msgstr "Escribe el tipo de evento tal como lo envía el remitente, sin espacios."
+
+#: src/pages/routine-webhook-draft.ts
+msgid "Enter a data field such as /status."
+msgstr "Escribe un campo de datos como /status."
+
+#: src/pages/routine-webhook-draft.ts
+msgid "A routine can check up to {ROUTINE_EVENT_FILTER_MAX} filters."
+msgstr "Una rutina puede comprobar hasta {ROUTINE_EVENT_FILTER_MAX} filtros."
+
+#: src/pages/shell/use-routine-editor.ts
+msgid "Could not create the secret"
+msgstr "No se pudo crear el secreto"
+
+#: src/pages/shell/use-routine-editor.ts
+msgid "Could not revoke the secrets"
+msgstr "No se pudieron revocar los secretos"
+
+#: src/pages/shell/use-routine-editor.ts
+msgid "Could not send the test event"
+msgstr "No se pudo enviar el evento de prueba"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ignored: other event type"
+msgstr "Ignorado: otro tipo de evento"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ignored: a filter did not match"
+msgstr "Ignorado: un filtro no coincidió"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ignored: routine paused"
+msgstr "Ignorado: la rutina estaba en pausa"

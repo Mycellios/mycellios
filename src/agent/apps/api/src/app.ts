@@ -111,6 +111,7 @@ import {
   createWebPresence,
   createDb,
   createPool,
+  createRoutineEventPruner,
   createSecurityEventPruner,
   createThreadEvents,
   describeRowSecurity,
@@ -120,7 +121,7 @@ import {
   parsePositiveInteger,
   provisionMessagingIdentity,
   pushSessionExpiresAt,
-  requireMembership,
+  requireMembershipWithRole,
   rowSecurityWarning,
   runAsSystem,
   runAsTenant,
@@ -686,6 +687,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
           prisma,
           securityEventRetentionDays(),
         ),
+        reconcileRoutineEventRetention: createRoutineEventPruner(prisma),
         reconcileThreadDeletions: () =>
           reconcileThreadDeletions({ prisma, artifacts, dataDir: env.dataDir }),
       })
@@ -731,6 +733,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     artifacts,
     dataDir: env.dataDir,
     billing,
+    email,
     messagingInstallations,
     messaging: {
       enabled: Boolean(messaging),
@@ -750,6 +753,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       phoneCallsEnabled: env.phoneCallsEnabled,
       phoneCallRingSeconds: env.phoneCallRingSeconds,
       ticketBoardEnabled,
+      spaceMembers: env.spaceMembers,
       agentRuntime: env.agentRuntime,
       defaultProvider: env.defaultProvider,
       defaultModel: env.defaultModel,
@@ -847,6 +851,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   for (const [path, reason] of [
     ["/api/auth/*", "authentication"],
     ["/api/v1/bots/*", "bot webhook"],
+    ["/api/v1/routines/*", "signed routine event"],
     ["/api/v1/messaging/*", "messaging webhook"],
     ["/api/v1/phone/*", "messaging webhook"],
   ] as const) {
@@ -878,15 +883,26 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     hostComputerAvailable: Boolean(process.env.SANDBOX_HOST_URL && process.env.SANDBOX_HOST_TOKEN),
     prisma,
   });
-  const requestSession = async (request: Request) => {
+  /**
+   * The signed-in actor in the requested Space, and its role there. A Space someone else owns
+   * admits its people only while the deployment enables Space members, and then only to the
+   * procedures `assertSpaceRoleAllows` lets through (specs/space-members).
+   */
+  const rpcSession = async (request: Request) => {
     // The bearer plugin turns a signed `Authorization: Bearer` into the session cookie.
     const session = request.headers.has(DEMO_AGENT_HEADER)
       ? await demoAgent?.session(request) : await auth.api.getSession({ headers: request.headers });
     if (!session?.user) return null;
-    const actor = await actorFromMembership(
-      requireMembership(prisma, session.user.id, readHeader((name) => request.headers.get(name), "space-id") ?? null),
+    const membership = await actorFromMembership(
+      requireMembershipWithRole(prisma, session.user.id, readHeader((name) => request.headers.get(name), "space-id") ?? null),
     );
-    return actor && { actor, sessionId: session.session.id };
+    if (!membership || (membership.spaceRole !== "owner" && !env.spaceMembers)) return null;
+    return { actor: membership.actor, spaceRole: membership.spaceRole, sessionId: session.session.id };
+  };
+  /** Every route outside RPC acts in a Space the actor owns: they have no shared-Space mode. */
+  const requestSession = async (request: Request) => {
+    const session = await rpcSession(request);
+    return session?.spaceRole === "owner" ? { actor: session.actor, sessionId: session.sessionId } : null;
   };
   const sessionActor = async (request: Request) => (await requestSession(request))?.actor ?? null;
   const ownsActiveBot = (actor: { userId: string; spaceId: string }, botId: string) =>
@@ -915,8 +931,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         await prisma.desktopBotDevice.upsert({ where: { spaceId_userId_botId: id }, create: { ...id, deviceKey }, update: { deviceKey } });
       }),
     },
+    // Only Spaces the account owns: a PC never runs anything in a Space someone else shared.
     spaces: actor => runAsSystem("native account computer memberships",async()=>
-      (await prisma.spaceMember.findMany({where:{userId:actor.userId},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
+      (await prisma.spaceMember.findMany({where:{userId:actor.userId,NOT:{role:{in:["admin","member"]}}},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",
     secret: env.screenProxySecret,
     revision: env.gitSha,
@@ -969,7 +986,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     if (!isSameSiteRpcRequest(c.req.raw, env)) {
       return c.json({ error: "cross_site_request_rejected" }, 403);
     }
-    const session = await requestSession(c.req.raw);
+    const session = await rpcSession(c.req.raw);
     const actor = session?.actor ?? null;
     if (actor) {
       enrichLogContext({ "user.id": actor.userId, "space.id": actor.spaceId });
@@ -978,13 +995,14 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       prefix: "/rpc",
       context: {
         actor,
+        spaceRole: session?.spaceRole,
         sessionId: session?.sessionId,
         requestHeaders: c.req.raw.headers,
         signal: c.req.raw.signal,
         // Same user in the same space, so leaving the space also ends a stream.
         // A database failure rejects this check; only a missing membership is unauthorized.
         stillAuthorized: async () => {
-          const current = await sessionActor(c.req.raw);
+          const current = (await rpcSession(c.req.raw))?.actor;
           return Boolean(
             actor && current?.userId === actor.userId && current.spaceId === actor.spaceId,
           );
@@ -1530,7 +1548,7 @@ function originVariants(origin: string): string[] {
  * failure, including the deployment-settings lookup, must stay a server error
  * so a blip does not look like a rejected session.
  */
-export async function actorFromMembership(membership: Promise<Actor>): Promise<Actor | null> {
+export async function actorFromMembership<T = Actor>(membership: Promise<T>): Promise<T | null> {
   try {
     return await membership;
   } catch (error) {

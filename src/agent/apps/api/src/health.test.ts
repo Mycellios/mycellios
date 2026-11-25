@@ -1,7 +1,7 @@
 import { InfisicalSecretStore } from "@mycellios/adapters";
 import { describe, expect, it, vi } from "vitest";
 import { infisicalFake } from "../../../packages/adapters/src/secret-store-fake.js";
-import { DATABASE_CHECK_TIMEOUT_MS, healthRoutes } from "./health.js";
+import { DATABASE_CHECK_TIMEOUT_MS, healthRoutes, PUBLIC_STATUS_REUSE_MS } from "./health.js";
 
 const app = healthRoutes(() => ({ runtime: "pi", sandbox: "docker", revision: "abc123" }));
 
@@ -91,6 +91,86 @@ describe("health routes", () => {
       ok: true,
       degraded: false,
     });
+  });
+
+  it("answers the public status read with ok or degraded and no details", async () => {
+    let up = true;
+    let degraded = false;
+    const health = healthRoutes(
+      () => ({ runtime: "pi", sandbox: "docker", revision: "abc123", degraded }),
+      async () => {
+        if (!up) throw new Error("connection refused at 10.0.0.5:5432");
+      },
+    );
+    const read = async (headers?: Record<string, string>) => {
+      vi.advanceTimersByTime(PUBLIC_STATUS_REUSE_MS);
+      const response = await health.request("/api/v1/status", { headers });
+      const text = await response.text();
+      for (const detail of ["abc123", "revision", "database", "pi", "docker", "10.0.0.5"]) {
+        expect(text).not.toContain(detail);
+      }
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect([...response.headers.keys()].sort()).toEqual(["cache-control", "content-type"]);
+      return { status: response.status, body: JSON.parse(text) as unknown };
+    };
+    vi.useFakeTimers();
+    try {
+      expect(await read()).toEqual({ status: 200, body: { status: "ok" } });
+      expect(await read({ "x-forwarded-for": "203.0.113.7" })).toEqual({
+        status: 200,
+        body: { status: "ok" },
+      });
+      up = false;
+      expect(await read()).toEqual({ status: 503, body: { status: "degraded" } });
+      up = true;
+      degraded = true;
+      expect(await read()).toEqual({ status: 503, body: { status: "degraded" } });
+      degraded = false;
+      expect(await read()).toEqual({ status: 200, body: { status: "ok" } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reuses one database answer for public status reads within the reuse window", async () => {
+    vi.useFakeTimers();
+    try {
+      let up = true;
+      const check = vi.fn(async () => {
+        if (!up) throw new Error("down");
+      });
+      const health = healthRoutes(() => ({}), check);
+      expect((await health.request("/api/v1/status")).status).toBe(200);
+      up = false;
+      expect((await health.request("/api/v1/status")).status).toBe(200);
+      expect(check).toHaveBeenCalledTimes(1);
+      // Orchestration readiness keeps its own fresh probe.
+      expect((await health.request("/ready")).status).toBe(503);
+      expect(check).toHaveBeenCalledTimes(2);
+      vi.advanceTimersByTime(PUBLIC_STATUS_REUSE_MS);
+      expect((await health.request("/api/v1/status")).status).toBe(503);
+      expect(check).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers degraded at the deadline while the database hangs", async () => {
+    vi.useFakeTimers();
+    try {
+      const check = vi.fn(() => new Promise<never>(() => {}));
+      const health = healthRoutes(() => ({}), check);
+      const first = health.request("/api/v1/status");
+      const second = health.request("/api/v1/status");
+      await vi.advanceTimersByTimeAsync(DATABASE_CHECK_TIMEOUT_MS);
+      for (const response of [await first, await second]) {
+        expect(response.status).toBe(503);
+        await expect(response.json()).resolves.toEqual({ status: "degraded" });
+      }
+      expect(check).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("serves details to direct requests on the API port", async () => {

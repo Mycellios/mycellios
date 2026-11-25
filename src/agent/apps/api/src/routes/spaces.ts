@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import type { Actor, SpaceNavigation } from "@mycellios/contracts";
+import type { Actor, SharedSpace, SpaceNavigation } from "@mycellios/contracts";
+import { spaceRoleOf } from "@mycellios/contracts";
 import type { createGroupRepos, createRepos, PrismaClient } from "@mycellios/db";
 import {
   CannotDeleteDefaultSpaceError,
@@ -18,6 +19,7 @@ import {
   SpaceLimitError,
   SpaceNotFoundError,
   setSpaceSettingOverride,
+  spaceOwnerNames,
   spaceSettingOverrides,
 } from "@mycellios/db";
 import type { RouterDeps } from "../router.js";
@@ -26,6 +28,7 @@ import { deleteSpaceWithContent } from "../space-deletion.js";
 import { resolveThreadTarget, threadSnapshot } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
 import { meDto } from "./shared.js";
+import { spaceMemberRoutes } from "./space-members.js";
 
 /**
  * Runs `fn` scoped to another of the actor's Spaces. Membership is checked first,
@@ -47,6 +50,7 @@ async function asMemberOf<T>(
 
 export function spacesRoutes(ctx: RouterContext) {
   const { deps, repos, groupRepos, authed } = ctx;
+  const { members, invites } = spaceMemberRoutes(ctx);
   return {
     spaceSettings: {
       overrides: authed.spaceSettings.overrides.handler(({ context }) =>
@@ -150,6 +154,8 @@ export function spacesRoutes(ctx: RouterContext) {
           }
         }),
       ),
+      members,
+      invites,
     },
     bootstrap: authed.bootstrap.handler(async ({ context, input }) => {
       const actor = context.actor;
@@ -180,6 +186,7 @@ export function spacesRoutes(ctx: RouterContext) {
         thread,
         routines,
         spaces: navigation.spaces,
+        ...(navigation.sharedSpaces ? { sharedSpaces: navigation.sharedSpaces } : {}),
       };
     }),
   };
@@ -209,7 +216,7 @@ async function memberSpaceNavigation(
     select: { organizationId: true },
   });
   if (!currentSpace) throw new IsolationError();
-  const memberships = await deps.prisma.spaceMember.findMany({
+  const organizationMemberships = await deps.prisma.spaceMember.findMany({
     where: { userId: actor.userId, organizationId: currentSpace.organizationId },
     select: {
       spaceId: true,
@@ -218,6 +225,10 @@ async function memberSpaceNavigation(
     },
     orderBy: { createdAt: "asc" },
   });
+  // Spaces someone else owns are never listed, opened or counted as this account's own.
+  const memberships = organizationMemberships.filter(
+    (membership) => spaceRoleOf(membership.role) === "owner",
+  );
   const spaceIds = memberships.map((membership) => membership.spaceId);
   const inactiveSpaceIds = spaceIds.filter((spaceId) => spaceId !== actor.spaceId);
   const [
@@ -255,8 +266,11 @@ async function memberSpaceNavigation(
     ...contentBots.map((row) => row.spaceId),
     ...contentGroups.map((row) => row.spaceId),
   ]);
-  const currentMembership = memberships.find((membership) => membership.spaceId === actor.spaceId);
+  const currentMembership = organizationMemberships.find(
+    (membership) => membership.spaceId === actor.spaceId,
+  );
   if (!currentMembership) throw new IsolationError();
+  const sharedSpaces = deps.env.spaceMembers ? await sharedSpacesOf(deps, actor) : undefined;
   const botsBySpace = partitionBySpace([...currentBots, ...inactiveBots]);
   const groupsBySpace = partitionBySpace([...currentGroups, ...inactiveGroups]);
   const sectionsBySpace = partitionBySpace(botSections);
@@ -326,7 +340,37 @@ async function memberSpaceNavigation(
         botSections: sectionsFor(membership.spaceId),
       };
     }),
+    ...(sharedSpaces ? { sharedSpaces } : {}),
   };
+}
+
+/** Spaces other people own that this account joined, with each owner's name and nothing else. */
+async function sharedSpacesOf(deps: RouterDeps, actor: Actor): Promise<SharedSpace[]> {
+  const memberships = await deps.prisma.spaceMember.findMany({
+    where: {
+      userId: actor.userId,
+      role: { in: ["admin", "member"] },
+      space: { isDefault: false, deletingAt: null },
+    },
+    select: { spaceId: true, role: true, space: { select: { name: true } } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  const owners = await spaceOwnerNames(
+    deps.prisma,
+    memberships.map((membership) => membership.spaceId),
+  );
+  return memberships.flatMap((membership) => {
+    const ownerName = owners.get(membership.spaceId);
+    if (ownerName === undefined) return [];
+    return [
+      {
+        id: membership.spaceId,
+        name: membership.space.name,
+        role: spaceRoleOf(membership.role) === "admin" ? ("admin" as const) : ("member" as const),
+        ownerName,
+      },
+    ];
+  });
 }
 
 function partitionBySpace<T extends { spaceId: string }>(rows: T[]): Map<string, T[]> {

@@ -3,6 +3,7 @@ import { execFile, spawn } from "node:child_process";
 import { accessSync, constants, existsSync, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 import { nativeAgentProtocolError } from "./native-agent-errors.js";
+import { withLoginShellPath } from "./native-login-path.js";
 
 export interface NativeCommand {
   command: string;
@@ -26,7 +27,22 @@ export type WireMessage = {
   error?: unknown;
 };
 
-export function nativeEnvironment(source = process.env): NodeJS.ProcessEnv {
+/**
+ * The environment a CLI process starts with: an allowlist of the host's variables, never its
+ * credentials. The process's own environment also gets the login shell's PATH once it was read
+ * (macOS and Linux). A CLI that Mycellios starts never runs its own updater.
+ */
+export function nativeEnvironment(source?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const environment = source ?? process.env;
+  const searchPath = source ? undefined : withLoginShellPath(environment.PATH);
+  return {
+    ...allowedEnvironment(environment),
+    ...(searchPath ? { PATH: searchPath } : {}),
+    DISABLE_AUTOUPDATER: "1",
+  };
+}
+
+function allowedEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(
     [
       "PATH",

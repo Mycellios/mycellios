@@ -1,6 +1,6 @@
 import { ServerConnections } from "../../components/ServerConnections";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Space } from "@mycellios/contracts";
+import type { Bot, SharedSpace, Space } from "@mycellios/contracts";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -47,8 +47,10 @@ export function SidebarHeader({
   setNewSpaceOpen,
   setCreateBotOpen,
   spaces,
+  sharedSpaces = [],
   spaceId,
   onSpace,
+  onSharedSpace,
   onSpaceSettings,
   history,
   mobileMenu,
@@ -71,8 +73,11 @@ export function SidebarHeader({
   setNewSpaceOpen: (open: boolean) => void;
   setCreateBotOpen: (open: boolean) => void;
   spaces: Space[];
+  /** Spaces other people own that the account joined; they open their people, not chats. */
+  sharedSpaces?: SharedSpace[];
   spaceId: string | null;
   onSpace: (spaceId: string, path: string) => void;
+  onSharedSpace?: (spaceId: string) => void;
   onSpaceSettings: () => void;
   history: { canBack: boolean; canForward: boolean; back: () => void; forward: () => void };
   onRoutines?: () => void;
@@ -164,6 +169,7 @@ export function SidebarHeader({
         {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 [&_button]:font-normal ${mobile ? "[&_button]:min-h-11" : ""}`}>
           <p className="px-3 py-2 text-xs text-muted-foreground">{t`Workspaces`}</p>
           {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{spaceLabel(space.name)}</Button>)}
+          {onSharedSpace ? sharedSpaces.map(space => <Button key={space.id} variant="ghost" className="justify-start gap-2" data-testid="shared-space" onClick={() => { setWorkspaceOpen(false); onSharedSpace(space.id); }}><span className="min-w-0 truncate">{spaceLabel(space.name)}</span>{space.ownerName ? <span className="ms-auto min-w-0 shrink truncate text-xs text-muted-foreground">{space.ownerName}</span> : null}</Button>) : null}
           <div className="my-1 border-t border-border" />
           {spaceId ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button> : null}
           <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>

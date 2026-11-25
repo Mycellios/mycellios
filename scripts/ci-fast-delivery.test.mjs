@@ -217,6 +217,14 @@ test('conversation lifecycle changes qualify their migration, archive and delete
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-thread-lifecycle-db.ts')));
 });
 
+test('Space members qualify invitations, roles and member isolation on a real isolated database',()=>{
+ for (const file of ['src/agent/packages/db/src/space-members.ts','src/agent/apps/api/src/routes/space-members.ts','src/agent/apps/api/src/routes/spaces.ts','src/agent/packages/db/src/scope.ts','src/agent/scripts/verify-space-members-db.ts','src/agent/packages/db/prisma/migrations/20261125100000_space_members/migration.sql']) {
+  const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-space-members-db.ts'));
+  assert.deepEqual(check?.args,['node_modules/tsx/dist/cli.mjs','scripts/verify-space-members-db.ts'], file);
+ }
+ assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-space-members-db.ts')));
+});
+
 test('event waits qualify the deployed CHECK upgrade and automatic return on a real isolated database',()=>{
  for (const file of ['src/agent/packages/db/src/event-waits.ts','src/agent/packages/db/src/work-delegation.ts','src/agent/scripts/verify-autonomy-waits-db.ts','src/agent/packages/db/prisma/migrations/20261116150000_event_wait_delegation_state/migration.sql']) {
   const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts'));
@@ -252,6 +260,26 @@ test('deployments are requested only from main pushes after the exact commit pas
   assert.ok(request.indexOf('check_name=CI%20summary') < request.indexOf('/api/v1/deployments/github'));
   assert.ok(request.includes('"completed success"'));
   assert.ok(!readFileSync('.github/workflows/ci.yml', 'utf8').includes('deployments/github'));
+});
+
+test('the public status page probes from GitHub-hosted runners and may only read issues and deploy Pages', () => {
+  const workflow = readFileSync('.github/workflows/public-status.yml', 'utf8');
+  assert.match(workflow, /^on:\n {2}schedule:\n {4}- cron: '\*\/5 \* \* \* \*'\n {2}workflow_dispatch:\n/m);
+  for (const forbidden of ['pull_request', 'secrets.', 'self-hosted', 'write-all', 'contents: write', 'issues: write', 'packages:', 'actions:', 'git push', 'git commit', 'deployments/github']) {
+    assert.ok(!workflow.includes(forbidden), forbidden);
+  }
+  assert.ok(workflow.includes('\npermissions: {}\n'));
+  assert.deepEqual([...new Set(workflow.match(/runs-on: .+/g))], ['runs-on: ubuntu-latest']);
+  for (const [, action] of workflow.matchAll(/uses:\s+([^\s#]+)/g)) assert.match(action, /@[0-9a-f]{40}$/, action);
+  assert.match(workflow, /concurrency:\n {2}group: public-status\n {2}cancel-in-progress: false\n/);
+  const build = workflow.slice(workflow.indexOf('\n  build:\n'), workflow.indexOf('\n  deploy:\n'));
+  assert.match(build, /permissions:\n {6}contents: read\n {6}issues: read\n {6}pages: read\n {4}outputs:/);
+  assert.ok(build.includes("if: github.repository == 'Mycellios/mycellios'"));
+  assert.ok(build.includes('run: node scripts/public-status.mjs pages') && build.includes('run: node scripts/public-status.mjs build _site'));
+  const deploy = workflow.slice(workflow.indexOf('\n  deploy:\n'));
+  assert.match(deploy, /permissions:\n {6}pages: write\n {6}id-token: write\n {4}environment:/);
+  assert.ok(deploy.includes("if: needs.build.outputs.deploy == 'true' && github.ref == 'refs/heads/main'"));
+  assert.equal((workflow.match(/^\s+run: /gm) ?? []).length, 2, 'the workflow only calls the tested script');
 });
 
 test('self-host images come only from main on GitHub-hosted runners and never replace the Nucleus images', () => {

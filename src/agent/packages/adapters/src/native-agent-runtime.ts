@@ -24,10 +24,13 @@ import { BACKGROUND_WAIT_PROGRESS, deliverFinishedShells } from "./shell-command
 import { steeringToolContent, watchSteeringDuringTool } from "./steering-delivery.js";
 import { isToolPauseResult } from "./approval-effect.js";
 import type { NativeCommand } from "./native-agent-process.js";
-import { findNativeCommand, nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
+import { nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
 import { nativeSignInState } from "./native-signin.js";
 import { nativeModelCatalog } from "./native-model-catalog.js";
-import { MANAGED_OPENCODE_VERSION, managedOpenCodeCommand, supportsManagedOpenCode } from "./managed-opencode.js";
+import { type NativeProcessSlots, nativeProcessWaitText } from "./native-process-slots.js";
+import { resolveNativeEngine } from "./native-engine-resolve.js";
+import type { NativeEngineStoreOptions } from "./native-engine-store.js";
+import { nativeEngineRelease, nativeEngineStoreRoot } from "./native-engine-store.js";
 import {
   restoreTurnCheckpoint,
   serializeTurnCheckpoint,
@@ -157,23 +160,32 @@ function configuredCommands(parsed: Record<string, unknown>): NativeConfig {
   return commands;
 }
 
-/** The command discovery reads for one engine: the host's configured path, else the CLI on PATH. */
-export async function nativeEngineCommand(engine: "codex" | "claude", dataDir?: string) {
-  return configuredCommands(await readNativeConfig(dataDir))[engine] ?? findNativeCommand(engine);
+/** A host keeps its managed CLIs in its data folder unless the caller names another store. */
+const hostStoreRoot = (dataDir?: string) => dataDir && isAbsolute(dataDir) ? nativeEngineStoreRoot(dataDir) : undefined;
+/** Discovery waits this long for a slow version or file check; the next read has the answer. */
+const DISCOVERY_WAIT_MS = 1_500;
+
+/** The command an engine runs with on this host, in the order resolveNativeEngine documents. */
+export async function nativeEngineCommand(engine: "codex" | "claude" | "opencode", dataDir?: string,
+  options: NativeEngineStoreOptions & { storeRoot?: string } = {}) {
+  const configured = configuredCommands(await readNativeConfig(dataDir))[engine];
+  return (await resolveNativeEngine(engine, { ...options, configured, storeRoot: options.storeRoot ?? hostStoreRoot(dataDir) }))
+    ?.command ?? null;
 }
 
+/** Server hosts install OpenCode only with the operator's grant (PCs use engines.install). */
 export async function canInstallNativeOpenCode(
   dataDir: string | undefined,
   scope: { userId: string; spaceId: string },
 ) {
-  if (!supportsManagedOpenCode(dataDir)) return false;
+  if (!hostStoreRoot(dataDir) || !nativeEngineRelease("opencode")) return false;
   const config = await readNativeConfig(dataDir);
   return config.allowOpenCodeInstall === true && hostAllowsScope(config, scope) &&
     !configuredCommands(config).opencode;
 }
 
 export async function discoverNativeCodexModels(dataDir?: string) {
-  const command = configuredCommands(await readNativeConfig(dataDir)).codex ?? findNativeCommand("codex");
+  const command = await nativeEngineCommand("codex", dataDir);
   if (!command || !nativeCommandAvailable(command)) throw new Error("Codex is unavailable.");
   const child = new NativeAgentProcess(command, ["app-server", "-c", "mcp_servers={}"], dataDir ?? process.cwd(), () => {}, () => {});
   try {
@@ -185,7 +197,7 @@ export async function discoverNativeCodexModels(dataDir?: string) {
 
 /** Called only behind the same account/Space grant as native model discovery. */
 export async function discoverNativeCodexQuota(dataDir?: string) {
-  const command = configuredCommands(await readNativeConfig(dataDir)).codex ?? findNativeCommand("codex");
+  const command = await nativeEngineCommand("codex", dataDir);
   if (!command || !nativeCommandAvailable(command)) return null;
   const child = new NativeAgentProcess(command, ["app-server", "-c", "mcp_servers={}"], dataDir ?? process.cwd(), () => {}, () => {});
   try {
@@ -195,24 +207,29 @@ export async function discoverNativeCodexQuota(dataDir?: string) {
   } finally { await child.stop(); }
 }
 
-export async function discoverNativeEngines(dataDir?: string) {
+/** The engines on this host. A Desktop passes its per-user store; a server uses its data folder's. */
+export async function discoverNativeEngines(dataDir?: string, options: NativeEngineStoreOptions & { storeRoot?: string } = {}) {
   const host = await readNativeConfig(dataDir);
   const configured = configuredCommands(host);
-  const managedOpenCode = configured.opencode ? null : managedOpenCodeCommand(dataDir);
-  const codex = configured.codex ?? findNativeCommand("codex");
-  const claude = configured.claude ?? findNativeCommand("claude");
+  const storeRoot = options.storeRoot ?? hostStoreRoot(dataDir);
+  const [codexEngine, claudeEngine, openCode] = await Promise.all((["codex", "claude", "opencode"] as const).map(engine =>
+    resolveNativeEngine(engine, { ...options, configured: configured[engine], storeRoot, waitMs: DISCOVERY_WAIT_MS })
+      .catch(() => null)));
+  const codex = codexEngine?.command, claude = claudeEngine?.command;
   const codexAvailable = nativeCommandAvailable(codex);
   const claudeAvailable = nativeCommandAvailable(claude);
-  // Only an installed CLI is asked; an unknown answer is left out rather than guessed.
+  // Only an installed CLI that passed its checks is asked; an unknown answer is left out rather than guessed.
+  const codexAsked = codex && codexAvailable && codexEngine?.ready, claudeAsked = claude && claudeAvailable && claudeEngine?.ready;
   const [codexSignedIn, claudeSignedIn] = await Promise.all([
-    codex && codexAvailable ? nativeSignInState("codex", codex) : undefined,
-    claude && claudeAvailable ? nativeSignInState("claude", claude) : undefined,
+    codexAsked ? nativeSignInState("codex", codex) : undefined,
+    claudeAsked ? nativeSignInState("claude", claude) : undefined,
   ]);
   // A signed-out CLI has no account catalog to read.
   const [codexModels, claudeModels] = await Promise.all([
-    codex && codexAvailable && codexSignedIn !== false ? nativeModelCatalog("codex", codex) : undefined,
-    claude && claudeAvailable && claudeSignedIn !== false ? nativeModelCatalog("claude", claude) : undefined,
+    codexAsked && codexSignedIn !== false ? nativeModelCatalog("codex", codex) : undefined,
+    claudeAsked && claudeSignedIn !== false ? nativeModelCatalog("claude", claude) : undefined,
   ]);
+  const managedOpenCode = openCode?.source === "managed";
   return [
     { id: "pi" as const, name: "Pi", available: true },
     {
@@ -233,10 +250,10 @@ export async function discoverNativeEngines(dataDir?: string) {
     {
       id: "opencode" as const,
       name: "OpenCode",
-      available: nativeCommandAvailable(configured.opencode ?? managedOpenCode ?? findNativeCommand("opencode")),
-      ...(managedOpenCode ? { managedVersion: MANAGED_OPENCODE_VERSION } : {}),
+      available: nativeCommandAvailable(openCode?.command),
+      ...(managedOpenCode ? { managedVersion: openCode.version } : {}),
       canInstall: !managedOpenCode && !configured.opencode &&
-        host.allowOpenCodeInstall === true && supportsManagedOpenCode(dataDir),
+        host.allowOpenCodeInstall === true && Boolean(storeRoot && nativeEngineRelease("opencode", options)),
     },
   ];
 }
@@ -400,6 +417,10 @@ export class NativeAgentRuntime implements AgentRuntime {
       commands?: NativeConfig;
       codexArgs?: string[];
       hostAccess?: (scope: { userId: string; spaceId: string }) => boolean;
+      /** The PC's bound on CLI processes, shared by every native turn on it (Desktop). */
+      processSlots?: NativeProcessSlots;
+      /** Where managed CLIs live; Desktop keeps one store per PC user. Defaults to dataDir's. */
+      storeRoot?: string;
     },
   ) {}
   describe() {
@@ -433,9 +454,9 @@ export class NativeAgentRuntime implements AgentRuntime {
       ...configuredCommands(await readNativeConfig(this.options.dataDir)),
       ...this.options.commands,
     };
-    const command = config[engine] ??
-      (engine === "opencode" ? managedOpenCodeCommand(this.options.dataDir) : null) ??
-      (engine === "acp" ? null : findNativeCommand(engine));
+    const command = config[engine] ?? (engine === "acp" ? null : (await resolveNativeEngine(engine, {
+      storeRoot: this.options.storeRoot ?? hostStoreRoot(this.options.dataDir),
+    }))?.command ?? null);
     if (!command)
       throw new Error(
         engine === "opencode"
@@ -627,8 +648,21 @@ export class NativeAgentRuntime implements AgentRuntime {
       );
       return next;
     };
+    let releaseSlot: (() => void) | undefined;
     const stopped = (async () => {
       try {
+        // Above the PC's bound this turn waits here, with its reason shown, before anything runs.
+        const slots = this.options.processSlots;
+        if (slots) {
+          let waited = false;
+          releaseSlot = await slots.acquire(signal, () => {
+            waited = true;
+            queue.push({ type: "progress", text: nativeProcessWaitText(slots.limit), activity: true });
+          });
+          if (signal.aborted) return;
+          // An empty activity line clears the waiting status once the turn starts.
+          if (waited) queue.push({ type: "progress", text: "", activity: true });
+        }
         if (request.turnCheckpoint) {
           sessionId = undefined; // Restart from the durable tool transcript after a human pause.
           const saved = restoreTurnCheckpoint(request.turnCheckpoint, request.model);
@@ -1059,6 +1093,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       controller.abort();
       await process?.stop();
       await stopped;
+      // The slot frees only once this turn's CLI has stopped.
+      releaseSlot?.();
       await bridge?.close();
       if (systemPromptFile) await rm(systemPromptFile, { force: true }).catch(() => undefined);
       await recordUsage();

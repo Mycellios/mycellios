@@ -27,6 +27,8 @@ x-app-environment: &app-environment
   API_URL:
   MYCELLIOS_DESKTOP_RELAY_ENABLED:
   DESKTOP_RELAY_API_URL:
+  # 1 lets Codex, Claude Code and OpenCode Micos run several conversations at once (off by default).
+  MYCELLIOS_NATIVE_CONCURRENCY:
   MAX_UPLOAD_SIZE_MB:
   RAKAZO_UPDATE_RESTART_SUPERVISOR:
   TICKET_BOARD_ENABLED:

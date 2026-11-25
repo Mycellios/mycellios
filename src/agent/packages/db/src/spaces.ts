@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { spaceRoleOf } from "@mycellios/contracts";
 import { displayName } from "@mycellios/core";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
 import { IsolationError } from "./scope.js";
+import { pruneDetachedOrganizationMembers } from "./space-members.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 /** Per member, per organization: one person cannot fan out unbounded boundaries. */
@@ -129,7 +131,31 @@ function normalizeSpaceName(name: string): string {
   return trimmed;
 }
 
-/** Create a sibling privacy boundary for a member of the active organization. */
+/**
+ * The organization new Spaces go to: the current Space's when the account owns it, else the
+ * account's own, the one of its Personal Space. A Space someone else shared with the account
+ * belongs to that person's organization, which never takes this account's new Spaces.
+ */
+async function ownOrganizationId(
+  tx: Pick<PrismaClient, "spaceMember">,
+  input: { currentSpaceId: string; userId: string },
+): Promise<string> {
+  const current = await tx.spaceMember.findUnique({
+    where: { spaceId_userId: { spaceId: input.currentSpaceId, userId: input.userId } },
+    select: { organizationId: true, role: true },
+  });
+  if (!current) throw new IsolationError();
+  if (spaceRoleOf(current.role) === "owner") return current.organizationId;
+  const personal = await tx.spaceMember.findFirst({
+    where: { userId: input.userId, space: { isDefault: true } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { organizationId: true, role: true },
+  });
+  if (!personal || spaceRoleOf(personal.role) !== "owner") throw new IsolationError();
+  return personal.organizationId;
+}
+
+/** Create a sibling privacy boundary in the account's own organization. */
 export async function createSpaceForMember(
   prisma: PrismaClient,
   input: {
@@ -146,27 +172,18 @@ export async function createSpaceForMember(
   await withTransactionRetry(() =>
     prisma.$transaction(
       async (tx) => {
-        const currentMembership = await tx.spaceMember.findUnique({
-          where: {
-            spaceId_userId: {
-              spaceId: input.currentSpaceId,
-              userId: input.userId,
-            },
-          },
-          select: { organizationId: true },
-        });
-        if (!currentMembership) throw new IsolationError();
+        const organizationId = await ownOrganizationId(tx, input);
         const count = await tx.spaceMember.count({
           where: {
             userId: input.userId,
-            organizationId: currentMembership.organizationId,
+            organizationId,
           },
         });
         if (count >= MAX_SPACES_PER_MEMBER) throw new SpaceLimitError();
         await createSpace(tx, {
           spaceId,
           spaceMembershipId,
-          organizationId: currentMembership.organizationId,
+          organizationId,
           userId: input.userId,
           name,
           createdAt,
@@ -407,7 +424,7 @@ export async function deleteClaimedSpaceForMember(
         await lockSpaceDeletion(tx, input.spaceId);
         const claim = await tx.space.findFirst({
           where: { id: input.spaceId, deletionClaimId: input.claimId },
-          select: { id: true },
+          select: { id: true, organizationId: true },
         });
         if (!claim) throw new SpaceDeletionInProgressError();
         const memberships = await assertSpaceDeletable(tx, input);
@@ -424,6 +441,8 @@ export async function deleteClaimedSpaceForMember(
         // was cut short; a retry finishes it.
         if (remainingBots > 0 || provisioned > 0) throw new SpaceDeletionInProgressError();
         await tx.space.delete({ where: { id: input.spaceId } });
+        // People invited to this Space leave the owner's organization when it was their last one.
+        await pruneDetachedOrganizationMembers(tx, claim.organizationId);
         const removed = {
           artifactKeys: artifacts.map((artifact) => artifact.storageKey),
           homeKeys: computers.map((computer) => computer.homeKey),
@@ -441,7 +460,25 @@ export async function deleteClaimedSpaceForMember(
   );
 }
 
-/** Organizations whose only member is this user; they are deleted with the account. */
+/**
+ * Whether an organization goes with this account: it is the only member, or it is the owner and
+ * everyone else only joined its Spaces by invitation (specs/space-members). An organization
+ * another owner shares stays.
+ */
+function organizationLeavesWithAccount(
+  members: Array<{ userId: string; role: string }>,
+  userId: string,
+): boolean {
+  const own = members.find((member) => member.userId === userId);
+  if (!own) return false;
+  if (members.every((member) => member.userId === userId)) return true;
+  return (
+    spaceRoleOf(own.role) === "owner" &&
+    members.every((member) => member.userId === userId || spaceRoleOf(member.role) !== "owner")
+  );
+}
+
+/** Organizations that are deleted with the account; see organizationLeavesWithAccount. */
 export async function personalOrganizationIds(
   prisma: Pick<PrismaClient, "member">,
   userId: string,
@@ -450,21 +487,21 @@ export async function personalOrganizationIds(
     where: { userId },
     select: {
       organizationId: true,
-      organization: { select: { members: { select: { userId: true } } } },
+      organization: { select: { members: { select: { userId: true, role: true } } } },
     },
   });
   return memberships
-    .filter(({ organization }) => organization.members.every((member) => member.userId === userId))
+    .filter(({ organization }) => organizationLeavesWithAccount(organization.members, userId))
     .map(({ organizationId }) => organizationId);
 }
 
 /**
  * Claim the spaces nobody else can use once this account is gone: every space of its personal
- * organizations, and spaces elsewhere where it is the only member. A claimed space refuses new
- * content, so nobody who joins later can lose a bot to the teardown. A retry after a failed
- * deletion keeps every space this account already claimed, even one someone has since joined,
- * so the last step can release it. A space another deletion is still working on fails the
- * account deletion until that claim finishes or goes stale.
+ * organizations (people it invited lose access with it), and spaces elsewhere where it is the
+ * only member. A claimed space refuses new content, so nobody who joins later can lose a bot to
+ * the teardown. A retry after a failed deletion keeps every space this account already claimed,
+ * even one someone has since joined, so the last step can release it. A space another deletion
+ * is still working on fails the account deletion until that claim finishes or goes stale.
  */
 export async function claimSpacesLeavingWithAccount(
   prisma: PrismaClient,
@@ -491,14 +528,14 @@ export async function claimSpacesLeavingWithAccount(
           await lockSpaceDeletion(tx, id);
           const space = await tx.space.findUnique({
             where: { id },
-            select: { deletingAt: true, deletionClaimId: true },
+            select: { deletingAt: true, deletionClaimId: true, organizationId: true },
           });
           if (!space) return false;
           if (space.deletionClaimId === claimId) return true;
           const others = await tx.spaceMember.count({
             where: { spaceId: id, userId: { not: userId } },
           });
-          if (others > 0) return false;
+          if (others > 0 && !organizationIds.includes(space.organizationId)) return false;
           const stale = new Date(Date.now() - SPACE_DELETION_CLAIM_TIMEOUT_MS);
           if (space.deletionClaimId && space.deletingAt && space.deletingAt >= stale)
             throw new SpaceDeletionInProgressError();
@@ -519,7 +556,9 @@ export async function claimSpacesLeavingWithAccount(
 /**
  * Delete a space claimed by `claimSpacesLeavingWithAccount`, once its bots and sandboxes are
  * gone. Rows left in it go by cascade, and its keys with it. Returns the stored artifacts to
- * remove after commit, or null when someone joined after the claim: the space stays, unclaimed.
+ * remove after commit, or null when someone joined after the claim a space whose organization
+ * stays: the space stays, unclaimed. A space of an organization leaving with the account goes
+ * with the people it invited.
  */
 export async function deleteSpaceLeavingWithAccount(
   prisma: PrismaClient,
@@ -530,7 +569,7 @@ export async function deleteSpaceLeavingWithAccount(
     prisma.$transaction(
       async (tx) => {
         await lockSpaceDeletion(tx, input.spaceId);
-        const [others, remainingBots, remainingComputers, artifacts] = await Promise.all([
+        const [others, remainingBots, remainingComputers, artifacts, space] = await Promise.all([
           tx.spaceMember.count({
             where: { spaceId: input.spaceId, userId: { not: input.userId } },
           }),
@@ -540,8 +579,16 @@ export async function deleteSpaceLeavingWithAccount(
             where: { spaceId: input.spaceId },
             select: { storageKey: true },
           }),
+          tx.space.findUnique({
+            where: { id: input.spaceId },
+            select: {
+              organization: { select: { members: { select: { userId: true, role: true } } } },
+            },
+          }),
         ]);
-        if (others > 0) {
+        const leavesWithAccount =
+          space !== null && organizationLeavesWithAccount(space.organization.members, input.userId);
+        if (others > 0 && !leavesWithAccount) {
           await tx.space.updateMany({
             where: { id: input.spaceId, deletionClaimId: claimId },
             data: { deletingAt: null, deletionClaimId: null },

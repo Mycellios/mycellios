@@ -1,5 +1,5 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import type { Bot, BotSection } from "@mycellios/contracts";
+import type { Bot, BotSection, SpaceRole } from "@mycellios/contracts";
 import { sidebarFolderTree } from "@mycellios/core";
 import {
   AlertDialog,
@@ -390,6 +390,10 @@ export type SettingsSpace = {
   canDelete?: boolean;
   /** Every bot deleting the space removes, from the server. */
   botCount?: number;
+  /** The account's Personal Space, which is never shared. */
+  isDefault?: boolean;
+  /** The viewer's role; absent for the Spaces it owns, as before Space members. */
+  role?: SpaceRole;
 };
 /** Names what goes with the space: its bots, and with them their chats and groups. */
 export function DeleteSpaceDialog({

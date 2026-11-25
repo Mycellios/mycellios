@@ -351,6 +351,36 @@ describe("durable direct run wakeups", () => {
     } finally { await f.host.stop(); }
   });
 
+  it.each([
+    { flag: undefined, engine: "codex", admitted: false },
+    { flag: "1", engine: "codex", admitted: true },
+    { flag: "1", engine: "claude", admitted: true },
+    { flag: "1", engine: "acp", admitted: false },
+  ])("lets a native side conversation pass a held Mico lease only with native concurrency ($engine, flag $flag)", async ({ flag, engine, admitted }) => {
+    vi.stubEnv("MYCELLIOS_NATIVE_CONCURRENCY", flag ?? "");
+    const f = fixture();
+    f.rows.set("side", { status: "queued", wakeAt: null });
+    f.findMany.mockImplementation(async () => [...f.rows].filter(([, row]) => row.status === "queued").map(([id]) => ({
+      id, botId: "mico", bot: { computerId: "computer", agentEngine: engine }, thread: { taskBotId: "mico" },
+    })));
+    // The Mico's main chat holds its computer lease.
+    f.leases.mockResolvedValue([{ computerId: "computer", botId: "mico", runId: "main-chat-run" }]);
+    const handler = vi.fn(async ({ runId }) => { f.rows.get(runId)!.status = "completed"; });
+    try {
+      await f.host.start({ "run.continue": handler } as unknown as BackgroundJobHandlers);
+      if (admitted) await vi.waitFor(() => expect(f.rows.get("side")!.status).toBe("completed"));
+      else {
+        await vi.waitFor(() => expect(f.leases).toHaveBeenCalled());
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(f.rows.get("side")!.status).toBe("queued");
+        expect(handler).not.toHaveBeenCalled();
+      }
+    } finally {
+      await f.host.stop();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("starts chat without invoking Graphile, deduplicates wakeups, and drains long executions", async () => {
     const f = fixture();
     f.rows.set("chat", { status: "queued", wakeAt: null });

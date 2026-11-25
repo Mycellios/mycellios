@@ -18,10 +18,16 @@ import {
   parseMcpOAuthAuthorizationParams,
 } from "./mcp.js";
 import { ModelHeadersSchema } from "./model-headers.js";
+import {
+  RoutineEventFiltersSchema,
+  RoutineEventTypeSchema,
+  RoutineWebhookStateSchema,
+} from "./routine-events.js";
 import { RoutineWatchSchema, RoutineWatchStateSchema } from "./routine-watch.js";
 import { RunTriggerSchema } from "./runs.js";
 import { MicoConversationSummarySchema } from "./side-threads.js";
 import { SettingsScopeSchema } from "./settings-scope.js";
+import { SharedSpaceSchema } from "./space-members.js";
 
 export const ComputerModeSchema = z.enum(["isolated", "team", "dedicated"]);
 export const DEFAULT_COMPUTER_MODE = "isolated" as const;
@@ -132,6 +138,36 @@ export const NativeEngineAccountResultSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("signedOut") }),
 ]);
 export type NativeEngineAccountResult = z.infer<typeof NativeEngineAccountResultSchema>;
+
+/** CLIs that a PC can install into its own store for the person (specs/native-engines/spec.md phase 3). */
+export const NativeInstallEngineSchema = z.enum(["codex", "claude", "opencode"]);
+export type NativeInstallEngine = z.infer<typeof NativeInstallEngineSchema>;
+/** A missing CLI the PC can install: the version its lock file pins, the vendor package and the download size. */
+export const NativeEngineInstallableSchema = z.object({
+  engine: NativeInstallEngineSchema,
+  version: z.string().max(64).regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
+  source: z.enum(["npm"]),
+  package: z.string().max(214).regex(/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/),
+  bytes: z.number().int().positive().max(2 ** 32),
+});
+export type NativeEngineInstallable = z.infer<typeof NativeEngineInstallableSchema>;
+/** An install that is running on the PC, or why its last attempt failed (a fixed, short sentence). */
+export const NativeEngineInstallProgressSchema = z.object({
+  engine: NativeInstallEngineSchema,
+  state: z.enum(["downloading", "checking", "failed"]),
+  receivedBytes: z.number().int().min(0).max(2 ** 32).optional(),
+  totalBytes: z.number().int().positive().max(2 ** 32).optional(),
+  error: z.string().max(200).regex(/^[^\r\n]*$/).optional(),
+});
+export type NativeEngineInstallProgress = z.infer<typeof NativeEngineInstallProgressSchema>;
+export const NativeEngineInstallRequestSchema = z.object({ engine: NativeInstallEngineSchema });
+export type NativeEngineInstallRequest = z.infer<typeof NativeEngineInstallRequestSchema>;
+/** The PC started the install (it reports progress with its engines) or already has that CLI. */
+export const NativeEngineInstallResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("installing") }),
+  z.object({ status: z.literal("installed") }),
+]);
+export type NativeEngineInstallResult = z.infer<typeof NativeEngineInstallResultSchema>;
 
 export const BusyMessageModeSchema =z.enum(["queue", "steer"]);
 export type BusyMessageMode = z.infer<typeof BusyMessageModeSchema>;
@@ -487,7 +523,13 @@ export const SpaceNavigationSchema = z.object({
     externalConversations: z.array(ExternalConversationSchema),
     botSections: z.array(BotSectionSchema),
   }),
+  /** Spaces this account owns. */
   spaces: z.array(SpaceSchema),
+  /**
+   * Spaces other people own that this account was invited to, while the deployment enables
+   * Space members. Absent from older servers and kept apart so older clients never open them.
+   */
+  sharedSpaces: z.array(SharedSpaceSchema).optional(),
 });
 export type SpaceNavigation = z.infer<typeof SpaceNavigationSchema>;
 
@@ -657,6 +699,8 @@ export const RoutineSchema = z.object({
   pausedByRunAt: z.string().nullable().optional(),
   /** Absent from older servers. */
   runIn: RoutineRunInSchema.optional(),
+  /** Its own signed webhook (secret state, event type and filters). Absent from older servers. */
+  webhook: RoutineWebhookStateSchema.optional(),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
 
@@ -684,6 +728,10 @@ export const CreateRoutineInput = z
     watch: RoutineWatchSchema.nullable().default(null),
     /** Omitted: the routine's own conversation. */
     runIn: RoutineRunInChoiceSchema.optional(),
+    /** Signed webhook events of only this type; omitted or null takes any type. */
+    webhookEventType: RoutineEventTypeSchema.nullable().optional(),
+    /** Every one must match a signed event's data before it runs. */
+    webhookFilters: RoutineEventFiltersSchema.optional(),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);
@@ -1794,6 +1842,8 @@ export const MeSchema = z.object({
   maxUploadSizeBytes: z.number().int().positive().optional(),
   ticketBoardEnabled: z.boolean(),
   phoneCallsEnabled: z.boolean().default(false),
+  /** True when this deployment lets owners invite people to their Spaces. Absent from older servers. */
+  spaceMembersEnabled: z.boolean().optional(),
   userId: Id,
   email: z.string().email(),
   name: z.string(),
@@ -1898,6 +1948,7 @@ export const AppBootstrapSchema = z.object({
   thread: ThreadSnapshotSchema.nullable(),
   routines: z.array(RoutineSchema),
   spaces: z.array(SpaceSchema),
+  sharedSpaces: z.array(SharedSpaceSchema).optional(),
 });
 export type AppBootstrap = z.infer<typeof AppBootstrapSchema>;
 

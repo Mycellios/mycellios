@@ -13,6 +13,8 @@ it("carries only the Mycellios account deep links through sign-in", () => {
   expect(signInNextFor("/onboarding", "?settings=api-keys")).toBeNull();
   expect(signInDestination("api-keys")).toBe("/app?settings=api-keys");
   expect(signInDestination("/integrations/setup")).toBe("/integrations/setup");
+  // A Space invitation returns to its page; its token never travels in the address.
+  expect(signInDestination("join")).toBe("/join");
 });
 
 it("never follows an unknown or external destination", () => {

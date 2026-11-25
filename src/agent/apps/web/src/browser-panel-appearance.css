@@ -1,0 +1,53 @@
+/* Applied only after the hosted frame receives a preference from the extension. */
+:root[data-browser-panel-theme="light"] {
+  --background: #ffffff;
+  --dialog: var(--background);
+  --foreground: #202124;
+  --card: #f1f3f4;
+  --card-foreground: var(--foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --primary-hover: #3c4043;
+  --chat-user: #eef0f2;
+  --chat-user-foreground: var(--foreground);
+  --muted: var(--card);
+  --muted-foreground: #5f6368;
+  --faint-foreground: #62676c;
+  --accent: #e8eaed;
+  --accent-foreground: var(--foreground);
+  --border: #dadce0;
+  --input: #80868b;
+  --ring: #5f6368;
+  --sidebar: #f8f9fa;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+}
+
+:root[data-browser-panel-theme="dark"] {
+  --background: #202124;
+  --sidebar: #252629;
+}
+
+:root[data-browser-panel-theme] .rk-chat-canvas {
+  background-color: var(--background);
+}
+
+:root[data-browser-panel-theme] [data-testid="message-user-bubble"] {
+  background-color: var(--chat-user);
+  color: var(--chat-user-foreground);
+}
+
+:root[data-browser-panel-discreet] [data-mico-avatar] {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+:root[data-browser-panel-discreet] .rk-personal-logo,
+:root[data-browser-panel-discreet] .app-loading-mark,
+:root[data-browser-panel-discreet] .rk-theme-sweep-mark {
+  visibility: hidden;
+}

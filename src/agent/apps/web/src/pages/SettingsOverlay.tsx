@@ -47,6 +47,7 @@ import {
   ShieldCheck,
   Smartphone,
   UserRound,
+  Users,
   Volume2,
   XIcon,
 } from "lucide-react";
@@ -69,6 +70,7 @@ import { McpServersOverlay } from "./McpServersOverlay";
 import { ModelSettingsOverlay } from "./ModelSettingsOverlay";
 import { SpaceSettingOverrides } from "./SpaceSettingOverrides";
 import { RunLogsSettingsPanel } from "./RunLogsSettingsPanel";
+import { SpaceMembersPanel } from "./SpaceMembersPanel";
 import { SpaceSettingsPanel } from "./SpaceSettingsPanel";
 import {
   MicosSettingsPanel,
@@ -111,6 +113,8 @@ export function SettingsOverlay({
   onSpaceChange,
   onRenameSpace,
   onDeleteSpace,
+  spaceMembersEnabled = false,
+  onLeaveSpace,
   email,
   name,
   usage,
@@ -144,6 +148,10 @@ export function SettingsOverlay({
   onSpaceChange?: (spaceId: string) => void;
   onRenameSpace?: (spaceId: string, name: string) => Promise<void>;
   onDeleteSpace?: (spaceId: string) => Promise<void>;
+  /** The deployment lets owners invite people to Spaces other than Personal. */
+  spaceMembersEnabled?: boolean;
+  /** The viewer left a Space someone else owns. */
+  onLeaveSpace?: (spaceId: string) => void;
   email?: string | null;
   name: string;
   usage?: {
@@ -200,13 +208,21 @@ export function SettingsOverlay({
   const recoveryHoldTimer = useRef<number | undefined>(undefined);
   const showComputer = true;
   const showUpdates = true;
+  // A Space someone else owns shows only its people: its settings stay with its owner.
+  const sharedSpace = Boolean(space?.role && space.role !== "owner");
+  const membersAvailable = spaceMembersEnabled && Boolean(space) && !space?.isDefault;
   // Keep unavailable device/developer sections out; Billing explains disabled payments in place.
-  const section =
+  const availableSection =
     (requestedSection === "logs" && !developerMode) ||
     (requestedSection === "computer" && !showComputer) ||
     (requestedSection === "updates" && !showUpdates)
       ? "general"
       : requestedSection === "usage" ? "profile" : requestedSection;
+  const section: SettingsSection = sharedSpace
+    ? "space-members"
+    : availableSection === "space-members" && !membersAvailable
+      ? "space"
+      : availableSection;
   const [companionBusy, setCompanionBusy] = useState(false);
   const [behaviorBusy, setBehaviorBusy] = useState(false);
   const panelBusy = memoryBusy || voiceBusy || localVoiceBusy || notificationBusy || companionBusy || behaviorBusy || formState.busy;
@@ -284,8 +300,11 @@ export function SettingsOverlay({
   }, [section, requestedSection, onUsageOpen]);
 
   const settingsTitle = serverSettings ? t`Space settings` : t`Your settings`;
-  const navItems: NavItem[] = serverSettings ? [
+  const navItems: NavItem[] = serverSettings ? sharedSpace ? [
+    { id: "space-members", label: t`Members`, icon: Users },
+  ] : [
     { id: "space", label: t`General`, icon: Settings },
+    ...(membersAvailable ? [{ id: "space-members" as const, label: t`Members`, icon: Users }] : []),
     { id: "memory", label: t`Memory`, icon: Brain },
     { id: "space-mcp", label: "MCP", icon: Cpu },
     { id: "space-providers", label: t`Providers`, icon: Cpu },
@@ -534,7 +553,7 @@ export function SettingsOverlay({
                 <DialogTitle className="text-heading2 font-medium text-foreground">
                   {sectionTitle}
                 </DialogTitle>
-                {!spaceScoped ? null : space && spaces.length > 1 && onSpaceChange ? (
+                {!spaceScoped ? null : space && !sharedSpace && spaces.length > 1 && onSpaceChange ? (
                   <OptionSelect
                     className="w-56 max-w-full"
                     data-testid="settings-space"
@@ -631,6 +650,13 @@ export function SettingsOverlay({
                     space={space}
                     onRename={(name) => onRenameSpace?.(space.id, name) ?? Promise.resolve()}
                     onDelete={() => onDeleteSpace?.(space.id) ?? Promise.resolve()}
+                  />
+                ) : null}
+                {section === "space-members" && space ? (
+                  <SpaceMembersPanel
+                    key={space.id}
+                    spaceName={space.name}
+                    onLeft={() => onLeaveSpace?.(space.id)}
                   />
                 ) : null}
                 {overrideSetting && space ? (

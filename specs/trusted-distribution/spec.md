@@ -131,6 +131,12 @@ Phases 3 to 5 start only after their open decision is settled.
    - Incidents and maintenance are issues with a `status` label that maintainers
      open and close; the page and the feed carry them. The page shows state,
      response time and incident text, and links to the Live network page.
+   - Implemented: `public-status.yml` runs `scripts/public-status.mjs` on that
+     schedule, and Agent answers `GET /api/v1/status` (`/agent/api/v1/status` through
+     the proxy) with only `ok` or `degraded`, reusing one database answer for 10
+     seconds. A run deploys only while Pages publishes from GitHub Actions; until the
+     owner sets that, the address and the `status` label, scheduled runs stop with a
+     warning and a manual run builds the page as an artifact.
 3. Phase 3 — signed Windows installers and unattended installs.
    - Prerequisite (open decision): a code-signing identity and route. Default:
      a cloud signing service that issues short-lived certificates to the release

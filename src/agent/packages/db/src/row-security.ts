@@ -129,6 +129,8 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "Task",
   "Routine",
   "RoutineDeliveryReceipt",
+  "RoutineWebhookSecret",
+  "RoutineEventReceipt",
   "Workflow",
   "WorkflowExecution",
   "Connection",
@@ -163,6 +165,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "UserActionApprovalRule",
   "UserActionAutoReviewPreference",
   "SecurityEvent",
+  "SpaceInvitation",
 ]);
 
 /**

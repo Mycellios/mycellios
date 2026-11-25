@@ -21,6 +21,13 @@ export const SECURITY_EVENT_TYPES = [
   "approval.policy.changed",
   "egress.refused",
   "rate_limit.hit",
+  // Space membership changes; owners and admins read them as the Space's audit log.
+  "space.invitation.created",
+  "space.invitation.revoked",
+  "space.member.joined",
+  "space.member.left",
+  "space.member.removed",
+  "space.member.role_changed",
 ] as const;
 
 export const SecurityEventTypeSchema = z.enum(SECURITY_EVENT_TYPES);

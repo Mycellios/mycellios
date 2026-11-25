@@ -449,6 +449,20 @@
   Bind each Space panel and its writes to the Space being edited, even when the
   open conversation belongs to another Space. Preserve account model credentials
   and per-Space inheritance for model, voice and approval preferences.
+
+- People in Spaces follow specs/space-members/spec.md behind MYCELLIOS_SPACE_MEMBERS_ENABLED
+  (off by default; MYCELLIOS_SPACE_MEMBER_LIMIT people, 20 by default). The owner or an admin
+  of a Space other than Personal invites by email or a one-use link valid 7 days; store only
+  the token's SHA-256 and keep the token in the link's fragment. Accepting runs as system,
+  binds an email invitation to that verified address and adds a `member` organization and
+  Space membership; the default-Space trigger joins owners only, so nobody reaches a Personal
+  Space. Nobody removes or changes the owner; only the owner changes roles. A non-owner
+  reaches only `spaces.members.*`/`spaces.invites.*` there (`assertSpaceRoleAllows`) and no
+  route outside RPC: their own identity would read Space rows and spend the owner
+  organization's Credits. Membership is read per request, so removal and leaving end access
+  at once. Audit changes in `security_events` with names, never addresses. Verify
+  scripts/verify-space-members-db.ts and the space-members, SpaceMembersPanel, SpaceInvite
+  and switcher tests.
   The chat provider/model selection owns execution: saved API/OAuth connections
   use Pi automatically; installed account providers are selected in the same
   model menu. Do not expose a second Agent engine switch in Mico settings or
@@ -509,10 +523,21 @@
   engines from the Mico's authorized computer. An offline Desktop never offers
   the server's engines or delegates its run to them. Verify the scoped settings and
   native-agent-runtime tests. Protocol fixtures do not qualify real inference.
-  Managed OpenCode installs are explicitly admitted by allowOpenCodeInstall
-  in the host's native-agents.json and the same account/Space grant. Verify
-  both artifact digests and preserve operator command overrides, the published
-  version directory and the no-fallback model policy.
+  Managed CLIs (specs/native-engines/spec.md phase 3) live in one store per host user,
+  provider-runtimes/<engine>/<version> (Desktop's profile, a server's data folder), and come
+  only from the npm URL, sha512 integrity and size bounds in
+  packages/adapters/src/native-engines.lock.json (regenerate with scripts/native-engine-lock.mjs,
+  never by hand). Downloads are verified before unpacking into staging, every file's SHA-256 is
+  recorded and `--version` checked before the folder is used, and again before a session's first
+  start. No administrator rights, global npm or CLI updater. Resolution: an absolute
+  native-agents.json command, then the newer of the managed copy and PATH (the person's CLI wins
+  ties; macOS/Linux add the login shell's PATH), then the managed copy. A PC installs through
+  `engines.install` → the owned Desktop's `engineInstall` (`engineInstall: 1`) with the same
+  This PC, owner and consent checks as `engines.account`; server hosts keep installOpenCode
+  behind allowOpenCodeInstall and the account/Space grant, and the pre-store OpenCode 1.19.5
+  copy is adopted by its pinned hash. Preserve operator command overrides and the no-fallback
+  model policy. Verify native-engine-store, native-login-path, desktop-agent-engine,
+  host-computer, the engines route tests and chat-header-model.
   Signing a PC's Codex or Claude Code in or out (specs/native-engines/spec.md phase 1)
   goes through `engines.account` → the owned Desktop's `engineAccount` method, only
   for a This PC Mico (never server, Team or isolated computers) and under the PC's
@@ -1116,8 +1141,18 @@
   Pi concurrency is admitted atomically per Bot and serialized per thread; a Pi
   Mico's main chat is its own lane outside its 1-4 conversation slots (claimMicoRun,
   delegation capacity), so it never waits behind side work. Native engines remain
-  single-turn in total, main chat included. Private Pi tasks reserve the existing computer lease
-  before computer/file/command tools, never share it between runs. Workflows reuse
+  single-turn in total, main chat included, unless the operator sets
+  MYCELLIOS_NATIVE_CONCURRENCY=1 on API and worker (specs/native-engines/spec.md phase 4):
+  then Codex, Claude Code and OpenCode get the same lanes (micoRunsLanes) and side-
+  conversation private lane, while a generic ACP agent stays single-turn. Each run keeps
+  its own session folder, CLI process and MCP bridge token; Desktop bounds turn CLI
+  processes per PC (NativeProcessSlots, default 6) and a turn above it waits visibly. The
+  Desktop relay's unchanged lanes still deliver at most 2 agent runs per Mico and 4 per API
+  instance; further admitted turns wait unclaimed there, as Pi tasks do.
+  Private Pi and native tasks reserve the existing computer lease
+  before computer/file/command tools, never share it between runs, so screen and browser
+  tools stay serialized. Verify scripts/verify-native-concurrency-db.ts with both flag
+  states, native-process-slots and the native runtime/Desktop engine tests. Workflows reuse
   existing Micos, owner/Space RPCs and the existing reconciler, freeze graph versions
   and persist private step runs. Stop commits cancellation and process teardown
   receipts together. Verify workflow contracts, affected wakeup/control tests and
@@ -1262,6 +1297,16 @@
   it with its history. Verify with verify-routine-isolation-db.ts and the routine tests above.
   `runIn` (thread default/chat; group is kept, never moved) is set by the editor switch and the
   schedule tools; moving back reuses the conversation found by key, never a second one.
+- Signed webhook routines (specs/mico-automation phase 2): `/api/v1/routines/<id>/events` takes
+  Standard Webhooks events (`v1,` HMAC-SHA256 of `id.timestamp.body`, `whsec_` secret, ±5 min),
+  verified on the raw bytes before parsing; every refusal is the same 401. Secrets stay encrypted
+  in `routine_webhook_secrets`, never in logs or prompts; a rotation keeps the previous one 24 h,
+  Revoke or turning the webhook off ends both. `claimRoutineEvent` locks the routine: delivery-id
+  digests dedupe for 7 days (runs keep their nonce, so never a second run), 60 events an hour then
+  429, and type/filters/paused decide before any run (202, shown in the history). Send test event
+  starts a `routine-test:event:` run, also while paused. The per-Mico Bearer route skips routines
+  with their own secret; the UI issues per-Mico keys only for GitHub. Verify routine-events tests
+  and `node --import tsx scripts/verify-routine-events-db.ts` (fresh loopback cluster).
 
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong
@@ -1683,6 +1728,10 @@
   browser choice. Before a saved choice exists, use English regardless of
   browser language or build environment. Forward only supported locale values to model-facing greetings
   and new task prompts; never translate history by rewriting stored messages.
+- Chrome side-panel appearance is local to the extension and independent of the
+  Agent account preference. Accept live visual overrides only from the exact
+  approved extension origin and the parent window. Keep the existing host
+  permissions, signing IDs and normal web/Desktop appearance.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the

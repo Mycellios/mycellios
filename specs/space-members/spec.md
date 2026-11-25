@@ -98,6 +98,11 @@ a member. Five phases, each shipping alone; phases 2 to 5 need phase 1.
    - A Space audit log for the owner and admins records invitations, joins,
      leaves, removals, role changes and shares in `security_events` with the Space
      id, keeping the names of the moment.
+   - Implemented (1a): behind `MYCELLIOS_SPACE_MEMBERS_ENABLED`, invitations
+     (`space_invitations`, hashed one-use tokens), roles, leaving, removal, the
+     audit log (`spaces.members.audit`), the switcher's shared Spaces and a Members
+     section; a non-owner reaches only `spaces.members.*`/`spaces.invites.*` in a
+     shared Space until Mico sharing and member conversations land.
 2. Phase 2 — work tools for members.
    - A member's turns on a shared Mico get their own home on that Mico's server
      computer (a home key per Mico and member), so their files never meet the

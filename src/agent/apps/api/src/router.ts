@@ -9,6 +9,7 @@ import type {
   ProductAnalytics,
   SandboxProvider,
   SecretStore,
+  TransactionalEmailProvider,
 } from "@mycellios/adapter-kit";
 import type {
   CloudAgentConnection,
@@ -137,7 +138,11 @@ export interface RouterDeps {
   };
   /** Present only when the deployment bills; self-hosted installs leave it unset. */
   billing?: BillingService;
+  /** The deployment's transactional mail, when configured; Space invitations use it. */
+  email?: TransactionalEmailProvider;
   env: {
+    /** People invited to Spaces; absent while the deployment keeps it off (specs/space-members). */
+    spaceMembers?: { limit: number };
     mycelliosSso?: boolean;
     /** The Mycellios identity authority (the OIDC issuer) when Mycellios SSO is on. */
     mycelliosIdentityIssuer?: string;

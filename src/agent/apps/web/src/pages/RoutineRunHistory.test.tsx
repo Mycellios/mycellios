@@ -91,6 +91,33 @@ it("shows loading, then the real run and its exact message link", async () => {
     await view.close();
   }
 });
+it("lists signed events that started nothing among the runs, with their reason", async () => {
+  api.history.mockResolvedValue({
+    ...page([run]),
+    events: [
+      { id: "receipt-2", receivedAt: "2026-01-02T13:00:00Z", reason: "filter" },
+      { id: "receipt-1", receivedAt: "2026-01-02T11:00:00Z", reason: "paused" },
+    ],
+  });
+  const view = await mounted();
+  const button = (name: string) =>
+    [...view.container.querySelectorAll("button")].find((b) => b.textContent === name)!;
+  try {
+    expect(view.container.querySelectorAll("li")).toHaveLength(1);
+    await act(async () => button("Run history").click());
+    const rows = [...view.container.querySelectorAll("li")];
+    expect(rows.map((row) => row.dataset.testid)).toEqual([
+      "routine-event-row",
+      "routine-run-row",
+      "routine-event-row",
+    ]);
+    expect(rows[0]?.textContent).toContain("Ignored: a filter did not match");
+    expect(rows[2]?.textContent).toContain("Ignored: routine paused");
+    expect(view.container.textContent).not.toContain("No runs yet");
+  } finally {
+    await view.close();
+  }
+});
 it("shows a genuine empty state and refreshes while the panel is open", async () => {
   vi.useFakeTimers();
   api.history

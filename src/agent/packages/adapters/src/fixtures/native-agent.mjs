@@ -11,6 +11,9 @@ const toolArguments = process.argv.includes("--fixture-questionnaire") ? {
     { question: "When?" },
   ],
 } : { path: "notes.txt" };
+// Records each started process, so tests can tell which runs shared a CLI process.
+const pidLog = process.argv.indexOf("--fixture-pid-log");
+if (pidLog >= 0) appendFileSync(process.argv[pidLog + 1], `${process.pid}\n`);
 const send = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 const reply = (message, result) => send({ jsonrpc: "2.0", id: message.id, result });
 setInterval(() => {}, 1000);

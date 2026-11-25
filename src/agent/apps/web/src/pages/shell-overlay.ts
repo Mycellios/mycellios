@@ -12,6 +12,7 @@ const SETTINGS_SECTIONS = [
   "space-voice",
   "space-approvals",
   "space-mcp",
+  "space-members",
   "models",
   "memory",
   "voice",
@@ -34,6 +35,7 @@ export const spaceSettingsSections: ReadonlySet<SettingsSection> = new Set([
   "space-voice",
   "space-approvals",
   "space-mcp",
+  "space-members",
   "memory",
 ]);
 

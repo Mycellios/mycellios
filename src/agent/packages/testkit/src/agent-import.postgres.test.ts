@@ -2070,7 +2070,8 @@ describeIntegration("agent import", () => {
       where: { id: shared.id },
       select: { organizationId: true },
     });
-    // The second member, added as the authorization tests add one.
+    // A second owner, added as the authorization tests add one: someone invited to the Space
+    // (specs/space-members) could not import there.
     const member = await signup(app, `import-shared-member-${stamp}@mycellios.test`, "Member");
     const memberActor = await rpc<{ userId: string }>(app, member, "me");
     await db.member.deleteMany({ where: { userId: memberActor.userId } });
@@ -2079,7 +2080,7 @@ describeIntegration("agent import", () => {
         id: `import-shared-org-member-${stamp}`,
         organizationId,
         userId: memberActor.userId,
-        role: "member",
+        role: "owner",
         createdAt: new Date(),
       },
     });
@@ -2089,7 +2090,7 @@ describeIntegration("agent import", () => {
         spaceId: shared.id,
         organizationId,
         userId: memberActor.userId,
-        role: "member",
+        role: "owner",
         createdAt: new Date(),
       },
     });

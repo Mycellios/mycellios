@@ -366,7 +366,7 @@ describe("native agent protocol integration", () => {
         ANTHROPIC_API_KEY: "private",
         RAKAZO_DESKTOP_STACK_TOKEN: "private",
       }),
-    ).toEqual({ PATH: "/bin" });
+    ).toEqual({ PATH: "/bin", DISABLE_AUTOUPDATER: "1" });
   });
 });
 

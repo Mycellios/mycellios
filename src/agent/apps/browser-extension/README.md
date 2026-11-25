@@ -12,6 +12,10 @@ It is plain Manifest V3 with no build step.
 If you are not signed in, the panel opens the normal sign-in page in a tab and loads Agent once
 the session exists. Identity pages are never framed.
 
+Open **Appearance** to select **Mycellios**, **White**, **Dark** or **System**. **Discreet mode**
+tones down avatars and branding inside the panel. These preferences are stored in Chrome for
+this extension and do not change the appearance of regular Agent tabs.
+
 ## How framing is allowed
 
 The hosted app sends `frame-ancestors 'none'` except for the origins in

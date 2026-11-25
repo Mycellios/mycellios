@@ -1,4 +1,5 @@
-import type { Actor } from "@mycellios/contracts";
+import type { Actor, SpaceRole } from "@mycellios/contracts";
+import { spaceRoleOf } from "@mycellios/contracts";
 import type { PrismaClient } from "./client.js";
 
 export class IsolationError extends Error {
@@ -16,11 +17,13 @@ export class BotSectionNameConflictError extends Error {
   }
 }
 
-export async function requireMembership(
+async function findMembership(
   prisma: PrismaClient,
   userId: string,
   requestedSpaceId?: string | null,
-): Promise<Actor> {
+) {
+  // Read on every request, so leaving or removal ends access on the next one. Without a
+  // requested Space this is the account's own Personal Space: Spaces shared with it never are.
   const membership = await prisma.spaceMember.findFirst({
     where: {
       userId,
@@ -32,12 +35,34 @@ export async function requireMembership(
   if (!membership) {
     throw new IsolationError("No personal space");
   }
+  return membership;
+}
+
+function actorOf(membership: Awaited<ReturnType<typeof findMembership>>): Actor {
   return {
     userId: membership.userId,
     spaceId: membership.spaceId,
     email: membership.member.user.email,
     isDeploymentOwner: false,
   };
+}
+
+export async function requireMembership(
+  prisma: PrismaClient,
+  userId: string,
+  requestedSpaceId?: string | null,
+): Promise<Actor> {
+  return actorOf(await findMembership(prisma, userId, requestedSpaceId));
+}
+
+/** The actor and its role in that Space, for request admission (specs/space-members). */
+export async function requireMembershipWithRole(
+  prisma: PrismaClient,
+  userId: string,
+  requestedSpaceId?: string | null,
+): Promise<{ actor: Actor; spaceRole: SpaceRole }> {
+  const membership = await findMembership(prisma, userId, requestedSpaceId);
+  return { actor: actorOf(membership), spaceRole: spaceRoleOf(membership.role) };
 }
 
 export function scoped<T extends { spaceId: string; userId?: string }>(

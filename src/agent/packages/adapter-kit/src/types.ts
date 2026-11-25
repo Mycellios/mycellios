@@ -2,6 +2,8 @@ import type {
   AgentQuestion,
   CacheCapabilities as ConnectionCacheCapabilities,
   ConnectionCatalogItem,
+  NativeEngineInstallable,
+  NativeEngineInstallProgress,
   NotificationKind,
   SandboxKind,
 } from "@mycellios/contracts";
@@ -28,6 +30,12 @@ export type NativeEngineState = {
   models?: NativeEngineModels;
   /** The host can sign its CLIs in and out for the person (older hosts omit it). */
   account?: boolean;
+  /** The host installs missing CLIs into its own store for the person (older hosts omit it). */
+  install?: boolean;
+  /** Missing CLIs the host can install, with the pinned version, vendor package and size. */
+  installable?: NativeEngineInstallable[];
+  /** Installs running on the host, or why the last one failed. */
+  installs?: NativeEngineInstallProgress[];
 };
 
 export interface AdapterContext {
