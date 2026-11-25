@@ -23,7 +23,9 @@ queue/steering semantics and authoritative event reducer.
 - An uncached chat gives history priority over secondary reads from its controls.
   Allow those reads after the first transcript can paint, and cap the delay for
   a slow or failed history request. Sends, auth recovery and realtime stay direct.
-  Reuse fresh model/account data across conversations in the same Space.
+  Resume deferred reads with at most two outstanding requests per tab. Start an
+  uncached same-Space roster destination at selection and share its result with
+  the incoming shell to avoid a second request. Reuse fresh model and account data.
 - Motion acknowledges pending send, first live reply and control changes. Do not
   replay a streamed reply on completion or animate history loads and token updates.
   Preserve scroll ownership, reduced motion, keyboard and assistive feedback.

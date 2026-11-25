@@ -65,6 +65,7 @@ export function readConversationHistory(
   spaceId: string | null,
   botId: string,
   taskScope?: TaskThreadScope,
+  reuseForMs = 0,
 ) {
   const input = { botId };
   const queryKey = spaceQueries(userId, spaceId, taskScope).threads.get.queryKey({ input });
@@ -75,7 +76,7 @@ export function readConversationHistory(
       { signal: anySignal([signal, AbortSignal.timeout(15_000)]) },
     ),
     retry: false,
-    staleTime: 0,
+    staleTime: reuseForMs,
   });
 }
 

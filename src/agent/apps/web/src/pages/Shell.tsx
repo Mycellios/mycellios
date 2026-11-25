@@ -413,6 +413,7 @@ type BrowserNoticeOptions = { quiet?: boolean; taskConversation?: boolean };
 
 const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
 const CONVERSATION_HISTORY_TIMEOUT_MS = 15_000;
+const FIRST_HISTORY_REUSE_MS = 1_500;
 const NO_AGENT_SKILLS: AgentSkillCatalogEntry[] = [];
 const NO_PROVIDERS: string[] = [];
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
@@ -1997,7 +1998,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     const routineRuns = new Set<string>();
     const abort = new AbortController();
     const historySignal = () => threadSnapshotSignal(abort.signal, CONVERSATION_HISTORY_TIMEOUT_MS);
-    const loadHistory = () => readConversationHistory(userId ?? null, shellSpaceId, active.id, taskScope);
+    const loadHistory = () =>
+      readConversationHistory(userId ?? null, shellSpaceId, active.id, taskScope, FIRST_HISTORY_REUSE_MS);
     setFailedThreadBotId(null);
     setLiveThreadConnection("live");
     void runThreadSubscription({
@@ -2351,6 +2353,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             }
           }
           primeConversationSeed(userId ?? null, spaceId, { ...lists, me }, target.botId, destinationTask);
+          const chatRoute = !["view", "m", "draft", "noticeSpace", "taskSpace"].some(
+            (param) => destination.searchParams.has(param),
+          );
+          if (chatRoute && userId && userId === me.userId && me.spaceId === spaceId) {
+            const key = spaceQueries(userId, spaceId, destinationTask).threads.get.queryKey({ input: { botId: target.botId } });
+            if (!queryClient.getQueryData(key)) {
+              void readConversationHistory(userId, spaceId, target.botId, destinationTask).catch(() => undefined);
+            }
+          }
         }
         navigate(path, { state: { conversationSwitch: true } });
         return;

@@ -670,8 +670,10 @@
   snapshot cursor and avoid evicting already loaded history on this first read.
   While the first read is pending, show loading in the chat pane. Prioritize
   history over the explicit list of secondary control reads, with a bounded hold
-  across rapid navigation. Keep writes, authentication recovery and realtime direct.
-  Reuse fresh model and account queries within their existing scope.
+  across rapid navigation. Resume queued control reads at most two at once.
+  Start a cold same-Space history read at roster selection and consume its fresh,
+  scoped result in the incoming shell. Keep writes, auth recovery and realtime
+  direct. Reuse fresh model and account queries within their existing scope.
   Preload at most two tab/picker destinations independently in the scoped memory
   cache, including when only the active tab fits on mobile; pointer/focus intent
   may warm another destination. Pending asks are preloaded without marking them read. Roster replies target the owned task thread and scroll to its loaded card.
