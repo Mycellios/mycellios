@@ -22,6 +22,7 @@ import { RoutineWatchSchema, RoutineWatchStateSchema } from "./routine-watch.js"
 import { RunTriggerSchema } from "./runs.js";
 import { MicoConversationSummarySchema } from "./side-threads.js";
 import { SettingsScopeSchema } from "./settings-scope.js";
+import { SharedSpaceSchema } from "./space-members.js";
 
 export const ComputerModeSchema = z.enum(["isolated", "team", "dedicated"]);
 export const DEFAULT_COMPUTER_MODE = "isolated" as const;
@@ -487,7 +488,13 @@ export const SpaceNavigationSchema = z.object({
     externalConversations: z.array(ExternalConversationSchema),
     botSections: z.array(BotSectionSchema),
   }),
+  /** Spaces this account owns. */
   spaces: z.array(SpaceSchema),
+  /**
+   * Spaces other people own that this account was invited to, while the deployment enables
+   * Space members. Absent from older servers and kept apart so older clients never open them.
+   */
+  sharedSpaces: z.array(SharedSpaceSchema).optional(),
 });
 export type SpaceNavigation = z.infer<typeof SpaceNavigationSchema>;
 
@@ -1794,6 +1801,8 @@ export const MeSchema = z.object({
   maxUploadSizeBytes: z.number().int().positive().optional(),
   ticketBoardEnabled: z.boolean(),
   phoneCallsEnabled: z.boolean().default(false),
+  /** True when this deployment lets owners invite people to their Spaces. Absent from older servers. */
+  spaceMembersEnabled: z.boolean().optional(),
   userId: Id,
   email: z.string().email(),
   name: z.string(),
@@ -1898,6 +1907,7 @@ export const AppBootstrapSchema = z.object({
   thread: ThreadSnapshotSchema.nullable(),
   routines: z.array(RoutineSchema),
   spaces: z.array(SpaceSchema),
+  sharedSpaces: z.array(SharedSpaceSchema).optional(),
 });
 export type AppBootstrap = z.infer<typeof AppBootstrapSchema>;
 

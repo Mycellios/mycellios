@@ -15463,3 +15463,80 @@ msgstr "Abre Mycellios en ese PC para iniciar sesión en Claude Code."
 #: src/pages/shell/native-engine-account.tsx
 msgid "Could not reach the PC. Try again."
 msgstr "No se pudo contactar con el PC. Inténtalo de nuevo."
+
+#: src/pages/SettingsOverlay.tsx
+msgid "Members"
+msgstr "Miembros"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Admin"
+msgstr "Administrador"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Role"
+msgstr "Rol"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Invite"
+msgstr "Invitar"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Invite link"
+msgstr "Enlace de invitación"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Email not sent. Share the link instead."
+msgstr "No se envió el correo. Comparte el enlace."
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Expires {date}"
+msgstr "Caduca el {date}"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Leave space"
+msgstr "Salir del espacio"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Leave {space}?"
+msgstr "¿Salir de {space}?"
+
+#: src/lib/user-error.ts
+#: src/pages/SpaceInvite.tsx
+msgid "This invitation is no longer valid."
+msgstr "Esta invitación ya no es válida."
+
+#: src/pages/SpaceInvite.tsx
+msgid "Sign in to accept this invitation."
+msgstr "Inicia sesión para aceptar esta invitación."
+
+#: src/pages/SpaceInvite.tsx
+msgid "You are already in this space."
+msgstr "Ya estás en este espacio."
+
+#: src/pages/SpaceInvite.tsx
+msgid "Invited by {inviter}"
+msgstr "Te invitó {inviter}"
+
+#: src/pages/SpaceInvite.tsx
+msgid "Join"
+msgstr "Unirme"
+
+#: src/lib/user-error.ts
+msgid "This space is full."
+msgstr "Este espacio está completo."
+
+#: src/lib/user-error.ts
+msgid "Already in this space."
+msgstr "Ya está en este espacio."
+
+#: src/lib/user-error.ts
+msgid "This invitation is for another email address."
+msgstr "Esta invitación es para otra dirección de correo."
+
+#: src/lib/user-error.ts
+msgid "Verify your email address to accept this invitation."
+msgstr "Verifica tu dirección de correo para aceptar esta invitación."
+
+#: src/lib/user-error.ts
+msgid "Too many email invitations today. Try again tomorrow."
+msgstr "Demasiadas invitaciones por correo hoy. Inténtalo mañana."

@@ -3,9 +3,23 @@ import { isNetworkVoiceErrorCode, isVoiceAccountErrorCode } from "@mycellios/con
 import type { CredentialField } from "@mycellios/core";
 import { authErrorMessage, MAX_PASSWORD_LENGTH, userErrorMessage } from "@mycellios/core";
 
+/** Space membership refusals a person can meet (specs/space-members), in their language. */
+const SPACE_MEMBER_ERRORS: Record<string, () => string> = {
+  "This space is full.": () => t`This space is full.`,
+  "Already in this space.": () => t`Already in this space.`,
+  "This invitation is no longer valid.": () => t`This invitation is no longer valid.`,
+  "This invitation is for another email address.": () =>
+    t`This invitation is for another email address.`,
+  "Verify your email address to accept this invitation.": () =>
+    t`Verify your email address to accept this invitation.`,
+  "Too many email invitations today. Try again tomorrow.": () =>
+    t`Too many email invitations today. Try again tomorrow.`,
+};
+
 /** Text for a failure: human messages pass through; network and implementation detail become copy. */
 export function errorText(error: unknown, fallback = t`Something went wrong. Try again.`): string {
   const message = error instanceof Error ? error.message : undefined;
+  if (message && Object.hasOwn(SPACE_MEMBER_ERRORS, message)) return SPACE_MEMBER_ERRORS[message]!();
   if (message === "You can pin up to 100 messages per conversation.") return t`You can pin up to 100 messages per conversation.`;
   if (message === "Folders support up to three levels.") return t`Folders support up to three levels.`;
   if (message === "A folder cannot be moved into itself or one of its subfolders.") return t`A folder cannot be moved into itself or one of its subfolders.`;

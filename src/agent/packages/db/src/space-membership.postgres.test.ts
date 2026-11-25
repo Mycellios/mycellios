@@ -20,7 +20,7 @@ describePostgres("default Space membership trigger (PostgreSQL)", () => {
     await close();
   });
 
-  it("adds a new organization member to its default Space", async () => {
+  it("adds a new organization owner to its default Space, never an invited member", async () => {
     const db = createDb(databaseUrl!);
     prisma = db.prisma;
     close = async () => {
@@ -55,6 +55,8 @@ describePostgres("default Space membership trigger (PostgreSQL)", () => {
       },
     });
 
+    // The default Space is the owner's Personal Space: someone invited to another of its
+    // Spaces joins only that one (specs/space-members).
     const memberId = `trigger-member-${suffix}`;
     await prisma.member.create({
       data: {
@@ -65,16 +67,30 @@ describePostgres("default Space membership trigger (PostgreSQL)", () => {
         createdAt,
       },
     });
+    await expect(
+      prisma.spaceMember.findUnique({ where: { spaceId_userId: { spaceId, userId } } }),
+    ).resolves.toBeNull();
 
+    await prisma.member.delete({ where: { id: memberId } });
+    const ownerId = `trigger-owner-${suffix}`;
+    await prisma.member.create({
+      data: {
+        id: ownerId,
+        organizationId,
+        userId,
+        role: "owner",
+        createdAt,
+      },
+    });
     const membership = await prisma.spaceMember.findUnique({
       where: { spaceId_userId: { spaceId, userId } },
     });
     expect(membership).toMatchObject({
-      id: `default-space-member:${memberId}`,
+      id: `default-space-member:${ownerId}`,
       spaceId,
       organizationId,
       userId,
-      role: "member",
+      role: "owner",
     });
   });
 });

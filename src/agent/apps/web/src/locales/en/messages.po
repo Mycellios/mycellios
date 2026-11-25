@@ -15080,3 +15080,80 @@ msgstr "Open Mycellios on that PC to sign in to Claude Code."
 #: src/pages/shell/native-engine-account.tsx
 msgid "Could not reach the PC. Try again."
 msgstr "Could not reach the PC. Try again."
+
+#: src/pages/SettingsOverlay.tsx
+msgid "Members"
+msgstr "Members"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Admin"
+msgstr "Admin"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Role"
+msgstr "Role"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Invite"
+msgstr "Invite"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Invite link"
+msgstr "Invite link"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Email not sent. Share the link instead."
+msgstr "Email not sent. Share the link instead."
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Expires {date}"
+msgstr "Expires {date}"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Leave space"
+msgstr "Leave space"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Leave {space}?"
+msgstr "Leave {space}?"
+
+#: src/lib/user-error.ts
+#: src/pages/SpaceInvite.tsx
+msgid "This invitation is no longer valid."
+msgstr "This invitation is no longer valid."
+
+#: src/pages/SpaceInvite.tsx
+msgid "Sign in to accept this invitation."
+msgstr "Sign in to accept this invitation."
+
+#: src/pages/SpaceInvite.tsx
+msgid "You are already in this space."
+msgstr "You are already in this space."
+
+#: src/pages/SpaceInvite.tsx
+msgid "Invited by {inviter}"
+msgstr "Invited by {inviter}"
+
+#: src/pages/SpaceInvite.tsx
+msgid "Join"
+msgstr "Join"
+
+#: src/lib/user-error.ts
+msgid "This space is full."
+msgstr "This space is full."
+
+#: src/lib/user-error.ts
+msgid "Already in this space."
+msgstr "Already in this space."
+
+#: src/lib/user-error.ts
+msgid "This invitation is for another email address."
+msgstr "This invitation is for another email address."
+
+#: src/lib/user-error.ts
+msgid "Verify your email address to accept this invitation."
+msgstr "Verify your email address to accept this invitation."
+
+#: src/lib/user-error.ts
+msgid "Too many email invitations today. Try again tomorrow."
+msgstr "Too many email invitations today. Try again tomorrow."

@@ -776,12 +776,14 @@ describeWithDatabase("API authorization and resource isolation", () => {
     const memberActor = await rpc<Actor>(app, member, "me");
 
     await handles.prisma.member.deleteMany({ where: { userId: memberActor.userId } });
+    // A second owner of the organization joins its default Space; an invited member would not
+    // (specs/space-members), and could not call these procedures there.
     await handles.prisma.member.create({
       data: {
         id: `approval-member-${stamp}`,
         organizationId: ownerActor.spaceId,
         userId: memberActor.userId,
-        role: "member",
+        role: "owner",
         createdAt: new Date(),
       },
     });
@@ -1347,24 +1349,17 @@ describeWithDatabase("API authorization and resource isolation", () => {
         createdAt: new Date(),
       },
     });
-    const memberNavigation = await rpc<SpaceNavigation>(
-      app,
-      memberCookie,
-      "spaces/list",
-      {},
-      shared.id,
-    );
-    expect(memberNavigation.spaces.find((space) => space.id === shared.id)).toMatchObject({
-      hasContent: true,
-      canDelete: false,
-      canRename: false,
-    });
+    // A Space someone else owns admits nothing while the deployment keeps Space members off
+    // (specs/space-members); with them on, only its people and invitations.
+    await expect(
+      raw(app, memberCookie, "spaces/list", {}, shared.id),
+    ).resolves.toMatchObject({ status: 401 });
     await expect(
       raw(app, memberCookie, "spaces/remove", { spaceId: shared.id }, shared.id),
-    ).resolves.toMatchObject({ status: 403 });
+    ).resolves.toMatchObject({ status: 401 });
     await expect(
       raw(app, memberCookie, "spaces/rename", { spaceId: shared.id, name: "Stolen" }, shared.id),
-    ).resolves.toMatchObject({ status: 403 });
+    ).resolves.toMatchObject({ status: 401 });
     await expect(
       handles.prisma.space.findUnique({ where: { id: shared.id }, select: { name: true } }),
     ).resolves.toEqual({ name: "Shared" });

@@ -223,6 +223,16 @@ import { SearchFilterSchema, SearchQueryOutputSchema, ThreadSearchOutputSchema }
 import { MessagePinSchema, MICO_PINS_LIST_LIMIT, MicoMessagePinSchema } from "./message-pins.js";
 import { SecurityEventListInputSchema, SecurityEventSchema } from "./security-events.js";
 import { SettingsScopeSchema, SpaceSettingSchema, settingsScopeInput } from "./settings-scope.js";
+import {
+  SpaceAuditEventSchema,
+  SpaceAuditInputSchema,
+  SpaceInvitationCreatedSchema,
+  SpaceInvitationCreateInputSchema,
+  SpaceInvitePreviewSchema,
+  SpaceInviteTokenSchema,
+  SpaceMemberRoleSchema,
+  SpaceMembersSchema,
+} from "./space-members.js";
 import { AgentUsageReportSchema, LastModelCallSchema, TaskCostSchema } from "./task-cost.js";
 
 const botId = z.object({ botId: Id });
@@ -412,6 +422,30 @@ export const appContract = {
     remove: oc
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
+    /**
+     * People in the request's Space (specs/space-members). Only while the deployment enables
+     * Space members; otherwise every procedure here answers NOT_FOUND.
+     */
+    members: {
+      list: oc.output(SpaceMembersSchema),
+      remove: oc.input(z.object({ userId: Id })).output(SpaceMembersSchema),
+      setRole: oc
+        .input(z.object({ userId: Id, role: SpaceMemberRoleSchema }))
+        .output(SpaceMembersSchema),
+      /** Leaves the request's Space; the owner cannot leave. */
+      leave: oc.output(z.object({ ok: z.literal(true) })),
+      /** Membership changes, newest first, for the owner and admins. */
+      audit: oc.input(SpaceAuditInputSchema).output(z.array(SpaceAuditEventSchema)),
+    },
+    invites: {
+      create: oc.input(SpaceInvitationCreateInputSchema).output(SpaceInvitationCreatedSchema),
+      revoke: oc.input(z.object({ invitationId: Id })).output(SpaceMembersSchema),
+      /** What an invitation link opens, for the signed-in account. */
+      preview: oc.input(z.object({ token: SpaceInviteTokenSchema })).output(SpaceInvitePreviewSchema),
+      accept: oc
+        .input(z.object({ token: SpaceInviteTokenSchema }))
+        .output(z.object({ spaceId: Id })),
+    },
   },
   bootstrap: oc.input(z.object({
     botId: Id.optional(), taskThreadId: Id.optional(), history: z.literal("recent").optional(),

@@ -63,6 +63,9 @@ const ArtifactsPage = lazyComponent(() =>
   import("./pages/Artifacts").then((module) => module.ArtifactsPage),
 );
 const BoardPage = lazyComponent(() => import("./pages/Board").then((module) => module.BoardPage));
+const SpaceInvitePage = lazyComponent(() =>
+  import("./pages/SpaceInvite").then((module) => module.SpaceInvitePage),
+);
 
 function SsoCallbackPage() {
   useEffect(() => {
@@ -212,6 +215,7 @@ function SessionApp() {
               }
             />
             <Route path="/reset-password" element={<PasswordResetPage />} />
+            <Route path="/join" element={<SpaceInvitePage signedIn={Boolean(user)} />} />
             <Route
               path="/mcp/oauth/callback"
               element={user ? <McpOAuthCallbackPage /> : <Navigate to="/sign-in" replace />}

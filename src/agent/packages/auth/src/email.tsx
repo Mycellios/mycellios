@@ -82,6 +82,33 @@ export function passwordResetEmail(
   );
 }
 
+/** A one-use invitation to someone's Space. Names stay out of the subject line. */
+export function spaceInvitationEmail(
+  email: string,
+  invitation: { inviterName: string; spaceName: string; url: string },
+): Promise<TransactionalEmail> {
+  const inviter = displayName(invitation.inviterName, "Someone").slice(0, 80);
+  const space = displayName(invitation.spaceName, "a space").slice(0, 60);
+  return message(
+    email,
+    `You are invited to a ${productBrand.shortName} space`,
+    <>
+      <Text>
+        {inviter} invited you to {space} on {productBrand.shortName}.
+      </Text>
+      <Text>
+        <Link href={invitation.url} style={linkStyle}>
+          Open invitation
+        </Link>
+      </Text>
+      <Text>
+        Sign in with this email address to join. The invitation expires in seven days. If you did
+        not expect it, ignore this email.
+      </Text>
+    </>,
+  );
+}
+
 export function accountDeletionEmail(email: string, code: string): Promise<TransactionalEmail> {
   return message(
     email,

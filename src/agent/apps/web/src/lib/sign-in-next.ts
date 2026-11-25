@@ -4,6 +4,8 @@
  */
 const DESTINATIONS = {
   "/integrations/setup": "/integrations/setup",
+  // A Space invitation; its token waits in the tab while the person signs in.
+  join: "/join",
   "api-keys": "/app?settings=api-keys",
   "api-plan": "/app?settings=api-plan",
   "api-usage": "/app?settings=api-usage",

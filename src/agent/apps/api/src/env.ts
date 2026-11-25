@@ -16,9 +16,11 @@ import type { MinimumClientBuilds } from "@mycellios/contracts";
 import {
   DEFAULT_MODEL_CONTEXT_WINDOW,
   DEFAULT_MODEL_MAX_TOKENS,
+  DEFAULT_SPACE_MEMBER_LIMIT,
   DESKTOP_VERSION_PATTERN,
   MAX_MODEL_CONTEXT_WINDOW,
   MAX_MODEL_MAX_TOKENS,
+  MAX_SPACE_MEMBER_LIMIT,
   parseMinimumClientBuilds,
 } from "@mycellios/contracts";
 import {
@@ -53,6 +55,11 @@ export interface AppEnv {
   desktopStackToken?: string;
   /** WhatsApp linked-device connector routes (specs/whatsapp-linked-device); off by default. */
   whatsappDeviceEnabled?: boolean;
+  /**
+   * People invited to Spaces (specs/space-members): MYCELLIOS_SPACE_MEMBERS_ENABLED, at most
+   * MYCELLIOS_SPACE_MEMBER_LIMIT people per Space. Off by default.
+   */
+  spaceMembers?: { limit: number };
   databaseUrl: string;
   realtimeDatabaseUrl: string;
   authSecret: string;
@@ -259,6 +266,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     realtimeDatabaseUrl: source.REALTIME_DATABASE_URL ?? required(source, "DATABASE_URL"),
     desktopStackToken: optional(readEnv("DESKTOP_STACK_TOKEN", source)),
     whatsappDeviceEnabled: source.MYCELLIOS_WHATSAPP_DEVICE_ENABLED === "true",
+    spaceMembers: spaceMembersFromEnv(source),
     authSecret,
     authUrl: source.BETTER_AUTH_URL ?? source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
     webOrigin: source.WEB_ORIGIN ?? "http://127.0.0.1:5173",
@@ -376,6 +384,17 @@ function browserMonitoringFromEnv(source: NodeJS.ProcessEnv): AppEnv["browserMon
     release: optional(source.SENTRY_RELEASE) ?? (sha === "unknown" ? undefined : sha),
     pseudonymSecret: monitoringPseudonymSecret(source),
   };
+}
+
+function spaceMembersFromEnv(source: NodeJS.ProcessEnv): AppEnv["spaceMembers"] {
+  if (source.MYCELLIOS_SPACE_MEMBERS_ENABLED !== "true") return undefined;
+  const raw = optional(source.MYCELLIOS_SPACE_MEMBER_LIMIT);
+  const limit = raw === undefined ? DEFAULT_SPACE_MEMBER_LIMIT : Number(raw);
+  if (!Number.isSafeInteger(limit) || limit < 2 || limit > MAX_SPACE_MEMBER_LIMIT)
+    throw new Error(
+      `MYCELLIOS_SPACE_MEMBER_LIMIT must be a whole number from 2 to ${MAX_SPACE_MEMBER_LIMIT}`,
+    );
+  return { limit };
 }
 
 /** An unguessable link code and a bounded number of places; both required together. */
