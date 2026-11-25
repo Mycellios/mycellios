@@ -691,9 +691,12 @@
   No open-conversation limit and nothing is archived automatically. finalizeRun,
   stopThreadRuns and expireStuckRun record outcome/lastError (2000 characters, never
   from background runs); the person's next message clears them.
-  Before task navigation, prime the destination's account/Space-scoped shell metadata
-  and only its own cached transcript. Keep immutable RPC/draft isolation, tab titles
-  and open-tab state across the scoped remount without a whole-page loading frame.
+  Before task navigation, including from the Projects sidebar, prime the
+  destination's account/Space-scoped shell metadata and only its own cached
+  transcript. Key the Projects list by the resolved Space so selecting a task in
+  the implicit primary Space keeps the same list on screen. Keep immutable
+  RPC/draft isolation, tab titles and open-tab state across the scoped remount
+  without a whole-page loading frame.
   A seeded tab switch reads the destination's history directly without duplicating it
   through bootstrap. Cold web history and bootstrap request the recent window.
   Inactive threads read 24 stored messages first and can page back normally.
