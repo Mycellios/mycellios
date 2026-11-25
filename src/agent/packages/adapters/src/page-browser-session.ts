@@ -29,8 +29,13 @@ const REOPEN_SAVED_SITE = "Open the saved site with browser_navigate, then fill 
 /** Saved usernames are typed only into these input types. Textareas stay out: a username is an input. */
 const USERNAME_INPUT_TYPES = new Set(["text", "email", "tel"]);
 
-/** A saved-login fill declined before the page changed; reported as settled, not uncertain. */
-class FillRefused extends Error {}
+/** A step declined before the page changed, such as a saved-login fill: settled, not uncertain. */
+class StepRefused extends Error {}
+
+/** Page text compared the way a wait compares it: case and runs of spaces ignored. */
+function plainText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
 
 type DomWindow = JSDOM["window"];
 type DomElement = InstanceType<DomWindow["Element"]>;
@@ -70,7 +75,17 @@ export class PageBrowserSession {
     return { url: this.url, title: this.title };
   }
 
-  snapshot(): BrowserSnapshotResult {
+  /** Part 0 is the whole page here: it lists every control, so there is never a later part. */
+  snapshot(from = 0): BrowserSnapshotResult {
+    if (from > 0) {
+      return {
+        url: this.url,
+        title: this.title,
+        tree: "",
+        elements: [],
+        error: `This page has 1 part(s), numbered from 0, so there is no part ${from}.`,
+      };
+    }
     const { elements, tree } = this.buildSnapshot();
     return {
       url: this.url,
@@ -83,8 +98,9 @@ export class PageBrowserSession {
   act(actions: BrowserActStep[]): BrowserActResult {
     let completed = 0;
     for (const action of actions) {
-      const el = this.refs.get(action.ref);
-      if (!el) {
+      const ref = "ref" in action ? action.ref : undefined;
+      const el = ref ? this.refs.get(ref) : undefined;
+      if (ref && !el) {
         const snap = this.snapshot();
         return {
           ok: false,
@@ -93,7 +109,7 @@ export class PageBrowserSession {
           title: snap.title,
           tree: snap.tree,
           elements: snap.elements,
-          error: `Unknown element ref "${action.ref}". Call browser_snapshot and use a fresh ref.`,
+          error: `Unknown element ref "${ref}". Call browser_snapshot and use a fresh ref.`,
           fallback: "computer_act",
         };
       }
@@ -109,7 +125,7 @@ export class PageBrowserSession {
           tree: snap.tree,
           elements: snap.elements,
           error: error instanceof Error ? error.message : String(error),
-          ...(error instanceof FillRefused
+          ...(error instanceof StepRefused
             ? { uncertain: false }
             : { fallback: "computer_act" as const }),
         };
@@ -127,8 +143,47 @@ export class PageBrowserSession {
     };
   }
 
-  private applyAction(el: DomElement, action: BrowserActStep): void {
+  private applyAction(target: DomElement | undefined, action: BrowserActStep): void {
     const win = this.dom.window;
+    const document = win.document;
+    if (action.kind === "dialog") {
+      throw new StepRefused(
+        "No dialog from your steps is open on this page, so there is nothing to answer.",
+      );
+    }
+    if (action.kind === "wait") {
+      // An in-process page does not change by itself, so a wait only checks it once.
+      const shown = plainText(document.body?.textContent ?? "");
+      const found = action.text !== undefined && shown.includes(plainText(action.text));
+      const met =
+        action.until === "quiet" ||
+        (action.until === "text" && found) ||
+        (action.until === "gone" && !found) ||
+        (action.until === "url" && action.text !== undefined && this.url.includes(action.text));
+      if (!met)
+        throw new StepRefused(`The page did not change as wait expected (${action.until}).`);
+      return;
+    }
+    if (action.kind === "press") {
+      const focused = target ?? document.activeElement ?? document.body;
+      if (target instanceof win.HTMLElement) target.focus();
+      const key = action.key.split("+").pop() ?? action.key;
+      for (const type of ["keydown", "keyup"]) {
+        focused?.dispatchEvent(
+          new win.KeyboardEvent(type, { key, bubbles: true, cancelable: true }),
+        );
+      }
+      return;
+    }
+    if (action.kind === "scroll") return;
+    // From here on, every step names an element.
+    const el = target as DomElement;
+    if (action.kind === "hover") {
+      for (const type of ["mouseover", "mouseenter", "mousemove"]) {
+        el.dispatchEvent(new win.MouseEvent(type, { bubbles: type !== "mouseenter" }));
+      }
+      return;
+    }
     if (action.kind === "upload") {
       if (!(el instanceof win.HTMLInputElement) || el.type !== "file") {
         throw new Error("upload needs a file upload element from browser_snapshot");
@@ -169,24 +224,24 @@ export class PageBrowserSession {
         try {
           saved = new URL(action.origin);
         } catch {
-          throw new FillRefused(`Website logins can only be filled on HTTPS. ${REOPEN_SAVED_SITE}`);
+          throw new StepRefused(`Website logins can only be filled on HTTPS. ${REOPEN_SAVED_SITE}`);
         }
         // Private-LAN HTTP never qualifies, even when the page origin matches.
         if (saved.protocol !== "https:" || page.protocol !== "https:") {
-          throw new FillRefused(`Website logins can only be filled on HTTPS. ${REOPEN_SAVED_SITE}`);
+          throw new StepRefused(`Website logins can only be filled on HTTPS. ${REOPEN_SAVED_SITE}`);
         }
         if (page.origin !== saved.origin) {
-          throw new FillRefused(
+          throw new StepRefused(
             `The page is not on the site this login was saved for. ${REOPEN_SAVED_SITE}`,
           );
         }
         const inputType = el instanceof win.HTMLInputElement ? el.type : "";
         // A password goes only into a password field, which never displays it.
         if (action.field !== "username" && inputType !== "password") {
-          throw new FillRefused("A saved password can only be typed into a password field.");
+          throw new StepRefused("A saved password can only be typed into a password field.");
         }
         if (action.field === "username" && !USERNAME_INPUT_TYPES.has(inputType)) {
-          throw new FillRefused(
+          throw new StepRefused(
             "A saved username can only be typed into a text, email, or telephone field.",
           );
         }

@@ -1,5 +1,11 @@
-/** The repository a stock Mycellios deployment tracks. */
-export const OFFICIAL_REPO_URL = "https://github.com/elie222/rakazo";
+import { SELF_HOST_REPOSITORY_URL } from "@mycellios/contracts";
+
+/**
+ * The repository a stock Mycellios deployment tracks: its `v<semver>` tags are the server releases
+ * and its CI publishes their images. Its other tags (`desktop-v*` installers, extension and model
+ * tags) never parse as releases.
+ */
+export const OFFICIAL_REPO_URL = SELF_HOST_REPOSITORY_URL;
 export const DEFAULT_UPDATE_BRANCH = "main";
 export const DEFAULT_UPDATE_REMOTE = "origin";
 
@@ -80,7 +86,7 @@ function normalizeRepoPath(raw: string): string | null {
   return segments.join("/");
 }
 
-/** `github.com/elie222/rakazo` for every spelling of the same remote, for comparison only. */
+/** `github.com/mycellios/mycellios` for every spelling of the same remote, for comparison only. */
 export function repoIdentity(url: string): string | null {
   const normalized = normalizeRepoUrl(url);
   if ("error" in normalized) return null;
@@ -208,26 +214,26 @@ export function updateSteps(input: UpdatePlanInput): UpdateStep[] {
     {
       id: "install",
       label: "Install dependencies",
-      command: "pnpm",
-      args: ["install", "--frozen-lockfile"],
+      command: "npm",
+      args: ["ci", "--no-audit", "--no-fund"],
     },
     {
       id: "generate",
       label: "Regenerate the database client",
-      command: "pnpm",
-      args: ["--filter", "@mycellios/db", "run", "generate"],
+      command: "npm",
+      args: ["run", "generate", "--workspace", "@mycellios/db"],
     },
     {
       id: "build",
       label: "Build the web app",
-      command: "pnpm",
-      args: ["--filter", "@mycellios/web", "run", "build"],
+      command: "npm",
+      args: ["run", "build", "--workspace", "@mycellios/web"],
     },
     {
       id: "migrate",
       label: "Apply database migrations",
-      command: "pnpm",
-      args: ["--filter", "@mycellios/db", "run", "migrate"],
+      command: "npm",
+      args: ["run", "migrate", "--workspace", "@mycellios/db"],
     },
   );
   return steps;

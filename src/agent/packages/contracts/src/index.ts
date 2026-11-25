@@ -49,6 +49,7 @@ export * from "./whatsapp-link.js";
 export * from "./search.js";
 export * from "./message-pins.js";
 export * from "./security-events.js";
+export * from "./self-host-images.js";
 export * from "./space-members.js";
 export * from "./task-cost.js";
 export * from "./projects.js";

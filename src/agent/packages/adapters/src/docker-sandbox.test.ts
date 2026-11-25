@@ -519,6 +519,26 @@ describe("Docker page browser", () => {
     );
   });
 
+  it("asks the conversation's computer what its page browser supports, and for later parts", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ ok: true, features: ["act.press"] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new DockerSandboxProvider("http://supervisor.test", "test-token");
+    const computer = { id: "computer", botId: "team-home", kind: "docker" as const, providerRef: "computer" };
+    const scoped = { ...context, browserThreadId: "owned-thread" };
+    expect(await provider.pageBrowser(computer, { command: "capabilities" }, scoped)).toEqual({
+      ok: true,
+      features: ["act.press"],
+    });
+    await provider.pageBrowser(computer, { command: "snapshot", from: 2 }, scoped);
+    const key = expect.stringMatching(/^[a-f0-9]{64}$/);
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, JSON.parse(String(init.body))])).toEqual([
+      ["http://supervisor.test/computers/computer/browser/scoped", { command: "capabilities", conversationKey: key }],
+      ["http://supervisor.test/computers/computer/browser/scoped", { command: "snapshot", from: 2, conversationKey: key }],
+    ]);
+  });
+
   it("uses the owned computer screen and lease instead of the generic exec endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json({ ok: true, title: "Fixture", url: "https://example.test" }),

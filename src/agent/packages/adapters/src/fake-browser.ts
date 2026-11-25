@@ -93,7 +93,7 @@ export class FakeBrowserProvider implements BrowserProvider {
 
   async snapshot(
     computer: ComputerRef,
-    _request: BrowserSnapshotRequest,
+    request: BrowserSnapshotRequest,
     context: AdapterContext,
   ): Promise<BrowserSnapshotResult> {
     if (this.forceFallback) {
@@ -107,7 +107,7 @@ export class FakeBrowserProvider implements BrowserProvider {
       };
     }
     if (this.snapshotError) throw this.snapshotError;
-    return this.sessions.get(pageBrowserSessionKey(computer, context)).snapshot();
+    return this.sessions.get(pageBrowserSessionKey(computer, context)).snapshot(request.from);
   }
 
   async act(

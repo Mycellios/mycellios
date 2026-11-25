@@ -688,8 +688,49 @@ describe("browser tools", () => {
     ],
     [
       "an unsupported kind",
-      [{ kind: "press", ref: "e1" }],
-      "browser_act action 0 needs kind: click, fill, type, upload, fill_secret",
+      [{ kind: "drag", ref: "e1" }],
+      "browser_act action 0 needs kind: click, fill, type, upload, fill_secret, press, scroll, hover, wait, dialog",
+    ],
+    [
+      "a press without its key",
+      [{ kind: "press" }],
+      "browser_act press needs key: Enter, Tab, Escape, Backspace, Delete, Space, an arrow key, a letter or digit, with modifiers like Shift+Tab or Control+A",
+    ],
+    [
+      "a press of an unknown key",
+      [{ kind: "press", key: "Hyper+Q" }],
+      "browser_act press needs key: Enter, Tab, Escape, Backspace, Delete, Space, an arrow key, a letter or digit, with modifiers like Shift+Tab or Control+A",
+    ],
+    [
+      "a scroll with neither ref nor direction",
+      [{ kind: "scroll" }],
+      "browser_act scroll needs ref (to bring it into view), direction, or both",
+    ],
+    [
+      "a scroll in an unknown direction",
+      [{ kind: "scroll", direction: "back" }],
+      "browser_act scroll direction must be up, down, left, right",
+    ],
+    ["a hover without its element", [{ kind: "hover" }], "browser_act action 0 requires ref"],
+    [
+      "a wait for nothing known",
+      [{ kind: "wait", until: "later" }],
+      "browser_act wait needs until: text, gone, url, quiet",
+    ],
+    [
+      "a wait for text without the text",
+      [{ kind: "wait", until: "text" }],
+      "browser_act wait until text needs text",
+    ],
+    [
+      "a wait for longer than a step may wait",
+      [{ kind: "wait", until: "quiet", timeout: 16 }],
+      "browser_act wait timeout is in seconds, at most 15",
+    ],
+    [
+      "a dialog answer that neither accepts nor dismisses",
+      [{ kind: "dialog", text: "Ada" }],
+      "browser_act dialog needs accept: true to accept (OK), false to dismiss (Cancel)",
     ],
     ["no actions", [], "browser_act requires at least one action"],
     [
@@ -780,6 +821,154 @@ describe("browser tools", () => {
       await browserSnapshotFromTool(browser, computer, context, {}, { desktopTools: true }),
     ).toMatchObject({ fallback: "computer_act", note: expect.stringContaining("computer_act") });
   });
+
+  it("parses keys, scrolls, hovers, waits and dialog answers into their steps", () => {
+    expect(
+      parseBrowserActions([
+        { kind: "press", key: " ctrl + shift+tab " },
+        { kind: "press", key: "enter", ref: "e1" },
+        { kind: "press", key: "a" },
+        { kind: "scroll", direction: "down" },
+        { kind: "scroll", ref: "e2", text: "ignored" },
+        { kind: "hover", ref: "e3" },
+        { kind: "wait", until: "text", text: "Saved", timeout: 2.5 },
+        { kind: "wait", until: "url" },
+        { kind: "wait", until: "quiet", ref: "e9" },
+        { kind: "dialog", accept: false },
+        { kind: "dialog", accept: true, text: "Ada" },
+      ]),
+    ).toEqual([
+      { kind: "press", key: "Control+Shift+Tab" },
+      { kind: "press", key: "Enter", ref: "e1" },
+      { kind: "press", key: "a" },
+      { kind: "scroll", direction: "down" },
+      { kind: "scroll", ref: "e2" },
+      { kind: "hover", ref: "e3" },
+      { kind: "wait", until: "text", text: "Saved", timeout: 2.5 },
+      { kind: "wait", until: "url" },
+      { kind: "wait", until: "quiet" },
+      { kind: "dialog", accept: false },
+      { kind: "dialog", accept: true, text: "Ada" },
+    ]);
+  });
+
+  it("returns the page's first snapshot with the navigation", async () => {
+    const browser = new FakeBrowserProvider({
+      pages: {
+        "https://example.test/first": {
+          title: "First",
+          html: `<!doctype html><html><head><title>First</title></head><body>
+            <button>Continue</button>
+          </body></html>`,
+        },
+      },
+    });
+    const navigated = await browserNavigateFromTool(browser, computer, context, {
+      url: "https://example.test/first",
+    });
+    expect(navigated).toMatchObject({ url: "https://example.test/first", title: "First" });
+    expect(String((navigated as { tree?: string }).tree)).toMatch(/button "Continue" \[e\d+\]/);
+    // A browser that read the page with the navigation is not asked for it again.
+    const live = new FakeBrowserProvider();
+    vi.spyOn(live, "navigate").mockResolvedValue({
+      url: "https://example.test/",
+      title: "Live",
+      tree: "Welcome",
+      elements: [],
+    });
+    const snapshot = vi.spyOn(live, "snapshot");
+    expect(
+      await browserNavigateFromTool(live, computer, context, { url: "https://example.test/" }),
+    ).toEqual({ url: "https://example.test/", title: "Live", tree: "Welcome", elements: [] });
+    expect(snapshot).not.toHaveBeenCalled();
+    // Without its snapshot, the navigation's own result stands.
+    const unread = new FakeBrowserProvider();
+    vi.spyOn(unread, "navigate").mockResolvedValue({
+      url: "https://example.test/",
+      title: "Read later",
+    });
+    vi.spyOn(unread, "snapshot").mockRejectedValue(new Error("socket closed"));
+    expect(
+      await browserNavigateFromTool(unread, computer, context, { url: "https://example.test/" }),
+    ).toEqual({ url: "https://example.test/", title: "Read later" });
+  });
+
+  it("reads a later part of a long page only with a part number", async () => {
+    const browser = new FakeBrowserProvider();
+    const snapshot = vi.spyOn(browser, "snapshot");
+    for (const from of [-1, 1.5, "2", 25]) {
+      expect(await browserSnapshotFromTool(browser, computer, context, { from })).toEqual({
+        ok: false,
+        uncertain: false,
+        error: "browser_snapshot from must be a part number from 0 to 24, as next names it",
+      });
+    }
+    expect(snapshot).not.toHaveBeenCalled();
+    await browserSnapshotFromTool(browser, computer, context, { from: 3 });
+    await browserSnapshotFromTool(browser, computer, context, { from: 0 });
+    expect(snapshot.mock.calls.map((call) => call[1].from)).toEqual([3, undefined]);
+  });
+
+  it.each([true, false])(
+    "says how to do a step an older computer cannot run (desktop tools: %s)",
+    async (desktopTools) => {
+      const browser = new FakeBrowserProvider();
+      vi.spyOn(browser, "act").mockResolvedValue({
+        ok: false,
+        completed: 1,
+        uncertain: false,
+        url: "https://example.test/",
+        title: "Example",
+        unsupported: "press",
+        error:
+          "This computer's page browser cannot press keys yet: it needs a newer computer image. The 1 step(s) before it ran.",
+      });
+      const result = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        {
+          actions: [
+            { kind: "click", ref: "e1" },
+            { kind: "press", key: "Enter" },
+          ],
+        },
+        { desktopTools },
+      );
+      expect(result).toMatchObject({
+        ok: false,
+        completed: 1,
+        uncertain: false,
+        unsupported: "press",
+      });
+      expect((result as { note: string }).note).toContain(
+        desktopTools ? "computer_act" : "request_takeover",
+      );
+      expect(result).not.toHaveProperty("fallback");
+      vi.spyOn(browser, "snapshot").mockResolvedValue({
+        url: "",
+        title: "",
+        tree: "",
+        elements: [],
+        unsupported: "snapshot.from",
+        error:
+          "This computer's page browser cannot read past the first part of a long page yet: it needs a newer computer image.",
+      });
+      expect(
+        (
+          (await browserSnapshotFromTool(
+            browser,
+            computer,
+            context,
+            { from: 1 },
+            { desktopTools },
+          )) as {
+            note: string;
+          }
+        ).note,
+      ).toContain(desktopTools ? "computer_observe" : "request_takeover");
+    },
+  );
 
   it("hides page browser tools when the computer is not graphical", () => {
     const tools = [...PAGE_BROWSER_TOOL_NAMES].map((name) => ({ name }));
