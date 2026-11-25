@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - ".github/workflows/native-engine-canary.yml"
+      - "src/agent/packages/adapters/src/native-agent-errors.ts"
       - "src/agent/packages/adapters/src/native-agent-process.ts"
       - "src/agent/packages/adapters/src/native-engine-store.ts"
       - "src/agent/packages/adapters/src/native-engines.*.json"
+      - "src/agent/packages/adapters/src/native-login-path.ts"
+      - "src/agent/packages/adapters/src/native-signin.ts"
       - "src/agent/scripts/native-engine-canary.ts"
   schedule:
     - cron: "32 5 * * *"
@@ -40,5 +43,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: node --import tsx scripts/native-engine-canary.ts ${{ matrix.target }}
+      - name: Install locked canary dependencies
+        # Zod comes from contracts and tsx from the workspace root.
+        run: npm ci --workspace @mycellios/contracts --include-workspace-root --ignore-scripts --no-audit --no-fund
+      - name: Verify vendor downloads and native CLI startup
+        run: node --import tsx scripts/native-engine-canary.ts ${{ matrix.target }}

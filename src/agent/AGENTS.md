@@ -533,7 +533,8 @@
   target package in that lock with the same checks. Check the bundled and published blocklist
   before a managed executable starts. Existing turns keep their version and new turns wait while
   an update is being verified. The hosted native-engine canary tests each target without model
-  requests. Downloads are verified before unpacking into staging, every file's SHA-256 is
+  requests. Its locked npm install is scoped to contracts and the workspace root.
+  Downloads are verified before unpacking into staging, every file's SHA-256 is
   recorded and `--version` checked before the folder is used, and again before a session's first
   start. No administrator rights, global npm or CLI updater. Resolution: an absolute
   native-agents.json command, then the newer of the managed copy and PATH (the person's CLI wins
