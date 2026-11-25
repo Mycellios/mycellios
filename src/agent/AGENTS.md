@@ -711,7 +711,13 @@
   Requests open bot_message_requests/recipients (ids and states only). Answers to a
   multi-recipient request are held and released as one turn under the request row lock,
   naming who did not answer; stopThreadRuns and the job reconciler settle stopped
-  recipients, and a request nobody answered starts no turn. "Waiting for replies"
+  recipients, and a request nobody answered starts no turn. A bot_message turn that an update
+  or lost PC connection cut off (isInterruptedRunError) starts again from finalizeRun's commit
+  (queueBotMessageRecoveryInTransaction): a fresh run on the same message (nonce
+  bot-message-recovery:<failed run>, INTERRUPTED_TURN_RECOVERY_DELAYS_MS, recovery note), which
+  takes over the recipient row and the answers it read; the cut-off run returns no failure
+  (botOutcomeReturnedAt), never a replay. Not for FYIs or turns that already answered, opened
+  tasks or delegated work; only the failure that ends recovery reaches the teammate. "Waiting for replies"
   (tasks.awaitingReplies) reuses the person's Stop and the revisioned work controls
   (Continue = resume). list_agents is read-only; interrupt_agent stops only turns working on
   the caller's own messages, through the durable Stop, and refuses the rest. Groups keep a
