@@ -466,6 +466,17 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   }),
   z.object({
     /**
+     * A webhook routine a Mico created from the person's message. The card shows the routine's
+     * address and offers its secret once, read from the server when the person asks for it; the
+     * secret is never part of a message, an event or the model's history.
+     */
+    kind: z.literal("routine_webhook"),
+    routineId: Id,
+    /** The routine's name when it was created. */
+    routineName: z.string().max(80),
+  }),
+  z.object({
+    /**
      * Where the copied history of a branched conversation ends, shown as a divider that links
      * back to the place it was copied from. A system message right after the copies.
      */

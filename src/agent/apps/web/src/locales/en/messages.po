@@ -15313,3 +15313,18 @@ msgstr "No Micos have been shared with you."
 #: src/pages/SpaceMicosPanel.tsx
 msgid "Close conversation"
 msgstr "Close conversation"
+#: src/components/RoutineWebhookCard.tsx
+msgid "Copy webhook URL"
+msgstr "Copy webhook URL"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Show secret once"
+msgstr "Show secret once"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Hide secret"
+msgstr "Hide secret"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "The secret is unavailable. You can rotate it in the routine editor."
+msgstr "The secret is unavailable. You can rotate it in the routine editor."

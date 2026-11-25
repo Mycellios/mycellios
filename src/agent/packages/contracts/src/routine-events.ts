@@ -16,6 +16,11 @@ export const ROUTINE_EVENT_RECEIPT_DAYS = 7;
 export const ROUTINE_WEBHOOK_PREVIOUS_SECRET_HOURS = 24;
 /** A signed event's timestamp may be this far from the server's clock, either way. */
 export const ROUTINE_EVENT_TOLERANCE_SECONDS = 5 * 60;
+/**
+ * A secret a Mico created with a webhook routine from the person's message can be shown once on
+ * its chat card within this time. Afterwards only a rotation in the routine editor shows one.
+ */
+export const ROUTINE_WEBHOOK_REVEAL_HOURS = 24;
 
 /** The URL path a routine's signed events are posted to. */
 export function routineEventsPath(routineId: string): string {
@@ -65,8 +70,25 @@ export const RoutineWebhookStateSchema = z.object({
   previousSecretExpiresAt: IsoDate.nullable(),
   eventType: z.string().nullable(),
   filters: RoutineEventFiltersSchema,
+  /**
+   * Until this time the chat card of a routine a Mico created can show its current secret once;
+   * null once shown, after a rotation and for secrets made in the editor. Absent from older
+   * servers.
+   */
+  revealUntil: IsoDate.nullable().optional(),
 });
 export type RoutineWebhookState = z.infer<typeof RoutineWebhookStateSchema>;
+
+/** A webhook routine as its chat card shows it now. */
+export const RoutineWebhookCardSchema = z.object({
+  routineId: Id,
+  botId: Id,
+  name: z.string(),
+  /** False once its webhook was turned off: events to its address are refused. */
+  webhookEnabled: z.boolean(),
+  webhook: RoutineWebhookStateSchema,
+});
+export type RoutineWebhookCard = z.infer<typeof RoutineWebhookCardSchema>;
 
 /** A signed event that started nothing, from the routine's 7-day receipts. */
 export const RoutineIgnoredEventSchema = z.object({

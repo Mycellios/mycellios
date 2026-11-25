@@ -17,6 +17,7 @@ import {
 import { SubagentCard } from "../../components/SubagentCard";
 import { TaskReportCard } from "../../components/TaskReportCard";
 import { RoutineRunMarker } from "../../components/RoutineRunMarker";
+import { RoutineWebhookCard } from "../../components/RoutineWebhookCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
   StandaloneToolActivity,
@@ -436,6 +437,9 @@ export const MessageView = memo(function MessageView({
                 locale={i18n.locale || "en"}
               />
             );
+          }
+          if (block.kind === "routine_webhook") {
+            return <RoutineWebhookCard key={i} routineId={block.routineId} name={block.routineName} />;
           }
           if (block.kind === "task_brief") {
             // What the Mico wrote into a conversation it opened: the brief or a follow-up.

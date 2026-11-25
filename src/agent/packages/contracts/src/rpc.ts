@@ -223,6 +223,7 @@ import { MessageReactionSchema } from "./reactions.js";
 import {
   RoutineEventFiltersSchema,
   RoutineEventTypeSchema,
+  RoutineWebhookCardSchema,
   RoutineWebhookStateSchema,
 } from "./routine-events.js";
 import { RoutineWatchSchema } from "./routine-watch.js";
@@ -1256,6 +1257,12 @@ export const appContract = {
     revokeWebhookSecret: oc
       .input(z.object({ routineId: Id }))
       .output(z.object({ webhook: RoutineWebhookStateSchema })),
+    webhookCard: oc
+      .input(z.object({ routineId: Id }))
+      .output(RoutineWebhookCardSchema),
+    revealWebhookSecret: oc
+      .input(z.object({ routineId: Id }))
+      .output(z.object({ secret: z.string() })),
     /** Signs a sample event with the routine's secret and starts a test run from it. */
     sendTestEvent: oc
       .input(

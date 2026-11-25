@@ -104,6 +104,15 @@ describe("Standard Webhooks signatures", () => {
 });
 
 describe("routineWebhookState", () => {
+  it("only shows the reveal deadline of an active secret within the reveal window", () => {
+    const now = new Date("2026-11-25T12:00:00Z");
+    const routine = { webhookEventType: null, webhookFilters: null };
+    const secret = { createdAt: now, expiresAt: null, revealUntil: new Date(now.getTime() + 1000) };
+    expect(routineWebhookState(routine, [secret], now).revealUntil).toBe(secret.revealUntil.toISOString());
+    expect(routineWebhookState(routine, [secret], secret.revealUntil).revealUntil).toBeNull();
+    expect(routineWebhookState(routine, [{ ...secret, expiresAt: secret.revealUntil }], now).revealUntil).toBeNull();
+  });
+
   it("shows when the secret was made and until when the previous one works, never the secret", () => {
     const now = new Date("2026-11-25T12:00:00Z");
     const state = routineWebhookState(
@@ -120,12 +129,14 @@ describe("routineWebhookState", () => {
       previousSecretExpiresAt: "2026-11-26T11:00:00.000Z",
       eventType: "invoice.paid",
       filters: [{ pointer: "/status", value: "paid" }],
+      revealUntil: null,
     });
     expect(routineWebhookState({ webhookEventType: null, webhookFilters: null }, [], now)).toEqual({
       secretCreatedAt: null,
       previousSecretExpiresAt: null,
       eventType: null,
       filters: [],
+      revealUntil: null,
     });
   });
 });
