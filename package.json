@@ -50,6 +50,7 @@
     "compile:python-launch": "tsx src/distribution/python-launcher-cli.ts",
     "model:auto-distribute": "tsx src/distribution/auto-distribute-cli.ts",
     "preflight:two-host": "tsx src/distribution/two-host-preflight-cli.ts",
+    "evidence:two-host": "tsx scripts/two-host-receipt.ts",
     "plan:macro-wave": "tsx src/distribution/macro-wave-cli.ts",
     "profile:model": "powershell -ExecutionPolicy Bypass -File scripts/profile-distributed-model.ps1",
     "compile:cell-fixture": "powershell -ExecutionPolicy Bypass -File scripts/compile-cell-fixture.ps1",

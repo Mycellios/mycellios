@@ -1,4 +1,10 @@
 {
   "schema": "mycellios-physical-evidence-trust/1",
-  "keys": []
+  "keys": [
+    {
+      "keyId": "home-lab-1",
+      "publicKeySpki": "MCowBQYDK2VwAyEAUQAL7xl2NvloMlYgHxMNcor78GPwDNolkzCVO-fQeCY",
+      "status": "active"
+    }
+  ]
 }
