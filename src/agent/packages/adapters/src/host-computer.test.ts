@@ -654,3 +654,37 @@ it("signs the PC's CLIs in only with local consent and passes on only a checked 
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
   }
 });
+
+it("installs a missing CLI only with local consent and passes on only a checked answer", async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-host-install-")));
+  const nativeEngineInstall = vi.fn().mockResolvedValue({ status: "installing" });
+  const release = { engine: "claude" as const, version: "2.1.326", source: "npm" as const,
+    package: "@anthropic-ai/claude-code-win32-x64", bytes: 174_663_115 };
+  const agentRuntime = {
+    describe: () => ({ id: "fixture", contractVersion: "1", adapterVersion: "1", capabilities: { streaming: true, tools: true, compaction: true, scripted: true } }),
+    abort: vi.fn(), async *run() {},
+    nativeEngineState: async () => ({ engines: ["codex" as const], signedOut: [], install: true,
+      installable: [release],
+      installs: [{ engine: "claude" as const, state: "downloading" as const, receivedBytes: 10, totalBytes: 174_663_115 }] }),
+    nativeEngineInstall,
+  };
+  const server = await startHostComputerServer({ root, token, hostname: "127.0.0.1", agentRuntime });
+  const client = new HostComputerSandbox(`http://127.0.0.1:${server.port}`, token);
+  const scoped = { ...context, botId: "test-bot" };
+  try {
+    await expect(client.nativeEngineInstall(scoped, { engine: "claude" })).rejects.toThrow();
+    expect(nativeEngineInstall).not.toHaveBeenCalled();
+    server.setEnabled(true);
+    expect(await client.nativeEngineState(scoped)).toMatchObject({ engines: ["codex"], install: true, installable: [release],
+      installs: [{ engine: "claude", state: "downloading", receivedBytes: 10, totalBytes: 174_663_115 }] });
+    await expect(client.nativeEngineInstall(scoped, { engine: "claude" })).resolves.toEqual({ status: "installing" });
+    expect(nativeEngineInstall).toHaveBeenCalledWith({ engine: "claude" });
+    nativeEngineInstall.mockResolvedValueOnce({ status: "installed", path: "/private/store" });
+    await expect(client.nativeEngineInstall(scoped, { engine: "claude" })).resolves.toEqual({ status: "installed" });
+    nativeEngineInstall.mockResolvedValueOnce({ status: "copied" });
+    await expect(client.nativeEngineInstall(scoped, { engine: "claude" })).rejects.toThrow("invalid install answer");
+  } finally {
+    await server.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  }
+});

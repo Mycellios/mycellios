@@ -7,17 +7,17 @@ vi.mock("@mycellios/adapters", () => ({
   signedOutEngines: (engines: Array<{ id: string; signedIn?: boolean }>) => engines.flatMap(engine => engine.signedIn === false ? [engine.id] : []),
   nativeEngineModels: (engines: Array<{ id: string; models?: unknown }>) => Object.fromEntries(engines.flatMap(engine => engine.models ? [[engine.id, engine.models]] : [])),
   defaultLocalEngine: (signedIn: string[] = []) => ["claude", "codex"].find(engine => signedIn.includes(engine)),
-  installManagedOpenCode: vi.fn(), reconcileWorkStops: vi.fn(),
+  installNativeEngine: vi.fn(), nativeEngineStoreRoot: vi.fn(), reconcileWorkStops: vi.fn(),
 }));
 import { localCapabilityRoutes } from "./routes/local-capabilities.js";
 import type { RouterContext } from "./routes/context.js";
 import { localEngineForNewMico } from "./routes/shared.js";
 import type { RouterDeps } from "./router.js";
 beforeEach(() => { fixtures.allowed = true; fixtures.read.mockReset().mockResolvedValue(null); fixtures.access.mockClear(); });
-function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn>; nativeEngineAccount?: ReturnType<typeof vi.fn>; nativeEngineUsage?: ReturnType<typeof vi.fn> }) {
+function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn>; nativeEngineAccount?: ReturnType<typeof vi.fn>; nativeEngineUsage?: ReturnType<typeof vi.fn>; nativeEngineInstall?: ReturnType<typeof vi.fn> }) {
   const procedure = { handler: (handler: unknown) => handler };
-  const authed = { engines: { forBot: procedure, account: procedure, codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
-  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState, nativeEngineAccount: dependencies?.nativeEngineAccount, nativeEngineUsage: dependencies?.nativeEngineUsage } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
+  const authed = { engines: { forBot: procedure, account: procedure, install: procedure, codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
+  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState, nativeEngineAccount: dependencies?.nativeEngineAccount, nativeEngineUsage: dependencies?.nativeEngineUsage, nativeEngineInstall: dependencies?.nativeEngineInstall } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
 }
 function route() {
   return routes().engines.codexQuota as unknown as (input: { context: { actor: { userId: string; spaceId: string } } }) => Promise<unknown>;
@@ -153,4 +153,42 @@ it("signs a CLI in or out only on the owner's own PC and never passes raw diagno
       .rejects.toThrow("This Mico does not run on your PC.");
   }
   expect(nativeEngineAccount).toHaveBeenCalledTimes(4);
+});
+
+it("lists the missing CLIs the owner's PC can install, passing on only well-formed reports", async () => {
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const release = { engine: "claude", version: "2.1.326", source: "npm", package: "@anthropic-ai/claude-code-darwin-arm64", bytes: 160_222_918 };
+  const nativeEngineState = vi.fn().mockResolvedValue({ engines: ["codex"], signedOut: [], account: true, install: true,
+    installable: [release, { ...release, engine: "codex" }, { ...release, engine: "gemini" }, { ...release, package: "../escape" }],
+    installs: [{ engine: "claude", state: "downloading", receivedBytes: 1, totalBytes: 160_222_918 },
+      { engine: "claude", state: "failed", error: "first line\nsecond line" }] });
+  const list = routes({ getBot, nativeEngineState }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
+  expect(await list({ context: { actor: { userId: "user", spaceId: "space" } }, input: { botId: "mico" } })).toEqual({
+    computer: "desktop", engines: ["codex"], signedOut: [], models: {}, account: true, install: true,
+    installable: [release], installing: [{ engine: "claude", state: "downloading", receivedBytes: 1, totalBytes: 160_222_918 }],
+  });
+});
+
+it("installs a CLI only on the owner's own PC and never passes raw diagnostics on", async () => {
+  const actor = { userId: "user", spaceId: "space" };
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const nativeEngineInstall = vi.fn().mockResolvedValue({ status: "installing" });
+  const install = routes({ getBot, nativeEngineInstall }).engines.install as unknown as (arg: unknown) => Promise<unknown>;
+  const request = { context: { actor }, input: { botId: "mico", engine: "claude" } };
+  expect(await install(request)).toEqual({ status: "installing" });
+  expect(getBot).toHaveBeenCalledWith(actor, "mico");
+  expect(nativeEngineInstall).toHaveBeenCalledWith(expect.objectContaining({ ...actor, botId: "mico" }), { engine: "claude" });
+
+  nativeEngineInstall.mockRejectedValueOnce(new Error("Its maker publishes no version for this PC."));
+  await expect(install(request)).rejects.toThrow("Its maker publishes no version for this PC.");
+  nativeEngineInstall.mockRejectedValueOnce(new Error("Invalid enum value. Expected 'environment' | 'execute', received 'engineInstall'"));
+  await expect(install(request)).rejects.toThrow("That PC could not install it. Update Mycellios on it and try again.");
+  nativeEngineInstall.mockRejectedValueOnce(new Error("Local computer disconnected. Check the result before retrying."));
+  await expect(install(request)).rejects.toThrow("Your PC is not connected.");
+
+  for (const computer of [{ kind: "docker", scope: "isolated" }, { kind: "desktop", scope: "isolated" }, null]) {
+    getBot.mockResolvedValueOnce({ id: "mico", computer });
+    await expect(install(request)).rejects.toThrow("This Mico does not run on your PC.");
+  }
+  expect(nativeEngineInstall).toHaveBeenCalledTimes(4);
 });

@@ -177,6 +177,10 @@ import {
   NativeEngineModelSchema,
   NativeAccountEngineSchema,
   NativeEngineAccountResultSchema,
+  NativeInstallEngineSchema,
+  NativeEngineInstallableSchema,
+  NativeEngineInstallProgressSchema,
+  NativeEngineInstallResultSchema,
 } from "./domain.js";
 import {
   MemoryConnectionCreateInput,
@@ -491,7 +495,18 @@ export const appContract = {
       }).optional(),
       /** The PC can sign its CLIs in and out from here (engines.account). Older servers omit it. */
       account: z.boolean().optional(),
+      /** The PC can install a missing CLI from here (engines.install). Older servers omit it. */
+      install: z.boolean().optional(),
+      /** Missing CLIs that PC can install, with the pinned version, vendor package and size. */
+      installable: z.array(NativeEngineInstallableSchema).optional(),
+      /** Installs running on that PC, or why the last one failed. */
+      installing: z.array(NativeEngineInstallProgressSchema).optional(),
     })),
+    /**
+     * Installs a missing Codex, Claude Code or OpenCode on the PC that runs this Mico, for its owner,
+     * from the vendor's channel pinned in that PC's lock file. The PC reports progress in forBot.
+     */
+    install: oc.input(z.object({ botId: Id, engine: NativeInstallEngineSchema })).output(NativeEngineInstallResultSchema),
     /**
      * Signs Codex or Claude Code in or out on the PC that runs this Mico, for its owner.
      * `browser` opens the CLI's sign-in on that PC; `device` returns a one-time code (Codex).

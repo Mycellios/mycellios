@@ -16,6 +16,7 @@ import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-cata
 import { ProviderLogo } from "../../components/ProviderLogo";
 import { MycelliosProvider } from "../model-settings/mycellios-provider";
 import { NativeEngineAccount } from "./native-engine-account";
+import { NativeEngineInstall } from "./native-engine-install";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
@@ -142,22 +143,29 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   // A saved first-party model identifies Mycellios even before discovery returns.
   const currentProvider = nativeName ?? (model?.startsWith("mycellios/") || credential && isMycelliosBaseUrl(credential.baseUrl)
     ? "Mycellios" : connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? entry?.providerName ?? provider);
+  const engineState = enginesQuery.data;
+  // A CLI missing on the owner's PC keeps its provider, with Install (older Desktops cannot install).
+  const installable = engineState?.computer === "desktop" && engineState.install ? engineState.installable ?? [] : [];
   // The saved engine remains visible when its host is temporarily unavailable.
   const nativeProviders = [...new Set<NativeProvider>([
-    ...(enginesQuery.data?.engines ?? []),
+    ...(engineState?.engines ?? []),
     ...(nativeEngine ? [nativeEngine] : []),
+    ...installable.map(release => release.engine),
   ])];
-  // A CLI that reported nobody signed in would fail its first turn: say why instead.
+  // A CLI that is missing or reported nobody signed in would fail its first turn: say why instead.
   // The Mico's current engine stays selectable so its saved choice is never hidden.
-  const signedOut = new Set<string>(enginesQuery.data?.signedOut ?? []);
-  const signInRequired = (engine: NativeProvider) => signedOut.has(engine) && engine !== nativeEngine
-    ? { unavailable: true, unavailableLabel: t`Sign in required` } : {};
+  const signedOut = new Set<string>(engineState?.signedOut ?? []);
+  const missing = new Set<string>(installable.map(release => release.engine));
+  const signInRequired = (engine: NativeProvider) => engine === nativeEngine ? {}
+    : missing.has(engine) ? { unavailable: true, unavailableLabel: t`Not installed` }
+      : signedOut.has(engine) ? { unavailable: true, unavailableLabel: t`Sign in required` } : {};
   // The PC's own CLI signs in and out from the provider it belongs to (older Desktops cannot).
-  const engineState = enginesQuery.data;
   const accountEngine = engineState?.computer === "desktop" && engineState.account
     ? (["codex", "claude"] as const).find(engine =>
       NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && engineState.engines.includes(engine))
     : undefined;
+  const installRelease = installable.find(release => NATIVE_PROVIDERS[release.engine] === (lastProvider ?? currentProvider));
+  const installProgress = installRelease && engineState?.installing?.find(item => item.engine === installRelease.engine);
   // An engine whose CLI listed its models offers each one; otherwise its account default.
   const listed = (engine: NativeProvider) => engine === "codex" || engine === "claude" ? engineModels(engine) : [];
   const nativeChoices = nativeProviders.filter(engine => !listed(engine).length).map(engine => ({
@@ -323,6 +331,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           </label> : null}
           {!recovery && accountEngine ? <NativeEngineAccount botId={bot.id} engine={accountEngine}
             signedOut={signedOut.has(accountEngine)} onChanged={refreshEngines} /> : null}
+          {!recovery && installRelease ? <NativeEngineInstall botId={bot.id} release={installRelease}
+            progress={installProgress} onChanged={refreshEngines} /> : null}
           {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
           {!recovery && me && !queryError && (lastProvider ?? currentProvider) !== "Mycellios" ? <div className="border-t border-border px-4 py-3">
             <Button variant="ghost" size="sm" disabled={saving} onClick={() => {

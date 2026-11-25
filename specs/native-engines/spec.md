@@ -129,6 +129,14 @@ the store from phase 3.
    - A scheduled CI canary installs each engine's newest release per target,
      verifies it, starts it and runs the protocol handshake without an account or
      a model call. A failing version reaches the blocklist through a pull request.
+   - Implemented (3a): the store, lock file, resolution and Install in the model menu.
+     `native-engines.lock.json` pins Codex, Claude Code (its npm `stable` tag) and
+     OpenCode 1.19.5 for Windows x64/arm64, macOS arm64/x64 and Linux x64/arm64 from
+     their npm packages (`scripts/native-engine-lock.mjs`); `native-engine-store.ts`
+     installs and checks them, `native-engine-resolve.ts` applies the resolution order,
+     and `engines.install` reaches the owned Desktop's `engineInstall`. Update checks,
+     the blocklist, holding turns during an update, Install in Settings and the canary
+     remain.
 4. Phase 4 — several conversations at once.
    - `micoTurnLimit` uses `taskConcurrency` for native engines too, and their
      main chat becomes its own lane, as for Pi (`claimMicoRun`). Each conversation

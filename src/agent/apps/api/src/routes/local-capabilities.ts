@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import {
-  canInstallNativeOpenCode, discoverNativeCodexModels, discoverNativeCodexQuota, discoverNativeEngines, installManagedOpenCode,
-  nativeHostAccess, reconcileWorkStops,
+  canInstallNativeOpenCode, discoverNativeCodexModels, discoverNativeCodexQuota, discoverNativeEngines, installNativeEngine,
+  nativeEngineStoreRoot, nativeHostAccess, reconcileWorkStops,
 } from "@mycellios/adapters";
 import { createTaskControls } from "../task-controls.js";
 import { createAcpRegistry } from "../acp-registry.js";
@@ -14,12 +14,13 @@ import type { RouterContext } from "./context.js";
 import { codingEnginesForComputer, computerContext } from "./shared.js";
 
 /** The PC's own short explanation when it gave one, else a plain fallback; never raw diagnostics. */
-export function engineAccountFailure(error: unknown) {
+export function engineAccountFailure(error: unknown,
+  fallback = "That PC could not sign in. Update Mycellios on it and try again.") {
   const message = error instanceof Error ? error.message.trim() : "";
   if (/disconnected|offline|unreachable|not connected|timed out|aborted/i.test(message))
     return "Your PC is not connected. Open Mycellios on it and try again.";
   if (message && message.length <= 160 && !/[\n{}[\]]|error:|zod|invalid enum|expected/i.test(message)) return message;
-  return "That PC could not sign in. Update Mycellios on it and try again.";
+  return fallback;
 }
 
 export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
@@ -46,6 +47,21 @@ export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
           return await deps.sandbox.nativeEngineAccount({ ...base, signal }, request);
         } catch (error) {
           throw new ORPCError("SERVICE_UNAVAILABLE", { message: engineAccountFailure(error) });
+        }
+      }),
+      install: authed.engines.install.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        // Only the owner's own PC, as for sign-in; a server's CLIs keep their operator's grant.
+        if (bot.computer?.kind !== "desktop" || bot.computer.scope === "isolated" || !deps.sandbox.nativeEngineInstall)
+          throw new ORPCError("BAD_REQUEST", { message: "This Mico does not run on your PC." });
+        const base = computerContext(context.actor, bot.id, "engine-install");
+        const signal = AbortSignal.any([context.signal ?? base.signal, AbortSignal.timeout(45_000)]);
+        try {
+          return await deps.sandbox.nativeEngineInstall({ ...base, signal }, { engine: input.engine });
+        } catch (error) {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: engineAccountFailure(error, "That PC could not install it. Update Mycellios on it and try again."),
+          });
         }
       }),
       codexQuota: authed.engines.codexQuota.handler(async ({ context, input }) => {
@@ -84,7 +100,7 @@ export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
           throw new ORPCError("FORBIDDEN");
         }
         try {
-          await installManagedOpenCode(deps.dataDir);
+          await installNativeEngine(nativeEngineStoreRoot(deps.dataDir), "opencode");
         } catch {
           throw new ORPCError("SERVICE_UNAVAILABLE", { message: "OpenCode could not be installed." });
         }

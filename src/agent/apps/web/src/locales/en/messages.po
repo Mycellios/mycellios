@@ -15157,3 +15157,23 @@ msgstr "Verify your email address to accept this invitation."
 #: src/lib/user-error.ts
 msgid "Too many email invitations today. Try again tomorrow."
 msgstr "Too many email invitations today. Try again tomorrow."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name}"
+msgstr "Install {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name} {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs."
+msgstr "Install {name} {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install"
+msgstr "Install"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Downloading {name}: {received} of {total}"
+msgstr "Downloading {name}: {received} of {total}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Checking {name}…"
+msgstr "Checking {name}…"

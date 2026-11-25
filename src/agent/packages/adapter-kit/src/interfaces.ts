@@ -1,4 +1,7 @@
-import type { AccountPlanLimit, ConnectionIdentity, NativeEngineAccountRequest, NativeEngineAccountResult } from "@mycellios/contracts";
+import type {
+  AccountPlanLimit, ConnectionIdentity, NativeEngineAccountRequest, NativeEngineAccountResult, NativeEngineInstallRequest,
+  NativeEngineInstallResult,
+} from "@mycellios/contracts";
 import type {
   AdapterContext,
   AdapterDescriptor,
@@ -115,6 +118,8 @@ export interface SandboxProvider {
   nativeEngineAccount?(context: AdapterContext, request: NativeEngineAccountRequest): Promise<NativeEngineAccountResult>;
   /** Plan usage of the PC's signed-in CLIs (allowlisted limit fields only); older hosts refuse it. */
   nativeEngineUsage?(context: AdapterContext): Promise<{ codex?: AccountPlanLimit }>;
+  /** Installs a missing CLI on the PC for the person; only hosts reporting `install` serve it. */
+  nativeEngineInstall?(context: AdapterContext, request: NativeEngineInstallRequest): Promise<NativeEngineInstallResult>;
   /** Native command environment; omitted for providers with a fixed container environment. */
   environment?(
     computer: ComputerRef,
@@ -332,6 +337,8 @@ export interface AgentRuntime {
   nativeEngineAccount?(request: NativeEngineAccountRequest): Promise<NativeEngineAccountResult>;
   /** Plan usage of this host's signed-in CLIs, read without a model call. */
   nativeEngineUsage?(): Promise<{ codex?: AccountPlanLimit }>;
+  /** Starts installing a missing CLI into this host's store, from the vendor channel its lock file pins. */
+  nativeEngineInstall?(request: NativeEngineInstallRequest): Promise<NativeEngineInstallResult>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,
