@@ -31,6 +31,7 @@ import { type NativeProcessSlots, nativeProcessWaitText } from "./native-process
 import { resolveNativeEngine } from "./native-engine-resolve.js";
 import type { NativeEngineStoreOptions } from "./native-engine-store.js";
 import { nativeEngineRelease, nativeEngineStoreRoot } from "./native-engine-store.js";
+import { type NativeEngineUpdateGate, nativeEngineUpdateWaitText } from "./native-engine-updates.js";
 import {
   restoreTurnCheckpoint,
   serializeTurnCheckpoint,
@@ -230,6 +231,8 @@ export async function discoverNativeEngines(dataDir?: string, options: NativeEng
     claudeAsked && claudeSignedIn !== false ? nativeModelCatalog("claude", claude) : undefined,
   ]);
   const managedOpenCode = openCode?.source === "managed";
+  // The version of a copy that runs from the store; updates are offered only for those.
+  const managed = (engine: typeof codexEngine) => engine?.source === "managed" && engine.version ? { managedVersion: engine.version } : {};
   return [
     { id: "pi" as const, name: "Pi", available: true },
     {
@@ -238,6 +241,7 @@ export async function discoverNativeEngines(dataDir?: string, options: NativeEng
       available: codexAvailable,
       ...(codexSignedIn === undefined ? {} : { signedIn: codexSignedIn }),
       ...(codexModels ? { models: codexModels } : {}),
+      ...managed(codexEngine),
     },
     {
       id: "claude" as const,
@@ -245,6 +249,7 @@ export async function discoverNativeEngines(dataDir?: string, options: NativeEng
       available: claudeAvailable,
       ...(claudeSignedIn === undefined ? {} : { signedIn: claudeSignedIn }),
       ...(claudeModels ? { models: claudeModels } : {}),
+      ...managed(claudeEngine),
     },
     { id: "acp" as const, name: "ACP", available: nativeCommandAvailable(configured.acp) },
     {
@@ -421,6 +426,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       processSlots?: NativeProcessSlots;
       /** Where managed CLIs live; Desktop keeps one store per PC user. Defaults to dataDir's. */
       storeRoot?: string;
+      /** Desktop's CLI updates: a new turn of an engine waits while that engine is being updated. */
+      engineUpdates?: NativeEngineUpdateGate;
     },
   ) {}
   describe() {
@@ -433,6 +440,33 @@ export class NativeAgentRuntime implements AgentRuntime {
     await this.options.fallback.abort(runId);
   }
   async *run(
+    request: AgentRunRequest,
+    context?: Partial<AdapterContext>,
+  ): AsyncIterable<AgentRuntimeEvent> {
+    const engine = request.agentEngine;
+    const updates = this.options.engineUpdates;
+    if (updates && (engine === "codex" || engine === "claude" || engine === "opencode") &&
+      !{ ...configuredCommands(await readNativeConfig(this.options.dataDir)), ...this.options.commands }[engine]) {
+      // An update never replaces a CLI during a turn: a new turn waits here, with its reason shown,
+      // while its engine is being updated, and counts as running until it ends. An operator's own
+      // command is never updated, so its turns do not wait.
+      const held = updates.held(engine);
+      if (held) yield { type: "progress", text: nativeEngineUpdateWaitText(engine), activity: true };
+      const leave = await updates.enter(engine, context?.signal ?? new AbortController().signal).catch(() => undefined);
+      if (!leave) return;
+      try {
+        // An empty activity line clears the waiting status once the turn goes on.
+        if (held) yield { type: "progress", text: "", activity: true };
+        yield* this.runEngine(request, context);
+      } finally {
+        leave();
+      }
+      return;
+    }
+    yield* this.runEngine(request, context);
+  }
+
+  private async *runEngine(
     request: AgentRunRequest,
     context?: Partial<AdapterContext>,
   ): AsyncIterable<AgentRuntimeEvent> {

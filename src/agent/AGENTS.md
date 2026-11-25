@@ -524,10 +524,13 @@
   the server's engines or delegates its run to them. Verify the scoped settings and
   native-agent-runtime tests. Protocol fixtures do not qualify real inference.
   Managed CLIs (specs/native-engines/spec.md phase 3) live in one store per host user,
-  provider-runtimes/<engine>/<version> (Desktop's profile, a server's data folder), and come
-  only from the npm URL, sha512 integrity and size bounds in
-  packages/adapters/src/native-engines.lock.json (regenerate with scripts/native-engine-lock.mjs,
-  never by hand). Downloads are verified before unpacking into staging, every file's SHA-256 is
+  provider-runtimes/<engine>/<version> (Desktop's profile, a server's data folder). First installs
+  use the exact npm URL, sha512 integrity and size bounds in packages/adapters/src/native-engines.lock.json
+  (regenerate with scripts/native-engine-lock.mjs). Desktop updates follow the npm channel and
+  target package in that lock with the same checks. Check the bundled and published blocklist
+  before a managed executable starts. Existing turns keep their version and new turns wait while
+  an update is being verified. The hosted native-engine canary tests each target without model
+  requests. Downloads are verified before unpacking into staging, every file's SHA-256 is
   recorded and `--version` checked before the folder is used, and again before a session's first
   start. No administrator rights, global npm or CLI updater. Resolution: an absolute
   native-agents.json command, then the newer of the managed copy and PATH (the person's CLI wins

@@ -8,13 +8,19 @@ import { nativeSignInState } from "./native-signin.js";
 import { nativeCodexUsageState } from "./native-usage.js";
 import { nativeCommandAvailable } from "./native-agent-process.js";
 import { discoverNativeEngines, NativeAgentRuntime, nativeEngineCommand, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
-import type { NativeEngineStoreOptions } from "./native-engine-store.js";
-import { installNativeEngine, nativeEngineInstallable, nativeEngineInstalls, nativeEngineStoreRoot } from "./native-engine-store.js";
+import { nativeEngineInstalls, nativeEngineStoreRoot } from "./native-engine-store.js";
+import type { NativeEngineUpdateOptions } from "./native-engine-updates.js";
+import { NativeEngineUpdates } from "./native-engine-updates.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 import { NATIVE_PROCESS_LIMIT, NativeProcessSlots } from "./native-process-slots.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const STORE_ENGINES = ["codex", "claude", "opencode"] as const;
+export type DesktopEngineStoreOptions = NativeEngineUpdateOptions & {
+  /** Read the CLIs' vendor channels and the blocklist at startup and daily (the app; tests call check). */
+  checkUpdates?: boolean;
+};
 /**
  * One owned native engine; account/server scopes and uncertain starts survive a restart.
  * `processSlots` bounds the CLI processes this PC runs for turns at once: every run shares it.
@@ -22,13 +28,17 @@ const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(valu
 export function createDesktopAgentEngine(profile: string, accessScope: () => string | undefined,
   createRuntime?: (directory: string, authorized: () => boolean, processSlots: NativeProcessSlots) => AgentRuntime,
   accountHost: NativeAccountHost = {}, processSlots = new NativeProcessSlots(NATIVE_PROCESS_LIMIT),
-  /** Tests only: a fixture lock, registry and version check for the store. */
-  store: NativeEngineStoreOptions = {}): AgentRuntime {
+  /** Update checks for the app; tests also pass a fixture lock, registry and version check. */
+  store: DesktopEngineStoreOptions = {}): AgentRuntime {
   const active = new Map<string, { runtime: AgentRuntime; localId: string }>();
   // One store of managed CLIs per PC user, shared by the accounts signed in on this profile.
   const storeRoot = nativeEngineStoreRoot(profile);
-  const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) =>
-    new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots, storeRoot }));
+  // Its updates: offers, the blocklist, and holding an engine's new turns while it is updated.
+  const updates = new NativeEngineUpdates(storeRoot, store);
+  if (store.checkUpdates) updates.start();
+  const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) => new NativeAgentRuntime({
+    dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots, storeRoot, engineUpdates: updates,
+  }));
   async function engineState(): Promise<NativeEngineState> {
     const scope = accessScope();
     if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return { engines: [], signedOut: [] };
@@ -36,6 +46,9 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
     if (accessScope() !== scope) return { engines: [], signedOut: [] };
     const engines = available.flatMap(({ id, available }) =>
       available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : []);
+    // The version each engine runs from the store; a person's own or an operator's CLI is never updated.
+    const managed = Object.fromEntries(available.flatMap(entry =>
+      "managedVersion" in entry && entry.managedVersion && engines.some(id => id === entry.id) ? [[entry.id, entry.managedVersion]] : []));
     return {
       engines,
       signedOut: signedOutEngines(available),
@@ -43,9 +56,9 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       models: nativeEngineModels(available),
       account: true,
       install: true,
-      installable: (["codex", "claude", "opencode"] as const).flatMap(engine =>
-        engines.includes(engine) ? [] : nativeEngineInstallable(engine, store) ?? []),
+      installable: STORE_ENGINES.flatMap(engine => engines.includes(engine) ? [] : updates.installable(engine) ?? []),
       installs: nativeEngineInstalls(storeRoot),
+      updates: updates.offers(managed),
     };
   }
   return {
@@ -76,13 +89,21 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
     async nativeEngineInstall(input) {
       const scope = accessScope();
       if (!scope || !/^[a-f0-9]{64}$/.test(scope)) throw Error("Desktop account access is unavailable");
-      const { engine } = NativeEngineInstallRequestSchema.parse(input);
+      const { engine, version } = NativeEngineInstallRequestSchema.parse(input);
       const command = await nativeEngineCommand(engine, path.join(profile, "agent-executor", scope), { ...store, storeRoot });
-      if (accessScope() !== scope) throw Error("Desktop account changed before installing");
-      if (command && nativeCommandAvailable(command)) return { status: "installed" };
-      if (!nativeEngineInstallable(engine, store)) throw Error("Its maker publishes no version for this PC.");
+      const authorize = () => {
+        if (accessScope() !== scope) throw Error("Desktop account changed before installing");
+      };
+      authorize();
       // The download goes on after this answer; its progress and outcome come with the engines.
-      installNativeEngine(storeRoot, engine, store).catch(() => undefined);
+      if (version) {
+        // Only the version this PC offers, verified like a first install before any turn runs it.
+        await updates.update(engine, version, authorize);
+        return { status: "installing" };
+      }
+      if (command && nativeCommandAvailable(command)) return { status: "installed" };
+      if (!updates.installable(engine)) throw Error("Its maker publishes no version for this PC.");
+      await updates.install(engine, authorize);
       return { status: "installing" };
     },
     abort: async runId => { const owned = active.get(runId); await owned?.runtime.abort(owned.localId); },

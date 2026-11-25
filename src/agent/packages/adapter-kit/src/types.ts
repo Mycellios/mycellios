@@ -4,6 +4,7 @@ import type {
   ConnectionCatalogItem,
   NativeEngineInstallable,
   NativeEngineInstallProgress,
+  NativeEngineUpdate,
   NotificationKind,
   SandboxKind,
 } from "@mycellios/contracts";
@@ -34,8 +35,10 @@ export type NativeEngineState = {
   install?: boolean;
   /** Missing CLIs the host can install, with the pinned version, vendor package and size. */
   installable?: NativeEngineInstallable[];
-  /** Installs running on the host, or why the last one failed. */
+  /** Installs and updates running on the host, or why the last one failed. */
   installs?: NativeEngineInstallProgress[];
+  /** Newer versions of the CLIs the host runs from its store (older hosts omit it). */
+  updates?: NativeEngineUpdate[];
 };
 
 export interface AdapterContext {

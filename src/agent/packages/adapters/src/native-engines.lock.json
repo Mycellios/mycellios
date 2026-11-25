@@ -4,6 +4,10 @@
     "codex": {
       "version": "0.172.0",
       "source": "npm",
+      "channel": {
+        "package": "@openai/codex",
+        "tag": "latest"
+      },
       "targets": {
         "win32-x64": {
           "package": "@openai/codex",
@@ -12,7 +16,8 @@
           "bytes": 196154811,
           "unpackedBytes": 548562559,
           "files": 47,
-          "executable": "package/vendor/x86_64-pc-windows-msvc/bin/codex.exe"
+          "executable": "package/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+          "versionSuffix": "-win32-x64"
         },
         "win32-arm64": {
           "package": "@openai/codex",
@@ -21,7 +26,8 @@
           "bytes": 183100717,
           "unpackedBytes": 472344703,
           "files": 47,
-          "executable": "package/vendor/aarch64-pc-windows-msvc/bin/codex.exe"
+          "executable": "package/vendor/aarch64-pc-windows-msvc/bin/codex.exe",
+          "versionSuffix": "-win32-arm64"
         },
         "darwin-arm64": {
           "package": "@openai/codex",
@@ -30,7 +36,8 @@
           "bytes": 160466396,
           "unpackedBytes": 400544462,
           "files": 43,
-          "executable": "package/vendor/aarch64-apple-darwin/bin/codex"
+          "executable": "package/vendor/aarch64-apple-darwin/bin/codex",
+          "versionSuffix": "-darwin-arm64"
         },
         "darwin-x64": {
           "package": "@openai/codex",
@@ -39,7 +46,8 @@
           "bytes": 170474941,
           "unpackedBytes": 427390886,
           "files": 43,
-          "executable": "package/vendor/x86_64-apple-darwin/bin/codex"
+          "executable": "package/vendor/x86_64-apple-darwin/bin/codex",
+          "versionSuffix": "-darwin-x64"
         },
         "linux-x64": {
           "package": "@openai/codex",
@@ -48,7 +56,8 @@
           "bytes": 174429086,
           "unpackedBytes": 449349826,
           "files": 45,
-          "executable": "package/vendor/x86_64-unknown-linux-musl/bin/codex"
+          "executable": "package/vendor/x86_64-unknown-linux-musl/bin/codex",
+          "versionSuffix": "-linux-x64"
         },
         "linux-arm64": {
           "package": "@openai/codex",
@@ -57,13 +66,18 @@
           "bytes": 178904250,
           "unpackedBytes": 446234372,
           "files": 45,
-          "executable": "package/vendor/aarch64-unknown-linux-musl/bin/codex"
+          "executable": "package/vendor/aarch64-unknown-linux-musl/bin/codex",
+          "versionSuffix": "-linux-arm64"
         }
       }
     },
     "claude": {
       "version": "2.1.326",
       "source": "npm",
+      "channel": {
+        "package": "@anthropic-ai/claude-code",
+        "tag": "stable"
+      },
       "targets": {
         "win32-x64": {
           "package": "@anthropic-ai/claude-code-win32-x64",
@@ -124,6 +138,10 @@
     "opencode": {
       "version": "1.19.5",
       "source": "npm",
+      "channel": {
+        "package": "opencode-ai",
+        "tag": "latest"
+      },
       "targets": {
         "win32-x64": {
           "package": "opencode-windows-x64-baseline",
