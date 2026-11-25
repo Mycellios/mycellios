@@ -64,22 +64,24 @@ https://github.com/user-attachments/assets/dccdeddb-2134-4a56-8eed-b2e591736b1c
 需要 Docker Engine、Compose 插件、curl 和 OpenSSL。无需克隆仓库或安装 Node.js。
 
 ```bash
-mkdir -p rakazo && cd rakazo &&
-curl -fsSLO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/install-images.sh &&
+mkdir -p mycellios && cd mycellios &&
+curl -fsSLO https://raw.githubusercontent.com/Mycellios/mycellios/main/src/agent/infra/compose/install-images.sh &&
 bash install-images.sh
 ```
 
-安装脚本会下载 Compose 文件，生成包含随机密钥的 `.env`，并启动 Mycellios。
-再次运行时会保留已有的 `.env`。
+安装脚本会下载本仓库的 Compose 文件，生成包含随机密钥的 `.env`，并启动 Mycellios。
+再次运行时会保留已有的 `.env`。仍在使用 Mycellios Agent 导入来源项目镜像的安装会继续使用这些镜像，直到你迁移它
+（[使用上游镜像的安装](./docs/self-host.md#installs-on-the-upstream-images)）。
 
 打开 [http://127.0.0.1:5173](http://127.0.0.1:5173)，创建账号并连接模型。
 默认启用本地 Docker 计算机。也可以选择远程提供商 `e2b`、`daytona`、`createos`、`box` 或 `railway`，
 并配置相应的 API 密钥。
 
 默认镜像标签为 `edge`，由主分支构建，支持 `linux/amd64` 和 `linux/arm64`。
+如需安装某个发布版本，请运行 `bash install-images.sh --release v<version>`。
 镜像详情与标签见[自托管指南](./docs/self-host.md#published-images-no-checkout)。
 
-在受限网络中，可以覆盖安装器的下载地址前缀（`RAKAZO_DOWNLOAD_BASE`），跳过已有的 Compose 文件
+在受限网络中，可以覆盖安装器的下载地址前缀（`MYCELLIOS_DOWNLOAD_BASE`），跳过已有的 Compose 文件
 （`--local` / `RAKAZO_DOWNLOAD_SKIP_EXISTING`），或使用引导脚本的镜像地址。
 参见[受限网络与镜像下载](./docs/self-host.md#restricted-networks--mirror-downloads)。
 
@@ -101,7 +103,7 @@ bash install-images.sh
 
 ## 本地开发（从源码运行）
 
-需要 Node.js 22.x（至少 22.22.2）、Node.js 24.x 或 Node.js 26 及以上版本，以及 pnpm 9 和 Docker。
+需要 Node.js 22.x（至少 22.22.2）、Node.js 24.x 或 Node.js 26 及以上版本，以及 npm 和 Docker。
 不支持 Node.js 23.x 和 25.x。
 
 ```bash
@@ -134,15 +136,15 @@ docker compose --env-file .env \
   -f infra/compose/docker-compose.yml \
   -f infra/compose/docker-compose.postgres-host.yml \
   up postgres -d
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm sandbox:build
-pnpm dev
+npm ci
+npm run db:generate
+npm run db:migrate
+npm run sandbox:build
+npm run dev
 ```
 
 默认 Compose 文件中的 Postgres 仅在容器网络内可访问，与已发布镜像的部署方式一致。
-`postgres-host` 叠加配置将数据库端口发布到宿主机的回环地址 `127.0.0.1:5433`，供宿主机上的 `pnpm` 和数据库工具使用。
+`postgres-host` 叠加配置将数据库端口发布到宿主机的回环地址 `127.0.0.1:5433`，供宿主机上的 `npm` 脚本和数据库工具使用。
 如果端口被占用，请同时修改 `.env` 中的 `POSTGRES_HOST_PORT` 以及 `DATABASE_URL` 和 `DATABASE_MIGRATION_URL` 中的端口。
 不使用叠加配置时，可以通过以下命令进入数据库交互终端：
 `docker compose --env-file .env -f infra/compose/docker-compose.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`。
@@ -183,7 +185,7 @@ Electron 和 Expo 应用都是 Mycellios API 的客户端，与网页版使用�
 开发服务启动后，使用以下命令启动 Electron：
 
 ```bash
-pnpm --filter @mycellios/desktop dev
+npm run dev --workspace @mycellios/desktop
 ```
 
 首次运行时，桌面应用会询问是在本机运行 Mycellios，还是连接已有服务器。
@@ -192,7 +194,7 @@ pnpm --filter @mycellios/desktop dev
 因此需要先安装 Docker Desktop、OrbStack 或 Docker Engine；未安装时，应用会提供相应链接。
 已安装的发行版将镜像标签固定为自身版本，未打包的开发版本则拉取 `edge`。
 
-运行 `pnpm dev` 的开发者应选择 **Existing instance**（已有实例），地址填写 `http://127.0.0.1:5173`。
+运行 `npm run dev` 的开发者应选择 **Existing instance**（已有实例），地址填写 `http://127.0.0.1:5173`。
 公共服务器必须使用 HTTPS；只有回环地址和局域网私有地址允许 HTTP，不包括链路本地地址。
 应用会在保存地址前检查 Mycellios 的健康检查端点，之后启动时直接连接该实例。
 退出应用后，服务仍会继续运行；可通过应用菜单中的 **Stop Local Stack**（停止本地服务）将其关闭。
@@ -233,11 +235,11 @@ docs/       架构、运维和发布指南
 常用检查命令：
 
 ```bash
-pnpm lint
-pnpm check
-pnpm test
-pnpm test:integration
-pnpm test:e2e
+npm run lint
+npm run check
+npm test
+npm run test:integration
+npm run test:e2e
 ```
 
 开发流程和测试矩阵见 [CONTRIBUTING.md](./CONTRIBUTING.md)。

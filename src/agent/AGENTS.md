@@ -2161,6 +2161,17 @@
   `.github` files here preserve the imported upstream CI reference for offline
   security-boundary tests; they do not execute as workflows in this repository.
 
+- Self-host defaults name this repository: `install-images.sh` fetches its
+  `infra/compose` files at the tag it installs, Compose files and env examples name the
+  `ghcr.io/mycellios/mycellios` images, and the updater reads only this repository's
+  `v<semver>` tags (never `desktop-v*`). An install whose `.env` names the upstream images
+  keeps them until its owner moves: the installer asks once and records the answer, the
+  updater offers `POST /move`, Desktop's Docker stack moves on its next start. Every move
+  first runs the target image's migration check and changes nothing when the database
+  records a migration the release lacks. Never pull this repository's tags from the upstream
+  namespace, and keep rollback on the exact cached image under its old name. Verify the
+  install-images, updater, local-stack tests and scripts/verify-migration-history-db.ts.
+
 - Native image generation uses only the run owner's already admitted Desktop
   computer and that host's ChatGPT-backed Codex session. Preserve explicit
   provider choices, bounded PNG transfer, nonce/thread/turn validation and
