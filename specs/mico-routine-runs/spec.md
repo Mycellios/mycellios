@@ -103,8 +103,8 @@ grows by one (plus any skipped times) and its reason is `busy` unless it already
 - Deleting a routine (editor, `schedule_cancel`, undoing an import) archives its own
   conversation in the same transaction, keeping its history; work still running there is not
   stopped. The main chat and group targets are never archived.
-- The Routines UI stays paused by default (`VITE_MYCELLIOS_ROUTINES`); the server behavior is
-  the same either way.
+- The Routines UI is on by default (`VITE_MYCELLIOS_ROUTINES=false` pauses it); the server
+  behavior is the same either way.
 
 ## Where a routine runs
 

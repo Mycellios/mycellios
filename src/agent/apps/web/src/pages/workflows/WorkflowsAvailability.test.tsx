@@ -9,6 +9,7 @@ import { WorkflowsAvailability } from "./WorkflowsAvailability";
 
 let root: ReturnType<typeof createRoot> | undefined;
 let host: HTMLDivElement;
+// Start paused so the Coming soon path stays covered; default cases clear the flag.
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubEnv("VITE_MYCELLIOS_WORKFLOWS", "false"); });
 afterEach(async () => { if (root) await act(() => root!.unmount()); root = undefined; host?.remove(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 async function mount(children: ReactNode, onExit = vi.fn(), onNavigation = vi.fn()) {
@@ -16,11 +17,15 @@ async function mount(children: ReactNode, onExit = vi.fn(), onNavigation = vi.fn
   await act(() => root!.render(<WorkflowsAvailability onExit={onExit} onNavigation={onNavigation}>{children}</WorkflowsAvailability>));
 }
 
-it.each([undefined, "", "false", "1", "TRUE"])("keeps workflows paused without explicit enablement (%s)", value => {
+it.each([undefined, "", "true", "1", "TRUE"])("opens workflows unless an operator pauses them (%s)", value => {
   vi.stubEnv("VITE_MYCELLIOS_WORKFLOWS", value);
+  expect(workflowsAvailable()).toBe(true);
+});
+it("keeps the operator's explicit pause without touching saved workflows", () => {
+  vi.stubEnv("VITE_MYCELLIOS_WORKFLOWS", "false");
   expect(workflowsAvailable()).toBe(false);
 });
-it("blocks a direct workflow/editor link before rendering queries or actions", async () => {
+it("blocks a direct workflow/editor link while paused, before rendering queries or actions", async () => {
   const load = vi.fn(() => <button>Run workflow</button>);
   const Loaded = load;
   await mount(<Loaded />);
@@ -29,15 +34,15 @@ it("blocks a direct workflow/editor link before rendering queries or actions", a
   expect(host.textContent).toContain("Coming soon");
   expect(host.textContent).not.toContain("Run workflow");
 });
-it("keeps back-to-chat and mobile navigation usable without executing a workflow", async () => {
+it("keeps back-to-chat and mobile navigation usable while paused, without executing a workflow", async () => {
   const exit = vi.fn(), navigate = vi.fn();
   await mount(<p>Private editor</p>, exit, navigate);
   await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Open navigation"]')!.click());
   await act(() => Array.from(host.querySelectorAll("button")).find(button => button.textContent === "Back to chat")!.click());
   expect(exit).toHaveBeenCalledOnce(); expect(navigate).toHaveBeenCalledOnce();
 });
-it("preserves the existing editor behind explicit reactivation", async () => {
-  vi.stubEnv("VITE_MYCELLIOS_WORKFLOWS", "true");
+it("mounts the saved workflow editor by default", async () => {
+  vi.stubEnv("VITE_MYCELLIOS_WORKFLOWS", undefined);
   await mount(<textarea defaultValue="Saved workflow" />);
   expect(workflowsAvailable()).toBe(true);
   expect(host.querySelector("textarea")?.value).toBe("Saved workflow");

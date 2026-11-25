@@ -309,8 +309,8 @@
   Hifa Store is available by default for the independent app launch.
   `VITE_MYCELLIOS_HIFA_STORE=false` explicitly pauses it, retaining the disabled
   navigation and direct-link placeholder without mounting HostedWebs. Preserve
-  independent Integrations/Micos/Skills sections and the separate paused routine
-  and workflow gates. New app implementations ship as independent static bundles,
+  independent Integrations/Micos/Skills sections and the separate routine and
+  workflow gates. New app implementations ship as independent static bundles,
   outside the host repository, through the existing owner-scoped publication API.
   Verify hifa-store and MarketplaceWorkspace tests. A published revision may carry
   only owner-granted `downloads` (`allow-downloads`) and `storage` (host data
@@ -324,15 +324,18 @@
   never raise the 25 MiB/250 MiB defaults, keep tombstone cleanup for every delete.
   Check hosted-webs capabilities/bridge/DraftHistory tests and
   scripts/verify-hosted-webs-db.ts on embedded PostgreSQL.
-  Routines UI is also paused by default; `VITE_MYCELLIOS_ROUTINES=true` explicitly
-  reactivates it. Keep rail/overflow entries visible with Coming soon, and gate
-  direct routine links/editors before mounting them. The computer panel shows the
-  same notice. Preserve saved routines and backend scheduling; this is a UI gate,
-  not a cancellation of existing jobs. Verify RoutinesAvailability tests.
-  Workflows uses the same paused UI pattern, enabled only with
-  `VITE_MYCELLIOS_WORKFLOWS=true`. Gate direct workflow links before mounting
-  WorkflowWorkspace, and keep navigation visible with Coming soon. Preserve
-  saved workflows and backend execution. Verify WorkflowsAvailability tests.
+  Routines UI is also available by default; `VITE_MYCELLIOS_ROUTINES=false`
+  explicitly pauses it. While paused, keep rail/overflow entries visible with
+  Coming soon, gate direct routine links/editors before mounting them, and show
+  the same notice in the computer panel. `?routine=` links (Schedule, search)
+  resolve through `lib/routine-link.ts` and open the editor that the computer panel
+  and Routines page open (`?routine=new` is a new draft). Preserve saved routines
+  and backend scheduling either way; this is a UI gate, not a cancellation of
+  existing jobs. Verify RoutinesAvailability and routine-link tests.
+  Workflows uses the same opt-out pattern: `VITE_MYCELLIOS_WORKFLOWS=false`
+  explicitly pauses it. While paused, gate direct workflow links before mounting
+  WorkflowWorkspace and keep navigation visible with Coming soon. Preserve saved
+  workflows and backend execution either way. Verify WorkflowsAvailability tests.
   Marketplace has no workspace-rail or More-menu entry, including the unpinned
   footer fallback. Preserve its routes/features and legacy pin preferences;
   a saved Marketplace pin must not restore a visible navigation entry.
