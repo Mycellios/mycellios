@@ -28,6 +28,7 @@ import { findNativeCommand, nativeCommandAvailable, NativeAgentProcess, NativeEv
 import { nativeSignInState } from "./native-signin.js";
 import { nativeModelCatalog } from "./native-model-catalog.js";
 import { MANAGED_OPENCODE_VERSION, managedOpenCodeCommand, supportsManagedOpenCode } from "./managed-opencode.js";
+import { type NativeProcessSlots, nativeProcessWaitText } from "./native-process-slots.js";
 import {
   restoreTurnCheckpoint,
   serializeTurnCheckpoint,
@@ -400,6 +401,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       commands?: NativeConfig;
       codexArgs?: string[];
       hostAccess?: (scope: { userId: string; spaceId: string }) => boolean;
+      /** The PC's bound on CLI processes, shared by every native turn on it (Desktop). */
+      processSlots?: NativeProcessSlots;
     },
   ) {}
   describe() {
@@ -627,8 +630,21 @@ export class NativeAgentRuntime implements AgentRuntime {
       );
       return next;
     };
+    let releaseSlot: (() => void) | undefined;
     const stopped = (async () => {
       try {
+        // Above the PC's bound this turn waits here, with its reason shown, before anything runs.
+        const slots = this.options.processSlots;
+        if (slots) {
+          let waited = false;
+          releaseSlot = await slots.acquire(signal, () => {
+            waited = true;
+            queue.push({ type: "progress", text: nativeProcessWaitText(slots.limit), activity: true });
+          });
+          if (signal.aborted) return;
+          // An empty activity line clears the waiting status once the turn starts.
+          if (waited) queue.push({ type: "progress", text: "", activity: true });
+        }
         if (request.turnCheckpoint) {
           sessionId = undefined; // Restart from the durable tool transcript after a human pause.
           const saved = restoreTurnCheckpoint(request.turnCheckpoint, request.model);
@@ -1059,6 +1075,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       controller.abort();
       await process?.stop();
       await stopped;
+      // The slot frees only once this turn's CLI has stopped.
+      releaseSlot?.();
       await bridge?.close();
       if (systemPromptFile) await rm(systemPromptFile, { force: true }).catch(() => undefined);
       await recordUsage();

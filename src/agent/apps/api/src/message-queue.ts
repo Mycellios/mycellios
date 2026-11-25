@@ -26,6 +26,7 @@ import {
   type MessageQueueTarget,
   micoTurnLimit,
   moveQueuedMessageFirst,
+  nativeConcurrencyEnabled,
   type QueuedMessageEntry,
   releaseQueuedMessageHold,
   reorderMessageQueue,
@@ -166,8 +167,10 @@ async function waitReason(
   });
   if (thread?.lastError && normalizeRunError(thread.lastError).kind === "maintenance")
     return { waiting: "restart" };
-  const slotsWhere = slotRunsWhere({ agentEngine: bot.agentEngine, mainThreadId: bot.thread?.id });
-  // The main chat of a Pi Mico has its own lane and never waits for a slot.
+  const nativeConcurrency = nativeConcurrencyEnabled();
+  const slotsWhere = slotRunsWhere({ agentEngine: bot.agentEngine, mainThreadId: bot.thread?.id }, nativeConcurrency);
+  // The main chat of a Mico with lanes (Pi, or a native engine with native concurrency on) has
+  // its own lane and never waits for a slot.
   if ("threadId" in slotsWhere && bot.thread?.id === target.threadId) return { waiting: "busy" };
   const running = await tx.run.count({
     where: {
@@ -177,7 +180,7 @@ async function waitReason(
       ...slotsWhere,
     },
   });
-  const limit = micoTurnLimit(bot);
+  const limit = micoTurnLimit(bot, nativeConcurrency);
   return running >= limit ? { waiting: "slot", slots: { running, limit } } : { waiting: "busy" };
 }
 

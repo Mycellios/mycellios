@@ -7,7 +7,7 @@ import { createTaskControls } from "../task-controls.js";
 import { createAcpRegistry } from "../acp-registry.js";
 import {
   awaitingRepliesForThread, awaitingReplyRun, closeEventWait, controlWorkTree, hideAwaitingReplies, listEventWaits,
-  workStatus, IsolationError,
+  micoTurnLimit, workStatus, IsolationError,
 } from "@mycellios/db";
 import { resolveThreadTarget, stopThreadRuns } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
@@ -116,7 +116,8 @@ export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
         if (!bot) throw new IsolationError();
         if (input.limit !== undefined) await deps.prisma.bot.updateMany({ where, data: { taskConcurrency: input.limit } });
         const limit = input.limit ?? bot.taskConcurrency;
-        return { limit, effectiveLimit: bot.agentEngine === "pi" ? limit : 1 };
+        // Native engines follow the operator's native concurrency switch; an ACP agent stays at one.
+        return { limit, effectiveLimit: micoTurnLimit({ agentEngine: bot.agentEngine, taskConcurrency: limit }) };
       }),
       work: authed.tasks.work.handler(({context,input})=>workStatus(deps.prisma,{...context.actor,taskId:input.taskId})),
       controlWork: authed.tasks.controlWork.handler(async({context,input})=>{

@@ -1130,8 +1130,18 @@
   Pi concurrency is admitted atomically per Bot and serialized per thread; a Pi
   Mico's main chat is its own lane outside its 1-4 conversation slots (claimMicoRun,
   delegation capacity), so it never waits behind side work. Native engines remain
-  single-turn in total, main chat included. Private Pi tasks reserve the existing computer lease
-  before computer/file/command tools, never share it between runs. Workflows reuse
+  single-turn in total, main chat included, unless the operator sets
+  MYCELLIOS_NATIVE_CONCURRENCY=1 on API and worker (specs/native-engines/spec.md phase 4):
+  then Codex, Claude Code and OpenCode get the same lanes (micoRunsLanes) and side-
+  conversation private lane, while a generic ACP agent stays single-turn. Each run keeps
+  its own session folder, CLI process and MCP bridge token; Desktop bounds turn CLI
+  processes per PC (NativeProcessSlots, default 6) and a turn above it waits visibly. The
+  Desktop relay's unchanged lanes still deliver at most 2 agent runs per Mico and 4 per API
+  instance; further admitted turns wait unclaimed there, as Pi tasks do.
+  Private Pi and native tasks reserve the existing computer lease
+  before computer/file/command tools, never share it between runs, so screen and browser
+  tools stay serialized. Verify scripts/verify-native-concurrency-db.ts with both flag
+  states, native-process-slots and the native runtime/Desktop engine tests. Workflows reuse
   existing Micos, owner/Space RPCs and the existing reconciler, freeze graph versions
   and persist private step runs. Stop commits cancellation and process teardown
   receipts together. Verify workflow contracts, affected wakeup/control tests and
