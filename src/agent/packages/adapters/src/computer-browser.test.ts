@@ -1,4 +1,4 @@
-import type { AdapterContext, ComputerRef } from "@mycellios/adapter-kit";
+import type { AdapterContext, ComputerRef, PageBrowserCommand } from "@mycellios/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBrowserProvider, resolveBrowserProviderKind } from "./browser-provider-factory.js";
 import { ComputerBrowserProvider } from "./computer-browser.js";
@@ -159,6 +159,181 @@ describe("computer browser provider", () => {
     const result = await provider.snapshot(computer, {}, { ...baseContext, botId: "bot-a" });
     expect(result.fallback).toBe("computer_act");
     expect(result.error).toMatch(/chrome not listening/i);
+  });
+
+  describe("steps a computer image may not support yet", () => {
+    const computer: ComputerRef = { id: "c", botId: "b", kind: "docker", providerRef: "c" };
+    const context = { ...baseContext, botId: "bot-a" };
+    const page = { url: "https://example.test/", title: "Example", tree: "Example", elements: [] };
+    const NEW_HELPER = [
+      "act.press",
+      "act.scroll",
+      "act.hover",
+      "act.wait",
+      "act.dialog",
+      "snapshot.from",
+    ];
+    // An older helper answers the question with an unknown command; an older supervisor rejects it.
+    const OLDER = [
+      async () => ({
+        ok: false,
+        error: "Unknown browser command.",
+        fallback: "computer_act" as const,
+      }),
+      async () => {
+        throw new Error("page browser failed: 500");
+      },
+    ];
+
+    function driver(capabilities: () => Promise<unknown>) {
+      return vi.fn(async (_computer: ComputerRef, request: PageBrowserCommand) => {
+        if (request.command === "capabilities") return capabilities();
+        if (request.command === "act")
+          return { ok: true, completed: request.actions.length, ...page };
+        if (request.command === "snapshot") return { ok: true, ...page, next: 2 };
+        return { ok: true, ...page };
+      });
+    }
+
+    it.each(OLDER)(
+      "runs only the steps before one an older computer cannot run (%#)",
+      async (older) => {
+        const live = driver(older);
+        const provider = new ComputerBrowserProvider({ liveDriver: live as never });
+        const result = await provider.act(
+          computer,
+          {
+            actions: [
+              { kind: "fill", ref: "e1", text: "mycelium" },
+              { kind: "press", key: "Enter" },
+              { kind: "click", ref: "e2" },
+            ],
+          },
+          context,
+        );
+        expect(result).toMatchObject({
+          ok: false,
+          completed: 1,
+          uncertain: false,
+          unsupported: "press",
+        });
+        expect(result.error).toBe(
+          "This computer's page browser cannot press keys yet: it needs a newer computer image. The 1 step(s) before it ran.",
+        );
+        expect(result).not.toHaveProperty("fallback");
+        expect(live.mock.calls.map((call) => call[1])).toEqual([
+          { command: "capabilities" },
+          { command: "act", actions: [{ kind: "fill", ref: "e1", text: "mycelium" }] },
+        ]);
+        live.mockClear();
+        expect(
+          await provider.act(computer, { actions: [{ kind: "wait", until: "quiet" }] }, context),
+        ).toMatchObject({
+          ok: false,
+          completed: 0,
+          unsupported: "wait",
+          error: expect.stringContaining("Nothing ran."),
+        });
+        expect(live.mock.calls.map((call) => call[1].command)).toEqual(["capabilities"]);
+        live.mockClear();
+        expect(await provider.snapshot(computer, { from: 1 }, context)).toMatchObject({
+          unsupported: "snapshot.from",
+          elements: [],
+        });
+        expect(live.mock.calls.map((call) => call[1].command)).toEqual(["capabilities"]);
+      },
+    );
+
+    it("sends every step and later parts to a computer that supports them", async () => {
+      const live = driver(async () => ({ ok: true, features: NEW_HELPER }));
+      const provider = new ComputerBrowserProvider({ liveDriver: live as never });
+      const actions = [
+        { kind: "press" as const, key: "Enter" },
+        { kind: "wait" as const, until: "text" as const, text: "Results" },
+      ];
+      expect(await provider.act(computer, { actions }, context)).toMatchObject({
+        ok: true,
+        completed: 2,
+      });
+      expect(await provider.snapshot(computer, { from: 1 }, context)).toMatchObject({ next: 2 });
+      expect(live.mock.calls.map((call) => call[1])).toEqual([
+        { command: "capabilities" },
+        { command: "act", actions },
+        { command: "capabilities" },
+        { command: "snapshot", from: 1 },
+      ]);
+    });
+
+    it("asks nothing before steps every computer runs", async () => {
+      const live = driver(async () => {
+        throw new Error("must not ask");
+      });
+      const provider = new ComputerBrowserProvider({ liveDriver: live as never });
+      await provider.act(computer, { actions: [{ kind: "click", ref: "e1" }] }, context);
+      await provider.snapshot(computer, {}, context);
+      expect(live.mock.calls.map((call) => call[1])).toEqual([
+        { command: "act", actions: [{ kind: "click", ref: "e1" }] },
+        { command: "snapshot" },
+      ]);
+    });
+  });
+
+  it("passes on dialogs and pages that do not answer as settled results", async () => {
+    const dialog = { type: "confirm" as const, message: "Delete this file?" };
+    const opened = {
+      ok: false,
+      uncertain: false,
+      url: "https://example.test/",
+      title: "Example",
+      dialog,
+      error: "Step 1 (click) opened a confirm dialog.",
+    };
+    const provider = new ComputerBrowserProvider({
+      liveDriver: async (_computer, request) =>
+        request.command === "act" ? { ...opened, completed: 1 } : opened,
+    });
+    const computer: ComputerRef = { id: "c", botId: "b", kind: "docker", providerRef: "c" };
+    const context = { ...baseContext, botId: "bot-a" };
+    const acted = await provider.act(
+      computer,
+      { actions: [{ kind: "click", ref: "e1" }] },
+      context,
+    );
+    expect(acted).toMatchObject({ ok: false, completed: 1, uncertain: false, dialog });
+    const navigated = await provider.navigate(computer, { url: "https://example.test/" }, context);
+    expect(navigated).toMatchObject({ dialog, error: opened.error });
+    const read = await provider.snapshot(computer, {}, context);
+    expect(read).toMatchObject({ dialog, error: opened.error, tree: "", elements: [] });
+    for (const result of [acted, navigated, read]) expect(result).not.toHaveProperty("fallback");
+  });
+
+  it("passes on the first snapshot a navigation read", async () => {
+    const elements = [{ ref: "e1", role: "button", name: "Continue" }];
+    const provider = new ComputerBrowserProvider({
+      liveDriver: async () => ({
+        ok: true,
+        url: "https://example.test/",
+        title: "Example",
+        tree: '- button "Continue" [e1]',
+        elements,
+        loading: true,
+        next: 1,
+      }),
+    });
+    expect(
+      await provider.navigate(
+        { id: "c", botId: "b", kind: "docker", providerRef: "c" },
+        { url: "https://example.test/" },
+        { ...baseContext, botId: "bot-a" },
+      ),
+    ).toEqual({
+      url: "https://example.test/",
+      title: "Example",
+      tree: '- button "Continue" [e1]',
+      elements,
+      loading: true,
+      next: 1,
+    });
   });
 
   it("uses in-process pages for fake computers", async () => {

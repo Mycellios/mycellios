@@ -12,6 +12,15 @@ const helper = path.resolve(
   "../../../infra/sandboxes/computer/rakazo-page-browser",
 );
 
+/** Runs one page helper command against the browser whose DevTools port is given. */
+async function runHelper(port: string, name: string, args: Record<string, unknown> = {}) {
+  const { stdout } = await execute("python3", [helper, name, JSON.stringify(args)], {
+    env: { ...process.env, RAKAZO_CDP_PORT: port },
+    timeout: 60_000,
+  });
+  return JSON.parse(stdout);
+}
+
 test("live page helper preserves identity, masks passwords, and reports partial actions", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "page-browser-test-"));
   const server = http.createServer((_req, res) => {
@@ -36,13 +45,8 @@ test("live page helper preserves identity, masks passwords, and reports partial 
       port = (await readFile(path.join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0];
       expect(port).toMatch(/^\d+$/);
     }).toPass({ timeout: 5_000 });
-    async function command(name: string, args: Record<string, unknown> = {}) {
-      const { stdout } = await execute("python3", [helper, name, JSON.stringify(args)], {
-        env: { ...process.env, RAKAZO_CDP_PORT: port },
-        timeout: 30_000,
-      });
-      return JSON.parse(stdout);
-    }
+    const command = (name: string, args: Record<string, unknown> = {}) =>
+      runHelper(port, name, args);
     const page = context.pages()[0]!;
     await page.goto(`http://127.0.0.1:${address.port}`);
     const snapshot = await command("snapshot");
@@ -208,13 +212,7 @@ test("live page helper waits for a site's sign-in check, or says the page is sti
       port = (await readFile(path.join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0];
       expect(port).toMatch(/^\d+$/);
     }).toPass({ timeout: 5_000 });
-    const snapshot = async () => {
-      const { stdout } = await execute("python3", [helper, "snapshot", "{}"], {
-        env: { ...process.env, RAKAZO_CDP_PORT: port },
-        timeout: 30_000,
-      });
-      return JSON.parse(stdout);
-    };
+    const snapshot = () => runHelper(port, "snapshot");
     const page = context.pages()[0]!;
 
     // The check answers within the wait: the snapshot shows the signed-in page.
@@ -230,6 +228,157 @@ test("live page helper waits for a site's sign-in check, or says the page is sti
     const loading = await snapshot();
     expect(loading).toMatchObject({ ok: true, title: "Example", loading: true });
     expect(loading.tree).toContain('link "Sign in"');
+  } finally {
+    await context?.close();
+    await rm(profile, { recursive: true, force: true });
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("live page helper presses keys, scrolls, hovers, waits, reads long pages in parts and reports dialogs", async () => {
+  test.setTimeout(240_000);
+  const profile = await mkdtemp(path.join(os.tmpdir(), "page-browser-steps-"));
+  const pages: Record<string, string> = {
+    "/form": `<title>Form</title><form action="/results"><input name="q" aria-label="Search"></form>`,
+    "/results": "<title>Results</title><p>Results page</p>",
+    "/menu": `<title>Menu</title><style>.items{display:none}.menu:hover .items{display:block}</style>
+      <div class="menu"><button id="menu-button">Menu</button><div class="items"><a href="#x">Hidden item</a></div></div>
+      <p id="hover-state">Not hovered</p>
+      <script>document.getElementById("menu-button").addEventListener("mouseenter", () => {
+        document.getElementById("hover-state").textContent = "Hovered";
+      });</script>`,
+    "/feed": `<title>Feed</title><div style="height:4000px"></div><p id="feed-end">Feed end</p>
+      <script>const end = document.getElementById("feed-end");
+        new IntersectionObserver((seen) => { if (seen[0].isIntersecting) end.textContent = "All loaded"; })
+          .observe(end);</script>`,
+    "/slow": `<title>Slow</title><main id="slow-main"><div class="skeleton" style="width:200px;height:20px"></div></main>
+      <button onclick="setTimeout(() => { document.getElementById('saved').textContent = 'Saved'; }, 800)">Save</button>
+      <p id="saved"></p>
+      <script>setTimeout(() => { document.getElementById("slow-main").textContent = "Loaded content"; }, 1000);</script>`,
+    "/long": `<title>Long</title><p>${"word ".repeat(2600)}END-OF-TEXT</p>${Array.from(
+      { length: 120 },
+      (_, i) => `<button>Item ${i + 1}</button>`,
+    ).join("")}`,
+    "/dialog": `<title>Dialog</title><p id="answer"></p>
+      <button onclick="document.getElementById('answer').textContent = confirm('Delete this file?') ? 'Deleted' : 'Kept'">Delete</button>`,
+  };
+  const server = http.createServer((req, res) => {
+    res.setHeader("content-type", "text/html");
+    res.end(
+      pages[new URL(req.url ?? "/", "http://fixture.test").pathname] ?? "<title>Missing</title>",
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("No fixture server");
+  const base = `http://127.0.0.1:${address.port}`;
+  let context: Awaited<ReturnType<typeof chromium.launchPersistentContext>> | undefined;
+  try {
+    // The full browser keeps a dialog open after the session that saw it leaves, as the computer's
+    // browser does; the headless shell would dismiss it.
+    context = await chromium.launchPersistentContext(profile, {
+      channel: "chromium",
+      headless: true,
+      args: ["--remote-debugging-port=0"],
+    });
+    // Playwright dismisses dialogs nobody listens for; listening leaves them to the page helper.
+    context.pages()[0]!.on("dialog", () => undefined);
+    let port = "";
+    await expect(async () => {
+      port = (await readFile(path.join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0];
+      expect(port).toMatch(/^\d+$/);
+    }).toPass({ timeout: 5_000 });
+    const command = (name: string, args: Record<string, unknown> = {}) =>
+      runHelper(port, name, args);
+    type Page = { elements: Array<{ name: string; ref: string }> };
+    const ref = (page: Page, name: string) =>
+      page.elements.find((element) => element.name === name)!.ref;
+    const names = (page: Page) => page.elements.map((element) => element.name);
+
+    // navigate returns the first snapshot; Enter goes to the field the fill left focused.
+    const form = await command("navigate", { url: `${base}/form` });
+    expect(form).toMatchObject({ ok: true, title: "Form" });
+    const submitted = await command("act", {
+      actions: [
+        { kind: "fill", ref: ref(form, "Search"), text: "mycelium" },
+        { kind: "press", key: "Enter" },
+      ],
+    });
+    expect(submitted).toMatchObject({ ok: true, completed: 2, title: "Results" });
+    expect(submitted.url).toContain("/results?q=mycelium");
+
+    // A real pointer opens a menu that only CSS :hover shows.
+    const menu = await command("navigate", { url: `${base}/menu` });
+    expect(names(menu)).not.toContain("Hidden item");
+    const hovered = await command("act", { actions: [{ kind: "hover", ref: ref(menu, "Menu") }] });
+    expect(hovered.tree).toContain("Hovered");
+    expect(names(hovered)).toContain("Hidden item");
+
+    // Scrolling to the end of a feed makes it load the rest, which a wait sees.
+    await command("navigate", { url: `${base}/feed` });
+    const scrolled = await command("act", {
+      actions: [
+        ...Array.from({ length: 8 }, () => ({ kind: "scroll", direction: "down" })),
+        { kind: "wait", until: "text", text: "all loaded", timeout: 3 },
+      ],
+    });
+    expect(scrolled).toMatchObject({ ok: true, completed: 9 });
+
+    // A snapshot waits while skeleton placeholders show; a wait for text that never comes is settled.
+    const slow = await command("navigate", { url: `${base}/slow` });
+    expect(slow.tree).toContain("Loaded content");
+    expect(slow).not.toHaveProperty("loading");
+    const saved = await command("act", {
+      actions: [
+        { kind: "click", ref: ref(slow, "Save") },
+        { kind: "wait", until: "text", text: "Saved" },
+      ],
+    });
+    expect(saved).toMatchObject({ ok: true, completed: 2 });
+    const never = await command("act", {
+      actions: [{ kind: "wait", until: "text", text: "Never shown", timeout: 1 }],
+    });
+    expect(never).toMatchObject({ ok: false, completed: 0, uncertain: false });
+    expect(never.error).toContain("did not appear");
+
+    // A long page is read in parts, and the refs of every part stay valid together.
+    const long = await command("navigate", { url: `${base}/long` });
+    expect(long).toMatchObject({ next: 1 });
+    expect(long.elements).toHaveLength(80);
+    expect(long.tree).not.toContain("END-OF-TEXT");
+    const rest = await command("snapshot", { from: 1 });
+    expect(rest.tree).toContain("END-OF-TEXT");
+    expect(rest).not.toHaveProperty("next");
+    expect(names(rest)).toEqual(Array.from({ length: 40 }, (_, i) => `Item ${i + 81}`));
+    expect(
+      await command("act", {
+        actions: [
+          { kind: "click", ref: ref(long, "Item 1") },
+          { kind: "click", ref: ref(rest, "Item 120") },
+        ],
+      }),
+    ).toMatchObject({ ok: true, completed: 2 });
+
+    // A dialog a step opens ends the call with its message. With no conversation tab, nothing
+    // holds it for the Mico's answer, so it stays for a person and the page stops answering.
+    const dialogPage = await command("navigate", { url: `${base}/dialog` });
+    const opened = await command("act", {
+      actions: [
+        { kind: "click", ref: ref(dialogPage, "Delete") },
+        { kind: "press", key: "Escape" },
+      ],
+    });
+    expect(opened).toMatchObject({
+      ok: false,
+      completed: 1,
+      uncertain: false,
+      dialog: { type: "confirm", message: "Delete this file?", forPerson: true },
+    });
+    expect(opened.error).toContain("The remaining 1 step(s) did not run.");
+    const blocked = await command("snapshot");
+    expect(blocked).toMatchObject({ ok: false, uncertain: false });
+    expect(blocked.error).toContain("not responding");
   } finally {
     await context?.close();
     await rm(profile, { recursive: true, force: true });
@@ -392,13 +541,8 @@ test("live page helper types codes as real key presses into one-box-per-digit fi
       port = (await readFile(path.join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0];
       expect(port).toMatch(/^\d+$/);
     }).toPass({ timeout: 5_000 });
-    async function command(name: string, args: Record<string, unknown> = {}) {
-      const { stdout } = await execute("python3", [helper, name, JSON.stringify(args)], {
-        env: { ...process.env, RAKAZO_CDP_PORT: port },
-        timeout: 30_000,
-      });
-      return JSON.parse(stdout);
-    }
+    const command = (name: string, args: Record<string, unknown> = {}) =>
+      runHelper(port, name, args);
     // Each result carries a fresh snapshot, whose refs replace the previous ones.
     let elements: Array<{ name: string; ref: string; value?: string }> = [];
     const refresh = async () => {

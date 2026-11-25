@@ -6,12 +6,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import type { ServerUpdateRun } from "@mycellios/contracts";
+import { MIGRATION_HISTORY_COMMAND, MIGRATION_HISTORY_UNKNOWN_EXIT } from "@mycellios/contracts";
 import type { ComposeUpdateStep } from "@mycellios/core";
 import {
   chooseUpdateStrategy,
   commitImageTag,
+  composePullArgv,
+  composeRunArgv,
   composeUpArgv,
   composeUpdatePlan,
+  DEFAULT_UPDATE_BRANCH,
   DEFAULT_UPDATE_REMOTE,
   forkImageTag,
   gitIndexContentDiffArgv,
@@ -19,10 +23,16 @@ import {
   gitUntrackedFilesArgv,
   gitWorktreeContentDiffArgv,
   hasValidBearerToken,
+  IMAGE_ENV,
+  IMAGE_MOVE_DECLINED,
+  IMAGE_MOVE_ENV,
   IMAGE_TAG_ENV,
   imageRef,
   isGitCommit,
   normalizeUpdateBranch,
+  OFFICIAL_REPO_URL,
+  OFFICIAL_SERVER_IMAGE,
+  PREVIOUS_IMAGE_ENV,
   PREVIOUS_IMAGE_TAG_ENV,
   parseGitNameOnly,
   parseGitStatusPorcelain,
@@ -40,9 +50,10 @@ import { createRootLogger } from "@mycellios/logging/axiom";
 import { requestLogging } from "@mycellios/logging/hono";
 import type { Context } from "hono";
 import { Hono } from "hono";
-import type { UpdaterConfig } from "./updater-logic.js";
+import type { ImageState, UpdaterConfig } from "./updater-logic.js";
 import {
   missingSecretAssignments,
+  readImageState,
   readTagState,
   resolveUpdaterConfig,
   truncateOutput,
@@ -55,9 +66,21 @@ const STEP_TIMEOUT_MS: Record<string, number> = {
   checkout: 60_000,
   merge: 60_000,
   pull: 600_000,
+  migrations: 300_000,
   recreate: 1_800_000,
   recover: 1_800_000,
 };
+
+/**
+ * An install that still runs the upstream project's images takes this repository's releases only
+ * after its owner moves it, so an official update never pulls this repository's tags from the
+ * upstream namespace (or the reverse).
+ */
+function moveRequired(state: ImageState): UpdateRefused {
+  return new UpdateRefused(
+    `This deployment runs ${state.image}, the images of the project Mycellios Agent was imported from. Official updates are releases of ${OFFICIAL_REPO_URL}, published as ${OFFICIAL_SERVER_IMAGE}. Move to them with POST /move, which first checks that the database records no migration the release lacks, or keep the current images with POST /move {"decline":true}.`,
+  );
+}
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 export interface CommandResult {
@@ -213,13 +236,19 @@ export function createUpdaterApp(
 
   app.get("/state", async (c) => {
     try {
-      const tags = readTagState(await readEnvFile());
+      const env = await readEnvFile();
+      const tags = readTagState(env);
+      const images = readImageState(env, config.image);
       const checkout = await readCheckout();
       return c.json({
         deployDir: config.deployDir,
         composeFiles: config.composeFiles,
-        image: config.image,
-        imageRef: imageRef(config.image, tags.currentTag),
+        image: images.image,
+        imageRef: imageRef(images.image, tags.currentTag),
+        imageSource: images.source,
+        previousImage: images.previousImage,
+        // Offered until the owner answers POST /move once; the official image is what it moves to.
+        move: images.move === null ? null : { status: images.move, to: OFFICIAL_SERVER_IMAGE },
         running,
         lastRun,
         ...tags,
@@ -232,11 +261,16 @@ export function createUpdaterApp(
 
   app.post("/plan", async (c) => {
     try {
-      if (planInFlight !== null) throw new UpdateRefused("A plan is already running.");
       const request = parseRequest(await body(c.req.raw));
+      if (planInFlight !== null) throw new UpdateRefused("A plan is already running.");
       const work = (async () => {
-        const tags = readTagState(await readEnvFile());
+        const env = await readEnvFile();
+        const tags = readTagState(env);
+        const images = readImageState(env, config.image);
         const decision = chooseUpdateStrategy(request);
+        if (decision.strategy === "pull" && images.source === "upstream") {
+          throw moveRequired(images);
+        }
         const checkout = await readCheckout();
         if (decision.strategy === "build") {
           const targetCommit = await resolveRemoteHead(request);
@@ -266,7 +300,7 @@ export function createUpdaterApp(
       planInFlight = work.finally(() => {
         planInFlight = null;
       });
-      return c.json(await work);
+      return c.json(await planInFlight);
     } catch (error) {
       return refusal(c, error);
     }
@@ -284,6 +318,20 @@ export function createUpdaterApp(
   app.post("/rollback", async (c) => {
     try {
       return c.json(await withRunLock(rollback));
+    } catch (error) {
+      return refusal(c, error);
+    }
+  });
+
+  /**
+   * The one-time offer to an install that still runs the upstream images: `{}` moves it to the
+   * newest release of this repository, `{"decline":true}` keeps its images and stops the offer.
+   */
+  app.post("/move", async (c) => {
+    try {
+      const input = (await body(c.req.raw)) as { decline?: unknown } | null;
+      if (input?.decline === true) return c.json(await withRunLock(declineMove));
+      return c.json(await withRunLock(move));
     } catch (error) {
       return refusal(c, error);
     }
@@ -477,7 +525,10 @@ export function createUpdaterApp(
 
   async function apply(request: { repoUrl: string; branch: string; official: boolean }) {
     const decision = chooseUpdateStrategy(request);
-    const tags = readTagState(await readEnvFile());
+    const env = await readEnvFile();
+    const tags = readTagState(env);
+    const images = readImageState(env, config.image);
+    if (decision.strategy === "pull" && images.source === "upstream") throw moveRequired(images);
     const checkout = await readCheckout();
 
     if (decision.strategy === "build") {
@@ -541,6 +592,7 @@ export function createUpdaterApp(
         fromTag: tags.currentTag,
         originalPreviousTag: tags.previousTag,
         toTag: targetTag,
+        image: { from: images.image, to: images.image, originalPrevious: images.previousImage },
         fromCommit: checkout.commit,
         fromBranch: checkout.branch,
         toCommit: targetCommit,
@@ -560,11 +612,15 @@ export function createUpdaterApp(
   }
 
   async function rollback(): Promise<ServerUpdateRun> {
-    const tags = readTagState(await readEnvFile());
+    const env = await readEnvFile();
+    const tags = readTagState(env);
+    const images = readImageState(env, config.image);
     const decision = rollbackTarget(tags);
     if ("error" in decision) throw new UpdateRefused(decision.error);
     const checkout = await readCheckout();
-    // Never re-pull a rollback tag: registry tags can move. Reuse the exact image cached when it ran.
+    // Never re-pull a rollback tag: registry tags can move. Reuse the exact image cached when it ran,
+    // under the name it ran as, so rolling back a move returns to the upstream image it replaced.
+    const toImage = images.previousImage ?? images.image;
     const steps = composeUpdatePlan({ strategy: "pull", target: composeTarget }).filter(
       (step) => step.id !== "pull",
     );
@@ -575,12 +631,81 @@ export function createUpdaterApp(
         fromTag: tags.currentTag,
         originalPreviousTag: tags.previousTag,
         toTag: decision.tag,
+        image: { from: images.image, to: toImage, originalPrevious: images.previousImage },
         fromCommit: checkout.commit,
         fromBranch: checkout.branch,
         toCommit: null,
         restoreRemoteUrl: null,
         steps,
-        restartAdvice: `Rolled back to ${decision.tag}. Database migrations are not reversed: if the newer version added a migration, roll forward again or restore a database backup.`,
+        restartAdvice: `Rolled back to ${toImage === images.image ? decision.tag : imageRef(toImage, decision.tag)}. Database migrations are not reversed: if the newer version added a migration, roll forward again or restore a database backup.`,
+      }),
+    );
+  }
+
+  /** Records the owner's answer, so the offer to move off the upstream images is made once. */
+  async function declineMove(): Promise<{ move: "declined"; image: string }> {
+    const images = readImageState(await readEnvFile(), config.image);
+    if (images.source !== "upstream") {
+      throw new UpdateRefused(
+        "This deployment does not run the upstream images; there is nothing to decline.",
+      );
+    }
+    await writeEnvAssignments({ [IMAGE_MOVE_ENV]: IMAGE_MOVE_DECLINED });
+    return { move: "declined", image: images.image };
+  }
+
+  /**
+   * Moves an install off the upstream images to the newest stable release of this repository. The
+   * pull and the migration check run on that exact image before anything is recreated, and a
+   * database that records a migration the release does not ship refuses the move: the `.env` pin
+   * is restored and the upstream containers keep running.
+   */
+  async function move(): Promise<ServerUpdateRun> {
+    const env = await readEnvFile();
+    const tags = readTagState(env);
+    const images = readImageState(env, config.image);
+    if (images.source !== "upstream") {
+      throw new UpdateRefused(
+        "This deployment does not run the upstream images; there is nothing to move.",
+      );
+    }
+    const target = await resolveRelease(OFFICIAL_REPO_URL);
+    const checkout = await readCheckout();
+    const pull = composePullArgv(composeTarget);
+    const check = composeRunArgv(composeTarget, "api", MIGRATION_HISTORY_COMMAND);
+    const up = composeUpArgv(composeTarget);
+    return rememberRun(
+      await execute({
+        request: { repoUrl: OFFICIAL_REPO_URL, branch: DEFAULT_UPDATE_BRANCH },
+        strategy: "pull",
+        fromTag: tags.currentTag,
+        originalPreviousTag: tags.previousTag,
+        toTag: target.imageTag,
+        image: {
+          from: images.image,
+          to: OFFICIAL_SERVER_IMAGE,
+          originalPrevious: images.previousImage,
+        },
+        fromCommit: checkout.commit,
+        fromBranch: checkout.branch,
+        toCommit: target.commit,
+        restoreRemoteUrl: null,
+        steps: [
+          {
+            id: "pull",
+            label: "Download this repository's images",
+            command: pull.command,
+            args: pull.args,
+          },
+          {
+            id: "migrations",
+            label: "Check the database for migrations the release does not ship",
+            command: check.command,
+            args: check.args,
+          },
+          { id: "recreate", label: "Recreate the services", command: up.command, args: up.args },
+        ],
+        restartAdvice: `The updater moved this deployment to ${OFFICIAL_SERVER_IMAGE} at ${target.releaseTag} (its full source-commit image tag) and recreated the API, worker, and web containers. Migrations ran inside the new API container before it became healthy. Rollback returns to ${imageRef(images.image, tags.currentTag)} from the local image cache.`,
       }),
     );
   }
@@ -600,6 +725,8 @@ export function createUpdaterApp(
     fromTag: string;
     originalPreviousTag: string | null;
     toTag: string | null;
+    /** The app image before and after the run; only a move, or a rollback of one, changes it. */
+    image: { from: string; to: string; originalPrevious: string | null };
     fromCommit: string | null;
     fromBranch: string | null;
     toCommit: string | null;
@@ -623,9 +750,17 @@ export function createUpdaterApp(
       error: null,
       steps: [],
     };
+    // The previous image is recorded once a move renamed the image, and kept current from then on,
+    // so a rollback never pairs a previous tag with the wrong image name.
+    const renamed = input.image.to !== input.image.from;
+    const recordsImage = renamed || input.image.originalPrevious !== null;
     const revertAssignments = {
       [IMAGE_TAG_ENV]: input.fromTag,
       [PREVIOUS_IMAGE_TAG_ENV]: input.originalPreviousTag ?? input.fromTag,
+      ...(renamed ? { [IMAGE_ENV]: input.image.from } : {}),
+      ...(recordsImage
+        ? { [PREVIOUS_IMAGE_ENV]: input.image.originalPrevious ?? input.image.from }
+        : {}),
     };
     // A failed Git command can still change files. Restore once before Compose recovery, or in
     // finally for failures that never reached Compose.
@@ -678,6 +813,8 @@ export function createUpdaterApp(
           ...missingSecretAssignments(await readEnvFile()),
           [IMAGE_TAG_ENV]: toTag,
           [PREVIOUS_IMAGE_TAG_ENV]: input.fromTag,
+          ...(renamed ? { [IMAGE_ENV]: input.image.to } : {}),
+          ...(recordsImage ? { [PREVIOUS_IMAGE_ENV]: input.image.from } : {}),
         });
       } catch {
         record.error = "Could not persist the target image tag in the deployment environment.";
@@ -685,11 +822,18 @@ export function createUpdaterApp(
         return record;
       }
       const composeEnv: Record<string, string> = { [IMAGE_TAG_ENV]: toTag };
+      if (renamed) composeEnv[IMAGE_ENV] = input.image.to;
       if (record.toCommit !== null) composeEnv.GIT_SHA = record.toCommit;
 
       for (const step of composeSteps) {
         if (!(await runStep(record, step, composeEnv))) {
-          const primaryError = record.error ?? `${step.label} failed.`;
+          const kept = imageRef(input.image.from, input.fromTag);
+          const primaryError =
+            step.id !== "migrations"
+              ? (record.error ?? `${step.label} failed.`)
+              : record.steps.at(-1)?.exitCode === MIGRATION_HISTORY_UNKNOWN_EXIT
+                ? `The move was refused: the database records migrations this release does not ship (listed in the step output), so a newer or different release migrated it. The deployment keeps ${kept}.`
+                : `The move was refused: the database's migration history could not be checked. The deployment keeps ${kept}.`;
           // The failed revision may have changed Compose or files it references. The old image
           // must be recreated from the old checkout, using the same configured Compose target.
           const checkoutRestored = await restoreCheckout();
@@ -709,7 +853,10 @@ export function createUpdaterApp(
                   command: previous.command,
                   args: previous.args,
                 },
-                { [IMAGE_TAG_ENV]: input.fromTag },
+                {
+                  [IMAGE_TAG_ENV]: input.fromTag,
+                  ...(renamed ? { [IMAGE_ENV]: input.image.from } : {}),
+                },
                 false,
               ));
             record.restart = recovered ? "not-required" : "manual";

@@ -4,6 +4,11 @@ import { createServer } from "node:net";
 import path from "node:path";
 import type { DesktopLocalStackState } from "@mycellios/contracts";
 import {
+  MIGRATION_HISTORY_COMMAND,
+  MIGRATION_HISTORY_UNKNOWN_EXIT,
+  UPSTREAM_IMAGE_OWNER,
+} from "@mycellios/contracts";
+import {
   classifyDockerFailure,
   composeSupportsWaitTimeout,
   type DockerFailureKind,
@@ -121,6 +126,22 @@ export function renderStackEnv(template: string, randomHex: (bytes: number) => s
     rendered.push(line);
   }
   return rendered.join("\n");
+}
+
+/**
+ * Stacks created before this repository published its images name the images of the project
+ * Mycellios Agent was imported from in `.env`. Without those lines Compose uses the bundled file's
+ * defaults, this repository's images; other image names, such as a mirror, are kept.
+ */
+export function withoutUpstreamImages(env: string): string {
+  return env
+    .split("\n")
+    .filter((line) => {
+      const match = /^\s*[A-Z][A-Z0-9_]*IMAGE\s*=(.*)$/.exec(line);
+      const value = match?.[1]?.trim().replace(/^["']/, "").toLowerCase() ?? "";
+      return !value.startsWith(UPSTREAM_IMAGE_OWNER);
+    })
+    .join("\n");
 }
 
 // Secrets a later version added. A stack created before then gets them appended,
@@ -257,6 +278,10 @@ const DOCKER_GROUP_HINT =
   "This user cannot access Docker. Add it to the docker group (sudo usermod -aG docker $USER), sign out and back in, then check again.";
 const STOP_FAILED = "Could not stop the local stack. Check that Docker is running, then try again.";
 const START_INTERRUPTED = "The start was interrupted. Retry to continue.";
+const MOVE_REFUSED =
+  "This stack's database was changed by a newer or different release, so this version will not start on it. Its data is unchanged.";
+const MOVE_UNCHECKED = "Could not check this stack's database before starting this version. Retry.";
+const MIGRATION_CHECK_TIMEOUT_MS = 120_000;
 
 /** Docker output may contain paths and hostnames, so the person only ever sees these. */
 export function stackFailureMessage(
@@ -506,6 +531,31 @@ export class LocalStackController {
     const stackToken = await ensureStackToken(this.deps.stackDir, this.deps.randomHex);
     this.currentStackToken = stackToken;
 
+    // A stack still naming the upstream images moves to this release's only once its database
+    // records no migration this release lacks; until then its `.env` is restored unchanged.
+    const envFile = path.join(this.deps.stackDir, STACK_ENV_FILE);
+    const stackEnv = await readFile(envFile, "utf8");
+    const movedEnv = withoutUpstreamImages(stackEnv);
+    const restore = { env: movedEnv === stackEnv ? null : stackEnv };
+    if (restore.env !== null) await writePrivateFile(envFile, movedEnv);
+    try {
+      await this.startStack(binary, version.stdout, stackToken, restore, signal);
+    } finally {
+      if (restore.env !== null) await writePrivateFile(envFile, restore.env);
+    }
+  }
+
+  /** Pull, the migration check of a moving stack, up and the health wait. */
+  private async startStack(
+    binary: string,
+    composeVersion: string,
+    stackToken: string,
+    restore: { env: string | null },
+    signal: AbortSignal,
+  ) {
+    const upArgs = composeSupportsWaitTimeout(composeVersion)
+      ? ["up", "-d", "--wait", "--wait-timeout", String(COMPOSE_WAIT_TIMEOUT_S)]
+      : ["up", "-d"];
     const imagesCached = await this.hasLocalReleaseImages(binary, signal);
     if (signal.aborted) return this.push({ type: "failed", message: START_INTERRUPTED });
     if (!imagesCached) {
@@ -523,9 +573,29 @@ export class LocalStackController {
     }
 
     this.push({ type: "up-start" });
-    const upArgs = composeSupportsWaitTimeout(version.stdout)
-      ? ["up", "-d", "--wait", "--wait-timeout", String(COMPOSE_WAIT_TIMEOUT_S)]
-      : ["up", "-d"];
+    if (restore.env !== null) {
+      const database = await this.compose(binary, [...upArgs, "postgres"], UP_TIMEOUT_MS, signal);
+      if (interrupted(signal, database))
+        return this.push({ type: "failed", message: START_INTERRUPTED });
+      if (database.code !== 0) return this.push({ type: "failed", message: MOVE_UNCHECKED });
+      const checked = await this.compose(
+        binary,
+        ["run", "--rm", "--no-deps", "-T", "api", ...MIGRATION_HISTORY_COMMAND],
+        MIGRATION_CHECK_TIMEOUT_MS,
+        signal,
+      );
+      if (interrupted(signal, checked))
+        return this.push({ type: "failed", message: START_INTERRUPTED });
+      if (checked.code !== 0) {
+        this.push({
+          type: "failed",
+          message: checked.code === MIGRATION_HISTORY_UNKNOWN_EXIT ? MOVE_REFUSED : MOVE_UNCHECKED,
+        });
+        return;
+      }
+      // Checked: the stack now runs this release's images, and `.env` keeps the move.
+      restore.env = null;
+    }
     await writePrivateFile(path.join(this.deps.stackDir, STACK_WEB_URL_FILE), this.currentWebUrl);
     let up = await this.compose(binary, upArgs, UP_TIMEOUT_MS, signal);
     for (

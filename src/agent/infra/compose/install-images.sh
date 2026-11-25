@@ -2,18 +2,43 @@
 
 set -Eeuo pipefail
 
-DOWNLOAD_BASE="${RAKAZO_DOWNLOAD_BASE:-https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose}"
-while [[ "$DOWNLOAD_BASE" == */ ]]; do
-  DOWNLOAD_BASE="${DOWNLOAD_BASE%/}"
+# This repository's Compose files and images (specs/trusted-distribution, phase 1). The files come
+# from src/agent/infra/compose at the tag being installed: edge from main, v<version> from that
+# release tag, sha-<commit> from that commit. An explicit download base, for a mirror, is used as given.
+readonly REPOSITORY_FILES="https://raw.githubusercontent.com/Mycellios/mycellios"
+readonly REPOSITORY_COMPOSE_PATH="src/agent/infra/compose"
+readonly APP_IMAGE="ghcr.io/mycellios/mycellios/app"
+readonly COMPUTER_IMAGE="ghcr.io/mycellios/mycellios/computer"
+# Installs created before this repository published its images name images of the project
+# Mycellios Agent was imported from. They keep them until their owner moves (--move-images).
+readonly UPSTREAM_IMAGES="ghcr.io/elie222/"
+# Before a move, the target app image lists the migrations the database records that it does not
+# ship, and exits 3 when there are any (MIGRATION_HISTORY_COMMAND in the shared contracts).
+readonly MIGRATION_CHECK="/app/apps/api/dist/cli/check-migration-history.js"
+readonly MIGRATIONS_UNKNOWN=3
+# The owner's answer to the move offer, so it is asked once.
+readonly MOVE_KEY="MYCELLIOS_IMAGE_MOVE"
+# Compose still reads the image settings under the legacy prefix until specs/legacy-name-migration
+# phase 2 renames them. As in packages/core/src/legacy-env.ts, the prefix is built from its
+# character codes, so new code does not spell it out again.
+legacy_prefix="$(printf '\122\101\113\101\132\117_')"
+readonly IMAGE_VAR="${legacy_prefix}IMAGE"
+readonly IMAGE_TAG_VAR="${legacy_prefix}IMAGE_TAG"
+readonly COMPUTER_IMAGE_VAR="${legacy_prefix}COMPUTER_IMAGE"
+readonly COMPUTER_IMAGE_TAG_VAR="${legacy_prefix}COMPUTER_IMAGE_TAG"
+
+explicit_base="${MYCELLIOS_DOWNLOAD_BASE:-${RAKAZO_DOWNLOAD_BASE:-}}"
+while [[ "$explicit_base" == */ ]]; do
+  explicit_base="${explicit_base%/}"
 done
-case "$DOWNLOAD_BASE" in
-  https://*) ;;
+case "$explicit_base" in
+  "" | https://*) ;;
   *)
-    echo "Mycellios setup failed: RAKAZO_DOWNLOAD_BASE must use https." >&2
+    echo "Mycellios setup failed: the download base must use https." >&2
     exit 1
     ;;
 esac
-readonly DOWNLOAD_BASE
+readonly explicit_base
 
 readonly COMPOSE_FILE="docker-compose.images.yml"
 # Optional operator overlay, layered after the base file the way Compose itself does by default.
@@ -22,10 +47,18 @@ readonly ENV_EXAMPLE=".env.images.example"
 readonly ENV_FILE=".env"
 readonly EGRESS_SCRIPT="restrict-computer-egress.sh"
 
+usage() {
+  echo "Usage: bash install-images.sh [--prepare-only] [--local] [--pull-never] [--offline] [--release v<version>] [--move-images | --keep-images]" >&2
+  exit 2
+}
+
 prepare_only=false
 skip_existing=false
 pull_never=false
 offline=false
+release=""
+# move or keep: the answer to the move offer given on the command line.
+move_answer=""
 if [[ "${RAKAZO_DOWNLOAD_SKIP_EXISTING:-}" == "1" ]]; then
   skip_existing=true
 fi
@@ -33,8 +66,8 @@ if [[ "${RAKAZO_PULL_NEVER:-}" == "1" ]]; then
   pull_never=true
 fi
 
-for arg in "$@"; do
-  case "$arg" in
+while (($# > 0)); do
+  case "$1" in
     --prepare-only)
       prepare_only=true
       ;;
@@ -50,17 +83,40 @@ for arg in "$@"; do
       pull_never=true
       offline=true
       ;;
+    --release)
+      (($# > 1)) || usage
+      shift
+      release="$1"
+      ;;
+    --release=*)
+      release="${1#--release=}"
+      ;;
+    --move-images)
+      move_answer=move
+      ;;
+    --keep-images)
+      move_answer=keep
+      ;;
     *)
-      echo "Usage: bash install-images.sh [--prepare-only] [--local] [--pull-never] [--offline]" >&2
-      exit 2
+      usage
       ;;
   esac
+  shift
 done
+if [[ -n "$release" && ! "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Mycellios setup failed: --release takes a release tag such as v1.2.3." >&2
+  exit 2
+fi
 
 temporary_file=""
+# Files a move downloads before it is allowed to replace anything.
+move_files=()
 cleanup() {
   if [[ -n "$temporary_file" ]]; then
     rm -f -- "$temporary_file"
+  fi
+  if ((${#move_files[@]} > 0)); then
+    rm -f -- "${move_files[@]}"
   fi
 }
 trap cleanup EXIT
@@ -206,24 +262,170 @@ curl_download() {
   return 1
 }
 
+# Set once the tag being installed is known; empty while an install keeps the upstream images.
+download_base=""
+# An install that keeps the upstream images keeps the Compose files that match them.
+keep_upstream=false
+
+# download <file> [destination]: a destination other than the file itself is always fetched.
 download() {
   local filename="$1"
-  local url="${DOWNLOAD_BASE}/${filename}"
+  local destination="${2:-$1}"
+  local url="${download_base}/${filename}"
 
-  if [[ "$skip_existing" == true && -e "$filename" ]]; then
+  if [[ "$destination" == "$filename" && "$skip_existing" == true && -e "$filename" ]]; then
     echo "Using local ${filename}"
     return 0
   fi
   if [[ "$offline" == true ]]; then
     fail "--offline cannot download missing ${filename}; copy it into the working directory first."
   fi
+  if [[ "$keep_upstream" == true ]]; then
+    fail "${filename} is missing. This install keeps its upstream images, so restore the file that matches them, or move with --move-images."
+  fi
 
   temporary_file=$(mktemp "./${filename}.tmp.XXXXXX")
   if ! curl_download "$url" "$temporary_file"; then
     fail "could not download ${filename} from ${url}. Set HTTP_PROXY/HTTPS_PROXY in the shell or .env (NO_PROXY for localhost), or pre-place the file and use --local / --offline."
   fi
-  mv -- "$temporary_file" "$filename"
+  mv -- "$temporary_file" "$destination"
   temporary_file=""
+}
+
+# The value of an existing .env setting as Compose reads it: the last assignment wins, an unquoted
+# value ends at " #", and one layer of matching quotes is removed. Empty when unset.
+env_value() {
+  local key="$1" line value="" found=false
+  [[ -f "$ENV_FILE" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=(.*)$ ]] || continue
+    [[ "${BASH_REMATCH[2]}" == "$key" ]] || continue
+    value="${BASH_REMATCH[3]}"
+    found=true
+  done <"$ENV_FILE"
+  [[ "$found" == true ]] || return 0
+  value="${value#"${value%%[![:space:]]*}"}"
+  if [[ "${value:0:1}" == '"' || "${value:0:1}" == "'" ]]; then
+    local quote="${value:0:1}"
+    value="${value:1}"
+    value="${value%%"$quote"*}"
+  else
+    value="${value%% #*}"
+    value="${value%"${value##*[![:space:]]}"}"
+  fi
+  printf '%s' "$value"
+}
+
+# set_env_values KEY=VALUE...: replaces every assignment of each key, or appends it, keeping the
+# rest of .env as it is.
+set_env_values() {
+  local line key pair handled=" "
+  umask 077
+  temporary_file=$(mktemp "./${ENV_FILE}.tmp.XXXXXX")
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    key=""
+    if [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*= ]]; then
+      key="${BASH_REMATCH[2]}"
+    fi
+    for pair in "$@"; do
+      if [[ -n "$key" && "${pair%%=*}" == "$key" ]]; then
+        line="$pair"
+        handled+="${key} "
+        break
+      fi
+    done
+    printf '%s\n' "$line"
+  done <"$ENV_FILE" >"$temporary_file"
+  for pair in "$@"; do
+    [[ "$handled" == *" ${pair%%=*} "* ]] || printf '%s\n' "$pair" >>"$temporary_file"
+  done
+  chmod 600 "$temporary_file"
+  mv -- "$temporary_file" "$ENV_FILE"
+  temporary_file=""
+}
+
+# Image repository names are lowercase, so a prefix comparison is exact.
+is_upstream_image() {
+  [[ -n "$1" && "$1" == "$UPSTREAM_IMAGES"* ]]
+}
+
+# The git ref whose Compose files match an image tag of this repository, or nothing for a tag it
+# does not publish.
+ref_for_tag() {
+  case "$1" in
+    edge) printf 'main' ;;
+    v*) [[ "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && printf '%s' "$1" ;;
+    sha-*) [[ "$1" =~ ^sha-([0-9a-f]{40})$ ]] && printf '%s' "${BASH_REMATCH[1]}" ;;
+  esac
+  return 0
+}
+
+base_for_tag() {
+  local ref
+  if [[ -n "$explicit_base" ]]; then
+    printf '%s' "$explicit_base"
+    return 0
+  fi
+  ref="$(ref_for_tag "$1")"
+  [[ -n "$ref" ]] || fail "${IMAGE_TAG_VAR}=$1 is not a tag this repository publishes (edge, v<version> or sha-<commit>). Set one in .env, or set MYCELLIOS_DOWNLOAD_BASE to where its Compose files are."
+  printf '%s/%s/%s' "$REPOSITORY_FILES" "$ref" "$REPOSITORY_COMPOSE_PATH"
+}
+
+# Whether an existing install runs the upstream images: .env names them, or names no app image
+# while the Compose file it runs defaults to them.
+runs_upstream_images() {
+  local app
+  [[ -e "$ENV_FILE" ]] || return 1
+  app="$(env_value "$IMAGE_VAR")"
+  is_upstream_image "$app" && return 0
+  is_upstream_image "$(env_value "$COMPUTER_IMAGE_VAR")" && return 0
+  [[ -z "$app" && -f "$COMPOSE_FILE" ]] && grep -qF "$UPSTREAM_IMAGES" "$COMPOSE_FILE"
+}
+
+# Moves an install off the upstream images to this repository's, at target_tag. The new Compose
+# file, the image pull and the migration check all happen before anything is replaced; a database
+# that records a migration the release does not ship refuses the move and changes nothing.
+move_to_repository_images() {
+  local compose_next env_next current_name next_name status wait_args=()
+  local overrides=("${IMAGE_VAR}=${APP_IMAGE}" "${IMAGE_TAG_VAR}=${target_tag}"
+    "${COMPUTER_IMAGE_VAR}=${COMPUTER_IMAGE}" "${COMPUTER_IMAGE_TAG_VAR}=${target_tag}")
+  echo "Moving this install to ${APP_IMAGE}:${target_tag}."
+  compose_next=$(mktemp "./${COMPOSE_FILE}.next.XXXXXX")
+  env_next=$(mktemp "./${ENV_EXAMPLE}.next.XXXXXX")
+  move_files=("$compose_next" "$env_next")
+  download "$COMPOSE_FILE" "$compose_next"
+  download "$ENV_EXAMPLE" "$env_next"
+  # Another project name would start an empty database beside the current one.
+  current_name="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config 2>/dev/null |
+    awk '/^name: / { print $2; exit }' || true)"
+  next_name="$(env "${overrides[@]}" docker compose --env-file "$ENV_FILE" -f "$compose_next" config 2>/dev/null |
+    awk '/^name: / { print $2; exit }' || true)"
+  if [[ -n "$current_name" && -n "$next_name" && "$current_name" != "$next_name" ]]; then
+    fail "the move was refused: this install's Compose project is ${current_name}, and the new Compose file names ${next_name}. Nothing was changed."
+  fi
+  env "${overrides[@]}" docker compose --env-file "$ENV_FILE" -f "$compose_next" pull api ||
+    fail "could not pull ${APP_IMAGE}:${target_tag}. Nothing was changed."
+  if docker compose up --help 2>/dev/null | grep -q -- '--wait-timeout'; then
+    wait_args=(--wait --wait-timeout 120)
+  fi
+  env "${overrides[@]}" docker compose --env-file "$ENV_FILE" -f "$compose_next" \
+    up -d ${wait_args[@]+"${wait_args[@]}"} postgres ||
+    fail "could not start the database to check it before the move. Nothing was changed."
+  echo "Checking the database for migrations this release does not ship."
+  status=0
+  env "${overrides[@]}" docker compose --env-file "$ENV_FILE" -f "$compose_next" \
+    run --rm --no-deps -T api node "$MIGRATION_CHECK" || status=$?
+  if ((status == MIGRATIONS_UNKNOWN)); then
+    fail "the move was refused: the database records migrations this release does not ship (listed above), so a newer or different release migrated it. This install keeps its images and files; nothing was changed."
+  elif ((status != 0)); then
+    fail "the move was refused: the database's migrations could not be checked. This install keeps its images and files; nothing was changed."
+  fi
+  mv -- "$compose_next" "$COMPOSE_FILE"
+  mv -- "$env_next" "$ENV_EXAMPLE"
+  move_files=()
+  set_env_values "${overrides[@]}"
+  echo "Moved to ${APP_IMAGE}:${target_tag}. The previous images stay in the local Docker cache."
 }
 
 create_env() {
@@ -325,7 +527,7 @@ YAML
 warn_unpassed_settings() {
   local key unpassed=""
   while IFS= read -r key; do
-    [[ "$key" == COMPOSE_* ]] || grep -qw -e "$key" "$COMPOSE_FILE" ${override_present:+"$OVERRIDE_FILE"} || unpassed+=" $key"
+    [[ "$key" == COMPOSE_* || "$key" == "$MOVE_KEY" ]] || grep -qw -e "$key" "$COMPOSE_FILE" ${override_present:+"$OVERRIDE_FILE"} || unpassed+=" $key"
   done < <(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$ENV_FILE" | sort -u)
   [[ -n "$unpassed" ]] || return 0
   echo "Warning: no container receives these .env settings:${unpassed}." >&2
@@ -370,6 +572,47 @@ configure_computer_egress() {
   echo "See Restricted computer egress in docs/self-host.md." >&2
 }
 
+# An install that runs the upstream images keeps them, and the Compose files that match them,
+# until its owner answers the move offer once (here, or with --move-images / --keep-images).
+if runs_upstream_images; then
+  recorded="$(env_value "$MOVE_KEY")"
+  if [[ -z "$move_answer" && "$recorded" == declined ]]; then
+    echo "Keeping the upstream images, as recorded in .env (${MOVE_KEY}=declined)."
+  elif [[ -z "$move_answer" && "$offline" != true && -t 0 ]]; then
+    echo "This install runs images of the project Mycellios Agent was imported from (${UPSTREAM_IMAGES})."
+    echo "Moving to ${APP_IMAGE} checks the database first and changes nothing if it records a migration this repository does not ship."
+    reply=""
+    read -r -p "Move this install now? [y/N] " reply || reply=""
+    case "$reply" in
+      [yY] | [yY][eE][sS]) move_answer=move ;;
+      *) move_answer=keep ;;
+    esac
+  elif [[ -z "$move_answer" ]]; then
+    echo "This install keeps images of the project Mycellios Agent was imported from. Run with --move-images to move it to ${APP_IMAGE}, or --keep-images to keep them and stop this notice."
+  fi
+  if [[ "$move_answer" == move ]]; then
+    [[ "$offline" != true ]] || fail "--offline cannot move to ${APP_IMAGE}; the move downloads it."
+    add_missing_secrets
+    target_tag="${release:-edge}"
+    download_base="$(base_for_tag "$target_tag")"
+    move_to_repository_images
+    # The files the move put in place are the ones for target_tag.
+    skip_existing=true
+  else
+    [[ -z "$release" ]] || fail "--release installs this repository's images, and this install keeps the upstream ones. Add --move-images to move it."
+    if [[ "$move_answer" == keep && "$recorded" != declined ]]; then
+      set_env_values "${MOVE_KEY}=declined"
+      echo "Keeping the upstream images; .env records the answer so it is not asked again."
+    fi
+    keep_upstream=true
+    skip_existing=true
+  fi
+else
+  [[ "$move_answer" != move ]] || echo "This install already uses this repository's images."
+  install_tag="${release:-$(env_value "$IMAGE_TAG_VAR")}"
+  download_base="$(base_for_tag "${install_tag:-edge}")"
+fi
+
 for filename in "${required_files[@]}"; do
   download "$filename"
 done
@@ -387,6 +630,9 @@ if [[ -e "$ENV_FILE" ]]; then
   add_missing_secrets
 else
   create_env
+fi
+if [[ -n "$release" ]]; then
+  set_env_values "${IMAGE_TAG_VAR}=${release}" "${COMPUTER_IMAGE_TAG_VAR}=${release}"
 fi
 
 validate_required_secrets

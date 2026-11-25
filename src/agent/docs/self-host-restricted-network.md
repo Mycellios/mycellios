@@ -6,7 +6,7 @@ These settings change downloads; model and remote-computer providers still need 
 | Failure | Setting or action |
 | --- | --- |
 | Cannot fetch the installer | Download it from your mirror or copy it locally |
-| Cannot fetch Compose files | `RAKAZO_DOWNLOAD_BASE`, `--local`, or `RAKAZO_DOWNLOAD_SKIP_EXISTING=1` |
+| Cannot fetch Compose files | `MYCELLIOS_DOWNLOAD_BASE`, `--local`, or `RAKAZO_DOWNLOAD_SKIP_EXISTING=1` |
 | Cannot pull app or computer images | `RAKAZO_IMAGE`, `RAKAZO_IMAGE_TAG`, `RAKAZO_COMPUTER_IMAGE`, `RAKAZO_COMPUTER_IMAGE_TAG` |
 | Cannot pull Postgres or busybox | `POSTGRES_IMAGE`, `BUSYBOX_IMAGE`, or Docker daemon `registry-mirrors` |
 
@@ -15,23 +15,25 @@ These settings change downloads; model and remote-computer providers still need 
 When raw GitHub is unreachable, download the installer from your mirror:
 
 ```bash
-export RAKAZO_INSTALLER_URL=https://example.com/mirror/rakazo/infra/compose/install-images.sh
-export RAKAZO_DOWNLOAD_BASE=https://example.com/mirror/rakazo/infra/compose
-mkdir -p rakazo && cd rakazo &&
-curl -fsSL -o install-images.sh "${RAKAZO_INSTALLER_URL}" &&
+export INSTALLER_URL=https://example.com/mirror/mycellios/src/agent/infra/compose/install-images.sh
+export MYCELLIOS_DOWNLOAD_BASE=https://example.com/mirror/mycellios/src/agent/infra/compose
+mkdir -p mycellios && cd mycellios &&
+curl -fsSL -o install-images.sh "${INSTALLER_URL}" &&
 bash install-images.sh --prepare-only
 ```
 
-`RAKAZO_INSTALLER_URL` selects the script for this curl command; `RAKAZO_DOWNLOAD_BASE` selects
-the Compose files downloaded by that script. Set both when raw GitHub is blocked.
+`INSTALLER_URL` selects the script for this curl command; `MYCELLIOS_DOWNLOAD_BASE` selects
+the Compose files downloaded by that script. Set both when raw GitHub is blocked. Mirror the files
+of the tag you install (`main` for `edge`, the `v<version>` tag for a release); the installer uses
+an explicit base as given. The older `RAKAZO_DOWNLOAD_BASE` name still works.
 
 ## Compose files
 
 To mirror `docker-compose.images.yml` and `.env.images.example`, point the installer at an HTTPS
-mirror of `infra/compose`:
+mirror of `src/agent/infra/compose`:
 
 ```bash
-export RAKAZO_DOWNLOAD_BASE=https://example.com/mirror/rakazo/infra/compose
+export MYCELLIOS_DOWNLOAD_BASE=https://example.com/mirror/mycellios/src/agent/infra/compose
 bash install-images.sh --prepare-only
 ```
 
