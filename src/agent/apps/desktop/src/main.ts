@@ -33,7 +33,7 @@ import type { Session } from "electron";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, safeStorage, session, shell, utilityProcess } from "electron";
 import { startDesktopDiagnostics, recordDesktopDiagnostic, desktopDiagnosticsText, desktopExceptionFields, type DesktopDiagnostics } from "./diagnostics.js";
 import type { AppDocumentState } from "./app-document-state.js";
-import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
+import { APP_DOCUMENT_STATE_SCRIPT, AppDocumentReadyTimeout, loadWithCloudRendererRecovery } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
 import {
   DesktopUpdateController,
@@ -144,7 +144,7 @@ const DESKTOP_STACK_TOKEN_HEADER = "x-rakazo-desktop-stack-token";
 let mainWindow: BrowserWindow | null = null;
 const appWindowTargets = new WeakMap<BrowserWindow, string>();
 let setupWindow: BrowserWindow | null = null;
-const bundledRendererInstallations = new Set<string>();
+const configuredRendererPartitions = new Set<string>();
 let currentSetup: DesktopSetup | null = null;
 let currentTargetUrl: string | null = null;
 let monitoringSession: Session | undefined;
@@ -514,7 +514,7 @@ async function defaultSessionHasOriginData(origin: string): Promise<boolean> {
   }
 }
 
-function createWindow(url: string, partition: string | null) {
+function createWindow(url: string, partition: string | null, restoreCloudRenderer?: () => void) {
   markOnce("rk:main:window-create-start");
   const icon = developmentIcon();
   const win = new BrowserWindow({
@@ -613,7 +613,7 @@ function createWindow(url: string, partition: string | null) {
   win.webContents.once("did-finish-load", () => markOnce("rk:main:did-finish-load"));
   win.webContents.once("did-stop-loading", () => markOnce("rk:main:did-stop-loading"));
   markOnce("rk:main:load-url-start");
-  const loaded = loadAppUrl(win, url).then(
+  const loaded = loadWithCloudRendererRecovery(() => loadAppUrl(win, url), restoreCloudRenderer).then(
     (state) => {
       markOnce("rk:main:load-url-resolved");
       return state;
@@ -736,7 +736,7 @@ async function waitForMountedAppDocument(
     if (state !== "pending") return state;
     await new Promise((r) => setTimeout(r, 50));
   }
-  throw new Error("The server page did not become ready.");
+  throw new AppDocumentReadyTimeout("The server page did not become ready.");
 }
 
 async function installBundledRenderer(
@@ -753,9 +753,10 @@ async function installBundledRenderer(
   const localRoot = renderer.local ? root : null;
   const webUrl = new URL(targetUrl);
   const installationKey = `${partition ?? "default"}:${webUrl.protocol}`;
-  if (bundledRendererInstallations.has(installationKey)) return;
+  if (configuredRendererPartitions.has(installationKey)) return;
 
-  await targetSession.protocol.handle(webUrl.protocol.slice(0, -1), async (request) => {
+  const protocol = webUrl.protocol.slice(0, -1);
+  await targetSession.protocol.handle(protocol, async (request) => {
     const forward = () => {
       const init = forwardedRendererRequestInit(request, webUrl.origin);
       // Page loads must reach the window as real redirects (see renderer-navigation.ts).
@@ -790,8 +791,15 @@ async function installBundledRenderer(
     }
     return forward();
   });
-  bundledRendererInstallations.add(installationKey);
+  configuredRendererPartitions.add(installationKey);
   markOnce("rk:main:bundled-renderer-ready");
+  if (!firstParty || localRoot) return;
+
+  return () => {
+    // Keep this partition configured for the rest of the process. Its original
+    // Electron protocol will now load official pages and API calls directly.
+    targetSession.protocol.unhandle(protocol);
+  };
 }
 
 function oauthPopupWindowOptions(partition: string | null) {
@@ -1247,13 +1255,17 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
     if (documentError !== null) {
       throw new Error(documentError);
     }
-    await installBundledRenderer(
+    const restoreCloudRenderer = await installBundledRenderer(
       targetUrl,
       target.value,
       target.partition,
       currentSetup?.mode === "new",
     );
-    const created = createWindow(targetUrl, target.partition);
+    const created = createWindow(
+      targetUrl,
+      target.partition,
+      !switching && previous === null ? restoreCloudRenderer : undefined,
+    );
     win = created.win;
     // On launch the web app's error screen stays up so its Refresh can recover;
     // switching to a server that cannot render keeps the previous one instead.
