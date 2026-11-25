@@ -19,7 +19,10 @@ export interface LegalDocument {
 const COMPANY = "[[legal name of the company]]";
 const ADDRESS = "[[registered address]]";
 const CONTACT = "hello@mycellios.com";
-const PRIVACY_CONTACT = "contact@nodecodex.io";
+const PRIVACY_CONTROLLER = (import.meta.env?.VITE_PRIVACY_CONTROLLER as string | undefined)?.trim()
+  || "[[legal name of the company]]";
+const PRIVACY_CONTACT = (import.meta.env?.VITE_PRIVACY_CONTACT as string | undefined)?.trim()
+  || "[[privacy contact email]]";
 const PRIVACY_MINIMUM_AGE = 16;
 
 export const TERMS: LegalDocument = {
@@ -100,12 +103,12 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   kind: "privacy",
   title: "Mycellios Privacy Policy",
-  updated: "24 November 2026",
+  updated: "25 November 2026",
   intro:
     "This policy explains what personal data Mycellios processes, why, who receives it and the choices you have. It covers the website, the Agent workspace, the Chrome extension, the Desktop and Android apps, the API and the compute network.",
   sections: [
     { id: "controller", heading: "Who is responsible", paragraphs: [
-      `NODECODEX (Andorran tax registration 393340G), Plaça Bartomeu Rebes Duran, 5, pis 0, AD500 Andorra la Vella, Andorra, is responsible for processing your personal data. Contact us at ${PRIVACY_CONTACT}.`,
+      `${PRIVACY_CONTROLLER} (Andorran tax registration 393340G), Plaça Bartomeu Rebes Duran, 5, pis 0, AD500 Andorra la Vella, Andorra, is responsible for processing your personal data. Contact us at ${PRIVACY_CONTACT}.`,
     ] },
     { id: "data-we-collect", heading: "Data we collect", list: [
       "Account: your email address, name, password (stored hashed) and sign-in records.",

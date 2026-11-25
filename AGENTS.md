@@ -67,6 +67,12 @@ These rules apply to the complete repository.
 
 ## Documentation
 
+- The hosted landing privacy policy gets the public operator name and contact
+  from the `MYCELLIOS_PRIVACY_CONTROLLER` and `MYCELLIOS_PRIVACY_CONTACT`
+  repository deployment variables. The coordinator image passes them to the
+  landing build. A missing value keeps the draft notice visible. Verify the
+  rendered `/privacy` after promoting a policy revision.
+
 - `README.md` is the entry point and `docs/README.md` is the documentation map.
 - README artwork belongs under `assets/readme/`. Keep brand illustrations and
   conceptual diagrams distinct from screenshots or measured runtime evidence.
