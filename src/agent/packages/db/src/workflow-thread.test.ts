@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "./client.js";
-import { isOwnedWorkflowThread } from "./workflow-thread.js";
+import { isOwnedWorkflowThread, isSignedWorkflowThread } from "./workflow-thread.js";
 
 describe("isOwnedWorkflowThread", () => {
   const thread = { id: "thread", taskBotId: "bot", taskKey: "workflow:execution:mico", projectKey: "workflow:flow" };
@@ -23,6 +23,16 @@ describe("isOwnedWorkflowThread", () => {
   it("requires the workflow run bound to this private thread", async () => {
     const { prisma } = fixture({ id: "execution" }, null);
     expect(await isOwnedWorkflowThread(prisma, actor, thread)).toBe(false);
+  });
+  it("binds signed provenance to the exact workflow execution and owner", async () => {
+    const { db, prisma } = fixture();
+    expect(await isSignedWorkflowThread(prisma, actor, thread)).toBe(true);
+    expect(db.workflowExecution.findFirst).toHaveBeenCalledWith({
+      where: { id: "execution", workflowId: "flow", userId: "owner", spaceId: "space", clientNonce: { startsWith: "workflow-event:" } },
+      select: { id: true },
+    });
+    expect(await isSignedWorkflowThread(fixture(null).prisma, actor, thread)).toBe(false);
+    expect(await isSignedWorkflowThread(prisma, actor, { ...thread, taskKey: "ordinary" })).toBe(false);
   });
   it("does not query for an ordinary task", async () => {
     const { db, prisma } = fixture();

@@ -2,8 +2,12 @@ import { randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import {
   createWorkflowExecution,
+  decideWorkflowApproval,
   ownedWorkflow,
   scheduledWorkflow,
+  saveWorkflowRevision,
+  restoreWorkflowVersion,
+  snapshotWorkflow,
   workflowDto,
   workflowExecutionDto,
 } from "@mycellios/adapters";
@@ -12,6 +16,7 @@ import type { WorkflowGraph } from "@mycellios/contracts";
 import { nextCronDate } from "@mycellios/core";
 import { stopWorkflowExecution } from "@mycellios/db";
 import type { RouterContext } from "./context.js";
+import { replaceWorkflowWebhook, revokeWorkflowWebhook, workflowWebhookPath } from "../workflow-webhooks.js";
 
 export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
   async function validateAgents(actor: Parameters<typeof repos.getBot>[0], graph: WorkflowGraph) {
@@ -30,11 +35,13 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
       create: authed.workflows.create.handler(async ({ context, input }) => {
         await validateAgents(context.actor, input.graph);
         const id = input.id ?? randomUUID();
-        await deps.prisma
-          .$executeRaw`INSERT INTO workflows (id,"spaceId","userId",name,graph) VALUES (${id},${context.actor.spaceId},${context.actor.userId},${input.name},${JSON.stringify(input.graph)}::jsonb) ON CONFLICT (id) DO NOTHING`;
-        const row = await ownedWorkflow(deps.prisma, context.actor, id);
-        if (!row) throw new ORPCError("CONFLICT");
-        return workflowDto(row);
+        return deps.prisma.$transaction(async tx => {
+          await tx.$executeRaw`INSERT INTO workflows (id,"spaceId","userId",name,graph) VALUES (${id},${context.actor.spaceId},${context.actor.userId},${input.name},${JSON.stringify(input.graph)}::jsonb) ON CONFLICT (id) DO NOTHING`;
+          const row = await ownedWorkflow(tx, context.actor, id);
+          if (!row) throw new ORPCError("CONFLICT");
+          if (row.version === 1) await snapshotWorkflow(tx, row, true);
+          return workflowDto(row);
+        });
       }),
       save: authed.workflows.save.handler(async ({ context, input }) => {
         const flow = await ownedWorkflow(deps.prisma, context.actor, input.id);
@@ -60,14 +67,12 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
             });
           }
         }
-        const saved = await deps.prisma.$queryRaw<
-          WorkflowRow[]
-        >`UPDATE workflows SET name=${input.name},graph=${JSON.stringify(input.graph)}::jsonb,active=${input.active},"nextRunAt"=${next},version=version+1,"updatedAt"=now() WHERE id=${flow.id} AND "userId"=${context.actor.userId} AND "spaceId"=${context.actor.spaceId} AND version=${input.expectedVersion} AND "archivedAt" IS NULL RETURNING *`;
-        if (!saved.length)
+        const saved = await deps.prisma.$transaction(tx => saveWorkflowRevision(tx, context.actor, { ...input, nextRunAt: next }));
+        if (!saved)
           throw new ORPCError("CONFLICT", {
             message: "This workflow changed on another device. Reload it before saving.",
           });
-        return workflowDto(saved[0]!);
+        return workflowDto(saved);
       }),
       archive: authed.workflows.archive.handler(async ({ context, input }) => {
         const flow = await ownedWorkflow(deps.prisma, context.actor, input.id);
@@ -77,6 +82,7 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
         return { ok: true as const };
       }),
       execute: authed.workflows.execute.handler(async ({ context, input }) => {
+        if (input.clientNonce.startsWith("workflow-event:")) throw new ORPCError("BAD_REQUEST", { message: "Reserved execution nonce" });
         return deps.prisma.$transaction(async (tx) => {
           const flow = (
             await tx.$queryRaw<
@@ -116,6 +122,53 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
             ExecutionRow[]
           >`SELECT * FROM workflow_executions WHERE "workflowId"=${input.id} AND "userId"=${context.actor.userId} AND "spaceId"=${context.actor.spaceId} ORDER BY "createdAt" DESC LIMIT 20`
         ).map(workflowExecutionDto);
+      }),
+      webhook: authed.workflows.webhook.handler(async ({ context, input }) => {
+        const { spaceId, userId } = context.actor;
+        if (!(await ownedWorkflow(deps.prisma, context.actor, input.id))) throw new ORPCError("NOT_FOUND");
+        const row = await deps.prisma.workflowWebhook.findFirst({
+          where: { workflowId: input.id, spaceId, userId }, select: { version: true },
+        });
+        return { version: row?.version ?? null, path: workflowWebhookPath(input.id) };
+      }),
+      rotateWebhook: authed.workflows.rotateWebhook.handler(async ({ context, input }) => {
+        const { spaceId, userId } = context.actor;
+        if (!(await ownedWorkflow(deps.prisma, context.actor, input.id))) throw new ORPCError("NOT_FOUND");
+        const result = await replaceWorkflowWebhook(deps, input.id, input.expectedVersion, {
+          operationId: "workflows.rotateWebhook", traceId: "workflows.rotateWebhook", userId, spaceId,
+          signal: context.signal ?? new AbortController().signal,
+        }).catch((error: unknown) => {
+          if (error instanceof Error && error.message === "Add exactly one webhook trigger.")
+            throw new ORPCError("BAD_REQUEST", { message: error.message });
+          throw error;
+        });
+        if (!result) throw new ORPCError("CONFLICT", { message: "Reload the saved workflow before enabling its webhook." });
+        return result;
+      }),
+      revokeWebhook: authed.workflows.revokeWebhook.handler(async ({ context, input }) => {
+        if (!(await revokeWorkflowWebhook(deps.prisma, input.id, context.actor))) throw new ORPCError("NOT_FOUND");
+        return { ok: true as const };
+      }),
+      versions: authed.workflows.versions.handler(async ({ context, input }) => {
+        if (!(await ownedWorkflow(deps.prisma, context.actor, input.id))) throw new ORPCError("NOT_FOUND");
+        const rows = await deps.prisma.workflowVersion.findMany({
+          where: { workflowId: input.id, spaceId: context.actor.spaceId, userId: context.actor.userId },
+          select: { version: true, name: true, createdAt: true }, orderBy: { version: "desc" }, take: 50,
+        });
+        return rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() }));
+      }),
+      restoreVersion: authed.workflows.restoreVersion.handler(async ({ context, input }) => {
+        const restored = await restoreWorkflowVersion(deps.prisma, context.actor, input);
+        if (restored === "missing") throw new ORPCError("NOT_FOUND");
+        if (restored === "conflict") throw new ORPCError("CONFLICT", { message: "This workflow changed on another device. Reload it before restoring." });
+        if (restored === "mico_unavailable") throw new ORPCError("BAD_REQUEST", { message: "A Mico in this version is no longer available." });
+        return restored;
+      }),
+      decideApproval: authed.workflows.decideApproval.handler(async ({ context, input }) => {
+        const decision = await decideWorkflowApproval(deps.prisma, context.actor, input);
+        if (decision === "not_found") throw new ORPCError("NOT_FOUND");
+        if (decision === "conflict") throw new ORPCError("CONFLICT", { message: "This workflow approval is no longer waiting" });
+        return decision;
       }),
       stop: authed.workflows.stop.handler(async ({ context, input }) => {
         await stopWorkflowExecution(deps.prisma, context.actor, input.executionId);

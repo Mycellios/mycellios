@@ -519,6 +519,27 @@ describe("Docker page browser", () => {
     );
   });
 
+  it("routes each routine attempt to an isolated browser and keeps that key for cleanup", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => Response.json({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new DockerSandboxProvider("http://supervisor.test", "test-token");
+    const computer = { id: "computer", botId: "home", kind: "docker" as const, providerRef: "computer" };
+    const routine = { ...context, botId: "bot", runId: "routine-run", browserThreadId: "thread", routineBrowserFence: 2 };
+    await provider.pageBrowser(computer, { command: "snapshot" }, routine);
+    await provider.pageBrowser(computer, { command: "close" }, routine);
+    await provider.pageBrowser(computer, { command: "snapshot" }, { ...routine, routineBrowserFence: 3 });
+    const keys = fetchMock.mock.calls.map(([url, request]) => {
+      expect(url).toBe("http://supervisor.test/computers/computer/browser/isolated");
+      return JSON.parse(String(request.body)).conversationKey;
+    });
+    expect(keys[0]).toMatch(/^[a-f0-9]{64}$/);
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+    await expect(provider.pageBrowser({ ...computer, kind: "desktop" }, { command: "snapshot" }, routine))
+      .resolves.toMatchObject({ ok: false });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("asks the conversation's computer what its page browser supports, and for later parts", async () => {
     const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
       Response.json({ ok: true, features: ["act.press"] }),

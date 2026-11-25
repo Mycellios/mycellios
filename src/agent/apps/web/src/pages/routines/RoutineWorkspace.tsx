@@ -5,7 +5,7 @@ import type { Bot, Routine, RoutineRun, ThreadMessage } from "@mycellios/contrac
 import { isOneShotRoutineCrons } from "@mycellios/core";
 import { BotAvatar, Button, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
+import { ArrowLeft, CalendarClock, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { desktopDragClass } from "../../lib/desktop";
@@ -24,13 +24,14 @@ import { ownedRoutines, routineCanRun } from "./routine-diagram";
 import { useRoutineActions } from "./use-routine-actions";
 
 const EMPTY_ROUTINES: Routine[] = [];
-export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onEdit, onAsk, onExit, onNavigation, editorOpen, messages }: {
+export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onEdit, onPrepareMorningBriefing, onAsk, onExit, onNavigation, editorOpen, messages }: {
   bot: Bot;
   scope: string;
   client: RpcClient;
   selectedId: string | null;
   onSelect: (routineId: string) => void;
   onEdit: (routine?: Routine) => void;
+  onPrepareMorningBriefing: () => void;
   onAsk: (routine: Routine) => void;
   onExit: () => void;
   onNavigation: () => void;
@@ -108,6 +109,7 @@ export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onE
       <Button variant="ghost" size="icon-sm" className="app-no-drag" aria-label={t`Back to chat`} onClick={onExit}><ArrowLeft size={16} /></Button>
       <BotAvatar identity={bot.id} color={bot.color} size={21} status={bot.status} /><span className="min-w-0 truncate text-sm font-medium">{bot.name}</span><span className="hidden text-sm text-muted-foreground sm:inline">/ {t`Routines`}</span>
       <div className="app-no-drag ms-auto flex shrink-0 items-center gap-1">
+        {selected ? <Button variant="ghost" size="icon-sm" aria-label={t`Prepare morning briefing`} title={t`Prepare morning briefing`} onClick={onPrepareMorningBriefing}><CalendarClock size={16} aria-hidden /></Button> : null}
         <Button variant="ghost" size="icon-sm" aria-label={t`Create Routine`} onClick={() => onEdit()}><Plus size={16} /></Button>
         {selected ? <Button size="sm" disabled={!canRun(selected.id)} onClick={() => selected && run(selected)}><Play size={13} />{selectedState?.busy ? t`Starting` : t`Run`}</Button> : null}
         {selected ? <Button variant="ghost" size="icon-sm" aria-label={t`Routine details`} aria-expanded={detailsOpen && !editorOpen} onClick={() => setDetailsOpen(value => !value)}><PanelRight size={16} /></Button> : null}
@@ -115,7 +117,7 @@ export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onE
     </header>
     {list.error ? <div role="alert" className="flex items-center gap-3 border-b border-border p-3 text-sm text-destructive">{errorText(list.error)}<Button size="xs" variant="outline" onClick={() => void list.refetch()}>{t`Retry`}</Button></div> : null}
     {selectedState?.error ? <p role="alert" className="border-b border-border px-4 py-2 text-xs text-destructive">{selectedState.error}</p> : null}
-    {list.isPending ? <LoadingSkeleton className="min-h-0 flex-1 p-4" /> : !selected ? (list.error ? <div className="grid flex-1 place-items-center p-6"><p className="text-sm text-muted-foreground">{t`Routines unavailable`}</p></div> : <RoutineEmptyState bot={bot} onCreate={() => onEdit()} />) : <>
+    {list.isPending ? <LoadingSkeleton className="min-h-0 flex-1 p-4" /> : !selected ? (list.error ? <div className="grid flex-1 place-items-center p-6"><p className="text-sm text-muted-foreground">{t`Routines unavailable`}</p></div> : <RoutineEmptyState bot={bot} onCreate={() => onEdit()} onPrepareMorningBriefing={onPrepareMorningBriefing} />) : <>
       <div className="app-no-drag flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <NativeSelect aria-label={t`Select routine`} value={selected.id} onChange={event => onSelect(event.target.value)} className="max-w-full text-xs">
           {routines.map(routine => <NativeSelectOption key={routine.id} value={routine.id}>{routine.name}</NativeSelectOption>)}

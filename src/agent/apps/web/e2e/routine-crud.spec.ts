@@ -20,6 +20,26 @@ async function saveAndReturn(page: Page, procedure: "routines/create" | "routine
   return response.request().postDataJSON().json;
 }
 
+test("a morning briefing is editable and only persists after saving it paused", async ({ page }) => {
+  await signup(page, `routine-briefing-${Date.now()}@mycellios.test`, "password12", "Routine Briefing");
+  await completeOnboarding(page);
+  const botId = activeBotId(page);
+
+  await page.goto(`/app/${botId}?view=routines`);
+  await page.getByRole("button", { name: "Prepare morning briefing" }).click();
+  await expect(page.locator("label:has-text('Name') input")).toHaveValue("Morning briefing");
+  await expect(page.locator("label:has-text('Instruction') textarea")).toHaveValue(/Read only/);
+  await expect(page.getByLabel("How often")).toHaveValue("Weekdays");
+  expect(await rpc<Routine[]>(page, "routines/list", { botId })).toEqual([]);
+
+  await page.locator("label:has-text('Name') input").fill("My briefing");
+  expect(await saveAndReturn(page, "routines/create")).toMatchObject({
+    botId, name: "My briefing", active: false, crons: ["0 9 * * 1-5"],
+  });
+  const [saved] = await rpc<Routine[]>(page, "routines/list", { botId });
+  expect(saved).toMatchObject({ botId, name: "My briefing", active: false, nextRunAt: null });
+});
+
 test("routine editing updates in place, preserves timezone, deletion persists, and model choice saves", async ({
   page,
 }, testInfo) => {

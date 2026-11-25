@@ -83,6 +83,7 @@ export function WorkflowWorkspace({
       prompt: t`Instruction`,
       agent: t`Mico`,
       condition: t`Condition`,
+      approval: t`Approval`,
       output: t`Result`,
       note: t`Note`,
       text: t`Text`,

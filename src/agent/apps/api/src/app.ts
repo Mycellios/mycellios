@@ -190,6 +190,7 @@ import {
 import { mountVoiceHttpRoutes, voiceAccountErrorStatus } from "./voice.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
 import { mountMicoScriptsHttp } from "./mico-scripts-http.js";
+import { mountWorkflowWebhooks } from "./workflow-webhooks.js";
 
 /**
  * Default API PostgreSQL pool size when DB_POOL_MAX is unset. Every Desktop relay
@@ -1029,6 +1030,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   });
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
   if (env.micoScriptsEnabled) mountMicoScriptsHttp(app, { prisma, events, jobs });
+  mountWorkflowWebhooks(app, { prisma, secrets });
   if (billing && billingProvider) {
     mountBillingRoutes(app, {
       billing,

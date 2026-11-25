@@ -49,6 +49,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     files: ['dist/**/*', '!dist/**/*.map', 'package.json'],
     extraMetadata: { name: 'mycellios-desktop', version, main: 'dist/main.js' },
     extraResources: [
+      { from: path.join(agentRoot, 'scripts/mycellios-cli.mjs'), to: 'cli/mycellios-cli.mjs' },
       ...(buildIdentity ? [{ from: buildIdentity, to: 'desktop-build.json' }] : []),
       // Koffi 3 uses a platform optional package. Dependency collection can miss
       // it; its loader also supports this explicit unpacked resources location.

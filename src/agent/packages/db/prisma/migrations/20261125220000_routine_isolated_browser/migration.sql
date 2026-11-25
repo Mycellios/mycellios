@@ -1,0 +1,4 @@
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+ALTER TABLE routines ADD COLUMN "isolatedBrowser" BOOLEAN NOT NULL DEFAULT FALSE;
+COMMIT;

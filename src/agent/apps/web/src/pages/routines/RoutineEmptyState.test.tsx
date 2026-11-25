@@ -15,7 +15,7 @@ beforeEach(() => {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); reduce = false; vi.unstubAllGlobals(); });
-function render(onCreate = vi.fn()) { act(() => root.render(<RoutineEmptyState bot={{ id: "mico", name: "Mico", color: "forest" } as Bot} onCreate={onCreate} />)); return onCreate; }
+function render(onCreate = vi.fn(), onPrepareMorningBriefing = vi.fn()) { act(() => root.render(<RoutineEmptyState bot={{ id: "mico", name: "Mico", color: "forest" } as Bot} onCreate={onCreate} onPrepareMorningBriefing={onPrepareMorningBriefing} />)); return onCreate; }
 it("shows a labelled example and creates only after an explicit click", () => {
   const create = render();
   expect(container.textContent).toContain("Illustrative example");
@@ -23,6 +23,13 @@ it("shows a labelled example and creates only after an explicit click", () => {
   expect(create).not.toHaveBeenCalled();
   act(() => [...container.querySelectorAll("button")].find(b => b.textContent?.includes("Create Routine"))!.click());
   expect(create).toHaveBeenCalledExactlyOnceWith();
+});
+it("opens the briefing draft through its own action", () => {
+  const prepare = vi.fn();
+  const create = render(vi.fn(), prepare);
+  act(() => [...container.querySelectorAll("button")].find(button => button.textContent === "Prepare morning briefing")!.click());
+  expect(prepare).toHaveBeenCalledTimes(1);
+  expect(create).not.toHaveBeenCalled();
 });
 it("lets the user pause and resume the motion without changing the draft", () => {
   const create = render();
@@ -39,6 +46,6 @@ it("stops on a hidden page and respects reduced motion", () => {
   act(() => { Object.defineProperty(document, "hidden", { configurable: true, value: true }); document.dispatchEvent(new Event("visibilitychange")); });
   expect(container.querySelector('[data-testid="routine-empty-state"]')?.getAttribute("data-animate")).toBe("false");
   reduce = true;
-  act(() => root.render(<RoutineEmptyState key="reduced" bot={{ id: "mico", name: "Mico" } as Bot} onCreate={vi.fn()} />));
+  act(() => root.render(<RoutineEmptyState key="reduced" bot={{ id: "mico", name: "Mico" } as Bot} onCreate={vi.fn()} onPrepareMorningBriefing={vi.fn()} />));
   expect(container.querySelector('[aria-label="Pause preview"]')).toBeNull();
 });

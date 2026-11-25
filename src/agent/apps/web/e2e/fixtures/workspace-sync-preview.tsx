@@ -2,9 +2,9 @@ import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import type { Bot, Routine, Space, Workflow } from "@mycellios/contracts";
+import type { Bot, Routine, Space, Workflow, WorkflowExecution } from "@mycellios/contracts";
 import { Button } from "@mycellios/ui-web";
 import { createSpaceRpc } from "../../src/lib/rpc";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
@@ -12,6 +12,8 @@ import { QueryUserProvider } from "../../src/lib/query";
 import { WorkspaceRail } from "../../src/pages/shell/workspace-rail";
 import { MarketplaceWorkspace } from "../../src/pages/marketplace/MarketplaceWorkspace";
 import { RoutineWorkspace } from "../../src/pages/routines/RoutineWorkspace";
+import { RoutineEditor } from "../../src/pages/RoutineEditor";
+import { useRoutineEditor } from "../../src/pages/shell/use-routine-editor";
 import { WorkflowWorkspace } from "../../src/pages/workflows/WorkflowWorkspace";
 import { TasksWorkspace } from "../../src/pages/tasks/TasksWorkspace";
 import { ScheduleWorkspace } from "../../src/pages/schedule/ScheduleWorkspace";
@@ -28,6 +30,7 @@ const spaces = [{ id: spaceId, name: "Synthetic workspace", bots, groups: [] }] 
 let routine = { id: "fixture-routine", botId: bots[0]!.id, name: "Fixture reminder", prompt: "Synthetic reminder only", active: false,
   crons: ["0 9 * * 1-5"], timezone: "Europe/Madrid", watch: null, nextRunAt: null, lastRunAt: null, createdAt: stamp, updatedAt: stamp } as Routine;
 let flows: Workflow[] = [];
+let workflowExecution: WorkflowExecution | null = null;
 const totals = { calls: 0, pricedCalls: 0, estimatedCalls: 0, pendingCalls: 0, incompleteCalls: 0, knownUsd: 0, confirmedUsd: 0,
   estimatedUsd: 0, costUsd: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, tokens: 0, processed: 0, knownTokens: 0, knownProcessed: 0 };
 const calls: Array<{ path: string; input: any }> = [];
@@ -49,11 +52,26 @@ window.fetch = async (resource, init) => {
   else if (path === "routines/history") value = { runs: [], nextCursor: null };
   else if (path === "routines/calendar") value = { routines: [routine], entries: [], truncated: false, invalidRoutineIds: [], now: new Date().toISOString() };
   else if (path === "routines/update") value = routine = { ...routine, ...input };
+  else if (path === "routines/create") value = { ...routine, ...input, id: "fixture-briefing", nextRunAt: null };
   else if (path === "workflows/available" || path === "taskInbox/available") value = { enabled: true };
   else if (path === "workflows/list") value = flows;
-  else if (path === "workflows/runs" || path === "taskInbox/list") value = [];
+  else if (path === "workflows/runs") value = workflowExecution?.workflowId === input.id ? [workflowExecution] : [];
+  else if (path === "taskInbox/list") value = [];
   else if (path === "workflows/create") { value = { ...input, version: 1, active: false, nextRunAt: null, updatedAt: stamp }; flows.push(value); }
   else if (path === "workflows/save") { value = { ...input, version: input.expectedVersion + 1, nextRunAt: null, updatedAt: stamp }; flows = flows.map(flow => flow.id === value.id ? value : flow); }
+  else if (path === "workflows/execute") {
+    value = workflowExecution = {
+      id: "fixture-execution", workflowId: input.id, version: input.expectedVersion, status: "running",
+      steps: { review: { status: "running", approval: { state: "waiting", message: "Review the result" } } },
+      error: null, createdAt: stamp, updatedAt: stamp,
+    };
+  }
+  else if (path === "workflows/decideApproval" && workflowExecution) {
+    value = workflowExecution = {
+      ...workflowExecution, status: input.decision === "approved" ? "completed" : "cancelled",
+      steps: {},
+    };
+  }
   else if (path === "usage/dashboard") value = { ...input, updatedAt: stamp, totals, agents: [], byAgent: [], byModel: [], byProvider: [], daily: [], providerDaily: [],
     sessions: 0, userMessages: 0, assistantMessages: 0, missingRuns: 0, activeRuns: 0, missingRunDays: [], unattributedCalls: 0, unmappedCalls: 0, collectionStartedAt: null };
   else return new Response(JSON.stringify({ message: `Unexpected fixture RPC: ${path}` }), { status: 500 });
@@ -63,6 +81,13 @@ const client = createSpaceRpc(spaceId), cache = new QueryClient({ defaultOptions
 function Preview() {
   const [page, setPage] = useState("tasks"), [tab, setTab] = useState<MarketplaceTab>("apps"), [routineId, selectRoutine] = useState<string | null>(null);
   const [taskId, selectTask] = useState<string | null>(null), [agentsOpen, setAgentsOpen] = useState(false);
+  const [routinePanel, setRoutinePanel] = useState(false);
+  const activeBotId = useRef(bots[0]!.id);
+  const routineEditor = useRoutineEditor({
+    rpc: client, active: bots[0], activeBotId, timezone: "Europe/Madrid",
+    setBots: () => {}, refreshThread: async () => { throw new Error("No transcript in fixture"); },
+    setPanel: panel => setRoutinePanel(panel === "routine"), messageProviders: [],
+  });
   const exit = () => setPage("tasks"), onSpace = () => {};
   return <div className="flex h-dvh min-h-0 flex-col">
     <div className="shrink-0 bg-warning px-3 py-1 text-xs text-background">Synthetic UI fixture — no real account or execution</div>
@@ -75,12 +100,17 @@ function Preview() {
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         <nav className="flex shrink-0 flex-wrap gap-1 p-1 md:hidden" aria-label="Fixture pages">{["tasks", "routines", "workflows", "schedule", "usage", "marketplace"].map(name => <Button key={name} variant="ghost" size="sm" onClick={() => setPage(name)}>{name}</Button>)}</nav>
         {page === "marketplace" ? <MarketplaceWorkspace tab={tab} onTab={setTab} scope={scope} bots={bots} activeBotId={bots[0]!.id} onExit={exit} onMcp={exit} onCreated={() => {}} onShowBot={exit} onBotsChanged={async () => {}} onCreateBot={exit}/> :
-        page === "routines" ? <RoutineWorkspace bot={bots[0]!} scope={scope} client={client} selectedId={routineId} onSelect={selectRoutine} onEdit={() => {}} onAsk={exit} onExit={exit} onNavigation={exit} editorOpen={false} messages={[]}/> :
+        page === "routines" ? <RoutineWorkspace bot={bots[0]!} scope={scope} client={client} selectedId={routineId} onSelect={selectRoutine} onEdit={routineEditor.startRoutine} onPrepareMorningBriefing={routineEditor.prepareMorningBriefing} onAsk={exit} onExit={exit} onNavigation={exit} editorOpen={routinePanel} messages={[]}/> :
         page === "workflows" ? <WorkflowWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onNavigation={exit}/> :
         page === "schedule" ? <ScheduleWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onOpenRoutine={() => setPage("routines")} onShowBot={exit} onCreateRoutine={() => setPage("routines")}/> :
         page === "usage" ? <UsageWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} onExit={exit} onPreferences={exit}/> :
         <TasksWorkspace client={client} scope={scope} bots={bots} spaces={spaces} spaceId={spaceId} onSpace={onSpace} initialBotId={bots[0]!.id} selectedId={taskId} onSelect={selectTask} onExit={exit} agentsOpen={agentsOpen} onToggleAgents={() => setAgentsOpen(value => !value)}/>}
       </main>
+      {page === "routines" && routinePanel && routineEditor.editorProps ? (
+        <aside aria-label="Routine draft" className="w-96 max-w-full shrink-0 border-s border-border">
+          <RoutineEditor {...routineEditor.editorProps} />
+        </aside>
+      ) : null}
     </div>
   </div>;
 }

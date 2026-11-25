@@ -100,6 +100,7 @@ export const BUILTIN_TOOL_NAMES = [
   "list_workflows",
   "save_workflow",
   "run_workflow",
+  "workflow_answer",
   "propose_instructions_update",
   "create_space",
   "spawn_bot",

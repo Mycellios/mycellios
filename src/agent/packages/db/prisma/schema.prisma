@@ -811,10 +811,40 @@ model Workflow {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
   executions WorkflowExecution[]
+  versions WorkflowVersion[]
+  webhook WorkflowWebhook?
   @@unique([id,spaceId,userId], map: "workflows_identity_scope_key")
   @@index([spaceId,userId], map: "workflows_owner_idx")
   @@map("workflows")
 }
+model WorkflowWebhook {
+  workflowId String @id
+  workflow Workflow @relation(fields: [workflowId,spaceId,userId], references: [id,spaceId,userId], onDelete: Cascade)
+  spaceId String
+  userId String
+  version Int
+  secretId String @unique
+  ciphertext String
+  createdAt DateTime @default(now())
+  @@unique([workflowId,spaceId,userId], map: "workflow_webhooks_identity_scope_key")
+  @@index([spaceId,userId,workflowId], map: "workflow_webhooks_owner_idx")
+  @@map("workflow_webhooks")
+}
+
+model WorkflowVersion {
+  workflowId String
+  workflow Workflow @relation(fields: [workflowId,spaceId,userId], references: [id,spaceId,userId], onDelete: Cascade)
+  spaceId String
+  userId String
+  version Int
+  name String
+  graph Json
+  createdAt DateTime @default(now())
+  @@id([workflowId, version])
+  @@index([spaceId,userId,workflowId], map: "workflow_versions_owner_idx")
+  @@map("workflow_versions")
+}
+
 model WorkflowExecution {
   id String @id
   workflowId String
@@ -1508,6 +1538,7 @@ model Routine {
   timezone       String    @default("UTC")
   active         Boolean   @default(false)
   notify         Boolean   @default(true)
+  isolatedBrowser Boolean @default(false)
   webhookEnabled Boolean   @default(false)
   githubEnabled  Boolean   @default(false)
   messageProvider String?

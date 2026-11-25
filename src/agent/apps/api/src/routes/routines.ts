@@ -135,7 +135,7 @@ export function routinesRoutes(ctx: RouterContext) {
         // Without a place the first run creates the routine's own conversation.
         const threadId = input.runIn === "chat" ? mainChatId(bot) : null;
         const row = await deps.prisma.routine.create({
-          data: { ...routineRowData(context.actor, input, routineNextRunAt(input)), threadId },
+          data: { ...routineRowData(context.actor, input, routineNextRunAt(input)), threadId, isolatedBrowser: input.isolatedBrowser },
           include: routineDtoInclude,
         });
         await announceRoutine(context.actor, bot, row);
@@ -313,6 +313,7 @@ export function routinesRoutes(ctx: RouterContext) {
               timezone: input.timezone,
               active: input.active,
               notify: input.notify,
+              isolatedBrowser: input.isolatedBrowser,
               webhookEnabled: input.webhookEnabled,
               githubEnabled: input.githubEnabled,
               messageProvider: input.messageProvider,

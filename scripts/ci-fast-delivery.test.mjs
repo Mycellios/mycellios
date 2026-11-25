@@ -228,6 +228,20 @@ test('Space members qualify invitations, roles, shared Micos and member isolatio
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-space-members-db.ts')));
 });
 
+test('the routine browser qualifies real Chromium and the supervisor',()=>{
+ const file='src/agent/infra/sandboxes/computer/test_page_browser.py';
+ const checks=planChecks([file],[]);
+ assert.ok(checks.some(check=>check.args.includes('isolated_browser_real')));
+ assert.ok(checks.some(check=>check.args.includes('chromium')));
+ assert.ok(checks.some(check=>check.args.includes('@mycellios/sandbox-supervisor')));
+});
+
+test('workflow version and webhook changes run their isolated database qualification',()=>{
+ for (const file of ['src/agent/apps/api/src/workflow-webhooks.ts','src/agent/packages/db/prisma/migrations/20261125210000_workflow_signed_webhooks/migration.sql','src/agent/packages/db/prisma/migrations/20261125200000_workflow_revision_history/migration.sql']) {
+  assert.ok(planChecks([file],[]).some(check=>check.args.includes('scripts/verify-workflow-thread-db.ts')),file);
+ }
+});
+
 test('event waits qualify the deployed CHECK upgrade and automatic return on a real isolated database',()=>{
  for (const file of ['src/agent/packages/db/src/event-waits.ts','src/agent/packages/db/src/work-delegation.ts','src/agent/scripts/verify-autonomy-waits-db.ts','src/agent/packages/db/prisma/migrations/20261116150000_event_wait_delegation_state/migration.sql']) {
   const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts'));
