@@ -70,9 +70,10 @@ export function readConversationHistory(
   const queryKey = spaceQueries(userId, spaceId, taskScope).threads.get.queryKey({ input });
   return queryClient.fetchQuery({
     queryKey,
-    queryFn: ({ signal }) => createSpaceRpc(spaceId, taskScope).threads.get(input, {
-      signal: anySignal([signal, AbortSignal.timeout(15_000)]),
-    }),
+    queryFn: ({ signal }) => createSpaceRpc(spaceId, taskScope).threads.get(
+      queryClient.getQueryData(queryKey) ? input : { ...input, history: "recent" },
+      { signal: anySignal([signal, AbortSignal.timeout(15_000)]) },
+    ),
     retry: false,
     staleTime: 0,
   });

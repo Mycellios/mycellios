@@ -15,6 +15,11 @@ queue/steering semantics and authoritative event reducer.
   Paint the first progress event immediately and coalesce subsequent progress to
   animation frames. Structural events, completion, errors, navigation and explicit
   preference changes flush immediately. Cancel pending frames on unmount.
+- Web cold loads ask for the latest 24 stored messages through the existing thread
+  or bootstrap read. Keep the older-history cursor, identity, and consistent event
+  cursor. Active runs use the regular 100-message window so pending questions and
+  takeovers can still be reached. Older clients and explicit history reads retain
+  their existing page size. Do not preload the roster's full transcripts.
 - Motion acknowledges pending send, first live reply and control changes. Do not
   replay a streamed reply on completion or animate history loads and token updates.
   Preserve scroll ownership, reduced motion, keyboard and assistive feedback.

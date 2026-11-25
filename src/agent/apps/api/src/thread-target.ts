@@ -78,6 +78,7 @@ export type ThreadTarget =
     };
 
 const THREAD_MESSAGE_PAGE_SIZE = 100;
+const RECENT_THREAD_MESSAGE_PAGE_SIZE = 24;
 const RUNS_NEEDING_CONTINUE = new Set(["queued", "waiting_takeover"]);
 
 const STEERABLE_RUN_STATUSES = new Set<string>(QUEUE_HOLDING_RUN_STATUSES);
@@ -398,11 +399,18 @@ export async function threadHead(prisma: PrismaClient, target: ThreadTarget) {
 export async function threadSnapshot(
   deps: { prisma: PrismaClient },
   target: ThreadTarget,
+  history?: "recent",
 ): Promise<ThreadSnapshot> {
   // Read messages, the event cursor, runs and progress from one MVCC snapshot.
   // Repeatable Read keeps the cursor aligned with the ask card without waiting
   // for a writer that holds the thread row lock.
   const readOptions = { isolationLevel: "RepeatableRead", timeout: 15_000, maxWait: 5_000 } as const;
+  const loadHistory = async (tx: Prisma.TransactionClient, activeRuns: Promise<readonly unknown[]>) => {
+    // An active run may need an older question or takeover card in the normal window.
+    const idleRecent = history === "recent" && (await activeRuns).length === 0;
+    const size = idleRecent ? RECENT_THREAD_MESSAGE_PAGE_SIZE : THREAD_MESSAGE_PAGE_SIZE;
+    return loadMessagePage(tx, target.threadId, undefined, size);
+  };
   if (target.kind === "bot") {
     const [busyBotName, core] = await Promise.all([
       resolveBusyBotName(deps.prisma, {
@@ -412,60 +420,41 @@ export async function threadSnapshot(
       }),
       deps.prisma.$transaction(
         async (tx) => {
-          const [messagePage, last, activeRuns, busyOrFailed] = await Promise.all([
-            loadMessagePage(tx, target.threadId, undefined, THREAD_MESSAGE_PAGE_SIZE),
+          const activeRunRead = tx.run.findMany({
+            where: {
+              botId: target.botId,
+              threadId: target.threadId,
+              status: { in: [...ACTIVE_RUN_STATUSES] },
+              OR: [
+                { trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] } },
+                { status: { in: ["waiting_input", "waiting_takeover"] } },
+              ],
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          }).then(runs => runs);
+          // Any foreground active run is already in activeRunRead. Without active
+          // work only the newest foreground terminal can surface an error.
+          const terminalRead = activeRunRead.then(runs => runs.length ? null : tx.run.findFirst({
+            where: {
+              botId: target.botId,
+              threadId: target.threadId,
+              trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
+              status: { in: ["failed", "completed", "cancelled"] },
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          }));
+          const [messagePage, last, activeRuns, terminal] = await Promise.all([
+            loadHistory(tx, activeRunRead),
             tx.event.findFirst({
               where: { threadId: target.threadId },
               orderBy: { seq: "desc" },
               select: { seq: true },
             }),
-            tx.run.findMany({
-              where: {
-                botId: target.botId,
-                threadId: target.threadId,
-                status: { in: [...ACTIVE_RUN_STATUSES] },
-                OR: [
-                  { trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] } },
-                  { status: { in: ["waiting_input", "waiting_takeover"] } },
-                ],
-              },
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            }),
-            tx.run.findFirst({
-              where: {
-                botId: target.botId,
-                threadId: target.threadId,
-                // Background ticket work stays silent; waiting is handled above.
-                trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
-                status: { in: [...ACTIVE_RUN_STATUSES, "failed"] },
-              },
-              // The id tiebreak keeps ordering deterministic under equal
-              // timestamps, matching the supersession probe below.
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            }),
+            activeRunRead,
+            terminalRead,
           ]);
-          const run = pickPrimaryPrivateActiveRun(activeRuns) ?? busyOrFailed;
-          // A failed run is only the thread's word while it is still the newest
-          // terminal run; otherwise a stale failure would resurface in the
-          // composer error strip on every load, forever. Instead of comparing
-          // timestamps (equal createdAt values reverse under gt/gte), ask for
-          // the newest terminal run under the same deterministic ordering and
-          // check whether it is this failure.
-          const newestTerminal =
-            run?.status === "failed"
-              ? await tx.run.findFirst({
-                  where: {
-                    botId: target.botId,
-                    threadId: target.threadId,
-                    // Background failures must not bury a user-visible failure.
-                    trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
-                    status: { in: ["failed", "completed", "cancelled"] },
-                  },
-                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                  select: { id: true },
-                })
-              : null;
-          const currentRun = run?.status === "failed" && newestTerminal?.id !== run.id ? null : run;
+          const currentRun =
+            pickPrimaryPrivateActiveRun(activeRuns) ?? (terminal?.status === "failed" ? terminal : null);
           const liveRuns = activeRuns.filter((run) => run.trigger !== "bot_message");
           const liveEvents =
             liveRuns.length > 0
@@ -506,26 +495,27 @@ export async function threadSnapshot(
 
   const core = await deps.prisma.$transaction(
     async (tx) => {
+      const activeRunRead = tx.run.findMany({
+        where: {
+          threadId: target.threadId,
+          status: { in: [...ACTIVE_RUN_STATUSES] },
+          // Waiting peer and ticket asks stay answerable. Busy ticket runs stay off
+          // the transcript; only their waiting_input / waiting_takeover states surface.
+          OR: [
+            { trigger: { notIn: ["bot_message", ...BACKGROUND_RUN_TRIGGERS] } },
+            { status: { in: ["waiting_input", "waiting_takeover"] } },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+      }).then(runs => runs);
       const [messagePage, last, activeRuns, recentTerminals] = await Promise.all([
-        loadMessagePage(tx, target.threadId, undefined, THREAD_MESSAGE_PAGE_SIZE),
+        loadHistory(tx, activeRunRead),
         tx.event.findFirst({
           where: { threadId: target.threadId },
           orderBy: { seq: "desc" },
           select: { seq: true },
         }),
-        tx.run.findMany({
-          where: {
-            threadId: target.threadId,
-            status: { in: [...ACTIVE_RUN_STATUSES] },
-            // Waiting peer and ticket asks stay answerable. Busy ticket runs stay off
-            // the transcript; only their waiting_input / waiting_takeover states surface.
-            OR: [
-              { trigger: { notIn: ["bot_message", ...BACKGROUND_RUN_TRIGGERS] } },
-              { status: { in: ["waiting_input", "waiting_takeover"] } },
-            ],
-          },
-          orderBy: { createdAt: "desc" },
-        }),
+        activeRunRead,
         // Recently updated terminals (completion bumps updatedAt). pickLatestTerminalRun then
         // ranks by completedAt ?? createdAt so null timestamps cannot revive a stale failure.
         tx.run.findMany({
