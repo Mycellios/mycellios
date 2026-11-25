@@ -1,3 +1,4 @@
+import { MIGRATION_HISTORY_COMMAND, UPSTREAM_IMAGE_OWNER } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +7,7 @@ import {
   compareReleaseTags,
   composePsArgv,
   composePullArgv,
+  composeRunArgv,
   composeUpArgv,
   composeUpdatePlan,
   DEFAULT_COMPOSE_PROJECT_NAME,
@@ -15,11 +17,16 @@ import {
   gitStatusArgv,
   gitUntrackedFilesArgv,
   gitWorktreeContentDiffArgv,
+  IMAGE_ENV,
+  IMAGE_TAG_ENV,
   imageRef,
+  imageSource,
   isValidComposeProjectName,
   isValidImageName,
   isValidImageTag,
+  OFFICIAL_COMPUTER_IMAGE,
   OFFICIAL_SERVER_IMAGE,
+  OFFICIAL_UPDATER_IMAGE,
   parseGitNameOnly,
   parseLsRemoteReleases,
   parseLsRemoteTags,
@@ -87,6 +94,25 @@ describe("image references", () => {
   });
 });
 
+describe("image identity", () => {
+  it("names this repository's images and the variables Compose reads them from", () => {
+    expect(OFFICIAL_SERVER_IMAGE).toBe("ghcr.io/mycellios/mycellios/app");
+    expect(OFFICIAL_COMPUTER_IMAGE).toBe("ghcr.io/mycellios/mycellios/computer");
+    expect(OFFICIAL_UPDATER_IMAGE).toBe("ghcr.io/mycellios/mycellios/updater");
+    expect(`${IMAGE_ENV}_TAG`).toBe(IMAGE_TAG_ENV);
+  });
+
+  it("tells this repository's images from the upstream project's and from forks or mirrors", () => {
+    expect(imageSource(OFFICIAL_SERVER_IMAGE)).toBe("official");
+    expect(imageSource(` ${OFFICIAL_UPDATER_IMAGE} `)).toBe("official");
+    expect(imageSource(`${UPSTREAM_IMAGE_OWNER}legacy/app`)).toBe("upstream");
+    expect(imageSource("ghcr.io/someone/fork/app")).toBe("other");
+    expect(imageSource("registry.example.com/mirror/app")).toBe("other");
+    // A namespace that only starts like this repository's is someone else's.
+    expect(imageSource("ghcr.io/mycellios/mycellios-fork/app")).toBe("other");
+  });
+});
+
 describe("release tag resolution", () => {
   it("parses semver release tags and rejects other tag shapes", () => {
     expect(parseReleaseTag("v1.2.3")).toMatchObject({ major: 1, minor: 2, patch: 3 });
@@ -132,6 +158,28 @@ describe("release tag resolution", () => {
     expect(parseLsRemoteTags("aa\trefs/tags/-dangerous\nbb\trefs/tags/v1.0.0")).toEqual(["v1.0.0"]);
   });
 
+  it("reads this repository's v<semver> tags as releases and ignores its other tags", () => {
+    const release = "1".repeat(40);
+    // Shapes this repository tags: Desktop installers, the browser extension, model artifacts.
+    const stdout = [
+      `${"9".repeat(40)}\trefs/tags/desktop-v9.9.9-windows-preview`,
+      `${"8".repeat(40)}\trefs/tags/desktop-v9.9.9-windows-preview^{}`,
+      `${"7".repeat(40)}\trefs/tags/browser-extension-v9.1.0`,
+      `${"6".repeat(40)}\trefs/tags/gguf-smollm2-1.7b-q4-k-m-c93c5203ca2c`,
+      `${"5".repeat(40)}\trefs/tags/v0.26.0-rc.1`,
+      `${release}\trefs/tags/v0.25.0`,
+      `${"4".repeat(40)}\trefs/tags/v0.24.0`,
+    ].join("\n");
+    expect(selectLatestRelease(parseLsRemoteReleases(stdout))).toEqual({
+      tag: "v0.25.0",
+      commit: release,
+    });
+    expect(parseReleaseTag("desktop-v0.25.0-windows-preview")).toBeNull();
+    expect(
+      selectLatestRelease(parseLsRemoteReleases(`${"9".repeat(40)}\trefs/tags/desktop-v1.0.0\n`)),
+    ).toBeNull();
+  });
+
   it("picks the newest stable release and never a pre-release", () => {
     expect(selectLatestReleaseTag(["v0.1.0", "v0.10.2", "v0.9.9"])).toBe("v0.10.2");
     expect(selectLatestReleaseTag(["v1.0.0", "v1.1.0-rc.3"])).toBe("v1.0.0");
@@ -167,6 +215,28 @@ describe("strategy and mode selection", () => {
 });
 
 describe("compose argv construction", () => {
+  it("runs a one-off command without dependencies, ports or a terminal", () => {
+    expect(composeRunArgv(target, "api", MIGRATION_HISTORY_COMMAND)).toEqual({
+      command: "docker",
+      args: [
+        "compose",
+        "-p",
+        DEFAULT_COMPOSE_PROJECT_NAME,
+        "--env-file",
+        "/srv/rakazo/.env",
+        "--file",
+        ...target.composeFiles,
+        "run",
+        "--rm",
+        "--no-deps",
+        "-T",
+        "api",
+        "node",
+        "/app/apps/api/dist/cli/check-migration-history.js",
+      ],
+    });
+  });
+
   it("passes the compose file and env files as separate arguments", () => {
     expect(composePullArgv(target)).toEqual({
       command: "docker",
@@ -560,10 +630,13 @@ describe("managed env assignments", () => {
 describe("sidecar boundary validation", () => {
   it("normalizes a request the API already validated", () => {
     expect(
-      validateUpdateRequest({ repoUrl: "https://github.com/elie222/rakazo.git", branch: " main " }),
+      validateUpdateRequest({
+        repoUrl: "https://github.com/Mycellios/mycellios.git",
+        branch: " main ",
+      }),
     ).toEqual({
       request: {
-        repoUrl: "https://github.com/elie222/rakazo.git",
+        repoUrl: "https://github.com/Mycellios/mycellios.git",
         branch: "main",
         official: true,
       },

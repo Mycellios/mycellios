@@ -56,22 +56,25 @@ https://github.com/user-attachments/assets/dccdeddb-2134-4a56-8eed-b2e591736b1c
 You need Docker Engine, the Compose plugin, curl, and OpenSSL. No clone or Node install.
 
 ```bash
-mkdir -p rakazo && cd rakazo &&
-curl -fsSLO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/install-images.sh &&
+mkdir -p mycellios && cd mycellios &&
+curl -fsSLO https://raw.githubusercontent.com/Mycellios/mycellios/main/src/agent/infra/compose/install-images.sh &&
 bash install-images.sh
 ```
 
-The installer downloads the Compose files, creates `.env` with random secrets, and starts Mycellios.
-It preserves an existing `.env` when rerun.
+The installer downloads this repository's Compose files, creates `.env` with random secrets, and
+starts Mycellios. It preserves an existing `.env` when rerun. An install that still runs the images
+of the project Mycellios Agent was imported from keeps them until you move it
+([installs on the upstream images](./docs/self-host.md#installs-on-the-upstream-images)).
 
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173), create an account, and connect a model.
 Local Docker computers are on by default. Optional remote providers: `e2b`, `daytona`, `createos`, `boat`, or `railway`
 with the matching API key.
 
-Default image tag is `edge` (main builds, `linux/amd64` + `linux/arm64`). Details and tags:
+Default image tag is `edge` (main builds, `linux/amd64` + `linux/arm64`);
+`bash install-images.sh --release v<version>` installs a release instead. Details and tags:
 [self-hosting guide](./docs/self-host.md#published-images-no-checkout).
 
-On restricted networks, override the installer download base (`RAKAZO_DOWNLOAD_BASE`), skip
+On restricted networks, override the installer download base (`MYCELLIOS_DOWNLOAD_BASE`), skip
 existing Compose files (`--local` / `RAKAZO_DOWNLOAD_SKIP_EXISTING`), or mirror the bootstrap
 script URL — see
 [Restricted networks / mirror downloads](./docs/self-host.md#restricted-networks--mirror-downloads).
@@ -98,7 +101,7 @@ Or [deploy on Railway](https://railway.com/new/template/rakazo-template); see th
 ## Local development (source checkout)
 
 You need Node.js 22.22.2 or newer in the 22.x line, Node.js 24.x, or Node.js 26+;
-pnpm 9; and Docker. Node.js 23.x and 25.x are not supported.
+npm; and Docker. Node.js 23.x and 25.x are not supported.
 
 ```bash
 git clone https://github.com/Mycellios/mycellios.git
@@ -129,12 +132,12 @@ hosted product should review [Treg's integration terms](https://treg.to/integrat
 a written agreement for hosted resale.
 
 ```bash
-pnpm install
-pnpm sandbox:build
-pnpm dev
+npm ci
+npm run sandbox:build
+npm run dev
 ```
 
-`pnpm dev` uses the Postgres in `DATABASE_URL` when it accepts a connection. Otherwise it starts a
+`npm run dev` uses the Postgres in `DATABASE_URL` when it accepts a connection. Otherwise it starts a
 local `rakazo-dev-postgres` container with Docker, and every checkout reuses that one. It applies
 migrations and generates the Prisma client before starting. A branch that adds migrations main
 doesn't have gets its own database on the same server, copied from the shared one when possible,
@@ -194,7 +197,7 @@ The Electron and Expo apps are clients of the same Mycellios API used by the web
 With the development stack running, launch Electron with:
 
 ```bash
-pnpm --filter @mycellios/desktop dev
+npm run dev --workspace @mycellios/desktop
 ```
 
 On first run the desktop app asks whether to run Mycellios on this computer or connect to an existing
@@ -202,7 +205,7 @@ server. **This computer** installs and starts the published images with Docker C
 files as `infra/compose/install-images.sh`) under the app's data directory, so Docker Desktop,
 OrbStack, or Docker Engine must be installed; the app links to them when it is not. Installed
 builds pin the image tag to their own version; unpackaged builds pull `edge`. Developers running
-`pnpm dev` should pick **Existing instance** with `http://127.0.0.1:5173` instead. Public servers
+`npm run dev` should pick **Existing instance** with `http://127.0.0.1:5173` instead. Public servers
 must use HTTPS; HTTP is accepted only for loopback and private LAN addresses (not link-local). The
 app verifies Mycellios's health endpoint before saving, and later launches go straight to that
 instance. The stack keeps running after the app quits; **Stop Local Stack** in the application
