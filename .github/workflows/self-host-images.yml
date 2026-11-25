@@ -1,0 +1,207 @@
+name: Self-host images
+
+# The images a self-host install runs, built only from this repository's main branch
+# (specs/trusted-distribution/spec.md, phase 1): ghcr.io/mycellios/mycellios/app (API, worker,
+# web and sandbox supervisor, with the Dockerfile's default / base path), computer (each bot's
+# desktop) and updater (the update sidecar). Each architecture builds natively on a
+# GitHub-hosted runner and pushes by digest. publish then writes one sha-<commit> manifest per
+# image, with the OCI revision label, and edge follows the newest main commit once all three
+# exist. installer-release.yml calls this workflow for a Desktop release's revision and then
+# adds v<version>. Tags are written once, and deploy.yml's amd64 computer for Nucleus is only
+# extended with arm64 (scripts/self-host-images.mjs). Nothing here requests a deployment.
+on:
+  push:
+    branches: [main]
+  # Publishes a main commit again; tags that already hold both architectures are kept.
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Full main commit to publish (empty publishes the head of main)
+        type: string
+        required: false
+  workflow_call:
+    inputs:
+      revision:
+        description: Full main commit to publish
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan self-host images
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+      # Reads whether deploy.yml publishes this commit's amd64 computer.
+      actions: read
+    outputs:
+      revision: ${{ steps.plan.outputs.revision }}
+      builds: ${{ steps.plan.outputs.builds }}
+      built: ${{ steps.plan.outputs.built }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Find the architectures this commit still needs
+        id: plan
+        env:
+          REVISION: ${{ inputs.revision || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/self-host-images.mjs plan
+
+  build:
+    name: Build ${{ matrix.image }} ${{ matrix.arch }}
+    needs: plan
+    if: needs.plan.outputs.builds != '[]'
+    # GitHub-hosted runners for each architecture (ARCHES in scripts/self-host-images.mjs).
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.plan.outputs.revision }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Name the GHCR repository
+        id: name
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}/${IMAGE}" >> "$GITHUB_OUTPUT"
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/${{ matrix.arch }}
+          build-args: ${{ matrix.buildArgs }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.plan.outputs.revision }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          # Untagged until publish has both architectures of this commit.
+          outputs: type=image,name=${{ steps.name.outputs.repository }},push-by-digest=true,name-canonical=true,push=true
+      - name: Record the digest
+        env:
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "The build reported no image digest." >&2; exit 1; }
+          mkdir -p digests
+          printf '%s\n' "$DIGEST" > "digests/$ARCH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: self-host-digest-${{ matrix.image }}-${{ matrix.arch }}
+          path: digests/${{ matrix.arch }}
+          if-no-files-found: error
+          # A re-run of the build replaces its own digest record.
+          overwrite: true
+          retention-days: 1
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: [plan, build]
+    # Each image is independent: a failed build of one never holds back the others.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    # computer waits for deploy.yml's amd64 image of the same commit.
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    # Runs for the same commit (a push and a Desktop release) write its tag one at a time.
+    concurrency:
+      group: self-host-image-${{ matrix.image }}-${{ needs.plan.outputs.revision }}
+      cancel-in-progress: false
+      queue: max
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [app, computer, updater]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - if: contains(fromJSON(needs.plan.outputs.built), matrix.image)
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          pattern: self-host-digest-${{ matrix.image }}-*
+          path: digests
+          merge-multiple: true
+      - name: Write sha-<commit> once both architectures exist
+        env:
+          IMAGE: ${{ matrix.image }}
+          REVISION: ${{ needs.plan.outputs.revision }}
+          BUILDS: ${{ needs.plan.outputs.builds }}
+          DIGESTS: digests
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/self-host-images.mjs publish "$IMAGE"
+
+  edge:
+    name: Move edge
+    needs: [plan, publish]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    # One run at a time, so a slower run for an older commit cannot move edge backwards.
+    concurrency:
+      group: self-host-edge
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Point edge at the newest main commit's images
+        env:
+          REVISION: ${{ needs.plan.outputs.revision }}
+        run: node scripts/self-host-images.mjs edge

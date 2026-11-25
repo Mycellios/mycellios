@@ -930,6 +930,12 @@ workflow merges that change to `main` through a `Release Desktop X.Y.Z` pull
 request and starts `installer-release.yml`. `npm run release:patch`, `release:minor`
 and `release:major` do the same preparation by hand when one is needed.
 
+`installer-release.yml` also builds the release commit's self-host images through
+`self-host-images.yml`, which publishes `app`, `computer` and `updater` for every
+main commit. Once the Desktop release is public, it adds `v<version>` to those
+images and tags the commit `v<version>`, the self-host release of that version
+(`src/agent/docs/self-host.md`, Published images and tags).
+
 The `changelog` workflow fails a pull request that changes `src/agent` without a
 `changelog.d` file or a `CHANGELOG.md` change, unless it has the `no-changelog`
 label. It checks each fragment, and the full section when the pull request

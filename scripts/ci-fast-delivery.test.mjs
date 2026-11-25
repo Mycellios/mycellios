@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { eventBase, planChecks, uncoveredNativeFiles, agentAffectedTestFiles } from './ci-proportional.mjs';
+import { ARCHES, DEPLOY_COMPUTER_JOB } from './self-host-images.mjs';
 
 test('isolated native revisions do not block newer builds and common publication stays serialized',()=>{
  const release=readFileSync('.github/workflows/installer-release.yml','utf8');
@@ -251,4 +252,33 @@ test('deployments are requested only from main pushes after the exact commit pas
   assert.ok(request.indexOf('check_name=CI%20summary') < request.indexOf('/api/v1/deployments/github'));
   assert.ok(request.includes('"completed success"'));
   assert.ok(!readFileSync('.github/workflows/ci.yml', 'utf8').includes('deployments/github'));
+});
+
+test('self-host images come only from main on GitHub-hosted runners and never replace the Nucleus images', () => {
+  const workflow = readFileSync('.github/workflows/self-host-images.yml', 'utf8');
+  assert.match(workflow, /^on:\n {2}push:\n {4}branches: \[main\]\n/m);
+  assert.ok(workflow.includes("if: github.ref == 'refs/heads/main'"));
+  for (const forbidden of ['pull_request', 'secrets.', 'id-token', 'contents: write', 'deployments/github', 'APP_BASE_PATH', 'setup-qemu']) {
+    assert.ok(!workflow.includes(forbidden), forbidden);
+  }
+  assert.deepEqual([...new Set(workflow.match(/runs-on: .+/g))].sort(), ['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest']);
+  assert.deepEqual(Object.values(ARCHES), ['ubuntu-24.04', 'ubuntu-24.04-arm']);
+  assert.ok(workflow.includes('platforms: linux/${{ matrix.arch }}') && workflow.includes('push-by-digest=true'));
+  assert.ok(workflow.includes('org.opencontainers.image.revision=${{ needs.plan.outputs.revision }}'));
+  for (const [, action] of workflow.matchAll(/uses:\s+([^\s#]+)/g)) assert.match(action, /@[0-9a-f]{40}$/, action);
+  assert.match(workflow, /edge:[\s\S]*?concurrency:\s+group: self-host-edge\s+cancel-in-progress: false\s+queue: max/);
+  // publish adds arm64 to the amd64 computer that deploy.yml builds for Nucleus, never replacing it.
+  const deploy = readFileSync('.github/workflows/deploy.yml', 'utf8');
+  assert.ok(deploy.includes('name: Publish ${{ matrix.image }} image') && deploy.includes('- image: computer\n'));
+  assert.equal(DEPLOY_COMPUTER_JOB, 'Publish computer image');
+  assert.ok(!deploy.includes('self-host'));
+  // A Desktop release builds its revision's images, and adds v<version> only once it is public.
+  const release = readFileSync('.github/workflows/installer-release.yml', 'utf8');
+  const images = release.slice(release.indexOf('  self-host-images:'), release.indexOf('  publish:'));
+  assert.ok(images.includes('uses: ./.github/workflows/self-host-images.yml'));
+  assert.ok(images.includes('revision: ${{ needs.admit.outputs.revision }}'));
+  const tagging = release.slice(release.indexOf('  self-host-release:'), release.indexOf('  node-components:'));
+  assert.ok(tagging.includes('needs: [admit, publish, self-host-images]'));
+  assert.ok(tagging.includes("needs.publish.result == 'success'") && tagging.includes("needs.self-host-images.result == 'success'"));
+  assert.ok(tagging.includes('node scripts/self-host-images.mjs release') && !tagging.includes('secrets.'));
 });

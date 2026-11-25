@@ -1819,17 +1819,22 @@ application traffic queued indefinitely.
 
 ### Published images and tags
 
-`.github/workflows/publish-server-image.yml` publishes to `ghcr.io/<owner>/<repo>/…`, derived from
-`${{ github.repository }}` rather than hardcoded, so a fork's CI fills the fork's own namespace. For
-this repository that is:
+The root workflow `.github/workflows/self-host-images.yml` publishes the self-host images from
+`main`, built only from this repository's source. It writes to `ghcr.io/<owner>/<repo>/…`, derived
+from `${{ github.repository }}`, so a fork's CI fills the fork's own namespace. For this repository
+that is:
 
 | Image | Contents |
 | --- | --- |
-| `ghcr.io/elie222/rakazo/app` | api, worker, web, and sandbox supervisor — one image, multiple commands |
-| `ghcr.io/elie222/rakazo/computer` | Linux desktop used as each bot computer |
-| `ghcr.io/elie222/rakazo/updater` | the updater sidecar, plus the Docker CLI |
+| `ghcr.io/mycellios/mycellios/app` | api, worker, web, and sandbox supervisor — one image, multiple commands |
+| `ghcr.io/mycellios/mycellios/computer` | Linux desktop used as each bot computer |
+| `ghcr.io/mycellios/mycellios/updater` | the updater sidecar, plus the Docker CLI |
 
-`infra/compose/docker-compose.images.yml` is the no-checkout path for those app and computer tags
+The installer, the Compose files and the updater still default to the images of the project
+Mycellios Agent was imported from; a later release moves those defaults to the images above.
+Pulling them without a GitHub login works once the packages are public.
+
+`infra/compose/docker-compose.images.yml` is the no-checkout path for the app and computer images
 plus Postgres. The supervisor runs from the app image on the internal network only (not a separate
 published supervisor image, and no host port). Production Compose (`docker-compose.prod.yml`) can
 also pull the same app tags once `RAKAZO_IMAGE_TAG` is set to a published value.
@@ -1841,47 +1846,43 @@ your CI cannot publish into someone else's.
 | --- | --- | --- |
 | `local` | nothing — built locally by `up --build` | rebuilt in place |
 | `local-<full-commit>` | nothing — built on the server by a fork update | never |
-| `vX.Y.Z`, `vX.Y` | release tags | conventionally no / on patch releases |
-| `latest` | stable `vX.Y.Z` tags only (not prereleases) | yes, to the newest stable release |
-| `sha-<full-commit>` | every main commit, release tag and manual run | source-addressed; used by the updater sidecar |
-| `edge` | pushes to main | yes, to the newest main build |
+| `sha-<full-commit>` | every main commit, including each Desktop release's commit | never; used by the updater sidecar |
+| `edge` | the newest main commit whose three images exist | yes, only forward along `main` |
+| `v<version>` | each Desktop release, on the same manifests as its `sha-<full-commit>` | never |
 
-Every publish, including `edge` from main merges, is multi-arch (`amd64` + `arm64`): each
-architecture builds natively, on Depot when the `DEPOT_PROJECT_ID` repository variable names a
-project and on GitHub's runners otherwise, and one manifest is assembled per image. Depot builds
-publish and attest each image in the same job; native GitHub builds combine their architecture
-artifacts in a separate publication job. Main CI revisions validate independently. Publication
-locks are per image, and a superseded main build keeps its commit tag without moving `edge`.
-Image and release queues retain pending jobs so a slower older run cannot displace a newer one.
-Production deployment remains serialized and deploys the exact revision that passed its checks.
-Before any tag points at a new app image, CI fails the publish if it holds a `.env` file, a `.git` directory or a
-private key (`infra/compose/check-image.sh`). Until a
-stable `vX.Y.Z` has been published, GHCR may only have `edge` and `sha-*` tags; do not pin
-`latest` unless that tag exists in the registry.
+There is no `latest` or `vX.Y` tag. Every image is multi-arch (`amd64` + `arm64`): each architecture
+builds natively on a GitHub-hosted runner and pushes by digest, and one manifest per image, with the
+commit in its `org.opencontainers.image.revision` label, is then tagged `sha-<full-commit>`. Tags
+are written once. A rerun keeps a `sha-<full-commit>` that already holds both architectures, and a
+`v<version>` never moves. Production (`deploy.yml`, through Nucleus) publishes an amd64 `computer`
+for each commit; the self-host workflow adds arm64 to that exact manifest instead of rebuilding it.
+`edge` moves only once all three images of a commit exist, and never back to an older commit. A
+Desktop release (`installer-release.yml`) builds the images of its commit, adds `v<version>` to them
+once the release is public, and tags the commit `v<version>`. `desktop-v*` tags name Desktop
+installers, not server releases.
 
 Building the images yourself does not need QEMU. `docker compose up --build` builds for the host's
-own architecture, and a fork publishing multi-arch images should do what `publish-server-image.yml`
+own architecture, and a fork publishing multi-arch images should do what `self-host-images.yml`
 does: build each architecture on a native runner (GitHub Actions provides `ubuntu-24.04-arm` for
 public repositories) and merge the digests into one manifest. QEMU emulation
 (`docker/setup-qemu-action`, `binfmt`) still works if you have no native arm64 machine, but it is
 many times slower, hours rather than minutes for the `computer` image.
 
 The updater resolves the newest stable `vX.Y.Z` source tag but deploys its `sha-<full-commit>` image,
-not `latest` or a moving minor tag. A registry tag is not an OCI digest and GHCR package writers can
-replace it, so the trust boundary remains this repository's publishing credentials. The workflow
-reduces that boundary by using SHA-pinned actions, read-only pull-request jobs, digest-pinned base
-images, SBOM/provenance output, and a GitHub build attestation. Operators who require registry-level
-content addressing can pin `RAKAZO_IMAGE` outside the automatic updater to a verified digest.
+not a moving tag. A registry tag is not an OCI digest and GHCR package writers can replace it, so
+the trust boundary remains this repository's publishing credentials. The workflow reduces that
+boundary with SHA-pinned actions, digest-pinned base images, no pull-request runs and write-once
+tags. Operators who require registry-level content addressing can pin `RAKAZO_IMAGE` outside the
+automatic updater to a verified digest.
 
 Rollback never contacts the registry: it redeploys the previous tag from the local Docker cache,
 so a later tag move cannot change rollback content. Do not prune the previous application image
 until the next update has been accepted. If it is missing, rollback fails closed instead of pulling
 new content under an old tag.
 
-To populate the registry the first time, run the workflow manually (`workflow_dispatch`) or push a
-`v*` tag. A manual run produces `sha-<full-commit>`; only a stable `vX.Y.Z` tag (no prerelease
-suffix) produces `latest`, and any `v*` tag produces semver tags. The updater ignores prereleases
-and refuses the official path until a stable `vX.Y.Z` exists.
+To publish a main commit again, run **Self-host images** manually (`workflow_dispatch`) with that
+commit; tags that already hold both architectures are kept. The updater ignores prereleases and
+refuses the official path until a stable `vX.Y.Z` tag exists.
 
 ### Updater sidecar
 
