@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Routine } from "@mycellios/contracts";
 import { activeBotId, captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
@@ -97,9 +98,98 @@ test("Korean webhook routine keeps technical field labels in English", async ({
 
   await expect(page.getByText("웹훅이 실행될 때", { exact: true })).toBeVisible();
   await expect(page.getByText("POST 대상")).toBeVisible();
-  await expect(page.getByText("key", { exact: true })).toBeVisible();
-  await expect(page.getByText("header")).toBeVisible();
+  // The signing scheme is a proper name and stays as it is in every language.
+  await expect(page.getByText(/Standard Webhooks/)).toBeVisible();
   await captureScreenshot(page, testInfo, "routine-webhook-ko");
+});
+
+test("a webhook routine gets its own signed URL, a secret shown once and event filters", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  const stamp = Date.now();
+  await signup(page, `routine-signed-${stamp}@mycellios.test`, "password12", "Signed Routine");
+  await completeOnboarding(page);
+
+  await page.getByRole("button", { name: "Agent computer", exact: true }).click();
+  await page.getByRole("button", { name: "Create Routine" }).click();
+  await page.getByPlaceholder("Name this routine").fill("Paid invoices");
+  await page
+    .getByPlaceholder("What should this routine do each time it runs?")
+    .fill("Summarize the paid invoice");
+  await page.getByRole("button", { name: "Add trigger" }).click();
+  await page.getByRole("menuitem", { name: "Webhook", exact: true }).click();
+
+  const card = page.getByTestId("routine-webhook-card");
+  await expect(card.getByText("Available after the routine is saved")).toBeVisible();
+  await card.getByText("Only some events").click();
+  await card.getByLabel("Event type").fill("invoice.paid");
+  await card.getByRole("button", { name: "Add filter" }).click();
+  await card.getByLabel("Data field").fill("/status");
+  await card.getByLabel("Value", { exact: true }).fill("paid");
+  await captureScreenshot(page, testInfo, "routine-signed-webhook-01-filters");
+
+  const created = page.waitForResponse(
+    (response) => response.url().includes("/rpc/routines/create") && response.ok(),
+  );
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const routine = ((await (await created).json()) as { json: Routine }).json;
+  expect(routine.webhook).toMatchObject({
+    secretCreatedAt: null,
+    eventType: "invoice.paid",
+    filters: [{ pointer: "/status", value: "paid" }],
+  });
+  const path = `/api/v1/routines/${routine.id}/events`;
+  await expect(card.getByText(path)).toBeVisible();
+  await card.getByRole("button", { name: "Create secret" }).click();
+  const secretCell = card.getByTestId("routine-webhook-secret");
+  await expect(secretCell).toHaveText(/^whsec_/);
+  const secret = (await secretCell.textContent())?.trim() ?? "";
+  await captureScreenshot(page, testInfo, "routine-signed-webhook-02-secret-once");
+
+  // A Standard Webhooks sender: HMAC-SHA256 of id.timestamp.body with the secret's key bytes.
+  const post = (body: string, id: string, key = secret) => {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac("sha256", Buffer.from(key.slice("whsec_".length), "base64"))
+      .update(`${id}.${timestamp}.${body}`)
+      .digest("base64");
+    return page.request.post(path, {
+      headers: {
+        "content-type": "application/json",
+        "webhook-id": id,
+        "webhook-timestamp": timestamp,
+        "webhook-signature": `v1,${signature}`,
+      },
+      data: body,
+    });
+  };
+  const paid = JSON.stringify({ type: "invoice.paid", data: { status: "paid" } });
+  const failed = JSON.stringify({ type: "invoice.failed", data: { status: "failed" } });
+  const ignored = await post(failed, `msg_failed_${stamp}`);
+  expect([ignored.status(), await ignored.json()]).toEqual([
+    202,
+    { ok: true, status: "ignored", reason: "event_type" },
+  ]);
+  const accepted = await post(paid, `msg_paid_${stamp}`);
+  expect(accepted.status()).toBe(202);
+  const { runId } = (await accepted.json()) as { runId: string };
+  expect(runId).toBeTruthy();
+  const repeat = await post(paid, `msg_paid_${stamp}`);
+  expect([repeat.status(), (await repeat.json()).runId]).toEqual([200, runId]);
+  const forged = await post(paid, `msg_forged_${stamp}`, `whsec_${Buffer.alloc(32, 7).toString("base64")}`);
+  expect(forged.status()).toBe(401);
+
+  await card.getByRole("button", { name: "Rotate secret" }).click();
+  await expect(card.getByTestId("routine-webhook-previous")).toBeVisible();
+  await expect(secretCell).not.toHaveText(secret);
+  // The replaced secret keeps working for 24 hours.
+  expect((await post(paid, `msg_previous_${stamp}`)).status()).toBe(202);
+
+  const history = page.getByTestId("routine-run-history");
+  await history.getByRole("button", { name: "Run history" }).click();
+  await history.getByRole("button", { name: "Refresh" }).click();
+  await expect(history.getByText("Ignored: other event type")).toBeVisible();
+  await captureScreenshot(page, testInfo, "routine-signed-webhook-03-rotated-history");
 });
 
 test("routine test-run completes and survives reload", async ({ page }, testInfo) => {

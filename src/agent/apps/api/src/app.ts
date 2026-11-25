@@ -111,6 +111,7 @@ import {
   createWebPresence,
   createDb,
   createPool,
+  createRoutineEventPruner,
   createSecurityEventPruner,
   createThreadEvents,
   describeRowSecurity,
@@ -686,6 +687,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
           prisma,
           securityEventRetentionDays(),
         ),
+        reconcileRoutineEventRetention: createRoutineEventPruner(prisma),
         reconcileThreadDeletions: () =>
           reconcileThreadDeletions({ prisma, artifacts, dataDir: env.dataDir }),
       })
@@ -849,6 +851,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   for (const [path, reason] of [
     ["/api/auth/*", "authentication"],
     ["/api/v1/bots/*", "bot webhook"],
+    ["/api/v1/routines/*", "signed routine event"],
     ["/api/v1/messaging/*", "messaging webhook"],
     ["/api/v1/phone/*", "messaging webhook"],
   ] as const) {

@@ -1,7 +1,7 @@
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { routineThreadPath } from "../lib/routine-thread-path";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import type { RoutineHistory, RoutineRun } from "@mycellios/contracts";
+import type { RoutineHistory, RoutineIgnoredEvent, RoutineRun } from "@mycellios/contracts";
 import type { RpcClient } from "../lib/rpc";
 import { isRetryableError, normalizeRunError } from "@mycellios/core";
 import { Button, Collapsible, CollapsibleContent } from "@mycellios/ui-web";
@@ -43,6 +43,17 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
   const hasLoadedOlder = useRef(false);
   const listId = useId();
   const runs = history?.runs ?? null;
+  // Signed events that started nothing sit among the runs by the time they arrived.
+  const entries = runs
+    ? [
+        ...runs.map((run) => ({ kind: "run" as const, at: run.createdAt, run })),
+        ...(history?.events ?? []).map((event) => ({
+          kind: "event" as const,
+          at: event.receivedAt,
+          event,
+        })),
+      ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    : null;
   useEffect(() => { onState?.(routineId, { history, failed }); }, [routineId, history, failed, onState]);
 
   useEffect(() => {
@@ -169,6 +180,7 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
                 ),
               ],
               nextCursor: page.nextCursor,
+              ...(current.events ? { events: current.events } : {}),
             }
           : current,
       );
@@ -222,6 +234,49 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
         )}
       </p>
     );
+  }
+
+  function ignoredLabel(reason: RoutineIgnoredEvent["reason"]): string {
+    switch (reason) {
+      case "event_type":
+        return t`Ignored: other event type`;
+      case "filter":
+        return t`Ignored: a filter did not match`;
+      default:
+        return t`Ignored: routine paused`;
+    }
+  }
+
+  function renderEvent(event: RoutineIgnoredEvent) {
+    return (
+      <li key={event.id} className="py-2.5 text-[13px]" data-testid="routine-event-row">
+        <div className="flex items-center justify-between gap-2">
+          <span className="min-w-0 truncate">
+            <span>
+              {t`Webhook`}
+              <span aria-hidden> · </span>
+            </span>
+            <time
+              dateTime={event.receivedAt}
+              title={new Date(event.receivedAt).toLocaleString(i18n.locale || "en")}
+            >
+              {new Date(event.receivedAt).toLocaleString(i18n.locale || "en", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </time>
+          </span>
+          <span className="text-muted-foreground">{ignoredLabel(event.reason)}</span>
+        </div>
+      </li>
+    );
+  }
+
+  function renderEntry(entry: NonNullable<typeof entries>[number]) {
+    return entry.kind === "run" ? renderRun(entry.run) : renderEvent(entry.event);
   }
 
   function renderRun(run: RoutineHistory["runs"][number]) {
@@ -325,20 +380,20 @@ export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, p
         <p role="alert" className="mt-2 text-[13.5px] text-destructive">
           <Trans>Could not load run history</Trans>
         </p>
-      ) : runs === null ? (
+      ) : entries === null ? (
         <LoadingSkeleton className="mt-2" />
-      ) : runs.length === 0 ? (
+      ) : entries.length === 0 ? (
         <p className="mt-2 text-[13.5px]">
           <Trans>No runs yet</Trans>
         </p>
       ) : null}
-      {runs && runs.length > 0 ? (
+      {entries && entries.length > 0 ? (
         <div id={listId} className="mt-2">
-          <ul className="divide-y divide-border">{runs.slice(0, 1).map(renderRun)}</ul>
+          <ul className="divide-y divide-border">{entries.slice(0, 1).map(renderEntry)}</ul>
           <Collapsible open={expanded} className="contents">
             <CollapsibleContent className="flex flex-col">
               <ul className="divide-y divide-border border-t border-border">
-                {runs.slice(1).map(renderRun)}
+                {entries.slice(1).map(renderEntry)}
               </ul>
             </CollapsibleContent>
           </Collapsible>
