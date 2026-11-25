@@ -15705,6 +15705,23 @@ msgstr "Nadie ha compartido Micos contigo."
 #: src/pages/SpaceMicosPanel.tsx
 msgid "Close conversation"
 msgstr "Cerrar conversación"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
+msgstr "¿Actualizar {name} a {version} en este PC? Mycellios descarga {size} de npm ({packageName}) y verifica el paquete antes de ejecutarlo. Los turnos nuevos de {name} esperan mientras se verifica."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "{name} {version} is available. This PC runs {current}."
+msgstr "{name} {version} está disponible. Este PC usa la versión {current}."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Update {name}"
+msgstr "Actualizar {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "This PC keeps {name} {current}."
+msgstr "Este PC conserva {name} {current}."
+
 #: src/components/RoutineWebhookCard.tsx
 msgid "Copy webhook URL"
 msgstr "Copiar URL del webhook"

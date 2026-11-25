@@ -537,10 +537,14 @@
   the server's engines or delegates its run to them. Verify the scoped settings and
   native-agent-runtime tests. Protocol fixtures do not qualify real inference.
   Managed CLIs (specs/native-engines/spec.md phase 3) live in one store per host user,
-  provider-runtimes/<engine>/<version> (Desktop's profile, a server's data folder), and come
-  only from the npm URL, sha512 integrity and size bounds in
-  packages/adapters/src/native-engines.lock.json (regenerate with scripts/native-engine-lock.mjs,
-  never by hand). Downloads are verified before unpacking into staging, every file's SHA-256 is
+  provider-runtimes/<engine>/<version> (Desktop's profile, a server's data folder). First installs
+  use the exact npm URL, sha512 integrity and size bounds in packages/adapters/src/native-engines.lock.json
+  (regenerate with scripts/native-engine-lock.mjs). Desktop updates follow the npm channel and
+  target package in that lock with the same checks. Check the bundled and published blocklist
+  before a managed executable starts. Existing turns keep their version and new turns wait while
+  an update is being verified. The hosted native-engine canary tests each target without model
+  requests. Its locked npm install is scoped to contracts and the workspace root.
+  Downloads are verified before unpacking into staging, every file's SHA-256 is
   recorded and `--version` checked before the folder is used, and again before a session's first
   start. No administrator rights, global npm or CLI updater. Resolution: an absolute
   native-agents.json command, then the newer of the managed copy and PATH (the person's CLI wins
@@ -803,8 +807,11 @@
   (botOutcomeReturnedAt), never a replay. Not for FYIs or turns that already answered, opened
   tasks or delegated work; only the failure that ends recovery reaches the teammate. "Waiting for replies"
   (tasks.awaitingReplies) reuses the person's Stop and the revisioned work controls
-  (Continue = resume). list_agents is read-only; interrupt_agent stops only turns working on
-  the caller's own messages, through the durable Stop, and refuses the rest. Groups keep a
+  (Continue = resume). Desktop keeps an initially open, bounded disclosure above
+  the composer. Narrow main chats use one bottom sheet for replies and queued
+  messages, with a compact trigger. list_agents is read-only;
+  interrupt_agent stops only turns working on the caller's own messages through
+  the durable Stop and refuses the rest. Groups keep a
   purpose and a person-chosen leadBotId (additive `20261123090000` migration); routing is
   deterministic (mentions, @everyone, an opening name, else the lead) with no model routing
   call; a member's history hides other members' replies to the same message; "continue"
@@ -1573,6 +1580,8 @@
   the inherit option in Mico settings and existing saved defaults.
   If its primary slot is empty, chat may start on the first saved backup with
   an owned connection. Preserve the backup order and the existing funding checks.
+  Pi's implicit reasoning default does not constrain the saved backups. Preserve
+  explicit thinking preferences and image requirements, and check pi-runtime-fallback.
   Keep the chat picker compact by connection and list all already authorized
   models directly, without a separate quick-list filter or catalog screen.
   Mycellios reads its live account catalog rather than saved enabled IDs; retain

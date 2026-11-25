@@ -1,3 +1,4 @@
+import type { RenderAwaitingReplies } from "../../components/AwaitingReplies";
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { NewChatControl } from "../../components/composer/NewChatControl";
 import { isAndroidHost } from "../../lib/android-host";
@@ -110,6 +111,7 @@ export const Composer = memo(function Composer({
   placeholder: customPlaceholder,
   newConversation = false,
   onQueuedMessageMoved,
+  renderAwaitingReplies,
 }: {
   activeName?: string;
   activeColor?: string;
@@ -167,6 +169,7 @@ export const Composer = memo(function Composer({
   newConversation?: boolean;
   /** A queued message moved to a new conversation of this Mico: open it in the background. */
   onQueuedMessageMoved?: (threadId: string, title: string) => void;
+  renderAwaitingReplies?: RenderAwaitingReplies;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
@@ -618,6 +621,12 @@ export const Composer = memo(function Composer({
     }
   }, [replyTarget, replyName, t]);
 
+  const queuePanel = newConversation ? null : <QueuePanel
+    target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }}
+    artifactTarget={artifactTarget} running={running} sending={sending}
+    onUseText={text => updateDraft(draft ? `${draft}\n\n${text}` : text)}
+    onMoved={onQueuedMessageMoved} renderAwaitingReplies={renderAwaitingReplies} />;
+
   return (
     <fieldset
       aria-label={t`Message composer`}
@@ -630,6 +639,7 @@ export const Composer = memo(function Composer({
         draggingFiles ? "rounded-[14px] ring-2 ring-inset ring-ring" : ""
       }`}
     >
+      {renderAwaitingReplies ? queuePanel : null}
       <ReviewedVoice voice={reviewedVoice} name={activeName} />
       <div role="status" data-testid="composer-announcement" className="sr-only">
         {replyAnnouncement}
@@ -1051,11 +1061,7 @@ export const Composer = memo(function Composer({
           ) : null}
         </div>
       </div>
-      {newConversation ? null : <QueuePanel
-        target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }}
-        artifactTarget={artifactTarget} running={running} sending={sending}
-        onUseText={text => updateDraft(draft ? `${draft}\n\n${text}` : text)}
-        onMoved={onQueuedMessageMoved} />}
+      {renderAwaitingReplies ? null : queuePanel}
       {busyMessages && acceptedMode ? <span className="sr-only" role="status">{acceptedMode === "queue" ? t`Message saved in the queue.` : t`Instructions sent to the current task.`}</span> : null}
 
     </fieldset>

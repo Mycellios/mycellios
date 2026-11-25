@@ -57,7 +57,8 @@ export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
         const base = computerContext(context.actor, bot.id, "engine-install");
         const signal = AbortSignal.any([context.signal ?? base.signal, AbortSignal.timeout(45_000)]);
         try {
-          return await deps.sandbox.nativeEngineInstall({ ...base, signal }, { engine: input.engine });
+          return await deps.sandbox.nativeEngineInstall({ ...base, signal },
+            { engine: input.engine, ...(input.version ? { version: input.version } : {}) });
         } catch (error) {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: engineAccountFailure(error, "That PC could not install it. Update Mycellios on it and try again."),

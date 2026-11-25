@@ -14,7 +14,7 @@ import {
 import type { Actor, Me, NativeEngineModelInfo } from "@mycellios/contracts";
 import {
   attachmentMaxBytes, canonicalPiProviderId, NativeEngineInstallableSchema, NativeEngineInstallProgressSchema,
-  NativeEngineModelSchema, usableModelId,
+  NativeEngineModelSchema, NativeEngineUpdateSchema, usableModelId,
 } from "@mycellios/contracts";
 import type { z } from "zod";
 import type { RouterDeps } from "../router.js";
@@ -76,6 +76,8 @@ export async function codingEnginesForComputer(
         install: true,
         installable: wellFormed(state.installable, NativeEngineInstallableSchema).filter(item => !engines.includes(item.engine)),
         installing: wellFormed(state.installs, NativeEngineInstallProgressSchema),
+        // Updates only for engines the PC reports installed.
+        updates: wellFormed(state.updates, NativeEngineUpdateSchema).filter(item => engines.includes(item.engine)),
       } : {}),
     };
   }
