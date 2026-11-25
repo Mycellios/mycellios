@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { prioritizeChatHistory } from "./chat-read-priority";
 import {
   clearSpaceSelection,
   createSpaceRpc,
@@ -7,6 +8,7 @@ import {
   rpcForSpace,
   selectedSpaceId,
   selectSpace,
+  withSpaceHeaders,
 } from "./rpc.js";
 
 const notify = vi.hoisted(() => vi.fn());
@@ -15,6 +17,30 @@ vi.mock("./auth", () => ({ authClient: { $store: { notify } } }));
 afterEach(() => {
   vi.unstubAllGlobals();
   notify.mockClear();
+});
+
+describe("chat history priority", () => {
+  it("sends critical reads first and keeps the deferred request in its original Space", async () => {
+    const requested: string[] = [];
+    const spaceHeaders = [...withSpaceHeaders(undefined, "space-a")];
+    vi.stubGlobal("fetch", vi.fn(async (request: Request, init?: RequestInit) => {
+      const procedure = new URL(request.url).pathname.split("/rpc/")[1]!;
+      expect([...new Headers(init?.headers)]).toEqual(expect.arrayContaining(spaceHeaders));
+      requested.push(procedure);
+      return Response.json({ json: procedure === "threads/head" ? { threadId: "thread-a", cursor: 0 } : [] });
+    }));
+    const release = prioritizeChatHistory();
+    const client = createSpaceRpc("space-a");
+    const overview = client.tasks.overview();
+    try {
+      await expect(client.threads.head({ botId: "mico-a" })).resolves.toEqual({ threadId: "thread-a", cursor: 0 });
+      expect(requested).toEqual(["threads/head"]);
+    } finally {
+      release();
+    }
+    await expect(overview).resolves.toEqual([]);
+    expect(requested).toEqual(["threads/head", "tasks/overview"]);
+  });
 });
 
 describe("signed-out responses", () => {

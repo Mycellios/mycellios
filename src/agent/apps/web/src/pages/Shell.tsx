@@ -1,4 +1,5 @@
 import { accountNotificationAllowed, accountNotificationSettings } from "../lib/account-notifications";
+import { prioritizeChatHistory } from "../lib/chat-read-priority";
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
 import { deferThreadProgressPresentation } from "../lib/thread-events";
@@ -2688,6 +2689,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     return lead ? { id: lead.botId, name: lead.name, color: lead.color,
       group: { id: activeGroup.id, name: activeGroup.name, members, leadBotId: activeGroup.leadBotId } } : null;
   }, [activeGroup, activeSnapshot?.members]);
+  const readingFirstHistory = !newConversation && !searchParams.has("view") && !activeSnapshot && Boolean(
+    inGroup ? activeGroup : active && failedThreadBotId !== active.id,
+  );
+  useLayoutEffect(() => {
+    if (readingFirstHistory) return prioritizeChatHistory();
+  }, [readingFirstHistory, active?.id, groupId, taskScope?.taskThreadId]);
   const pendingSendScope = JSON.stringify([userId, currentSpaceId]);
   const {
     visible: pendingMessages, begin: beginPendingSend, accept: acceptPendingSend,

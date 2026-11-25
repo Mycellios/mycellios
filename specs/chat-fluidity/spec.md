@@ -20,6 +20,10 @@ queue/steering semantics and authoritative event reducer.
   cursor. Active runs use the regular 100-message window so pending questions and
   takeovers can still be reached. Older clients and explicit history reads retain
   their existing page size. Do not preload the roster's full transcripts.
+- An uncached chat gives history priority over secondary reads from its controls.
+  Allow those reads after the first transcript can paint, and cap the delay for
+  a slow or failed history request. Sends, auth recovery and realtime stay direct.
+  Reuse fresh model/account data across conversations in the same Space.
 - Motion acknowledges pending send, first live reply and control changes. Do not
   replay a streamed reply on completion or animate history loads and token updates.
   Preserve scroll ownership, reduced motion, keyboard and assistive feedback.

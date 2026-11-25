@@ -61,10 +61,10 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const queries = useSpaceQueries();
   const queryClient = useQueryClient();
   const rpc = useSpaceRpc();
-  const meQuery = useQuery({ ...queries.me.queryOptions(), enabled: Boolean(initialMe) });
+  const meQuery = useQuery({ ...queries.me.queryOptions(), refetchOnMount: true, enabled: Boolean(initialMe) });
   const me = meQuery.data ?? initialMe;
-  const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: Boolean(me) });
-  const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: Boolean(me) });
+  const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), refetchOnMount: true, enabled: Boolean(me) });
+  const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), refetchOnMount: true, enabled: Boolean(me) });
   const enginesQuery = useQuery(queries.engines.forBot.queryOptions({ input: { botId: bot.id }, enabled: open }));
   // Servers that predate per-computer catalogs only list Codex models of their own CLI.
   const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({
