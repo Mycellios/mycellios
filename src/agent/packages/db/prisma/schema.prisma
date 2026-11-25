@@ -787,6 +787,8 @@ model Bot {
   inboxTasks InboxTask[]
   taskConcurrency Int @default(4)
   agentEngine String @default("pi")
+  /// When the one-time move of a This PC Mico to a CLI signed in on its PC happened (never repeats).
+  localEngineAdoptedAt DateTime?
   nativeConfig Json?
   busyMessageMode String?
   micoPreferences Json @default("{}")

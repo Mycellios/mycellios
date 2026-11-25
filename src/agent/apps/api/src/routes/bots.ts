@@ -1,5 +1,6 @@
 import { responseLanguageInstruction } from "../response-language.js";
 import { initialComputerAssignmentFilter } from "../initial-computer-assignment.js";
+import { adoptLocalEngines } from "../local-engine-adoption.js";
 import { randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
@@ -345,6 +346,14 @@ export function botsRoutes(ctx: RouterContext) {
         if (!bot) throw new IsolationError();
         const locale = context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined;
         return { queued: await enqueueBotIntroRun(deps, context.actor, bot, locale) };
+      }),
+      adoptLocalEngine: authed.bots.adoptLocalEngine.handler(async ({ context }) => {
+        // Only a connected Desktop can confirm a CLI sign-in; without one nothing moves.
+        if (!deps.desktopAgentAvailable?.(context.actor)) return { adopted: [] };
+        return {
+          adopted: await adoptLocalEngines(deps.prisma, context.actor,
+            (botId) => localEngineForNewMico(deps, context.actor, botId, context.signal)),
+        };
       }),
       importPreview: authed.bots.importPreview.handler(async ({ context, input }) =>
         previewAgentImport(agentImportServices as AgentImportServices, context.actor, input),

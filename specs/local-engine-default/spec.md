@@ -83,6 +83,15 @@ it is not, and let programs on the PC use the Mico's AI in both cases.
      note to the main chat naming the new engine, and can be undone from the
      picker. A failed or skipped move changes nothing. The migration is recorded
      per Mico so it never repeats and never overrides a later manual choice.
+     Implemented (3c): Desktop calls `bots.adoptLocalEngine` once per account
+     and Space after the roster loads. The API (only while a Desktop is
+     available) checks at most 24 Pi Micos on This PC with no
+     `bots.localEngineAdoptedAt` (additive `20261125090000` migration), asks
+     each Mico's PC for a confirmed sign-in as at creation, and under the bot
+     row lock moves only a Mico with no active run and no unfinished delegated
+     work, records the time and adds the system note. Skipped Micos stay
+     unrecorded and may move on a later start; undo is choosing a model in the
+     picker, which the record keeps from being moved again.
    - PC offline: a fresh turn of a native-engine Mico runs on its saved Pi
      fallback model in the server workspace and says so in the chat (extends the
      #448 notice). Without a saved fallback model it keeps today's offline
