@@ -1,16 +1,24 @@
+import { GroupFolderLabel } from "@mycellios/contracts";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
-import type { NativeCodingEngine } from "@mycellios/adapter-kit";
+import type { NativeCodingEngine, NativeEngineModels } from "@mycellios/adapter-kit";
 import { appControlRequest } from "./app-control.js";
 
 export const HOST_COMPUTER_MAX_BYTES = 12 * 1024 * 1024;
 export const HOST_COMPUTER_MAX_FILE_BYTES = 8 * 1024 * 1024;
 /** Largest workspace file moved in verified pieces (writeFileChunk). */
 export const HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES = 100 * 1024 * 1024;
+/** Shared group folders a run may use at most (specs/group-shared-folders/spec.md). */
+export const HOST_GROUP_FOLDER_MAX = 8;
+export const hostGroupFolderId = z.string().regex(/^[a-f0-9]{64}$/);
+/** A folder the server names for this run, with the label it assigned to the folder. */
+const hostGroupFolder = z.object({ folderId: hostGroupFolderId, label: GroupFolderLabel });
 const file = z.object({
   path: z.string().max(4096),
   content: z.string().max(HOST_COMPUTER_MAX_BYTES),
   executable: z.boolean().optional(),
+  /** Write only while the file still has this content (shared folder edits); older hosts ignore it. */
+  expectedSha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });
 const command = z.object({
   commandId: z.string().min(1).max(256).optional(),
@@ -40,6 +48,9 @@ const base = {
   runId: z.string().min(1).max(256).optional(),
   /** The Mico's display name; names its PC folder only when that folder is first created. */
   botName: z.string().min(1).max(200).optional(),
+  /** The group whose thread this run works in, with the shared folders it may use now. */
+  groupId: z.string().min(1).max(256).optional(),
+  groupFolders: z.array(hostGroupFolder).max(HOST_GROUP_FOLDER_MAX).optional(),
 };
 export const hostComputerRequest = z.discriminatedUnion("method", [
   z.object({ ...base, method: z.literal("agentRun"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), segmentId: z.string().regex(/^[a-f0-9]{64}$/).optional(), request: z.unknown() }),
@@ -106,8 +117,16 @@ export interface HostComputerEnvironment {
   projectSessionId?:string;
   taskIsolation?: "worktree-v1";
   nativeEngines?: NativeCodingEngine[];
+  /** Installed engines whose CLI reported nobody signed in (older Desktops omit it). */
+  signedOutEngines?: NativeCodingEngine[];
+  /** Installed engines whose CLI confirmed a sign-in (older Desktops omit it). */
+  signedInEngines?: NativeCodingEngine[];
+  /** Model catalogs of the signed-in CLIs on this PC (older Desktops omit it). */
+  nativeModels?: NativeEngineModels;
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
+  /** Shared group folders this PC grants to this run, mounted under group/<label>. */
+  groupFolders?: Array<{ folderId: string; label: string; path: string }>;
 }
 /**
  * One exportWorkspace value: a whole file, an ordered piece of a larger one, or a file

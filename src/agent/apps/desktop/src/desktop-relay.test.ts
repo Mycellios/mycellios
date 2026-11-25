@@ -1,5 +1,28 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { DesktopRelayClient, missingOperationAction, pollRetryDelayMs } from "./desktop-relay.js";
+import { DesktopRelayClient, missingOperationAction, pollRetryDelayMs, relayConflictMessage } from "./desktop-relay.js";
+
+it("explains a relay conflict with the server's sentence, never by asking to sign in again", async () => {
+  const busy = "This Mico is working on another computer. Wait for it to finish there, or stop it, then try again.";
+  expect(await relayConflictMessage(Response.json({ error: busy }, { status: 409 }))).toBe(busy);
+  const neutral = "The PC connection changed. Try again.";
+  expect(await relayConflictMessage(new Response("not json", { status: 409 }))).toBe(neutral);
+  expect(await relayConflictMessage(Response.json({ error: "x".repeat(201) }, { status: 409 }))).toBe(neutral);
+  expect(await relayConflictMessage(Response.json({ error: "line\nbreak" }, { status: 409 }))).toBe(neutral);
+});
+
+it("shows the server's reason when connecting a Mico another PC is running", async () => {
+  const busy = "This Mico is working on another computer. Wait for it to finish there, or stop it, then try again.";
+  const client = new DesktopRelayClient({
+    base: "https://example.test",
+    localUrl: "http://127.0.0.1:1234",
+    localToken: "unused",
+    revoked: vi.fn(),
+    fetch: async () => Response.json({ error: busy, code: "busy_elsewhere" }, { status: 409 }),
+  });
+  try {
+    await expect(client.identity()).rejects.toThrow(busy);
+  } finally { client.stop(); }
+});
 
 it("forgets a settled delivery and still aborts an unsettled orphan", () => {
   const settled = new Set(["done"]);
@@ -194,6 +217,55 @@ it("stops local work and stops posting when the API no longer holds the operatio
   } finally { client.stop(); }
 });
 
+it("sends the lines that arrive during a result POST together in the next one", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  let emit!: (line: string) => void;
+  let finish!: () => void;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      emit = line => controller.enqueue(new TextEncoder().encode(line));
+      finish = () => controller.close();
+    },
+  })));
+  const reports: { seq: number; done: boolean; text: string }[] = [];
+  let release!: () => void;
+  const firstPost = new Promise<void>(resolve => { release = resolve; });
+  let binding: unknown;
+  let delivered = false;
+  const client = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "http://127.0.0.1:1234",
+    localToken: "unused", revoked: vi.fn(),
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      const payload = JSON.parse(String(init?.body));
+      if (action === "identity") return Response.json(identity);
+      if (action === "bind") { binding = payload; return Response.json({ ok: true }); }
+      if (action === "poll") {
+        const operations = delivered || !binding ? [] : [{ id: "busy", binding, request: { method: "environment", botId: "bot" } }];
+        if (operations.length) delivered = true;
+        return Response.json({ identity, active: delivered ? ["busy"] : [], operations });
+      }
+      reports.push({ seq: payload.seq, done: payload.done, text: Buffer.from(payload.data, "base64").toString() });
+      // The first result POST is slow; everything emitted meanwhile must wait for the next one.
+      if (payload.seq === 0) await firstPost;
+      return Response.json({ ok: true });
+    },
+  });
+  try {
+    await client.bind("bot");
+    await vi.waitFor(() => expect(emit).toBeTypeOf("function"), { timeout: 3_000 });
+    emit('{"n":1}\n');
+    await vi.waitFor(() => expect(reports).toHaveLength(1), { timeout: 3_000 });
+    for (let n = 2; n <= 6; n++) emit(`{"n":${n}}\n`);
+    finish();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    release();
+    await vi.waitFor(() => expect(reports.at(-1)?.done).toBe(true), { timeout: 3_000 });
+    expect(reports.map(({ seq, done }) => [seq, done])).toEqual([[0, false], [1, true]]);
+    expect(reports.map(report => report.text).join("")).toBe([1, 2, 3, 4, 5, 6].map(n => `{"n":${n}}\n`).join(""));
+  } finally { client.stop(); }
+});
+
 it("keeps running work through a stalled server by resending the same frame", async () => {
   const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
   let localSignal: AbortSignal | undefined;
@@ -229,9 +301,10 @@ it("keeps running work through a stalled server by resending the same frame", as
   });
   try {
     await client.bind("bot");
-    await vi.waitFor(() => expect(reports.at(-1)?.done).toBe(true), { timeout: 8_000 });
-    expect(reports.map(({ seq, done }) => [seq, done])).toEqual([[0, false], [0, false], [0, false], [1, true]]);
-    expect(new Set(reports.slice(0, 3).map(report => report.text)).size).toBe(1);
+    await vi.waitFor(() => expect(reports.length).toBeGreaterThanOrEqual(3), { timeout: 8_000 });
+    // The output and its end travel in one frame, resent unchanged through the stall.
+    expect(reports.map(({ seq, done }) => [seq, done])).toEqual([[0, true], [0, true], [0, true]]);
+    expect(new Set(reports.map(report => report.text))).toEqual(new Set(['{"event":1}\n{"event":2}\n']));
     expect(reports.some(report => report.text.includes("interrupted"))).toBe(false);
     expect(localSignal?.aborted).toBe(false);
   } finally { client.stop(); }

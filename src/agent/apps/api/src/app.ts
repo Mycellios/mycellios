@@ -919,8 +919,16 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       (await prisma.spaceMember.findMany({where:{userId:actor.userId},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",
     secret: env.screenProxySecret,
+    revision: env.gitSha,
     authenticate: requestSession,
     ownsBot: ownsActiveBot,
+    ownedBots: (actor, botIds) =>
+      runAsTenant(actor, async () =>
+        new Set((await prisma.bot.findMany({
+          where: { id: { in: [...botIds] }, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+          select: { id: true },
+        })).map((bot) => bot.id)),
+      ),
   });
   desktopHostProbe = stopDesktopRelay.hasAgentDevice;
   mountDesktopWhatsApp(app, {

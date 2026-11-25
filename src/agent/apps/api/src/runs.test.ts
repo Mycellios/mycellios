@@ -1,3 +1,4 @@
+import { LOCATION_ANSWER_NOTE, LOCATION_DECLINED_PROMPT } from "@mycellios/core";
 import { describe, expect, it } from "vitest";
 import { activityNotificationsEnabled, activityPreview } from "./runs.js";
 
@@ -40,6 +41,19 @@ describe("run activity copy", () => {
       });
     },
   );
+
+  it("shows the request that started a turn instead of a location card's internal note", () => {
+    for (const prompt of [LOCATION_ANSWER_NOTE, LOCATION_DECLINED_PROMPT]) {
+      expect(
+        activityPreview({
+          trigger: "user",
+          prompt,
+          sourceBlocks: [{ kind: "text", text: "find restaurants\nnear me" }],
+        }),
+      ).toEqual({ promptSnippet: "find restaurants near me", agentMessage: null });
+      expect(activityPreview({ trigger: "user", prompt }).promptSnippet).toBe("Location request");
+    }
+  });
 
   it("caps the whole legacy label and the structured text independently", () => {
     expect(activityPreview({ trigger: "user", prompt: " hello\n world " })).toEqual({

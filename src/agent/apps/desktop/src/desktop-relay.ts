@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setImmediate as deferTurn } from "node:timers/promises";
 import { recordDesktopDiagnostic, desktopExceptionFields } from "./diagnostics.js";
 import type { DesktopFailureCode } from "@mycellios/contracts";
 import type { UpdateResumeBinding } from "./update-resume.js";
@@ -22,6 +23,11 @@ const ONLINE_MS = 40_000;
  */
 const RELAY_STALL_MS = 85_000;
 const RESULT_ATTEMPT_MS = 15_000;
+/**
+ * Bytes of native output per result POST. Base64 keeps it under the server's
+ * 350,000-character frame and 360,000-byte body bounds.
+ */
+export const RESULT_FRAME_BYTES = 240 * 1024;
 const POLL_RETRY_BASE_MS = 250;
 const POLL_RETRY_MAX_MS = 5_000;
 
@@ -35,6 +41,19 @@ export function pollRetryDelayMs(failures: number, held: boolean): number {
   const idle = held ? 0 : 2_000;
   if (failures <= 0) return idle;
   return Math.max(idle, Math.min(POLL_RETRY_MAX_MS, POLL_RETRY_BASE_MS * 2 ** (failures - 1)));
+}
+
+const RELAY_CONFLICT_MESSAGE = "The PC connection changed. Try again.";
+
+/** The server's short reason for a 409, or a neutral sentence; never asks to sign in again. */
+export async function relayConflictMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    const text = typeof body.error === "string" ? body.error.trim() : "";
+    return text && text.length <= 200 && !/[\r\n]/.test(text) ? text : RELAY_CONFLICT_MESSAGE;
+  } catch {
+    return RELAY_CONFLICT_MESSAGE;
+  }
 }
 
 /** A delivery the broker has already accepted must be forgotten, never aborted or replayed. */
@@ -105,7 +124,11 @@ export class DesktopRelayClient {
       throw Object.assign(new Error(response.status >= 500
         // A server restart or overload, not an account problem: signing in again would not help.
         ? "The server is temporarily unavailable."
-        : "Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
+        : response.status === 409
+          // The PC connection changed (another PC runs this Mico, or this PC reconnected).
+          // The server's own short sentence says which; signing in again would not help.
+          ? await relayConflictMessage(response)
+          : "Desktop connection is unavailable. Sign in again or reconnect the project."), { status: response.status });
     return response;
   }
   async identity() {
@@ -435,15 +458,36 @@ export class DesktopRelayClient {
       delivery = next;
       return next;
     };
-    // An interruption must not split an NDJSON frame already being forwarded.
+    // Complete NDJSON lines wait here while a result POST is in flight; the next POST
+    // carries all of them. One POST per line made every engine event, callback and model
+    // read wait for the previous round trip. Only complete lines enter, so an
+    // interruption never splits a frame.
+    let outgoing: Buffer = Buffer.alloc(0), ending = false, ended = false;
+    let sendFailure: unknown;
     let frames = Promise.resolve();
-    const forward = (data: Uint8Array, done: boolean) => {
+    const drain = () => {
       frames = frames.then(async () => {
-        for (let offset = 0; offset < data.byteLength; offset += 128 * 1024)
-          await send(data.subarray(offset, offset + 128 * 1024), done && offset + 128 * 1024 >= data.byteLength);
-        if (!data.byteLength) await send(data, done);
+        // Let an end of stream that is already arriving travel with the last lines.
+        await deferTurn();
+        while (outgoing.byteLength || (ending && !ended)) {
+          const data = outgoing.subarray(0, RESULT_FRAME_BYTES);
+          outgoing = outgoing.subarray(data.byteLength);
+          const last = ending && !outgoing.byteLength;
+          await send(data, last);
+          if (last) ended = true;
+        }
       });
+      // The reader keeps going without awaiting; it checks sendFailure instead.
+      frames.catch((error: unknown) => { sendFailure ??= error; controller.abort(); });
       return frames;
+    };
+    const append = (data: Uint8Array) => {
+      if (data.byteLength) outgoing = outgoing.byteLength ? Buffer.concat([outgoing, data]) : Buffer.from(data);
+    };
+    const forward = (data: Uint8Array, done: boolean) => {
+      append(data);
+      if (done) ending = true;
+      return drain();
     };
     const interrupt = async (dispatched = true) => {
       await forward(Buffer.from(JSON.stringify({error:"The PC is updating; pending work will resume after reconnecting.",code:"desktop_updating",dispatched}) + "\n"), true);
@@ -473,7 +517,9 @@ export class DesktopRelayClient {
       let pending: Buffer = Buffer.alloc(0);
       try {
         for (;;) {
+          if (sendFailure) throw sendFailure;
           const { value, done } = await reader.read();
+          if (sendFailure) throw sendFailure;
           if (done) {
             if (pending.byteLength) {failureCode="stream_incomplete";throw Error("Incomplete native frame");}
             await forward(new Uint8Array(), true);
@@ -483,8 +529,10 @@ export class DesktopRelayClient {
           if (pending.byteLength > HOST_COMPUTER_MAX_BYTES) {failureCode="invalid_frame";throw Error("Native frame exceeds its limit");}
           const end = pending.lastIndexOf(10);
           if (end >= 0) {
-            await forward(pending.subarray(0, end + 1), false);
+            void forward(pending.subarray(0, end + 1), false).catch(() => undefined);
             pending = pending.subarray(end + 1);
+            // Bound what waits for the relay: past one frame's worth, let the POSTs catch up.
+            if (outgoing.byteLength > HOST_COMPUTER_MAX_BYTES) await frames;
           }
         }
       } finally {

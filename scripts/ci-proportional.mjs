@@ -34,8 +34,10 @@ const llamaCppTests = ['test_llama_cpp_runtime.py', 'test_llama_cpp_stage.py', '
 // The Kokoro speech engine's unit tests use fake pipelines on CPU torch from the same lock.
 const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'python/tests/test_kokoro_engine.py']);
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
+// The two-host TCP link probe and its test use only Python's standard library.
+const linkProbePython = new Set(['python/distributed_runtime/link_probe.py', 'python/tests/test_link_probe.py']);
 const pageBrowserFile = file => /^src\/agent\/infra\/sandboxes\/computer\/(?:[^/]+-page-browser|test_page_browser\.py)$/.test(file);
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !pageBrowserFile(f));
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !linkProbePython.has(f) && !pageBrowserFile(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -77,6 +79,9 @@ export function planChecks(files, availableAgentTests) {
   if (files.some(f => installerPython.has(f))) {
     add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'deploy/installers', '-p', 'test_*.py'], 'installer promotion ownership, signing and recovery boundaries');
     add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...installerPython], 'installer publisher Python syntax');
+  }
+  if (files.some(f => linkProbePython.has(f))) {
+    add('python', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_link_probe.py'], 'two-host TCP link probe (loopback only)');
   }
   if (files.some(f => memoryEmbeddingPython.has(f))) {
     add('python', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_qwen06_*.py'], 'memory-embedding replica and forwarder boundaries (no model or GPU)');
@@ -151,6 +156,7 @@ export function planChecks(files, availableAgentTests) {
     }
     for (const [pattern, script, label] of [
       [/event-waits?[-.]|verify-autonomy-waits|event_wait_delegation_state|packages\/db\/src\/work-delegation/, 'verify-autonomy-waits-db.ts', 'event wait migration and automatic return on isolated PostgreSQL'],
+      [/agent-tasks\.ts$|verify-agent-tasks-db/, 'verify-agent-tasks-db.ts', 'Mico-opened conversations, their reports and report recovery on isolated PostgreSQL'],
       [/sidebar.fold|bot-folders|20261115130000_sidebar_folders/, 'verify-sidebar-folders-db.ts', 'folder migration, isolation and hierarchy'],
       [/message-pins|20261115160000_message_pins|20261122200000_message_pin_authors/, 'verify-message-pins-db.ts', 'message pin migrations, Mico pins and account/thread isolation'],
       [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],

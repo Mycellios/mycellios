@@ -5,6 +5,8 @@ import type { ProjectRunnerBridge } from "../../../../contracts/project-runner.j
 export type { ProjectRunState, ProjectRunConfig, ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
 
 export type DesktopMicoFolder = { name: string; path: string; repositoryId?: string };
+/** A group folder granted on this PC: its opaque id, display name and native path. */
+export type DesktopGroupFolder = { folderId: string; name: string; path: string };
 
 export type LocalVoiceModelKind = "asr" | "tts";
 export interface LocalVoiceModelStatus {
@@ -228,6 +230,15 @@ export interface MycelliosDesktop {
     /** Opens that same folder in the system file manager. */
     openMicoFolder?: (botId: string) => Promise<void>;
     projectAvailable?: () => Promise<boolean>;
+    /**
+     * Group shared folders (specs/group-shared-folders/spec.md); absent in older releases.
+     * Choosing opens the native picker; with a folderId it accepts only that same folder again.
+     */
+    chooseGroupFolder?: (groupId: string, folderId?: string) => Promise<DesktopGroupFolder | null>;
+    /** The group folders this PC grants right now. */
+    groupFolders?: (groupId: string) => Promise<DesktopGroupFolder[]>;
+    /** Withdraws this PC's grant for one group folder. */
+    removeGroupFolder?: (groupId: string, folderId: string) => Promise<void>;
     /** Accessibility control of this PC's apps: shipped component and the owner's opt-in. */
     appControl?: () => Promise<{ available: boolean; enabled: boolean }>;
     /** Turning it on shows a native confirmation; the result is the state afterwards. */

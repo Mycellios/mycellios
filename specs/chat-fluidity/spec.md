@@ -15,9 +15,25 @@ queue/steering semantics and authoritative event reducer.
   Paint the first progress event immediately and coalesce subsequent progress to
   animation frames. Structural events, completion, errors, navigation and explicit
   preference changes flush immediately. Cancel pending frames on unmount.
+- Web cold loads ask for the latest 24 stored messages through the existing thread
+  or bootstrap read. Keep the older-history cursor, identity, and consistent event
+  cursor. Active runs use the regular 100-message window so pending questions and
+  takeovers can still be reached. Older clients and explicit history reads retain
+  their existing page size. Do not preload the roster's full transcripts.
 - Motion acknowledges pending send, first live reply and control changes. Do not
   replay a streamed reply on completion or animate history loads and token updates.
   Preserve scroll ownership, reduced motion, keyboard and assistive feedback.
+- Completed natural replies retain meaningful symbols, including emoji-only replies.
+  A jump into a folded routine opens the group and scrolls to the exact run.
+- Keep a single history-page read in flight for the selected conversation visit.
+  A read finishing after navigation must not clear another conversation's loader.
+  Reuse unchanged message render inputs while the live tail updates.
+- Fetch routine mention summaries once per account and Space when the composer
+  opens its mention search. Opening a chat must not load every Mico's routines.
+- An empty transcript with a failed run explains the failure and preserves the
+  existing composer error and recovery controls.
+- Switching Spaces cannot wait indefinitely for a browser transition capture.
+  If the capture stalls, commit the same scoped navigation without the crossfade.
 - Measure real components in a deterministic browser fixture at desktop and mobile
   widths, including slow acknowledgements, SSE-first delivery, rejection, navigation,
   long transcripts and progress bursts. This is UI evidence, not a live model's

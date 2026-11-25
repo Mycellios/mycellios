@@ -92,6 +92,7 @@ import type {
   WebSearchRequest,
   WorkspaceDirectoryRequest,
   NativeCodingEngine,
+  NativeEngineState,
 } from "./types.js";
 
 export interface SandboxProvider {
@@ -108,11 +109,13 @@ export interface SandboxProvider {
   ): Promise<string[]>;
   /** Read the installed coding engines from the owned Desktop without starting a workspace. */
   nativeEngines?(context: AdapterContext): Promise<NativeCodingEngine[] | undefined>;
+  /** Same read as nativeEngines, plus signed-out engines and the CLIs' model catalogs. */
+  nativeEngineState?(context: AdapterContext): Promise<NativeEngineState | undefined>;
   /** Native command environment; omitted for providers with a fixed container environment. */
   environment?(
     computer: ComputerRef,
     context: AdapterContext,
-  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean; nativeEngines?: NativeCodingEngine[] } | undefined>;
+  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1"; appControl?: boolean; nativeEngines?: NativeCodingEngine[]; groupFolders?: Array<{ folderId: string; label: string; path: string }> } | undefined>;
   /** Optional live browser on the same leased screen as observe/act. */
   pageBrowser?(
     computer: ComputerRef,
@@ -319,6 +322,8 @@ export interface SemanticMemoryProvider {
 export interface AgentRuntime {
   /** Installed coding engines on this account-authorized native host. */
   nativeEngines?(): Promise<NativeCodingEngine[]>;
+  /** The installed engines, those whose CLI reported nobody signed in, and their model catalogs. */
+  nativeEngineState?(): Promise<NativeEngineState>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,

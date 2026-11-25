@@ -64,6 +64,12 @@ test('Kokoro engine changes run its CPU unit tests', () => {
   assert.deepEqual(uncoveredNativeFiles(files), []);
   assert.ok(planChecks(files).some(c => c.args.includes('test_kokoro_engine.py')));
 });
+test('the stdlib two-host link probe runs its loopback test', () => {
+  const files = ['python/distributed_runtime/link_probe.py', 'python/tests/test_link_probe.py'];
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  assert.ok(planChecks(files).some(c => c.args.includes('test_link_probe.py') && c.args.includes('-I')));
+  assert.deepEqual(uncoveredNativeFiles(['python/distributed_runtime/server_extra.py']), ['python/distributed_runtime/server_extra.py']);
+});
 test('documentation requires no dependency installation', () => {
   const plan = planChecks(['docs/DEVELOPMENT.md', 'AGENTS.md']);
   assert.ok(plan.some(c => c.label === 'CI policy tests'));
@@ -216,6 +222,14 @@ test('event waits qualify the deployed CHECK upgrade and automatic return on a r
   assert.deepEqual(check?.args,['node_modules/tsx/dist/cli.mjs','scripts/verify-autonomy-waits-db.ts']);
  }
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts')));
+});
+
+test('Mico-opened conversations qualify their reports and report recovery on a real isolated database',()=>{
+ for (const file of ['src/agent/packages/db/src/agent-tasks.ts','src/agent/packages/core/src/agent-tasks.ts','src/agent/scripts/verify-agent-tasks-db.ts']) {
+  const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-agent-tasks-db.ts'));
+  assert.deepEqual(check?.args,['node_modules/tsx/dist/cli.mjs','scripts/verify-agent-tasks-db.ts'], file);
+ }
+ assert.ok(!planChecks(['src/agent/packages/adapters/src/executor-agent-tasks.test.ts'],[]).some(c=>c.args.includes('scripts/verify-agent-tasks-db.ts')));
 });
 
 test('deployments are requested only from main pushes after the exact commit passes CI, with OIDC and no stored secret', () => {

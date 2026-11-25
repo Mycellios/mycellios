@@ -25,7 +25,7 @@ function stubTransitions() {
         skip = () => reject(new Error("Transition skipped"));
       });
       transitions.push({ update, done, skip });
-      return { finished };
+      return { finished, skipTransition: skip };
     },
   });
   return { transitions, classes };
@@ -38,6 +38,23 @@ afterEach(() => {
 });
 
 describe("switching spaces in place", () => {
+  it("commits once when the browser fails to capture the old screen", async () => {
+    vi.useFakeTimers();
+    const { transitions, classes } = stubTransitions();
+    const { remountShellForSpace } = await import("./space-switch");
+    const commit = vi.fn(() => true);
+
+    remountShellForSpace(commit);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(commit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(commit).toHaveBeenCalledOnce();
+    expect(classes.has("rk-space-switching")).toBe(false);
+
+    await transitions[0]!.update();
+    expect(commit).toHaveBeenCalledOnce();
+  });
+
   it("releases a skipped transition without an unhandled rejection", async () => {
     const { transitions, classes } = stubTransitions();
     const { remountShellForSpace } = await import("./space-switch");

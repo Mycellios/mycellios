@@ -1,6 +1,7 @@
 import { PeerExchangeSummary } from "../../components/ai/PeerExchangeSummary";
 import { joinMessageBubbles } from "../../lib/message-bubble-group";
 import { peerExchanges } from "../../lib/peer-exchange-groups";
+import { earlierProgressNotes } from "../../lib/natural-turn";
 import { routineRunGroups } from "../../lib/routine-run-groups";
 import { RoutineRunMarker } from "../../components/RoutineRunMarker";
 import { useGeneralPreferences } from "../../lib/general-preferences";
@@ -226,6 +227,7 @@ export const Transcript = memo(function Transcript({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
+  const earlierNotes = useMemo(() => earlierProgressNotes(messages), [messages]);
   // A reply the reader watched arrive must not shrink when its durable message replaces progress.
   // Keys include the thread; the bounded set never changes another conversation's presentation.
   const [streamedTextRuns, setStreamedTextRuns] = useState<ReadonlySet<string>>(() => new Set());
@@ -607,8 +609,14 @@ export const Transcript = memo(function Transcript({
         {reactionView.visibleMessages.length === 0 && !pendingMessages.length && !running && olderCursor == null ? (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-4 py-12 text-center">
             <TranscriptEmptyAvatar bot={conversationBot} />
-            <h2 className="font-display text-2xl tracking-tight">{t`What shall we work on?`}</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
+            <h2 className="font-display text-2xl tracking-tight">
+              {lastRun?.status === "failed"
+                ? t`The last run failed before saving a message.`
+                : t`What shall we work on?`}
+            </h2>
+            {lastRun?.status !== "failed" ? (
+              <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
+            ) : null}
           </div>
         ) : null}
         {threadItems.map((item, itemIndex) => {
@@ -655,8 +663,11 @@ export const Transcript = memo(function Transcript({
                   <TimeSeparator createdAt={message.createdAt} locale={i18n.locale || "en"} />
                 ) : null}
                 {holdsUnread ? <UnreadDivider afterSeparator={separatorIds.has(message.id)} /> : null}
-                <div data-message-id={message.id} data-message-role={message.role} className="relative py-0.5">
-                  <RoutineRunMarker runs={routineGroup.runs} locale={i18n.locale || "en"} />
+                <div data-message-id={routineGroup.runs.length === 1 ? message.id : undefined}
+                  data-message-role={message.role} className="relative py-0.5">
+                  <RoutineRunMarker runs={routineGroup.runs} locale={i18n.locale || "en"}
+                    revealMessageId={scrollRequest && routineGroupOf.get(scrollRequest.messageId) === routineGroup
+                      ? scrollRequest.messageId : undefined} />
                 </div>
               </Fragment>
             );
@@ -785,6 +796,7 @@ export const Transcript = memo(function Transcript({
                       runEnded={Boolean(message.runId) && (!running || Boolean(activeRun && activeRun.id !== message.runId))}
                       showFullText={scrollRequest?.messageId === message.id}
                       textWasStreamed={Boolean(message.runId && streamedTextRuns.has(`${message.threadId}:${message.runId}`))}
+                      earlierNotes={earlierNotes.get(message.id)}
                       hideHoverActions={compactMessages}
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}

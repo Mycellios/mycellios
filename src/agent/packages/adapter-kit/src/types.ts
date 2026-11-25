@@ -8,6 +8,26 @@ import type {
 
 export type NativeCodingEngine = "codex" | "claude" | "opencode";
 
+/** One model the signed-in CLI account can use, as that CLI reported it. */
+export type NativeEngineModel = {
+  id: string;
+  label: string;
+  isDefault: boolean;
+  thinkingLevels: string[];
+  defaultThinkingLevel?: string;
+  fast: boolean;
+};
+/** Model catalogs of the installed CLIs that can list them without a model call. */
+export type NativeEngineModels = Partial<Record<"codex" | "claude", NativeEngineModel[]>>;
+/** The installed engines, those whose CLI reported nobody signed in, and their catalogs. */
+export type NativeEngineState = {
+  engines: NativeCodingEngine[];
+  signedOut: NativeCodingEngine[];
+  /** Installed engines whose CLI confirmed someone is signed in (older hosts omit it). */
+  signedIn?: NativeCodingEngine[];
+  models?: NativeEngineModels;
+};
+
 export interface AdapterContext {
   operationId: string;
   traceId: string;
@@ -21,8 +41,18 @@ export interface AdapterContext {
   browserThreadId?: string;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
+  /**
+   * Server-derived for a member's turn in its group's thread: the shared folder ids the group
+   * has now (specs/group-shared-folders/spec.md). The PC grants only ids it holds for that group.
+   */
+  groupFolders?: { groupId: string; folders: Array<{ folderId: string; label: string }> };
   /** Resolved by the local Desktop host only, never received in a run request. */
   resolveOpenCodeProject?: () => Promise<string | undefined>;
+  /**
+   * Resolved by the local Desktop host only: the folder a native CLI works in for this run (the
+   * linked project, else the Mico's own folder). Its presence also marks a run on the owner's PC.
+   */
+  resolveNativeWorkspace?: () => Promise<string | undefined>;
   /** Server-selected workspace for this run, including after Desktop reconnects. */
   cloudWorkspace?: { workerId: string; runFence: number };
   /** Server-derived from the owned Computer scope; never supplied by a client. */
@@ -98,6 +128,8 @@ export interface PortableFile {
   path: string;
   content: Uint8Array;
   executable?: boolean;
+  /** Only the PC host honors it, for shared group folders: write only over this content. */
+  expectedSha256?: string;
 }
 
 export interface ComputerRef {
@@ -476,9 +508,14 @@ export interface AgentRunModel {
   /** Scoped inference stream only; the owned Desktop never receives provider credentials. */
   desktopTransport?: {
     model: Record<string, unknown>;
-    open(context: unknown, options: Record<string, unknown>): Promise<{
+    /**
+     * `accept.firstBatch` asks the cloud to answer with the first events already read,
+     * saving one relay round trip per model call. Older servers ignore it and omit `first`.
+     */
+    open(context: unknown, options: Record<string, unknown>, accept?: { firstBatch?: boolean }): Promise<{
       read(): Promise<{ events: unknown[]; done: boolean; result?: unknown }>;
       cancel(): Promise<void>;
+      first?: { events: unknown[]; done: boolean; result?: unknown };
     }>;
   };
   /** Server-side spending authorization, carried with the resolved credential. */
@@ -530,7 +567,7 @@ export interface AgentRunRequest {
   workState?: unknown;
   saveWorkState?: (state: unknown) => Promise<void>;
   agentEngine?: "pi" | "codex" | "claude" | "acp" | "opencode";
-  nativeConfig?: { modelId?: string | null; thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | null; fastMode?: boolean } | null;
+  nativeConfig?: { modelId?: string | null; thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | null; fastMode?: boolean; userSettings?: boolean } | null;
   /** Another engine ran this conversation since the saved native session. */
   resetNativeSession?: boolean;
   /** Awaited producer-side accounting, independent of event-consumer cancellation. */
@@ -603,7 +640,7 @@ export interface AgentRunRequest {
 export interface ScriptedTurn {
   assistant?: string;
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-  ask?: { text: string; detail?: string; actions?: Array<{ id: string; label: string }> };
+  ask?: { text: string; detail?: string; actions?: Array<{ id: string; label: string }>; location?: true };
   takeover?: { reason: string };
   files?: Array<{ path: string; content: string }>;
   memory?: Array<{ scope: "bot" | "user"; path: string; content: string }>;
@@ -676,6 +713,8 @@ export type AgentRuntimeEvent =
       actions?: Array<{ id: string; label: string }>;
       /** A plan card's steps (acknowledge_request); the executor adds its auto-start time. */
       plan?: { steps: Array<{ label: string; text: string }> };
+      /** A one-time location request (ask_location): the card asks for a place, not a reply. */
+      location?: true;
     }
   | { type: "takeover"; reason: string; executionId?: string }
   | ({

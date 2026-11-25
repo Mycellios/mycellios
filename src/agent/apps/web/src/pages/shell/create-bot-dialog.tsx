@@ -197,7 +197,7 @@ export function CreateBotDialog({
                 onChange={(event) => setDescription(event.target.value)}
               />
             </div>
-            {me ? <Disclosure summary={t`Model · automatic`}><CreateBotModelPicker me={me} model={model} onChange={setModel} /></Disclosure> : null}
+            {me ? <CreateBotModelPicker me={me} model={model} onChange={setModel} /> : null}
             {description.trim() ? <Disclosure summary={t`Review instructions`} open={reviewing} onOpenChange={setReviewing}>
               <p className="whitespace-pre-wrap text-sm">{normalizeCreateBotProfile({ name, title: "", description }).instructions}</p>
               <p className="mt-2 text-xs text-muted-foreground">{t`These instructions will be saved when you create the Mico. You can edit them later.`}</p>

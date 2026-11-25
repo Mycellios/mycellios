@@ -14,7 +14,7 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "@mycellios/db";
-import { DesktopUnreachableError } from "./computer-errors.js";
+import { ComputerUpdatingError, DesktopUnreachableError } from "./computer-errors.js";
 import { cancelComputerRunWork } from "./computer-idle.js";
 import { manageComputerWorkspaceDirectories } from "./computer-workspace.js";
 import { desktopRelayPresence, desktopRelayTransport } from "./desktop-relay.js";
@@ -128,13 +128,16 @@ export class HostAwareSandbox implements SandboxProvider {
   /**
    * Whether the PC can take this work. A check that got no answer only matters when the
    * work belongs on the PC; anything else keeps using the server computer, as it would
-   * with the PC offline, so a busy relay never blocks Micos that do not use a PC.
+   * with the PC offline, so a busy relay (or one handing its PCs to a new server version)
+   * never blocks Micos that do not use a PC.
    */
   private async hostAvailable(context: AdapterContext, pcRequired: boolean) {
     try {
       return await this.hostEnabled(context);
     } catch (error) {
-      if (!pcRequired && error instanceof DesktopUnreachableError) return false;
+      if (!pcRequired && (error instanceof DesktopUnreachableError || error instanceof ComputerUpdatingError)) return false;
+      // Work that needs the PC pauses and continues once it reconnects, as for a PC update.
+      if (error instanceof ComputerUpdatingError) context.onComputerUpdate?.(error.dispatched);
       throw error;
     }
   }
@@ -186,6 +189,10 @@ export class HostAwareSandbox implements SandboxProvider {
 
   async nativeEngines(context: AdapterContext) {
     return this.host.nativeEngines?.(context);
+  }
+
+  async nativeEngineState(context: AdapterContext) {
+    return this.host.nativeEngineState?.(context);
   }
 
   async environment(computer: ComputerRef, context: AdapterContext) {

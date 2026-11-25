@@ -47,6 +47,28 @@ describe("desktop local computer consent", () => {
     await computer.revoke();expect(computer.executionScope()).toBeUndefined();
   });
 
+  it("clears folder grants when another account takes over this PC, and keeps group folder ids stable", async () => {
+    const owner = computerConsentScope("https://example.test/agent", { userId: "owner" });
+    const other = computerConsentScope("https://example.test/agent", { userId: "other" });
+    const folder = await mkdtemp(path.join(tmpdir(), "mycellios-group-grant-"));
+    const secret = computer.groupFolderSecret();
+    expect(secret).toMatch(/^[a-f0-9]{64}$/);
+    try {
+      await computer.grant(owner);
+      computer.activate(true);
+      await computer.grantGroupFolder("group-1", "a".repeat(64), folder);
+      await computer.grant(owner);
+      expect(computer.groupFolders("group-1")).toHaveLength(1);
+      await computer.grant(other);
+      expect(computer.groupFolders("group-1")).toEqual([]);
+      await computer.close();
+      computer = await prepareHostComputer(root);
+      expect(computer.groupFolderSecret()).toBe(secret);
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  });
+
   it("does not forget account consent when transport credentials must rotate", async () => {
     const scope = computerConsentScope("https://example.test", {userId:"owner"});
     await computer.grant(scope);

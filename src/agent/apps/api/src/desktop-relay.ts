@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Actor } from "@mycellios/contracts";
 import { getLogger } from "@mycellios/logging";
 import type { Hono } from "hono";
@@ -28,6 +28,12 @@ export function mountDesktopRelay(
     secret: string;
     authenticate(request: Request): Promise<{ actor: Actor; sessionId: string } | null>;
     ownsBot(actor: Pick<Actor,"userId"|"spaceId">, botId: string): Promise<boolean>;
+    /**
+     * The same check for every Mico bound to a PC, in one database round trip. Each
+     * poll and delivery rechecks all of them; one query per Mico made every message
+     * to a PC with many Micos wait for dozens of transactions.
+     */
+    ownedBots?(actor: Pick<Actor,"userId"|"spaceId">, botIds: readonly string[]): Promise<ReadonlySet<string>>;
     spaces?(actor: Actor): Promise<string[]>;
     desktopExecution?(actor: Pick<Actor, "userId" | "spaceId">, enabled?: boolean): Promise<boolean>;
     /**
@@ -39,10 +45,28 @@ export function mountDesktopRelay(
       get(scope: Pick<Actor, "userId" | "spaceId">, botId: string): Promise<string | undefined>;
       remember(scope: Pick<Actor, "userId" | "spaceId">, botId: string, deviceKey: string): Promise<void>;
     };
+    /** The deployed revision, reported with the handoff state. */
+    revision?: string;
   },
 ) {
   const broker = new DesktopRelayBroker();
+  /** This process's relay: a handoff's evidence names the instance it came from. */
+  const instance = randomUUID();
   const replay = new Map<string, number>();
+  const ownedOf = async (actor: Pick<Actor, "userId" | "spaceId">, botIds: readonly string[]): Promise<ReadonlySet<string>> => {
+    if (!botIds.length) return new Set();
+    if (deps.ownedBots) return deps.ownedBots(actor, botIds);
+    const owned = new Set<string>();
+    for (const botId of botIds) if (await deps.ownsBot(actor, botId)) owned.add(botId);
+    return owned;
+  };
+  /** Drops this PC's bindings to Micos the account no longer owns; returns the ones it does. */
+  const recheckBindings = async (actor: Pick<Actor, "userId" | "spaceId">, owner: Parameters<typeof broker.revokeBot>[0], deviceId: string) => {
+    const bound = broker.ownedBindings(owner, deviceId);
+    const owned = await ownedOf(actor, bound);
+    for (const botId of bound) if (!owned.has(botId)) broker.revokeBot(owner, botId);
+    return new Set(bound.filter(botId => owned.has(botId)));
+  };
   const secret = desktopRelayKey(deps.secret);
   app.post("/api/desktop-relay/internal", async (c) => {
     const body = await readBoundedBody(c.req.raw, HOST_COMPUTER_MAX_BYTES);
@@ -63,6 +87,12 @@ export function mountDesktopRelay(
         return c.json({ error: "Duplicate request" }, 409);
       replay.set(input.nonce, Date.now() + 60_000);
       if (!deps.enabled) return c.json({ error: "Unavailable" }, 404);
+      // Handing its PCs to a new server version: the turn waits instead of reading the PC as
+      // offline and moving to the server.
+      if (input.probe && !input.request && broker.handingOff()) {
+        c.header("x-mycellios-desktop-error", "desktop_updating");
+        return c.json({ error: "The server is moving to a new version.", code: "desktop_updating" }, 503);
+      }
       const botId=input.probe ?? (input.request ? hostComputerRequest.parse(input.request).botId : undefined);
       if (botId) {
         if (!await deps.ownsBot(input.scope,botId)) return c.json({available:false,error:"Unavailable agent"},404);
@@ -102,6 +132,34 @@ export function mountDesktopRelay(
       );
     }
   });
+  /**
+   * A deploy hands the PC connections from this API to a new version: `start` stops new work
+   * reaching PCs through this instance (renew it before DESKTOP_RELAY_HANDOFF_MS ends),
+   * `cancel` ends it (a rollback), `status` only reads. Every answer is the evidence the
+   * deployment waits for: this instance, its revision and what is still open here. Never
+   * through the public edge, and signed with the relay key like /internal.
+   */
+  app.post("/internal/desktop-relay/handoff", async (c) => {
+    c.header("cache-control", "no-store");
+    if (c.req.header("x-forwarded-for") || c.req.header("forwarded")) return c.notFound();
+    const body = await readBoundedBody(c.req.raw, 1_024);
+    if (body === null) return c.json({ error: "Too large" }, 413);
+    if (!verifyDesktopRelay(secret, c.req.header("x-desktop-time") ?? "", body, c.req.header("x-desktop-signature") ?? ""))
+      return c.json({ error: "Unauthorized" }, 401);
+    let action: unknown;
+    try {
+      action = (JSON.parse(body) as { action?: unknown } | null)?.action;
+    } catch {
+      action = undefined;
+    }
+    if (action !== "status" && action !== "start" && action !== "cancel")
+      return c.json({ error: "Invalid request" }, 400);
+    if (action !== "status") {
+      broker.handOff(action === "start");
+      getLogger().info("desktop.relay.handoff", { "desktop.handoff": action, ...broker.handoffState() });
+    }
+    return c.json({ instance, ...(deps.revision ? { revision: deps.revision } : {}), ...broker.handoffState() });
+  });
   app.post("/api/desktop-relay/:action", async (c) => {
     c.header("cache-control", "no-store");
     if (!deps.enabled) return c.json({ error: "Unavailable" }, 404);
@@ -132,12 +190,7 @@ export function mountDesktopRelay(
           if (!current || current.sessionId !== owner.sessionId || current.actor.userId !== owner.userId || current.actor.spaceId !== owner.spaceId) {
             broker.revoke(owner,value.deviceId); throw Error("Desktop session changed while waiting");
           }
-          const verifiedBots = new Set<string>();
-          for (const botId of broker.ownedBindings(owner, value.deviceId)) {
-            if (await deps.ownsBot(current.actor, botId)) verifiedBots.add(botId);
-            else broker.revokeBot(owner, botId);
-          }
-          return verifiedBots;
+          return recheckBindings(current.actor, owner, value.deviceId);
         } : undefined);
       switch (action) {
         case "identity":
@@ -150,8 +203,7 @@ export function mountDesktopRelay(
             return c.json({error:"The account session changed"},403);
           if (value.agentExecution === 1 && broker.needsExecutionPreference(owner, value)) await deps.desktopExecution?.(session.actor, true);
           broker.register(owner,value);
-          for(const botId of broker.ownedBindings(owner,value.deviceId))
-            if(!await deps.ownsBot(session.actor,botId))broker.revokeBot(owner,botId);
+          await recheckBindings(session.actor, owner, value.deviceId);
           // ownership: this server accepts the PC's Mico folder keys in later registrations.
           return c.json({...await poll(value),identity,ownership:1});
         }
@@ -168,8 +220,7 @@ export function mountDesktopRelay(
         }
         case "poll": {
           const value = parseDesktopPoll(input);
-          for (const botId of broker.ownedBindings(owner, value.deviceId))
-            if (!(await deps.ownsBot(session.actor, botId))) broker.revokeBot(owner, botId);
+          await recheckBindings(session.actor, owner, value.deviceId);
           // Membership/session was freshly checked above on every heartbeat.
           return c.json({ ...await poll(value), identity });
         }
@@ -197,13 +248,17 @@ export function mountDesktopRelay(
         : message === "Desktop session changed while waiting" ? "session_changed"
         : message === "Operation unavailable" ? "operation_unavailable"
         : message === "Invalid Desktop result" ? "invalid_result"
-        : message === "Slow consumer" ? "slow_consumer" : "request_rejected";
-      if (!c.req.raw.signal.aborted && (action === "account" || action === "poll" || resultId)) {
+        : message === "Slow consumer" ? "slow_consumer"
+        : message === "Agent busy on another computer" ? "busy_elsewhere" : "request_rejected";
+      if (!c.req.raw.signal.aborted && (action === "account" || action === "poll" || action === "bind" || resultId)) {
         getLogger().warn("desktop.relay.request_rejected", {
           "desktop.action": action, "desktop.operation.id": resultId, "desktop.reason": reason,
         });
       }
       if (reason === "session_changed") return c.json({error:"Sign in again"},403);
+      // Another of the person's PCs is running this Mico now: not an account or project problem.
+      if (reason === "busy_elsewhere")
+        return c.json({ error: "This Mico is working on another computer. Wait for it to finish there, or stop it, then try again.", code: reason }, 409);
       return c.json({ error: "PC connection changed. Reconnect the paired computer." }, 409);
     }
   });

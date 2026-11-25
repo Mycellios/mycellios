@@ -23,6 +23,7 @@ import {
   HOST_COMPUTER_MAX_BYTES,
   HOST_COMPUTER_MAX_FILE_BYTES,
   HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES,
+  HOST_GROUP_FOLDER_MAX,
   hostComputerDeadlineMs,
 } from "./host-computer-protocol.js";
 import {
@@ -78,6 +79,10 @@ export class HostComputerSandbox implements SandboxProvider {
     // The name travels only with its own Mico id; the PC uses it to name a new folder.
     const botName = context.botId ? context.botName?.trim().slice(0, 200) : undefined;
     input = { ...input, botId: context.botId ?? input.botId, ...(botName ? { botName } : {}), ...(context.projectSessionId?{projectSessionId:context.projectSessionId}:{}) };
+    // Read at send time: the run refreshes the group's folder ids before each tool call.
+    const shared = context.groupFolders;
+    if (shared && !context.projectSessionId)
+      input = { ...input, groupId: shared.groupId, groupFolders: shared.folders.slice(0, HOST_GROUP_FOLDER_MAX) };
     if ((!this.url || !this.token) && !this.transport)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
     const ownedInput = { ...input, ...(context.runId ? { runId: context.runId } : {}) };
@@ -181,8 +186,15 @@ export class HostComputerSandbox implements SandboxProvider {
     return result as T;
   }
   async nativeEngines(context: AdapterContext) {
+    return (await this.nativeEngineState(context))?.engines;
+  }
+  async nativeEngineState(context: AdapterContext) {
     if (!context.botId) return;
-    return (await this.one<HostComputerEnvironment>({ method: "environment", botId: context.botId }, context))?.nativeEngines;
+    const environment = await this.one<HostComputerEnvironment>({ method: "environment", botId: context.botId }, context);
+    if (!environment) return;
+    return { engines: environment.nativeEngines ?? [], signedOut: environment.signedOutEngines ?? [],
+      ...(environment.signedInEngines ? { signedIn: environment.signedInEngines } : {}),
+      ...(environment.nativeModels ? { models: environment.nativeModels } : {}) };
   }
   environment(computer: ComputerRef, context: AdapterContext) {
     return this.one<HostComputerEnvironment>(

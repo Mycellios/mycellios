@@ -449,6 +449,19 @@ describe("Composer", () => {
     expect(container?.querySelector('[data-testid="mention-chip"]')?.textContent).toBe("Plan");
   });
 
+  it("requests more mention targets only when a mention starts", () => {
+    const onMentionOpen = vi.fn();
+    const textarea = renderComposer(vi.fn(), { onMentionOpen });
+    type(textarea, "ordinary draft");
+    expect(onMentionOpen).not.toHaveBeenCalled();
+    type(textarea, "ordinary draft @");
+    type(textarea, "ordinary draft @check");
+    expect(onMentionOpen).toHaveBeenCalledTimes(1);
+    type(textarea, "ordinary draft");
+    type(textarea, "ordinary draft @");
+    expect(onMentionOpen).toHaveBeenCalledTimes(2);
+  });
+
   it.each([false, true])(
     "keeps the keyboard mention selection when targets refresh (reorder: %s)",
     (reorder) => {

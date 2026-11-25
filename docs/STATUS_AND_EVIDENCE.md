@@ -1,5 +1,57 @@
 # Status and evidence
 
+## Two physical computers, generic pipeline — measured, unsigned, 2026-11-24
+
+The first run of `docs/TWO_HOST_QUICKSTART.md` on two physical machines, using
+the same home LAN and commit e56e1d76. It is a measured run, not a signed
+receipt, so the gate stays open (see below).
+
+| Setting | Value |
+| --- | --- |
+| Model | Qwen/Qwen3-0.6B, revision c1899de2, adapter `transformers-qwen3-v1` |
+| Host A | Windows 11 x64 PC, AMD Ryzen AI 9 HX 370, 31 GB RAM |
+| Host B | MacBook Air, Apple M1, 8 GB RAM, on battery |
+| Route | layers 0–13 (root and API) on host B, layers 14–27 on host A |
+| Execution | host B (root) on the M1 GPU through MPS in float16, as reported by the root server; host A on CPU, where the installed PyTorch has no accelerator; one thread per stage, fp16 activation codec |
+| Transport | TCP between the two stages over the LAN; host A to B ICMP RTT 5–7 ms minimum, 14–47 ms mean, spikes up to 644 ms |
+
+- **Parity**: the greedy canary produced the same 7 token ids, with the same
+  hash, as the complete model on one machine (`canary_reference`, float32
+  CPU), in every run.
+- **Activation**: 48–66 s from launch to a passing canary, about 40 s of it
+  process startup.
+- **Throughput**: `api_benchmark`, 5 requests of 32 tokens at concurrency 1,
+  in two runs:
+
+  | Run | Tokens/s | TTFT mean / p95 | TPOT mean / p95 |
+  | --- | ---: | ---: | ---: |
+  | 1 | 3.9 | 744 / 990 ms | 241 / 265 ms |
+  | 2 | 4.9 | 565 / 719 ms | 193 / 214 ms |
+
+- **Peak memory**: sampled every 2 s as the sum of all Python processes on
+  each host: about 2.35 GB on host A, which also ran the benchmark client,
+  and about 1.1 GB on host B.
+- **Failure**: SIGKILL of host B's processes 8 s into a 200-token request.
+  The request failed with a connection error, the coordinator marked the
+  route failed and exited, and no stage, server or launch-agent process
+  remained on either host. The root has no standby, so no recovery is
+  claimed.
+- **Cleanup**: no process remained on either host after any of the four
+  launches, including the two that failed.
+
+Missing for a signed receipt:
+- a measured link from host B to host A, since host A drops ICMP;
+- a signed artifact;
+- host B on mains power.
+
+Every result covers this one small model. The device was chosen automatically and the first\nversion of this section wrongly said both stages ran on CPU in float32.
+
+The run found one concrete gap. The planner put the root on host B, but the
+template's return endpoint and API host named host A. The tail stage on host A
+then dialed itself and failed after a 300 s connect timeout. Compilation now
+refuses such a route at once and names the root node; the quickstart pins the
+root with `stageRoles`.
+
 ## Verified node runtime updates — source candidate, 2026-11-23
 
 `specs/node-runtime-auto-update/spec.md` adds a signed `node-app` component.
@@ -1290,7 +1342,8 @@ The complete npm dependency audit reported zero known vulnerabilities.
 
 ## Not yet demonstrated by committed evidence
 
-- one inference route spanning two physical computers;
+- a signed receipt for an inference route spanning two physical computers
+  (an unsigned measured CPU run is recorded above);
 - a model that requires the combined memory of several hosts;
 - GPU tensor or expert parallelism across machines;
 - remote recovery after physically losing a stage;
@@ -1326,9 +1379,11 @@ performance claim.
 
 ## Next gate
 
-Run the native contiguous pipeline on two computers using
-[`TWO_HOST_QUICKSTART.md`](TWO_HOST_QUICKSTART.md). Do not add a new engine or a
-new product surface before that run identifies a concrete missing capability.
+Turn the measured two-computer run into a signed receipt using
+[`TWO_HOST_QUICKSTART.md`](TWO_HOST_QUICKSTART.md), with the link measured in
+both directions and both hosts on mains power. Do not add a new engine or a
+new product surface before that receipt or a concrete missing capability
+found by these runs.
 
 ## Optional speech replicas
 

@@ -52,19 +52,25 @@ export function FixtureTranscript({
   running,
   showToolActivity,
   activeRun,
+  lastRun,
   unreadAfterSeq = null,
   header,
   footer,
   pendingMessages,
+  scrollRequest = null,
+  onScrollRequestHandled = noop,
 }: {
   messages: readonly ThreadMessage[];
   running: boolean;
   showToolActivity: boolean;
   activeRun?: Run;
+  lastRun?: Run | null;
   header?: ReactNode;
   footer?: ReactNode;
   pendingMessages?: readonly PendingThreadSend[];
   unreadAfterSeq?: number | null;
+  scrollRequest?: { messageId: string; nonce: number } | null;
+  onScrollRequestHandled?: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const transcript = useMemo(
@@ -76,8 +82,8 @@ export function FixtureTranscript({
       {header}
       <Transcript
         scrollRef={scrollRef}
-        scrollRequest={null}
-        onScrollRequestHandled={noop}
+        scrollRequest={scrollRequest}
+        onScrollRequestHandled={onScrollRequestHandled}
         artifactTarget={ARTIFACT_TARGET}
         transcript={transcript}
         pendingMessages={pendingMessages}
@@ -89,6 +95,7 @@ export function FixtureTranscript({
         dismissableAskIds={NO_IDS}
         running={running}
         activeRun={activeRun}
+        lastRun={lastRun}
         workingBots={running ? [BOT] : []}
         onLoadOlder={noop}
         onShowBot={noop}

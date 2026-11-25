@@ -5,8 +5,11 @@ import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
+  encodeLocationAnswer,
   LoginSecretValue,
+  locationAskOutcome,
   MessageBlock as MessageBlockSchema,
+  parseLocationAnswer,
 } from "@mycellios/contracts";
 import {
   ACTIVE_RUN_STATUSES,
@@ -17,7 +20,9 @@ import {
   instructionUpdateDiff,
   isApprovalAskBlock,
   isConversationalRun,
+  isLocationAskBlock,
   isSecretAskBlock,
+  locationAnswerTaskPrompt,
   messageReaction,
   messagingChannelId,
   planCardResumeText,
@@ -51,7 +56,8 @@ import { isRunResponse, readRunTimingFields } from "./run-timing.js";
 import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
 import { recordThreadTurnOutcome } from "./thread-lifecycle.js";
-import { type QueuedTaskReport, queueTaskReportInTransaction } from "./agent-tasks.js";
+import { type QueuedTaskReport, queueTaskReportInTransaction, queueTaskReportRecoveryInTransaction } from "./agent-tasks.js";
+import { queueBotMessageRecoveryInTransaction } from "./bot-message-requests.js";
 import { type QueuedRoutineRunMarker, queueRoutineRunMarkerInTransaction } from "./routine-run-markers.js";
 import { compareQueuedRows } from "./queue-order.js";
 import { IsolationError } from "./scope.js";
@@ -146,6 +152,11 @@ export interface FinalizeRunResult {
   taskReport?: QueuedTaskReport | null;
   /** The marker a routine run added to the Mico's main chat. */
   routineMarker?: QueuedRoutineRunMarker | null;
+  /**
+   * A fresh run queued because an update or a lost PC connection cut this one off (a task
+   * report or a Mico-to-Mico turn); it carries the turn, so nobody is told it failed yet.
+   */
+  recoveryRunId?: string | null;
 }
 
 interface FinalizeRunBase {
@@ -325,6 +336,8 @@ export interface RunSecretWriter {
     userId: string;
     spaceId: string;
     plaintext: string;
+    /** A location card's encoded answer, kept under runLocationKind until the run ends. */
+    location?: true;
     tx: Prisma.TransactionClient;
   }): Promise<void>;
 }
@@ -812,6 +825,14 @@ async function commitAnswerRunInput(
   if (login && !login.success) return null;
   if (secretAsk && input.answer.length > BOT_SECRET_VALUE_MAX_LENGTH)
     throw new AnswerTooLongError();
+  // A location card is answered only by its run's user: a rounded position, a typed place or a
+  // refusal. A position or place waits encrypted with the run (never in the task prompt or on
+  // the card), so it needs the run secret writer.
+  const locationAsk = !approvalAsk && !secretAsk && isLocationAskBlock(pendingAsk);
+  const locationAnswer = locationAsk ? parseLocationAnswer(input.answer) : null;
+  if (locationAsk && (!locationAnswer || dismissed || run.userId !== input.answeredByUserId))
+    return null;
+  if (locationAnswer && locationAnswer.kind !== "declined" && !runSecretWriter) return null;
   let approvalEffect: { id: string; kind: string; request: Prisma.JsonValue } | null = null;
   let editedInstructions: string | undefined;
   let approvalAnswer = input.answer;
@@ -877,9 +898,9 @@ async function commitAnswerRunInput(
   });
   if (queued.count !== 1) return null;
 
-  const recordedAnswer = secretAsk ? "" : (selectedChoice?.id ?? approvalAnswer);
+  const recordedAnswer = secretAsk || locationAsk ? "" : (selectedChoice?.id ?? approvalAnswer);
   const callId = callIdFromClientNonce(input.clientNonce);
-  const recordsCallUtterance = Boolean(callId && !secretAsk);
+  const recordsCallUtterance = Boolean(callId && !secretAsk && !locationAsk);
 
   // Give spoken answers the same durable, call-scoped user utterance as other voice turns.
   // Secret asks stay out of message history; the call UI requires those answers on screen.
@@ -982,6 +1003,17 @@ async function commitAnswerRunInput(
       },
     });
   } else {
+    if (locationAnswer && locationAnswer.kind !== "declined") {
+      await runSecretWriter!.store({
+        botId: run.botId,
+        runId: input.runId,
+        userId: run.userId,
+        spaceId: input.spaceId,
+        plaintext: encodeLocationAnswer(locationAnswer),
+        location: true,
+        tx,
+      });
+    }
     const resumeLabel = selectedChoice
       ? resumeChoiceLabel(selectedChoice, run.checkpoint)
       : undefined;
@@ -998,7 +1030,9 @@ async function commitAnswerRunInput(
                 answer: input.answer,
                 autoStarted: input.autoStart,
               })
-            : selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
+            : locationAnswer
+              ? locationAnswerTaskPrompt(locationAnswer)
+              : selectedChoice ? `Selected choice ${selectedChoice.id}: ${resumeLabel}` : input.answer,
         ),
       },
     });
@@ -1012,6 +1046,7 @@ async function commitAnswerRunInput(
           status: "answered" as const,
           answer: recordedAnswer,
           ...(dismissed ? { dismissed: true as const } : {}),
+          ...(locationAnswer ? { location: { outcome: locationAskOutcome(locationAnswer) } } : {}),
           ...(input.autoStart && block.kind === "ask" && block.plan
             ? { plan: { ...block.plan, autoStarted: true as const } }
             : {}),
@@ -1117,7 +1152,10 @@ export async function retireWaitingQuestionInTransaction(
       questions.push({
         id: message.id,
         blocks: parsed.data.map((block) =>
-          pending.includes(block) ? { ...block, status: "answered" as const, answer } : block,
+          pending.includes(block)
+            ? // A retired location card keeps no text and no outcome: it shows as no longer active.
+              { ...block, status: "answered" as const, answer: isLocationAskBlock(block) ? "" : answer }
+            : block,
         ),
       });
     }
@@ -1180,7 +1218,14 @@ export async function answerWaitingRunWithTextInTransaction(
   if (!answer) return null;
   const found = await findPendingAsk(tx, input);
   if (!found) return null;
-  if (isApprovalAskBlock(found.pendingAsk) || isSecretAskBlock(found.pendingAsk)) return null;
+  // A location card answers only on the card; a composer message is an ordinary message and
+  // retires the card instead.
+  if (
+    isApprovalAskBlock(found.pendingAsk) ||
+    isSecretAskBlock(found.pendingAsk) ||
+    isLocationAskBlock(found.pendingAsk)
+  )
+    return null;
   if (input.messageId !== undefined) {
     if (input.messageId !== found.messageId) return null;
   } else {
@@ -1622,6 +1667,7 @@ export async function finalizeRun(
     continuationRunId: committed.continuationRunId,
     ...(committed.taskReport ? { taskReport: committed.taskReport } : {}),
     ...(committed.routineMarker ? { routineMarker: committed.routineMarker } : {}),
+    ...(committed.recoveryRunId ? { recoveryRunId: committed.recoveryRunId } : {}),
   };
 }
 
@@ -1657,6 +1703,7 @@ async function finalizeRunOnce(
   firstResponse: boolean;
   taskReport: QueuedTaskReport | null;
   routineMarker: QueuedRoutineRunMarker | null;
+  recoveryRunId: string | null;
   status: "completed" | "failed";
 } | null> {
   // A routine run that reports its own failure did its turn: its answer is a normal reply, its
@@ -1804,6 +1851,13 @@ async function finalizeRunOnce(
       threadId: input.threadId,
       status,
     });
+    // A report or Mico-to-Mico turn cut off by an update or a lost PC connection starts again
+    // in this commit, so the person or the teammate waiting on it still gets the result.
+    const recoveryRunId =
+      input.outcome === "failed"
+        ? ((await queueTaskReportRecoveryInTransaction(tx, { runId: input.runId, error, now })) ??
+          (await queueBotMessageRecoveryInTransaction(tx, { runId: input.runId, error, now })))
+        : null;
     if (writableRun) {
       await deleteRunSecretsInTransaction(tx, [
         { id: input.runId, userId: writableRun.userId, spaceId: input.spaceId },
@@ -1832,6 +1886,7 @@ async function finalizeRunOnce(
       firstResponse,
       taskReport,
       routineMarker,
+      recoveryRunId,
       status,
     };
   }, FINALIZE_TRANSACTION_OPTIONS);

@@ -1,14 +1,18 @@
 import type { AdapterContext, ManagedConnectorProvider, SecretStore } from "@mycellios/adapter-kit";
+import type { LocationAnswer } from "@mycellios/contracts";
 import {
   BOT_SECRET_VALUE_MAX_LENGTH,
+  encodeLocationAnswer,
   encodeLoginSecret,
   LoginSecretValue,
   MessageBlock as MessageBlockSchema,
+  parseLocationAnswer,
   SecretAskPurpose,
 } from "@mycellios/contracts";
-import { isSecretAskBlock } from "@mycellios/core";
+import { isLocationAskBlock, isSecretAskBlock } from "@mycellios/core";
 import type { PrismaClient, RunSecretWriter } from "@mycellios/db";
-import { runSecretKind, withTransactionRetry } from "@mycellios/db";
+import { runLocationKind, runSecretKind, withTransactionRetry } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { type ApprovalPausedToolResult, resolveDuplicateEffectGate } from "./approval-effect.js";
 import { prepareBotSecret } from "./bot-secrets.js";
 import { persistPreparedSecret } from "./secret-persistence.js";
@@ -113,6 +117,85 @@ export async function reconcileManagedConnection(
   return "pending";
 }
 
+const changedRequest: RunSecretWriter = {
+  store: async () => {
+    throw new Error("Secret request changed; retry");
+  },
+};
+
+/**
+ * A location card's position or place is encrypted before the answer transaction and stored
+ * under runLocationKind, replacing an earlier answer of the same run. A refusal stores nothing.
+ */
+async function withPreparedLocation<T>(
+  prisma: PrismaClient,
+  secretStore: SecretStore,
+  input: Parameters<NonNullable<RunSecretWriter["withPrepared"]>>[1],
+  run: { botId: string; userId: string },
+  commit: (writer: RunSecretWriter) => Promise<T>,
+): Promise<T> {
+  const answer = parseLocationAnswer(input.answer);
+  if (!answer || answer.kind === "declined" || run.userId !== input.answeredByUserId)
+    return commit(changedRequest);
+  const plaintext = encodeLocationAnswer(answer);
+  const scope = { userId: run.userId, spaceId: input.spaceId, botId: run.botId };
+  const prepared = await secretStore.put(
+    plaintext,
+    { operationId: input.runId, traceId: input.runId, ...scope, signal: new AbortController().signal },
+    { ephemeral: true },
+  );
+  return persistPreparedSecret(prisma, secretStore, prepared, () =>
+    commit({
+      async store(value) {
+        if (
+          !value.location ||
+          value.userId !== run.userId ||
+          value.botId !== run.botId ||
+          value.plaintext !== plaintext
+        )
+          throw new Error("Location request changed; retry");
+        const kind = runLocationKind(input.runId);
+        await value.tx.secret.deleteMany({
+          where: { userId: run.userId, spaceId: input.spaceId, kind },
+        });
+        await value.tx.secret.create({
+          data: {
+            id: prepared.id,
+            userId: run.userId,
+            spaceId: input.spaceId,
+            kind,
+            ciphertext: prepared.ciphertext,
+          },
+        });
+      },
+    }),
+  );
+}
+
+/**
+ * The location a run's card gave, decrypted for one attempt. Null when there is none or it can
+ * no longer be read (a rotated key, a missing record): the turn then reads the stored note and
+ * asks again instead of failing.
+ */
+export async function loadRunLocation(
+  prisma: PrismaClient,
+  secretStore: SecretStore,
+  run: { id: string; userId: string; spaceId: string },
+): Promise<LocationAnswer | null> {
+  try {
+    const row = await prisma.secret.findFirst({
+      where: { userId: run.userId, spaceId: run.spaceId, kind: runLocationKind(run.id) },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!row) return null;
+    return parseLocationAnswer(await secretStore.load(row.ciphertext, row.id));
+  } catch {
+    // The error can echo stored material, so only a fixed code is recorded.
+    getLogger().warn("run location unavailable", { code: "run_location_unreadable" });
+    return null;
+  }
+}
+
 export function createRunSecretWriter(secretStore: SecretStore): RunSecretWriter {
   return {
     async withPrepared(prisma, input, commit) {
@@ -140,6 +223,8 @@ export function createRunSecretWriter(secretStore: SecretStore): RunSecretWriter
         const ask = blocks.success
           ? blocks.data.find((block) => block.kind === "ask" && block.status !== "answered")
           : undefined;
+        if (run && ask?.kind === "ask" && isLocationAskBlock(ask))
+          return withPreparedLocation(prisma, secretStore, input, run, commit);
         if (!run || ask?.kind !== "ask" || !isSecretAskBlock(ask))
           return commit({
             store: async () => {

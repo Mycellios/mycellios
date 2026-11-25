@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FAKE_VIDEO_BASE64 } from "../../../packages/adapters/src/fake-media-assets";
+import { ATTACHMENT_DOCX_MIME_TYPE } from "@mycellios/contracts";
+import { sampleDocx } from "./fixtures/docx-sample";
 import { captureScreenshot } from "./helpers";
 
 test("audio plays inline and retains its download control", async ({ page }, testInfo) => {
@@ -71,4 +73,38 @@ test("generated MP4 opens a playable preview with download", async ({ page }, te
   expect((await downloadPromise).suggestedFilename()).toBe("generated-video.mp4");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+});
+
+test("Word documents open as a sanitized preview with download", async ({ page }, testInfo) => {
+  const docx = Buffer.from(await sampleDocx());
+  await page.route("**/rpc/artifacts/get", (route) =>
+    route.fulfill({
+      json: { json: { contentBase64: docx.toString("base64"), mimeType: ATTACHMENT_DOCX_MIME_TYPE } },
+    }),
+  );
+  await page.goto("/e2e/fixtures/media-preview.html?docx=1");
+  // The document links to a web page; previewing it must not fetch anything off this origin.
+  const origin = new URL(page.url()).origin;
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).origin !== origin) external.push(request.url());
+  });
+  await page.getByRole("button", { name: "Preview report.docx" }).click();
+  const dialog = page.getByRole("dialog", { name: "report.docx" });
+  await expect(dialog.getByRole("heading", { level: 1, name: "Quarterly report" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { level: 2, name: "Highlights" })).toBeVisible();
+  await expect(dialog.getByRole("listitem")).toHaveText(["Revenue grew", "Costs fell"]);
+  await expect(dialog.getByRole("cell", { name: "North" })).toBeVisible();
+  await expect(dialog.locator("article strong")).toHaveText("Bold");
+  await expect(dialog.locator("article em")).toHaveText("italic");
+  await expect(dialog.locator("article u")).toHaveText("underlined");
+  await expect(dialog.locator("article s")).toHaveText("struck");
+  await expect(dialog.getByText("Unsafe link")).not.toHaveAttribute("href");
+  await expect(dialog.getByRole("link", { name: "Project site" })).toHaveAttribute("target", "_blank");
+  expect(await page.evaluate(() => "ranDocx" in window)).toBe(false);
+  expect(external).toEqual([]);
+  await captureScreenshot(page, testInfo, "docx-preview");
+  const downloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Download report.docx" }).click();
+  expect((await downloadPromise).suggestedFilename()).toBe("report.docx");
 });

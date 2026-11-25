@@ -76,6 +76,7 @@ export const MessageView = memo(function MessageView({
   runEnded = false,
   showFullText = false,
   textWasStreamed = false,
+  earlierNotes,
   hideHoverActions = false,
   onReply,
   onMarkUnread,
@@ -123,6 +124,8 @@ export const MessageView = memo(function MessageView({
   /** A search or quote jump must reveal the complete target. */
   showFullText?: boolean;
   textWasStreamed?: boolean;
+  /** Natural style: notes this turn already showed in earlier progress messages, not repeated. */
+  earlierNotes?: readonly string[];
   hideHoverActions?: boolean;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread: (message: ThreadMessage) => void;
@@ -224,7 +227,7 @@ export const MessageView = memo(function MessageView({
   if (isNarration && naturalStyle) {
     // Natural style: the short notes the agent wrote between steps, one steps summary, then the
     // complete answer. The notes and the summary carry no actions; the answer keeps them.
-    const turn = naturalTurnLayout(blocks, isLive);
+    const turn = naturalTurnLayout(blocks, isLive, earlierNotes);
     // A durable mid-turn progress message is a note too: it is never the answer.
     const layout = message.progress
       ? { ...turn, notes: [...turn.notes, ...turn.answer.map((block) => block.text.trim())], answer: [] }
@@ -691,6 +694,8 @@ export const MessageView = memo(function MessageView({
                   block={block}
                   canAnswer={canAnswer}
                   canDismiss={canDismiss}
+                  // dismissableAskMessageIds marks the asks of the viewer's own waiting runs.
+                  isRunUser={canDismiss}
                   onAnswer={(text, username) => onAnswer(message, text, username)}
                   onDismiss={() => onAnswer(message, "", undefined, true)}
                 />

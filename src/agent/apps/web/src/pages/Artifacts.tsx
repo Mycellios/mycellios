@@ -40,12 +40,14 @@ import {
 } from "lucide-react";
 import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { DocxViewer } from "../components/DocxViewer";
 import { IconTooltip } from "../components/IconTooltip";
 import { PdfViewer } from "../components/PdfViewer";
 import { SandboxedHtmlViewer } from "../components/SandboxedHtmlViewer";
 import { decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
 import { takeInitialBootstrap } from "../lib/bootstrap";
 import { desktopBridge, desktopDragClass } from "../lib/desktop";
+import { isDocxMimeType } from "../lib/docx-preview";
 import { useSpaceQueries, writeSaved } from "../lib/query";
 import { ArtifactShareButton } from "../components/ArtifactShareButton";
 import { formatRelativeTime } from "../lib/relative-time";
@@ -934,6 +936,7 @@ function mimeLabel(mimeType: string): string {
   if (mimeType === "text/html") return "HTML";
   if (mimeType === "text/markdown") return "MD";
   if (mimeType === "application/pdf") return "PDF";
+  if (isDocxMimeType(mimeType)) return "DOCX";
   const slash = mimeType.indexOf("/");
   return (slash === -1 ? mimeType : mimeType.slice(slash + 1)).toUpperCase().slice(0, 6);
 }
@@ -1082,6 +1085,13 @@ function ArtifactPreview({ artifact, bytes }: { artifact: Artifact; bytes: Uint8
   }
   if (artifact.mimeType === "application/pdf") {
     return <PdfViewer bytes={bytes} title={artifact.name} />;
+  }
+  if (isDocxMimeType(artifact.mimeType)) {
+    return (
+      <div className="h-full overflow-y-auto bg-background">
+        <DocxViewer bytes={bytes} />
+      </div>
+    );
   }
   if (isAttachmentImageMimeType(artifact.mimeType)) {
     return <ImagePreview bytes={bytes} mimeType={artifact.mimeType} name={artifact.name} />;

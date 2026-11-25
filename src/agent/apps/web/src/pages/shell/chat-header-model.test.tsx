@@ -14,7 +14,8 @@ const fixtures = vi.hoisted(() => ({
   mycelliosCatalog: [] as ModelCatalogEntry[],
   catalog: [{ provider: "opencode-go", providerName: "OpenCode Go", id: "gpt-6-luna", label: "GPT-6 Luna", thinkingLevels: ["medium"] }],
   nativeModels: [] as Array<{id:string;label:string;isDefault:boolean;thinkingLevels:string[];fast:boolean}>,
-  engines: { computer: "server", engines: ["codex", "opencode"] },
+  engines: { computer: "server", engines: ["codex", "opencode"] } as { computer: string; engines: string[]; signedOut?: string[];
+    models?: Record<string, Array<{ id: string; label: string; isDefault: boolean; thinkingLevels: string[]; fast: boolean }>> },
 }));
 const connect = vi.hoisted(() => vi.fn());
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
@@ -38,7 +39,8 @@ vi.mock("@mycellios/ui-web", () => ({
   PopoverTrigger: ({ children }: { children: ReactNode }) => <button data-trigger>{children}</button>,
   PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Button: ({ children, onClick }: { children: ReactNode; onClick: () => void }) => <button onClick={onClick}>{children}</button>,
-  Switch: ({ checked, onCheckedChange }: { checked: boolean; onCheckedChange: (value: boolean) => void }) => <button data-fast role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)}>Fast</button>,
+  Switch: ({ checked, onCheckedChange, "aria-label": label }: { checked: boolean; onCheckedChange: (value: boolean) => void; "aria-label": string }) =>
+    <button data-fast={label === "Fast" || undefined} data-switch={label} role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)}>{label}</button>,
   OptionSelect: () => <select aria-label="Thinking" />,
   Spinner: () => null,
 }));
@@ -171,6 +173,14 @@ it("offers only the selected Desktop's native engines, and saves the engine with
   expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "opencode", nativeConfig: null, modelProvider: null, modelId: null, thinkingLevel: null });
 });
 
+it("disables an engine whose CLI is signed out, but keeps the Mico's current engine selectable", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["claude", "opencode"], signedOut: ["claude", "opencode"] };
+  await render("opencode");
+  expect(container.querySelector<HTMLButtonElement>('[data-choice="native-claude::default"]')?.disabled).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::default"]')?.disabled).toBe(false);
+  expect(save).not.toHaveBeenCalled();
+});
+
 it("preserves a saved native provider when the selected Desktop is offline", async () => {
   fixtures.engines = { computer: "desktop", engines: [] };
   await render("opencode");
@@ -185,6 +195,30 @@ it("saves Fast as native execution configuration, without changing reasoning eff
   expect(container.querySelector('[data-choice="native-codex::native-model"]')?.getAttribute("data-selected")).toBe("true");
   await act(async () => container.querySelector<HTMLButtonElement>("[data-fast]")!.click());
   expect(save).toHaveBeenCalledWith({ agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { fastMode: true } });
+});
+it("lists Claude Code's own models on This PC and keeps the configuration switch when changing model", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["claude"], models: { claude: [
+    { id: "default", label: "Default (recommended)", isDefault: true, thinkingLevels: ["high"], fast: false },
+    { id: "opus", label: "Opus", isDefault: false, thinkingLevels: ["high"], fast: false },
+  ] } };
+  act(() => root.render(<ChatHeaderModel bot={{ agentEngine: "claude", modelProvider: null, modelId: null, thinkingLevel: null,
+    nativeConfig: { userSettings: true } } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
+  expect(container.querySelector('[data-choice="native-claude::default"]')?.getAttribute("data-selected")).toBe("true");
+  expect(container.querySelector("[data-fast]")).toBeNull();
+  const settings = container.querySelector<HTMLButtonElement>('[data-switch="Use my Claude Code settings"]');
+  expect(settings?.getAttribute("aria-checked")).toBe("true");
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-choice="native-claude::opus"]')!.click());
+  expect(save).toHaveBeenLastCalledWith({ agentEngine: "claude", nativeConfig: { modelId: "opus", thinkingLevel: null, userSettings: true },
+    modelProvider: null, modelId: null, thinkingLevel: null });
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-switch="Use my Claude Code settings"]')!.click());
+  expect(save).toHaveBeenLastCalledWith({ agentEngine: "claude", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { userSettings: false } });
+});
+it("never offers the personal configuration switch for Claude Code on a server", async () => {
+  fixtures.engines = { computer: "server", engines: ["claude"] };
+  await render("claude");
+  expect(container.querySelector('[data-switch="Use my Claude Code settings"]')).toBeNull();
 });
 it("does not offer a functional Fast switch for a provider that has no native priority capability", async () => {
   await render("pi");

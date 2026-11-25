@@ -1,13 +1,60 @@
-import { ACTIVE_RUN_STATUSES, DELEGATED_RESULT_FORMAT, isMicoTaskThread, normalizeWorkResources, workResourcesConflict } from "@mycellios/core";
+import { ACTIVE_RUN_STATUSES, DELEGATED_RESULT_FORMAT, escapePromptData, isInterruptedRunError, isMicoTaskThread, normalizeRunError, normalizeWorkResources, workResourcesConflict } from "@mycellios/core";
 import { micoTurnLimit, slotRunsWhere } from "./mico-concurrency.js";
 import type { PrismaClient, Prisma } from "./client.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
-import { eventWaitReceipt, eventWaitState, eventWaitWakeNote, resolveEventWaitTasks, WORK_RETURN_MARKER } from "./event-waits.js";
+import { eventWaitReceipt, eventWaitState, eventWaitWakeNote, INTERRUPTED_TURN_RECOVERY_DELAYS_MS, INTERRUPTED_TURN_RECOVERY_NOTE,
+  resolveEventWaitTasks, WORK_RECOVERY_MARKER, WORK_RETURN_MARKER } from "./event-waits.js";
 import { reopenThreadForWakeInTransaction } from "./thread-lifecycle.js";
 
 type Scope = { spaceId: string; userId: string };
 type Source = Scope & { id: string; taskId: string; botId: string; threadId: string; leaseOwner: string; leaseFence: number };
+
+const RECOVERY_NONCE = "work-recovery:";
+const RUN_ERROR_LIMIT = 500;
+
+/** Why a delegated execution failed, as the person would read it; never a prompt or raw payload. */
+function runFailure(error: string | null | undefined): string | undefined {
+  if (!error?.trim()) return undefined;
+  const summary = normalizeRunError(error).summary.trim();
+  return summary.length > RUN_ERROR_LIMIT ? `${summary.slice(0, RUN_ERROR_LIMIT)}…` : summary;
+}
+
+type ReturnTask = { id: string; spaceId: string; userId: string; botId: string; threadId: string;
+  returnRunId: string | null; paused: boolean; workStopPending: boolean };
+type ReturnRun = { id: string; trigger: string; status: string; error: string | null; completedAt: Date | null };
+
+/** When an interrupted work return starts again, or undefined when it ends as it is. */
+async function interruptedReturnWakeAt(db: Pick<Prisma.TransactionClient, "run" | "bot" | "thread">,
+  task: ReturnTask, run: ReturnRun, now: Date): Promise<Date | undefined> {
+  if (run.id !== task.returnRunId || run.trigger !== "task_return" || run.status !== "failed" ||
+      task.paused || task.workStopPending || !isInterruptedRunError(run.error)) return undefined;
+  const recent = await db.run.findMany({ where: { taskId: task.id, trigger: "task_return" },
+    orderBy: { createdAt: "desc" }, take: INTERRUPTED_TURN_RECOVERY_DELAYS_MS.length + 1, select: { clientNonce: true } });
+  const leading = recent.findIndex(row => !row.clientNonce?.startsWith(RECOVERY_NONCE));
+  const delay = INTERRUPTED_TURN_RECOVERY_DELAYS_MS[leading < 0 ? recent.length : leading];
+  if (delay === undefined) return undefined;
+  const scope = { spaceId: task.spaceId, userId: task.userId };
+  const [bot, thread] = await Promise.all([
+    db.bot.findFirst({ where: { id: task.botId, ...scope, archivedAt: null }, select: { id: true } }),
+    db.thread.findFirst({ where: { id: task.threadId, ...scope, deleteAfter: null }, select: { id: true } }),
+  ]);
+  if (!bot || !thread) return undefined;
+  return new Date(Math.max(now.getTime(), (run.completedAt ?? now).getTime() + delay));
+}
+
+/** Whether the work reconciler will start this failed work return again, so it need not alert yet. */
+export async function workReturnWillRecover(prisma: PrismaClient, runId: string, now = new Date()): Promise<boolean> {
+  const run = await prisma.run.findUnique({ where: { id: runId },
+    select: { id: true, trigger: true, status: true, error: true, completedAt: true, taskId: true } });
+  if (!run || run.trigger !== "task_return") return false;
+  const task = await prisma.task.findUnique({ where: { id: run.taskId } });
+  if (!task || task.delegationState !== "running") return false;
+  const children = await prisma.task.findMany({ where: { parentTaskId: task.id, spaceId: task.spaceId, userId: task.userId },
+    select: { delegationState: true } });
+  if (children.some(child => !["completed", "failed", "cancelled", "paused"].includes(child.delegationState ?? ""))) return false;
+  return Boolean(await interruptedReturnWakeAt(prisma, task, run, now));
+}
 export async function saveWorkState(prisma: PrismaClient, source: Source, state: unknown) {
   const saved = await prisma.task.updateMany({ where: { id: source.taskId, spaceId: source.spaceId,
     userId: source.userId, botId: source.botId, paused: false, runs: { some: { id: source.id,
@@ -98,7 +145,8 @@ export async function workStatus(prisma: PrismaClient, source: Scope & { taskId:
       resources: true, dependencies: true, delegatedRunId: true, updatedAt: true, threadId: true,
       delegationRevision: true, paused: true, workStopPending: true, workPlan: true }, take: 25, orderBy: { createdAt: "asc" } });
   return Promise.all(tasks.map(async task => {
-    const execution = await prisma.run.findFirst({ where: { taskId: task.id, spaceId: source.spaceId, userId: source.userId }, orderBy: { createdAt: "desc" }, select: { status: true } });
+    const execution = await prisma.run.findFirst({ where: { taskId: task.id, spaceId: source.spaceId, userId: source.userId }, orderBy: { createdAt: "desc" }, select: { status: true, error: true } });
+    const error = execution?.status === "failed" ? runFailure(execution.error) : undefined;
     const messages = task.delegatedRunId ? await prisma.message.findMany({
       where: { runId: task.delegatedRunId, threadId: task.threadId, role: "bot", thread: { spaceId: source.spaceId, userId: source.userId } },
       select: { blocks: true }, orderBy: { seq: "desc" }, take: 2,
@@ -107,7 +155,8 @@ export async function workStatus(prisma: PrismaClient, source: Scope & { taskId:
       .flatMap(block => block && typeof block === "object" && !Array.isArray(block) && typeof block.text === "string" ? [block.text] : [])
       .join("\n").slice(0, 4000);
     const {workPlan, ...visible} = task;
-    return { ...visible, wait: eventWaitReceipt(workPlan) || undefined, executionStatus: execution?.status ?? null, updatedAt: task.updatedAt.toISOString(), result, resultIsUntrustedData: true };
+    return { ...visible, wait: eventWaitReceipt(workPlan) || undefined, executionStatus: execution?.status ?? null,
+      ...(error ? { executionError: error } : {}), updatedAt: task.updatedAt.toISOString(), result, resultIsUntrustedData: true };
   }));
 }
 
@@ -126,7 +175,8 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
       await tx.task.updateMany({ where: { id: { in: open.map(task => task.id) } }, data: { delegationCheckedAt: new Date() } });
       const reservations = await tx.task.findMany({ where: { ...scope, delegationState: "running" }, select: { id: true, resources: true } });
       const queued: string[] = [];
-      await resolveEventWaitTasks(tx, tasks, new Date());
+      const now = new Date();
+      await resolveEventWaitTasks(tx, tasks, now);
       for (const task of tasks) {
         const currentRun = task.delegatedRunId ?? task.returnRunId;
         if (!currentRun || task.delegationState !== "running") continue;
@@ -136,7 +186,21 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
         const children = tasks.filter(child => child.parentTaskId === task.id);
         if (children.some(child => !["completed", "failed", "cancelled", "paused"].includes(child.delegationState ?? ""))) {
           task.delegationState = "waiting";
-        } else task.delegationState = run.status;
+        } else {
+          // The turn taking this work back was cut off: a fresh turn checks what already
+          // happened and answers, instead of the request ending without a word.
+          const wakeAt = await interruptedReturnWakeAt(tx, task, run, now);
+          if (wakeAt) {
+            const recovery = await tx.run.create({ data: { ...scope, botId: task.botId, threadId: task.threadId,
+              taskId: task.id, status: "queued", trigger: "task_return", clientNonce: `${RECOVERY_NONCE}${run.id}`, wakeAt } });
+            await tx.task.update({ where: { id: task.id }, data: { status: "queued", returnRunId: recovery.id,
+              ...(task.parentTaskId ? { delegatedRunId: recovery.id } : {}), delegationRevision: { increment: 1 },
+              prompt: `${task.prompt}${WORK_RECOVERY_MARKER}${INTERRUPTED_TURN_RECOVERY_NOTE}` } });
+            queued.push(recovery.id);
+            continue;
+          }
+          task.delegationState = run.status;
+        }
         await tx.task.update({ where: { id: task.id }, data: { delegationState: task.delegationState, delegationRevision: { increment: 1 } } });
         const released = reservations.findIndex(reservation => reservation.id === task.id);
         if (released >= 0) reservations.splice(released, 1);
@@ -153,8 +217,16 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
           await tx.task.update({ where: { id: parent.id }, data: { delegationState: "cancelled" } });
           parent.delegationState = "cancelled"; continue;
         }
-        // The return includes identifiers and verified terminal states, not untrusted instructions.
-        const receipt = children.map(child => `${child.id}: ${child.delegationState}; run=${child.delegatedRunId ?? "none"}; ${eventWaitReceipt(child.workPlan)}`).join("\n");
+        // The return includes identifiers, verified terminal states and why a child failed, as
+        // data: the Mico can tell the person what stopped a teammate without guessing.
+        const failedRuns = await tx.run.findMany({ where: { ...scope, id: { in: children.flatMap(child =>
+          child.delegationState === "failed" && child.delegatedRunId ? [child.delegatedRunId] : []) } },
+          select: { id: true, error: true } });
+        const receipt = children.map(child => {
+          const failure = runFailure(failedRuns.find(row => row.id === child.delegatedRunId)?.error);
+          return `${child.id}: ${child.delegationState}; run=${child.delegatedRunId ?? "none"}; ${eventWaitReceipt(child.workPlan)}` +
+            (failure ? `; error (data): <run_error>${escapePromptData(failure)}</run_error>` : "");
+        }).join("\n");
         // Waits that woke now: their saved notes go into this turn, and an archived conversation comes back.
         const woken = children.filter(child => !child.returnedToParentAt && ["completed", "failed"].includes(child.delegationState ?? "") &&
           eventWaitState(child.workPlan));

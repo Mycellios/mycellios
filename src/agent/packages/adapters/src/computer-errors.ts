@@ -1,3 +1,5 @@
+import { DESKTOP_UNREACHABLE_ERROR } from "@mycellios/core";
+
 export class ComputerBusyError extends Error {
   constructor() {
     super("Computer is busy");
@@ -21,10 +23,7 @@ export class ComputerUpdatingError extends ComputerBusyError {
  */
 export class DesktopUnreachableError extends Error {
   constructor(options?: { cause?: unknown }) {
-    super(
-      "Your PC did not answer in time. Check that Mycellios Desktop is open and online, then try again.",
-      options,
-    );
+    super(DESKTOP_UNREACHABLE_ERROR, options);
     this.name = "DesktopUnreachableError";
   }
 }

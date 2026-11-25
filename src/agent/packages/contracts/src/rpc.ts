@@ -165,12 +165,16 @@ import {
   UpdateBotInput,
   UpdateExternalConversationPolicyInput,
   UpdateGroupInput,
+  AddGroupFolderInput,
+  GroupFolderSchema,
+  RemoveGroupFolderInput,
   UsageRecordSchema,
   UsageSummarySchema,
   VoiceCatalogEntrySchema,
   VoiceCredentialSchema,
   VoiceInfoSchema,
   VoiceStatusSchema,
+  NativeEngineModelSchema,
 } from "./domain.js";
 import {
   MemoryConnectionCreateInput,
@@ -407,7 +411,9 @@ export const appContract = {
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
   },
-  bootstrap: oc.input(z.object({ botId: Id.optional(), taskThreadId: Id.optional() })
+  bootstrap: oc.input(z.object({
+    botId: Id.optional(), taskThreadId: Id.optional(), history: z.literal("recent").optional(),
+  })
     .refine(input => !input.taskThreadId || Boolean(input.botId), "A task conversation requires its Mico"))
     .output(AppBootstrapSchema),
   deployment: {
@@ -440,6 +446,13 @@ export const appContract = {
     forBot: oc.input(z.object({ botId: Id })).output(z.object({
       computer: z.enum(["desktop", "server"]),
       engines: z.array(z.enum(["codex", "claude", "opencode"])),
+      /** Installed engines whose CLI reported nobody signed in. Older servers omit it. */
+      signedOut: z.array(z.enum(["codex", "claude", "opencode"])).optional(),
+      /** Model catalogs the signed-in CLIs reported on that computer. Older servers omit it. */
+      models: z.object({
+        codex: z.array(NativeEngineModelSchema).optional(),
+        claude: z.array(NativeEngineModelSchema).optional(),
+      }).optional(),
     })),
     codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
     codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),
@@ -449,6 +462,8 @@ export const appContract = {
           id: z.enum(["pi", "codex", "claude", "acp", "opencode"]),
           name: z.string(),
           available: z.boolean(),
+          /** Absent when the CLI could not say (older host, timeout or unsupported engine). */
+          signedIn: z.boolean().optional(),
           managedVersion: z.string().optional(),
           canInstall: z.boolean().optional(),
         }),
@@ -623,6 +638,10 @@ export const appContract = {
     archive: oc.input(groupId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(groupId).output(z.object({ ok: z.literal(true) })),
     remove: oc.input(groupId).output(z.object({ ok: z.literal(true) })),
+    /** Shared folders (specs/group-shared-folders/spec.md): ids and names, never paths. */
+    folders: oc.input(groupId).output(z.object({ spaceId: Id, folders: z.array(GroupFolderSchema) })),
+    addFolder: oc.input(AddGroupFolderInput).output(GroupFolderSchema),
+    removeFolder: oc.input(RemoveGroupFolderInput).output(z.object({ ok: z.literal(true) })),
   },
   botSections: {
     list: oc.output(z.array(BotSectionSchema)),
@@ -693,7 +712,7 @@ export const appContract = {
         cursor: z.number().int().min(-1),
       }),
     ),
-    get: oc.input(threadTarget).output(ThreadSnapshotSchema),
+    get: oc.input(threadTarget.safeExtend({ history: z.literal("recent").optional() })).output(ThreadSnapshotSchema),
     retry: oc.input(threadTarget.safeExtend({ runId: Id })).output(z.object({ ok: z.literal(true) })),
     messages: oc
       .input(
@@ -984,6 +1003,9 @@ export const appContract = {
   },
   routines: {
     calendar: oc.input(RoutineCalendarInputSchema).output(RoutineCalendarSchema),
+    mentions: oc.input(z.object({})).output(z.array(RoutineSchema.pick({
+      id: true, botId: true, name: true, crons: true,
+    }))),
     list: oc.input(botId).output(z.array(RoutineSchema)),
     history: oc
       .input(z.object({ routineId: Id, before: RoutineRunCursorSchema.optional() }))

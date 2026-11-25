@@ -122,6 +122,48 @@ try {
   proof.quotedCompletion = { liveHeight: quoteHeight, finalHeight: quoteSettled };
   proof.scenarios.push("quoted reply completion preserves nested final-block spacing");
 
+  await open("?natural");
+  await page.evaluate(() => {
+    window.__chatFlow.emit({
+      type: "thread.message.created", payload: {
+        messageId: "symbol-reply", role: "bot", blocks: [
+          { kind: "steps", steps: [{ label: "Check", count: 1 }] },
+          { kind: "text", text: "✅" },
+        ],
+      },
+    });
+    for (const [index, status] of ["reported", "failed"].entries()) {
+      window.__chatFlow.emit({
+        type: "thread.message.created", payload: {
+          messageId: `routine-${index}`, role: "bot", blocks: [{
+            kind: "routine_run", routineId: "routine-qa", fromBotId: "bot-1",
+            routineName: "Revisión de disponibilidad, documentación y seguimiento del proyecto",
+            taskId: "routine-task", runId: `test-run-${index}`, status,
+          }],
+        },
+      });
+    }
+  });
+  await expect(page.locator('[data-message-id="symbol-reply"]')).toContainText("✅");
+  const routineToggle = page.getByTestId("routine-run-group-toggle");
+  await expect(routineToggle).toHaveAttribute("aria-expanded", "false");
+  await page.evaluate(() => window.__chatFlow.jump("routine-1"));
+  await expect(routineToggle).toHaveAttribute("aria-expanded", "true");
+  const failedRun = page.locator('[data-message-id="routine-1"]');
+  await expect(failedRun).toBeInViewport();
+  await expect(failedRun).toHaveAttribute("data-outcome", "failed");
+  assert.equal(await failedRun.evaluate(row => row.scrollWidth > row.clientWidth), false);
+  await page.screenshot({ path: path.join(output, "routine-jump-mobile.png"), animations: "disabled" });
+  proof.scenarios.push("natural replies keep emoji and a mobile routine jump reveals the exact failed run");
+
+  await open("?empty-failure");
+  await expect(page.getByRole("heading", { name: "The last run failed before saving a message." })).toBeVisible();
+  await expect(page.getByText("What shall we work on?")).toHaveCount(0);
+  await expect(page.getByTestId("composer-error")).toBeVisible();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: path.join(output, "empty-failed-run-mobile.png"), animations: "disabled" });
+  proof.scenarios.push("a failed run with no messages shows its state and recovery controls on mobile");
+
   for (const [name, width, height, theme, reducedMotion] of [
     ["mobile-light", 390, 844, "light", "no-preference"],
     ["mobile-dark-reduced", 390, 844, "dark", "reduce"],

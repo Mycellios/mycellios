@@ -150,10 +150,26 @@ it("still pauses a running contributor after a rejected command", async () => {
   f.status.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: null, rejected: true });
   f.control.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: "pause", rejected: false });
   await rendered(async host => {
-    expect(host.querySelector("button")!.textContent).toContain("Retry");
+    expect(host.querySelector("button")!.textContent).toContain("Pause");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "pause" });
   });
+});
+it("still pauses a running contributor after a failed status read", async () => {
+  vi.useFakeTimers();
+  f.status.mockResolvedValueOnce({ nodeId: "same-node", connected: true, enabled: true, pending: null, rejected: false })
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: null, rejected: false });
+  f.control.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: "pause", rejected: false });
+  try {
+    await rendered(async host => {
+      await act(async () => vi.advanceTimersByTimeAsync(10000));
+      expect(host.querySelector('[role="alert"]')).not.toBeNull();
+      expect(host.querySelector("button")!.textContent).toContain("Pause");
+      await act(async () => host.querySelector("button")!.click());
+      expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "pause" });
+    });
+  } finally { vi.useRealTimers(); }
 });
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {
   f.native.mockResolvedValue({ supported: true, enrolled: false, installed: false, nodeId: null });

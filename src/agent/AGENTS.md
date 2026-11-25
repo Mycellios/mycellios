@@ -92,6 +92,16 @@
   safe types; everything else downloads. Verify artifact-shares and
   ArtifactShareButton tests plus scripts/verify-artifact-shares-db.ts.
 
+- Word (.docx) attachments preview in the chat file card, review workspace and
+  Library, as the reference app's file preview does (behavior reference only; no
+  copied code). `lib/docx-preview.ts` bounds the file (20 MiB, declared ZIP
+  expansion), converts it with the pinned mammoth in a terminable module worker,
+  keeps only embedded raster images and sanitizes the HTML with a private DOMPurify
+  allowlist before DocxViewer renders it with app tokens. Never fetch linked
+  resources or run document content; failures show the existing error with the
+  download kept. Shared links keep downloading .docx. Verify docx-preview,
+  DocxViewer and the media-preview E2E.
+
 - PC app control (`pc_windows`, `pc_snapshot`, `pc_act`) follows
   specs/desktop-accessibility-control/spec.md. Desktop runs the pinned agent-desktop
   CLI (`app-control-runner.ts`, SHA-256 verified before every call, Windows x64 only)
@@ -386,9 +396,22 @@
   order and update the authoritative reference immediately. Flush structural,
   terminal, navigation and preference changes without waiting for a frame.
   New-reply/send/control motion must preserve reduced motion and history scroll
-  ownership. Run focused composer/thread/pending/frame tests and
+  ownership. Loading an earlier page belongs to the current conversation visit.
+  Message links into folded routine history reveal the exact run, and completed
+  natural replies retain visible symbols such as emoji. A failed run with an empty
+  transcript shows its actual state alongside the composer recovery controls. Run focused
+  composer/thread/pending/frame tests and
   `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
   with synthetic delivery/progress. This does not measure a live model's latency.
+- Chat routine mentions are a single owner- and Space-scoped summary read, triggered
+  by the composer mention search. Do not fetch routine lists for the entire roster
+  on chat entry. Check composer/query tests and `scripts/verify-routine-isolation-db.ts`.
+- The chat task menu shares its in-flight and recent overview poll across chats in
+  the same account and Space. Preserve the periodic refresh and the per-thread
+  notification filter. Check the query-scope tests when changing this path.
+- Space navigation skips a browser transition that cannot capture the old
+  screen. Preserve the single guarded commit, Space-scoped state reset and
+  late-callback regression in `lib/space-switch.test.ts`.
 
 - Production English messages with interpolated values must exist in
   `apps/web/src/locales/en/messages.po`; production macros omit development text.
@@ -427,7 +450,12 @@
   use Pi automatically; installed account providers are selected in the same
   model menu. Do not expose a second Agent engine switch in Mico settings or
   select an unrelated CLI merely because a PC is connected. New Micos inherit
-  the general connection unless the user selects an installed provider.
+  the general connection unless the user selects an installed provider, except
+  a new This PC Mico created with no model or engine: it starts on the first CLI
+  in the order Claude Code, Codex whose sign-in that PC confirmed
+  (localEngineForNewMico, specs/local-engine-default/spec.md), keeping the
+  general model as its server fallback. Unknown sign-in, an older Desktop, no
+  answer, OpenCode (no sign-in report) and idempotent spawnKey creates keep Pi.
   Conversational turns capture the resolved model, engine and owned connection
   before their first model call, with the Run lease fence. Resume uses that
   selection and rechecks credentials and native consent. A later turn reads the
@@ -609,7 +637,11 @@
   and only its own cached transcript. Keep immutable RPC/draft isolation, tab titles
   and open-tab state across the scoped remount without a whole-page loading frame.
   A seeded tab switch reads the destination's history directly without duplicating it
-  through bootstrap. While the first read is pending, show loading in the chat pane.
+  through bootstrap. Cold web history and bootstrap request the recent window.
+  Inactive threads read 24 stored messages first and can page back normally.
+  Active runs and explicit history reads keep their current window. Preserve the
+  snapshot cursor and avoid evicting already loaded history on this first read.
+  While the first read is pending, show loading in the chat pane.
   Preload at most two tab/picker destinations independently in the scoped memory
   cache, including when only the active tab fits on mobile; pointer/focus intent
   may warm another destination. Pending asks are preloaded without marking them read. Roster replies target the owned task thread and scroll to its loaded card.
@@ -673,7 +705,11 @@
   a waiting teammate, delegation-parked or deleting turns). Report turns are ordinary paid
   turns: normal Credit admission and observers, tainted from the start. A bot_message turn
   that opened tasks replies to its teammate only once they settle (auto-outcome key; the
-  reconciler retries). Verify core/adapters agent-tasks, executor-agent-tasks, bot-messages,
+  reconciler retries). A report turn that an update or lost PC connection cut off
+  (isInterruptedRunError) starts again from finalizeRun's own commit: a fresh task_report run
+  on the same report message (nonce <report nonce>:recovery:<failed run>, so teammates keep
+  waiting), INTERRUPTED_TURN_RECOVERY_DELAYS_MS and the recovery note; never a replay, and only
+  the failure that ends recovery alerts. Verify core/adapters agent-tasks, executor-agent-tasks, bot-messages,
   db events/messages, message-view and peer-exchange-groups tests and
   `node --import tsx scripts/verify-agent-tasks-db.ts`; fakes do not qualify a live model.
 
@@ -684,7 +720,13 @@
   Requests open bot_message_requests/recipients (ids and states only). Answers to a
   multi-recipient request are held and released as one turn under the request row lock,
   naming who did not answer; stopThreadRuns and the job reconciler settle stopped
-  recipients, and a request nobody answered starts no turn. "Waiting for replies"
+  recipients, and a request nobody answered starts no turn. A bot_message turn that an update
+  or lost PC connection cut off (isInterruptedRunError) starts again from finalizeRun's commit
+  (queueBotMessageRecoveryInTransaction): a fresh run on the same message (nonce
+  bot-message-recovery:<failed run>, INTERRUPTED_TURN_RECOVERY_DELAYS_MS, recovery note), which
+  takes over the recipient row and the answers it read; the cut-off run returns no failure
+  (botOutcomeReturnedAt), never a replay. Not for FYIs or turns that already answered, opened
+  tasks or delegated work; only the failure that ends recovery reaches the teammate. "Waiting for replies"
   (tasks.awaitingReplies) reuses the person's Stop and the revisioned work controls
   (Continue = resume). list_agents is read-only; interrupt_agent stops only turns working on
   the caller's own messages, through the durable Stop, and refuses the rest. Groups keep a
@@ -696,6 +738,21 @@
   Verify adapters/core bot-messages, group-mentions, message-visibility, thread-target,
   AwaitingReplies, CollaborationMarker, GroupPanel and SendToGroup tests and
   `node --import tsx scripts/verify-mico-requests-db.ts`.
+
+- Group shared folders follow specs/group-shared-folders/spec.md (the reference product is a
+  behavior reference only): up to 8 folders per group, chosen only with Desktop's native picker
+  after the server confirms the owner/Space owns the group; the server keeps an opaque HMAC id
+  (keyed by a private per-profile key, not the host token), a name and a label it assigns once
+  (additive `20261124120000` migration, RLS), never a path. Grants stay in memory on the PC like
+  ordinary folder grants, are pruned to the server's list and cleared for another account. Only
+  a person-started turn (own message/call/reaction, or a same-thread handoff chain back to one)
+  of a This PC (`dedicated`) member in the group's own thread carries them; never routines,
+  webhooks, channels, Mico requests or background work. Re-read before each computer tool; the
+  PC serves only ids it holds for that group, as `group/<label>/`. Never mount them on server or
+  Team computers. Shared edit_file writes carry the read SHA-256 and are serialized per real,
+  case-folded file. Shells keep OS permissions; ids gate file tools only. Verify adapters
+  host-group-folders and group-folders, desktop group-folder-ipc, web GroupFolders tests and
+  `node --import tsx scripts/verify-group-folders-db.ts`.
 
 - "Branch in new conversation" (specs/conversation-branching/spec.md; behavior reference only)
   sits in the More menu of the last Mico message of each finished turn, main chat or side
@@ -759,6 +816,16 @@
   The bridge carries plain data, bytes and callbacks only (no AbortSignal or class
   instance). The server owns the steering watch for Desktop tools: never send
   steeringPending across it. Verify with the Pi tool-call test in desktop-agent-runtime.
+  Every bridge message costs a relay round trip, so keep them few and full: a model
+  read merges consecutive deltas of one block and answers with everything buffered
+  (desktop-model-batch.ts, bounded by bytes, never by a small event count); open()
+  returns the first batch when the PC asks with firstBatch, and both sides keep
+  working with peers that do not. Checkpoints go without awaiting the reply; the
+  tool call follows on the same ordered stream. The Desktop relay sends every
+  complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
+  with the stream end joined to the last lines, and the API rechecks all of a PC's
+  bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,
+  desktop-agent-runtime and the Desktop/API relay tests.
   Disconnects must not silently substitute a cloud run for an admitted local run.
   Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
   Preserve local project and checkpoint bindings; a tool result payload alone
@@ -779,7 +846,12 @@
   id, sent after the server's `ownership: 1`); none or several is `unresolved`, never
   guessed or offline. One online PC still takes every Mico; explicit binds win. The
   offline cloud workspace needs a really offline PC, and for native engines the
-  server's nativeHostAccess grant (specs/desktop-mico-ownership/spec.md). Verify
+  server's nativeHostAccess grant (specs/desktop-mico-ownership/spec.md).
+  Without that grant a fresh turn of a native-engine Mico answers on the server
+  with its saved Pi model, else the account's main model (piFallback), captured
+  as engine pi so resume stays there, and the chat note names the engine it
+  replaced; with neither model it keeps the PC's offline message
+  (specs/local-engine-default/spec.md). Admitted local runs never move. Verify
   relay broker/API/client, mico-folders, offline-cloud-workspace and runtime tests.
 
 - The installed PWA Voice shortcut uses ?dictate=1 and the existing scoped chat
@@ -1164,7 +1236,12 @@
   to the admitted host/Mico and are observed with command_status; a lost observer or
   missing exit is never success or authorization to replay. Preserve native Windows
   Job ownership, consent, Stop, bounded budgets and exact run/fence teardown. Plans
-  and continuation counters are fenced Task metadata, not new instructions. Verify
+  and continuation counters are fenced Task metadata, not new instructions.
+  A work return that an update or lost PC connection cut off (isInterruptedRunError) never
+  ends the request silently: reconcileWork queues one fresh task_return run (nonce
+  work-recovery:<failed run>, wakeAt 30 s, 2 min, then 5 min, WORK_RECOVERY_MARKER note to
+  check before acting), never a replay; only the failure that ends recovery alerts. A failed
+  child's normalized reason (≤500) travels as data in the receipt and work_status. Verify
   native-command-journal/recovery, work-continuation, work-resources, work-stop-reconciler
   and API work-controls tests plus scripts/verify-resilient-work-db.ts through the
   shared scheduler. Keep production and existing user accounts out of these fixtures.
@@ -2019,6 +2096,14 @@
   profile skips the relay wait. A start the
   PC never claimed requeues the run as not dispatched and frees its segment; a
   claimed start stays uncertain. Verify the broker, stream, runtime and API relay tests.
+  A deploy hands the in-memory broker to a new API version through
+  `/internal/desktop-relay/handoff` (never through the public edge; signed with the relay
+  key; `node dist/cli/desktop-relay-handoff.js status|start|cancel` inside the container).
+  `start` (15 minutes unless renewed) refuses new operations and probes with 503
+  `desktop_updating`, so turns wait (ComputerUpdatingError(false): setup retries without the
+  setup limit, PC work pauses and continues) and are never read as offline; callbacks of
+  agent runs open on that instance still pass. Every answer carries the instance, revision
+  and open/delivered/agent-run operations a handoff waits for; `cancel` is the rollback.
 
 - Only the relay's own answer (200, or 404 unavailable) says whether a PC is available.
   A probe that times out, loses its connection or finds the relay busy (409, 429, 5xx)
@@ -2314,6 +2399,27 @@
   (a side conversation's card mirrored into the main chat answers through that same operation).
   Skip supplies no authorization. Credentials and protected actions keep their
   dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.
+- `ask_location` follows the reference app's location request (behavior reference only, our
+  own words): a pausing ask with a `location` field, offered only to person-started turns
+  (never routines, webhooks, background or Mico-started work, outside chats, calls or
+  call_end). Only the run's user answers, on the card, through the same fenced answer
+  operation (a composer message retires the card with no text or outcome): Share location
+  reads the browser position once on that click (no watch), rounded to three decimals
+  (~100 m) on the device and again on the server; typing a place or declining works
+  everywhere, and Desktop offers only typing. A position or place never enters the task
+  prompt, the card or events: the run secret writer encrypts it under runLocationKind (local
+  only; secret-store migration treats it as ephemeral), every path that ends a run deletes it
+  with the run's other one-time answers, and the task keeps LOCATION_ANSWER_NOTE, which the
+  executor replaces in the model prompt only. An unreadable answer gives the turn the note,
+  never a failure. Run previews show the source request instead of that note. Tool labels,
+  commands, output, activity notes, plans, completion errors, ask_user and approval card text
+  and their notifications hide the answer through locationRedactionPatterns (case-insensitive,
+  URL-encoded spaces/commas, never inside a longer word or number; places and parts under
+  five letters stay visible). The model's reply, narration and helper summaries are not
+  redacted, nor are other spellings. Never log the answer. The Android host grants WebView
+  geolocation only to packaged chat routes, without retaining the grant; the Expo preview
+  answers by typing. Verify location-request (contracts/core), location-answer, run-location,
+  ask-location, runs and LocationAskCard tests and NavigationPolicyTest.
 
 - Mycellios creation keeps the authenticated viewer pinned for quote, execute,
   status, content and checkout. Keep stable purchase keys, quote-before-confirm,

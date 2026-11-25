@@ -1999,6 +1999,7 @@ msgid "Could not stop computer"
 msgstr "No se ha podido detener el ordenador"
 
 #: src/components/AskCard.tsx
+#: src/components/LocationAskCard.tsx
 msgid "Could not submit this answer"
 msgstr "No se pudo enviar esta respuesta"
 
@@ -3609,6 +3610,7 @@ msgid "No bots match"
 msgstr "No se han encontrado Micos"
 
 #: src/components/AskCard.tsx
+#: src/components/LocationAskCard.tsx
 msgid "No longer active"
 msgstr "Ya no está activo"
 
@@ -4674,6 +4676,7 @@ msgid "Self-hosted"
 msgstr "Autoalojado"
 
 #: src/pages/shell/composer.tsx
+#: src/components/LocationAskCard.tsx
 msgid "Send"
 msgstr "Enviar"
 
@@ -4710,6 +4713,7 @@ msgid "Send with Enter"
 msgstr "Enviar con Enter"
 
 #: src/components/AskCard.tsx
+#: src/components/LocationAskCard.tsx
 msgid "Sending…"
 msgstr "Enviando…"
 
@@ -6310,6 +6314,10 @@ msgstr "Usar tu propia clave"
 #: src/components/SignupSurvey.tsx
 msgid "Welcome to Mycellios"
 msgstr ""
+
+#: src/pages/shell/transcript.tsx
+msgid "The last run failed before saving a message."
+msgstr "La última ejecución falló antes de guardar un mensaje."
 
 #: src/pages/shell/transcript.tsx
 msgid "What shall we work on?"
@@ -15344,10 +15352,78 @@ msgstr "Puede olvidar lo que guardó"
 msgid "Could not change which Micos can use this memory"
 msgstr "No se pudo cambiar qué Micos pueden usar esta memoria"
 
+#: src/components/LocationAskCard.tsx
+msgid "Don't share"
+msgstr "No compartir"
+
+#: src/components/LocationAskCard.tsx
+msgid "Locating…"
+msgstr "Buscando ubicación…"
+
+#: src/components/LocationAskCard.tsx
+msgid "Location access is off. Type a place instead."
+msgstr "El acceso a la ubicación está desactivado. Escribe un lugar."
+
+#: src/components/LocationAskCard.tsx
+msgid "Location shared"
+msgstr "Ubicación compartida"
+
 #: src/lib/native-computer-execution.ts
 msgid "Mycellios did not respond while checking access to this computer. The message was not sent. Try again in a moment."
 msgstr "Mycellios no ha respondido al comprobar el acceso a este ordenador. El mensaje no se ha enviado; vuelve a intentarlo en un momento."
 
+#: src/components/LocationAskCard.tsx
+msgid "Not shared"
+msgstr "No compartida"
+
+#: src/components/LocationAskCard.tsx
+msgid "Place"
+msgstr "Lugar"
+
 #: src/lib/run-error.ts
 msgid "Several of your PCs are connected and none has been chosen for this Mico yet. In Mycellios Desktop on the PC that should run it, send the message again or choose that PC in the Mico's computer settings."
 msgstr "Tienes varios PCs conectados y aún no has elegido cuál ejecuta este Mico. En Mycellios Desktop, desde el PC que debe ejecutarlo, vuelve a enviar el mensaje o elige ese PC en los ajustes de ordenador del Mico."
+
+#: src/components/LocationAskCard.tsx
+msgid "Share location"
+msgstr "Compartir ubicación"
+
+#: src/components/LocationAskCard.tsx
+msgid "Type a place"
+msgstr "Escribe un lugar"
+
+#: src/components/LocationAskCard.tsx
+msgid "Your location is unavailable. Type a place instead."
+msgstr "Tu ubicación no está disponible. Escribe un lugar."
+
+#: src/components/GroupFolders.tsx
+msgid "Micos of this group on This PC can change files and run commands in these folders."
+msgstr "Los Micos de este grupo en Este PC pueden cambiar archivos y ejecutar comandos en estas carpetas."
+
+#: src/components/GroupFolders.tsx
+msgid "Not connected on this PC"
+msgstr "No conectada en este PC"
+
+#: src/components/GroupFolders.tsx
+msgid "Add folders from Mycellios Desktop."
+msgstr "Añade carpetas desde Mycellios Desktop."
+
+#: src/components/GroupFolders.tsx
+msgid "Can use them: {reach}"
+msgstr "Pueden usarlas: {reach}"
+
+#: src/components/GroupFolders.tsx
+msgid "Can't reach them (not on This PC): {away}"
+msgstr "No pueden usarlas (no están en Este PC): {away}"
+
+#: src/lib/user-error.ts
+msgid "A group can have up to 8 folders."
+msgstr "Un grupo puede tener hasta 8 carpetas."
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "Use my Claude Code settings"
+msgstr "Usar mi configuración de Claude Code"
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "Loads your instructions, hooks and skills from Claude Code on this PC."
+msgstr "Carga tus instrucciones, hooks y skills de Claude Code en este PC."

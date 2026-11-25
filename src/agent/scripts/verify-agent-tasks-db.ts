@@ -18,8 +18,9 @@ const {
   createDb, asSystem, startAgentTask, messageAgentTask, stopAgentTaskRuns, queueTaskReportInTransaction,
   pendingTeammateRequest, agentTasksStartedByRun, finalizeRun, archiveSideThreadInTransaction, readHistoryPage,
   isOwnedAgentTask, expireStuckRun, AgentTaskError, countUnfinishedAgentTasks, LocalKeyProvider,
+  INTERRUPTED_TURN_RECOVERY_DELAYS_MS, WORK_RECOVERY_MARKER,
 } = await import("@mycellios/db");
-const { taskThreadKind, AGENT_TASK_UNFINISHED_LIMIT, TASK_REPORT_CUT_MARKER } = await import("@mycellios/core");
+const { taskThreadKind, AGENT_TASK_UNFINISHED_LIMIT, TASK_REPORT_CUT_MARKER, DESKTOP_RUN_INTERRUPTED_ERROR } = await import("@mycellios/core");
 const { stopThreadRuns } = await import("../apps/api/src/thread-target.js");
 
 const socket = createServer();
@@ -259,7 +260,35 @@ try {
   assert.equal((lost.blocks as Array<Record<string, unknown>>)[0]?.outcome, "interrupted");
   checks.push("a turn the stuck-work reconciler expires reports as interrupted");
 
-  const result = { passed: true, checks, productionAccess: false };
+  // 12. A report turn cut off by an update or a lost PC connection starts again on the same
+  // report message after a growing delay, a bounded number of times; a model failure does not.
+  let reportTurn = await prisma.run.findUniqueOrThrow({ where: { id: finished.taskReport.runId } });
+  assert.equal(reportTurn.status, "queued");
+  for (const [attempt, delay] of INTERRUPTED_TURN_RECOVERY_DELAYS_MS.entries()) {
+    const before = Date.now();
+    const cut = await end(reportTurn, { outcome: "failed", error: DESKTOP_RUN_INTERRUPTED_ERROR });
+    assert.ok(cut?.recoveryRunId, "an interrupted report starts again");
+    const recovery = await prisma.run.findUniqueOrThrow({ where: { id: cut.recoveryRunId }, include: { task: true } });
+    assert.deepEqual([recovery.threadId, recovery.trigger, recovery.status, recovery.sourceMessageId, recovery.clientNonce],
+      [main, "task_report", "queued", reportA.id, `task-report:${taskA.id}:${runA.id}:recovery:${reportTurn.id}`]);
+    const wakeAt = recovery.wakeAt?.getTime() ?? 0;
+    assert.ok(wakeAt >= before + delay && wakeAt <= Date.now() + delay, "the new turn waits for the update or the connection");
+    assert.equal(recovery.task.prompt.split(WORK_RECOVERY_MARKER).length - 1, attempt + 1, "the turn is told to check what already happened");
+    assert.match(recovery.task.prompt, /read_history with taskId/, "the turn keeps the report it relays");
+    assert.equal((await prisma.message.findUniqueOrThrow({ where: { id: reportA.id } })).runId, recovery.id);
+    reportTurn = recovery;
+  }
+  const spent = await end(reportTurn, { outcome: "failed", error: DESKTOP_RUN_INTERRUPTED_ERROR });
+  assert.ok(spent);
+  assert.equal(spent.recoveryRunId, undefined, "the recovery budget is spent");
+  assert.equal(await prisma.run.count({ where: { sourceMessageId: reportA.id, trigger: "task_report" } }),
+    1 + INTERRUPTED_TURN_RECOVERY_DELAYS_MS.length);
+  const refused = await end(stoppedRun, { outcome: "failed", error: "Synthetic model refusal" });
+  assert.ok(refused);
+  assert.equal(refused.recoveryRunId, undefined, "a model failure is not an interruption");
+  checks.push("a report turn cut off by an update or a lost PC connection starts again on its report after growing delays, a bounded number of times, never after a model failure");
+
+  const result ={ passed: true, checks, productionAccess: false };
   await writeFile(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ ...result, receipt: path.join(directory, "result.json") }, null, 2));
 } finally {

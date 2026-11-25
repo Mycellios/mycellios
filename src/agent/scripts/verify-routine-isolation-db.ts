@@ -17,6 +17,7 @@ const { createWorkflowExecution, reconcileWorkflowExecutions } = await import(".
 const { executeWorkflowTool } = await import("../packages/adapters/src/workflow-tools.js");
 const { acquireComputerExecutionLease, releaseComputerExecutionLease } = await import("../packages/adapters/src/computer-lifecycle.js");
 const { deliverWebhookEvent, inboundDeliveryClientNonce } = await import("../apps/api/src/webhook-inbound.js");
+const { routinesRoutes } = await import("../apps/api/src/routes/routines.js");
 const { findPendingRoutineTick, routineTimerNonce } = await import("../packages/adapters/src/routine-coalescing.js");
 const server = createServer(); await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
 const port = (server.address() as { port: number }).port; await new Promise<void>(resolve => server.close(() => resolve()));
@@ -67,6 +68,16 @@ try {
     ...scope, botId: bot.id, name: `Synthetic ${name}`, prompt: `Synthetic ${name} task`, crons: [], active: true,
     webhookEnabled: true, modelProvider: "openai-compatible", modelId: `synthetic-${name}`,
   } })));
+  const archivedBot = await prisma.bot.create({ data: { ...scope, name: "Archived Mico", color: "#10B981", archivedAt: new Date() } });
+  await prisma.routine.create({ data: { ...scope, botId: archivedBot.id, name: "Archived routine", prompt: "Hidden", crons: [] } });
+  const authed = { routines: new Proxy({}, { get: () => ({ handler: (fn: unknown) => fn }) }) };
+  const mentions = routinesRoutes({ deps: { prisma }, authed } as never).routines.mentions as unknown as
+    (input: { context: { actor: typeof scope } }) => Promise<unknown>;
+  const expected = routines.map(({ id, botId, name, crons }) => ({ id, botId, name, crons })).sort((a, b) => a.id.localeCompare(b.id));
+  assert.deepEqual(await mentions({ context: { actor: scope } }), expected);
+  assert.deepEqual(await mentions({ context: { actor: { ...scope, userId: "foreign" } } }), []);
+  assert.deepEqual(await mentions({ context: { actor: { ...scope, spaceId: "foreign" } } }), []);
+  checks.push("one routine mention query omits prompt fields, archived Micos and routines of other owners or Spaces");
   const [one, duplicate] = await Promise.all([ensureRoutineThread(prisma, scope, routines[0]!.id), ensureRoutineThread(prisma, scope, routines[0]!.id)]);
   assert.equal(one.id, duplicate.id); assert.notEqual(one.id, bot.thread!.id);
   const own = await prisma.thread.findUniqueOrThrow({ where: { id: one.id } });

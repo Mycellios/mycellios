@@ -17,6 +17,7 @@
       "codecScale": 1,
       "powerWatts": 65,
       "availability": 0.99,
+      "stageRoles": ["head"],
       "agent": { "kind": "local" }
     },
     {
@@ -30,6 +31,7 @@
       "codecScale": 1,
       "powerWatts": 65,
       "availability": 0.99,
+      "stageRoles": ["tail"],
       "agent": {
         "kind": "http",
         "endpoint": "http://192.0.2.11:9750",

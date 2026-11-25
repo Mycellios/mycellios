@@ -1,10 +1,15 @@
 import { expect, it } from "vitest";
 import { desktopDiagnosticMessage, DESKTOP_FAILURE_CODES } from "@mycellios/contracts";
 import {
+  DESKTOP_OWNER_UNRESOLVED_ERROR,
+  DESKTOP_RUN_INTERRUPTED_ERROR,
+  DESKTOP_UNREACHABLE_ERROR,
   desktopSetupInterruptedMessage,
   desktopRunDiagnosticText,
+  isInterruptedRunError,
   isUncertainDesktopRun,
   normalizeRunError,
+  RUN_INTERRUPTED_BY_MAINTENANCE_ERROR,
   userRunError,
 } from "./run-error.js";
 const operationId = "12345678-1234-4321-8765-123456789abc";
@@ -52,4 +57,14 @@ it("reports a computer setup failure after Desktop dispatch as an uncertain inte
   expect(isUncertainDesktopRun(message)).toBe(true);
   expect(userRunError(Error(message))).toBe(message);
   expect(normalizeRunError(message)).toMatchObject({ kind: "interrupted" });
+});
+
+it("tells an infrastructure interruption from a model or owner failure", () => {
+  const transport = desktopDiagnosticMessage({ code: "native_transport_interrupted", phase: "run", stage: "native_stream", operationId });
+  expect(isInterruptedRunError(transport)).toBe(true);
+  expect(isInterruptedRunError(DESKTOP_RUN_INTERRUPTED_ERROR)).toBe(true);
+  expect(isInterruptedRunError(RUN_INTERRUPTED_BY_MAINTENANCE_ERROR)).toBe(true);
+  expect(isInterruptedRunError(DESKTOP_UNREACHABLE_ERROR)).toBe(true);
+  for (const failure of [null, "", DESKTOP_OWNER_UNRESOLVED_ERROR, "429: rate limited", "The model returned an unusable response."])
+    expect(isInterruptedRunError(failure)).toBe(false);
 });

@@ -32,6 +32,7 @@ import {
   ComputerLimitError,
   commitBotUpdate,
   computerKindForMode,
+  GroupFolderLimitError,
   InstructionConflictError,
   IsolationError,
   parseComputerMode,
@@ -52,7 +53,7 @@ import { deleteAgentSecret, listAgentSecrets, putAgentSecret } from "../agent-se
 import type { RouterDeps } from "../router.js";
 import { loadMessagePage } from "../thread-message-pages.js";
 import type { RouterContext } from "./context.js";
-import { codingEnginesForComputer, computerContext, modelSetup, THREAD_MESSAGE_PAGE_SIZE } from "./shared.js";
+import { codingEnginesForComputer, computerContext, localEngineForNewMico, modelSetup, THREAD_MESSAGE_PAGE_SIZE } from "./shared.js";
 
 /** Surface a Space deletion race as a retryable conflict instead of a generic failure. */
 function mapSpaceLifecycleError(error: unknown): unknown {
@@ -302,6 +303,19 @@ export function botsRoutes(ctx: RouterContext) {
     } catch (error) {
       throw mapSpaceLifecycleError(error);
     }
+    // A new This PC Mico with no chosen model or engine starts on a CLI already signed in on that
+    // PC. The general model stays its server fallback. Idempotent creates keep what they made.
+    if (!profile.agentEngine && !model && !profile.spawnKey && bot.computerMode === "dedicated" &&
+        deps.desktopAgentAvailable?.(context.actor)) {
+      const engine = await localEngineForNewMico(deps, context.actor, bot.id).catch(() => undefined);
+      if (engine) {
+        const updated = await deps.prisma.bot.updateMany({
+          where: { id: bot.id, userId: context.actor.userId, spaceId: context.actor.spaceId, agentEngine: bot.agentEngine ?? "pi" },
+          data: { agentEngine: engine },
+        });
+        if (updated.count === 1) bot = { ...bot, agentEngine: engine };
+      }
+    }
     if (intro) {
       await enqueueBotIntroRun(deps, context.actor, bot, context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined).catch((error) => {
         getLogger().error("bot intro run enqueue", error);
@@ -413,8 +427,12 @@ export function botsRoutes(ctx: RouterContext) {
           });
           if (!section) throw new IsolationError();
         }
-        if (input.nativeConfig && (input.agentEngine ?? existing.agentEngine) !== "codex") {
-          throw new ORPCError("BAD_REQUEST", { message: "Codex preferences require the Codex provider." });
+        const configEngine = input.agentEngine ?? existing.agentEngine;
+        if (input.nativeConfig && configEngine !== "codex" && configEngine !== "claude") {
+          throw new ORPCError("BAD_REQUEST", { message: "Model preferences require Codex or Claude Code." });
+        }
+        if (input.nativeConfig?.fastMode && configEngine !== "codex") {
+          throw new ORPCError("BAD_REQUEST", { message: "Fast mode requires Codex." });
         }
         const modelChange = await validateBotModelChange(botModelValidation(context.actor), {
           userId: context.actor.userId,
@@ -433,6 +451,8 @@ export function botsRoutes(ctx: RouterContext) {
             const available = await codingEnginesForComputer(deps, context.actor, existing, context.signal);
             if (!available.engines.includes(input.agentEngine))
               throw new ORPCError("BAD_REQUEST", { message: "This coding engine is unavailable on the selected computer." });
+            if (available.signedOut.includes(input.agentEngine))
+              throw new ORPCError("BAD_REQUEST", { message: "Sign in to this coding engine on the selected computer first." });
           }
         }
         const thinkingLevel = input.thinkingLevel;
@@ -815,6 +835,22 @@ export function botsRoutes(ctx: RouterContext) {
           if (result.status === "rejected")
             getLogger().error("group artifact cleanup", result.reason);
         }
+        return { ok: true as const };
+      }),
+      folders: authed.groups.folders.handler(async ({ context, input }) =>
+        groupRepos.listGroupFolders(context.actor, input.groupId),
+      ),
+      addFolder: authed.groups.addFolder.handler(async ({ context, input }) => {
+        try {
+          return await groupRepos.addGroupFolder(context.actor, input);
+        } catch (error) {
+          if (error instanceof GroupFolderLimitError)
+            throw new ORPCError("BAD_REQUEST", { message: error.message });
+          throw error;
+        }
+      }),
+      removeFolder: authed.groups.removeFolder.handler(async ({ context, input }) => {
+        await groupRepos.removeGroupFolder(context.actor, input);
         return { ok: true as const };
       }),
     },

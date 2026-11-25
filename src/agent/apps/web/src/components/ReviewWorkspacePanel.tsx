@@ -22,6 +22,7 @@ import { flushSync } from "react-dom";
 import { appPath } from "../lib/app-path";
 import { fetchArtifactBytes } from "../lib/artifact-open";
 import { desktopBridge } from "../lib/desktop";
+import { isDocxMimeType } from "../lib/docx-preview";
 import type { ReviewDocument, ReviewSelection } from "../lib/review-workspace";
 import {
   previewUrl,
@@ -32,6 +33,7 @@ import {
 } from "../lib/review-workspace";
 import { ResizableSidePanel } from "../pages/ResizableSidePanel";
 import { NativeProjectPreview, selectionScreenshot } from "./NativeProjectPreview";
+import { DocxViewer } from "./DocxViewer";
 import { ReviewPdfViewer } from "./ReviewPdfViewer";
 import { SandboxedHtmlViewer } from "./SandboxedHtmlViewer";
 import { ProjectRunControls, type ProjectPreparationStatus } from "./ProjectRunControls";
@@ -607,6 +609,8 @@ function ReviewDocumentView({
               },
             }}
           />
+        ) : isDocxMimeType(document.mimeType) ? (
+          <DocxViewer bytes={bytes} />
         ) : (
           <div className="p-5 text-sm break-words [overflow-wrap:anywhere]">
             {document.mimeType === "text/markdown" ? (

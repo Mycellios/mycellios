@@ -107,7 +107,18 @@ lines.on("line", (line) => {
           params: { threadId: "fixture-thread", turn: { id: "fixture-turn", status: "completed" } },
         });
       }
+    } else if (engine === "claude" && message.type === "control_request" && message.request?.subtype === "initialize") {
+      send({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {
+        account: { email: "synthetic-private-account" },
+        models: [
+          { value: "default", displayName: "Default (recommended)", supportsEffort: true, supportedEffortLevels: ["low", "high"] },
+          { value: "fixture-claude", displayName: "Fixture Claude", supportsEffort: true, supportedEffortLevels: ["low", "high"] },
+          { value: "fixture-plain", displayName: "Fixture Plain" },
+        ],
+      } } });
     } else if (engine === "claude" && message.type === "user") {
+      const launchLog = process.argv.indexOf("--claude-launch-log");
+      if (launchLog >= 0) appendFileSync(process.argv[launchLog + 1], `${JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(3) })}\n`);
       send({ type: "system", subtype: "init", session_id: "fixture-session" });
       if (process.argv.includes("--fixture-mcp-sdk")) {
         const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");

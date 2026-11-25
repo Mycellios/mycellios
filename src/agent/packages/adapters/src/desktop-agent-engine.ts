@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AgentRuntime } from "@mycellios/adapter-kit";
-import { discoverNativeEngines, NativeAgentRuntime } from "./native-agent-runtime.js";
+import type { AgentRuntime, NativeEngineState } from "@mycellios/adapter-kit";
+import { discoverNativeEngines, NativeAgentRuntime, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 
@@ -12,17 +12,26 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
   createRuntime?: (directory: string, authorized: () => boolean) => AgentRuntime): AgentRuntime {
   const active = new Map<string, { runtime: AgentRuntime; localId: string }>();
   const makeRuntime = createRuntime ?? ((dataDir, authorized) => new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized }));
+  async function engineState(): Promise<NativeEngineState> {
+    const scope = accessScope();
+    if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return { engines: [], signedOut: [] };
+    const available = await discoverNativeEngines(path.join(profile, "agent-executor", scope));
+    if (accessScope() !== scope) return { engines: [], signedOut: [] };
+    return {
+      engines: available.flatMap(({ id, available }) =>
+        available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
+      ),
+      signedOut: signedOutEngines(available),
+      signedIn: signedInEngines(available),
+      models: nativeEngineModels(available),
+    };
+  }
   return {
     describe: () => new PiAgentRuntime().describe(),
     async nativeEngines() {
-      const scope = accessScope();
-      if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return [];
-      const available = await discoverNativeEngines(path.join(profile, "agent-executor", scope));
-      if (accessScope() !== scope) return [];
-      return available.flatMap(({ id, available }) =>
-        available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
-      );
+      return (await engineState()).engines;
     },
+    nativeEngineState: () => engineState(),
     abort: async runId => { const owned = active.get(runId); await owned?.runtime.abort(owned.localId); },
     async *run(request, context) {
       const scope = accessScope();

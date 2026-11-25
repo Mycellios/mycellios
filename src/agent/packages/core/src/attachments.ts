@@ -1,5 +1,6 @@
 import type { AttachmentMimeType, MessageBlock } from "@mycellios/contracts";
 import {
+  ATTACHMENT_DOCX_MIME_TYPE,
   ATTACHMENT_MAX_BYTES,
   attachmentSizeLabel,
   isAllowedAttachmentMimeType,
@@ -161,6 +162,10 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       }
       // Without the answer a later turn sees the question as still open and asks it again.
       if (block.kind === "ask") {
+        // A location answer belonged to its own turn; later turns only learn how it went.
+        if (block.location?.outcome) {
+          return `${block.text}\nAnswer: ${block.location.outcome === "declined" ? "the person did not share a location" : "a location was shared for that request only and is not kept"}`;
+        }
         if (block.status !== "answered" || !block.answer) return block.text;
         const choice = block.actions?.find((action) => action.id === block.answer);
         return `${block.text}\nAnswer: ${choice?.label ?? block.answer}`;
@@ -202,6 +207,7 @@ const EXTENSION_MIME_TYPES: Record<string, AttachmentMimeType> = {
   ".htm": "text/html",
   ".json": "application/json",
   ".zip": "application/zip",
+  ".docx": ATTACHMENT_DOCX_MIME_TYPE,
 };
 
 const MIME_TYPE_EXTENSIONS: Record<AttachmentMimeType, string> = {
@@ -221,6 +227,7 @@ const MIME_TYPE_EXTENSIONS: Record<AttachmentMimeType, string> = {
   "text/html": ".html",
   "application/json": ".json",
   "application/zip": ".zip",
+  [ATTACHMENT_DOCX_MIME_TYPE]: ".docx",
 };
 
 export function inferAttachmentMimeType(

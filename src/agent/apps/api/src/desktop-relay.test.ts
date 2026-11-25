@@ -419,6 +419,39 @@ it("routes a Mico to the PC that reports its folder and reports an unchosen one 
   expect((await call("session-b", "account", { ...mac, workspaces: Array.from({ length: 257 }, (_, n) => createHash("sha256").update(String(n)).digest("hex")) })).status).toBe(409);
 });
 
+it("says a Mico is working on another PC instead of asking to sign in again", async () => {
+  const app = new Hono();
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes"
+      ? { actor: owner, sessionId: request.headers.get("x-test-session") ?? "session-a" }
+      : null,
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const call = (session: string, action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "x-test-session": session, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const windows = { deviceId: randomUUID(), generation: randomUUID() };
+  const mac = { deviceId: randomUUID(), generation: randomUUID() };
+  expect((await call("session-a", "bind", { ...windows, botId: "test-bot" })).status).toBe(200);
+  // Windows is running this Mico's work.
+  const body = JSON.stringify({ request: { method: "environment", botId: "test-bot" }, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+  const time = String(Date.now());
+  const running = app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const refused = await call("session-b", "bind", { ...mac, botId: "test-bot" });
+  expect(refused.status).toBe(409);
+  const answer = await refused.json() as { error: string; code: string };
+  expect(answer.code).toBe("busy_elsewhere");
+  expect(answer.error).toContain("working on another computer");
+  expect(answer.error).not.toContain("Sign in");
+  close();
+  await running.catch(() => undefined);
+});
+
 it("remembers the PC the owner chose for a Mico after the API forgets the binding", async () => {
   const chosen = new Map<string, string>();
   let failLookup = false;
@@ -484,4 +517,83 @@ it("remembers the PC the owner chose for a Mico after the API forgets the bindin
   expect((await api.call("session-a", "account", { ...windows, workspaces: [folder] })).status).toBe(200);
   expect((await api.call("session-b", "account", { ...mac, workspaces: [folder] })).status).toBe(200);
   expect(await api.probe("test-bot")).toMatchObject({ available: false, unresolved: true });
+});
+
+it("rechecks every Mico bound to a PC in one ownership read and drops the ones no longer owned", async () => {
+  const app = new Hono();
+  const owned = new Set(["test-bot", "other-bot", "third-bot"]);
+  const batches: string[][] = [];
+  let single = 0;
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    desktopExecution: async () => true,
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes" ? { actor: owner, sessionId: "session-a" } : null,
+    ownsBot: async (_actor, id) => { single++; return owned.has(id); },
+    ownedBots: async (_actor, ids) => { batches.push([...ids].sort()); return new Set(ids.filter(id => owned.has(id))); },
+  });
+  const call = (action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const probe = async (botId: string) => {
+    const body = JSON.stringify({ probe: botId, agentExecution: 1, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+    const time = String(Date.now());
+    return (await app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body })).json();
+  };
+  const pc = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await call("identity", {})).json(), agentExecution: 1 };
+  expect((await call("account", pc)).status).toBe(200);
+  for (const botId of owned) expect(await probe(botId)).toMatchObject({ available: true });
+  batches.length = 0;
+  single = 0;
+  owned.delete("other-bot");
+  expect((await call("account", pc)).status).toBe(200);
+  // One read for all three Micos, never one per Mico.
+  expect(batches).toEqual([["other-bot", "test-bot", "third-bot"]]);
+  expect(single).toBe(0);
+  expect((await call("account", pc)).status).toBe(200);
+  expect(batches.at(-1)).toEqual(["test-bot", "third-bot"]);
+});
+
+it("hands the relay to a new server version only on a signed request from inside the deployment", async () => {
+  const app = new Hono();
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    revision: "test-revision",
+    authenticate: async () => ({ actor: owner, sessionId: "test-session" }),
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const signed = (path: string, payload: unknown, headers: Record<string, string> = {}) => {
+    const body = JSON.stringify(payload);
+    const time = String(Date.now());
+    return app.request(path, {
+      method: "POST",
+      headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body), ...headers },
+      body,
+    });
+  };
+  const handoff = (action: unknown, headers?: Record<string, string>) =>
+    signed("/internal/desktop-relay/handoff", { action }, headers);
+  expect((await app.request("/internal/desktop-relay/handoff", { method: "POST", body: JSON.stringify({ action: "start" }) })).status).toBe(401);
+  expect((await handoff("start", { "x-forwarded-for": "203.0.113.7" })).status).toBe(404);
+  expect((await handoff("drop")).status).toBe(400);
+  const idle = await (await handoff("status")).json();
+  expect(idle).toMatchObject({ revision: "test-revision", handingOff: false, openOperations: 0, connectedComputers: 0 });
+  expect(idle.instance).toMatch(/^[0-9a-f-]{36}$/);
+  expect(await (await handoff("start")).json()).toMatchObject({ instance: idle.instance, handingOff: true });
+  // While it hands off, a check or new work waits for the new version instead of reading
+  // the PC as offline; nothing is dispatched.
+  const scope = { userId: owner.userId, spaceId: owner.spaceId };
+  for (const payload of [
+    { probe: "test-bot", scope, nonce: randomUUID() },
+    { request: { method: "environment", botId: "test-bot" }, scope, nonce: randomUUID() },
+  ]) {
+    const refused = await signed("/api/desktop-relay/internal", payload);
+    expect(refused.status).toBe(503);
+    expect(refused.headers.get("x-mycellios-desktop-error")).toBe("desktop_updating");
+  }
+  expect(await (await handoff("cancel")).json()).toMatchObject({ instance: idle.instance, handingOff: false });
+  expect((await signed("/api/desktop-relay/internal", { probe: "test-bot", scope, nonce: randomUUID() })).status).toBe(200);
 });

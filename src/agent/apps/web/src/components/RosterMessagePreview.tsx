@@ -40,7 +40,7 @@ export function RosterMessagePreview({ children, disabled = false, conversations
     return <PreviewCard open={open && !disabled} onOpenChange={next => setOpen(next && !disabled)}>
       <PreviewCardTrigger delay={CONVERSATION_CARD_DELAY_MS} closeDelay={200} render={children} />
       <PreviewCardContent side="inline-end" align="start" sideOffset={8} data-testid="roster-conversation-card"
-        className="grid w-72 max-w-[calc(100vw-24px)] items-start gap-1 rounded-md border border-border bg-popover p-2.5 text-popover-foreground shadow-md">
+        className="grid w-72 max-w-[calc(100vw-24px)] grid-cols-[minmax(0,1fr)] items-start gap-1 rounded-md border border-border bg-popover p-2.5 text-popover-foreground shadow-md">
         <RosterMessagePreviewContent {...message} />
         {conversations}
       </PreviewCardContent>
@@ -49,7 +49,7 @@ export function RosterMessagePreview({ children, disabled = false, conversations
   return <Tooltip disabled={disabled}>
     <TooltipTrigger delay={350} render={children} />
     <TooltipContent side="inline-end" align="start" sideOffset={8}
-      className="grid w-64 max-w-[calc(100vw-24px)] items-start gap-1 rounded-md border border-border bg-popover p-2.5 text-popover-foreground shadow-md [&>:last-child]:hidden">
+      className="grid w-64 max-w-[calc(100vw-24px)] grid-cols-[minmax(0,1fr)] items-start gap-1 rounded-md border border-border bg-popover p-2.5 text-popover-foreground shadow-md [&>:last-child]:hidden">
       <RosterMessagePreviewContent {...message} />
     </TooltipContent>
   </Tooltip>;

@@ -56,15 +56,19 @@ function OpenLink({ block }: { block: RoutineRunBlock }) {
 export function RoutineRunMarker({
   runs,
   locale,
+  revealMessageId,
 }: {
   runs: readonly RoutineRun[];
   locale: string;
+  revealMessageId?: string;
 }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const listId = useId();
   const latest = runs.at(-1);
   if (!latest) return null;
+  // The transcript looks up the exact row in the same commit as the jump.
+  if (!open && revealMessageId && runs.some(run => run.id === revealMessageId)) setOpen(true);
   const time = (at: string) =>
     new Date(at).toLocaleTimeString(locale || "en", { hour: "numeric", minute: "2-digit" });
   const rowClass = "flex min-h-6 w-fit max-w-full items-center gap-1.5 py-0.5 text-[12px]";
@@ -76,7 +80,7 @@ export function RoutineRunMarker({
         className={cn(rowClass, outcomeTone(latest.block))}
       >
         <Repeat aria-hidden size={13} strokeWidth={1.8} className="shrink-0" />
-        <span dir="auto" className="truncate">
+        <span dir="auto" className="min-w-0 wrap-anywhere">
           <RunText block={latest.block} />
         </span>
         <span aria-hidden>·</span>
@@ -104,7 +108,7 @@ export function RoutineRunMarker({
             strokeWidth={1.8}
             className={`shrink-0 transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
           />
-          <span dir="auto" className="truncate">
+          <span dir="auto" className="min-w-0 wrap-anywhere">
             <Plural value={count} one={`# run of ${routine}`} other={`# runs of ${routine}`} />
           </span>
         </button>
@@ -116,13 +120,14 @@ export function RoutineRunMarker({
           {runs.map((run) => (
             <li
               key={run.id}
+              data-message-id={run.id}
               data-outcome={run.block.status}
               className={cn(rowClass, outcomeTone(run.block))}
             >
               <time dateTime={run.createdAt} className="shrink-0 tabular-nums">
                 {time(run.createdAt)}
               </time>
-              <span dir="auto" className="truncate">
+              <span dir="auto" className="min-w-0 wrap-anywhere">
                 <RunText block={run.block} />
               </span>
             </li>

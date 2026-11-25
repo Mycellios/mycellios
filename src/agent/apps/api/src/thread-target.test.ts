@@ -4,6 +4,7 @@ import { callClientNonce } from "@mycellios/core";
 import type * as MessageQuoteModule from "@mycellios/core/message-quote";
 import type { PrismaClient } from "@mycellios/db";
 import { describe, expect, it, vi } from "vitest";
+import { loadMessagePage } from "./thread-message-pages.js";
 import type { ThreadTarget } from "./thread-target.js";
 import {
   cancelSupersededQueuedRuns,
@@ -564,6 +565,54 @@ describe("reaction turns", () => {
 });
 
 describe("threadSnapshot", () => {
+
+  it.each(["bot", "group"] as const)("pages an idle %s from a small recent window", async (kind) => {
+    const rows = Array.from({ length: 102 }, (_, index) => ({
+      id: `message-${102 - index}`,
+      seq: 102 - index,
+      threadId: "thread-1",
+      role: "user",
+      botId: null,
+      runId: null,
+      replyToMessageId: null,
+      blocks: [{ kind: "text", text: "Stored message" }],
+      createdAt: new Date("2026-09-01T00:00:00Z"),
+    }));
+    const findMany = vi.fn(async ({ take, where }: { take: number; where: { seq?: { lt: number } } }) =>
+      rows.filter(row => row.seq < (where.seq?.lt ?? Infinity)).slice(0, take),
+    );
+    const findActiveRuns = vi.fn().mockResolvedValue([]);
+    const tx = {
+      message: { findMany },
+      event: { findFirst: vi.fn().mockResolvedValue({ seq: 780 }) },
+      run: { findFirst: vi.fn().mockResolvedValue(null), findMany: findActiveRuns },
+    };
+    const prisma = {
+      ...tx,
+      $transaction: vi.fn(async (work: (client: typeof tx) => unknown) => work(tx)),
+    } as unknown as PrismaClient;
+    const target = kind === "group" ? groupTarget() : {
+      kind: "bot",
+      botId: "bot-1",
+      threadId: "thread-1",
+      bot: { computer: null },
+    } as ThreadTarget;
+
+    const recent = await threadSnapshot({ prisma }, target, "recent");
+    expect(recent).toMatchObject({ cursor: 780, olderCursor: 79 });
+    expect(recent.messages.map(row => row.seq)).toEqual(rows.slice(0, 24).reverse().map(row => row.seq));
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ take: 25 }));
+    expect(findActiveRuns).toHaveBeenCalledTimes(kind === "group" ? 2 : 1);
+
+    const earlier = await loadMessagePage(prisma, target.threadId, recent.olderCursor!, 100);
+    expect(earlier.olderCursor).toBeNull();
+    expect([...earlier.messages, ...recent.messages].map(row => row.seq))
+      .toEqual(Array.from({ length: 102 }, (_, index) => index + 1));
+
+    const compatibility = await threadSnapshot({ prisma }, target);
+    expect(compatibility).toMatchObject({ cursor: 780, olderCursor: 3 });
+    expect(compatibility.messages).toHaveLength(100);
+  });
   it("returns all private pending runs alongside new work and its live progress", async () => {
     const runs = [
       { id: "paused-a", status: "waiting_input" },
@@ -598,7 +647,8 @@ describe("threadSnapshot", () => {
       botId: "bot-1",
       threadId: "thread-1",
       bot: { computer: null },
-    } as ThreadTarget);
+    } as ThreadTarget, "recent");
+    expect(tx.message.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 101 }));
     expect(snapshot.run).toMatchObject({
       id: "new-work",
       status: "running",
@@ -764,7 +814,7 @@ describe("threadSnapshot", () => {
           threadId: "thread-1",
           trigger: { notIn: ["tickets", "project_prepare"] },
           status: {
-            in: ["queued", "leased", "running", "waiting_input", "waiting_takeover", "failed"],
+            in: ["failed", "completed", "cancelled"],
           },
         }),
       }),
@@ -987,7 +1037,7 @@ describe("threadSnapshot", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: {
-            in: ["queued", "leased", "running", "waiting_input", "waiting_takeover", "failed"],
+            in: ["failed", "completed", "cancelled"],
           },
         }),
       }),
@@ -4139,8 +4189,8 @@ describe("stopThreadRuns", () => {
     expect(transaction.secret.deleteMany).toHaveBeenCalledWith({
       where: {
         OR: [
-          { userId: "user-1", spaceId: "workspace-1", kind: "run-secret:run-a" },
-          { userId: "user-1", spaceId: "workspace-1", kind: "run-secret:run-b" },
+          { userId: "user-1", spaceId: "workspace-1", kind: { in: ["run-secret:run-a", "run-location:run-a"] } },
+          { userId: "user-1", spaceId: "workspace-1", kind: { in: ["run-secret:run-b", "run-location:run-b"] } },
         ],
       },
     });

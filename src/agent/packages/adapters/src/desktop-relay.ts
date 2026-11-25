@@ -2,7 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import type { AdapterContext } from "@mycellios/adapter-kit";
 import { getLogger } from "@mycellios/logging";
 import { desktopLegacyFailureCode } from "@mycellios/contracts";
-import { DesktopUnreachableError } from "./computer-errors.js";
+import { ComputerUpdatingError, DesktopUnreachableError } from "./computer-errors.js";
 import type { DesktopExecutorBinding, DesktopExecutorOwner, DesktopExecutorPoll } from "../../../../contracts/desktop-executor.js";
 import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, type HostComputerRequest } from "./host-computer-protocol.js";
 
@@ -14,12 +14,15 @@ const MAX_WAITING_OPERATIONS = 32;
 const MAX_BOT_OPERATIONS = 8;
 const MAX_REQUEST_BUFFER = MAX_OPERATIONS * HOST_COMPUTER_MAX_BYTES;
 const MAX_STREAM_BUFFER = 2 * 1024 * 1024;
+/** A handoff nobody renews ends by itself, so a lost deployment never leaves PCs refused. */
+export const DESKTOP_RELAY_HANDOFF_MS = 15 * 60_000;
+const HANDOFF_REFUSAL = "The server is moving to a new version. This operation was not dispatched; it continues once the PC reconnects.";
 const LOST_DELIVERY = Buffer.from(JSON.stringify({
   error: "Desktop delivery was interrupted. Check results before retrying.",
 }) + "\n").toString("base64");
 
 export class DesktopRelayError extends Error {
-  constructor(readonly code: "desktop_disconnected" | "desktop_busy" | "desktop_connection_changed" | "desktop_request_too_large", message: string, readonly status: 409 | 429 | 413 = 409) {
+  constructor(readonly code: "desktop_disconnected" | "desktop_busy" | "desktop_connection_changed" | "desktop_request_too_large" | "desktop_updating", message: string, readonly status: 409 | 429 | 413 | 503 = 409) {
     super(message);
     this.name = "DesktopRelayError";
   }
@@ -59,6 +62,7 @@ export class DesktopRelayBroker {
   private sweep: ReturnType<typeof setInterval>;
   private waiting = new Map<string, Set<() => void>>();
   private polling = new Set<string>();
+  private handoffUntil = 0;
   private pollKey(owner: DesktopExecutorOwner, deviceId: string) { return JSON.stringify([owner.userId, owner.spaceId, owner.sessionId, deviceId]); }
   private wake(owner: DesktopExecutorOwner, deviceId: string) { for (const finish of this.waiting.get(this.pollKey(owner, deviceId)) ?? []) finish(); }
   constructor(private readonly now = Date.now) {
@@ -164,7 +168,7 @@ export class DesktopRelayBroker {
     if (existing && !sameAccount) throw new Error("This agent is already connected to a computer. Disconnect it first.");
     if (existing && (!sameOwner(owner, existing) || existing.deviceId !== input.deviceId || existing.generation !== input.generation)) {
       const busy = [...this.operations.values()].some(op => op.binding === existing && !op.closed);
-      if (busy) throw new Error("This agent is already connected to a computer. Disconnect it first.");
+      if (busy) throw new Error("Agent busy on another computer");
       this.bindings.set(id, { ...owner, ...input, seen: this.now() });
       return existing.deviceId !== input.deviceId;
     }
@@ -228,6 +232,9 @@ export class DesktopRelayBroker {
     const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed);
     const lane = (op: Operation) => op.request.method === "agentMessage" ? "control" : op.request.method === "agentRun" ? "agent" : "computer";
     const limits = { control: 8, agent: 4, computer: MAX_OPERATIONS };
+    // A callback reply stays claimed until the PC acknowledges it, so two per Mico made a
+    // third reply wait a whole round trip. Control matches its dispatch bound per Mico.
+    const perMico = { control: 4, agent: 2, computer: 2 };
     const claimed = { control: 0, agent: 0, computer: 0 };
     for (const op of this.operations.values()) if (op.claimed && !op.closed) claimed[lane(op)]++;
     const pending: Operation[] = [];
@@ -242,7 +249,7 @@ export class DesktopRelayBroker {
       const group = lane(op);
       if (op.claimed || (verifiedBots && !verifiedBots.has(op.binding.botId)) || claimed[group] >= limits[group]) continue;
       const slots = perBinding.get(op.binding) ?? { control: 0, agent: 0, computer: 0 };
-      if (slots[group] >= 2) continue;
+      if (slots[group] >= perMico[group]) continue;
       if (claim) op.claimed = true;
       claimed[group]++;
       slots[group]++;
@@ -276,8 +283,41 @@ export class DesktopRelayBroker {
       return this.pollState(owner, deviceId, true, verifiedBots ?? undefined);
     } finally { this.polling.delete(id); }
   }
+  /**
+   * A new API version takes over the PC connections (a deploy's handoff, see the API's
+   * /internal/desktop-relay/handoff). Until it ends, nothing new reaches a PC through this
+   * instance: new work hears "updating", so its turn pauses and continues once the PC has
+   * reconnected to the new version. Requests of agent runs already open here (their
+   * callbacks) still pass, so those runs finish where they started. A handoff lasts DESKTOP_RELAY_HANDOFF_MS
+   * unless renewed; `false` ends it now (a rollback).
+   */
+  handOff(start: boolean) {
+    this.handoffUntil = start ? this.now() + DESKTOP_RELAY_HANDOFF_MS : 0;
+  }
+  handingOff() {
+    return this.handoffUntil > this.now();
+  }
+  /** What a handoff waits for: the operations still open here and the PCs connected to it. */
+  handoffState() {
+    this.expire();
+    const open = [...this.operations.values()].filter(op => !op.closed);
+    const handingOff = this.handingOff();
+    return {
+      handingOff,
+      ...(handingOff ? { handoffEndsAt: new Date(this.handoffUntil).toISOString() } : {}),
+      openOperations: open.length,
+      deliveredOperations: open.filter(op => op.claimed).length,
+      agentRuns: open.filter(op => op.method === "agentRun").length,
+      connectedComputers: new Set([...this.accounts.values()].map(account =>
+        JSON.stringify([account.userId, account.spaceId, account.deviceId]))).size,
+    };
+  }
   dispatch(input: HostComputerRequest, context: AdapterContext): Response {
     this.expire();
+    if (this.handingOff() && !(input.runId && [...this.operations.values()].some(op =>
+      !op.closed && op.method === "agentRun" && op.runId === input.runId && op.binding.botId === input.botId &&
+      op.binding.userId === context.userId && op.binding.spaceId === context.spaceId)))
+      throw new DesktopRelayError("desktop_updating", HANDOFF_REFUSAL, 503);
     const binding = this.bindings.get(key(context, input.botId));
     const started = input.runId ? this.runs.get(key(context, `${input.botId}:${input.runId}`)) : undefined;
     if (input.method === "agentRun" && !this.agentAvailable(context, input.botId))
@@ -415,6 +455,8 @@ async function probeDesktopRelay(url: string, secret: string, context: AdapterCo
     if (context.signal.aborted) throw error;
     throw new DesktopUnreachableError({ cause: error });
   }
+  // A relay handing its PCs to a new server version: the turn waits for it, as for a PC update.
+  if (response.headers.get("x-mycellios-desktop-error") === "desktop_updating") throw new ComputerUpdatingError(false);
   if (response.status === 409 || response.status === 429 || response.status >= 500) throw new DesktopUnreachableError();
   return state;
 }

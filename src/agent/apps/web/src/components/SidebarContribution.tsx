@@ -104,9 +104,10 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const waiting = Boolean(node?.pending);
   const active = node?.enabled === true;
   const hasError = !incomplete && (error || Boolean(node?.rejected));
-  // Stopping must always stay possible: after a rejected command, a click on a
-  // running contributor sends a fresh pause. Starting again still only refreshes.
-  const retryPause = !error && Boolean(node?.rejected) && active;
+  // Stopping must always stay possible: after a rejected command or a failed read,
+  // a click on a running contributor sends a pause (toggle re-reads the current
+  // state first). Starting again after an error still only refreshes.
+  const retryPause = hasError && active;
   const confirmedActive = Boolean(runtime) && supported && active && node?.connected === true && !hasError && !incomplete && !accountUnavailable && !needsIdentity;
   useEffect(() => {
     const key = indicator.current;
@@ -117,7 +118,7 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const shortLabel = t`Earn with your computer`;
   const unavailable = !runtime || !supported || incomplete || accountUnavailable;
   const label = busy ? needsIdentity ? t`Verifying this computer…` : t`Setting up contribution…`
-    : needsIdentity ? t`Verify this computer` : hasError ? t`Retry`
+    : needsIdentity ? t`Verify this computer` : hasError && !retryPause ? t`Retry`
     : waiting ? t`Waiting for this computer…` : active ? t`Pause contribution` : idleLabel;
   const detail = accountUnavailable ? t`Contribute in your browser while this page stays open.`
     : incomplete ? t`The local contribution runtime is missing.`
@@ -133,8 +134,8 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     <div className="flex min-w-0 items-center">
     <Button variant="ghost" className={actionClass}
       onClick={event => { if (active) stopContributionGrowth(); else if (!hasError && !needsIdentity) startContributionGrowth(event.currentTarget); if (hasError && !needsIdentity && !retryPause) void refresh(); else void toggle(); }} disabled={unavailable || busy || (waiting && !hasError)} aria-label={label} title={unavailable ? t`Available on Desktop` : mini ? `${label}. ${detail}` : detail}>
-      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : t`Generate AI`}</span><span className="block text-[11px] text-muted-foreground">{hasError ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Share computing power with the network`}</span></span>}
-      <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>{spinning ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : hasError || needsIdentity ? <RefreshCw size={22} className="size-5" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}</span>
+      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : t`Generate AI`}</span><span className="block text-[11px] text-muted-foreground">{hasError && !retryPause ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Share computing power with the network`}</span></span>}
+      <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>{spinning ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : (hasError && !retryPause) || needsIdentity ? <RefreshCw size={22} className="size-5" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}</span>
     </Button>
     </div>
     {!mini && unavailable && <p className="px-2 text-[11px] text-muted-foreground">{t`Available on Desktop`}</p>}
