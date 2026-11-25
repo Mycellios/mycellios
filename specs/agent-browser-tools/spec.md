@@ -1,6 +1,6 @@
 # Complete the Mico's own browser
 
-Status: proposed design. No product code changes with this spec.
+Status: proposed design; phase 1 is implemented (see its last item).
 
 This spec covers the Mico's own browser: the Chromium on its computer that
 `browser_navigate`, `browser_snapshot` and `browser_act` drive. The person's
@@ -77,6 +77,12 @@ implements it later gets the same tools.
      and returns its type and message. The Mico answers with a `dialog` step
      (accept or dismiss, with text for `prompt`); until then other steps on that
      tab are refused. Dialogs it did not cause stay for a person.
+   - Implemented: helper, supervisor and API ship these steps, the navigate
+     snapshot, placeholder waits and `from` parts. The API asks the helper's
+     `capabilities` before sending them, so an older image answers unsupported
+     after the steps before it. A short-lived keeper process holds a dialog for
+     the conversation's next call. Active once the owner rolls out a new computer
+     image and supervisor.
 2. Phase 2 — a browser for This PC Micos.
    - Desktop hosts the Mico's tabs in sandboxed WebContentsViews, as the project
      browser does: no preload or application bridge, and a persistent partition

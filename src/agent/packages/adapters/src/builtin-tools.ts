@@ -1,4 +1,4 @@
-import type { ConnectorTool } from "@mycellios/adapter-kit";
+import { type ConnectorTool, MAX_BROWSER_WAIT_SECONDS } from "@mycellios/adapter-kit";
 import { workflowTools } from "./workflow-tools.js";
 import { hostedAppTools } from "./hosted-app-tools.js";
 import {
@@ -371,7 +371,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "browser_navigate",
     description:
-      'Open a URL in the page browser on this bot\'s computer and return the document title. Prefer this over pixel clicks for web pages. If the result includes fallback:"computer_act", use computer_act on the desktop browser instead.',
+      'Open a URL in the page browser on this bot\'s computer and return the page\'s first snapshot, as browser_snapshot does. Prefer this over pixel clicks for web pages. If the result includes fallback:"computer_act", use computer_act on the desktop browser instead.',
     inputSchema: {
       type: "object",
       properties: {
@@ -383,13 +383,21 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "browser_snapshot",
     description:
-      "Capture an accessibility-style snapshot of the current page with element refs (e1, e2, …). Use refs with browser_act. Prefer this over computer_observe for web pages. If loading is true, take another snapshot before deciding what the page shows. If fallback is computer_act, use the desktop tools instead.",
-    inputSchema: { type: "object", properties: {} },
+      "Capture an accessibility-style snapshot of the current page with element refs (e1, e2, …). Use refs with browser_act. Prefer this over computer_observe for web pages. If loading is true, take another snapshot before deciding what the page shows. A long page comes in parts: when next is set, call again with from set to next to read on; refs from every part stay valid. If fallback is computer_act, use the desktop tools instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: {
+          type: "number",
+          description: "Part of a long page to read, as the previous snapshot's next names it.",
+        },
+      },
+    },
     readOnly: true,
   },
   {
     name: "browser_act",
-    description: `Click or fill page elements by ref from browser_snapshot (kinds: ${BROWSER_ACT_KINDS.join(", ")}). upload attaches your files to a "file upload" element; use it instead of clicking upload buttons. fill_secret types the username or password of a login saved with request_secret, only on the site it was saved for; you never see the value. type presses keys like a keyboard and replaces the field's text; use it for code boxes and fields that ignore fill. For a code split into one box per digit, type the whole code once into the first box, and to correct it type it again. Prefer this over computer_act for web pages. If the result includes fallback:"computer_act", use computer_act instead.`,
+    description: `Act on the page by ref from browser_snapshot (kinds: ${BROWSER_ACT_KINDS.join(", ")}); steps run in order. upload attaches your files to a "file upload" element; use it instead of clicking upload buttons. fill_secret types the username or password of a login saved with request_secret, only on the site it was saved for; you never see the value. type presses keys like a keyboard and replaces the field's text; use it for code boxes and fields that ignore fill. For a code split into one box per digit, type the whole code once into the first box, and to correct it type it again. press sends one key, such as Enter, Tab, Escape, Backspace, ArrowDown, Shift+Tab or Control+A, to ref or the focused element. scroll brings ref into view, or moves the page (or ref's scroll area) by direction. hover moves the pointer over ref. wait waits until text appears or is gone, the URL changes, or the page is quiet; waits in one call share ${MAX_BROWSER_WAIT_SECONDS} s. A step that opens a page dialog stops the call: read its message, then answer with a dialog step (accept true or false, text for a prompt). Prefer this over computer_act for web pages. If the result includes fallback:"computer_act", use computer_act instead.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -402,8 +410,16 @@ export const builtinAgentTools: ConnectorTool[] = [
                 type: "string",
                 enum: [...BROWSER_ACT_KINDS],
               },
-              ref: { type: "string", description: "Element ref from browser_snapshot." },
-              text: { type: "string", description: "Text for fill or type." },
+              ref: {
+                type: "string",
+                description:
+                  "Element ref from browser_snapshot; optional for press and scroll, unused by wait and dialog.",
+              },
+              text: {
+                type: "string",
+                description:
+                  "Text for fill or type; for wait, the text to wait for (or part of the URL); for dialog, a prompt's answer.",
+              },
               paths: {
                 type: "array",
                 items: { type: "string" },
@@ -415,8 +431,31 @@ export const builtinAgentTools: ConnectorTool[] = [
                 enum: ["username", "password"],
                 description: "Login field for fill_secret.",
               },
+              key: {
+                type: "string",
+                description: "Key for press, such as Enter or Shift+Tab.",
+              },
+              direction: {
+                type: "string",
+                enum: ["up", "down", "left", "right"],
+                description: "Direction for scroll.",
+              },
+              until: {
+                type: "string",
+                enum: ["text", "gone", "url", "quiet"],
+                description:
+                  "What wait waits for: text to appear, text to be gone, the URL to change (to one containing text, if given), or the page to stop loading and changing.",
+              },
+              timeout: {
+                type: "number",
+                description: `Seconds a wait may last, at most ${MAX_BROWSER_WAIT_SECONDS}; default 10.`,
+              },
+              accept: {
+                type: "boolean",
+                description: "For dialog: true accepts (OK), false dismisses (Cancel).",
+              },
             },
-            required: ["kind", "ref"],
+            required: ["kind"],
           },
         },
       },

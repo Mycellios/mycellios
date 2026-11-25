@@ -1877,6 +1877,17 @@
   diagnostics or switching funding sources. Preserve revocation of unused keys.
 - Browser saved-login fills must check the current origin and focused input type
   together. Passwords belong only in password fields; partial fills are cleared.
+- Page tools on Docker computers follow phase 1 of specs/agent-browser-tools/spec.md at the
+  repository root: browser_act press, scroll, hover, wait (15 s a step, shared by one call's
+  waits) and dialog; browser_navigate returns the first snapshot; browser_snapshot `from` reads
+  later parts with the same refs. Send these only after the helper's `capabilities` lists them;
+  on an older image or supervisor the steps before the first unsupported one run and the result
+  says it, never a replay. A dialog that a navigate or act opens ends that step and a keeper
+  process holds it for the conversation's next call (10 minutes, outside the display lock), which
+  answers it with a dialog step first; other calls on that tab are refused, and dialogs nobody
+  holds stay for a person. Dialog messages are untrusted page text. Verify test_page_browser.py,
+  browser-tools, computer-browser and page-browser-route tests and the page-browser e2e;
+  activation needs a new computer image and supervisor.
 - Stream recovery is bounded and never executes truncated tool calls. Preserve
   partial replies with redaction and attribute every retry's usage separately.
 - Optional authenticated-device session duration belongs to the API composition

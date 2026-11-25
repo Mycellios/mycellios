@@ -12,7 +12,7 @@ vi.mock("dockerode", () => ({
   },
 }));
 
-import { supervisorApp } from "./index.js";
+import { pageBrowserTimeoutMs, supervisorApp } from "./index.js";
 
 beforeEach(() => {
   mock.exec.mockReset();
@@ -51,7 +51,15 @@ beforeEach(() => {
   }));
 });
 
-async function snapshot(id: string, screen: string, lease: string, home = "home", conversationKey?: string, command = "snapshot") {
+async function snapshot(
+  id: string,
+  screen: string,
+  lease: string,
+  home = "home",
+  conversationKey?: string,
+  command = "snapshot",
+  fields: Record<string, unknown> = {},
+) {
   return supervisorApp.request(`/computers/${id}/browser${conversationKey ? "/scoped" : ""}`, {
     method: "POST",
     headers: {
@@ -62,9 +70,63 @@ async function snapshot(id: string, screen: string, lease: string, home = "home"
       "x-rakazo-screen-id": screen,
       "x-rakazo-screen-lease-id": lease,
     },
-    body: JSON.stringify({ command, ...(conversationKey ? { conversationKey } : {}) }),
+    body: JSON.stringify({ command, ...fields, ...(conversationKey ? { conversationKey } : {}) }),
   });
 }
+
+/** The helper command line of the last exec: the timeout wrapper's deadline and the helper's own arguments. */
+function lastHelperRun() {
+  const command = mock.exec.mock.calls.at(-1)?.[0].Cmd as string[];
+  return { deadline: command[2], name: command.at(-2), args: JSON.parse(command.at(-1)!) };
+}
+
+it("forwards the new page steps and the capability question, each within its own deadline", async () => {
+  const key = "c".repeat(64);
+  const actions = [
+    { kind: "press", key: "Shift+Tab", ref: "e1" },
+    { kind: "scroll", direction: "down" },
+    { kind: "hover", ref: "e2" },
+    { kind: "wait", until: "text", text: "Saved", timeout: 5 },
+    { kind: "dialog", accept: false, text: "Ada" },
+  ];
+  for (const [command, fields, name, deadline] of [
+    ["act", { actions }, "scoped-act", "45s"],
+    ["act", { actions: [{ kind: "press", key: "Enter" }] }, "scoped-act", "25s"],
+    ["capabilities", {}, "scoped-capabilities", "10s"],
+    ["snapshot", { from: 2 }, "scoped-snapshot", "25s"],
+    ["navigate", { url: "https://example.test/" }, "scoped-navigate", "30s"],
+  ] as const) {
+    const response = await snapshot("steps", "first", "run:1", "home", key, command, fields);
+    expect(await response.json()).toMatchObject({ ok: true });
+    expect(lastHelperRun()).toEqual({
+      deadline,
+      name,
+      args: { command, ...fields, conversationKey: key },
+    });
+    expect(mock.exec.mock.calls.at(-1)?.[0].Cmd).toContain(pageBrowserHelper);
+  }
+  expect(pageBrowserTimeoutMs({ command: "focus" })).toBe(25_000);
+});
+
+it.each([
+  ["a key that is not a key name", { actions: [{ kind: "press", key: "Enter; reboot" }] }],
+  ["a scroll with neither ref nor direction", { actions: [{ kind: "scroll" }] }],
+  ["a hover without its element", { actions: [{ kind: "hover" }] }],
+  ["a wait for text without the text", { actions: [{ kind: "wait", until: "text" }] }],
+  ["a wait longer than 15 seconds", { actions: [{ kind: "wait", until: "quiet", timeout: 16 }] }],
+  ["a dialog answer that neither accepts nor dismisses", { actions: [{ kind: "dialog" }] }],
+  ["a step kind the helper does not know", { actions: [{ kind: "drag", ref: "e1" }] }],
+])("rejects %s before any command runs", async (_, fields) => {
+  const response = await snapshot("bad-steps", "first", "run:1", "home", "d".repeat(64), "act", fields);
+  expect(response.status).toBeGreaterThanOrEqual(400);
+  expect(mock.exec).not.toHaveBeenCalled();
+});
+
+it.each([0, 25, 1.5])("rejects snapshot part %s before any command runs", async (from) => {
+  const response = await snapshot("bad-part", "first", "run:1", "home", "e".repeat(64), "snapshot", { from });
+  expect(response.status).toBeGreaterThanOrEqual(400);
+  expect(mock.exec).not.toHaveBeenCalled();
+});
 
 it("forwards only a validated scoped command without weakening the display fence", async () => {
   const key = "a".repeat(64);
