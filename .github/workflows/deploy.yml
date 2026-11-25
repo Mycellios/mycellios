@@ -81,6 +81,8 @@ jobs:
           build-args: |
             ${{ matrix.revision-arg }}=${{ github.sha }}
             ${{ matrix.base-path-arg }}
+            ${{ matrix.image == 'coordinator' && format('VITE_PRIVACY_CONTROLLER={0}', vars.MYCELLIOS_PRIVACY_CONTROLLER) || '' }}
+            ${{ matrix.image == 'coordinator' && format('VITE_PRIVACY_CONTACT={0}', vars.MYCELLIOS_PRIVACY_CONTACT) || '' }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
