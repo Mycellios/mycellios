@@ -336,7 +336,7 @@ try {
     (input: { context: { actor: typeof scope; signal?: AbortSignal }; input: Record<string, unknown> }) => Promise<Record<string, unknown>>
   >;
   const foreign = { ...scope, userId: "foreign" };
-  for (const name of ["rotateWebhookSecret", "revokeWebhookSecret", "sendTestEvent"]) {
+  for (const name of ["rotateWebhookSecret", "revokeWebhookSecret", "sendTestEvent", "history"]) {
     await assert.rejects(routes[name]!({ context: { actor: foreign }, input: { routineId } }), /NOT_FOUND|Not Found/i);
   }
   const rotated = await routes.rotateWebhookSecret!({ context: { actor: scope }, input: { routineId } });
