@@ -8,6 +8,8 @@ import { nextRoutineRunDateAcross } from "./cron.js";
 export const ROUTINE_TEST_NONCE_PREFIX = "routine-test:";
 const ROUTINE_SCRIPT_NONCE_PREFIX = `${ROUTINE_TEST_NONCE_PREFIX}local:`;
 const ROUTINE_CHAT_NONCE_PREFIX = `${ROUTINE_TEST_NONCE_PREFIX}routine-mention:`;
+/** A webhook routine's run from Send test event, a sample event the person asked for. */
+export const ROUTINE_TEST_EVENT_NONCE_PREFIX = `${ROUTINE_TEST_NONCE_PREFIX}event:`;
 const ROUTINE_TIMER_NONCE_PREFIX = "routine-timer:";
 
 /** A routine run can report its own failure with a reason of at most this many characters. */
@@ -46,7 +48,10 @@ export function routineRunSource(
   routine?: { watch: unknown } | null,
 ): RoutineRunSource {
   const nonce = run.clientNonce ?? "";
-  if (run.trigger === "webhook") return nonce.startsWith("github:") ? "github" : "webhook";
+  if (run.trigger === "webhook") {
+    if (nonce.startsWith("github:")) return "github";
+    return nonce.startsWith(ROUTINE_TEST_EVENT_NONCE_PREFIX) ? "manual" : "webhook";
+  }
   if (run.retryOfRunId) return "retry";
   if (nonce.startsWith(ROUTINE_SCRIPT_NONCE_PREFIX)) return "script";
   if (nonce.startsWith(ROUTINE_CHAT_NONCE_PREFIX)) return "chat";

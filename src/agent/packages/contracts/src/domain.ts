@@ -18,6 +18,11 @@ import {
   parseMcpOAuthAuthorizationParams,
 } from "./mcp.js";
 import { ModelHeadersSchema } from "./model-headers.js";
+import {
+  RoutineEventFiltersSchema,
+  RoutineEventTypeSchema,
+  RoutineWebhookStateSchema,
+} from "./routine-events.js";
 import { RoutineWatchSchema, RoutineWatchStateSchema } from "./routine-watch.js";
 import { RunTriggerSchema } from "./runs.js";
 import { MicoConversationSummarySchema } from "./side-threads.js";
@@ -702,6 +707,8 @@ export const RoutineSchema = z.object({
   pausedByRunAt: z.string().nullable().optional(),
   /** Absent from older servers. */
   runIn: RoutineRunInSchema.optional(),
+  /** Its own signed webhook (secret state, event type and filters). Absent from older servers. */
+  webhook: RoutineWebhookStateSchema.optional(),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
 
@@ -729,6 +736,10 @@ export const CreateRoutineInput = z
     watch: RoutineWatchSchema.nullable().default(null),
     /** Omitted: the routine's own conversation. */
     runIn: RoutineRunInChoiceSchema.optional(),
+    /** Signed webhook events of only this type; omitted or null takes any type. */
+    webhookEventType: RoutineEventTypeSchema.nullable().optional(),
+    /** Every one must match a signed event's data before it runs. */
+    webhookFilters: RoutineEventFiltersSchema.optional(),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);

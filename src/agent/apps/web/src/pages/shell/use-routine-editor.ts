@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Routine, ThinkingLevel, ThreadSnapshot } from "@mycellios/contracts";
+import { routineEventsPath } from "@mycellios/contracts";
 import { cronFromPreset } from "@mycellios/core";
 import type { ComponentProps, Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useRef, useState } from "react";
@@ -17,6 +18,7 @@ import {
   routineNeedsOneShotArm,
   watchFromDraft,
 } from "../RoutineEditor";
+import { webhookSettingsFromDraft } from "../routine-webhook-draft";
 
 export function useRoutineEditor({
   rpc,
@@ -42,6 +44,11 @@ export function useRoutineEditor({
   const { t } = useLingui();
   const [routineDraft, setRoutineDraft] = useState<RoutineDraftState>(emptyRoutineDraft());
   const [routineWebhookSecret, setRoutineWebhookSecret] = useState<string | null>(null);
+  // A routine's own secret, shown once after Create or Rotate.
+  const [routineEventSecret, setRoutineEventSecret] = useState<{ routineId: string; secret: string } | null>(null);
+  const [webhookBusy, setWebhookBusy] = useState(false);
+  const webhookPending = useRef(false);
+  const routineTestEventRequest = useRef<{ routineId: string; nonce: string } | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState<Routine | null>(null);
   const [savingRoutine, setSavingRoutine] = useState(false);
@@ -65,6 +72,7 @@ export function useRoutineEditor({
     setRoutineDraft({ ...emptyRoutineDraft(), name, prompt });
     setRoutineError(null);
     setRoutineWebhookSecret(null);
+    setRoutineEventSecret(null);
     setEditingRoutine(null);
     setPanel("routine");
   }, []);
@@ -73,10 +81,12 @@ export function useRoutineEditor({
     setEditingRoutine(routine);
     setRoutineDraft(routine ? draftFromRoutine(routine) : emptyRoutineDraft());
     setRoutineWebhookSecret(null);
+    setRoutineEventSecret(null);
   }
   function startRoutine(routine?: Routine) {
     setRoutineDraft(routine ? draftFromRoutine(routine) : emptyRoutineDraft());
     setRoutineWebhookSecret(null);
+    setRoutineEventSecret(null);
     setEditingRoutine(routine ?? null);
     setRoutineError(null);
     setPanel("routine");
@@ -89,6 +99,33 @@ export function useRoutineEditor({
     routineSaveRequest.current += 1;
     setRoutineError(null);
   }
+  /** Rotate, revoke or test the saved routine's own webhook, one action at a time. */
+  async function routineWebhookAction(
+    action: (routine: Routine) => Promise<void>,
+    fallback: string,
+  ) {
+    const target = editingRoutine;
+    if (!target || webhookPending.current) return;
+    webhookPending.current = true;
+    setWebhookBusy(true);
+    setRoutineError(null);
+    try {
+      await action(target);
+    } catch (error) {
+      if (activeBotId.current === target.botId) setRoutineError(errorText(error, fallback));
+    } finally {
+      webhookPending.current = false;
+      setWebhookBusy(false);
+    }
+  }
+  const followWebhookState = (routineId: string, webhook: Routine["webhook"]) =>
+    setEditingRoutine((current) => (current?.id === routineId ? { ...current, webhook } : current));
+  const routineEventsUrl =
+    editingRoutine?.webhookEnabled && editingRoutine.webhook
+      ? typeof window !== "undefined"
+        ? `${window.location.origin}${appPath(routineEventsPath(editingRoutine.id))}`
+        : appPath(routineEventsPath(editingRoutine.id))
+      : null;
   const editorProps = active
     ? ({
         draft: routineDraft,
@@ -102,6 +139,44 @@ export function useRoutineEditor({
               : appPath(`/api/v1/bots/${active.id}/webhook`),
           secret: routineWebhookSecret,
           configured: active.webhookConfigured || Boolean(routineWebhookSecret),
+        },
+        routineWebhook: {
+          url: routineEventsUrl,
+          secret:
+            routineEventSecret && routineEventSecret.routineId === editingRoutine?.id
+              ? routineEventSecret.secret
+              : null,
+          busy: webhookBusy,
+          onRotate: () =>
+            void routineWebhookAction(async (routine) => {
+              const result = await rpc.routines.rotateWebhookSecret({ routineId: routine.id });
+              setRoutineEventSecret({ routineId: routine.id, secret: result.secret });
+              followWebhookState(routine.id, result.webhook);
+            }, t`Could not create the secret`),
+          onRevoke: () =>
+            void routineWebhookAction(async (routine) => {
+              const result = await rpc.routines.revokeWebhookSecret({ routineId: routine.id });
+              setRoutineEventSecret(null);
+              followWebhookState(routine.id, result.webhook);
+            }, t`Could not revoke the secrets`),
+          onSendTest: () =>
+            void routineWebhookAction(async (routine) => {
+              if (routineTestEventRequest.current?.routineId !== routine.id)
+                routineTestEventRequest.current = { routineId: routine.id, nonce: crypto.randomUUID() };
+              const started = await rpc.routines.sendTestEvent({
+                routineId: routine.id,
+                clientNonce: routineTestEventRequest.current.nonce,
+              });
+              routineTestEventRequest.current = null;
+              if (activeBotId.current !== routine.botId) return;
+              // Do not discard an unsaved editor draft to follow the run automatically.
+              if ((started.taskThreadId || started.groupId) && onOpenRoutineRun &&
+                JSON.stringify(routineDraft) === JSON.stringify(draftFromRoutine(routine))) {
+                onOpenRoutineRun({ botId: routine.botId, ...started });
+                return;
+              }
+              await refreshThread(routine.botId);
+            }, t`Could not send the test event`),
         },
         githubPath:
           typeof window !== "undefined"
@@ -137,16 +212,20 @@ export function useRoutineEditor({
             return;
           }
           const watch = watchResult?.watch ?? null;
+          const webhookSettings = routineDraft.webhookEnabled
+            ? webhookSettingsFromDraft(routineDraft)
+            : null;
+          if (webhookSettings && "error" in webhookSettings) {
+            setRoutineError(webhookSettings.error);
+            return;
+          }
           const saveRequest = ++routineSaveRequest.current;
           routineSavePending.current = true;
           setSavingRoutine(true);
           setRoutineError(null);
           try {
-            if (
-              (routineDraft.webhookEnabled || routineDraft.githubEnabled) &&
-              !active.webhookConfigured &&
-              !routineWebhookSecret
-            ) {
+            // GitHub events are signed with the Mico's key; a webhook gets its own secret once saved.
+            if (routineDraft.githubEnabled && !active.webhookConfigured && !routineWebhookSecret) {
               await ensureWebhookSecret(targetBotId);
             }
             const crons = routineDraft.schedules.map(cronFromPreset);
@@ -191,6 +270,7 @@ export function useRoutineEditor({
                   ? routineModel
                   : {}),
                 ...(runAt ? { runAt } : {}),
+                ...(webhookSettings ?? {}),
                 // Only a change is sent, so a group routine or an older server is left alone.
                 ...(routineDraft.runIn && routineDraft.runIn !== targetRoutine.runIn
                   ? { runIn: routineDraft.runIn }
@@ -210,6 +290,7 @@ export function useRoutineEditor({
                 messageProvider: routineDraft.messageProvider,
                 watch,
                 ...routineModel,
+                ...(webhookSettings ?? {}),
                 ...(routineDraft.runIn ? { runIn: routineDraft.runIn } : {}),
               });
             }

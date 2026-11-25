@@ -246,6 +246,9 @@
 
 - Web entry keeps its React root in HMR data and disposes entry listeners on
   replacement; never create a second root on the existing container.
+- On Desktop startup, a bundled official cloud page that never mounts can retry
+  once on the original HTTPS protocol in the same native session. Preserve
+  explicit local renderers, self-hosted servers and connection-switch behavior.
 - Cold-start session/bootstrap/navigation reads use startup-fetch with a 15-second
   deadline so a stalled connection reaches existing retry/error handling. Preserve
   caller cancellation and keep auth writes, paid requests and event streams outside
@@ -1300,6 +1303,16 @@
   it with its history. Verify with verify-routine-isolation-db.ts and the routine tests above.
   `runIn` (thread default/chat; group is kept, never moved) is set by the editor switch and the
   schedule tools; moving back reuses the conversation found by key, never a second one.
+- Signed webhook routines (specs/mico-automation phase 2): `/api/v1/routines/<id>/events` takes
+  Standard Webhooks events (`v1,` HMAC-SHA256 of `id.timestamp.body`, `whsec_` secret, ±5 min),
+  verified on the raw bytes before parsing; every refusal is the same 401. Secrets stay encrypted
+  in `routine_webhook_secrets`, never in logs or prompts; a rotation keeps the previous one 24 h,
+  Revoke or turning the webhook off ends both. `claimRoutineEvent` locks the routine: delivery-id
+  digests dedupe for 7 days (runs keep their nonce, so never a second run), 60 events an hour then
+  429, and type/filters/paused decide before any run (202, shown in the history). Send test event
+  starts a `routine-test:event:` run, also while paused. The per-Mico Bearer route skips routines
+  with their own secret; the UI issues per-Mico keys only for GitHub. Verify routine-events tests
+  and `node --import tsx scripts/verify-routine-events-db.ts` (fresh loopback cluster).
 
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong
@@ -1721,6 +1734,10 @@
   browser choice. Before a saved choice exists, use English regardless of
   browser language or build environment. Forward only supported locale values to model-facing greetings
   and new task prompts; never translate history by rewriting stored messages.
+- Chrome side-panel appearance is local to the extension and independent of the
+  Agent account preference. Accept live visual overrides only from the exact
+  approved extension origin and the parent window. Keep the existing host
+  permissions, signing IDs and normal web/Desktop appearance.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the
@@ -1863,6 +1880,17 @@
   diagnostics or switching funding sources. Preserve revocation of unused keys.
 - Browser saved-login fills must check the current origin and focused input type
   together. Passwords belong only in password fields; partial fills are cleared.
+- Page tools on Docker computers follow phase 1 of specs/agent-browser-tools/spec.md at the
+  repository root: browser_act press, scroll, hover, wait (15 s a step, shared by one call's
+  waits) and dialog; browser_navigate returns the first snapshot; browser_snapshot `from` reads
+  later parts with the same refs. Send these only after the helper's `capabilities` lists them;
+  on an older image or supervisor the steps before the first unsupported one run and the result
+  says it, never a replay. A dialog that a navigate or act opens ends that step and a keeper
+  process holds it for the conversation's next call (10 minutes, outside the display lock), which
+  answers it with a dialog step first; other calls on that tab are refused, and dialogs nobody
+  holds stay for a person. Dialog messages are untrusted page text. Verify test_page_browser.py,
+  browser-tools, computer-browser and page-browser-route tests and the page-browser e2e;
+  activation needs a new computer image and supervisor.
 - Stream recovery is bounded and never executes truncated tool calls. Preserve
   partial replies with redaction and attribute every retry's usage separately.
 - Optional authenticated-device session duration belongs to the API composition
@@ -2149,6 +2177,17 @@
 - Repository-root `.github/workflows` owns Mycellios CI and publication. Nested
   `.github` files here preserve the imported upstream CI reference for offline
   security-boundary tests; they do not execute as workflows in this repository.
+
+- Self-host defaults name this repository: `install-images.sh` fetches its
+  `infra/compose` files at the tag it installs, Compose files and env examples name the
+  `ghcr.io/mycellios/mycellios` images, and the updater reads only this repository's
+  `v<semver>` tags (never `desktop-v*`). An install whose `.env` names the upstream images
+  keeps them until its owner moves: the installer asks once and records the answer, the
+  updater offers `POST /move`, Desktop's Docker stack moves on its next start. Every move
+  first runs the target image's migration check and changes nothing when the database
+  records a migration the release lacks. Never pull this repository's tags from the upstream
+  namespace, and keep rollback on the exact cached image under its old name. Verify the
+  install-images, updater, local-stack tests and scripts/verify-migration-history-db.ts.
 
 - Native image generation uses only the run owner's already admitted Desktop
   computer and that host's ChatGPT-backed Codex session. Preserve explicit

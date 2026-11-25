@@ -6,8 +6,7 @@ import {
   runFailureError,
 } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
-import { routineRunInInclude } from "@mycellios/db";
-import { mapRoutine } from "./routines.js";
+import { mapRoutine, routineDtoInclude } from "./routines.js";
 
 const LIMIT = 5000;
 export function plannedRoutineEntries(
@@ -82,7 +81,7 @@ export async function routineCalendar(
     where: { spaceId: actor.spaceId, userId: actor.userId, bot: { archivedAt: null } },
     orderBy: { id: "asc" },
     take: 1001,
-    include: routineRunInInclude,
+    include: routineDtoInclude,
   });
   const routines = rows.slice(0, 1000).map(mapRoutine);
   const runs = routines.length

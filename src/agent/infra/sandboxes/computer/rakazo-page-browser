@@ -9,13 +9,16 @@ fallback computer_act.
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import os
 import re
+import select
 import socket
 import stat
 import struct
+import subprocess
 import sys
 import tempfile
 import time
@@ -75,15 +78,61 @@ def discover_ws_url(port: int) -> str:
 
 
 WORLD_NAME = "rakazo-page-browser"
+# The object EVAL_HELPERS installs in that world.
+PAGE_HELPER = "__" + "".join(part if i == 0 else part.title() for i, part in enumerate(WORLD_NAME.split("-")))
 
+
+def page_call(method: str, *args: Any) -> str:
+    """An expression calling one method of the page helper with JSON arguments."""
+    return f"window.{PAGE_HELPER}.{method}({', '.join(json.dumps(arg) for arg in args)})"
+
+
+# What this helper adds to the first page-tool contract. The API asks for these before it sends a
+# step that an older computer image cannot run, and answers such a step itself instead.
+FEATURES = ("act.press", "act.scroll", "act.hover", "act.wait", "act.dialog", "snapshot.from")
 
 # A frame asked for, began or committed a load of another document. Same-document changes, such as
 # a new URL fragment, leave the page and its fields in place and are not counted.
 NAVIGATION_EVENTS = ("Page.frameRequestedNavigation", "Page.frameStartedNavigating", "Page.frameNavigated")
 
+DIALOG_TYPES = ("alert", "confirm", "prompt", "beforeunload")
+DIALOG_TEXT_LIMIT = 2000
+# Answered by the browser itself, so they still work while a dialog blocks the page.
+DIALOG_SAFE_METHODS = ("Page.handleJavaScriptDialog", "Target.getTargetInfo")
+
 
 class Refused(RuntimeError):
     """The page helper declined an action before changing anything it does not report."""
+
+
+class PageNotResponding(RuntimeError):
+    """The page did not answer in time: it is busy, or shows a dialog nobody here can answer."""
+
+
+class DialogOpened(BaseException):
+    """The page opened a JavaScript dialog, so it answers nothing until someone answers the dialog.
+
+    A BaseException, so the helper's best-effort ``except Exception`` paths never swallow it.
+    """
+
+    def __init__(self, dialog: dict[str, Any], typed: int | None = None, of: int | None = None) -> None:
+        super().__init__(f"The page opened a {dialog.get('type')} dialog")
+        self.dialog = dialog
+        # For a type step: how many of its characters were typed before the dialog opened.
+        self.typed = typed
+        self.of = of
+
+
+def dialog_info(params: dict[str, Any]) -> dict[str, Any]:
+    """The bounded, untrusted description of a dialog that the model may read."""
+    kind = params.get("type")
+    info: dict[str, Any] = {
+        "type": kind if kind in DIALOG_TYPES else "alert",
+        "message": str(params.get("message") or "")[:DIALOG_TEXT_LIMIT],
+    }
+    if info["type"] == "prompt":
+        info["defaultPrompt"] = str(params.get("defaultPrompt") or "")[:DIALOG_TEXT_LIMIT]
+    return info
 
 
 class CdpClient:
@@ -100,6 +149,8 @@ class CdpClient:
         self._lifecycle: dict[tuple[Any, str], tuple[Any, set[str]]] = {}
         # Navigations to another document started or committed in each frame, per CDP session.
         self._navigations: dict[tuple[Any, str], int] = {}
+        # The JavaScript dialog open on each page session, as Chromium reported it to that session.
+        self.dialogs: dict[str, dict[str, Any]] = {}
 
     def connect(self) -> None:
         assert self._ws_url.startswith("ws://"), self._ws_url
@@ -266,6 +317,12 @@ class CdpClient:
             if params.get("navigationType") in ("sameDocument", "historySameDocument"):
                 return
             self._navigations[(session_id, frame_id)] = self._navigations.get((session_id, frame_id), 0) + 1
+        elif method == "Page.javascriptDialogOpening":
+            if isinstance(session_id, str):
+                self.dialogs[session_id] = dialog_info(params)
+        elif method == "Page.javascriptDialogClosed":
+            if isinstance(session_id, str):
+                self.dialogs.pop(session_id, None)
         elif method == "Runtime.executionContextsCleared":
             if session_id is None:
                 self._contexts.clear()
@@ -294,6 +351,24 @@ class CdpClient:
             return context_id
         return None
 
+    def send(self, method: str, params: dict[str, Any] | None = None, *, session_id: str | None = None) -> int:
+        """Send a command without waiting for its answer, which is dropped when it arrives."""
+        assert self._sock is not None
+        msg_id = self._next_id
+        self._next_id += 1
+        payload: dict[str, Any] = {"id": msg_id, "method": method, "params": params or {}}
+        if session_id:
+            payload["sessionId"] = session_id
+        self._send_frame(json.dumps(payload).encode("utf-8"))
+        return msg_id
+
+    def _check_dialog(self, method: str, session_id: str | None, msg_id: int | None = None) -> None:
+        # A page showing a dialog answers nothing else until the dialog closes: stop waiting on it.
+        if session_id and session_id in self.dialogs and method not in DIALOG_SAFE_METHODS:
+            if msg_id is not None:
+                self._pending.pop(msg_id, None)
+            raise DialogOpened(self.dialogs[session_id])
+
     def call(
         self,
         method: str,
@@ -303,13 +378,10 @@ class CdpClient:
         timeout_s: float = 30.0,
     ) -> dict[str, Any]:
         assert self._sock is not None
+        self._check_dialog(method, session_id)
         msg_id = self._next_id
-        self._next_id += 1
-        payload: dict[str, Any] = {"id": msg_id, "method": method, "params": params or {}}
-        if session_id:
-            payload["sessionId"] = session_id
         self._pending[msg_id] = None
-        self._send_frame(json.dumps(payload).encode("utf-8"))
+        self.send(method, params, session_id=session_id)
         deadline = time.time() + timeout_s
         while time.time() < deadline:
             pending = self._pending.get(msg_id)
@@ -332,6 +404,8 @@ class CdpClient:
                 continue
             if message.get("method"):
                 self._handle_event(message)
+                self._check_dialog(method, session_id, msg_id)
+        self._pending.pop(msg_id, None)
         raise TimeoutError(f"CDP call timed out: {method}")
 
 
@@ -339,24 +413,29 @@ def attach_page(client: CdpClient) -> str:
     targets = client.call("Target.getTargets").get("targetInfos") or []
     pages = [t for t in targets if isinstance(t, dict) and t.get("type") == "page"]
     candidates = []
+    silent = 0
     for page in pages[:32]:
         attached = client.call("Target.attachToTarget", {
             "targetId": page["targetId"], "flatten": True,
         })
         session_id = attached["sessionId"]
         try:
-            client.call("Page.enable", session_id=session_id)
+            client.call("Page.enable", session_id=session_id, timeout_s=PAGE_ANSWER_SECONDS)
             ensure_world(client, session_id)
             if eval_json(client, session_id, 'document.visibilityState === "visible"'):
                 focused = eval_json(client, session_id, "document.hasFocus()")
                 candidates.append((session_id, focused))
-        except Exception:
+        except TimeoutError:
+            silent += 1
+        except (Exception, DialogOpened):
             continue
     focused = [session for session, focus in candidates if focus]
     if len(focused) == 1:
         selected = focused[0]
     elif len(candidates) == 1:
         selected = candidates[0][0]
+    elif not candidates and silent:
+        raise PageNotResponding()
     else:
         raise RuntimeError("No unambiguous visible browser tab. Use desktop tools to select a tab.")
     ensure_world(client, selected)
@@ -401,6 +480,10 @@ def scope_directory(port: int) -> Path:
     return directory
 
 
+# A page that does not answer within this time is busy, or blocked by a dialog nobody here can answer.
+PAGE_ANSWER_SECONDS = 5.0
+
+
 def run_scoped(client: CdpClient, port: int, command: str, args: dict[str, Any]) -> dict[str, Any]:
     import fcntl
 
@@ -415,31 +498,369 @@ def run_scoped(client: CdpClient, port: int, command: str, args: dict[str, Any])
         if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
             raise RuntimeError("Invalid browser display lock")
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-        target = scoped_target(client, directory / key, create=command == "navigate")
-        if target is None:
-            if command == "snapshot":
-                return {"ok": True, "url": "about:blank", "title": "", "tree": "", "elements": []}
-            return {"ok": False, "completed": 0, "uncertain": False,
-                    "error": "Open a page in this conversation first."}
-        if command != "snapshot":
-            client.call("Target.activateTarget", {"targetId": target})
-        if command == "focus":
-            return {"ok": True}
-        session_id = client.call("Target.attachToTarget", {"targetId": target, "flatten": True})["sessionId"]
-        client.call("Page.enable", session_id=session_id)
+        return run_in_tab(client, directory, key, command, args)
+
+
+def run_in_tab(client: CdpClient, directory: Path, key: str, command: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Run one command in the conversation's own tab, under the display lock."""
+    target = scoped_target(client, directory / key, create=command == "navigate")
+    if target is None:
+        if command == "snapshot":
+            return {"ok": True, "url": "about:blank", "title": "", "tree": "", "elements": []}
+        return {"ok": False, "completed": 0, "uncertain": False,
+                "error": "Open a page in this conversation first."}
+    keeper = dialog_socket(directory, key)
+    held = held_dialog(keeper)
+    steps = args.get("actions")
+    answer = None
+    if held is not None and command == "act" and isinstance(steps, list) and steps \
+            and isinstance(steps[0], dict) and steps[0].get("kind") == "dialog":
+        validate_actions(steps)
+        answer = steps[0]
+    elif held is not None and command != "focus":
+        return held_dialog_refusal(client, target, held, command)
+    if command != "snapshot":
+        client.call("Target.activateTarget", {"targetId": target})
+    if command == "focus":
+        return {"ok": True}
+    session_id = client.call("Target.attachToTarget", {"targetId": target, "flatten": True})["sessionId"]
+    done_before = 0
+    if answer is not None:
+        refused = answer_held_dialog(client, session_id, keeper, answer)
+        if refused is not None:
+            return refused
+        args = {**args, "actions": steps[1:]}
+        done_before = 1
+    try:
+        try:
+            client.call("Page.enable", session_id=session_id, timeout_s=PAGE_ANSWER_SECONDS)
+        except TimeoutError:
+            return not_responding(command, done_before)
         ensure_world(client, session_id)
-        return run_page_command(client, session_id, command, args)
+        result = run_page_command(client, session_id, command, args, done_before)
+    except DialogOpened as opened:
+        total = done_before + len(args.get("actions") or []) if command == "act" else None
+        result = dialog_result(client, session_id, opened.dialog,
+                               f"The page opened {dialog_name(opened.dialog)}.",
+                               done_before if command == "act" else None, total)
+    if "dialog" in result:
+        # Only a dialog that a Mico command led to is the Mico's to answer.
+        held_now = command in ("navigate", "act") and session_id in client.dialogs \
+            and hold_dialog(client, session_id, keeper, client.dialogs[session_id])
+        settle_dialog(result, held_now)
+    return result
 
 
-def run_page_command(client: CdpClient, session_id: str, command: str, args: dict[str, Any]) -> dict[str, Any]:
-    if command == "navigate":
-        return navigate(client, session_id, str(args.get("url") or ""))
-    if command == "snapshot":
-        return snapshot(client, session_id)
-    actions = args.get("actions")
-    if not isinstance(actions, list):
-        raise RuntimeError("actions must be an array")
-    return act(client, session_id, actions)
+def run_page_command(client: CdpClient, session_id: str, command: str, args: dict[str, Any],
+                     done_before: int = 0) -> dict[str, Any]:
+    try:
+        if command == "navigate":
+            return navigate(client, session_id, str(args.get("url") or ""))
+        if command == "snapshot":
+            return snapshot(client, session_id, snapshot_part(args.get("from")))
+        actions = args.get("actions")
+        if not isinstance(actions, list):
+            raise RuntimeError("actions must be an array")
+        return act(client, session_id, actions, done_before)
+    except DialogOpened as opened:
+        reading = " while the page was being read" if command == "snapshot" else ""
+        return dialog_result(client, session_id, opened.dialog,
+                             f"The page opened {dialog_name(opened.dialog)}{reading}.",
+                             done_before if command == "act" else None)
+    except Refused as refused:
+        if command != "snapshot":
+            raise
+        # A part of a snapshot that no longer exists: settled, and fixed by a new snapshot.
+        return {"ok": False, "uncertain": False, "error": str(refused)}
+
+
+def snapshot_part(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < SNAPSHOT_PARTS:
+        raise RuntimeError(f"from must be a part number from 0 to {SNAPSHOT_PARTS - 1}")
+    return value
+
+
+def not_responding(command: str, done_before: int) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ok": False, "uncertain": False,
+        "error": "This page is not responding. It may be showing a dialog that only a person can answer "
+                 "(use request_takeover), or it is still busy: take a snapshot again in a moment.",
+    }
+    if command == "act":
+        result["completed"] = done_before
+    return result
+
+
+def dialog_name(dialog: dict[str, Any]) -> str:
+    kind = str(dialog.get("type") or "")
+    return f"a {kind} dialog" if kind != "alert" else "an alert dialog"
+
+
+def page_of(client: CdpClient, *, session_id: str | None = None, target: str | None = None) -> dict[str, str]:
+    """The tab's URL and title as the browser knows them, which still works while a dialog is open."""
+    try:
+        info = client.call("Target.getTargetInfo", {"targetId": target} if target else {},
+                           session_id=session_id, timeout_s=PAGE_ANSWER_SECONDS).get("targetInfo") or {}
+    except Exception:  # noqa: BLE001
+        info = {}
+    return {"url": str(info.get("url") or "")[:2048], "title": str(info.get("title") or "")[:200]}
+
+
+def dialog_result(client: CdpClient, session_id: str, dialog: dict[str, Any], error: str,
+                  completed: int | None = None, total: int | None = None) -> dict[str, Any]:
+    result: dict[str, Any] = {"ok": False, "uncertain": False, **page_of(client, session_id=session_id),
+                              "dialog": dict(dialog), "error": error}
+    if completed is not None:
+        result["completed"] = completed
+        if total is not None and total > completed:
+            result["error"] += f" The remaining {total - completed} step(s) did not run."
+    return result
+
+
+def settle_dialog(result: dict[str, Any], held: bool) -> dict[str, Any]:
+    """Say who can answer the dialog in result: the Mico's next step, or only a person."""
+    if held:
+        result["error"] += (" Read its message, then answer it with a browser_act dialog step: accept, or"
+                            " dismiss (text answers a prompt). Nothing else runs on this page until then.")
+    else:
+        result["dialog"] = {**result["dialog"], "forPerson": True}
+        result["error"] += " It stays for a person to answer: use request_takeover if you need this page."
+    return result
+
+
+def held_dialog_refusal(client: CdpClient, target: str, dialog: dict[str, Any], command: str) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ok": False, "uncertain": False, **page_of(client, target=target), "dialog": dict(dialog),
+        "error": f"{dialog_name(dialog).capitalize()} from your earlier step is still open on this page."
+                 " Answer it first with a browser_act dialog step: accept, or dismiss (text answers a prompt).",
+    }
+    if command == "act":
+        result["completed"] = 0
+    return result
+
+
+# The dialog keeper. Chromium lets only a CDP session that was listening when a dialog opened answer
+# it, and a later session cannot even read the page until the dialog closes. So the command that saw
+# a dialog leaves its connection to a small process that holds the dialog for the conversation's next
+# command, which asks it over a Unix socket in the private tab directory.
+DIALOG_HOLD_SECONDS = 600.0
+DIALOG_ASK_SECONDS = 2.0
+DIALOG_ANSWER_SECONDS = 8.0
+DIALOG_LINE_BYTES = 64 * 1024
+
+
+def dialog_socket(directory: Path, key: str) -> Path:
+    # Unix socket paths are short; half of the key still names one conversation.
+    return directory / f"{key[:32]}.dialog"
+
+
+def send_line(conn: socket.socket, message: dict[str, Any]) -> None:
+    conn.sendall(json.dumps(message).encode("utf-8") + b"\n")
+
+
+def read_line(conn: socket.socket) -> dict[str, Any]:
+    data = bytearray()
+    while not data.endswith(b"\n"):
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+        if len(data) > DIALOG_LINE_BYTES:
+            raise ValueError("Dialog message too large")
+    message = json.loads(data.decode("utf-8"))
+    if not isinstance(message, dict):
+        raise ValueError("Invalid dialog message")
+    return message
+
+
+def ask_dialog_keeper(path: Path, request: dict[str, Any], timeout_s: float = DIALOG_ASK_SECONDS) -> dict[str, Any] | None:
+    """The keeper's reply, or None when no keeper holds a dialog for this conversation."""
+    family = getattr(socket, "AF_UNIX", None)
+    if family is None:
+        return None
+    with socket.socket(family, socket.SOCK_STREAM) as conn:
+        conn.settimeout(timeout_s)
+        try:
+            conn.connect(str(path))
+        except OSError:
+            return None
+        send_line(conn, request)
+        return read_line(conn)
+
+
+def held_dialog(path: Path) -> dict[str, Any] | None:
+    """The dialog a keeper holds for this conversation. A keeper that does not answer holds none."""
+    try:
+        reply = ask_dialog_keeper(path, {"op": "describe"})
+    except (OSError, ValueError):
+        return None
+    dialog = reply.get("dialog") if reply and reply.get("ok") is True else None
+    return dialog if isinstance(dialog, dict) else None
+
+
+def answer_held_dialog(client: CdpClient, session_id: str, path: Path, step: dict[str, Any]) -> dict[str, Any] | None:
+    """Answer the held dialog with a dialog step. None once it is answered, else the call's result."""
+    # Listen on this session before the dialog closes, so a dialog the page opens right after the
+    # answer reaches this command. The browser enables it before it answers the next call here.
+    client.send("Page.enable", session_id=session_id)
+    client.call("Target.getTargets")
+    request: dict[str, Any] = {"op": "answer", "accept": step.get("accept") is True}
+    if isinstance(step.get("text"), str):
+        request["promptText"] = step["text"]
+    try:
+        reply = ask_dialog_keeper(path, request, DIALOG_ANSWER_SECONDS)
+    except (OSError, ValueError):
+        return {"ok": False, "completed": 0, "uncertain": True, "fallback": "computer_act",
+                "error": "The dialog answer was sent, but its result was lost. Look at the page before continuing."}
+    if reply is None or reply.get("error") == "closed":
+        return {"ok": False, "completed": 0, "uncertain": False,
+                "error": "That dialog is no longer waiting for your answer: it closed, or only a person can answer"
+                         " it now. Take a snapshot to see the page."}
+    if reply.get("ok") is not True:
+        return {"ok": False, "completed": 0, "uncertain": True, "fallback": "computer_act",
+                "error": "The dialog could not be answered. Look at the page before continuing."}
+    return None
+
+
+def hold_dialog(client: CdpClient, session_id: str, path: Path, dialog: dict[str, Any]) -> bool:
+    """Leave this connection, with the dialog open on it, to a keeper the next command can ask."""
+    if getattr(socket, "AF_UNIX", None) is None or client._sock is None:
+        return False
+    fd = client._sock.fileno()
+    init = {"session": session_id, "path": str(path), "dialog": dialog, "nextId": client._next_id + 1_000_000,
+            # Bytes Chromium already sent that this process read but did not handle.
+            "pending": base64.b64encode(bytes(client._buf)).decode("ascii")}
+    try:
+        keeper = subprocess.Popen(
+            [sys.executable, os.path.abspath(__file__), "hold-dialog", str(fd)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            pass_fds=(fd,), start_new_session=True)
+    except OSError:
+        return False
+    assert keeper.stdin is not None and keeper.stdout is not None
+    try:
+        keeper.stdin.write(json.dumps(init).encode("utf-8") + b"\n")
+        keeper.stdin.close()
+        if select.select([keeper.stdout], [], [], 3.0)[0] and keeper.stdout.readline(16) == b"ready\n":
+            return True
+    except OSError:
+        pass
+    finally:
+        keeper.stdout.close()
+    keeper.kill()
+    return False
+
+
+def keep_dialog(fd: int) -> int:
+    """Hold one page dialog for the conversation's next command, for a bounded time."""
+    init = json.loads(sys.stdin.buffer.readline(DIALOG_LINE_BYTES).decode("utf-8"))
+    session, path = str(init["session"]), str(init["path"])
+    sock = socket.socket(fileno=fd)
+    # The descriptor keeps the non-blocking mode of the command that passed it on.
+    sock.settimeout(1.0)
+    client = CdpClient("ws://127.0.0.1/dialog")
+    client._sock = sock
+    client._buf.extend(base64.b64decode(init["pending"]))
+    client._next_id = int(init["nextId"])
+    client.dialogs[session] = dict(init["dialog"])
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    previous = os.umask(0o177)
+    try:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(path)
+        listener.bind(path)
+    finally:
+        os.umask(previous)
+    listener.listen(4)
+    own = os.stat(path).st_ino
+    sys.stdout.write("ready\n")
+    sys.stdout.flush()
+    os.dup2(os.open(os.devnull, os.O_RDWR), 1)
+    try:
+        hold_until_answered(client, session, listener, path, own, time.monotonic() + DIALOG_HOLD_SECONDS)
+    finally:
+        release_dialog_socket(path, own)
+        listener.close()
+        sock.close()
+    return 0
+
+
+def hold_until_answered(client: CdpClient, session: str, listener: socket.socket, path: str, own: int,
+                        deadline: float) -> None:
+    """Serve the conversation's commands until the dialog is answered or closes, or time is up.
+
+    When the keeper stops, its connection closes and the browser keeps any dialog still open for a
+    person to answer.
+    """
+    assert client._sock is not None
+    while session in client.dialogs and time.monotonic() < deadline:
+        waiting = [listener] + ([] if client._buf else [client._sock])
+        pause = 0.0 if client._buf else max(0.0, min(1.0, deadline - time.monotonic()))
+        readable = select.select(waiting, [], [], pause)[0]
+        if (client._buf or client._sock in readable) and not pump_dialog_events(client, session):
+            return
+        if listener in readable and serve_dialog_request(client, session, listener, path, own):
+            return
+
+
+def pump_dialog_events(client: CdpClient, session: str) -> bool:
+    """Handle one CDP message; False once the browser or the tab is gone."""
+    assert client._sock is not None
+    client._sock.settimeout(1.0)
+    try:
+        frame = client._read_frame()
+    except socket.timeout:
+        return True  # The rest of a message arrives later; what was read stays buffered.
+    except (OSError, RuntimeError):
+        return False
+    try:
+        message = json.loads(frame.decode("utf-8"))
+    except ValueError:
+        return True
+    if isinstance(message, dict) and message.get("method"):
+        client._handle_event(message)
+        params = message.get("params") or {}
+        if message["method"] == "Target.detachedFromTarget" and params.get("sessionId") == session:
+            return False
+    return True
+
+
+def serve_dialog_request(client: CdpClient, session: str, listener: socket.socket, path: str, own: int) -> bool:
+    """Answer one request from a command of this conversation; True once the dialog is answered."""
+    conn, _ = listener.accept()
+    with conn:
+        conn.settimeout(DIALOG_ASK_SECONDS)
+        try:
+            request = read_line(conn)
+        except (OSError, ValueError):
+            return False
+        if request.get("op") == "describe":
+            send_line(conn, {"ok": True, "dialog": client.dialogs.get(session)})
+            return False
+        if request.get("op") != "answer" or not isinstance(request.get("accept"), bool):
+            send_line(conn, {"ok": False, "error": "invalid"})
+            return False
+        # A dialog the page opens next is held by a new keeper under the same name.
+        release_dialog_socket(path, own)
+        params: dict[str, Any] = {"accept": request["accept"]}
+        if isinstance(request.get("promptText"), str):
+            params["promptText"] = request["promptText"][:DIALOG_LINE_BYTES // 2]
+        try:
+            client.call("Page.handleJavaScriptDialog", params, session_id=session, timeout_s=5.0)
+            reply: dict[str, Any] = {"ok": True}
+        except (OSError, RuntimeError, TimeoutError) as exc:
+            reply = {"ok": False, "error": "closed" if "No dialog is showing" in str(exc) else "failed"}
+        with contextlib.suppress(OSError):
+            send_line(conn, reply)
+        return True
+
+
+def release_dialog_socket(path: str, own: int) -> None:
+    with contextlib.suppress(OSError):
+        if os.stat(path).st_ino == own:
+            os.unlink(path)
 
 
 def ensure_world(client: CdpClient, session_id: str) -> None:
@@ -666,15 +1087,83 @@ EVAL_HELPERS = r"""
       })
       .join("\n");
   }
+  // Placeholders pages draw while their content loads: a busy region, or an empty skeleton box.
+  function loadingShown() {
+    for (const el of Array.from(document.querySelectorAll('[aria-busy="true"]')).slice(0, 200)) {
+      if (visible(el)) return true;
+    }
+    for (const el of Array.from(document.querySelectorAll('[class*="skeleton" i], [data-skeleton]')).slice(0, 200)) {
+      if (visible(el) && !(el.innerText || "").trim()) return true;
+    }
+    return false;
+  }
+  // When the document last changed, watched from the first question on.
+  let changedAt = 0;
+  let watcher = null;
+  function quietFor() {
+    if (!watcher) {
+      watcher = new MutationObserver(() => { changedAt = performance.now(); });
+      watcher.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+      changedAt = performance.now();
+    }
+    return performance.now() - changedAt;
+  }
+  const plain = (value) => String(value).replace(/\s+/g, " ").trim().toLowerCase();
+  function canScroll(el, vertical, sign) {
+    const style = window.getComputedStyle(el);
+    if (!/auto|scroll|overlay/.test(vertical ? style.overflowY : style.overflowX)) return false;
+    const room = vertical ? el.scrollHeight - el.clientHeight : el.scrollWidth - el.clientWidth;
+    const at = vertical ? el.scrollTop : el.scrollLeft;
+    return room > 0 && (sign > 0 ? at < room - 1 : at > 0);
+  }
+  // A long page is read in parts: 12,000 characters of text and 80 controls at a time.
+  const PART_TEXT = 12000;
+  const PART_CONTROLS = 80;
+  const PARTS = 25;
+  // What the last full snapshot captured, so later parts keep its refs.
+  let reading = null;
   window.__rakazoPageBrowser = {
-    snapshot() {
-      refMap.clear();
+    // Part 0 is a new snapshot with new refs. A later part reads on from it, and keeps its refs.
+    snapshot(part = 0) {
+      if (!part) {
+        refMap.clear();
+        const controls = [];
+        const first = [];
+        const listed = new Set();
+        for (const el of document.querySelectorAll("body *")) {
+          if (!isInteractive(el) || !(visible(el) || isFileInput(el) || isCodeInput(el))) continue;
+          // Upload targets do not count toward the 80-control parts, so hidden inputs cannot crowd out buttons.
+          if (controls.length < PART_CONTROLS) {
+            first.push(el);
+            listed.add(el);
+          }
+          if (!isFileInput(el) && controls.push(el) >= PART_CONTROLS * PARTS) break;
+        }
+        // Upload targets are listed with the first part even past its controls or inside shadow DOM.
+        for (const el of allFileInputs()) {
+          if (!listed.has(el)) first.push(el);
+        }
+        const text = (document.body?.innerText || "").slice(0, PART_TEXT * PARTS);
+        reading = {
+          text, controls, first, refs: new Map(),
+          parts: Math.max(1, Math.ceil(text.length / PART_TEXT), Math.ceil(controls.length / PART_CONTROLS)),
+        };
+      } else if (!reading) {
+        throw refused("This page changed since the snapshot that part belongs to. Take a new browser_snapshot without from.");
+      } else if (part >= reading.parts) {
+        throw refused(`This page has ${reading.parts} part(s), numbered from 0, so there is no part ${part}.`);
+      }
+      const { text, controls, first, refs, parts } = reading;
       const elements = [];
-      const listed = new Set();
-      const describe = (el) => {
-        const ref = newRef();
-        refMap.set(ref, el);
-        listed.add(el);
+      for (const el of part ? controls.slice(part * PART_CONTROLS, (part + 1) * PART_CONTROLS) : first) {
+        if (!el.isConnected) continue;
+        // A control keeps its ref in every part, so the refs of all parts stay valid together.
+        let ref = refs.get(el);
+        if (!ref) {
+          ref = newRef();
+          refs.set(el, ref);
+          refMap.set(ref, el);
+        }
         elements.push({
           ref,
           role: roleOf(el),
@@ -685,25 +1174,72 @@ EVAL_HELPERS = r"""
             : "value" in el ? String(el.value ?? "").slice(0, 2000) : undefined,
           tag: el.tagName.toLowerCase(),
         });
-      };
-      // Upload targets do not count toward the 80-control cap, so hidden inputs cannot crowd out buttons.
-      let controls = 0;
-      for (const el of document.querySelectorAll("body *")) {
-        if (!isInteractive(el) || !(visible(el) || isFileInput(el) || isCodeInput(el))) continue;
-        describe(el);
-        if (!isFileInput(el) && ++controls >= 80) break;
       }
-      // Upload targets are listed even past the element cap or inside shadow DOM.
-      for (const el of allFileInputs()) {
-        if (!listed.has(el)) describe(el);
-      }
+      const more = part + 1 < parts;
       return {
         url: location.href,
         title: (document.title || "").slice(0, 200),
         elements,
-        tree: (document.body?.innerText || "").slice(0, 12000) + "\n" + formatTree(elements)
-          + (document.querySelector("iframe,frame") ? "\nEmbedded frames require desktop tools." : ""),
+        tree: text.slice(part * PART_TEXT, (part + 1) * PART_TEXT) + "\n" + formatTree(elements)
+          + (!part && document.querySelector("iframe,frame") ? "\nEmbedded frames require desktop tools." : "")
+          + (more ? `\n(Part ${part + 1} of ${parts}. Call browser_snapshot with from: ${part + 1} to read on.)` : ""),
+        ...(more ? { next: part + 1 } : {}),
       };
+    },
+    busy() {
+      return loadingShown();
+    },
+    // Whether a wait step's condition holds now. Text matches ignore case and runs of spaces.
+    waitState(until, text) {
+      if (until === "quiet") return quietFor() >= 500 && document.readyState === "complete" && !loadingShown();
+      const found = plain(document.body?.innerText || "").includes(plain(text));
+      return until === "gone" ? !found : found;
+    },
+    // Focuses an element so the next pressed key goes to it.
+    focusRef(ref) {
+      const el = this.resolve(ref);
+      if (!el) throw new Error(`Unknown element ref: ${ref}`);
+      el.focus();
+      const active = document.activeElement;
+      return Boolean(active) && (active === el || el.contains(active));
+    },
+    // Scrolls an element into view, or by most of a screen what a wheel over the element (or over
+    // the middle of the window) would move: its own scroll area, else the page.
+    scroll(ref, direction) {
+      const el = ref ? this.resolve(ref) : null;
+      if (ref && !el) throw new Error(`Unknown element ref: ${ref}`);
+      if (!direction) {
+        el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+        return { scrolled: true };
+      }
+      const vertical = direction === "up" || direction === "down";
+      const sign = direction === "up" || direction === "left" ? -1 : 1;
+      const page = document.scrollingElement || document.documentElement;
+      let area = el || document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+      while (area && area !== page && !canScroll(area, vertical, sign)) area = area.parentElement;
+      area = area || page;
+      const size = area === page ? (vertical ? window.innerHeight : window.innerWidth)
+        : (vertical ? area.clientHeight : area.clientWidth);
+      const before = vertical ? area.scrollTop : area.scrollLeft;
+      area.scrollBy({ [vertical ? "top" : "left"]: sign * Math.max(40, Math.round(size * 0.85)), behavior: "instant" });
+      return { scrolled: (vertical ? area.scrollTop : area.scrollLeft) !== before };
+    },
+    // Where the pointer goes to hover an element: its middle, once in view, unless something covers it.
+    hoverPoint(ref) {
+      const el = this.resolve(ref);
+      if (!el) throw new Error(`Unknown element ref: ${ref}`);
+      let rect = el.getBoundingClientRect();
+      if (rect.top < 0 || rect.left < 0 || rect.bottom > window.innerHeight || rect.right > window.innerWidth) {
+        el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+        rect = el.getBoundingClientRect();
+      }
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || !(hit === el || el.contains(hit))) {
+        throw refused("Another element covers this one, so it was not hovered. Close what covers it, or take a fresh snapshot.");
+      }
+      return { x, y };
     },
     resolve(ref) {
       const el = refMap.get(String(ref));
@@ -841,7 +1377,7 @@ EVAL_HELPERS = r"""
 """
 
 
-def eval_json(client: CdpClient, session_id: str, expression: str) -> Any:
+def eval_json(client: CdpClient, session_id: str, expression: str, timeout_s: float = 30.0) -> Any:
     result = client.call(
         "Runtime.evaluate",
         {
@@ -851,6 +1387,7 @@ def eval_json(client: CdpClient, session_id: str, expression: str) -> Any:
             "awaitPromise": True,
         },
         session_id=session_id,
+        timeout_s=timeout_s,
     )
     if result.get("exceptionDetails"):
         details = result["exceptionDetails"]
@@ -876,7 +1413,8 @@ def navigate(client: CdpClient, session_id: str, url: str) -> dict[str, Any]:
     if result.get("errorText") or result.get("isDownload"):
         raise RuntimeError(result.get("errorText") or "Navigation started a download")
     deadline = time.monotonic() + 10.0
-    while time.monotonic() < deadline:
+    page: dict[str, Any] | None = None
+    while page is None and time.monotonic() < deadline:
         try:
             frame = client.call("Page.getFrameTree", session_id=session_id)["frameTree"]["frame"]
             if result.get("loaderId") and frame.get("loaderId") != result["loaderId"]:
@@ -885,12 +1423,19 @@ def navigate(client: CdpClient, session_id: str, url: str) -> dict[str, Any]:
             ensure_world(client, session_id)
             ready = eval_json(client, session_id, "document.readyState")
             if ready in ("interactive", "complete"):
-                return {"ok": True, "url": eval_json(client, session_id, "location.href"),
+                page = {"ok": True, "url": eval_json(client, session_id, "location.href"),
                         "title": eval_json(client, session_id, "(document.title || '').slice(0, 200)")}
+                break
         except Exception:
             pass
         time.sleep(0.1)
-    raise RuntimeError("Navigation did not settle; inspect the screen before continuing")
+    if page is None:
+        raise RuntimeError("Navigation did not settle; inspect the screen before continuing")
+    # The first snapshot comes with the page, which saves the model a call. Without it, the caller
+    # takes the snapshot itself.
+    with contextlib.suppress(Exception):
+        page.update(snapshot(client, session_id))
+    return page
 
 
 MAX_UPLOAD_FILES = 10
@@ -951,7 +1496,7 @@ def upload(client: CdpClient, session_id: str, ref: str, files: list[str]) -> No
     result = client.call(
         "Runtime.evaluate",
         {
-            "expression": f"window.__rakazoPageBrowser.fileInput({json.dumps(ref)}, {len(files)})",
+            "expression": page_call("fileInput", ref, len(files)),
             "contextId": client.context_id,
             "returnByValue": False,
         },
@@ -998,13 +1543,26 @@ def wait_for_settle(client: CdpClient, session_id: str) -> bool:
         while True:
             # Each call also handles the lifecycle events that arrived meanwhile.
             frame = client.call("Page.getFrameTree", session_id=session_id, timeout_s=remaining())
-            if {"load", "networkIdle"} <= client.lifecycle(session_id, frame["frameTree"]["frame"]["id"]):
+            if ({"load", "networkIdle"} <= client.lifecycle(session_id, frame["frameTree"]["frame"]["id"])
+                    and not page_busy(client, session_id, remaining())):
                 return True
             if time.monotonic() >= deadline:
                 return False
             time.sleep(min(0.1, remaining()))
     except TimeoutError:
         # A browser too slow to answer within the wait is not settled either.
+        return False
+
+
+def page_busy(client: CdpClient, session_id: str, timeout_s: float) -> bool:
+    """Whether the page still shows loading placeholders: a visible aria-busy region or skeleton box."""
+    try:
+        return eval_json(client, session_id, page_call("busy"), timeout_s) is True
+    except RuntimeError:
+        # A document without the helper yet: install it and look once more.
+        with contextlib.suppress(Exception):
+            ensure_helpers(client, session_id)
+            return eval_json(client, session_id, page_call("busy"), timeout_s) is True
         return False
 
 
@@ -1026,12 +1584,64 @@ def key_event(char: str) -> dict[str, Any] | None:
 
 
 def press_key(client: CdpClient, session_id: str, event: dict[str, Any]) -> None:
-    down = {"type": "keyDown", **event}
+    # A key that types nothing (Tab, Escape, a shortcut) is a raw key press, as on a real keyboard.
+    down = {"type": "keyDown" if "text" in event else "rawKeyDown", **event}
     if "text" in event:
         down["unmodifiedText"] = event["text"]
     client.call("Input.dispatchKeyEvent", down, session_id=session_id)
     client.call("Input.dispatchKeyEvent", {"type": "keyUp", **{k: v for k, v in event.items() if k != "text"}},
                 session_id=session_id)
+
+
+KEY_MODIFIERS = {"alt": 1, "control": 2, "ctrl": 2, "meta": 4, "cmd": 4, "shift": 8}
+# The named keys press takes: key, code, Windows key code, and the text it types without modifiers.
+NAMED_KEYS: dict[str, tuple[str, str, int, str | None]] = {
+    "enter": ("Enter", "Enter", 13, "\r"),
+    "tab": ("Tab", "Tab", 9, None),
+    "escape": ("Escape", "Escape", 27, None),
+    "esc": ("Escape", "Escape", 27, None),
+    "backspace": ("Backspace", "Backspace", 8, None),
+    "delete": ("Delete", "Delete", 46, None),
+    "space": (" ", "Space", 32, " "),
+    "arrowup": ("ArrowUp", "ArrowUp", 38, None),
+    "arrowdown": ("ArrowDown", "ArrowDown", 40, None),
+    "arrowleft": ("ArrowLeft", "ArrowLeft", 37, None),
+    "arrowright": ("ArrowRight", "ArrowRight", 39, None),
+    "home": ("Home", "Home", 36, None),
+    "end": ("End", "End", 35, None),
+    "pageup": ("PageUp", "PageUp", 33, None),
+    "pagedown": ("PageDown", "PageDown", 34, None),
+}
+KEY_HELP = "press needs a key such as Enter, Tab, Escape, Backspace, ArrowDown, Shift+Tab or Control+A"
+
+
+def key_combo(value: Any) -> dict[str, Any]:
+    """CDP key event fields for one key with optional modifiers, such as Enter, Shift+Tab or Control+A."""
+    if not isinstance(value, str) or not 0 < len(value) <= 40:
+        raise RuntimeError(KEY_HELP)
+    *names, name = [part.strip() for part in value.split("+")]
+    modifiers = 0
+    for modifier in names:
+        bit = KEY_MODIFIERS.get(modifier.lower(), 0)
+        if not bit or modifiers & bit:
+            raise RuntimeError(KEY_HELP)
+        modifiers |= bit
+    named = NAMED_KEYS.get(name.lower())
+    if named:
+        key, code, key_code, text = named
+    elif len(name) == 1 and name.isascii() and name.isalnum():
+        key = name.upper() if modifiers & 8 else name.lower()
+        code = f"Digit{name}" if name.isdigit() else f"Key{name.upper()}"
+        key_code, text = ord(name.upper()), key
+    else:
+        raise RuntimeError(KEY_HELP)
+    event: dict[str, Any] = {"key": key, "code": code, "windowsVirtualKeyCode": key_code}
+    if modifiers:
+        event["modifiers"] = modifiers
+    # Shortcuts with Control, Alt or Meta type no character, as on a real keyboard.
+    if text is not None and not modifiers & 7:
+        event["text"] = text
+    return event
 
 
 class TypingStopped(RuntimeError):
@@ -1041,7 +1651,7 @@ class TypingStopped(RuntimeError):
 def focus_holds(client: CdpClient, session_id: str) -> bool | None:
     """Whether keys still reach the field or its code boxes; None once its document is gone."""
     try:
-        return eval_json(client, session_id, "window.__rakazoPageBrowser.focusHolds()") is True
+        return eval_json(client, session_id, page_call("focusHolds")) is True
     except Exception:  # noqa: BLE001
         return None
 
@@ -1074,20 +1684,26 @@ def type_keys(client: CdpClient, session_id: str, text: str, multiline: bool,
 
     # Enter in a one-line field would submit its form.
     chars = [char for char in text.replace("\r\n", "\n").replace("\r", "\n") if multiline or char != "\n"]
-    for index, char in enumerate(chars):
-        holds = focus_holds(client, session_id)
-        if moved_on(holds):
-            raise TypingStopped(f"The page changed while typing, after {index} of {len(chars)} characters, "
-                                "so the rest was not typed. Take a fresh snapshot before continuing.")
-        if not holds:
-            raise TypingStopped(f"Focus left the field while typing, after {index} of {len(chars)} characters, "
-                                "so the rest was not typed. Check the page in this snapshot before trying again.")
-        event = key_event(char)
-        if event is None:
-            client.call("Input.insertText", {"text": char}, session_id=session_id)
-        else:
-            press_key(client, session_id, event)
-    return moved_on(focus_holds(client, session_id))
+    index = 0
+    try:
+        for index, char in enumerate(chars):
+            holds = focus_holds(client, session_id)
+            if moved_on(holds):
+                raise TypingStopped(f"The page changed while typing, after {index} of {len(chars)} characters, "
+                                    "so the rest was not typed. Take a fresh snapshot before continuing.")
+            if not holds:
+                raise TypingStopped(f"Focus left the field while typing, after {index} of {len(chars)} characters, "
+                                    "so the rest was not typed. Check the page in this snapshot before trying again.")
+            event = key_event(char)
+            if event is None:
+                client.call("Input.insertText", {"text": char}, session_id=session_id)
+            else:
+                press_key(client, session_id, event)
+        index = len(chars)
+        return moved_on(focus_holds(client, session_id))
+    except DialogOpened as opened:
+        # The dialog stopped the keys; say how many reached the page.
+        raise DialogOpened(opened.dialog, typed=index, of=len(chars)) from None
 
 
 def wait_for_new_document(client: CdpClient, session_id: str, loader_id: Any) -> None:
@@ -1106,57 +1722,232 @@ def wait_for_new_document(client: CdpClient, session_id: str, loader_id: Any) ->
 def typed_in_full(client: CdpClient, session_id: str, ref: str, text: str) -> bool:
     """A widget may refuse keys. A page that submitted or navigated on the last key counts as done."""
     try:
-        return eval_json(client, session_id,
-                         f"window.__rakazoPageBrowser.typed({json.dumps(ref)}, {json.dumps(text)})") is not False
+        return eval_json(client, session_id, page_call("typed", ref, text)) is not False
     except Exception:  # noqa: BLE001
         return True
 
 
-def snapshot(client: CdpClient, session_id: str) -> dict[str, Any]:
-    settled = wait_for_settle(client, session_id)
+# A long page is read in parts of 12,000 characters and 80 controls; EVAL_HELPERS keeps as many.
+SNAPSHOT_PARTS = 25
+
+
+def snapshot(client: CdpClient, session_id: str, part: int = 0) -> dict[str, Any]:
+    # A later part reads what the first one captured, so only the first part waits for the page.
+    settled = part > 0 or wait_for_settle(client, session_id)
     ensure_helpers(client, session_id)
-    data = eval_json(client, session_id, "window.__rakazoPageBrowser.snapshot()")
+    data = eval_json(client, session_id, page_call("snapshot", part) if part else page_call("snapshot"))
     if not isinstance(data, dict):
         raise RuntimeError("snapshot returned non-object")
     return {"ok": True, **data, **({} if settled else {"loading": True})}
 
 
-def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> dict[str, Any]:
-    if not actions or len(actions) > 24:
-        raise RuntimeError("Expected 1 to 24 actions")
+def snapshot_or(client: CdpClient, session_id: str, fallback: dict[str, Any]) -> dict[str, Any]:
+    """The page after a stopped step, for the result; fallback when it cannot be read."""
+    try:
+        return snapshot(client, session_id)
+    except Exception:  # noqa: BLE001
+        return fallback
+
+
+MAX_ACTIONS = 24
+ACT_KINDS = ("click", "fill", "type", "upload", "press", "scroll", "hover", "wait", "dialog")
+# Steps that work on one element a snapshot named; press and scroll may name one too.
+REF_KINDS = ("click", "fill", "type", "upload", "hover")
+SCROLL_DIRECTIONS = ("up", "down", "left", "right")
+WAIT_CONDITIONS = ("text", "gone", "url", "quiet")
+WAIT_TEXT_LIMIT = 500
+WAIT_DEFAULT_SECONDS = 10.0
+WAIT_MAX_SECONDS = 15.0
+# The waits of one call share this time. It keeps a call inside the supervisor's deadline, and the
+# display lock short for other conversations on the same computer.
+WAIT_BATCH_SECONDS = 15.0
+WAIT_POLL_SECONDS = 0.2
+
+
+def validate_actions(actions: Any, done_before: int = 0) -> None:
+    """Check every step before acting, so a bad step cannot leave a half-done form."""
+    if not isinstance(actions, list) or not 1 <= len(actions) + done_before <= MAX_ACTIONS:
+        raise RuntimeError(f"Expected 1 to {MAX_ACTIONS} actions")
     for step in actions:
-        if not isinstance(step, dict) or step.get("kind") not in ("click", "fill", "type", "upload"):
+        if not isinstance(step, dict) or step.get("kind") not in ACT_KINDS:
             raise RuntimeError("Invalid browser action")
-        if not isinstance(step.get("ref"), str) or not step["ref"]:
+        kind, ref = step["kind"], step.get("ref")
+        if (kind in REF_KINDS or ref is not None) and (not isinstance(ref, str) or not ref):
             raise RuntimeError("Element ref is required")
-        if step["kind"] == "upload":
+        if kind == "upload":
             # Check every file before acting, so a bad path cannot leave a half-done form.
             step["files"] = resolve_upload_paths(step.get("paths"), roots=step.get("roots"))
-        elif step["kind"] != "click" and not isinstance(step.get("text"), str):
+        elif kind in ("fill", "type") and not isinstance(step.get("text"), str):
             raise RuntimeError("Text is required")
-        if step.get("origin") is not None and (
-            step["kind"] != "fill" or not isinstance(step["origin"], str)
-        ):
+        elif kind == "press":
+            key_combo(step.get("key"))
+        elif kind == "scroll" and step.get("direction") not in (*SCROLL_DIRECTIONS, *((None,) if ref else ())):
+            raise RuntimeError("scroll needs a ref, a direction (up, down, left or right), or both")
+        elif kind == "wait":
+            validate_wait(step)
+        elif kind == "dialog" and (not isinstance(step.get("accept"), bool)
+                                   or not isinstance(step.get("text", ""), str)):
+            raise RuntimeError("A dialog step needs accept: true or false")
+        if step.get("origin") is not None and (kind != "fill" or not isinstance(step["origin"], str)):
             raise RuntimeError("An origin applies only to fill")
+
+
+def validate_wait(step: dict[str, Any]) -> None:
+    until, text, timeout = step.get("until"), step.get("text"), step.get("timeout")
+    if until not in WAIT_CONDITIONS:
+        raise RuntimeError("wait needs until: text, gone, url or quiet")
+    if text is not None and (not isinstance(text, str) or not 0 < len(text) <= WAIT_TEXT_LIMIT):
+        raise RuntimeError(f"wait text must be 1 to {WAIT_TEXT_LIMIT} characters")
+    if until in ("text", "gone") and text is None:
+        raise RuntimeError(f"wait until {until} needs text")
+    if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+                                or not 0 < timeout <= WAIT_MAX_SECONDS):
+        raise RuntimeError(f"wait timeout must be more than 0 and at most {WAIT_MAX_SECONDS:g} seconds")
+
+
+def page_url(client: CdpClient, session_id: str, timeout_s: float = SETTLE_SECONDS) -> str:
+    """The tab's address with its fragment, as the browser knows it, also while a document loads."""
+    try:
+        frame = client.call("Page.getFrameTree", session_id=session_id, timeout_s=timeout_s)["frameTree"]["frame"]
+    except Exception:  # noqa: BLE001
+        return ""
+    return str(frame.get("url") or "") + str(frame.get("urlFragment") or "")
+
+
+def left_document(client: CdpClient, session_id: str, mark: tuple[dict[str, Any], int]) -> bool:
+    """Whether the page began loading another document since mark, as a pressed Enter can make it do.
+
+    When it did, the new document gets the settle budget to replace the old one before this returns.
+    """
+    frame, navigations = mark
+    # A round trip delivers the navigation events the key caused.
+    with contextlib.suppress(Exception):
+        client.call("Page.getFrameTree", session_id=session_id, timeout_s=SETTLE_SECONDS)
+    if client.navigations(session_id, frame["id"]) == navigations:
+        return False
+    wait_for_new_document(client, session_id, frame.get("loaderId"))
+    return True
+
+
+def wait_state(client: CdpClient, session_id: str, until: str, text: Any, timeout_s: float) -> bool:
+    try:
+        return eval_json(client, session_id, page_call("waitState", until, text), timeout_s) is True
+    except TimeoutError:
+        return False
+    except RuntimeError:
+        # A new document has no helper yet: install it and look again on the next round.
+        with contextlib.suppress(Exception):
+            ensure_helpers(client, session_id)
+        return False
+
+
+def wait_until(client: CdpClient, session_id: str, step: dict[str, Any], start_url: str, seconds: float) -> bool:
+    """Poll the page until the wait step's condition holds; False once its time is up."""
+    until, text = step["until"], step.get("text")
+    deadline = time.monotonic() + seconds
+    while True:
+        budget = max(0.2, deadline - time.monotonic())
+        if until == "url":
+            url = page_url(client, session_id, budget)
+            # Without an earlier address to compare with, the first one read is the start.
+            start_url = start_url or url
+            if url and (text.lower() in url.lower() if text else url != start_url):
+                return True
+        elif wait_state(client, session_id, until, text, budget):
+            return True
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return False
+        time.sleep(min(WAIT_POLL_SECONDS, left))
+
+
+def wait_failure(step: dict[str, Any], requested: float, given: float) -> str:
+    until, text = step["until"], step.get("text")
+    shared = f" Waits in one browser_act share {WAIT_BATCH_SECONDS:g} seconds."
+    if given <= 0:
+        return f"This wait had no time left.{shared}"
+    if until == "text":
+        what = f'"{text}" did not appear'
+    elif until == "gone":
+        what = f'"{text}" was still on the page'
+    elif until == "url":
+        what = f'The address did not change to one containing "{text}"' if text else "The address did not change"
+    else:
+        what = "The page was still loading or changing"
+    return (f"{what} after {given:.3g} seconds.{shared if given < requested else ''}"
+            " Check the page in this snapshot before trying again.")
+
+
+def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]], done_before: int = 0) -> dict[str, Any]:
+    """Run browser_act steps; done_before counts steps of the call that already ran (an answered dialog)."""
+    validate_actions(actions, done_before)
     ensure_helpers(client, session_id)
-    completed = 0
+    total = done_before + len(actions)
+    completed = done_before
     uncertain = False
-    # Refs belong to the document that was typed into; a page that moved on keeps none of them.
+    # Refs belong to the document they were read from; a page that moved on keeps none of them.
     page_changed = False
+    wait_left = WAIT_BATCH_SECONDS
+    # A wait for the address to change compares with the address before the first step.
+    start_url = page_url(client, session_id) if any(
+        step["kind"] == "wait" and step["until"] == "url" for step in actions) else ""
+    kind: str | None = None
     try:
         for step in actions:
-            kind, ref = step["kind"], step["ref"]
+            kind, ref = step["kind"], step.get("ref")
+            if page_changed and isinstance(ref, str):
+                # The result shows the page the step led to, so the bot can carry on from there.
+                return {"uncertain": False, **snapshot_or(client, session_id, {"uncertain": True}), "ok": False,
+                        "completed": completed, "error": "Stale element ref. Take a fresh snapshot."}
             if page_changed:
-                # The result shows the page the code led to, so the bot can carry on from there.
-                try:
-                    snap = snapshot(client, session_id)
-                except Exception:  # noqa: BLE001
-                    snap = {"uncertain": True}
-                return {"uncertain": False, **snap, "ok": False, "completed": completed,
-                        "error": "Stale element ref. Take a fresh snapshot."}
+                # Steps without a ref carry on in the new document.
+                ensure_helpers(client, session_id)
+            if kind == "dialog":
+                raise Refused("No dialog from your steps is open on this page, so there is nothing to answer.")
+            if kind == "wait":
+                requested = float(step.get("timeout") or WAIT_DEFAULT_SECONDS)
+                given = min(requested, wait_left)
+                started = time.monotonic()
+                met = given > 0 and wait_until(client, session_id, step, start_url, given)
+                wait_left = max(0.0, wait_left - (time.monotonic() - started))
+                if not met:
+                    return {"uncertain": False, **snapshot_or(client, session_id, {}), "ok": False,
+                            "completed": completed, "error": wait_failure(step, requested, given)}
+                completed += 1
+                continue
             # Preflight catches stale refs before a mutation is dispatched.
-            if not eval_json(client, session_id, f"Boolean(window.__rakazoPageBrowser.resolve({json.dumps(ref)}))"):
+            if isinstance(ref, str) and not eval_json(client, session_id, f"Boolean({page_call('resolve', ref)})"):
                 raise RuntimeError("Stale element ref. Take a fresh snapshot.")
+            if kind == "press":
+                event = key_combo(step["key"])
+                if isinstance(ref, str) and eval_json(client, session_id, page_call("focusRef", ref)) is not True:
+                    raise Refused("The element did not take keyboard focus, so no key was pressed. "
+                                  "Click it, then press the key again.")
+                mark = page_mark(client, session_id)
+                uncertain = True
+                press_key(client, session_id, event)
+                completed += 1
+                uncertain = False
+                page_changed = left_document(client, session_id, mark) or page_changed
+                continue
+            if kind == "scroll":
+                uncertain = True
+                eval_json(client, session_id, page_call("scroll", ref, step.get("direction")))
+                completed += 1
+                uncertain = False
+                continue
+            if kind == "hover":
+                point = eval_json(client, session_id, page_call("hoverPoint", ref))
+                if not isinstance(point, dict) or not all(
+                        isinstance(point.get(axis), (int, float)) for axis in ("x", "y")):
+                    raise RuntimeError("The element has no point to hover over")
+                uncertain = True
+                # A real pointer move, so the page sees :hover and its mouse events as from a person.
+                client.call("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": point["x"], "y": point["y"],
+                                                         "button": "none", "buttons": 0}, session_id=session_id)
+                completed += 1
+                uncertain = False
+                continue
             if kind == "upload":
                 uncertain = True
                 upload(client, session_id, ref, step["files"])
@@ -1167,9 +1958,7 @@ def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> di
                 uncertain = True
                 mark = page_mark(client, session_id)
                 # One character goes into the ref'd box alone; longer text replaces the whole code.
-                whole = json.dumps(len(step["text"]) > 1)
-                focus = eval_json(client, session_id,
-                                  f"window.__rakazoPageBrowser.focusForKeys({json.dumps(ref)}, {whole})")
+                focus = eval_json(client, session_id, page_call("focusForKeys", ref, len(step["text"]) > 1))
                 if isinstance(focus, dict) and focus.get("select"):
                     kind = "fill"
                 else:
@@ -1179,12 +1968,8 @@ def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> di
                         page_changed = type_keys(client, session_id, step["text"],
                                                  multiline=bool(focus.get("multiline")), mark=mark)
                     except TypingStopped as stopped:
-                        try:
-                            snap = snapshot(client, session_id)
-                        except Exception:  # noqa: BLE001
-                            snap = {"uncertain": True}
-                        return {"uncertain": False, **snap, "ok": False, "completed": completed,
-                                "error": str(stopped)}
+                        return {"uncertain": False, **snapshot_or(client, session_id, {"uncertain": True}),
+                                "ok": False, "completed": completed, "error": str(stopped)}
                     completed += 1
                     uncertain = False
                     if not page_changed and not typed_in_full(client, session_id, ref, step["text"]):
@@ -1192,19 +1977,33 @@ def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> di
                                 "error": "The page did not keep every character typed. "
                                          "Check the field in this snapshot before trying again."}
                     continue
-            arguments = json.dumps(ref)
-            if kind != "click":
-                arguments += ", " + json.dumps(step["text"])
+            arguments: list[Any] = [ref] if kind == "click" else [ref, step["text"]]
             if step.get("origin"):
-                arguments += ", " + json.dumps(step["origin"]) + ", " + json.dumps(step.get("field"))
+                arguments += [step["origin"], step.get("field")]
             uncertain = True
-            data = eval_json(client, session_id, f"window.__rakazoPageBrowser.{kind}({arguments})")
+            data = eval_json(client, session_id, page_call(kind, *arguments))
             if not isinstance(data, dict):
                 raise RuntimeError("Action response unavailable")
             completed += 1
             uncertain = False
+        kind = None
         snap = snapshot(client, session_id)
         return {**snap, "completed": completed}
+    except DialogOpened as opened:
+        name = dialog_name(opened.dialog)
+        later = total
+        if kind == "type" and uncertain and not (opened.typed is not None and opened.typed == opened.of):
+            error = (f"The page opened {name} while step {completed + 1} was typing, after {opened.typed} of "
+                     f"{opened.of} characters, so the rest was not typed." if opened.typed is not None
+                     else f"The page opened {name} before step {completed + 1} typed anything.")
+            later -= 1  # That step is told about above; count only the steps after it.
+        elif uncertain:
+            # The step reached the page before the dialog paused it.
+            completed += 1
+            error = f"Step {completed} ({kind}) opened {name}."
+        else:
+            error = f"The page opened {name}."
+        return dialog_result(client, session_id, opened.dialog, error, completed, later)
     except Refused as exc:
         # Settled, and fixable in the page browser: no desktop fallback.
         return {"ok": False, "completed": completed, "uncertain": False, "error": str(exc)}
@@ -1509,6 +2308,8 @@ def read_stdin_line() -> str:
 def run(argv: list[str]) -> int:
     if len(argv) == 4 and argv[1] == "tab-stream":
         return serve_tab_stream(argv[2], argv[3])
+    if len(argv) == 3 and argv[1] == "hold-dialog" and argv[2].isdigit():
+        return keep_dialog(int(argv[2]))
     stdin_args = (
         read_stdin_line() if os.environ.get("RAKAZO_BROWSER_ARGS_STDIN") == "1" else None
     )
@@ -1528,9 +2329,13 @@ def run(argv: list[str]) -> int:
     command = argv[1]
     scoped = command.startswith("scoped-")
     command = command.removeprefix("scoped-")
-    if command not in ("navigate", "snapshot", "act", "focus") or (command == "focus" and not scoped):
+    if command not in ("navigate", "snapshot", "act", "focus", "capabilities") or (command == "focus" and not scoped):
         print(json.dumps({"ok": False, "error": "Unknown browser command.", "fallback": "computer_act"}))
         return 2
+    if command == "capabilities":
+        # Answered without the browser: what this image's helper can do.
+        print(json.dumps({"ok": True, "features": list(FEATURES)}))
+        return 0
     args: dict[str, Any] = {}
     raw_args = stdin_args if stdin_args is not None else (argv[2] if len(argv) >= 3 else "")
     if raw_args.strip():
@@ -1542,13 +2347,24 @@ def run(argv: list[str]) -> int:
         client = CdpClient(ws_url)
         client.connect()
         try:
-            result = run_scoped(client, port, command, args) if scoped else run_page_command(
-                client, attach_page(client), command, args
-            )
+            if scoped:
+                result = run_scoped(client, port, command, args)
+            else:
+                result = run_page_command(client, attach_page(client), command, args)
+                # Without a conversation there is no keeper, so a dialog waits for a person.
+                if "dialog" in result:
+                    settle_dialog(result, held=False)
             print(json.dumps(result))
             return 0  # Structured failures preserve partial action progress.
         finally:
             client.close()
+    except DialogOpened as opened:
+        print(json.dumps(settle_dialog({"ok": False, "uncertain": False, "dialog": opened.dialog,
+                                        "error": f"The page opened {dialog_name(opened.dialog)}."}, held=False)))
+        return 0
+    except PageNotResponding:
+        print(json.dumps(not_responding(command, 0)))
+        return 0
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": str(exc), "fallback": "computer_act",
                               "uncertain": command == "act"}))

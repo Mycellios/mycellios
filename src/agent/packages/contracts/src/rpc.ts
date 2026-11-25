@@ -221,6 +221,11 @@ import {
   MycelliosSignInMethodsSchema,
 } from "./mycellios-identities.js";
 import { MessageReactionSchema } from "./reactions.js";
+import {
+  RoutineEventFiltersSchema,
+  RoutineEventTypeSchema,
+  RoutineWebhookStateSchema,
+} from "./routine-events.js";
 import { RoutineWatchSchema } from "./routine-watch.js";
 import { RunLogsInputSchema, RunLogsOutputSchema } from "./run-logs.js";
 import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } from "./runs.js";
@@ -1114,6 +1119,9 @@ export const appContract = {
             watch: RoutineWatchSchema.nullable().optional(),
             /** Moves the routine's runs; a group routine keeps its group. */
             runIn: RoutineRunInChoiceSchema.optional(),
+            /** Null takes signed webhook events of any type. */
+            webhookEventType: RoutineEventTypeSchema.nullable().optional(),
+            webhookFilters: RoutineEventFiltersSchema.optional(),
           })
           .superRefine((value, ctx) => {
             if (
@@ -1135,6 +1143,26 @@ export const appContract = {
       .output(RoutineSchema),
     remove: oc.input(z.object({ routineId: Id })).output(z.object({ ok: z.literal(true) })),
     testRun: oc
+      .input(
+        z.object({
+          routineId: Id,
+          clientNonce: z.string().min(1).max(200).optional(),
+        }),
+      )
+      .output(z.object({ runId: Id, taskThreadId: Id.optional(), groupId: Id.optional() })),
+    /**
+     * Creates the routine's own webhook secret, shown only in this answer. The one it replaces
+     * keeps working for 24 hours.
+     */
+    rotateWebhookSecret: oc
+      .input(z.object({ routineId: Id }))
+      .output(z.object({ secret: z.string(), path: z.string(), webhook: RoutineWebhookStateSchema })),
+    /** Ends the routine's current and previous webhook secrets at once. */
+    revokeWebhookSecret: oc
+      .input(z.object({ routineId: Id }))
+      .output(z.object({ webhook: RoutineWebhookStateSchema })),
+    /** Signs a sample event with the routine's secret and starts a test run from it. */
+    sendTestEvent: oc
       .input(
         z.object({
           routineId: Id,

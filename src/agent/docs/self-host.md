@@ -4,32 +4,36 @@ The signed-in product is a long-running API, a Graphile Worker, Postgres, and a 
 
 ## Local (source checkout)
 
-Same as the README quick start: `.env` from `.env.example`, `pnpm sandbox:build`, `pnpm dev`, then the URL it prints ([http://127.0.0.1:5173](http://127.0.0.1:5173) by default, or `http://localhost:5173` — both loopback hosts are trusted). Electron: `pnpm --filter @mycellios/desktop dev` while that stack is up, choosing **Existing instance** with that address. The desktop app's **This computer** option instead installs and runs the published images itself with Docker Compose (see [Published images](#published-images-no-checkout)), using port 45173 by default so it can run alongside `pnpm dev`. If that port is occupied, the app selects and remembers another loopback port. The managed API gets a Docker-assigned loopback port; all desktop traffic uses the web origin.
+Same as the README quick start: `.env` from `.env.example`, `npm run sandbox:build`, `npm run dev`, then the URL it prints ([http://127.0.0.1:5173](http://127.0.0.1:5173) by default, or `http://localhost:5173` — both loopback hosts are trusted). Electron: `npm run dev --workspace @mycellios/desktop` while that stack is up, choosing **Existing instance** with that address. The desktop app's **This computer** option instead installs and runs the published images itself with Docker Compose (see [Published images](#published-images-no-checkout)), using port 45173 by default so it can run alongside `npm run dev`. If that port is occupied, the app selects and remembers another loopback port. The managed API gets a Docker-assigned loopback port; all desktop traffic uses the web origin.
 
-For source development in WSL, keep the checkout and `data` directory in the Linux filesystem (for example, `~/rakazo`), and run `pnpm dev` as your normal user. The host-run supervisor matches bot container UID/GID to that user. If Docker Desktop container IPs are unreachable, set `SANDBOX_CONTROL_VIA_LOOPBACK=true` in `.env`; this publishes the token-protected control service on a random loopback port. Leave this unset for the Compose-hosted supervisor.
+For source development in WSL, keep the checkout and `data` directory in the Linux filesystem (for example, `~/rakazo`), and run `npm run dev` as your normal user. The host-run supervisor matches bot container UID/GID to that user. If Docker Desktop container IPs are unreachable, set `SANDBOX_CONTROL_VIA_LOOPBACK=true` in `.env`; this publishes the token-protected control service on a random loopback port. Leave this unset for the Compose-hosted supervisor.
 
 Compose bot homes mount only their own subdirectory of the application volume using Docker volume semantics. Docker's internal volume paths are never used as host bind mounts.
 
 ## Published images (no checkout)
 
-Pull Postgres and `ghcr.io/elie222/rakazo/app` into any empty folder. No clone or image build.
+Pull Postgres and `ghcr.io/mycellios/mycellios/app` into any empty folder. No clone or image build.
 Requires Docker Engine 26+ (API 1.45+ for bot home volume subpaths), the Compose plugin, curl, and OpenSSL.
 
 ```bash
-mkdir -p rakazo && cd rakazo &&
-curl -fsSLO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/install-images.sh &&
+mkdir -p mycellios && cd mycellios &&
+curl -fsSLO https://raw.githubusercontent.com/Mycellios/mycellios/main/src/agent/infra/compose/install-images.sh &&
 bash install-images.sh
 ```
 
-The installer downloads `docker-compose.images.yml` and `.env.images.example`, creates `.env` with
-random secrets, then pulls and starts the images. It preserves an existing `.env` when rerun. For
+The installer downloads `docker-compose.images.yml` and `.env.images.example` from this
+repository's `src/agent/infra/compose` at the tag it installs, creates `.env` with random secrets,
+then pulls and starts the images. It installs `edge`, the newest `main` build, unless `.env` pins
+another tag of this repository; `bash install-images.sh --release v<version>` installs a Desktop
+release instead, with that tag's files and images. It preserves an existing `.env` when rerun. For
 the installer secret list, non-reuse rules, and recovery, see
 [Self-host secrets checklist](./self-host-secrets.md). To customize the public URL, image tag, or
 optional providers before startup, run `bash install-images.sh --prepare-only`, edit `.env`, then
-run `bash install-images.sh`. Flags may be combined in either order: `--prepare-only`, `--local`.
+run `bash install-images.sh`. Flags may be combined in any order: `--prepare-only`, `--local`,
+`--release v<version>`.
 
 `SANDBOX_PROVIDER` defaults to `docker`. The images Compose file runs a sandbox supervisor
-(from the app image, on the internal network only) and pulls `ghcr.io/elie222/rakazo/computer`.
+(from the app image, on the internal network only) and pulls `ghcr.io/mycellios/mycellios/computer`.
 Signup and local Docker computers work without an E2B account. Optional remote providers: set
 `SANDBOX_PROVIDER` to `e2b`, `daytona`, `createos`, or `boat` and add the matching API key. The published-images
 Compose stack requires `SANDBOX_SUPERVISOR_TOKEN` for every provider; leave it empty and `compose up` fails closed.
@@ -58,7 +62,8 @@ TypeSafe direct remains available through `RAKAZO_AUTO_REVIEW_PROVIDER=jev` and
 `TYPESAFE_API_KEY`. Core runs without either hosted service.
 
 The example defaults to `edge` (main builds). Every publish is multi-arch (`amd64` + `arm64`), so
-arm64 hosts need no special tag. Do not assume `latest` is present until a stable release exists.
+arm64 hosts need no special tag. There is no `latest` tag; pin a `v<version>` release for a fixed
+version ([Published images and tags](#published-images-and-tags)).
 
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Signup never grants server-administration permissions. Put TLS in front of `:5173` for a public host and set the three public origins to
 that HTTPS URL.
@@ -79,10 +84,33 @@ the local Docker computer. For in-stack Caddy plus remote E2B computers, use the
 [production Compose](#public-single-vm-deployment) path and `infra/compose/Caddyfile.prod`
 instead of this host proxy.
 
+### Installs on the upstream images
+
+Installs created before this repository published its own images run the images of the project
+Mycellios Agent was imported from: their `.env` names images under `ghcr.io/elie222/`. They keep
+those images, and the Compose files that match them, until their owner moves them:
+
+- Rerunning `install-images.sh` asks once. A no is recorded in `.env`
+  (`MYCELLIOS_IMAGE_MOVE=declined`) so it is not asked again. Without a terminal the installer only
+  says how to answer: `--move-images` moves, `--keep-images` keeps the images and records that.
+- The move downloads this repository's Compose files, pulls the app image (`edge`, or the release
+  given with `--release`), starts the database and runs the app image's migration check before it
+  replaces anything. When the database records a migration that release does not ship, because a
+  newer or different release migrated it, the move is refused and nothing changes. Otherwise the
+  installer writes the new image names and tags to `.env` and starts the stack on them. The
+  previous images stay in the local Docker cache.
+- The [updater sidecar](#updater-sidecar) makes the same offer and the same check.
+- Desktop's Docker stack moves on its first start after the update, after the same check. A
+  refused check leaves the stack and its data unchanged.
+
+A move changes the code, not the data: the new API applies this repository's migrations when it
+starts, and no rollback reverses them. Take a [backup](#backup) first.
+
 ### Restricted networks / mirror downloads
 
 If the installer, Compose downloads, or image pulls are blocked, use the
 [restricted-network guide](./self-host-restricted-network.md) for mirror settings and local files.
+An explicit `MYCELLIOS_DOWNLOAD_BASE` replaces the repository files URL as given.
 
 ### Bot computer resource ceilings
 
@@ -135,7 +163,7 @@ warning in its log. It keeps the first completed answer; a check that could not 
 error or timeout) fails that computer's start and runs again on the next one. An install from before the ruleset existed therefore
 keeps working when it upgrades. After installing the ruleset, recreate the supervisor, or set
 `restricted` to refuse computers whenever the rules are missing. A host-run supervisor
-(`pnpm dev`) and the desktop app's **This computer** stack default to open: Docker Desktop
+(`npm run dev`) and the desktop app's **This computer** stack default to open: Docker Desktop
 keeps its bridges in a VM the host rules cannot reach.
 
 Screen streaming is unaffected: the supervisor and web proxy join each computer's bridge,
@@ -176,11 +204,11 @@ under a path, its `WEB_ORIGIN` includes that path and screens use `<path>/novnc/
 
 1. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` and `POSTGRES_APP_PASSWORD` (`openssl rand -hex 16` each), plus `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, and `SCREEN_PROXY_SECRET` to independent long random strings (32+ characters; 64 hex for `ENCRYPTION_KEY`). Docker sandboxes also need a dedicated `SANDBOX_SUPERVISOR_TOKEN`. Keep existing `ENCRYPTION_KEY` values so stored credentials stay decryptable.
 2. Set `OPENROUTER_API_KEY` (and `COMPOSIO_API_KEY` if you want Plugins).
-3. Build the computer image: `pnpm sandbox:build` (Compose also builds it via the `computer` service).
+3. Build the computer image: `npm run sandbox:build` (Compose also builds it via the `computer` service).
 4. `docker compose --env-file .env -f infra/compose/docker-compose.yml up --build`
 5. Open the web origin (`http://127.0.0.1:5173` by default). Signup never grants server-administration permissions.
 
-On Windows, if an older clone with `core.autocrlf=true` leaves the computer pane hung on boot (`bash\r` in sandbox logs): from a clean worktree, set `git config core.autocrlf false`, run `git add --renormalize . && git checkout -- .`, then rebuild with `pnpm sandbox:build`.
+On Windows, if an older clone with `core.autocrlf=true` leaves the computer pane hung on boot (`bash\r` in sandbox logs): from a clean worktree, set `git config core.autocrlf false`, run `git add --renormalize . && git checkout -- .`, then rebuild with `npm run sandbox:build`.
 
 Compose runs Postgres, the sandbox supervisor (Docker socket), API, worker, and a Vite preview of the web app. Bot computers are sibling containers (`rakazo/computer:local`) on separate per-bot networks; only the supervisor and screen proxy join each one. The API process does not get an unrestricted Docker socket; the supervisor owns the lifecycle.
 
@@ -191,7 +219,7 @@ inside Compose. Official Postgres images set user, password, and database only o
 init, so an existing database volume keeps its original identity: keep those values in `.env`, or
 change them in place with `ALTER ROLE` / rename. Recreate the volume only after a backup (or when
 the data is disposable); `docker compose down -v` deletes all Postgres state. For host-side clients
-(`pnpm db:migrate`, GUI tools),
+(`npm run db:migrate`, GUI tools),
 add `infra/compose/docker-compose.postgres-host.yml` so Postgres is published on loopback
 `127.0.0.1:5433`, or use
 `docker compose --env-file .env -f infra/compose/docker-compose.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`.
@@ -207,7 +235,7 @@ Mycellios uses two Postgres logins:
   superuser, cannot bypass row-level security, cannot create objects, and can only read and write
   the app tables.
 
-`pnpm db:migrate` (in containers, its prebuilt form `pnpm --filter @mycellios/api db:deploy`, which the
+`npm run db:migrate` (in containers, its prebuilt form `npm run db:deploy --workspace @mycellios/api`, which the
 API container runs before it starts serving) applies the migrations and the job queue
 schema as the owner. It then creates the app login named in `DATABASE_URL`, or updates its
 password, and grants it the `rakazo_app` role. When migrations run as a role without
@@ -224,11 +252,11 @@ skill, thread or cloud agent runs as that row's Space and user, so agent tools g
 backstop. Security events are written and read only in system scope. Reconcilers, queue sweeps,
 the messaging outbox drain and webhooks run in a named system scope (`runAsSystem` in
 `packages/db`). The job queue's tables (`graphile_worker`) hold job metadata, not Space content:
-graphile-worker turns on row-level security for them, and `pnpm db:migrate` adds a policy that
+graphile-worker turns on row-level security for them, and `npm run db:migrate` adds a policy that
 gives the app login every row.
 
 With only `DATABASE_URL` set, migrations and the app share one login. Everything keeps working,
-but `pnpm db:migrate`, the API and the worker warn that row-level security is not enforced. To fix
+but `npm run db:migrate`, the API and the worker warn that row-level security is not enforced. To fix
 this, set `DATABASE_MIGRATION_URL` to the owner and `DATABASE_URL` to a new login.
 
 Run `pg_dump` as the owner. The app login would only dump rows it is allowed to see.
@@ -653,8 +681,8 @@ Optional:
 ```env
 SIGNUPS_ENABLED=true
 SIGNUP_ALLOWLIST=you@example.com,@company.com
-SANDBOX_PROVIDER=docker   # or none, e2b, daytona, createos, boat. Keep fake only for pnpm test.
-AGENT_RUNTIME=pi          # Keep scripted only for pnpm test.
+SANDBOX_PROVIDER=docker   # or none, e2b, daytona, createos, boat. Keep fake only for npm test.
+AGENT_RUNTIME=pi          # Keep scripted only for npm test.
 WAKEUP_DRIVER=graphile
 SANDBOX_IDLE_MS=600000    # pause or stop after 10 minutes idle; 0 disables idle sleep
 # Set 0 when self-hosting with Docker, where an idle computer costs nothing, to keep long-running apps and sessions up.
@@ -1066,7 +1094,7 @@ The Electron desktop app is a client of the same API. Docker remains the default
 Native file reads and workspace exports are limited to 8 MiB per file. A larger workspace file fails the checkpoint and preserves the previous saved workspace; local files remain on the computer. Writes are bounded by the 12 MiB encoded request limit.
 
 - **Published images** (`docker-compose.images.yml`) default to `SANDBOX_PROVIDER=docker` with a
-  local supervisor and published `ghcr.io/elie222/rakazo/computer` image. No E2B account required.
+  local supervisor and published `ghcr.io/mycellios/mycellios/computer` image. No E2B account required.
   Optional: set `e2b`, `daytona`, `createos`, or `boat` plus the matching API key for remote computers.
 - **Docker** is the quick-start default for published images and for a source checkout / full local
   Compose stack. Workspace bots share a persistent Team Computer by default; Private computers are
@@ -1139,8 +1167,8 @@ To switch on later, set `CONTENT_ENCRYPTION=on`, restart, then encrypt what was 
 it was off. From the published-images folder (other stacks use their own Compose file):
 
 ```bash
-docker compose -f docker-compose.images.yml exec api pnpm --filter @mycellios/api content-encryption migrate
-docker compose -f docker-compose.images.yml exec api pnpm --filter @mycellios/api content-encryption status
+docker compose -f docker-compose.images.yml exec api npm run content-encryption --workspace @mycellios/api -- migrate
+docker compose -f docker-compose.images.yml exec api npm run content-encryption --workspace @mycellios/api -- status
 ```
 
 Search works in both modes and while rows are mixed.
@@ -1151,7 +1179,7 @@ documents and revisions as JSON lines. It reads the whole database by default; n
 
 ```bash
 docker compose -f docker-compose.images.yml exec -T api \
-  pnpm -s --filter @mycellios/api content-encryption export --bot <bot id> > rakazo-export.jsonl
+  npm run -s content-encryption --workspace @mycellios/api -- export --bot <bot id> > rakazo-export.jsonl
 ```
 
 The export is plaintext: store it like the database itself. Files are not included; use
@@ -1221,8 +1249,8 @@ is mounted. It skips homes already stored, so it can be stopped and run again. E
 downloaded and checked before the home counts as moved. It never deletes local files.
 
 ```bash
-docker compose -f docker-compose.images.yml exec api pnpm --filter @mycellios/api home-storage migrate --dry-run
-docker compose -f docker-compose.images.yml exec api pnpm --filter @mycellios/api home-storage migrate
+docker compose -f docker-compose.images.yml exec api npm run home-storage --workspace @mycellios/api -- migrate --dry-run
+docker compose -f docker-compose.images.yml exec api npm run home-storage --workspace @mycellios/api -- migrate
 ```
 
 Homes listed as having no computer belong to bots that no longer exist; they are left alone.
@@ -1724,7 +1752,7 @@ Sidecar `/apply` and `/rollback` recover a failed recreate by redeploying the pr
 image when possible; if that also fails, they report a possible mixed-version runtime.
 
 Source checkouts (not Compose) still upgrade the old way: pull, rebuild with
-`GIT_SHA=$(git rev-parse HEAD)`, run `pnpm db:migrate`, then restart API and worker.
+`GIT_SHA=$(git rev-parse HEAD)`, run `npm run db:migrate`, then restart API and worker.
 Product contracts stay compatible across cloud and self-hosted.
 
 ### Upgrading to the separate app database login
@@ -1830,9 +1858,10 @@ that is:
 | `ghcr.io/mycellios/mycellios/computer` | Linux desktop used as each bot computer |
 | `ghcr.io/mycellios/mycellios/updater` | the updater sidecar, plus the Docker CLI |
 
-The installer, the Compose files and the updater still default to the images of the project
-Mycellios Agent was imported from; a later release moves those defaults to the images above.
-Pulling them without a GitHub login works once the packages are public.
+The installer, the Compose files, the updater and Desktop's Docker stack default to these images,
+which anyone can pull without a GitHub login. Installs that still name the images of the project
+Mycellios Agent was imported from keep them until their owner moves
+([Installs on the upstream images](#installs-on-the-upstream-images)).
 
 `infra/compose/docker-compose.images.yml` is the no-checkout path for the app and computer images
 plus Postgres. The supervisor runs from the app image on the internal network only (not a separate
@@ -1868,15 +1897,15 @@ public repositories) and merge the digests into one manifest. QEMU emulation
 (`docker/setup-qemu-action`, `binfmt`) still works if you have no native arm64 machine, but it is
 many times slower, hours rather than minutes for the `computer` image.
 
-The updater resolves the newest stable `vX.Y.Z` source tag but deploys its `sha-<full-commit>` image,
-not a moving tag. A registry tag is not an OCI digest and GHCR package writers can replace it, so
+The updater resolves the newest stable `vX.Y.Z` tag of this repository (never a `desktop-v*`
+installer tag or a pre-release) but deploys its `sha-<full-commit>` image, not a moving tag. A registry tag is not an OCI digest and GHCR package writers can replace it, so
 the trust boundary remains this repository's publishing credentials. The workflow reduces that
 boundary with SHA-pinned actions, digest-pinned base images, no pull-request runs and write-once
 tags. Operators who require registry-level content addressing can pin `RAKAZO_IMAGE` outside the
 automatic updater to a verified digest.
 
 Rollback never contacts the registry: it redeploys the previous tag from the local Docker cache,
-so a later tag move cannot change rollback content. Do not prune the previous application image
+under the image name it ran as, so a later tag move cannot change rollback content. Do not prune the previous application image
 until the next update has been accepted. If it is missing, rollback fails closed instead of pulling
 new content under an old tag.
 
@@ -1895,9 +1924,23 @@ docker compose --env-file .env -f infra/compose/docker-compose.prod.yml \
   --profile updater up -d --build updater
 ```
 
-It exposes `/health`, `/state`, `/plan`, `/apply`, and `/rollback` at `http://updater:7092` with
-`RAKAZO_UPDATER_TOKEN`. Operator CLI upgrades above do not need it; the sidecar is for automated
-apply/rollback over that private HTTP API. Only deployment tooling calls it; app accounts have no update endpoint, and the application API does not receive the updater token.
+It exposes `/health`, `/state`, `/plan`, `/apply`, `/rollback` and `/move` at
+`http://updater:7092` with `RAKAZO_UPDATER_TOKEN`. Operator CLI upgrades above do not need it; the
+sidecar is for automated apply/rollback over that private HTTP API. Only deployment tooling calls it; app accounts have no update endpoint, and the application API does not receive the updater token.
+
+A deployment whose `.env` names the upstream images is offered the move once:
+
+- `GET /state` reports `imageSource` (`official`, `upstream` or `other`) and, for the upstream
+  images, `move` with status `offered` or `declined`.
+- `POST /move` moves to this repository's newest stable release. It pulls that image and runs its
+  migration check in a one-off `api` container before recreating anything; a database that records
+  a migration the release does not ship refuses the move, restores the `.env` pin and leaves the
+  running containers alone. The `.env` keeps the replaced image in `MYCELLIOS_IMAGE_PREVIOUS`, so
+  `/rollback` returns to that exact image from the local cache.
+- `POST /move` with `{"decline":true}` keeps the images and records `MYCELLIOS_IMAGE_MOVE=declined`.
+- Until it moves, `/plan` and `/apply` refuse the official update instead of pulling this
+  repository's tags from the upstream namespace. The `updater` image itself still moves only when
+  you set `RAKAZO_UPDATER_IMAGE` and its tag.
 
 The API cannot update itself — its image has no `.git`, and nothing inside the container would
 restart it — so the work happens in a separate `updater` container that outlives the recreate:
@@ -2123,8 +2166,8 @@ node dist/cli/shared-storage.js push-tokens --dry-run
 node dist/cli/shared-storage.js push-tokens
 
 # Source checkout equivalents:
-pnpm --filter @mycellios/api shared-storage artifacts
-pnpm --filter @mycellios/api shared-storage push-tokens
+npm run shared-storage --workspace @mycellios/api -- artifacts
+npm run shared-storage --workspace @mycellios/api -- push-tokens
 ```
 
 The artifact migration uploads and decrypts each file to verify it before conditionally

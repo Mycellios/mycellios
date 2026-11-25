@@ -6,5 +6,14 @@
   "signIn": { "message": "Sign in" },
   "unavailableTitle": { "message": "Mycellios is not reachable" },
   "retry": { "message": "Try again" },
-  "openInTab": { "message": "Open in a tab" }
+  "openInTab": { "message": "Open in a tab" },
+  "appearance": { "message": "Appearance" },
+  "design": { "message": "Design" },
+  "themeOriginal": { "message": "Mycellios" },
+  "themeLight": { "message": "White" },
+  "themeDark": { "message": "Dark" },
+  "themeSystem": { "message": "System" },
+  "discreet": { "message": "Discreet mode" },
+  "signInTitleDiscreet": { "message": "Sign in to continue" },
+  "unavailableTitleDiscreet": { "message": "Unable to connect" }
 }

@@ -6,6 +6,139 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-25
+
+### Added
+
+- Choose the Claude Code model and effort in the chat model menu, from the models your signed-in
+  Claude Code account offers. Micos on This PC also list the Codex models of that PC.
+- A "Use my Claude Code settings" switch in the model menu of a Claude Code Mico on This PC loads
+  your own Claude Code instructions, hooks and skills. It is off by default.
+- Mycellios publishes its own self-host images, built from this repository for amd64 and arm64:
+  `ghcr.io/mycellios/mycellios/app`, `computer` and `updater`, tagged `sha-<commit>` and `edge`
+  from main, and `v<version>` for each Desktop release, which also tags its commit `v<version>`.
+  The installer, the Compose files and the updater keep their current images until a later
+  release moves them.
+- Sign in to ChatGPT (Codex) or Claude Code on your PC from the chat model menu. In Desktop the
+  program's own sign-in opens on that PC; from the web or a phone, Codex shows a one-time code
+  to enter on its sign-in page. Claude Code signs in from Mycellios on that PC.
+- Sign out of Codex or Claude Code on your PC from the same menu, after a confirmation. It also
+  signs you out of that program in your own terminal and in every Mico on that PC.
+- Routines and Workflows are now available. The side menu, the computer panel and links open
+  them instead of showing Coming soon. Your saved routines and workflows stay as they were.
+- The plan usage beside the workspace rail now shows the ChatGPT (Codex) plan of your PC while a
+  Mico that works on This PC is open, the same way it shows the plans of your model accounts.
+- Behind the server setting `MYCELLIOS_SPACE_MEMBERS_ENABLED` (off by default), the owner or
+  an admin of a space other than Personal can invite people by email or with a one-use link,
+  valid for seven days. People who join see the space in the space menu with its owner's name,
+  can see who is in it and can leave; the owner changes roles and anyone who manages the space
+  can remove a member. Sharing Micos and talking to them in a shared space come in a later
+  release. With the setting off, nothing changes.
+- The server answers `GET /api/v1/status` with only `{"status":"ok"}` or
+  `{"status":"degraded"}`, from the same database check as `/ready` and with no version or
+  other details, so a status page or uptime monitor can tell whether Agent works. `/health`
+  is unchanged.
+- Codex, Claude Code and OpenCode Micos can work in several conversations at once, up to the
+  Mico's conversation limit, and their main chat no longer waits behind those conversations.
+  This stays off until the server's operator turns it on; until then these Micos still work on
+  one conversation at a time, main chat included.
+- Mycellios Desktop runs at most 6 agent engine turns (Codex, Claude Code or OpenCode) at once on
+  your PC. Another turn waits, says so in its conversation, and starts when one of them finishes.
+- Install Codex, Claude Code or OpenCode on your PC from the chat model menu when it is missing.
+  The menu shows the version, the npm package it comes from and the download size first. Mycellios
+  checks the download against the hash its maker published before it runs, needs no administrator
+  rights and leaves any copy you installed yourself as it is.
+- Each webhook routine now has its own address and secret. Senders sign events in the Standard
+  Webhooks format, and an event signed more than five minutes away, sent again with the same id
+  or past 60 in an hour does not start another run.
+- A webhook routine can wait for one event type and check fields of the event before it runs.
+  Events it skips, and events that arrive while it is paused, show in its run history.
+- Rotate a routine's secret without missing events: the previous one keeps working for 24
+  hours. Revoke ends both at once, and Send test event runs the routine on a signed sample.
+- The Chrome side panel has its own appearance settings. Choose Mycellios, white, dark or system colors and optionally tone down branding and Mico avatars with Discreet mode.
+- A Mico using the browser on its server computer can now press keys such as Enter, Tab or
+  Escape, scroll, point at a menu to open it and wait until a page shows what it expects. Opening
+  a page also shows the Mico what is on it, and it reads long pages to the end. When a step makes
+  the page ask a question in a pop-up, the Mico reads it and answers it before going on. A
+  computer gets these after its owner updates the computer image; until then the Mico is told
+  that the step needs a newer image.
+
+### Changed
+
+- The model picker marks Claude Code or Codex as "Sign in required" when that program is installed
+  on the Mico's computer but nobody is signed in to it, instead of letting you choose it and fail
+  on the first message. The Mico's current choice stays selectable.
+- Claude Code now works in the Mico's own folder on your PC (or its linked project) instead of a
+  hidden folder. The first message after updating starts a fresh Claude Code session that keeps
+  the conversation history.
+- A new Mico on This PC starts on Claude Code, or else Codex, when that program is already
+  signed in on your PC and you did not choose a model when creating it. You can switch it to
+  another model from the model menu.
+- When your PC is offline, a Claude Code, Codex or OpenCode Mico on This PC answers new messages
+  on the server with its saved model (or your main model) instead of waiting, and the chat says
+  so. Without any model it keeps saying that the PC is offline.
+- Your existing Micos on This PC move once to Claude Code, or else Codex, when that program is
+  signed in on your PC. Only Micos that are not working move, each chat says so, and choosing a
+  model in the model menu takes a Mico back for good.
+- When your PC has its own copy of Codex, Claude Code or OpenCode and one that Mycellios installed,
+  Micos use yours if it is the same version or newer.
+- Adding a webhook to a routine no longer creates the Mico's shared webhook key. Senders that
+  already use that key keep working for routines that have no secret of their own.
+- Self-hosted Mycellios installs and updates from this repository: the installer, the Compose
+  files and the updater sidecar use the `ghcr.io/mycellios/mycellios` images and this
+  repository's `v<version>` releases, and the installer fetches its files from the tag it
+  installs. `bash install-images.sh --release v<version>` installs a release instead of `edge`.
+  Desktop's Docker stack uses the images of its own version from this repository too.
+
+### Fixed
+
+- When a Mico opens a conversation of its own for part of a task, it now tells you the result in
+  its main chat even when an update or a lost PC connection stops the turn in which it reads that
+  result. That turn starts again on its own, up to three times over about eight minutes, and the
+  Mico checks what it already did before going on. Before, the result stayed in the other
+  conversation and the main chat said nothing.
+- Fixed chat history loading and jumps to individual runs in grouped routines.
+- Kept emoji-only Mico replies visible in natural mode and made long routine summaries easier to read on phones.
+- Reduced redundant rendering of settled messages while a reply arrives.
+- Load routine suggestions when you type a mention instead of making one routine request per Mico as the chat opens.
+- Rapidly switching chats now reuses the Space's recent task overview instead of making duplicate requests.
+- A conversation whose run failed before saving a message now explains what happened alongside the existing recovery controls.
+- Switching to a chat in another Space now continues if the browser stalls while capturing the transition.
+- When one Mico asks another for something, an update or a lost PC connection no longer ends the
+  exchange. If the turn of the Mico doing the work stops halfway, it starts again on its own, up
+  to three times over about eight minutes, and the Mico that asked keeps waiting for the answer
+  instead of being told it failed. The same happens to the turn in which the Mico that asked
+  tells you the answer. Each Mico checks what it already did before going on. Before, the
+  request failed at once or the answer never reached you.
+- Open a chat with its recent messages first, with earlier history available when you scroll back.
+- Prioritize messages over background controls when opening a chat for the first time.
+- Create Routine on the Schedule page opens a new routine for the Mico you picked. Before, it
+  opened the Mico's computer panel.
+- Start new chat history at selection and keep deferred controls from refreshing all at once.
+- On macOS and Linux, Mycellios opened from Finder or an app launcher now also finds the coding
+  programs your terminal finds (for example ones installed with Homebrew or npm). Before, they
+  showed as not installed.
+- Reopen the official cloud workspace in Desktop when the bundled interface stalls during startup.
+
+### Self-host upgrade notes
+
+- Apply the additive migration `20261125100000_space_members` before starting this version. It
+  adds the `space_invitations` table with row-level security and makes a new organization
+  membership join the organization's default space only for an owner, so a person invited to
+  one space never reaches the owner's Personal space. Set `MYCELLIOS_SPACE_MEMBERS_ENABLED=true`
+  to turn the feature on and `MYCELLIOS_SPACE_MEMBER_LIMIT` (2 to 100, default 20) to change
+  how many people a space can hold. Email invitations use the email provider already configured
+  for sign-in; without one, share the link instead.
+- Set `MYCELLIOS_NATIVE_CONCURRENCY=1` on the API and the worker to let Codex, Claude Code and
+  OpenCode Micos run several conversations at once. Leave it unset to keep one turn at a time.
+  A generic ACP agent always stays at one turn.
+- An install whose `.env` still names the images of the project Mycellios Agent was imported from
+  keeps them until you move it. Rerunning the installer asks once (`--move-images` and
+  `--keep-images` answer without asking), and the updater sidecar offers the same with
+  `POST /move`. The move first checks the database and changes nothing when it records a
+  migration this repository does not ship. Until it moves, the updater refuses official updates
+  instead of pulling this repository's releases onto the other images.
+
 ## [0.24.0] - 2026-11-24
 
 ### Added

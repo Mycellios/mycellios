@@ -162,12 +162,14 @@ export function planChecks(files, availableAgentTests) {
       [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],
       [/signup-invite|20261122233000_signup_invite|^deploy\/primary-account-beta\.sql$/, 'verify-signup-invite-db.ts', 'invitation link migration and concurrent signup places on isolated PostgreSQL'],
       [/thread-lifecycle|side-threads|thread-deletion|20261122120000_thread_lifecycle/, 'verify-thread-lifecycle-db.ts', 'conversation lifecycle migration, archive, delete and lock races on isolated PostgreSQL'],
-      [/routine-thread|routine-run-markers|verify-routine-isolation|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
+      [/routine-thread|routine-run-markers|verify-routine-isolation|webhook-inbound|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
+      [/routine-events?[-.]|routine-event-filter|webhook-inbound|verify-routine-events|20261125120000_routine_signed_webhooks/, 'verify-routine-events-db.ts', 'signed routine events: signatures, receipts, filters, hourly limit and RLS on isolated PostgreSQL'],
       [/conversation-surfaces/, 'verify-conversation-surfaces-db.ts', 'sidebar counts, mark all read and mirrored requests on isolated PostgreSQL'],
       [/20261123090000_mico_requests_and_group_leads|verify-mico-requests-db|bot-message-requests|group-requests|group-handoff|team-awareness/, 'verify-mico-requests-db.ts', 'Mico request settlement, group leads and migration on isolated PostgreSQL'],
       [/message-queue|queue-order|mico-concurrency|routes\/threads\.ts|20261123090000_message_queue_controls|20261123100000_conversation_turn_model/, 'verify-message-queue-db.ts', 'queue operations and turn model persistence on isolated PostgreSQL'],
       [/conversation-branch|thread-lifecycle|artifact-versions/, 'verify-conversation-branch-db.ts', 'branch copies, encryption, idempotency and isolation on isolated PostgreSQL'],
       [/space-members|space-invit|routes\/spaces\.ts|packages\/db\/src\/(?:spaces|scope)\.ts|20261125100000_space_members/, 'verify-space-members-db.ts', 'Space invitations, roles, member isolation and audit on isolated PostgreSQL'],
+      [/migration-history|self-host-images\.ts$/, 'verify-migration-history-db.ts', 'migration check that refuses moving an install to this release, on isolated PostgreSQL'],
     ]) {
       if (files.some(file => (file.startsWith('src/agent/') || file === primaryAccountBeta) && pattern.test(file)))
         add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);

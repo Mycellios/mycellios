@@ -1,6 +1,7 @@
 # Automate Micos with routines, signed events, scripts and workflows
 
-Status: phase 1 implemented; phases 2 to 6 are a proposed design.
+Status: phase 1 implemented; phase 2 implemented except creation from chat; phases 3 to 6
+are a proposed design.
 
 This spec builds on `specs/mico-routine-runs/spec.md` (routine conversations,
 main-chat markers, quiet and failed runs) and on the workflow engine and
@@ -114,6 +115,13 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
    - The per-Mico Bearer route keeps accepting existing secrets; the UI stops
      issuing new ones. Open decision: retire that route later (default: keep it,
      with no removal date).
+   - Implemented: per-routine URLs and secrets, signature and timestamp checks,
+     7-day receipts, event type and filters, rotation, Revoke, Send test event and
+     the hourly limit, in the routine editor. A routine with its own secret no
+     longer takes the per-Mico route, and the UI issues per-Mico keys only for
+     GitHub events. Creating a webhook routine from a person's message, with the
+     secret card, is still to come; a real Standard Webhooks sender is still to be
+     reported.
 3. Phase 3 — run a Mico from a script and wait.
    - Scripts is off by default for each Mico. Only the owner turns it on, never a
      Mico. It creates a token scoped to that Mico, account and Space, shown once,
@@ -218,8 +226,9 @@ Rejected:
   reported separately.
 - Phase 2: signature tests (valid, wrong secret, stale timestamp, changed body,
   both secrets during rotation), duplicate, filter, receipt-expiry and rate-limit
-  tests and a test-event run. A real Standard Webhooks sender is reported
-  separately.
+  tests and a test-event run (`apps/api/src/routine-events.test.ts` and
+  `scripts/verify-routine-events-db.ts`). A real Standard Webhooks sender is
+  reported separately.
 - Phase 3: token scope and revocation on isolated PostgreSQL, route tests for
   every status, CLI exit codes against a fixture server, and an `await_event` wake
   through a script run (`scripts/verify-autonomy-waits-db.ts`).
