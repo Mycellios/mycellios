@@ -41,7 +41,7 @@ export function MicoScriptsSection({ botId }: { botId: string }) {
     }
   }
 
-  return <SettingsGroup label={t`Mico Scripts`}>
+  return <SettingsGroup title={t`Mico Scripts`}>
     <SettingsRow label={t`Allow scripts to call this Mico`} control={
       <Switch checked={enabled} disabled={busy} aria-label={t`Allow scripts to call this Mico`}
         onCheckedChange={(next) => void save(() => rpc.micoScripts.configure({
