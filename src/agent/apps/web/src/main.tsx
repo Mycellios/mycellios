@@ -30,9 +30,11 @@ import { installPreloadRecovery } from "./lib/preload-recovery";
 import { queryClient } from "./lib/query";
 import { applyInterfaceSize } from "./lib/interface-size";
 import { applyUiAppearance, watchSystemAppearance } from "./lib/ui-appearance";
+import { installBrowserPanelAppearance } from "./lib/browser-panel-appearance";
 import { resolveUiLocale } from "./lib/ui-locale";
 import { registerServiceWorker } from "./pwa/register";
 import "./styles.css";
+import "./browser-panel-appearance.css";
 
 markOnce("rk:renderer:module-evaluated");
 const removePreloadRecovery = installPreloadRecovery();
@@ -43,6 +45,8 @@ installAndroidHost();
 if (!isAndroidHost()) { clientUpdates().install(); registerServiceWorker(); }
 applyUiDirection(resolveUiLocale());
 applyUiAppearance();
+const removeBrowserPanelAppearance = installBrowserPanelAppearance();
+import.meta.hot?.dispose(removeBrowserPanelAppearance);
 applyInterfaceSize();
 applyGeneralPreferences();
 installActionSounds();

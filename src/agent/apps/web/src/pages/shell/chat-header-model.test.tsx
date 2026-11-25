@@ -15,10 +15,14 @@ const fixtures = vi.hoisted(() => ({
   catalog: [{ provider: "opencode-go", providerName: "OpenCode Go", id: "gpt-6-luna", label: "GPT-6 Luna", thinkingLevels: ["medium"] }],
   nativeModels: [] as Array<{id:string;label:string;isDefault:boolean;thinkingLevels:string[];fast:boolean}>,
   engines: { computer: "server", engines: ["codex", "opencode"] } as { computer: string; engines: string[]; signedOut?: string[]; account?: boolean;
-    models?: Record<string, Array<{ id: string; label: string; isDefault: boolean; thinkingLevels: string[]; fast: boolean }>> },
+    models?: Record<string, Array<{ id: string; label: string; isDefault: boolean; thinkingLevels: string[]; fast: boolean }>>;
+    install?: boolean; installable?: Array<{ engine: string; version: string; source: string; package: string; bytes: number }>;
+    installing?: Array<{ engine: string; state: string; receivedBytes?: number; totalBytes?: number; error?: string }> },
 }));
 const connect = vi.hoisted(() => vi.fn());
 const account = vi.hoisted(() => vi.fn());
+const install = vi.hoisted(() => vi.fn());
+const refetch = vi.hoisted(() => vi.fn());
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
   t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((text, part, i) => `${text}${i ? values[i - 1] : ""}${part}`, ""),
 }) }));
@@ -26,14 +30,15 @@ vi.mock("../../lib/query", () => {
   const query = (key: string) => ({ queryOptions: () => ({ queryKey: [key] }), queryKey: () => [key] });
   return { writeSaved: async (_client: unknown, _key: unknown, apply: () => unknown) => apply(), useSpaceQueries: () => ({ me: query("me"), models: { credentials: query("credentials"), list: query("catalog") }, engines: { forBot: query("engines"), codexModels: query("nativeModels") } }) };
 });
-vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect }, engines: { account } }) }));
+vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect }, engines: { account, install } }) }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"] }) => ({ data: queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[queryKey[0]], isPending: false }),
+  useQuery: ({ queryKey }: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"] }) => ({ data: queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[queryKey[0]], isPending: false, refetch }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
-vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onChange, initialProvider }: { choices: (ChatModelChoice & { unavailable?: boolean })[]; value: string; onChange: (key: string) => void; initialProvider?: string | null }) =>
-  <div data-picker-provider={initialProvider}>{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-selected={choice.key === value} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
+vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onChange, initialProvider, onProviderChange }: { choices: (ChatModelChoice & { unavailable?: boolean; unavailableLabel?: string })[]; value: string; onChange: (key: string) => void; initialProvider?: string | null; onProviderChange?: (provider: string) => void }) =>
+  <div data-picker-provider={initialProvider}>{[...new Set(choices.map(choice => choice.providerLabel))].map(name =>
+    <button key={`provider-${name}`} data-provider={name} aria-label={name} onClick={() => onProviderChange?.(name!)} />)}{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-selected={choice.key === value} data-unavailable={choice.unavailableLabel} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
 }));
 vi.mock("@mycellios/ui-web", () => ({
   Popover: ({ children, onOpenChange }: { children: ReactNode; onOpenChange: (open: boolean) => void }) => <div><button data-open onClick={() => onOpenChange(true)}>Open</button>{children}</div>,
@@ -250,4 +255,49 @@ it("never offers the personal configuration switch for Claude Code on a server",
 it("does not offer a functional Fast switch for a provider that has no native priority capability", async () => {
   await render("pi");
   expect(container.querySelector("[data-fast]")).toBeNull();
+});
+
+const claudeRelease = { engine: "claude", version: "2.1.326", source: "npm", package: "@anthropic-ai/claude-code-win32-x64", bytes: 174_663_115 };
+
+it("installs a CLI missing on the owner's PC from its provider after showing its source and size", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["codex"], account: true, install: true, installable: [claudeRelease] };
+  install.mockReset().mockResolvedValue({ status: "installing" });
+  refetch.mockClear();
+  await render("pi");
+  const row = container.querySelector<HTMLButtonElement>('[data-choice="native-claude::default"]');
+  expect(row?.disabled).toBe(true);
+  expect(row?.getAttribute("data-unavailable")).toBe("Not installed");
+  expect(container.querySelector('[data-testid="native-engine-install"]')).toBeNull();
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-provider="Claude Code"]')!.click());
+  const start = [...container.querySelectorAll("button")].find(button => button.textContent === "Install Claude Code");
+  await act(async () => start!.click());
+  expect(container.querySelector('[data-testid="native-engine-install"]')?.textContent).toContain(
+    "Install Claude Code 2.1.326 on this PC? It downloads 175 MB from npm (@anthropic-ai/claude-code-win32-x64) and checks it before it runs.");
+  expect(install).not.toHaveBeenCalled();
+  await act(async () => [...container.querySelectorAll("button")].find(button => button.textContent === "Install")!.click());
+  expect(install).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ engine: "claude" }));
+  expect(refetch).toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("shows the PC's install progress or failure, and offers nothing on an older Desktop", async () => {
+  fixtures.engines = { computer: "desktop", engines: [], install: true, installable: [claudeRelease],
+    installing: [{ engine: "claude", state: "downloading", receivedBytes: 50_000_000, totalBytes: 174_663_115 }] };
+  await render("claude");
+  expect(container.querySelector('[data-testid="native-engine-install"] [role="status"]')?.textContent)
+    .toBe("Downloading Claude Code: 50 MB of 175 MB");
+  // The Mico's own engine stays selectable while it is missing.
+  expect(container.querySelector<HTMLButtonElement>('[data-choice="native-claude::default"]')?.disabled).toBe(false);
+  act(() => root.unmount());
+  root = createRoot(container);
+  fixtures.engines = { ...fixtures.engines, installing: [{ engine: "claude", state: "failed", error: "The Claude Code download did not match its published hash." }] };
+  await render("claude");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("The Claude Code download did not match its published hash.");
+  expect([...container.querySelectorAll("button")].some(button => button.textContent === "Install Claude Code")).toBe(true);
+  act(() => root.unmount());
+  root = createRoot(container);
+  fixtures.engines = { computer: "desktop", engines: [], installable: [claudeRelease] };
+  await render("pi");
+  expect(container.querySelector('[data-choice="native-claude::default"]')).toBeNull();
+  expect(container.querySelector('[data-testid="native-engine-install"]')).toBeNull();
 });

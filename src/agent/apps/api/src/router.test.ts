@@ -6490,6 +6490,9 @@ describe("routine live Codex model validation", () => {
         lastRunAt: null,
         nextRunAt: null,
         createdAt: stamp,
+        webhookEventType: null,
+        webhookFilters: null,
+        webhookSecrets: [],
       };
       const save = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         ...row,
@@ -6604,6 +6607,9 @@ describe("routines.update", () => {
     lastRunAt: null,
     nextRunAt: null,
     createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    webhookEventType: null,
+    webhookFilters: null,
+    webhookSecrets: [],
   };
 
   function fixture(
@@ -6821,6 +6827,7 @@ describe("routine run place", () => {
       webhookEnabled: false, githubEnabled: false, messageProvider: null, modelProvider: null,
       modelId: null, thinkingLevel: null, watch: null, watchState: null, lastRunAt: null,
       nextRunAt: null, createdAt: new Date("2026-11-01T00:00:00Z"),
+      webhookEventType: null, webhookFilters: null, webhookSecrets: [],
       threadId: current ? threadIds[current] : null, thread: current ? places[current] : null,
     };
     const placeOf = (threadId: unknown) =>

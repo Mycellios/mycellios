@@ -6,6 +6,8 @@ import type { AgentRunRequest, AgentRuntime } from "@mycellios/adapter-kit";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDesktopAgentEngine } from "./desktop-agent-engine.js";
 import { resetNativeAccountLogins } from "./native-account.js";
+import { nativeEngineLock, resetNativeEngineStore } from "./native-engine-store.js";
+import { loginShellPath, resetLoginShellPath } from "./native-login-path.js";
 
 const roots: string[]=[];afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
 const input:AgentRunRequest={botId:"mico",threadId:"thread",runId:"same-run",prompt:"private-prompt",instructions:"private-instructions",history:[],tools:[],model:{provider:"fixture",id:"fixture"}};
@@ -97,3 +99,42 @@ it("reads Codex plan usage only under the PC's account scope and once the CLI co
   }
   expect(await engine.nativeEngineUsage!()).toEqual({});
 }, 30_000);
+
+it("installs a missing CLI into the PC user's store only under the PC's account scope", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-engine-test-")); roots.push(root);
+  const empty = path.join(root, "empty");
+  await mkdir(empty);
+  // No CLI of the test machine is found: PATH, home and npm folders are empty here.
+  for (const key of ["PATH", "HOME", "USERPROFILE", "APPDATA"]) vi.stubEnv(key, empty);
+  resetLoginShellPath();
+  await loginShellPath({ platform: "linux", run: async () => "" });
+  let scope: string | undefined;
+  const fetch = vi.fn().mockRejectedValue(new Error("offline"));
+  const engine = createDesktopAgentEngine(root, () => scope, undefined, {}, undefined,
+    { target: "linux-x64", fetch: fetch as unknown as typeof globalThis.fetch, version: async () => undefined });
+  try {
+    await expect(engine.nativeEngineInstall!({ engine: "claude" })).rejects.toThrow("unavailable");
+    expect(fetch).not.toHaveBeenCalled();
+    scope = "d".repeat(64);
+    expect(await engine.nativeEngineState!()).toMatchObject({ engines: [], install: true, installs: [],
+      installable: (["codex", "claude", "opencode"] as const).map(id => ({ engine: id, source: "npm", version: nativeEngineLock.engines[id].version,
+        package: nativeEngineLock.engines[id].targets["linux-x64"]!.package, bytes: nativeEngineLock.engines[id].targets["linux-x64"]!.bytes })) });
+    await expect(engine.nativeEngineInstall!({ engine: "claude" })).resolves.toEqual({ status: "installing" });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith(nativeEngineLock.engines.claude.targets["linux-x64"]!.url,
+      expect.objectContaining({ redirect: "error" })));
+    await vi.waitFor(async () => expect((await engine.nativeEngineState!()).installs).toEqual([
+      { engine: "claude", state: "failed", error: "Could not download Claude Code. Check the connection and try again." }]));
+    // The store belongs to the PC user, outside every account's folder, and keeps no partial download.
+    expect(await readdir(path.join(root, "provider-runtimes", "claude"))).toEqual([]);
+    // A CLI the PC already has is reported, not downloaded again.
+    const directory = path.join(root, "agent-executor", scope);
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, "native-agents.json"), JSON.stringify({ codex: { command: process.execPath } }));
+    await expect(engine.nativeEngineInstall!({ engine: "codex" })).resolves.toEqual({ status: "installed" });
+    expect(fetch).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllEnvs();
+    resetNativeEngineStore();
+    resetLoginShellPath();
+  }
+});

@@ -12,7 +12,11 @@ import {
   resolveMemberMainModel,
 } from "@mycellios/adapters";
 import type { Actor, Me, NativeEngineModelInfo } from "@mycellios/contracts";
-import { attachmentMaxBytes, canonicalPiProviderId, NativeEngineModelSchema, usableModelId } from "@mycellios/contracts";
+import {
+  attachmentMaxBytes, canonicalPiProviderId, NativeEngineInstallableSchema, NativeEngineInstallProgressSchema,
+  NativeEngineModelSchema, usableModelId,
+} from "@mycellios/contracts";
+import type { z } from "zod";
 import type { RouterDeps } from "../router.js";
 
 export function computerContext(actor: Actor, botId: string, operationId: string): AdapterContext {
@@ -68,6 +72,11 @@ export async function codingEnginesForComputer(
       signedOut,
       models: engineModels(state?.models, engines.filter(id => !signedOut.includes(id))),
       ...(state && "account" in state && state.account === true ? { account: true } : {}),
+      ...(state && "install" in state && state.install === true ? {
+        install: true,
+        installable: wellFormed(state.installable, NativeEngineInstallableSchema).filter(item => !engines.includes(item.engine)),
+        installing: wellFormed(state.installs, NativeEngineInstallProgressSchema),
+      } : {}),
     };
   }
   const engines = await nativeHostAccess(deps.dataDir, actor) ? await discoverNativeEngines(deps.dataDir) : [];
@@ -81,6 +90,14 @@ export async function codingEnginesForComputer(
     signedOut,
     models: engineModels(nativeEngineModels(engines), installed.filter(id => !signedOut.includes(id))),
   };
+}
+
+/** Keeps only the well-formed entries of a short list a PC reports. */
+function wellFormed<T>(value: unknown, schema: z.ZodType<T>): T[] {
+  return (Array.isArray(value) ? value : []).slice(0, 8).flatMap(item => {
+    const parsed = schema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 /** Keeps only well-formed, bounded catalogs of installed, signed-in engines: a PC reports them. */
