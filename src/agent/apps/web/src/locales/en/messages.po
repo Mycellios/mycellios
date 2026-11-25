@@ -15285,3 +15285,19 @@ msgstr "AI Credits per Mico turn"
 #: src/pages/settings/MicoBehaviorSettings.tsx
 msgid "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
 msgstr "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Copy webhook URL"
+msgstr "Copy webhook URL"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Show secret once"
+msgstr "Show secret once"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "Hide secret"
+msgstr "Hide secret"
+
+#: src/components/RoutineWebhookCard.tsx
+msgid "The secret is unavailable. You can rotate it in the routine editor."
+msgstr "The secret is unavailable. You can rotate it in the routine editor."

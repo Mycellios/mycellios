@@ -1507,6 +1507,9 @@ model RoutineWebhookSecret {
   ciphertext String
   createdAt  DateTime  @default(now())
   expiresAt  DateTime?
+  /// A secret a Mico created from the person's message: until this time the chat card can show
+  /// it once. Null once shown, after a rotation, and for every secret made in the editor.
+  revealUntil DateTime?
 
   @@index([routineId])
   @@map("routine_webhook_secrets")

@@ -498,6 +498,7 @@ import {
   SCHEDULE_TOOL_NAMES,
   updateScheduleFromTool,
 } from "./schedule-tools.js";
+import { createWebhookRoutineFromChat, createWebhookRoutineTool } from "./schedule-webhook.js";
 import { loadAgentScratchpadContext } from "./scratchpad-context.js";
 import {
   addScratchpadItemFromTool,
@@ -4739,13 +4740,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
           (run.trigger === "user" || run.trigger === "follow_up") && run.sourceMessageId
             ? await deps.prisma.message.findUnique({
                 where: { id: run.sourceMessageId },
-                select: { clientNonce: true, role: true, blocks: true },
+                select: { clientNonce: true, role: true, blocks: true, threadId: true },
               })
             : null;
         // Calls carry no schema flag: the sending client encodes them in the clientNonce.
         const sourceClientNonce = sourceMessage?.clientNonce ?? null;
         // A follow-up can be queued by a bot (group handoffs); only the user's own counts.
         const ownerStartedRun = isOwnerStartedRun(run.trigger, sourceMessage?.role === "user");
+        const canCreateWebhookRoutine = run.trigger === "user" && ownerStartedRun &&
+          sourceMessage?.threadId === thread.id && thread.botId === bot.id && !thread.groupId &&
+          run.userId === bot.userId;
         // A hang-up run has no source message: its own nonce carries the call it closes.
         const callEndRun = run.trigger === "call_end";
         const callClientNonceForRun = callEndRun ? run.clientNonce : sourceClientNonce;
@@ -4887,6 +4891,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const savedPlanWait = ownerDefaults.planAutoStartSeconds;
         const planWaitSeconds = savedPlanWait === undefined ? DEFAULT_PLAN_AUTO_START_SECONDS : savedPlanWait;
         const builtins = [
+          ...(canCreateWebhookRoutine && !disabledBuiltinTools.has("schedule_create")
+            ? [createWebhookRoutineTool] : []),
           ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).agentNewChat && run.trigger === "user" && thread.botId === bot.id && !thread.groupId && !disabledBuiltinTools.has("start_new_chat") ? [agentNewChatTool] : []),
           // The plan card follows the Mico's "Show a plan before long tasks" preference in direct user chats.
           ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).showPlan && run.trigger === "user" && thread.botId === bot.id && !thread.groupId ? [planCardTool] : []),
@@ -7558,6 +7564,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 body: String(args.body ?? ""),
               }),
             );
+          }
+          if (name === createWebhookRoutineTool.name) {
+            if (!canCreateWebhookRoutine || disabledBuiltinTools.has("schedule_create"))
+              return finish({ error: "Ask the Mico to create a webhook from your own direct chat." });
+            const created = await createWebhookRoutineFromChat(deps.prisma, deps.secretStore, context, {
+              runId: run.id, botId: bot.id, spaceId: run.spaceId, userId: run.userId,
+            }, executionId, args, (tx, routine) => persistMessageInTransaction(tx, run, "bot", [
+              { kind: "routine_webhook", routineId: routine.id, routineName: routine.name },
+            ]));
+            if (created.card) {
+              await deps.events.notify(run.threadId, created.card.eventSeq, created.card.firstResponseRunId)
+                .catch((error) => getLogger().error("Webhook card realtime notification", error));
+            }
+            return finish(created.result);
           }
           if (name === "schedule_create") {
             const command = commandWatchFromTool(args.watch);
