@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-25
+
+### Changed
+
+- The conversation bar has a dedicated Main chat tab and a labeled list of all conversations. The list marks which conversations are open as tabs.
+
+### Fixed
+
+- Opening a project conversation keeps the workspace and Projects sidebar visible while its chat history loads.
+
 ## [0.26.0] - 2026-11-25
 
 ### Added

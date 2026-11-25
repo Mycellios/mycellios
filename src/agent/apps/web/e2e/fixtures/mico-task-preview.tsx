@@ -17,8 +17,12 @@ import type { RpcClient } from "../../src/lib/rpc";
 import "../../src/styles.css";
 
 // The shared relative-time helper reads the global catalog, as in the app.
-i18n.load("en", {});
-i18n.activate("en");
+const locale = new URLSearchParams(window.location.search).get("locale") === "es" ? "es" : "en";
+if (locale === "es") {
+  const { messages } = await import("../../src/locales/es/messages.po");
+  i18n.load(locale, messages);
+} else i18n.load(locale, {});
+i18n.activate(locale);
 const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 type Row = { threadId: string; title: string; kind?: string; archived?: boolean; archivedAt?: string | null; deleteAfter?: string | null;
   state?: string; outcome?: string | null; unread?: boolean; startedBy?: string; createdAt?: string; updatedAt?: string };
@@ -117,7 +121,7 @@ function Preview() {
     updateConversationTabs(scope, state => adoptNewConversation(state, result.threadId));
     setDraftOpen(false); select(result.threadId);
   }
-  return <SpaceRpcProvider spaceId="fixture" client={rpc}><main className="mx-auto flex h-dvh max-w-3xl flex-col bg-background p-4 text-foreground">
+  return <SpaceRpcProvider spaceId="fixture" client={rpc}><main className="mx-auto flex h-dvh max-w-6xl flex-col bg-background p-4 text-foreground">
     <header className="mb-4 text-sm font-medium">Mycellios · Mico</header>
     <div className={`flex min-w-0 items-center gap-1 ${narrow ? "w-[180px]" : ""}`} data-testid="tab-row">
       <MicoTaskTabs key={draftOpen ? "draft" : threadId ?? "main"} botId="mico-fixture" scope={scope} taskThreadId={threadId}
