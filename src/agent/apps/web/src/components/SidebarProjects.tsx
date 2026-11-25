@@ -11,7 +11,8 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
   onSelect(botId: string, threadId: string): void; failed: boolean;
 }) {
   const { t } = useLingui();
-  const [expanded, expand] = useState<string[]>([]);
+  const activeProjectId = projects.find(p => p.conversations.some(c => c.threadId === activeThread))?.id;
+  const [expanded, expand] = useState<string[]>(() => activeProjectId ? [activeProjectId] : []);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -19,7 +20,6 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
   const alive = useRef(true);
   const saving = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const activeProjectId = projects.find(p => p.conversations.some(c => c.threadId === activeThread))?.id;
   useEffect(() => {
     if (activeProjectId) expand(ids => ids.includes(activeProjectId) ? ids : [...ids, activeProjectId]);
   }, [activeProjectId, activeThread]);
