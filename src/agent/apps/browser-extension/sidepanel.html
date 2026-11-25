@@ -8,6 +8,24 @@
     <script type="module" src="sidepanel.js"></script>
   </head>
   <body>
+    <details class="appearance">
+      <summary data-i18n="appearance">Appearance</summary>
+      <div class="appearance-controls">
+        <label class="appearance-row">
+          <span data-i18n="design">Design</span>
+          <select id="design">
+            <option value="original" data-i18n="themeOriginal">Mycellios</option>
+            <option value="light" data-i18n="themeLight">White</option>
+            <option value="dark" data-i18n="themeDark">Dark</option>
+            <option value="system" data-i18n="themeSystem">System</option>
+          </select>
+        </label>
+        <label class="appearance-row">
+          <span data-i18n="discreet">Discreet mode</span>
+          <input id="discreet" type="checkbox" />
+        </label>
+      </div>
+    </details>
     <main id="notice" hidden>
       <img src="icons/icon-128.png" alt="" width="56" height="56" />
       <h1 id="notice-title">Mycellios Agent</h1>

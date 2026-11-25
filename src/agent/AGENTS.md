@@ -1728,6 +1728,10 @@
   browser choice. Before a saved choice exists, use English regardless of
   browser language or build environment. Forward only supported locale values to model-facing greetings
   and new task prompts; never translate history by rewriting stored messages.
+- Chrome side-panel appearance is local to the extension and independent of the
+  Agent account preference. Accept live visual overrides only from the exact
+  approved extension origin and the parent window. Keep the existing host
+  permissions, signing IDs and normal web/Desktop appearance.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the
