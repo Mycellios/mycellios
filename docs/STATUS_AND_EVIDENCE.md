@@ -1,6 +1,6 @@
 # Status and evidence
 
-## Two physical computers, generic CPU pipeline — measured, unsigned, 2026-11-24
+## Two physical computers, generic pipeline — measured, unsigned, 2026-11-24
 
 The first run of `docs/TWO_HOST_QUICKSTART.md` on two physical machines, using
 the same home LAN and commit e56e1d76. It is a measured run, not a signed
@@ -12,7 +12,7 @@ receipt, so the gate stays open (see below).
 | Host A | Windows 11 x64 PC, AMD Ryzen AI 9 HX 370, 31 GB RAM |
 | Host B | MacBook Air, Apple M1, 8 GB RAM, on battery |
 | Route | layers 0–13 (root and API) on host B, layers 14–27 on host A |
-| Execution | CPU, float32, one thread per stage, fp16 activation codec |
+| Execution | host B (root) on the M1 GPU through MPS in float16, as reported by the root server; host A on CPU, where the installed PyTorch has no accelerator; one thread per stage, fp16 activation codec |
 | Transport | TCP between the two stages over the LAN; host A to B ICMP RTT 5–7 ms minimum, 14–47 ms mean, spikes up to 644 ms |
 
 - **Parity**: the greedy canary produced the same 7 token ids, with the same
@@ -44,7 +44,7 @@ Missing for a signed receipt:
 - a signed artifact;
 - host B on mains power.
 
-Every result covers this one small model on CPU only.
+Every result covers this one small model. The device was chosen automatically and the first\nversion of this section wrongly said both stages ran on CPU in float32.
 
 The run found one concrete gap. The planner put the root on host B, but the
 template's return endpoint and API host named host A. The tail stage on host A
