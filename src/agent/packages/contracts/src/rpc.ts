@@ -594,6 +594,10 @@ export const appContract = {
     createProfile: oc.input(CreateBotInput.extend({ expectedUserId: z.string().min(1).max(256) })).output(BotSchema),
     /** Opening a Mico's untouched chat queues its one welcome turn; later calls do nothing. */
     welcome: oc.input(botId).output(z.object({ queued: z.boolean() })),
+    /** Desktop asks once per start: idle This PC Micos on Pi move once to a CLI signed in there. */
+    adoptLocalEngine: oc.output(z.object({
+      adopted: z.array(z.object({ botId: z.string(), engine: z.enum(["claude", "codex"]) })),
+    })),
     importPreview: oc.input(AgentImportPreviewInput).output(AgentImportPlanSchema),
     importCreate: oc.input(AgentImportCreateInput).output(BotSchema),
     importInfo: oc.input(botId).output(AgentImportInfoSchema.nullable()),
