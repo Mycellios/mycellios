@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Actor } from "@mycellios/contracts";
 import { getLogger } from "@mycellios/logging";
 import type { Hono } from "hono";
@@ -45,9 +45,13 @@ export function mountDesktopRelay(
       get(scope: Pick<Actor, "userId" | "spaceId">, botId: string): Promise<string | undefined>;
       remember(scope: Pick<Actor, "userId" | "spaceId">, botId: string, deviceKey: string): Promise<void>;
     };
+    /** The deployed revision, reported with the handoff state. */
+    revision?: string;
   },
 ) {
   const broker = new DesktopRelayBroker();
+  /** This process's relay: a handoff's evidence names the instance it came from. */
+  const instance = randomUUID();
   const replay = new Map<string, number>();
   const ownedOf = async (actor: Pick<Actor, "userId" | "spaceId">, botIds: readonly string[]): Promise<ReadonlySet<string>> => {
     if (!botIds.length) return new Set();
@@ -83,6 +87,12 @@ export function mountDesktopRelay(
         return c.json({ error: "Duplicate request" }, 409);
       replay.set(input.nonce, Date.now() + 60_000);
       if (!deps.enabled) return c.json({ error: "Unavailable" }, 404);
+      // Handing its PCs to a new server version: the turn waits instead of reading the PC as
+      // offline and moving to the server.
+      if (input.probe && !input.request && broker.handingOff()) {
+        c.header("x-mycellios-desktop-error", "desktop_updating");
+        return c.json({ error: "The server is moving to a new version.", code: "desktop_updating" }, 503);
+      }
       const botId=input.probe ?? (input.request ? hostComputerRequest.parse(input.request).botId : undefined);
       if (botId) {
         if (!await deps.ownsBot(input.scope,botId)) return c.json({available:false,error:"Unavailable agent"},404);
@@ -121,6 +131,34 @@ export function mountDesktopRelay(
         409,
       );
     }
+  });
+  /**
+   * A deploy hands the PC connections from this API to a new version: `start` stops new work
+   * reaching PCs through this instance (renew it before DESKTOP_RELAY_HANDOFF_MS ends),
+   * `cancel` ends it (a rollback), `status` only reads. Every answer is the evidence the
+   * deployment waits for: this instance, its revision and what is still open here. Never
+   * through the public edge, and signed with the relay key like /internal.
+   */
+  app.post("/internal/desktop-relay/handoff", async (c) => {
+    c.header("cache-control", "no-store");
+    if (c.req.header("x-forwarded-for") || c.req.header("forwarded")) return c.notFound();
+    const body = await readBoundedBody(c.req.raw, 1_024);
+    if (body === null) return c.json({ error: "Too large" }, 413);
+    if (!verifyDesktopRelay(secret, c.req.header("x-desktop-time") ?? "", body, c.req.header("x-desktop-signature") ?? ""))
+      return c.json({ error: "Unauthorized" }, 401);
+    let action: unknown;
+    try {
+      action = (JSON.parse(body) as { action?: unknown } | null)?.action;
+    } catch {
+      action = undefined;
+    }
+    if (action !== "status" && action !== "start" && action !== "cancel")
+      return c.json({ error: "Invalid request" }, 400);
+    if (action !== "status") {
+      broker.handOff(action === "start");
+      getLogger().info("desktop.relay.handoff", { "desktop.handoff": action, ...broker.handoffState() });
+    }
+    return c.json({ instance, ...(deps.revision ? { revision: deps.revision } : {}), ...broker.handoffState() });
   });
   app.post("/api/desktop-relay/:action", async (c) => {
     c.header("cache-control", "no-store");

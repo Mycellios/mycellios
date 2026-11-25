@@ -3,8 +3,8 @@ import { createServer } from "node:http";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DesktopUnreachableError } from "./computer-errors.js";
-import { DesktopRelayBroker, desktopAgentSelection, desktopDeviceKey, desktopRelayAvailable, desktopRelayKey, desktopRelayPresence, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
+import { ComputerUpdatingError, DesktopUnreachableError } from "./computer-errors.js";
+import { DESKTOP_RELAY_HANDOFF_MS, DesktopRelayBroker, desktopAgentSelection, desktopDeviceKey, desktopRelayAvailable, desktopRelayKey, desktopRelayPresence, signDesktopRelay, verifyDesktopRelay } from "./desktop-relay.js";
 const owner = { userId: "user", spaceId: "space", sessionId: "session" };
 const binding = { deviceId: "device", botId: "bot", generation: "generation" };
 const context = () => ({ userId: "user", spaceId: "space", botId: "bot", operationId: "op", traceId: "trace", signal: new AbortController().signal });
@@ -348,6 +348,47 @@ it("never lets a start the PC already received run again after it disconnects",a
   expect(()=>broker.dispatch({...run,sessionId:crypto.randomUUID()},context())).toThrow("already dispatched");
 });
 
+it("hands its PCs to a new server version and still answers the runs already open here", async () => {
+  let now = 1_000;
+  broker = new DesktopRelayBroker(() => now);
+  broker.register(owner, { ...binding, agentExecution: 1 }); broker.connectAccountBot(owner, "bot");
+  const run = broker.dispatch({ method: "agentRun", botId: "bot", runId: "open-run", sessionId: crypto.randomUUID(), request: {} }, context());
+  const runOp = broker.poll(owner, "device").operations[0]!.id;
+  broker.handOff(true);
+  expect(broker.handoffState()).toEqual({
+    handingOff: true, handoffEndsAt: new Date(now + DESKTOP_RELAY_HANDOFF_MS).toISOString(),
+    openOperations: 1, deliveredOperations: 1, agentRuns: 1, connectedComputers: 1,
+  });
+  const refusal = (request: Parameters<DesktopRelayBroker["dispatch"]>[0]) => {
+    try { broker.dispatch(request, context()); } catch (error) { return error; }
+    return undefined;
+  };
+  // New work never reaches the PC through this instance: it waits for the new version.
+  for (const request of [
+    { method: "execute" as const, botId: "bot", command: { argv: ["fixture"] } },
+    { method: "agentRun" as const, botId: "bot", runId: "new-run", sessionId: crypto.randomUUID(), request: {} },
+    { method: "agentMessage" as const, botId: "bot", runId: "other-run", sessionId: crypto.randomUUID(), message: {} },
+  ]) expect(refusal(request)).toMatchObject({ code: "desktop_updating", status: 503 });
+  // The open run's callbacks still pass, so it finishes where it started.
+  const callback = broker.dispatch({ method: "agentMessage", botId: "bot", runId: "open-run", sessionId: crypto.randomUUID(), message: {} }, context());
+  const callbackOp = broker.poll(owner, "device").operations[0]!.id;
+  const done = Buffer.from('{"done":true}\n').toString("base64");
+  broker.result(owner, "device", callbackOp, 0, done, true);
+  broker.result(owner, "device", runOp, 0, done, true);
+  await Promise.all([run.text(), callback.text()]);
+  expect(broker.handoffState()).toMatchObject({ handingOff: true, openOperations: 0, agentRuns: 0 });
+  // A rollback ends it at once; a handoff nobody renews ends by itself.
+  broker.handOff(false);
+  expect(broker.handoffState()).not.toHaveProperty("handoffEndsAt");
+  await broker.dispatch({ method: "environment", botId: "bot" }, { ...context(), signal: AbortSignal.abort() }).text();
+  broker.handOff(true);
+  now += DESKTOP_RELAY_HANDOFF_MS - 1;
+  expect(broker.handingOff()).toBe(true);
+  now += 1;
+  expect(broker.handingOff()).toBe(false);
+  expect(broker.handoffState()).toMatchObject({ handingOff: false });
+});
+
 describe("Desktop availability checks", () => {
   const key = desktopRelayKey("fixture-relay-secret");
   const servers: Server[] = [];
@@ -378,6 +419,18 @@ describe("Desktop availability checks", () => {
     const url = await relay(status, { error: "busy" });
     await expect(desktopRelayAvailable(url, key)(context())).rejects.toBeInstanceOf(DesktopUnreachableError);
     await expect(desktopAgentSelection(url, key)(context())).rejects.toBeInstanceOf(DesktopUnreachableError);
+  });
+
+  it("waits for a relay handing its PCs to a new server version, never reading it as offline", async () => {
+    const handingOff = () => new Response(JSON.stringify({ error: "moving" }), {
+      status: 503, headers: { "content-type": "application/json", "x-mycellios-desktop-error": "desktop_updating" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(handingOff()).mockResolvedValueOnce(handingOff()));
+    const presence = await desktopRelayAvailable("http://relay.invalid/internal", key)(context()).catch((error: unknown) => error);
+    expect(presence).toBeInstanceOf(ComputerUpdatingError);
+    expect(presence).toMatchObject({ dispatched: false });
+    await expect(desktopAgentSelection("http://relay.invalid/internal", key)(context()))
+      .rejects.toBeInstanceOf(ComputerUpdatingError);
   });
 
   it("reports a timed-out or lost check as no answer, not as offline", async () => {

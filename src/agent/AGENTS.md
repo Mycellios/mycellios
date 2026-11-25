@@ -2082,6 +2082,14 @@
   profile skips the relay wait. A start the
   PC never claimed requeues the run as not dispatched and frees its segment; a
   claimed start stays uncertain. Verify the broker, stream, runtime and API relay tests.
+  A deploy hands the in-memory broker to a new API version through
+  `/internal/desktop-relay/handoff` (never through the public edge; signed with the relay
+  key; `node dist/cli/desktop-relay-handoff.js status|start|cancel` inside the container).
+  `start` (15 minutes unless renewed) refuses new operations and probes with 503
+  `desktop_updating`, so turns wait (ComputerUpdatingError(false): setup retries without the
+  setup limit, PC work pauses and continues) and are never read as offline; callbacks of
+  agent runs open on that instance still pass. Every answer carries the instance, revision
+  and open/delivered/agent-run operations a handoff waits for; `cancel` is the rollback.
 
 - Only the relay's own answer (200, or 404 unavailable) says whether a PC is available.
   A probe that times out, loses its connection or finds the relay busy (409, 429, 5xx)
