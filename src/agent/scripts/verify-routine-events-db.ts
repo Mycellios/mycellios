@@ -20,6 +20,7 @@ const { createDb, asSystem, createThreadEvents, pruneRoutineEvents, listRoutineI
   await import("@mycellios/db");
 const { routineRunSource } = await import("@mycellios/core");
 const { EncryptedSecretStore } = await import("../packages/adapters/src/secrets.js");
+const { createWebhookRoutineFromChat } = await import("../packages/adapters/src/schedule-webhook.js");
 const {
   acceptRoutineEvent,
   mountRoutineEventRoutes,
@@ -348,6 +349,24 @@ try {
   const history = await routes.history!({ context: { actor: scope }, input: { routineId } });
   assert.ok(Array.isArray(history.events) && history.events.length >= 4);
   const ownerRequest = { context: { actor: scope }, input: { routineId } };
+  const chatActor = { ...scope, botId: bot.id, runId: "synthetic-chat-run" };
+  const cardArgs = { name: "From chat", prompt: "Process receipt", eventType: "receipt.created" };
+  const makeCard = (_tx: unknown, row: { id: string }) =>
+    Promise.resolve({ kind: "routine_webhook", routineId: row.id });
+  const created = await createWebhookRoutineFromChat(prisma, secrets, context(), chatActor, "call-1", cardArgs, makeCard);
+  assert.ok("routineId" in created.result && created.result.routineId);
+  assert.doesNotMatch(JSON.stringify(created), /whsec_/);
+  const replay = await createWebhookRoutineFromChat(prisma, secrets, context(), chatActor, "call-1", cardArgs, makeCard);
+  assert.deepEqual(replay, { result: created.result });
+  const chatSecret = await routes.revealWebhookSecret!({
+    ...ownerRequest, input: { routineId: created.result.routineId },
+  });
+  assert.match(String(chatSecret.secret), /^whsec_/);
+  await assert.rejects(createWebhookRoutineFromChat(prisma, secrets, context(), chatActor, "call-2", {
+    ...cardArgs, name: "Failed card",
+  }, async () => { throw new Error("Synthetic card write failure"); }), /Synthetic card write failure/);
+  assert.equal(await prisma.routine.count({ where: { ...scope, name: "Failed card" } }), 0);
+  checks.push("a chat retry creates one routine and card, and a failed card rolls back the routine and secret");
   await assert.rejects(routes.revealWebhookSecret!(ownerRequest), /NOT_FOUND|Not Found/i);
   const revealUntil = new Date(Date.now() + HOUR);
   await prisma.routineWebhookSecret.updateMany({
