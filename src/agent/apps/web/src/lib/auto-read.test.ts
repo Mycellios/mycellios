@@ -43,7 +43,7 @@ describe("queued automatic reads", () => {
     );
     expect(guard).toContain("manuallyUnread.current.has(groupId)");
     // Marking a message unread in an open group sets that hold.
-    const fromMessage = slice("onMarkUnread={(message) => {", "} else if (active) {");
+    const fromMessage = slice("const markTranscriptMessageUnread = useCallback(", "} else if (activeBotId.current) {");
     expect(fromMessage).toContain("manuallyUnread.current.add(groupId)");
     // Opening the group clears it, so the next visit reads as usual.
     const open = slice("if (!groupId || !activeGroup) return;", "const markVisibleGroupRead");
@@ -56,7 +56,7 @@ describe("queued automatic reads", () => {
       "// A bot the user marked unread by hand",
     );
     expect(markBot).toContain("readInOrder(`bot:");
-    const fromMessage = slice("onMarkUnread={(message) => {", "} else if (active) {");
+    const fromMessage = slice("const markTranscriptMessageUnread = useCallback(", "} else if (activeBotId.current) {");
     expect(fromMessage).toContain("readInOrder(`group:");
     const bot = slice(
       "const markBotReadIfVisible = useCallback(",
