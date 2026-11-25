@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-25
+
+### Added
+
+- Update managed copies of Codex, Claude Code and OpenCode from the model picker. Mycellios
+  shows the new version and verifies its package before installing it. Ongoing turns keep
+  their version and new turns wait while the update is checked.
+
+### Fixed
+
+- A configured text model can take over when a reasoning model is rate-limited on a text request that has no explicit thinking preference.
+- Waiting for replies can fold away on desktop. On small screens, a compact button opens replies and queued messages in one sheet.
+
 ## [0.27.0] - 2026-11-25
 
 ### Changed
