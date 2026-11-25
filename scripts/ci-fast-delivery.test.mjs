@@ -262,6 +262,26 @@ test('deployments are requested only from main pushes after the exact commit pas
   assert.ok(!readFileSync('.github/workflows/ci.yml', 'utf8').includes('deployments/github'));
 });
 
+test('the public status page probes from GitHub-hosted runners and may only read issues and deploy Pages', () => {
+  const workflow = readFileSync('.github/workflows/public-status.yml', 'utf8');
+  assert.match(workflow, /^on:\n {2}schedule:\n {4}- cron: '\*\/5 \* \* \* \*'\n {2}workflow_dispatch:\n/m);
+  for (const forbidden of ['pull_request', 'secrets.', 'self-hosted', 'write-all', 'contents: write', 'issues: write', 'packages:', 'actions:', 'git push', 'git commit', 'deployments/github']) {
+    assert.ok(!workflow.includes(forbidden), forbidden);
+  }
+  assert.ok(workflow.includes('\npermissions: {}\n'));
+  assert.deepEqual([...new Set(workflow.match(/runs-on: .+/g))], ['runs-on: ubuntu-latest']);
+  for (const [, action] of workflow.matchAll(/uses:\s+([^\s#]+)/g)) assert.match(action, /@[0-9a-f]{40}$/, action);
+  assert.match(workflow, /concurrency:\n {2}group: public-status\n {2}cancel-in-progress: false\n/);
+  const build = workflow.slice(workflow.indexOf('\n  build:\n'), workflow.indexOf('\n  deploy:\n'));
+  assert.match(build, /permissions:\n {6}contents: read\n {6}issues: read\n {6}pages: read\n {4}outputs:/);
+  assert.ok(build.includes("if: github.repository == 'Mycellios/mycellios'"));
+  assert.ok(build.includes('run: node scripts/public-status.mjs pages') && build.includes('run: node scripts/public-status.mjs build _site'));
+  const deploy = workflow.slice(workflow.indexOf('\n  deploy:\n'));
+  assert.match(deploy, /permissions:\n {6}pages: write\n {6}id-token: write\n {4}environment:/);
+  assert.ok(deploy.includes("if: needs.build.outputs.deploy == 'true' && github.ref == 'refs/heads/main'"));
+  assert.equal((workflow.match(/^\s+run: /gm) ?? []).length, 2, 'the workflow only calls the tested script');
+});
+
 test('self-host images come only from main on GitHub-hosted runners and never replace the Nucleus images', () => {
   const workflow = readFileSync('.github/workflows/self-host-images.yml', 'utf8');
   assert.match(workflow, /^on:\n {2}push:\n {4}branches: \[main\]\n/m);

@@ -6,7 +6,8 @@ import { Hono } from "hono";
  * operators on the API port; a reverse proxy adds forwarding headers, so a request that
  * carries them came through the public edge and gets no details. `/ready` adds only the
  * deployed revision, as the coordinator's public health does: Nucleus deploys check that the
- * new commit is the one being served.
+ * new commit is the one being served. `/api/v1/status` is the public status page's read: the
+ * same database probe and degraded flag as `/ready`, answered only as `ok` or `degraded`.
  */
 export function healthRoutes(
   details: () => Record<string, unknown>,
@@ -43,6 +44,20 @@ export function healthRoutes(
       ok ? 200 : 503,
     );
   });
+  // Anyone can call it, so callers share one database answer for a short while.
+  let lastPublic: { at: number; up: boolean } | null = null;
+  app.get("/api/v1/status", async (c) => {
+    let up =
+      lastPublic && Date.now() - lastPublic.at < PUBLIC_STATUS_REUSE_MS ? lastPublic.up : null;
+    if (up === null) {
+      up = database ? await withinDeadline(probe(database)) : true;
+      lastPublic = { at: Date.now(), up };
+    }
+    const ok = up && details().degraded !== true;
+    return c.json({ status: ok ? "ok" : "degraded" }, ok ? 200 : 503, {
+      "cache-control": "no-store",
+    });
+  });
   app.get("/health", (c) => c.json({ ok: true }));
   app.get("/internal/health", (c) => {
     if (c.req.header("x-forwarded-for") || c.req.header("forwarded")) return c.notFound();
@@ -52,6 +67,8 @@ export function healthRoutes(
 }
 
 export const DATABASE_CHECK_TIMEOUT_MS = 1500;
+/** How long `/api/v1/status` reuses a database answer, so public reads cannot drive the probe rate. */
+export const PUBLIC_STATUS_REUSE_MS = 10_000;
 
 /** Readiness callers poll with short timeouts, so a hung database counts as unreachable. */
 async function withinDeadline(check: Promise<boolean>) {
