@@ -45,6 +45,8 @@ export async function createOwnedArtifact(
     mimeType: string;
     contentBase64: string;
     clientNonce?: string;
+    /** A Space member's upload to their conversation with this shared Mico. */
+    memberUserId?: string;
   },
 ) {
   const replayed = await findReplayedArtifact(deps.prisma, actor, input);
@@ -121,6 +123,7 @@ async function storeOwnedArtifact(
     mimeType: string;
     bytes: Uint8Array;
     clientNonce?: string;
+    memberUserId?: string;
   },
 ) {
   const { mimeType, bytes } = input;
@@ -135,6 +138,7 @@ async function storeOwnedArtifact(
       botId: input.botId,
       groupId: input.groupId,
       name: input.name,
+      memberUserId: input.memberUserId,
     },
     async (tx, { rootArtifactId, version }) => {
       // A retry of the same upload has the same name and target, so it waits on the same lock.
@@ -155,6 +159,7 @@ async function storeOwnedArtifact(
           rootArtifactId,
           version,
           clientNonce: input.clientNonce,
+          ...(input.memberUserId ? { memberUserId: input.memberUserId } : {}),
         },
       });
       return { row: created, replay: false };
@@ -171,7 +176,7 @@ async function storeOwnedArtifact(
 async function findReplayedArtifact(
   db: Pick<Prisma.TransactionClient, "artifact">,
   actor: ArtifactOwner,
-  input: { botId: string; groupId?: string; clientNonce?: string },
+  input: { botId: string; groupId?: string; clientNonce?: string; memberUserId?: string },
 ) {
   if (!input.clientNonce) return null;
   const row = await db.artifact.findFirst({
@@ -182,7 +187,8 @@ async function findReplayedArtifact(
   const sameTarget = input.groupId
     ? row.groupId === input.groupId
     : row.botId === input.botId && row.groupId === null;
-  if (!sameTarget) throw new IsolationError();
+  if (!sameTarget || (row.memberUserId ?? null) !== (input.memberUserId ?? null))
+    throw new IsolationError();
   return row;
 }
 
@@ -220,6 +226,53 @@ export async function getOwnedArtifact(
   });
   if (!row) throw new IsolationError();
   return readArtifact(deps.artifacts, actor, row, input.botId);
+}
+
+/**
+ * A file a Space member uploaded to their own conversation with a shared Mico
+ * (specs/space-members). The owner's files, and other members', stay out of reach.
+ */
+export async function getMemberArtifact(
+  deps: {
+    prisma: PrismaClient;
+    artifacts: ArtifactStore;
+  },
+  owner: Actor,
+  input: { botId: string; artifactId: string; memberUserId: string },
+) {
+  const row = await deps.prisma.artifact.findFirst({
+    where: {
+      id: input.artifactId,
+      botId: input.botId,
+      groupId: null,
+      spaceId: owner.spaceId,
+      userId: owner.userId,
+      memberUserId: input.memberUserId,
+    },
+  });
+  if (!row) throw new IsolationError();
+  return readArtifact(deps.artifacts, owner, row, input.botId);
+}
+
+/** A member attaches only their own uploads to this Mico; anything else is refused unseen. */
+export async function assertMemberUploads(
+  prisma: Pick<PrismaClient, "artifact">,
+  owner: Actor,
+  input: { botId: string; memberUserId: string; artifactIds?: string[] },
+) {
+  const ids = [...new Set(input.artifactIds ?? [])];
+  if (!ids.length) return;
+  const found = await prisma.artifact.count({
+    where: {
+      id: { in: ids },
+      botId: input.botId,
+      groupId: null,
+      spaceId: owner.spaceId,
+      userId: owner.userId,
+      memberUserId: input.memberUserId,
+    },
+  });
+  if (found !== ids.length) throw new IsolationError();
 }
 
 export async function getSpaceArtifact(

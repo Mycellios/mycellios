@@ -81,6 +81,8 @@ export interface CreateThreadMessageInput {
   markUnread?: boolean;
   /** Terminal echo after the run is already cancelled. Every other write stays rejected. */
   allowCancelledRun?: boolean;
+  /** The Space member who wrote a user message in their conversation with a shared Mico. */
+  authorUserId?: string;
 }
 
 export async function createThreadMessage(prisma: PrismaClient, input: CreateThreadMessageInput) {
@@ -128,6 +130,7 @@ export async function createThreadMessageInTransaction(
       replyQuote: input.replyQuote,
       runId: input.runId,
       clientNonce: input.clientNonce,
+      ...(input.authorUserId ? { authorUserId: input.authorUserId } : {}),
     },
   });
 }

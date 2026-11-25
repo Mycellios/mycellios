@@ -1,5 +1,6 @@
 import * as z from "zod";
-import { Id } from "./ids.js";
+import { Id, IsoDate } from "./ids.js";
+import { SideThreadStateSchema } from "./side-threads.js";
 
 /**
  * People in a Space other than Personal (specs/space-members, phase 1). The owner created the
@@ -87,9 +88,17 @@ export const SPACE_AUDIT_EVENT_TYPES = [
   "space.member.left",
   "space.member.removed",
   "space.member.role_changed",
+  "space.mico.shared",
 ] as const;
 export const SpaceAuditEventTypeSchema = z.enum(SPACE_AUDIT_EVENT_TYPES);
 export type SpaceAuditEventType = z.infer<typeof SpaceAuditEventTypeSchema>;
+
+/**
+ * Who a Mico is shared with (phase 1b). `none` is every Mico's default; `everyone` includes people
+ * who join later; `people` lists them. Sharing gives the level `chat`.
+ */
+export const MicoShareAudienceSchema = z.enum(["none", "everyone", "people"]);
+export type MicoShareAudience = z.infer<typeof MicoShareAudienceSchema>;
 
 /** One membership change, with the names people had when it happened. */
 export const SpaceAuditEventSchema = z.object({
@@ -99,9 +108,95 @@ export const SpaceAuditEventSchema = z.object({
   targetName: z.string().nullable(),
   role: SpaceMemberRoleSchema.nullable(),
   kind: SpaceInvitationKindSchema.nullable(),
+  /** For a share: the Mico's name at the time and who it went to. Absent from older servers. */
+  micoName: z.string().nullable().optional(),
+  audience: MicoShareAudienceSchema.nullable().optional(),
   createdAt: z.string(),
 });
 export type SpaceAuditEvent = z.infer<typeof SpaceAuditEventSchema>;
+
+/** Credit microunits a person may spend on one shared Mico per UTC day unless the owner says otherwise. */
+export const DEFAULT_MICO_SHARE_DAILY_ALLOWANCE_MICROS = 1_000_000;
+/** The largest daily allowance per person and Mico: 100 Credits. */
+export const MAX_MICO_SHARE_DAILY_ALLOWANCE_MICROS = 100_000_000;
+
+const DailyAllowanceMicros = z.number().int().min(0).max(MAX_MICO_SHARE_DAILY_ALLOWANCE_MICROS);
+
+/** How one Mico of the Space is shared, for the Space's owner and admins. */
+export const MicoShareSchema = z.object({
+  botId: Id,
+  name: z.string(),
+  title: z.string(),
+  color: z.string(),
+  audience: MicoShareAudienceSchema,
+  /** The people it is shared with when the audience is `people`. */
+  userIds: z.array(Id),
+  /** What each person may spend on it per UTC day, paid by its owner; 0 stops their messages. */
+  dailyAllowanceMicros: DailyAllowanceMicros,
+});
+export type MicoShare = z.infer<typeof MicoShareSchema>;
+
+export const MicoShareInputSchema = z
+  .object({
+    botId: Id,
+    audience: MicoShareAudienceSchema,
+    userIds: z.array(Id).max(MAX_SPACE_MEMBER_LIMIT).default([]),
+    dailyAllowanceMicros: DailyAllowanceMicros.default(DEFAULT_MICO_SHARE_DAILY_ALLOWANCE_MICROS),
+  })
+  .refine(
+    (input) =>
+      input.audience === "people"
+        ? input.userIds.length > 0 && new Set(input.userIds).size === input.userIds.length
+        : input.userIds.length === 0,
+    { message: "List the people only when sharing with chosen people", path: ["userIds"] },
+  );
+export type MicoShareInput = z.infer<typeof MicoShareInputSchema>;
+
+/** One of the viewer's own conversations with a Mico shared with them. */
+export const SharedMicoConversationSchema = z.object({
+  threadId: Id,
+  title: z.string(),
+  state: SideThreadStateSchema,
+  unread: z.boolean(),
+  createdAt: IsoDate,
+  updatedAt: IsoDate,
+});
+export type SharedMicoConversation = z.infer<typeof SharedMicoConversationSchema>;
+
+/**
+ * A Mico shared with the viewer: its name, avatar and title, never its settings, instructions,
+ * memory, skills, connections or computer.
+ */
+export const SharedMicoSchema = z.object({
+  botId: Id,
+  name: z.string(),
+  title: z.string(),
+  color: z.string(),
+  ownerName: z.string(),
+  /** Credit microunits the viewer may still spend on it today (UTC). */
+  allowanceLeftMicros: z.number().int().nonnegative(),
+  conversations: z.array(SharedMicoConversationSchema),
+});
+export type SharedMico = z.infer<typeof SharedMicoSchema>;
+
+export const SharedMicosSchema = z.object({ micos: z.array(SharedMicoSchema) });
+export type SharedMicos = z.infer<typeof SharedMicosSchema>;
+
+/** The viewer's own conversation with a shared Mico; their only way to reach it. */
+export const SharedMicoTargetSchema = z.object({ botId: Id, taskThreadId: Id });
+export type SharedMicoTarget = z.infer<typeof SharedMicoTargetSchema>;
+
+/** Refusals a member may see, shared by the API, the worker and the clients that translate them. */
+export const SHARED_MICO_UNAVAILABLE_ERROR = "This Mico is no longer shared with you.";
+export const SHARED_MICO_PAUSED_ERROR = "Your messages to this Mico are paused.";
+export const SHARED_MICO_ALLOWANCE_ERROR = "You reached today's limit for this Mico.";
+export const SHARED_MICO_PAYER_ERROR = "This Mico can't answer members right now.";
+export const SHARED_MICO_CONVERSATION_ERROR = "Only the person who started this conversation can write in it.";
+
+/** The start of the UTC day a daily allowance counts from. */
+export function allowanceDayStart(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
 
 export const SpaceAuditInputSchema = z.object({
   /** The id of the last event on the previous page. */

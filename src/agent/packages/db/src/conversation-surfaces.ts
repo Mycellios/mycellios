@@ -32,10 +32,11 @@ export const SIDE_THREAD_REQUEST_LIMIT = 20;
 
 /**
  * Open conversations of a Mico as its tabs list them: not archived, not being deleted, and not a
- * development project's session (those live under their project).
+ * development project's session (those live under their project). A Space member's conversation
+ * with a shared Mico is theirs to read, answer and mark read, so it never counts or waits here.
  */
 const OPEN_SIDE_THREAD = Prisma.sql`t."archivedAt" IS NULL AND t."deleteAfter" IS NULL
-  AND (t."projectKey" IS NULL OR t."projectKey" NOT LIKE 'project:%')`;
+  AND (t."projectKey" IS NULL OR t."projectKey" NOT LIKE 'project:%') AND t."memberUserId" IS NULL`;
 
 const count = (value: unknown) => {
   const parsed = typeof value === "bigint" ? Number(value) : typeof value === "number" ? value : Number(value);
@@ -137,10 +138,11 @@ export async function markAllThreadsRead(
   scope: Scope,
   input: { botId?: string } = {},
 ): Promise<number> {
+  // Members' conversations keep their own read state (see OPEN_SIDE_THREAD).
   const target = input.botId
-    ? Prisma.sql`(t."botId" = ${input.botId} OR (t."taskBotId" = ${input.botId} AND t."archivedAt" IS NULL AND t."deleteAfter" IS NULL))`
+    ? Prisma.sql`(t."botId" = ${input.botId} OR (t."taskBotId" = ${input.botId} AND t."archivedAt" IS NULL AND t."deleteAfter" IS NULL AND t."memberUserId" IS NULL))`
     : Prisma.sql`(t."botId" IS NOT NULL OR t."groupId" IS NOT NULL
-        OR (t."taskBotId" IS NOT NULL AND t."archivedAt" IS NULL AND t."deleteAfter" IS NULL))`;
+        OR (t."taskBotId" IS NOT NULL AND t."archivedAt" IS NULL AND t."deleteAfter" IS NULL AND t."memberUserId" IS NULL))`;
   return prisma.$executeRaw`
     UPDATE threads t SET unread = false, "lastReadSeq" = GREATEST(t."lastReadSeq", t."nextMessageSeq" - 1)
     WHERE t."spaceId" = ${scope.spaceId} AND t."userId" = ${scope.userId} AND ${target}

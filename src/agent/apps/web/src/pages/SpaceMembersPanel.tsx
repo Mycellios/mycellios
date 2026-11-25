@@ -1,5 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type {
+  SpaceAuditEvent,
+  SpaceAuditEventType,
   SpaceInvitationCreated,
   SpaceMemberRole,
   SpaceMembers,
@@ -30,6 +32,7 @@ import { useSpaceQueries, writeSaved } from "../lib/query";
 import { spaceLabel } from "../lib/space-label";
 import { useSpaceRpc } from "../lib/space-rpc";
 import { errorText } from "../lib/user-error";
+import { SpaceMicosPanel } from "./SpaceMicosPanel";
 
 /**
  * The people in the bound Space (specs/space-members). Its owner and admins invite by email or
@@ -54,6 +57,13 @@ export function SpaceMembersPanel({
   const [email, setEmail] = useState("");
   const [created, setCreated] = useState<SpaceInvitationCreated | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [earlierActivity, setEarlierActivity] = useState<{ entries: SpaceAuditEvent[]; more: boolean } | null>(null);
+  const activity = useQuery({
+    queryKey: ["space-member-activity", members.data?.spaceId],
+    queryFn: () => rpc.spaces.members.audit({ limit: 50 }),
+    enabled: showActivity && !!members.data && canInviteToSpace(members.data.role),
+  });
   const [copied, copy] = useCopyText();
 
   async function run(action: () => Promise<SpaceMembers | undefined>) {
@@ -63,6 +73,7 @@ export function SpaceMembersPanel({
     try {
       const next = await action();
       if (next) await writeSaved(queryClient, listOptions.queryKey, () => next);
+      if (showActivity && next) void activity.refetch();
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -100,6 +111,19 @@ export function SpaceMembersPanel({
     role === "owner" ? t`Owner` : role === "admin" ? t`Admin` : t`Member`;
   const personName = (person: SpacePerson) => person.name || person.email || "—";
   const expires = (iso: string) => i18n.date(new Date(iso), { dateStyle: "medium" });
+  const activityLabels: Record<SpaceAuditEventType, string> = {
+    "space.invitation.created": t`Created an invitation`,
+    "space.invitation.revoked": t`Revoked an invitation`,
+    "space.member.joined": t`Joined the Space`,
+    "space.member.left": t`Left the Space`,
+    "space.member.removed": t`Removed a member`,
+    "space.member.role_changed": t`Changed a member's role`,
+    "space.mico.shared": t`Changed Mico sharing`,
+  };
+  const activityEntries = [...new Map(
+    [...(activity.data ?? []), ...(earlierActivity?.entries ?? [])].map((entry) => [entry.id, entry]),
+  ).values()];
+  const hasEarlierActivity = earlierActivity?.more ?? activity.data?.length === 50;
   const showLink =
     created && (created.invitation.kind === "link" || !created.emailSent) ? created : null;
   const space = spaceLabel(spaceName);
@@ -155,6 +179,8 @@ export function SpaceMembersPanel({
           );
         })}
       </SettingsGroup>
+
+      <SpaceMicosPanel members={data} />
 
       {manages ? (
         <SettingsGroup data-testid="space-invite">
@@ -238,6 +264,41 @@ export function SpaceMembersPanel({
           })}
         </SettingsGroup>
       ) : null}
+
+      {manages ? <SettingsGroup>
+        <SettingsRow label={t`Space activity`} control={
+          <Button size="sm" variant="outline" aria-expanded={showActivity}
+            onClick={() => {
+              setEarlierActivity(null);
+              setShowActivity(!showActivity);
+            }}>
+            {showActivity ? t`Hide activity` : t`Show activity`}
+          </Button>
+        } />
+        {showActivity ? <>
+          {activity.isPending ? <LoadingSkeleton layout="settings" /> : null}
+          {activity.error ? <p role="alert" className="p-3">{errorText(activity.error)}</p> : null}
+          {!activity.error && activity.data?.length === 0 ? <p className="p-3 text-sm">{t`No Space activity yet.`}</p> : null}
+          {!activity.error && activityEntries.map((entry) => <SettingsRow key={entry.id}
+            label={activityLabels[entry.type]}
+            description={[entry.actorName, entry.targetName, entry.micoName,
+              entry.role ? roleLabel(entry.role) : null].filter(Boolean).join(" · ")}
+            control={<time className="text-sm text-muted-foreground" dateTime={entry.createdAt}>
+              {i18n.date(new Date(entry.createdAt), { dateStyle: "medium", timeStyle: "short" })}
+            </time>} />)}
+          {hasEarlierActivity && !activity.error ? <div className="p-3">
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => {
+              const cursor = activityEntries.at(-1)?.id;
+              if (!cursor) return;
+              void run(async () => {
+                const page = await rpc.spaces.members.audit({ cursor, limit: 50 });
+                setEarlierActivity({ entries: [...(earlierActivity?.entries ?? []), ...page], more: page.length === 50 });
+                return undefined;
+              });
+            }}>{t`Load earlier activity`}</Button>
+          </div> : null}
+        </> : null}
+      </SettingsGroup> : null}
 
       {error ? (
         <p role="alert" className="text-[13px] text-destructive">

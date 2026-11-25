@@ -390,6 +390,7 @@ export type SettingsSpace = {
   canDelete?: boolean;
   /** Every bot deleting the space removes, from the server. */
   botCount?: number;
+  otherMemberCount?: number;
   /** The account's Personal Space, which is never shared. */
   isDefault?: boolean;
   /** The viewer's role; absent for the Spaces it owns, as before Space members. */
@@ -406,6 +407,7 @@ export function DeleteSpaceDialog({
   onConfirm: () => Promise<void>;
 }) {
   const botCount = space.botCount ?? 0;
+  const otherMemberCount = space.otherMemberCount ?? 0;
   const name = spaceLabel(space.name);
   return (
     <DeleteItemDialog
@@ -420,6 +422,11 @@ export function DeleteSpaceDialog({
           />
         ) : undefined
       }
+      description={otherMemberCount > 0 ? <Plural
+        value={otherMemberCount}
+        one="This removes access for # other member and cannot be undone."
+        other="This removes access for # other members and cannot be undone."
+      /> : undefined}
       onCancel={onCancel}
       onConfirm={onConfirm}
     />

@@ -133,6 +133,7 @@ export function SpaceInvitePage({ signedIn }: { signedIn: boolean }) {
   } else {
     const space = spaceLabel(preview.spaceName);
     const inviter = preview.invitedBy || preview.ownerName;
+    const owner = preview.ownerName;
     content = (
       <>
         <h1 className="text-xl font-medium break-words">{space}</h1>
@@ -145,6 +146,12 @@ export function SpaceInvitePage({ signedIn }: { signedIn: boolean }) {
           <>
             {inviter ? (
               <p className="text-sm text-muted-foreground break-words">{t`Invited by ${inviter}`}</p>
+            ) : null}
+            {/* Members' turns run on the owner's Credits, so the owner can open them (spec). */}
+            {owner ? (
+              <p className="text-sm text-muted-foreground break-words">
+                {t`${owner} can read your conversations with their Micos.`}
+              </p>
             ) : null}
             {error ? (
               <p role="alert" className="text-sm text-destructive">

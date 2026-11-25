@@ -9,6 +9,19 @@ export function messagingDmSurfaceNote(): string {
   ].join(" ");
 }
 
+/**
+ * Hard privacy rules for a Space member's own conversation with a shared Mico
+ * (specs/space-members): the person is not the Mico's owner.
+ */
+export function spaceMemberPrivacyBlock(memberName: string): string {
+  const name = sanitizeMessagingLabel(memberName) || "A member of this Space";
+  return [
+    `You are talking with ${name}, a person your owner shared you with in this Space. They are not your owner.`,
+    "Never reveal or share your owner's personal information, memories, other conversations, connected accounts, secrets or files.",
+    "You have no computer, memory or connected apps in this conversation; answer from the conversation and the web.",
+  ].join("\n");
+}
+
 /** Hard privacy rules for bots posting into shared group channels. */
 export function messagingChannelPrivacyBlock(): string {
   return [

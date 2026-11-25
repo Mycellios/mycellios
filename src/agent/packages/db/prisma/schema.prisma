@@ -486,6 +486,7 @@ model Space {
   deletionClaimId             String?
   memberships                 SpaceMember[]
   invitations                 SpaceInvitation[]
+  micoShares                  MicoShare[]
   bots                        Bot[]
   botSections                 BotSection[]
   developmentProjects         DevelopmentProject[]
@@ -559,6 +560,7 @@ model SpaceKey {
 model SpaceMember {
   desktopExecution DesktopExecutionPreference?
   desktopBotDevices DesktopBotDevice[]
+  micoShares       MicoShareMember[]
   id               String                 @id
   spaceId          String
   organizationId   String
@@ -647,6 +649,39 @@ model SpaceInvitation {
   @@index([spaceId, createdAt])
   @@index([inviterUserId, createdAt])
   @@map("space_invitations")
+}
+
+/// Who a Mico is shared with (specs/space-members, phase 1b): everyone in its Space, or the
+/// people in MicoShareMember. No row is the default, `none`. Sharing gives `chat`: the person
+/// talks to the Mico in their own conversations, on its owner's Credits within the allowance.
+model MicoShare {
+  botId                String            @id
+  bot                  Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
+  spaceId              String
+  space                Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  everyone             Boolean           @default(false)
+  /// Credit microunits each person may spend on this Mico per UTC day; 0 stops their messages.
+  dailyAllowanceMicros BigInt            @default(1000000)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  members              MicoShareMember[]
+
+  @@index([spaceId])
+  @@map("mico_shares")
+}
+
+/// One person a Mico is shared with. Removing them from the Space removes the row.
+model MicoShareMember {
+  botId      String
+  share      MicoShare   @relation(fields: [botId], references: [botId], onDelete: Cascade)
+  spaceId    String
+  userId     String
+  membership SpaceMember @relation(fields: [spaceId, userId], references: [spaceId, userId], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@id([botId, userId])
+  @@index([spaceId, userId])
+  @@map("mico_share_members")
 }
 
 model DeploymentSettings {
@@ -805,6 +840,7 @@ model WorkflowExecution {
 model Bot {
   memoryGrants MicoMemoryGrant[]
   desktopDevices DesktopBotDevice[]
+  share MicoShare?
   ledGroups ChatGroup[] @relation("ChatGroupLead")
   sentBotMessageRequests BotMessageRequest[] @relation("BotMessageRequestSender")
   botMessageRecipients BotMessageRecipient[] @relation("BotMessageRecipientBot")
@@ -1092,6 +1128,9 @@ model Thread {
   branches Thread[] @relation("ThreadBranches")
   branchedFromMessageId String?
   branchedFromMessage Message? @relation("ThreadBranchSource", fields: [branchedFromMessageId], references: [id], onDelete: SetNull)
+  /// A Space member's own conversation with a Mico shared with them (specs/space-members). The
+  /// thread stays the Mico owner's; no foreign key, so it keeps its author after they leave.
+  memberUserId String?
   id                          String     @id @default(cuid())
   spaceId                     String
   space                       Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
@@ -1128,6 +1167,7 @@ model Thread {
   @@index([startedByRunId])
   @@index([branchedFromThreadId])
   @@index([branchedFromMessageId])
+  @@index([spaceId, memberUserId])
   @@unique([id,spaceId,userId],map:"memory_thread_identity_scope_key")
   @@map("threads")
 }
@@ -1168,6 +1208,8 @@ model Message {
   replies          Message[] @relation("MessageReplies")
   runId            String?
   clientNonce      String?
+  /// The Space member who wrote a user message in their conversation; null for the owner.
+  authorUserId     String?
   /// Blind-index search tokens for the encrypted blocks; NULL until the row is encrypted.
   searchTokens     Int[]
   sourceRuns            Run[]             @relation("RunSourceMessage")
@@ -1261,6 +1303,8 @@ model Run {
   taskId               String
   task                 Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId               String
+  /// The Space member whose message started this turn; the Mico's owner (`userId`) pays.
+  requestedByUserId    String?
   status               String
   trigger              String
   modelProvider        String?
@@ -1879,6 +1923,8 @@ model Artifact {
   groupId    String?
   group      ChatGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   userId     String
+  /// The Space member who uploaded it to their conversation with this Mico; null for the owner.
+  memberUserId String?
   runId      String?
   name       String
   description String?
@@ -1936,6 +1982,8 @@ model UsageRecord {
   /// IS the bot id, so a deleted bot's name is still reachable for display.
   botId              String?
   userId             String
+  /// The Space member whose turn this was; `userId` (the Mico's owner) paid for it.
+  requestedByUserId  String?
   runId              String?
   provider           String
   model              String
@@ -2482,6 +2530,8 @@ model ModelCreditEntry {
   userId                 String?
   spaceId                String?
   runId                  String?
+  /// The Space member whose turn reserved this hold; counted against their daily allowance.
+  requestedByUserId      String?
   provider               String?
   model                  String?
   providerRequestId      String?
@@ -2497,6 +2547,7 @@ model ModelCreditEntry {
 
   @@index([reconciliationState, nextReconcileAt])
   @@index([organizationId, createdAt])
+  @@index([requestedByUserId, createdAt])
   @@map("model_credit_entries")
 }
 

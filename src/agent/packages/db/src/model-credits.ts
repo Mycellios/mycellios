@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { CREDIT_MICROUNITS, usdCentsToCreditMicrounits } from "@mycellios/contracts";
+import {
+  CREDIT_MICROUNITS,
+  SHARED_MICO_ALLOWANCE_ERROR,
+  SHARED_MICO_PAUSED_ERROR,
+  usdCentsToCreditMicrounits,
+} from "@mycellios/contracts";
 import type { AgentUsage, BillingCreditPurchase } from "@mycellios/adapter-kit";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./generated/prisma/client.js";
@@ -95,7 +100,46 @@ export async function reconcileCreditPurchase(
   });
 }
 
-/** Atomic debit prevents concurrent calls from reserving the same available funds. */
+/** A Space member's turns on a shared Mico went past what its owner allows them per UTC day. */
+export class SharedMicoAllowanceError extends Error {
+  constructor(readonly paused: boolean) {
+    super(paused ? SHARED_MICO_PAUSED_ERROR : SHARED_MICO_ALLOWANCE_ERROR);
+    this.name = "SharedMicoAllowanceError";
+  }
+}
+
+/** What one member may hold or spend on one shared Mico since the start of the UTC day. */
+export interface MemberAllowance {
+  memberUserId: string;
+  botId: string;
+  limitMicros: bigint;
+  since: Date;
+}
+
+/**
+ * Credit microunits a member's turns on one Mico have held or spent since `since`: pending holds
+ * at their reserved amount, settled ones at their cost. Holds are attributed through their run.
+ */
+export async function memberSpentMicros(
+  db: Pick<PrismaClient, "$queryRaw">,
+  input: { memberUserId: string; botId: string; since: Date },
+): Promise<bigint> {
+  const [row] = await db.$queryRaw<Array<{ spent: bigint | number | null }>>`
+    SELECT COALESCE(SUM(-e."amountMicros"), 0)::bigint AS spent
+    FROM model_credit_entries e
+    JOIN runs r ON r.id = e."runId"
+    WHERE e."requestedByUserId" = ${input.memberUserId}
+      AND e."createdAt" >= ${input.since}
+      AND e."amountMicros" < 0
+      AND r."botId" = ${input.botId}`;
+  return BigInt(row?.spent ?? 0);
+}
+
+/**
+ * Atomic debit prevents concurrent calls from reserving the same available funds. A member's
+ * call also has to fit what is left of their daily allowance; the account lock serializes that
+ * check with every other hold of the payer.
+ */
 export async function reserveModelCredits(
   prisma: PrismaClient,
   organizationId: string,
@@ -107,8 +151,10 @@ export async function reserveModelCredits(
     runId?: string;
     provider?: string;
     model?: string;
+    requestedByUserId?: string;
   },
   now = new Date(),
+  allowance?: MemberAllowance,
 ) {
   if (!Number.isFinite(maxCostUsd) || maxCostUsd <= 0 || maxCostUsd > 10_000)
     throw new Error("This model has no reliable price. Connect your own API key to use it.");
@@ -122,6 +168,11 @@ export async function reserveModelCredits(
       if (existing.organizationId !== organizationId)
         throw new Error("Model call belongs to another account");
       return existing.id;
+    }
+    if (allowance) {
+      if (allowance.limitMicros <= 0n) throw new SharedMicoAllowanceError(true);
+      const spent = await memberSpentMicros(tx, allowance);
+      if (spent + amountMicros > allowance.limitMicros) throw new SharedMicoAllowanceError(false);
     }
     await prepareCreditLots(tx, organizationId, now);
     await expireCreditLots(tx, organizationId, now);

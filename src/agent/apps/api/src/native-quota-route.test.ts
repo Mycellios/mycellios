@@ -155,17 +155,21 @@ it("signs a CLI in or out only on the owner's own PC and never passes raw diagno
   expect(nativeEngineAccount).toHaveBeenCalledTimes(4);
 });
 
-it("lists the missing CLIs the owner's PC can install, passing on only well-formed reports", async () => {
+it("lists the owner's available CLI installs and updates from well-formed reports", async () => {
   const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
   const release = { engine: "claude", version: "2.1.326", source: "npm", package: "@anthropic-ai/claude-code-darwin-arm64", bytes: 160_222_918 };
+  const update = { engine: "codex", current: "0.171.0", version: "0.172.0", source: "npm",
+    package: "@openai/codex", bytes: 100_000_000 };
   const nativeEngineState = vi.fn().mockResolvedValue({ engines: ["codex"], signedOut: [], account: true, install: true,
     installable: [release, { ...release, engine: "codex" }, { ...release, engine: "gemini" }, { ...release, package: "../escape" }],
+    updates: [update, { ...release, current: "2.1.325" }, { ...update, current: "not a version" }],
     installs: [{ engine: "claude", state: "downloading", receivedBytes: 1, totalBytes: 160_222_918 },
       { engine: "claude", state: "failed", error: "first line\nsecond line" }] });
   const list = routes({ getBot, nativeEngineState }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
   expect(await list({ context: { actor: { userId: "user", spaceId: "space" } }, input: { botId: "mico" } })).toEqual({
     computer: "desktop", engines: ["codex"], signedOut: [], models: {}, account: true, install: true,
     installable: [release], installing: [{ engine: "claude", state: "downloading", receivedBytes: 1, totalBytes: 160_222_918 }],
+    updates: [update],
   });
 });
 

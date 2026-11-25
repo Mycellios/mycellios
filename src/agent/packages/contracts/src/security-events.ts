@@ -28,6 +28,7 @@ export const SECURITY_EVENT_TYPES = [
   "space.member.left",
   "space.member.removed",
   "space.member.role_changed",
+  "space.mico.shared",
 ] as const;
 
 export const SecurityEventTypeSchema = z.enum(SECURITY_EVENT_TYPES);

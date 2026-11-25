@@ -122,6 +122,8 @@ it("shows who invited a signed-in account and joins on request", async () => {
   expect(invites.preview).toHaveBeenCalledWith({ token }, { context: { spaceId: null } });
   expect(container.querySelector("h1")?.textContent).toBe("Launch");
   expect(container.textContent).toContain("Invited by Ben");
+  // Members' turns run on the owner's Credits, so the invitation says the owner can read them.
+  expect(container.textContent).toContain("Ana can read your conversations with their Micos.");
   await act(async () => button("Join").click());
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(invites.accept).toHaveBeenCalledWith({ token }, { context: { spaceId: null } });
@@ -140,6 +142,7 @@ it("opens a Space the account already belongs to without joining again", async (
   });
   await show(true);
   expect(container.textContent).toContain("You are already in this space.");
+  expect(container.textContent).not.toContain("can read your conversations");
   await act(async () => button("Open").click());
   expect(invites.accept).not.toHaveBeenCalled();
   expect(location).toBe("/app?settings=space-members&space=space-launch");
