@@ -162,6 +162,20 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
           })).toMatchObject({ ok: false });
           expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, context))
             .toMatchObject({ ok: true, url: firstUrl });
+          // The headless routine survives separate Docker exec calls without changing the interactive tab.
+          const routine = { ...context, runId: "fixture-routine-run", routineBrowserFence: 1 };
+          const routineUrl = new URL("#routine-private", address).href;
+          expect(await sandbox.pageBrowser!(ref, { command: "capabilities" }, routine))
+            .toMatchObject({ ok: true, features: expect.arrayContaining(["routine.isolated"]) });
+          expect(await sandbox.pageBrowser!(ref, { command: "navigate", url: routineUrl }, routine))
+            .toMatchObject({ ok: true, url: routineUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, routine))
+            .toMatchObject({ ok: true, url: routineUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, context))
+            .toMatchObject({ ok: true, url: firstUrl });
+          expect(await sandbox.pageBrowser!(ref, { command: "close" }, routine)).toMatchObject({ ok: true });
+          expect(await sandbox.pageBrowser!(ref, { command: "navigate", url: routineUrl }, routine))
+            .toMatchObject({ ok: false });
           // The handoff view streams only the first conversation's tab, and only under control.
           await expect(provider.connectTabView(ref, { controlToken: "tab-lease" }, first)).rejects.toThrow(/409/);
           await provider.setScreenControl(ref, true, context, "tab-lease");
