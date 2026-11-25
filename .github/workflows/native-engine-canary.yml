@@ -1,6 +1,13 @@
 name: Managed CLI canary
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/native-engine-canary.yml"
+      - "src/agent/packages/adapters/src/native-agent-process.ts"
+      - "src/agent/packages/adapters/src/native-engine-store.ts"
+      - "src/agent/packages/adapters/src/native-engines.*.json"
+      - "src/agent/scripts/native-engine-canary.ts"
   schedule:
     - cron: "32 5 * * *"
   workflow_dispatch:
@@ -10,7 +17,7 @@ permissions:
 
 jobs:
   native-engines:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     strategy:
