@@ -849,7 +849,12 @@
   id, sent after the server's `ownership: 1`); none or several is `unresolved`, never
   guessed or offline. One online PC still takes every Mico; explicit binds win. The
   offline cloud workspace needs a really offline PC, and for native engines the
-  server's nativeHostAccess grant (specs/desktop-mico-ownership/spec.md). Verify
+  server's nativeHostAccess grant (specs/desktop-mico-ownership/spec.md).
+  Without that grant a fresh turn of a native-engine Mico answers on the server
+  with its saved Pi model, else the account's main model (piFallback), captured
+  as engine pi so resume stays there, and the chat note names the engine it
+  replaced; with neither model it keeps the PC's offline message
+  (specs/local-engine-default/spec.md). Admitted local runs never move. Verify
   relay broker/API/client, mico-folders, offline-cloud-workspace and runtime tests.
 
 - The installed PWA Voice shortcut uses ?dictate=1 and the existing scoped chat
