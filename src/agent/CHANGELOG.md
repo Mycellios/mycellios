@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-25
+
+### Added
+
+- Ask a Mico in your own chat to create a signed webhook routine. The chat card
+  provides the event URL and lets you reveal the signing secret once.
+
 ## [0.25.0] - 2026-11-25
 
 ### Added
