@@ -247,12 +247,12 @@ import { clearSpaceSelection, createSpaceRpc, type RpcClient, rpcForSpace, selec
 import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
 import { ResponseStyleContext, useSavedResponseStyle } from "../lib/response-style";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
-import { MainTabMenu, MicoTaskTabs } from "../components/MicoTaskTabs";
+import { MicoTaskTabs } from "../components/MicoTaskTabs";
 import { ConversationFailureCard, MicoStartedBanner, NewConversationIntro } from "../components/NewConversationIntro";
 import { BranchOriginDivider } from "../components/BranchOriginDivider";
 import { type BranchOriginBlock, branchConversation, branchSource } from "../lib/conversation-branch";
 import {
-  adoptNewConversation, closeOtherTabs, forgetNewConversationRequest, isClosedConversation, NEW_CONVERSATION_TAB,
+  adoptNewConversation, forgetNewConversationRequest, isClosedConversation, NEW_CONVERSATION_TAB,
   newConversationRequest, openTab, updateConversationTabs, useConversationRows, useConversationTabs, writeConversationRows,
 } from "../lib/thread-tabs";
 import { openMovedConversation } from "../lib/moved-conversation";
@@ -4612,12 +4612,6 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   };
   // Branching is a desktop and web action: not on phones, in groups, projects or floating chats.
   const branchingOffered = Boolean(active && !inGroup && !activeProject && !newConversation && !isMobileSidebar && !floatingChat);
-  /** The main tab closes every conversation tab; it never closes itself. */
-  const closeAllConversationTabs = () => {
-    if (!conversationScope) return;
-    updateConversationTabs(conversationScope, state => closeOtherTabs(state, null));
-    if (taskScope || newConversation) selectConversation();
-  };
   const renderTaskTabs = (close?: () => void, inMenu = isMobileSidebar) => (
     <>
     {active && !inGroup && !activeProject ? <MicoTaskTabs
@@ -5113,15 +5107,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 {active || activeGroup ? <ArrowLeft className="size-6" /> : <Menu strokeWidth={1.7} className="size-6" />}
               </Button>
             </div>
-            {firstMicoSetup ? <span className="text-sm font-medium"><Trans>New bot</Trans></span> : <MainTabMenu
-              enabled={Boolean(active && !inGroup && !activeProject && !isMobileSidebar)}
-              label={t`Main chat`} onCloseAll={closeAllConversationTabs}><Button
-              variant={active && !inGroup && !activeProject ? (!taskScope && !newConversation ? "secondary" : "ghost") : "floating"}
+            {firstMicoSetup ? <span className="text-sm font-medium"><Trans>New bot</Trans></span> : <Button
+              variant={active && !inGroup && !activeProject ? "ghost" : "floating"}
               data-testid="bot-settings-trigger"
-              aria-label={(taskScope || newConversation) && !activeProject && !inGroup ? t`Main chat` : undefined}
-              aria-current={active && !taskScope && !newConversation && !inGroup ? "page" : undefined}
+              aria-label={isMobileSidebar && (taskScope || newConversation) && !activeProject && !inGroup ? t`Main chat` : undefined}
               onClick={() => {
-                if ((taskScope || newConversation) && active && !activeProject && !inGroup) {
+                if (isMobileSidebar && (taskScope || newConversation) && active && !activeProject && !inGroup) {
                   selectConversation();
                 } else setPanel(inGroup ? "group-settings" : "settings");
               }}
@@ -5149,7 +5140,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                     : (activeProject ? `${activeProject.name} · ${activeProject.conversations.find(chat => chat.threadId === taskScope?.taskThreadId)?.title ?? active?.name}` : active?.name ?? t`Select a bot`)}
                 </span>
               </span>
-            </Button></MainTabMenu>}
+            </Button>}
             {active && !inGroup && !newConversation ? <DeveloperContextLink
               key={`debug-link:${userId}:${currentSpaceId}:${active.id}:${activeSnapshot?.threadId}`}
               botId={active.id} spaceId={currentSpaceId} threadId={activeSnapshot?.threadId}

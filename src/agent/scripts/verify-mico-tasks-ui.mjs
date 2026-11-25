@@ -80,8 +80,67 @@ try {
   if (process.argv.includes("--mobile-menu-only")) {
     await verifyMobileMenu(browser, url);
     console.log("Mobile conversation menu passed with synthetic RPCs.");
-  } else await verifyConversationSurfaces(browser, url);
+  } else if (process.argv.includes("--navigation-only")) await verifyConversationNavigation(browser, url);
+  else await verifyConversationSurfaces(browser, url);
 } finally { await browser?.close(); await server.close(); }
+
+async function verifyConversationNavigation(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1327, height: 680 } });
+  try {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto(`${url}?locale=es`);
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+    const picker = page.locator('[data-slot="popover-content"]');
+    const switcher = page.getByRole("button", { name: /Todas las conversaciones/ });
+    const mainTab = page.locator("[data-main-chat-tab]");
+    const routineTab = page.locator('[data-thread-tab="task-routine"]');
+    const routineRow = picker.getByRole("button", { name: /Daily digest/ });
+    await switcher.waitFor();
+    assert.equal(await switcher.textContent(), "Todas las conversaciones");
+    assert.equal(await switcher.locator("span.truncate").evaluate(label => label.scrollWidth > label.clientWidth), false);
+    const shortTab = await page.locator('[data-thread-tab="task-one"]').boundingBox();
+    const longTab = await page.locator('[data-thread-tab="task-two"]').boundingBox();
+    assert.ok(shortTab && longTab && longTab.width > shortTab.width, "tabs give more width to longer titles");
+    assert.equal(await mainTab.textContent(), "Chat principal");
+    assert.equal(await mainTab.getAttribute("aria-current"), "page");
+    assert.equal(await routineTab.count(), 0);
+    await switcher.click();
+    await picker.getByRole("button", { name: /Review API/ }).getByText("Pestaña abierta").waitFor();
+    assert.equal(await routineRow.locator("[data-open-tab]").count(), 0);
+    await page.screenshot({ path: path.join(output, "conversation-navigation-desktop.png"), animations: "disabled" });
+    await routineRow.click();
+    await routineTab.locator('button[aria-current="page"]').waitFor();
+    await switcher.click();
+    await routineRow.getByText("Pestaña abierta").waitFor();
+    await page.keyboard.press("Escape");
+    await picker.waitFor({ state: "hidden" });
+    await routineTab.hover();
+    await routineTab.locator("button[aria-label]").click();
+    await routineTab.waitFor({ state: "detached" });
+    await mainTab.click();
+    await switcher.click();
+    await routineRow.waitFor();
+    assert.equal(await routineRow.locator("[data-open-tab]").count(), 0);
+    await routineRow.click();
+    await page.getByRole("button", { name: "Narrow header", exact: true }).click();
+    await page.setViewportSize({ width: 520, height: 680 });
+    await page.locator('nav[data-tabs-layout="compact"]').waitFor();
+    assert.equal(await switcher.textContent(), "Daily digest");
+    assert.match(await switcher.getAttribute("aria-label"), /^Daily digest · Todas las conversaciones/);
+    await switcher.focus();
+    await page.keyboard.press("Enter");
+    await picker.waitFor();
+    await page.screenshot({ path: path.join(output, "conversation-navigation-compact.png"), animations: "disabled" });
+    await picker.getByRole("button", { name: "Chat principal", exact: true }).click();
+    assert.equal(await switcher.textContent(), "Chat principal");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    assert.deepEqual(errors, []);
+    console.log(`Conversation navigation passed in Spanish, at wide and compact widths. Screenshots: ${output}`);
+  } finally {
+    await page.close();
+  }
+}
 
 async function verifyConversationSurfaces(browser, url) {
   const page = await browser.newPage();
@@ -90,7 +149,7 @@ async function verifyConversationSurfaces(browser, url) {
   const reviewTab = () => page.locator('[data-thread-tab="task-one"] button:not([aria-label])');
   await reviewTab().waitFor({ timeout: 90_000 });
   const picker = () => page.locator('[data-slot="popover-content"]');
-  const chevron = () => page.getByRole("button", { name: /^Conversations/ });
+  const chevron = () => page.getByRole("button", { name: /All conversations/ });
   const openPicker = async () => {
     await chevron().click();
     await picker().waitFor();
@@ -216,8 +275,8 @@ async function verifyConversationSurfaces(browser, url) {
   await page.screenshot({ path: path.join(output, "compact.png"), animations: "disabled" });
   await page.getByRole("button", { name: "Narrow header", exact: true }).click();
 
-  // On a phone, Delete asks first and offers no Undo.
-  await page.setViewportSize({ width: 390, height: 844 });
+  // Below the mobile breakpoint, Delete asks first and offers no Undo.
+  await page.setViewportSize({ width: 620, height: 844 });
   await page.reload();
   // A phone shows one readable tab; the others stay in the picker.
   await chevron().waitFor({ timeout: 60_000 });
@@ -451,7 +510,7 @@ async function verifyConversationSurfaces(browser, url) {
     "draft tab creates nothing until the first message and keeps its text across a reload", "first message creates the conversation in the draft's place",
     "tab menu with close, rename, archive and delete; delete disabled while working", "archive closes the tab",
     "delete hides the tab with Undo that restores its place", "Mico-started conversation opens as a background tab",
-    "Delete key, Ctrl+Shift+O and Alt+Shift+Up", "compact switcher below 200 px", "phone delete asks first",
+    "Delete key, Ctrl+Shift+O and Alt+Shift+Up", "compact switcher below 440 px", "phone delete asks first",
     "return to main chat", "change Mico concurrency", "save and execute visual workflow", "stop workflow",
     "Conversations pane lists open conversations with state, time and Waiting for you", "a conversation opens beside the chat and its tab menu closes it with neighbour fallback",
     "Open in the chat moves a beside conversation into the chat", "Open waits card shows each wait, its request, cancels one and never claims a woken wait",

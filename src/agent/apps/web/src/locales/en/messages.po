@@ -13621,6 +13621,15 @@ msgstr "Restore conversation"
 msgid "Conversations, new replies"
 msgstr "Conversations, new replies"
 
+msgid "All conversations"
+msgstr "All conversations"
+
+msgid "All conversations, new replies"
+msgstr "All conversations, new replies"
+
+msgid "Open tab"
+msgstr "Open tab"
+
 #: src/components/NewConversationIntro.tsx
 msgid "New conversation with {name}"
 msgstr "New conversation with {name}"

@@ -54,7 +54,7 @@ test("conversation tabs render a slow first history read and reopen from cache",
     await route.fulfill({ response, json: { ...payload, json: { ...payload.json, messages: [message] } } });
   });
 
-  await page.getByRole("button", { name: "Conversations", exact: true }).click();
+  await page.getByRole("button", { name: "All conversations", exact: true }).click();
   await page.getByRole("button", { name: title, exact: true }).click();
   await expect(page.getByRole("status", { name: "Loading…" })).toBeVisible();
   await expect(page.getByText("What shall we work on?")).toHaveCount(0);
