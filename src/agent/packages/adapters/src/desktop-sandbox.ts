@@ -312,7 +312,7 @@ export class DesktopSandboxProvider implements SandboxProvider {
     request: CommandRequest,
     context: AdapterContext,
     /** Folders granted to this one command only, such as a group's shared folder it starts in. */
-    options: { grantedRoots?: readonly string[] } = {},
+    options: { grantedRoots?: readonly string[]; localModelEnvironment?: Record<string, string> } = {},
   ): AsyncIterable<ProcessEvent> {
     const box = this.boxFor(computer);
     if (!box) {
@@ -330,12 +330,30 @@ export class DesktopSandboxProvider implements SandboxProvider {
     const argv = request.argv.length ? request.argv : ["echo", "ready"];
     this.sweepProcesses();
     if (this.processTrees.size >= 256) throw new Error("Too many local background commands");
+    const modelEnv = options.localModelEnvironment;
+    // Exclude transient credentials from the durable command fingerprint.
+    // Retried delivery observes the existing command even after the token rotates.
+    const spawnRequest = modelEnv ? {
+      ...request,
+      env: {
+        ...Object.fromEntries(Object.entries(request.env ?? {}).filter(([key]) =>
+          !Object.hasOwn(modelEnv, key.toUpperCase()))),
+        ...modelEnv,
+        NO_PROXY: "127.0.0.1,localhost",
+        no_proxy: "127.0.0.1,localhost",
+      },
+      unsetEnv: [
+        ...(request.unsetEnv ?? []).filter(key => !Object.hasOwn(modelEnv, key.toUpperCase())),
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy",
+      ],
+    } : request;
+    if (modelEnv && !request.commandId) throw new Error("Local model access requires a recoverable command");
     const start = (signal: AbortSignal) => streamLocalCommand(
       argv,
       cwd,
       boundedSandboxCommandTimeoutMs(request.timeoutMs),
       signal,
-      request,
+      spawnRequest,
       (tree) => {
         this.processTrees.set(tree, { home: box.home, runId: context.runId });
         if (!this.processSweep) {
@@ -349,8 +367,9 @@ export class DesktopSandboxProvider implements SandboxProvider {
       if (!context.runId || request.commandId.length > 256) throw new Error("A recoverable command requires its owned run identity");
       const fingerprint = createHash("sha256").update(JSON.stringify({
         argv, cwd, env: request.env, unsetEnv: request.unsetEnv, timeoutMs: request.timeoutMs,
+        useLocalModel: request.useLocalModel || undefined,
       })).digest("hex");
-      const secrets = Object.entries(hostCommandEnvironment(request))
+      const secrets = Object.entries(hostCommandEnvironment(spawnRequest))
         .filter(([name, value]) => value && /secret|token|password|credential|api.?key/i.test(name))
         .map(([, value]) => value!);
       yield* this.commandJournal(box.home).execute({ id: request.commandId, executionId: request.executionId, runId: context.runId,

@@ -4,6 +4,7 @@ import { DESKTOP_OWNER_UNRESOLVED_ERROR, isUncertainDesktopRun } from "@mycellio
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { DesktopUnreachableError } from "./computer-errors.js";
 import { desktopAgentSelection, desktopRelayKey } from "./desktop-relay.js";
+import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { startHostComputerServer } from "./host-computer-server.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
@@ -318,6 +319,97 @@ it("keeps actual provider credentials and producer-side billing in cloud while P
     expect(calls).toEqual(["reserve", "provider", "settle", "usage"]);
   } finally { provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve())); }
 });
+
+it("hands the local model only to an owned shell process and redacts its temporary key", async () => {
+  const profile = await mkdtemp(path.join(tmpdir(), "desktop-tool-model-"));
+  const token = "e".repeat(64);
+  const wallet = { beforeCall: vi.fn(() => "wallet-fixture"), afterCall: vi.fn() };
+  const observed: string[] = [];
+  const provider = createServer((req, res) => {
+    observed.push(req.headers.authorization ?? "");
+    req.resume();
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    const chunk = (delta: object, finish: string | null, usage?: object) =>
+      res.write(`data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture",
+        choices: [{ index: 0, delta, finish_reason: finish }], ...(usage ? { usage } : {}) })}\n\n`);
+    chunk({ role: "assistant", content: "from-owned-model" }, null);
+    chunk({}, "stop", { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 });
+    res.end("data: [DONE]\n\n");
+  });
+  await new Promise<void>(resolve => provider.listen(0, "127.0.0.1", resolve));
+  const address = provider.address();
+  if (!address || typeof address === "string") throw new Error("Provider fixture did not listen");
+  const host = await startHostComputerServer({
+    root: profile, token, hostname: "127.0.0.1",
+    agentRuntime: { describe, abort: vi.fn(), async *run(input) {
+      expect(input.desktopToolGrant).toBeUndefined();
+      expect(input.desktopToolModel).toBeUndefined();
+      await input.executeTool!("shell", { use_local_model: true }, "model-shell");
+      yield { type: "done" };
+    } },
+  });
+  hosts.push(host);
+  host.setEnabled(true);
+  try {
+    const url = `http://127.0.0.1:${host.port}`;
+    const client = new HostComputerSandbox(url, token);
+    const computer = await client.provision({ botId: "mico", homePath: "/unused" }, context);
+    const runtime = new DesktopAgentRuntime({
+      fallback: { describe, abort: vi.fn(), run: vi.fn() },
+      select: async () => ({ available: true, preferred: true }),
+      transport: (input, ctx) => {
+        expect(JSON.stringify(input)).not.toContain("fixture-model-key");
+        return fetch(`${url}/computer`, { method: "POST", headers: { authorization: `Bearer ${token}` },
+          body: JSON.stringify(input), signal: ctx.signal });
+      },
+    });
+    const input = request();
+    input.desktopToolGrant = {
+      provider: "openai-compatible", id: "fixture", apiKey: "fixture-model-key",
+      baseUrl: `http://127.0.0.1:${address.port}/v1`, allowPrivateEndpoint: true, callObserver: wallet,
+      maxTokens: 128, contextWindow: 8192,
+    };
+    let output = "";
+    input.executeTool = async () => {
+      const script = `
+        (async () => {
+          const key = process.env.OPENAI_API_KEY;
+          if (!/^[0-9a-f]{64}$/.test(key)) throw new Error("No local tool key");
+          const url = process.env.OPENAI_BASE_URL;
+          const res = await fetch(url + "/chat/completions", { method: "POST",
+            headers: { "content-type": "application/json", authorization: "Bearer " + key },
+            body: JSON.stringify({ model: process.env.MYCELLIOS_MODEL,
+              messages: [{ role: "user", content: "fixture" }], max_tokens: 32 }) });
+          if (!res.ok) throw new Error("Local tool returned " + res.status);
+          const data = await res.json();
+          console.log(url, data.choices[0].message.content, key);
+        })().catch(error => { console.error(error.message); process.exitCode = 1; });
+      `;
+      for await (const event of client.execute(computer, {
+        argv: [process.execPath, "-e", script], commandId: "run:model-shell", useLocalModel: true,
+        ...(process.versions.electron ? { env: { ELECTRON_RUN_AS_NODE: "1" } } : {}),
+      }, context)) {
+        if (event.type === "exit") expect(event.code, output).toBe(0);
+        else output += event.data;
+      }
+      return { ok: true };
+    };
+    for await (const _ of runtime.run(input, context)) {}
+    expect(output).toContain("from-owned-model");
+    expect(output).not.toMatch(/[a-f0-9]{64}/);
+    expect(observed).toEqual(["Bearer fixture-model-key"]);
+    expect(wallet.beforeCall).toHaveBeenCalledOnce();
+    expect(wallet.afterCall).toHaveBeenCalledOnce();
+    const closed = output.match(/http:\/\/127\.0\.0\.1:[0-9]+\/v1/)?.[0];
+    expect(closed).toBeDefined();
+    await expect(fetch(closed!)).rejects.toThrow();
+  } finally {
+    await host.close();
+    provider.closeAllConnections();
+    await new Promise<void>(resolve => provider.close(() => resolve()));
+    await rm(profile, { recursive: true, force: true, maxRetries: 5 });
+  }
+}, 20_000);
 
 it("runs a Pi tool call on Desktop while the server can take a person's message into the turn", async () => {
   let requests = 0;

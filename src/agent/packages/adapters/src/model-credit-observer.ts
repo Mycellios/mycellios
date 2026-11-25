@@ -27,9 +27,10 @@ export async function hostedModelCreditObserver(
   prisma: PrismaClient,
   scope: { userId: string; spaceId: string },
   requester?: ModelCallRequester,
+  desktopTool?: { botId: string; leaseOwner: string; leaseFence: number },
 ): Promise<ModelCallObserver> {
   const membership = await organizationForMember(prisma, scope);
-  if (!membership) throw new Error("Model credit account is unavailable");
+  if (!membership || (desktopTool && !membership.isOwner)) throw new Error("Model credit account is unavailable");
   const account = await creditAccount(prisma, membership.organizationId);
   if (account.mode !== "credits")
     throw new HostedModelCreditsRequiredError(HOSTED_MODEL_CREDITS_REQUIRED_ERROR);
@@ -42,6 +43,7 @@ export async function hostedModelCreditObserver(
         runId: call.runId,
         provider: call.provider,
         model: call.modelId,
+        ...(desktopTool ? { desktopTool } : {}),
       };
       const maxCostUsd = call.maxCostUsd ?? Number.NaN;
       if (!requester)
