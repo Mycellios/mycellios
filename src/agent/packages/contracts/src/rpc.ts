@@ -174,6 +174,7 @@ import {
   VoiceCredentialSchema,
   VoiceInfoSchema,
   VoiceStatusSchema,
+  NativeEngineModelSchema,
 } from "./domain.js";
 import {
   MemoryConnectionCreateInput,
@@ -447,6 +448,11 @@ export const appContract = {
       engines: z.array(z.enum(["codex", "claude", "opencode"])),
       /** Installed engines whose CLI reported nobody signed in. Older servers omit it. */
       signedOut: z.array(z.enum(["codex", "claude", "opencode"])).optional(),
+      /** Model catalogs the signed-in CLIs reported on that computer. Older servers omit it. */
+      models: z.object({
+        codex: z.array(NativeEngineModelSchema).optional(),
+        claude: z.array(NativeEngineModelSchema).optional(),
+      }).optional(),
     })),
     codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
     codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),

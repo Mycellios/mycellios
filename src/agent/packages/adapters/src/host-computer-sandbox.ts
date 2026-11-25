@@ -192,7 +192,8 @@ export class HostComputerSandbox implements SandboxProvider {
     if (!context.botId) return;
     const environment = await this.one<HostComputerEnvironment>({ method: "environment", botId: context.botId }, context);
     if (!environment) return;
-    return { engines: environment.nativeEngines ?? [], signedOut: environment.signedOutEngines ?? [] };
+    return { engines: environment.nativeEngines ?? [], signedOut: environment.signedOutEngines ?? [],
+      ...(environment.nativeModels ? { models: environment.nativeModels } : {}) };
   }
   environment(computer: ComputerRef, context: AdapterContext) {
     return this.one<HostComputerEnvironment>(

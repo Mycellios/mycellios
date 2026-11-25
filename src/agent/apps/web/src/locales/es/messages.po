@@ -15419,3 +15419,11 @@ msgstr "No pueden usarlas (no están en Este PC): {away}"
 #: src/lib/user-error.ts
 msgid "A group can have up to 8 folders."
 msgstr "Un grupo puede tener hasta 8 carpetas."
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "Use my Claude Code settings"
+msgstr "Usar mi configuración de Claude Code"
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "Loads your instructions, hooks and skills from Claude Code on this PC."
+msgstr "Carga tus instrucciones, hooks y skills de Claude Code en este PC."

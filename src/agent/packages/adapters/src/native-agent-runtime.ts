@@ -16,6 +16,7 @@ import type {
   AgentToolExecutionResult,
   AgentToolResultContent,
   ConnectorTool,
+  NativeEngineModels,
 } from "@mycellios/adapter-kit";
 import { WorkContinuation, withWorkContinuation, workContinuationEnabled } from "./work-continuation.js";
 import { nativeAgentProtocolError } from "./native-agent-errors.js";
@@ -25,6 +26,7 @@ import { isToolPauseResult } from "./approval-effect.js";
 import type { NativeCommand } from "./native-agent-process.js";
 import { findNativeCommand, nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
 import { nativeSignInState } from "./native-signin.js";
+import { nativeModelCatalog } from "./native-model-catalog.js";
 import { MANAGED_OPENCODE_VERSION, managedOpenCodeCommand, supportsManagedOpenCode } from "./managed-opencode.js";
 import {
   restoreTurnCheckpoint,
@@ -32,7 +34,7 @@ import {
   unresolvedTurnCheckpointCalls,
 } from "./turn-checkpoint.js";
 
-import { nativeCodexModels, codexTurnSettings } from "./native-codex-settings.js";
+import { claudeTurnArgs, nativeCodexModels, codexTurnSettings } from "./native-codex-settings.js";
 
 type Engine = "codex" | "claude" | "acp" | "opencode";
 const NATIVE_ENGINES: readonly Engine[] = ["codex", "claude", "acp", "opencode"];
@@ -201,6 +203,11 @@ export async function discoverNativeEngines(dataDir?: string) {
     codex && codexAvailable ? nativeSignInState("codex", codex) : undefined,
     claude && claudeAvailable ? nativeSignInState("claude", claude) : undefined,
   ]);
+  // A signed-out CLI has no account catalog to read.
+  const [codexModels, claudeModels] = await Promise.all([
+    codex && codexAvailable && codexSignedIn !== false ? nativeModelCatalog("codex", codex) : undefined,
+    claude && claudeAvailable && claudeSignedIn !== false ? nativeModelCatalog("claude", claude) : undefined,
+  ]);
   return [
     { id: "pi" as const, name: "Pi", available: true },
     {
@@ -208,12 +215,14 @@ export async function discoverNativeEngines(dataDir?: string) {
       name: "Codex",
       available: codexAvailable,
       ...(codexSignedIn === undefined ? {} : { signedIn: codexSignedIn }),
+      ...(codexModels ? { models: codexModels } : {}),
     },
     {
       id: "claude" as const,
       name: "Claude Code",
       available: claudeAvailable,
       ...(claudeSignedIn === undefined ? {} : { signedIn: claudeSignedIn }),
+      ...(claudeModels ? { models: claudeModels } : {}),
     },
     { id: "acp" as const, name: "ACP", available: nativeCommandAvailable(configured.acp) },
     {
@@ -232,6 +241,15 @@ export function signedOutEngines(engines: Awaited<ReturnType<typeof discoverNati
   return engines.flatMap(engine =>
     engine.available && "signedIn" in engine && engine.signedIn === false &&
     (engine.id === "codex" || engine.id === "claude") ? [engine.id] : []);
+}
+
+/** The model catalogs the installed, signed-in CLIs reported. */
+export function nativeEngineModels(engines: Awaited<ReturnType<typeof discoverNativeEngines>>): NativeEngineModels {
+  const models: NativeEngineModels = {};
+  for (const engine of engines)
+    if (engine.available && (engine.id === "codex" || engine.id === "claude") && "models" in engine && engine.models)
+      models[engine.id] = engine.models;
+  return models;
 }
 
 const openCodeFileTools = new Set(["list_files", "read_file", "write_file", "edit_file"]);
@@ -411,6 +429,11 @@ export class NativeAgentRuntime implements AgentRuntime {
       engine,
     );
     const openCodeProject = engine === "opencode" ? await context.resolveOpenCodeProject?.() : undefined;
+    // On the owner's PC Claude Code works in the Mico's folder; its session and prompt files stay private.
+    const claudeWorkspace = engine === "claude" ? await context.resolveNativeWorkspace?.() : undefined;
+    // Only the owner's own PC may load the owner's personal CLI configuration, never a server's.
+    const claudeUserSettings = engine === "claude" && Boolean(context.resolveNativeWorkspace) &&
+      request.nativeConfig?.userSettings === true;
     await mkdir(cwd, { recursive: true, mode: 0o700 });
     const controller = new AbortController();
     const signal = context.signal
@@ -423,8 +446,10 @@ export class NativeAgentRuntime implements AgentRuntime {
     const openCodeFileToolNames = engine === "opencode"
       ? tools.filter(({ name }) => openCodeFileTools.has(name)).map(({ name }) => `${nativeMcpServerName}_${name}`)
       : [];
+    // Claude Code keeps sessions per working folder, so a new folder or configuration starts a fresh one.
     const baseBinding = [engine, request.model.id, request.instructions, tools,
-      ...(openCodeProject ? [openCodeProject] : []), ...openCodeFileToolNames];
+      ...(openCodeProject ? [openCodeProject] : []), ...openCodeFileToolNames,
+      ...(claudeWorkspace ? [claudeWorkspace] : []), ...(claudeUserSettings ? ["claude-user-settings"] : [])];
     const modelConfig = request.nativeConfig;
     const binding = hash(engine === "codex" && (modelConfig?.modelId || modelConfig?.thinkingLevel || modelConfig?.fastMode)
       ? [...baseBinding, [modelConfig.modelId ?? null, modelConfig.thinkingLevel ?? null, Boolean(modelConfig.fastMode)]]
@@ -809,8 +834,16 @@ export class NativeAgentRuntime implements AgentRuntime {
             });
             systemPromptFile = join(cwd, `system-${randomUUID()}.txt`);
             await writeFile(systemPromptFile, request.instructions, { mode: 0o600 });
+            // The saved model and effort are checked against this same CLI's account catalog.
+            const choice = request.nativeConfig;
+            const modelArgs = choice && (choice.modelId || choice.thinkingLevel || choice.fastMode)
+              ? claudeTurnArgs(choice, await nativeModelCatalog("claude", command, { waitMs: 12_000 }))
+              : [];
             const args = [
-              "--restricted",
+              // Restricted mode ignores every settings file. With the owner's switch on, only their
+              // user configuration loads: never project files the Mico could write in its own folder.
+              ...(claudeUserSettings ? ["--setting-sources", "user"] : ["--restricted"]),
+              ...modelArgs,
               "-p",
               "--input-format",
               "stream-json",
@@ -834,7 +867,7 @@ export class NativeAgentRuntime implements AgentRuntime {
             process = new NativeAgentProcess(
               command,
               args,
-              cwd,
+              claudeWorkspace ?? cwd,
               (message) => {
                 const raw = message as unknown as Record<string, unknown>;
                 if (raw.type === "system" && raw.subtype === "init")
