@@ -4858,7 +4858,33 @@ export function createRunExecutor(deps: ExecutorDeps) {
           for (const name of COMPUTER_REQUIRED_TOOL_NAMES) disabledBuiltinTools.add(name);
         }
         const micoOwner = await deps.prisma.user.findUniqueOrThrow({ where: { id: run.userId }, select: { micoDefaults: true } });
-        const savedPlanWait = readMicoDefaults(micoOwner.micoDefaults).planAutoStartSeconds;
+        const ownerDefaults = readMicoDefaults(micoOwner.micoDefaults);
+        let desktopToolGrant: AgentRunRequest["desktopToolGrant"];
+        if (
+          ownerDefaults.desktopToolCreditLimitMicros && hostEnvironment?.desktopToolModels === 1 &&
+          hostEnvironment.durableCommands && bot.computer?.scope === "dedicated" && !context.cloudWorkspace &&
+          run.trigger === "user" && !thread.groupId && !messagingChannelRun && !voiceCall && !context.projectSessionId
+        ) {
+          try {
+            const material = nativeEngine
+              ? await resolveModelKey(deps, run.userId, run.spaceId, credential, runModelProvider, runModelId,
+                  values => runSecrets.push(...values))
+              : resolved;
+            if (material.callObserver && material.apiKey && !material.oauth && !material.allowPrivateEndpoint) {
+              const callObserver = await hostedModelCreditObserver(deps.prisma, run, {
+                botId: bot.id, leaseOwner: workerId, leaseFence: fence,
+              });
+              desktopToolGrant = {
+                provider: runModelProvider, id: runModelId, apiKey: material.apiKey, callObserver,
+                ...cloudflareRunFields(material), baseUrl: material.baseUrl, headers: material.headers,
+                contextWindow: material.contextWindow, maxTokens: material.maxTokens,
+              };
+            }
+          } catch {
+            // An unavailable paid connection must not block the Mico's ordinary turn.
+          }
+        }
+        const savedPlanWait = ownerDefaults.planAutoStartSeconds;
         const planWaitSeconds = savedPlanWait === undefined ? DEFAULT_PLAN_AUTO_START_SECONDS : savedPlanWait;
         const builtins = [
           ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).agentNewChat && run.trigger === "user" && thread.botId === bot.id && !thread.groupId && !disabledBuiltinTools.has("start_new_chat") ? [agentNewChatTool] : []),
@@ -4892,7 +4918,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           run.trigger !== "created"
             ? agentConnectionTools.filter((tool) => !disabledBuiltinTools.has(tool.name))
             : []),
-        ];
+        ].map(tool => tool.name === "shell" && desktopToolGrant ? {
+          ...tool,
+          description: tool.description + " Set use_local_model for a program that needs the Mico's metered AI. Use the MYCELLIOS_MODEL value and the supplied OpenAI or Anthropic environment variables. Never print the API key.",
+          inputSchema: {
+            ...tool.inputSchema,
+            properties: { ...tool.inputSchema.properties as object, use_local_model: { type: "boolean" } },
+          },
+        } : tool);
         const exposedConnectorTools = discovered.filter(
           (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),
         );
@@ -6902,6 +6935,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish(result);
           }
           if (name === "shell") {
+            const useLocalModel = args.use_local_model === true;
+            if (useLocalModel && !desktopToolGrant) {
+              return finish({ error: "Local model access is unavailable for this Desktop command", started: false });
+            }
             const command = String(args.command ?? args.cmd ?? "");
             const refusal = protectedComputerLifecycleRefusal(command);
             if (graphical && refusal) {
@@ -6981,6 +7018,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? await deps.sandbox.environment?.(computer, context)
                   : undefined);
               desktopCommand = shellEnvironment?.durableCommands === true;
+              if (useLocalModel && (computer.kind !== "desktop" || !desktopCommand ||
+                  shellEnvironment?.desktopToolModels !== 1)) {
+                throw new Error("Local model access is unavailable for this Desktop command");
+              }
               const dockerProgress = computer.kind === "docker" ? search.progress : undefined;
               const executedCommand = dockerProgress ? dockerAdaptiveSearchCommand(command, search.timeoutMs, dockerProgress) : command;
               commandStartedAt = Date.now();
@@ -7010,6 +7051,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         : undefined,
                     unsetEnv: commandEnvironment.unsetEnv,
                     commandId: shellEnvironment?.durableCommands ? commandId : undefined,
+                    ...(useLocalModel ? { useLocalModel: true } : {}),
                     executionId,
                     timeoutMs: dockerProgress ? dockerProgress.maxMs + 1000 : search.timeoutMs,
                     ...(shellEnvironment && search.progress ? { searchProgress: search.progress } : {}),
@@ -9393,6 +9435,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               allowSilentEmpty: allowSilentEmptyRun,
               emptyResponseText,
               executeTool: scripted ? undefined : applyTool,
+              desktopToolGrant,
               resolveModel: scripted
                 ? undefined
                 : (provider, modelId) =>
@@ -11093,11 +11136,11 @@ function pageWorkClause(
 }
 
 /**
- * A Mico's model stays with its server-owned connection, so a third-party program it launches
- * cannot borrow it. Prefer an AI CLI already signed in on that computer before asking.
+ * Server model credentials stay on the server. An explicitly offered shell option
+ * can provide the account model to a local program within the owner's Credit limit.
  */
 export const LOCAL_TOOL_MODEL_CLAUSE =
-  "When a program you run on the computer needs its own AI model, your own model connection cannot be shared with it: first check whether an AI command-line tool already signed in on that computer (such as Claude Code, Codex or OpenCode) can serve it, and ask the user only when none is signed in.";
+  "When a local program needs AI, prefer an AI CLI already signed in on that computer (Claude Code, Codex or OpenCode). If shell offers use_local_model and the program needs an API, it can use MYCELLIOS_MODEL and its supplied environment within the owner's Credit limit. Ask the user when neither option is available. Never share provider credentials.";
 
 function secretGuidance(disabled?: ReadonlySet<string>): string[] {
   const clauses: string[] = [];

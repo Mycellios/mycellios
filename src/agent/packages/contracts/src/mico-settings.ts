@@ -17,7 +17,9 @@ export const DEFAULT_MEMORY_REVIEW_POLICY = {enabled:true, interval:20, dailyLim
 /** Seconds before a plan card starts by itself; null waits for a person. Unset means 10. */
 export const PlanAutoStartSeconds = z.union([z.literal(5), z.literal(10), z.literal(30), z.literal(60)]).nullable();
 export const DEFAULT_PLAN_AUTO_START_SECONDS = 10;
+export const DesktopToolCreditLimit = z.number().int().min(0).max(100_000);
 export const MicoDefaults = z.object({
+  desktopToolCreditLimitMicros: DesktopToolCreditLimit.optional(),
   localScripts: z.boolean().default(false),
   agentNewChat: z.boolean().default(false),
   showPlan: z.boolean().default(false),
@@ -46,7 +48,7 @@ export const MicoSettingsState = z.object({
 });
 export type MicoSettingsState = z.infer<typeof MicoSettingsState>;
 export const MicoSettingsUpdate = z.object({ revision: z.number().int().nonnegative() }).and(z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("defaults"), patch: MicoOverrides.extend({ gitCoauthor: z.boolean().optional(), responseStyle: ResponseStyle.optional(), memoryReview: LocalMemoryReviewPolicy.optional(), planAutoStartSeconds: PlanAutoStartSeconds.optional() }) }),
+  z.object({ kind: z.literal("defaults"), patch: MicoOverrides.extend({ desktopToolCreditLimitMicros: DesktopToolCreditLimit.optional(), gitCoauthor: z.boolean().optional(), responseStyle: ResponseStyle.optional(), memoryReview: LocalMemoryReviewPolicy.optional(), planAutoStartSeconds: PlanAutoStartSeconds.optional() }) }),
   z.object({ kind: z.literal("bot"), botId: z.string().min(1), key: MicoBehaviorKey, value: z.boolean().nullable() }),
   z.object({ kind: z.literal("all"), key: MicoBehaviorKey, value: z.boolean().nullable() }),
 ]));

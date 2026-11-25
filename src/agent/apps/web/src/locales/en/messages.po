@@ -15273,3 +15273,15 @@ msgstr "Ignored: a filter did not match"
 #: src/pages/RoutineRunHistory.tsx
 msgid "Ignored: routine paused"
 msgstr "Ignored: routine paused"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Local programs"
+msgstr "Local programs"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "AI Credits per Mico turn"
+msgstr "AI Credits per Mico turn"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
+msgstr "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."

@@ -22,6 +22,7 @@ const file = z.object({
   expectedSha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });
 const command = z.object({
+  useLocalModel: z.boolean().optional(),
   commandId: z.string().min(1).max(256).optional(),
   executionId: z.string().min(1).max(256).optional(),
   argv: z

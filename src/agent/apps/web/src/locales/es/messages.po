@@ -15656,3 +15656,15 @@ msgstr "Ignorado: un filtro no coincidió"
 #: src/pages/RoutineRunHistory.tsx
 msgid "Ignored: routine paused"
 msgstr "Ignorado: la rutina estaba en pausa"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Local programs"
+msgstr "Programas locales"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "AI Credits per Mico turn"
+msgstr "Créditos de IA por turno del Mico"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
+msgstr "Permite que los programas que tus Micos abran en Este PC usen su IA. Solo se aplica en los espacios donde tú gestionas la facturación."

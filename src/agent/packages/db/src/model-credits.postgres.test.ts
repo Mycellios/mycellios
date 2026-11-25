@@ -9,7 +9,7 @@ import {
   settleModelCredits,
   settleModelCreditsTx,
 } from "./model-credits.js";
-import { asSystem } from "./row-security.js";
+import { asSystem, runAsTenant } from "./row-security.js";
 
 const dbTests =
   process.env.VERIFY_DATABASE && process.env.DATABASE_URL ? describe.sequential : describe.skip;
@@ -107,6 +107,64 @@ dbTests("model credits ledger", () => {
     await settleModelCredits(prisma, id, 0.125);
     expect(await balance()).toBe(9_875_000n);
   });
+  it("enforces the approved Desktop ceiling across concurrent calls and replaced leases", async () => {
+    const userId = `${organizationId}-owner`;
+    const spaceId = `${organizationId}-space`;
+    const scope = { userId, spaceId };
+    await prisma.user.create({ data: { id: userId, name: "Desktop fixture", email: `${userId}@example.test` } });
+    try {
+      await prisma.space.create({ data: { id: spaceId, name: "Desktop fixture", organizationId } });
+      await prisma.member.create({ data: {
+        id: `${organizationId}-member`, userId, organizationId, role: "owner", createdAt: new Date(),
+      } });
+      await asSystem(prisma, "Desktop fixture membership").spaceMember.create({ data: {
+        id: `${organizationId}-space-member`, userId, spaceId, organizationId, role: "owner", createdAt: new Date(),
+      } });
+      await reconcileCreditPurchase(prisma, organizationId, { id: `${organizationId}-desktop`, amountCents: 1000 });
+      await runAsTenant(scope, async () => {
+        const computer = await prisma.computer.create({ data: {
+          ...scope, kind: "desktop", scope: "dedicated", scopeKey: spaceId, homeKey: spaceId,
+        } });
+        const bot = await prisma.bot.create({ data: {
+          ...scope, name: "Desktop fixture", color: "#10B981", computerId: computer.id,
+          thread: { create: scope },
+        }, include: { thread: true } });
+        const runScope = { ...scope, botId: bot.id, threadId: bot.thread!.id };
+        const task = await prisma.task.create({ data: { ...runScope, prompt: "Synthetic", status: "running" } });
+        const run = await prisma.run.create({ data: {
+          ...runScope, taskId: task.id, trigger: "user", status: "running", leaseOwner: "worker-a",
+          leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 60_000),
+        } });
+        const reserve = (id: string, worker = "worker-a", fence = 1) =>
+          reserveModelCredits(prisma, organizationId, 0.004, {
+            ...scope, runId: run.id, callId: `${run.id}-${id}`, desktopTool: { botId: bot.id, leaseOwner: worker, leaseFence: fence },
+          });
+        await expect(reserve("disabled")).rejects.toThrow("approval is disabled");
+        const approve = (value: number) => prisma.user.update({
+          where: { id: userId }, data: { micoDefaults: { desktopToolCreditLimitMicros: value } },
+        });
+        await approve(5000);
+        const attempts = await Promise.allSettled([reserve("one"), reserve("two")]);
+        const accepted = attempts.flatMap(attempt => attempt.status === "fulfilled" ? [attempt.value] : []);
+        expect(accepted).toHaveLength(1);
+        const held = accepted[0]!;
+        expect(await prisma.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ desktopToolCreditLimitMicros: 5000 });
+        await expect(reserve(held.slice(run.id.length + 1))).rejects.toThrow("already admitted");
+        await settleModelCredits(prisma, held, null);
+        await approve(10000);
+        await prisma.run.update({ where: { id: run.id }, data: { leaseOwner: "worker-b", leaseFence: 2 } });
+        await expect(reserve("stale")).rejects.toThrow("no longer authorized");
+        await expect(reserve("new-worker", "worker-b", 2)).rejects.toThrow("approved run budget");
+        await settleModelCredits(prisma, held, 0.001);
+        await expect(reserve("settled", "worker-b", 2)).resolves.toBe(`${run.id}-settled`);
+        await approve(0);
+        await expect(reserve("revoked", "worker-b", 2)).rejects.toThrow("approval is disabled");
+      });
+    } finally {
+      await prisma.user.delete({ where: { id: userId } });
+    }
+  });
+
   it("rejects unknown pricing and BYOK accounts before spending", async () => {
     await expect(reserveModelCredits(prisma, organizationId, Number.NaN)).rejects.toThrow(
       "reliable price",

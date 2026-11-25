@@ -174,6 +174,8 @@ export function planChecks(files, availableAgentTests) {
       if (files.some(file => (file.startsWith('src/agent/') || file === primaryAccountBeta) && pattern.test(file)))
         add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);
     }
+    if (files.some(file => /desktop[-_]tool[-_]credits|packages\/db\/src\/model-credits\./.test(file)))
+      add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-desktop-tool-credits-db.ts'], 'Desktop tool spend ceiling and wallet admission on isolated PostgreSQL');
     if (files.some(file => file.startsWith('src/agent/') && /local-memory|packages\/memory\/src|20261115180000/.test(file)))
       add('src/agent', 'env', ['MEMORY_TEST_EPHEMERAL=1', 'node', 'scripts/verify-local-memory-db.mjs'], 'isolated memory migration, RLS and bounded review reservations');
     if (files.some(f => /^src\/agent\/(?:scripts\/verify-task-conversations|apps\/api\/src\/(?:routes\/task-inbox|task-inbox-conversations)|packages\/adapters\/src\/task-reminders|packages\/db\/prisma\/migrations\/20261115100000_task_followup)/.test(f))) {
