@@ -187,6 +187,23 @@ export function spaceMemberRoutes(ctx: RouterContext) {
       }),
     },
     shares: {
+        conversations: enabled.spaces.shares.conversations.handler(async ({ context, input }) => {
+          const { userId, spaceId } = context.actor;
+          const ownerBot = await deps.prisma.bot.findFirst({
+            where: { id: input.botId, userId, spaceId, archivedAt: null },
+            select: { id: true },
+          });
+          if (!ownerBot) throw new ORPCError("NOT_FOUND");
+          const threads = await deps.prisma.thread.findMany({
+            where: { spaceId, userId, taskBotId: ownerBot.id, memberUserId: { not: null }, deleteAfter: null },
+            select: { id: true, title: true, memberUserId: true },
+            orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+            take: 200,
+          });
+          return threads.flatMap((thread) => thread.memberUserId
+            ? [{ threadId: thread.id, title: thread.title, memberUserId: thread.memberUserId }]
+            : []);
+        }),
       list: enabled.spaces.shares.list.handler(({ context }) =>
         mapped(() =>
           listMicoShares(deps.prisma, {

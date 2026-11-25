@@ -1,11 +1,14 @@
 import { useLingui } from "@lingui/react/macro";
 import type { MicoShare, MicoShareAudience, SharedMicoTarget, SpaceMembers, ThreadMessage } from "@mycellios/contracts";
-import { MicoShareInputSchema } from "@mycellios/contracts";
+import { ATTACHMENT_MAX_COUNT, MicoShareInputSchema } from "@mycellios/contracts";
+import { isApprovalAskBlock, isSecretAskBlock } from "@mycellios/core";
 import { Button, Input, NativeSelect, NativeSelectOption } from "@mycellios/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { SettingsGroup } from "../components/SettingsRows";
+import { AskCard } from "../components/AskCard";
 import { useBoundSpaceId, useSpaceRpc } from "../lib/space-rpc";
+import { readFileAsBase64 } from "../lib/pending-attachments";
 import { errorText } from "../lib/user-error";
 
 export function SpaceMicosPanel({ members }: { members: SpaceMembers }) {
@@ -52,8 +55,11 @@ export function SpaceMicosPanel({ members }: { members: SpaceMembers }) {
       {shares.error || shared.error ? <p role="alert">{errorText(shares.error ?? shared.error)}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {manage && shares.data?.length ? <SettingsGroup>
-        {shares.data.map((share) => <ManageMicoShare key={JSON.stringify(share)} share={share} people={members.people}
-          onSaved={() => void shares.refetch()} />)}
+        {shares.data.map((share) => <div key={share.botId}>
+          <ManageMicoShare key={JSON.stringify(share)} share={share} people={members.people}
+            onSaved={() => void shares.refetch()} />
+          {members.role === "owner" ? <OwnerConversations botId={share.botId} scope={scope} people={members.people} /> : null}
+        </div>)}
       </SettingsGroup> : null}
       {shared.data && !shared.data.micos.length ? <p className="text-sm text-muted-foreground">{t`No Micos have been shared with you.`}</p> : null}
       {shared.data?.micos.map((mico) => <SettingsGroup key={mico.botId}>
@@ -139,31 +145,105 @@ function ManageMicoShare({ share, people, onSaved }: {
   );
 }
 
-function MemberConversation({ queryScope, target, onClose }: {
+function OwnerConversations({ botId, scope, people }: {
+  botId: string;
+  scope: Array<string | null | undefined>;
+  people: SpaceMembers["people"];
+}) {
+  const { t } = useLingui();
+  const rpc = useSpaceRpc();
+  const [open, setOpen] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const conversations = useQuery({
+    queryKey: ["owner-mico-conversations", ...scope, botId],
+    queryFn: () => rpc.spaces.shares.conversations({ botId }),
+    enabled: open,
+  });
+  return <div className="space-y-2 px-3 pb-3">
+    <Button size="sm" variant="outline" aria-expanded={open} onClick={() => setOpen(!open)}>
+      {t`Member conversations`}
+    </Button>
+    {open ? <>
+      {conversations.error ? <p role="alert">{errorText(conversations.error)}</p> : null}
+      {conversations.data?.map((thread) => {
+        const member = people.find((person) => person.userId === thread.memberUserId);
+        return <div key={thread.threadId}>
+          <Button size="sm" variant="ghost" onClick={() => setThreadId(thread.threadId)}>
+            {member?.name || t`Member`} · {thread.title || t`Conversation`}
+          </Button>
+          {threadId === thread.threadId ? <MemberConversation key={threadId} queryScope={scope} readOnly
+            target={{ botId, taskThreadId: thread.threadId }} onClose={() => setThreadId(null)} /> : null}
+        </div>;
+      })}
+    </> : null}
+  </div>;
+}
+
+function MemberConversation({ queryScope, target, onClose, readOnly = false }: {
   queryScope: Array<string | null | undefined>;
   target: SharedMicoTarget;
   onClose: () => void;
+  readOnly?: boolean;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
   const snapshot = useQuery({
-    queryKey: ["shared-mico-thread", ...queryScope, target],
-    queryFn: () => rpc.sharedMicos.get({ ...target, history: "recent" }),
+    queryKey: ["shared-mico-thread", ...queryScope, target, readOnly],
+    queryFn: () => readOnly
+      ? rpc.threads.get({ ...target, history: "recent" })
+      : rpc.sharedMicos.get({ ...target, history: "recent" }),
     refetchInterval: (query) => query.state.data?.run ? 1500 : false,
   });
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pending = useRef<{ text: string; nonce: string } | null>(null);
-  async function send() {
-    if (!text.trim() || busy || snapshot.error) return;
-    if (pending.current?.text !== text) pending.current = { text, nonce: crypto.randomUUID() };
+  const [older, setOlder] = useState<{ messages: ThreadMessage[]; cursor: number | null } | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [files, setFiles] = useState<Array<{ id: string; name: string }>>([]);
+  const pending = useRef<{ signature: string; nonce: string } | null>(null);
+  const before = older ? older.cursor : snapshot.data?.olderCursor;
+  async function loadOlder() {
+    if (before == null || loadingHistory) return;
+    setLoadingHistory(true);
+    try {
+      const page = readOnly
+        ? await rpc.threads.messages({ ...target, before })
+        : await rpc.sharedMicos.messages({ ...target, before });
+      setOlder((current) => ({ messages: [...page.messages, ...(current?.messages ?? [])], cursor: page.olderCursor }));
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+  async function upload(file: File) {
+    if (readOnly || busy || files.length >= ATTACHMENT_MAX_COUNT) return;
     setBusy(true);
     setError(null);
     try {
-      await rpc.sharedMicos.send({ ...target, text, clientNonce: pending.current.nonce });
+      const artifact = await rpc.sharedMicos.upload({
+        ...target, name: file.name, mimeType: file.type || "application/octet-stream",
+        contentBase64: await readFileAsBase64(file), clientNonce: crypto.randomUUID(),
+      });
+      setFiles((current) => [...current, { id: artifact.id, name: file.name }]);
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function send() {
+    if (readOnly || (!text.trim() && !files.length) || busy || snapshot.error) return;
+    const artifactIds = files.map((file) => file.id);
+    const signature = JSON.stringify([text, artifactIds]);
+    if (pending.current?.signature !== signature) pending.current = { signature, nonce: crypto.randomUUID() };
+    setBusy(true);
+    setError(null);
+    try {
+      await rpc.sharedMicos.send({ ...target, text, artifactIds, clientNonce: pending.current.nonce });
       pending.current = null;
       setText("");
+      setFiles([]);
       await snapshot.refetch();
     } catch (cause) {
       setError(errorText(cause));
@@ -171,12 +251,13 @@ function MemberConversation({ queryScope, target, onClose }: {
       setBusy(false);
     }
   }
-  const visible = (snapshot.error ? [] : snapshot.data?.messages ?? []).filter((message) => message.role !== "system");
-  const textBlocks = (message: ThreadMessage) => message.blocks.flatMap((block) => block.kind === "text" ? [block.text] : []);
+  const byId = new Map([...(older?.messages ?? []), ...(snapshot.data?.messages ?? [])].map((message) => [message.id, message]));
+  const visible = snapshot.error ? [] : [...byId.values()]
+    .filter((message) => message.role !== "system").sort((a, b) => a.seq - b.seq);
   return (
     <section className="space-y-2 border-t border-border pt-2">
       <Button size="sm" variant="ghost" onClick={onClose}>{t`Close conversation`}</Button>
-      {snapshot.data?.run && !snapshot.error ? <Button size="sm" variant="outline" disabled={busy}
+      {!readOnly && snapshot.data?.run && !snapshot.error ? <Button size="sm" variant="outline" disabled={busy}
         onClick={() => {
           setBusy(true);
           setError(null);
@@ -188,14 +269,42 @@ function MemberConversation({ queryScope, target, onClose }: {
         {t`Stop`}
       </Button> : null}
       <div className="max-h-64 space-y-2 overflow-auto" aria-live="polite">
-        {visible.map((message) => <p key={message.id} dir="auto" className="whitespace-pre-wrap break-words text-sm">
-          {textBlocks(message).join("\n")}
-        </p>)}
+        {before != null && !snapshot.error ? <Button size="sm" variant="ghost" disabled={loadingHistory}
+          onClick={() => void loadOlder()}>{t`Load earlier messages`}</Button> : null}
+        {visible.map((message) => <div key={message.id} dir="auto" className="whitespace-pre-wrap break-words text-sm">
+          {message.blocks.map((block, index) => {
+            if (block.kind === "text") return <p key={index}>{block.text}</p>;
+            if (block.kind === "file" || block.kind === "image") return <p key={index}>{block.name}</p>;
+            const runId = message.runId;
+            if (block.kind !== "ask" || message.role !== "bot" || !runId ||
+                isSecretAskBlock(block) || isApprovalAskBlock(block) ||
+                block.location || block.plan || block.instructionUpdate) return null;
+            return <AskCard key={index} block={block} canAnswer={!readOnly && block.status !== "answered"}
+              canDismiss={false} onDismiss={async () => {}}
+              onAnswer={async (answer) => {
+                if (readOnly) return;
+                await rpc.sharedMicos.answer({
+                  ...target, messageId: message.id, runId, answer, clientNonce: crypto.randomUUID(),
+                });
+                await snapshot.refetch();
+              }} />;
+          })}
+        </div>)}
       </div>
-      <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); void send(); }}>
+      {!readOnly ? <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); void send(); }}>
         <Input aria-label={t`Message`} value={text} onChange={(event) => setText(event.target.value)} />
-        <Button size="sm" type="submit" disabled={busy || !text.trim() || Boolean(snapshot.error)}>{t`Send`}</Button>
-      </form>
+        <Input type="file" aria-label={t`Attach file`} disabled={busy || files.length >= ATTACHMENT_MAX_COUNT}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            if (file) void upload(file);
+          }} />
+        {files.map((file) => <Button type="button" key={file.id} variant="ghost" size="sm" disabled={busy}
+          onClick={() => setFiles((current) => current.filter((item) => item.id !== file.id))}>
+          {t`Remove ${file.name}`}
+        </Button>)}
+        <Button size="sm" type="submit" disabled={busy || (!text.trim() && !files.length) || Boolean(snapshot.error)}>{t`Send`}</Button>
+      </form> : null}
       {snapshot.error || error ? <p role="alert">{error ?? errorText(snapshot.error)}</p> : null}
     </section>
   );

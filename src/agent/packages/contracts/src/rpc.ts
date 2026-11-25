@@ -479,6 +479,11 @@ export const appContract = {
     /** Who each Mico of the request's Space is shared with; for its owner and admins (phase 1b). */
     shares: {
       list: oc.output(z.array(MicoShareSchema)),
+      conversations: oc.input(z.object({ botId: Id })).output(z.array(z.object({
+        threadId: Id,
+        memberUserId: Id,
+        title: z.string().nullable(),
+      }))),
       /** Replaces who a Mico is shared with; people who lose it stop at their next request. */
       set: oc.input(MicoShareInputSchema).output(MicoShareSchema),
     },
