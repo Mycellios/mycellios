@@ -84,8 +84,10 @@ the store from phase 3.
      OpenCode stays without a probe until its pinned version can report one.
 2. Phase 2 — settings and plan usage from the PC.
    - Model, effort and Fast for This PC Micos shipped with local-engine-default
-     phase 2 (#641: Desktops report the Codex and Claude Code catalogs). Plan
-     usage from the PC is still to do.
+     phase 2 (#641: Desktops report the Codex and Claude Code catalogs).
+   - Implemented: plan usage of the PC's Codex through the `engineUsage` host
+     method and `engines.codexQuota({ botId })`, shown in the rail while a This PC
+     Mico is open (`native-usage.ts`).
    - Desktop answers the reads that a server host answers today, over the
      existing host-computer channel and binding: Codex `model/list` and
      `account/rateLimits/read`, and Claude Code's catalog once local-engine-default

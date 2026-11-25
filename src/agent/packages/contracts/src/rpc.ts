@@ -466,7 +466,11 @@ export const appContract = {
       z.object({ botId: Id, action: z.literal("signIn"), engine: NativeAccountEngineSchema, flow: z.enum(["browser", "device"]) }),
       z.object({ botId: Id, action: z.literal("signOut"), engine: NativeAccountEngineSchema }),
     ])).output(NativeEngineAccountResultSchema),
-    codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
+    /**
+     * Codex plan usage. With a This PC Mico, its PC's signed-in Codex; otherwise the server's
+     * own Codex under the operator grant. Older clients send no input.
+     */
+    codexQuota: oc.input(z.object({ botId: Id }).optional()).output(AccountPlanLimitSchema.nullable()),
     codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),
     list: oc.output(
       z.array(

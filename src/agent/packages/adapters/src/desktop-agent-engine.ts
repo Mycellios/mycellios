@@ -4,6 +4,8 @@ import path from "node:path";
 import type { AgentRuntime, NativeEngineState } from "@mycellios/adapter-kit";
 import { NativeEngineAccountRequestSchema } from "@mycellios/contracts";
 import { nativeEngineAccount, type NativeAccountHost } from "./native-account.js";
+import { nativeSignInState } from "./native-signin.js";
+import { nativeCodexUsageState } from "./native-usage.js";
 import { discoverNativeEngines, NativeAgentRuntime, nativeEngineCommand, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
@@ -44,6 +46,15 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       const command = await nativeEngineCommand(request.engine, path.join(profile, "agent-executor", scope));
       if (accessScope() !== scope) throw Error("Desktop account changed before signing in");
       return nativeEngineAccount(request, command, accountHost);
+    },
+    // Plan usage only for a Codex whose CLI confirmed a sign-in; never for another account scope.
+    async nativeEngineUsage() {
+      const scope = accessScope();
+      if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return {};
+      const command = await nativeEngineCommand("codex", path.join(profile, "agent-executor", scope));
+      if (!command || await nativeSignInState("codex", command) !== true) return {};
+      const codex = await nativeCodexUsageState(command);
+      return accessScope() === scope && codex ? { codex } : {};
     },
     abort: async runId => { const owned = active.get(runId); await owned?.runtime.abort(owned.localId); },
     async *run(request, context) {

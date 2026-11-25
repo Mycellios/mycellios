@@ -10,7 +10,7 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@mycellios/adapter-kit";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
-import { NativeEngineAccountResultSchema, type NativeEngineAccountRequest } from "@mycellios/contracts";
+import { AccountPlanLimitSchema, NativeEngineAccountResultSchema, type NativeEngineAccountRequest } from "@mycellios/contracts";
 import { getLogger } from "@mycellios/logging";
 import { describeDesktopSandbox } from "./desktop-sandbox.js";
 import { projectLeaseOwner } from "./project-execution.js";
@@ -205,6 +205,13 @@ export class HostComputerSandbox implements SandboxProvider {
     const parsed = NativeEngineAccountResultSchema.safeParse(answer);
     if (!parsed.success) throw new Error("The PC returned an invalid sign-in answer.");
     return parsed.data;
+  }
+  /** The PC's plan usage, keeping only a well-formed allowlisted reading. */
+  async nativeEngineUsage(context: AdapterContext) {
+    if (!context.botId) return {};
+    const answer = await this.one<{ codex?: unknown } | undefined>({ method: "engineUsage", botId: context.botId }, context);
+    const codex = AccountPlanLimitSchema.safeParse(answer?.codex);
+    return codex.success ? { codex: codex.data } : {};
   }
   environment(computer: ComputerRef, context: AdapterContext) {
     return this.one<HostComputerEnvironment>(

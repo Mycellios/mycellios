@@ -4800,6 +4800,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     onNavigate={mobile ? () => setMobileNavigationOpen(false) : undefined}
     apps={appsOpen} library={libraryView} onApps={openApps}
     marketplace={marketplaceView && !appsOpen} scope={JSON.stringify([userId, currentSpaceId])}
+    activeBotId={inGroup ? undefined : active?.id}
     usage={usageView} schedule={scheduleView} onSchedule={showSchedule}
     tasks={taskView} onTasks={showTasks} activity={activityMode}
     workflows={workflowView} onWorkflows={showWorkflows} routines={routineView} onRoutines={showRoutines}

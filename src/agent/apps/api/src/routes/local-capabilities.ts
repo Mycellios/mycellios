@@ -48,7 +48,18 @@ export function localCapabilityRoutes({ authed, deps, repos }: RouterContext) {
           throw new ORPCError("SERVICE_UNAVAILABLE", { message: engineAccountFailure(error) });
         }
       }),
-      codexQuota: authed.engines.codexQuota.handler(async ({ context }) => {
+      codexQuota: authed.engines.codexQuota.handler(async ({ context, input }) => {
+        if (input?.botId) {
+          const bot = await repos.getBot(context.actor, input.botId);
+          // A This PC Mico shows its own PC's Codex; the PC caches its reading for a minute.
+          if (bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated") {
+            if (!deps.sandbox.nativeEngineUsage) return null;
+            const base = computerContext(context.actor, bot.id, "engine-usage");
+            const signal = AbortSignal.any([context.signal ?? base.signal, AbortSignal.timeout(8_000)]);
+            const usage = await deps.sandbox.nativeEngineUsage({ ...base, signal }).catch(() => undefined);
+            return usage?.codex ?? null;
+          }
+        }
         // Check on every request, including cached reads, so revocation is immediate.
         if (!(await nativeHostAccess(deps.dataDir, context.actor))) return null;
         if (quota && Date.now() - quota.at < 60_000) return quota.value;

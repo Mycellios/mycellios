@@ -523,6 +523,12 @@
   the cached probe and a pending sign-in rereads status every 2 s. Sign out asks for
   confirmation. Verify native-account, native-signin, desktop-agent-engine, the
   engines route tests and chat-header-model.
+  `engines.codexQuota({ botId })` reads a This PC Mico's own PC through the
+  `engineUsage` host method (never inside `environment`, so runs are not slowed):
+  only a Codex whose CLI confirmed a sign-in, `account/rateLimits/read` mapped by
+  `nativeCodexQuota`, cached a minute on the PC (`native-usage.ts`), checked again
+  against AccountPlanLimitSchema on the server. Without a Mico it keeps the
+  server's own Codex under the operator grant. The rail passes the open Mico.
 
 - Ask aside lives in a resizable side pane, with transient state pinned to user,
   Space, Mico and task. Hiding or switching panes preserves pending exchanges;

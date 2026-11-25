@@ -28,6 +28,14 @@ it("shows native ChatGPT's real remaining allowance and logo, and navigates on c
   expect(container.textContent).not.toContain("Manage model accounts");
   act(() => container.querySelector<HTMLButtonElement>('[data-testid="provider-quota-trigger"]')!.click()); expect(usage).toHaveBeenCalledOnce();
 });
+it("asks for the open Mico's own PC usage, and the server's without a Mico", async () => {
+  mocks.native.mockResolvedValue(account());
+  await act(async () => root.render(<ProviderQuota scope="user/space" botId="mico" onModels={models} onUsage={usage} />));
+  expect(mocks.native).toHaveBeenLastCalledWith({ botId: "mico" }, expect.anything());
+  expect(container.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("92");
+  await act(async () => root.render(<ProviderQuota scope="user/space" onModels={models} onUsage={usage} />));
+  expect(mocks.native).toHaveBeenLastCalledWith(undefined, expect.anything());
+});
 it("keeps saved account quotas when the native host is unavailable", async () => {
   mocks.native.mockRejectedValue(new Error("unsupported host")); mocks.planLimits.mockResolvedValue({ accounts: [account()] }); await render();
   expect(container.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("92");

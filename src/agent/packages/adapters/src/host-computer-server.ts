@@ -503,6 +503,9 @@ export async function startHostComputerServer(options: {
         yield await options.agentRuntime.nativeEngineAccount(input.account);
         break;
       }
+      case "engineUsage":
+        yield (await options.agentRuntime?.nativeEngineUsage?.()) ?? {};
+        break;
       case "appControl":
         yield appControlOffered(input.projectSessionId)
           ? await appControl!.run(input.request, context.signal)

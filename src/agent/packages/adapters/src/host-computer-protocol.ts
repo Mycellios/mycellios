@@ -85,6 +85,8 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
   z.object({ ...base, method: z.literal("appControl"), request: appControlRequest }),
   /** Sign one of the PC's CLIs in or out for the person (hosts reporting engineAccount: 1). */
   z.object({ ...base, method: z.literal("engineAccount"), account: NativeEngineAccountRequestSchema }),
+  /** Plan usage of the PC's signed-in CLIs; older hosts answer 400 and show none. */
+  z.object({ ...base, method: z.literal("engineUsage") }),
   z.object({
     ...base,
     method: z.literal("readFile"),
@@ -158,6 +160,7 @@ export function hostComputerDeadlineMs(request: HostComputerRequest) {
   if (request.method === "agentRun") return 24 * 60 * 60_000;
   // A sign-in only starts on the PC; the person finishes it there or with a device code.
   if (request.method === "engineAccount") return 60_000;
+  if (request.method === "engineUsage") return 30_000;
   return request.method === "execute"
     ? Math.max(boundedSandboxCommandTimeoutMs(request.command.timeoutMs), request.command.searchProgress?.maxMs ?? 0) + 30_000
     : 10 * 60_000;
