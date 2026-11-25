@@ -5,9 +5,12 @@ import type {
   AwaitingReplyRequest,
   AwaitingWork,
 } from "@mycellios/contracts";
-import { Button, NativeSelect } from "@mycellios/ui-web";
-import { MessagesSquare, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { BotAvatar, Button, DEFAULT_BOT_AVATAR_COLOR, NativeSelect } from "@mycellios/ui-web";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mycellios/ui-web/components/ui/collapsible";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
+import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
+import { ChevronDown, ChevronUp, Clock, Square, X } from "lucide-react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 
 /** While something is still owed, how often the list checks for answers given elsewhere. */
@@ -23,27 +26,32 @@ type AwaitingClient = {
 const SETTLED = new Set(["replied", "failed", "stopped"]);
 const EMPTY: AwaitingRepliesData = { requests: [], work: [] };
 
-/**
- * "Waiting for replies", above a Mico's composer: the teammates its requests still wait on
- * ("{done} of {total} replies in", one row each with Stop), and the tasks it delegated. A
- * stopped delegated task offers Continue, Reassign and Cancel through the revisioned work
- * controls; Continue resumes it where it stopped. Once every answer is in, the list shrinks to
- * one "Replies in" line that hides at once (the server call follows).
- */
+export type MobileReplyQueue = { preview: string; messages: ReactNode };
+
+export type RenderAwaitingReplies = (queue?: MobileReplyQueue) => ReactNode;
+
+type ReplyBot = { id: string; name: string; color?: string };
+
+/** The reply activity disclosure and the mobile message queue. */
 export function AwaitingReplies({
   rpc,
   botId,
   bots,
   refreshKey,
+  mobileQueue,
 }: {
   rpc: AwaitingClient;
   botId: string;
   /** The person's Micos, for Reassign. */
-  bots: ReadonlyArray<{ id: string; name: string }>;
+  bots: readonly ReplyBot[];
   /** Changes when the chat's turn or messages move, so the list is read again. */
   refreshKey?: string;
+  mobileQueue?: MobileReplyQueue;
 }) {
   const { t } = useLingui();
+  const mobile = useIsMobile();
+  const progressId = useId();
+  const [disclosure, setDisclosure] = useState<{ botId: string; open: boolean }>();
   const [data, setData] = useState<AwaitingRepliesData>(EMPTY);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -84,7 +92,8 @@ export function AwaitingReplies({
   }, [rpc, botId, refreshKey, reload]);
 
   const requests = data.requests.filter((request) => !hidden.has(request.requestId));
-  if (!requests.length && !data.work.length) return null;
+  const hasActivity = requests.length > 0 || data.work.length > 0;
+  if (!hasActivity && !mobileQueue) return null;
 
   async function act(key: string, action: () => Promise<unknown>) {
     if (busy) return;
@@ -103,23 +112,6 @@ export function AwaitingReplies({
     }
   }
 
-  const hint = (recipient: AwaitingReplyRecipient) => {
-    const name = recipient.name;
-    switch (recipient.state) {
-      case "asked":
-        return t`${name} picks it up next`;
-      case "working":
-        return t`${name} is working on it`;
-      case "needs_you":
-        return t`${name} needs you`;
-      case "replied":
-        return t`${name} replied`;
-      case "failed":
-        return t`${name} could not finish`;
-      default:
-        return t`${name} was stopped`;
-    }
-  };
   async function hide(requestIds: string[]) {
     const owner = current.current;
     setError(false);
@@ -137,57 +129,26 @@ export function AwaitingReplies({
     }
   }
 
-  if (!data.work.length && requests.every((request) => request.settled)) {
-    // Nothing is owed any more: one line saying who answered, and a close button.
-    const outcomes = [
-      ...new Set(
-        requests.flatMap((request) => request.recipients.map((recipient) => hint(recipient))),
-      ),
-    ].join(" · ");
-    return (
-      <section
-        data-testid="awaiting-replies"
-        data-settled="true"
-        aria-label={t`Replies in`}
-        className="pointer-events-auto mx-auto mb-2 flex w-full min-w-0 max-w-[42rem] items-center gap-2 rounded-2xl border border-border bg-background/95 py-1.5 ps-3 pe-1.5 text-sm shadow-sm backdrop-blur"
-      >
-        <MessagesSquare size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="shrink-0 text-xs font-medium text-muted-foreground">{t`Replies in`}</span>
-        <span className="min-w-0 flex-1 truncate" dir="auto" title={outcomes}>
-          {outcomes}
-        </span>
-        {error ? (
-          <span role="alert" className="shrink-0 text-xs text-muted-foreground">
-            {t`The list could not be updated. Try again.`}
-          </span>
-        ) : null}
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label={t`Hide this list`}
-          onClick={() => void hide(requests.map((request) => request.requestId))}
-        >
-          <X aria-hidden="true" />
-        </Button>
-      </section>
-    );
-  }
-
-  return (
-    <section
-      data-testid="awaiting-replies"
-      aria-label={t`Waiting for replies`}
-      className="pointer-events-auto mx-auto mb-2 flex w-full max-w-[42rem] flex-col gap-2 rounded-2xl border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur"
-    >
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <MessagesSquare size={14} className="shrink-0" aria-hidden="true" />
-        <span className="flex-1">{t`Waiting for replies`}</span>
-      </div>
+  const settled = hasActivity && !data.work.length && requests.every((request) => request.settled);
+  const label = settled ? t`Replies in` : t`Waiting for replies`;
+  const recipients = requests.flatMap((request) => request.recipients);
+  const total = recipients.length;
+  const done = recipients.filter((recipient) => recipient.state === "replied").length;
+  const active = recipients.find((recipient) => recipient.state === "needs_you")
+    ?? recipients.find((recipient) => recipient.state === "working");
+  const open = disclosure?.botId === botId ? disclosure.open : true;
+  const name = active?.name;
+  const summary = open || !name ? label : active?.state === "needs_you"
+    ? t`${name} needs you`
+    : t`${name} is working on it`;
+  const dismiss = () => void hide(requests.map((request) => request.requestId));
+  const activity = hasActivity ? (
+    <div className="flex min-w-0 flex-col gap-1">
       {requests.map((request) => (
         <RequestRows
           key={request.requestId}
           request={request}
-          hint={hint}
+          bots={bots}
           busy={busy}
           onStop={(recipient) =>
             void act(`${request.requestId}:${recipient.botId}`, () =>
@@ -220,22 +181,126 @@ export function AwaitingReplies({
           className="text-xs text-muted-foreground"
         >{t`The list could not be updated. Try again.`}</p>
       ) : null}
+    </div>
+  ) : null;
+
+  if (mobile || mobileQueue) {
+    const sheetTitle = mobileQueue ? t`Messages waiting to send` : label;
+    return (
+      <section
+        key={botId}
+        data-testid="awaiting-replies"
+        data-settled={settled || undefined}
+        aria-label={sheetTitle}
+        className="pointer-events-auto mx-auto mb-2 w-fit min-w-0 max-w-full"
+      >
+        <Sheet>
+          <SheetTrigger
+            render={<Button variant="secondary" />}
+            aria-label={sheetTitle}
+            className="h-11 max-w-full gap-2 rounded-full px-4"
+          >
+            <Clock aria-hidden="true" />
+            <span className="min-w-0 truncate" dir="auto">{mobileQueue?.preview ?? label}</span>
+            <ChevronUp aria-hidden="true" />
+          </SheetTrigger>
+          <SheetContent
+            side="bottom"
+            showCloseButton={false}
+            className="max-h-[85dvh] gap-0 overflow-hidden rounded-t-2xl motion-reduce:transition-none"
+          >
+            <div className="flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+              <SheetTitle>{sheetTitle}</SheetTitle>
+              <SheetClose render={<Button variant="ghost" size="icon" className="size-11" aria-label={t`Close`} />}>
+                <X aria-hidden="true" />
+              </SheetClose>
+            </div>
+            <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {mobileQueue && activity ? <h3 className="text-sm font-medium">{label}</h3> : null}
+              {activity}
+              {settled ? (
+                <Button variant="ghost" onClick={dismiss}>
+                  {t`Hide this list`}
+                </Button>
+              ) : null}
+              {mobileQueue?.messages}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      data-testid="awaiting-replies"
+      data-settled={settled || undefined}
+      aria-label={label}
+      className="pointer-events-auto mx-auto mb-2 w-full min-w-0 max-w-[42rem]"
+    >
+      <Collapsible
+        open={open}
+        onOpenChange={(next) => setDisclosure({ botId, open: next })}
+        className="rounded-xl border border-border bg-background"
+      >
+        <div className="flex min-w-0 items-center gap-1 pe-1">
+          <CollapsibleTrigger
+            render={<Button variant="ghost" />}
+            aria-label={label}
+            aria-describedby={total > 1 ? progressId : undefined}
+            className="group min-w-0 flex-1 justify-start gap-2 text-start"
+          >
+            {total > 0 ? (
+              <svg viewBox="0 0 16 16" className="size-4 shrink-0 -rotate-90" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="2" className="text-border" />
+                <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="2" pathLength="1"
+                  strokeDasharray={`${done / total} 1`} className="text-primary" />
+              </svg>
+            ) : <Clock className="text-muted-foreground" aria-hidden="true" />}
+            <span className="min-w-0 flex-1 truncate" dir="auto">{summary}</span>
+            {total > 1 ? (
+              <span id={progressId} className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {t`${done} of ${total} replies in`}
+              </span>
+            ) : null}
+            <ChevronDown className="text-muted-foreground group-aria-expanded:rotate-180" aria-hidden="true" />
+          </CollapsibleTrigger>
+          {settled ? (
+            <Button size="icon-sm" variant="ghost" aria-label={t`Hide this list`} onClick={dismiss}>
+              <X aria-hidden="true" />
+            </Button>
+          ) : null}
+        </div>
+        <CollapsibleContent>
+          <div className="max-h-[min(14rem,32dvh)] overflow-y-auto overscroll-contain px-1 pb-1">
+            {activity}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </section>
   );
 }
 
 function RequestRows({
   request,
-  hint,
+  bots,
   busy,
   onStop,
 }: {
   request: AwaitingReplyRequest;
-  hint: (recipient: AwaitingReplyRecipient) => string;
+  bots: readonly ReplyBot[];
   busy: string | null;
   onStop: (recipient: AwaitingReplyRecipient) => void;
 }) {
   const { t } = useLingui();
+  const states = {
+    asked: t`Queued`,
+    working: t`Working`,
+    needs_you: t`Needs you`,
+    replied: t`Answered`,
+    failed: t`Failed`,
+    stopped: t`Stopped`,
+  };
   const total = request.recipients.length;
   const done = request.recipients.filter((recipient) => SETTLED.has(recipient.state)).length;
   const group = request.groupName;
@@ -259,19 +324,23 @@ function RequestRows({
             key={recipient.botId}
             data-recipient={recipient.botId}
             data-state={recipient.state}
-            className="flex min-w-0 items-center gap-2 text-sm"
+            className="flex min-h-9 min-w-0 items-center gap-2 text-sm pointer-coarse:min-h-11"
           >
-            <span className="min-w-0 flex-1 truncate" dir="auto">
-              {hint(recipient)}
+            <BotAvatar color={bots.find((bot) => bot.id === recipient.botId)?.color ?? DEFAULT_BOT_AVATAR_COLOR} identity={recipient.botId} size={20} />
+            <span className="min-w-0 flex-1 truncate font-medium" dir="auto" title={name}>{name}</span>
+            <span className={recipient.state === "failed" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+              {states[recipient.state]}
             </span>
             {stoppable ? (
               <Button
                 size="xs"
                 variant="ghost"
+                className="pointer-coarse:size-11"
+                title={t`Stop`}
                 aria-label={t`Stop ${name}`}
                 disabled={busy !== null}
                 onClick={() => onStop(recipient)}
-              >{t`Stop`}</Button>
+              ><Square aria-hidden="true" /></Button>
             ) : null}
           </div>
         );
@@ -287,7 +356,7 @@ function WorkRow({
   onControl,
 }: {
   work: AwaitingWork;
-  bots: ReadonlyArray<{ id: string; name: string }>;
+  bots: readonly ReplyBot[];
   busy: string | null;
   onControl: (action: "pause" | "resume" | "cancel" | "reassign", botId?: string) => void;
 }) {

@@ -797,8 +797,11 @@
   (botOutcomeReturnedAt), never a replay. Not for FYIs or turns that already answered, opened
   tasks or delegated work; only the failure that ends recovery reaches the teammate. "Waiting for replies"
   (tasks.awaitingReplies) reuses the person's Stop and the revisioned work controls
-  (Continue = resume). list_agents is read-only; interrupt_agent stops only turns working on
-  the caller's own messages, through the durable Stop, and refuses the rest. Groups keep a
+  (Continue = resume). Desktop keeps an initially open, bounded disclosure above
+  the composer. Narrow main chats use one bottom sheet for replies and queued
+  messages, with a compact trigger. list_agents is read-only;
+  interrupt_agent stops only turns working on the caller's own messages through
+  the durable Stop and refuses the rest. Groups keep a
   purpose and a person-chosen leadBotId (additive `20261123090000` migration); routing is
   deterministic (mentions, @everyone, an opening name, else the lead) with no model routing
   call; a member's history hides other members' replies to the same message; "continue"
