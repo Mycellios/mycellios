@@ -236,6 +236,10 @@ import { MessagePinSchema, MICO_PINS_LIST_LIMIT, MicoMessagePinSchema } from "./
 import { SecurityEventListInputSchema, SecurityEventSchema } from "./security-events.js";
 import { SettingsScopeSchema, SpaceSettingSchema, settingsScopeInput } from "./settings-scope.js";
 import {
+  MicoShareInputSchema,
+  MicoShareSchema,
+  SharedMicosSchema,
+  SharedMicoTargetSchema,
   SpaceAuditEventSchema,
   SpaceAuditInputSchema,
   SpaceInvitationCreatedSchema,
@@ -313,6 +317,23 @@ const threadSendInput = threadTarget
       });
     }
   });
+
+/**
+ * A Space member's message to a shared Mico, in their own conversation: text and their own
+ * uploads only. Mentions, task instructions and delivery choices stay with the Mico's owner.
+ */
+const sharedMicoSendInput = SharedMicoTargetSchema.safeExtend({
+  text: z.string().optional(),
+  artifactIds: z.array(Id).max(ATTACHMENT_MAX_COUNT).optional(),
+  replyToMessageId: Id.optional(),
+  replyQuote: z.string().trim().min(1).max(REPLY_QUOTE_MAX_LENGTH).optional(),
+  clientNonce: z.string().min(1).max(200).optional(),
+}).superRefine((input, ctx) => {
+  if (!input.text?.trim() && !(input.artifactIds ?? []).length)
+    ctx.addIssue({ code: "custom", message: "Provide text or at least one attachment", path: ["text"] });
+  if (input.replyQuote && !input.replyToMessageId)
+    ctx.addIssue({ code: "custom", message: "replyQuote requires replyToMessageId", path: ["replyQuote"] });
+});
 
 const spaceName = z.string().trim().min(1).max(60);
 
@@ -458,6 +479,84 @@ export const appContract = {
         .input(z.object({ token: SpaceInviteTokenSchema }))
         .output(z.object({ spaceId: Id })),
     },
+    /** Who each Mico of the request's Space is shared with; for its owner and admins (phase 1b). */
+    shares: {
+      list: oc.output(z.array(MicoShareSchema)),
+      conversations: oc.input(z.object({ botId: Id })).output(z.array(z.object({
+        threadId: Id,
+        memberUserId: Id,
+        title: z.string().nullable(),
+      }))),
+      /** Replaces who a Mico is shared with; people who lose it stop at their next request. */
+      set: oc.input(MicoShareInputSchema).output(MicoShareSchema),
+    },
+  },
+  /**
+   * A Space member's use of the Micos shared with them (specs/space-members, phase 1b): only their
+   * own conversations, resolved again on every call. The Mico's owner pays within each person's
+   * daily allowance. NOT_FOUND while the deployment keeps Space members off or for the owner.
+   */
+  sharedMicos: {
+    list: oc.output(SharedMicosSchema),
+    /** Starts a conversation with a shared Mico; the same requestKey returns the same one. */
+    open: oc
+      .input(z.object({ botId: Id, requestKey: z.string().uuid() }))
+      .output(z.object({ threadId: Id })),
+    get: oc
+      .input(SharedMicoTargetSchema.safeExtend({ history: z.literal("recent").optional() }))
+      .output(ThreadSnapshotSchema),
+    messages: oc
+      .input(
+        SharedMicoTargetSchema.safeExtend({
+          before: z.number().int().nonnegative().optional(),
+          around: z
+            .object({ messageId: Id.optional(), seq: z.number().int().nonnegative().optional() })
+            .optional(),
+        }),
+      )
+      .output(ThreadMessagePageSchema),
+    subscribe: oc
+      .input(SharedMicoTargetSchema.safeExtend({ cursor: z.number().int().min(-1) }))
+      .output(eventIterator(ProductEventSchema)),
+    send: oc.input(sharedMicoSendInput).output(
+      z.object({
+        taskId: Id,
+        runId: Id,
+        seq: z.number().int(),
+        messageId: Id.optional(),
+        runIds: z.array(Id).optional(),
+      }),
+    ),
+    /** Answers the Mico's question in this conversation. */
+    answer: oc
+      .input(
+        SharedMicoTargetSchema.safeExtend({
+          runId: Id,
+          messageId: Id,
+          answer: z.string().min(1),
+          clientNonce: z.string().min(1).max(200).optional(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    stop: oc.input(SharedMicoTargetSchema).output(z.object({ ok: z.literal(true) })),
+    markRead: oc
+      .input(SharedMicoTargetSchema)
+      .output(z.object({ ok: z.literal(true), unreadAfterSeq: z.number().int().nullable() })),
+    /** A file for this conversation, attached to the next message. */
+    upload: oc
+      .input(
+        SharedMicoTargetSchema.safeExtend({
+          name: z.string().min(1).max(ARTIFACT_NAME_MAX_LENGTH),
+          mimeType: z.string().min(1),
+          contentBase64: z.string().min(1),
+          clientNonce: z.string().min(1).max(200).optional(),
+        }),
+      )
+      .output(ArtifactSchema),
+    /** A file this person uploaded to the conversation. */
+    file: oc
+      .input(SharedMicoTargetSchema.safeExtend({ artifactId: Id }))
+      .output(ArtifactWithContentSchema),
   },
   bootstrap: oc.input(z.object({
     botId: Id.optional(), taskThreadId: Id.optional(), history: z.literal("recent").optional(),

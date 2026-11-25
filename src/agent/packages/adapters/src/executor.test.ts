@@ -1279,7 +1279,10 @@ describe("parseUpdateBotPatch", () => {
 
 describe("run notification preference", () => {
   it("silences direct messages but leaves group notifications enabled", async () => {
-    let source: { bot: { notifyOnFinish: boolean }; thread: { groupId: string | null } } | null = {
+    let source: {
+      bot: { notifyOnFinish: boolean };
+      thread: { groupId: string | null; memberUserId?: string | null };
+    } | null = {
       bot: { notifyOnFinish: false },
       thread: { groupId: null },
     };
@@ -1310,7 +1313,7 @@ describe("run notification preference", () => {
       },
       select: {
         bot: { select: { notifyOnFinish: true } },
-        thread: { select: { groupId: true, taskBotId: true, taskKey: true } },
+        thread: { select: { groupId: true, taskBotId: true, taskKey: true, memberUserId: true } },
       },
     });
 
@@ -1323,6 +1326,22 @@ describe("run notification preference", () => {
         userId: "user-1",
       }),
     ).resolves.toBe(true);
+  });
+
+  it("never notifies the owner about a Space member's conversation with a shared Mico", async () => {
+    const findFirst = vi.fn(async () => ({
+      bot: { notifyOnFinish: true },
+      thread: { groupId: null, taskBotId: "bot-1", taskKey: "mico-task:bot-1:member:ben:k", memberUserId: "ben" },
+    }));
+    const prisma = { run: { findFirst } } as unknown as PrismaClient;
+    await expect(
+      runNotificationsEnabled(prisma, {
+        botId: "bot-1",
+        threadId: "thread-1",
+        spaceId: "workspace-1",
+        userId: "owner-1",
+      }),
+    ).resolves.toBe(false);
   });
 });
 

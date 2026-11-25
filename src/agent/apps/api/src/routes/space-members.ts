@@ -4,7 +4,9 @@ import { productAppUrl } from "@mycellios/contracts";
 import {
   acceptSpaceInvitation,
   createSpaceInvitation,
+  IsolationError,
   leaveSpace,
+  listMicoShares,
   listSpaceAuditEvents,
   listSpaceMembers,
   previewSpaceInvitation,
@@ -20,11 +22,13 @@ import {
   SpaceMembersForbiddenError,
   SpaceNotShareableError,
   SpaceOwnerCannotLeaveError,
+  setMicoShare,
   setSpaceMemberRole,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 import { ORPCError } from "@orpc/server";
 import type { RouterContext } from "./context.js";
+import { stopSharedMicoTurns } from "./shared-micos.js";
 
 /** The link an invitation opens. The token travels in the fragment, so no server or log sees it. */
 export function spaceInvitationUrl(webOrigin: string, token: string): string {
@@ -54,6 +58,7 @@ async function mapped<T>(work: () => Promise<T>): Promise<T> {
       throw new ORPCError("CONFLICT", { message: error.message });
     if (error instanceof SpaceInvitationRateError)
       throw new ORPCError("TOO_MANY_REQUESTS", { message: error.message });
+    if (error instanceof IsolationError) throw new ORPCError("NOT_FOUND");
     throw error;
   }
 }
@@ -90,6 +95,11 @@ export function spaceMemberRoutes(ctx: RouterContext) {
             targetUserId: input.userId,
           }),
         );
+        // Their access already ended with the membership; their queued turns stop too.
+        await stopSharedMicoTurns(deps, {
+          spaceId: context.actor.spaceId,
+          memberUserIds: [input.userId],
+        });
         return members(context.actor);
       }),
       setRole: enabled.spaces.members.setRole.handler(async ({ context, input }) => {
@@ -107,6 +117,10 @@ export function spaceMemberRoutes(ctx: RouterContext) {
         await mapped(() =>
           leaveSpace(deps.prisma, { spaceId: context.actor.spaceId, userId: context.actor.userId }),
         );
+        await stopSharedMicoTurns(deps, {
+          spaceId: context.actor.spaceId,
+          memberUserIds: [context.actor.userId],
+        });
         return { ok: true as const };
       }),
       audit: enabled.spaces.members.audit.handler(({ context, input }) =>
@@ -170,6 +184,50 @@ export function spaceMemberRoutes(ctx: RouterContext) {
           acceptSpaceInvitation(deps.prisma, { token: input.token, user, limit: limit() }),
         );
         return { spaceId };
+      }),
+    },
+    shares: {
+        conversations: enabled.spaces.shares.conversations.handler(async ({ context, input }) => {
+          const { userId, spaceId } = context.actor;
+          const ownerBot = await deps.prisma.bot.findFirst({
+            where: { id: input.botId, userId, spaceId, archivedAt: null },
+            select: { id: true },
+          });
+          if (!ownerBot) throw new ORPCError("NOT_FOUND");
+          const threads = await deps.prisma.thread.findMany({
+            where: { spaceId, userId, taskBotId: ownerBot.id, memberUserId: { not: null }, deleteAfter: null },
+            select: { id: true, title: true, memberUserId: true },
+            orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+            take: 200,
+          });
+          return threads.flatMap((thread) => thread.memberUserId
+            ? [{ threadId: thread.id, title: thread.title, memberUserId: thread.memberUserId }]
+            : []);
+        }),
+      list: enabled.spaces.shares.list.handler(({ context }) =>
+        mapped(() =>
+          listMicoShares(deps.prisma, {
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+          }),
+        ),
+      ),
+      set: enabled.spaces.shares.set.handler(async ({ context, input }) => {
+        const { share, lostUserIds } = await mapped(() =>
+          setMicoShare(deps.prisma, {
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            share: input,
+          }),
+        );
+        // People who lost the Mico stop at their next request; their unfinished turns stop now.
+        if (lostUserIds.length)
+          await stopSharedMicoTurns(deps, {
+            spaceId: context.actor.spaceId,
+            memberUserIds: lostUserIds,
+            botId: input.botId,
+          });
+        return share;
       }),
     },
   };

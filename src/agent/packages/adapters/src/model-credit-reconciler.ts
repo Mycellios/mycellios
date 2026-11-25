@@ -77,6 +77,8 @@ export function createModelCreditReconciler(deps: {
                 {
                   userId: call.userId,
                   spaceId: call.spaceId,
+                  // A member's turn keeps its requester on the receipt it settles.
+                  ...(call.requestedByUserId ? { requestedByUserId: call.requestedByUserId } : {}),
                   runId: call.runId ?? undefined,
                   operationId: call.runId ?? call.callId,
                   operationKind: usage.operationKind ?? "answer",

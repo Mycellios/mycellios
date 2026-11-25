@@ -168,7 +168,7 @@ export function planChecks(files, availableAgentTests) {
       [/20261123090000_mico_requests_and_group_leads|verify-mico-requests-db|bot-message-requests|group-requests|group-handoff|team-awareness/, 'verify-mico-requests-db.ts', 'Mico request settlement, group leads and migration on isolated PostgreSQL'],
       [/message-queue|queue-order|mico-concurrency|routes\/threads\.ts|20261123090000_message_queue_controls|20261123100000_conversation_turn_model/, 'verify-message-queue-db.ts', 'queue operations and turn model persistence on isolated PostgreSQL'],
       [/conversation-branch|thread-lifecycle|artifact-versions/, 'verify-conversation-branch-db.ts', 'branch copies, encryption, idempotency and isolation on isolated PostgreSQL'],
-      [/space-members|space-invit|routes\/spaces\.ts|packages\/db\/src\/(?:spaces|scope)\.ts|20261125100000_space_members/, 'verify-space-members-db.ts', 'Space invitations, roles, member isolation and audit on isolated PostgreSQL'],
+      [/space-members|space-invit|shared-micos|model-credit-observer|routes\/spaces\.ts|packages\/db\/src\/(?:spaces|scope)\.ts|20261125100000_space_members|20261125120000_space_member_sharing/, 'verify-space-members-db.ts', 'Space invitations, roles, shared Micos, member isolation, allowances and audit on isolated PostgreSQL'],
       [/migration-history|self-host-images\.ts$/, 'verify-migration-history-db.ts', 'migration check that refuses moving an install to this release, on isolated PostgreSQL'],
       [/mico-script-(credentials|deliveries)|mico-scripts-http/, 'verify-mico-script-credentials-db.ts', 'Mico Scripts credentials, delivery and isolation on PostgreSQL'],
     ]) {

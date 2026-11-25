@@ -10,7 +10,7 @@ import { isPersonRequestedRoutineRun, missedRoutineOccurrences, ROUTINE_FAILURE_
 import { type HistoryAccess, runHistoryTool, runPinMessageTool } from "./history-tools.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
 import { planCardTool } from "./plan-card.js";
-import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, isTaskConversation, readMicoDefaults } from "@mycellios/contracts";
+import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, isTaskConversation, readMicoDefaults, SHARED_MICO_PAYER_ERROR } from "@mycellios/contracts";
 import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
@@ -144,6 +144,7 @@ import {
   hideLocationValues,
   locationRedactionPatterns,
   withLocationAnswer,
+  spaceMemberPrivacyBlock,
 } from "@mycellios/core";
 import {
   isSiteFetchTool,
@@ -396,6 +397,7 @@ import {
   personalMemoryInstruction,
 } from "./personal-memory.js";
 import { appendMemoryFact, selectMemoryTools } from "./memory-tools.js";
+import type { ModelCallRequester } from "./model-credit-observer.js";
 import {
   HostedModelCreditsRequiredError,
   hostedModelCreditObserver,
@@ -3847,6 +3849,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
       const current = await deps.prisma.run.findUniqueOrThrow({
         where: { id: runId },
+        include: { thread: { select: { memberUserId: true } } },
       });
       if (
         current.status === "queued" ||
@@ -3885,12 +3888,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
         },
       });
       const turnModel = readTurnModelSelection(current.modelExecution);
-      let agentEngine = (turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
+      // A Space member's turn on a shared Mico (specs/space-members): every run in their
+      // conversation, whoever's message started it, gets the member policy below.
+      const memberUserId = current.thread?.memberUserId ?? null;
+      // Member turns run on the server's Pi model only: never a CLI or sign-in on the owner's PC.
+      let agentEngine = (memberUserId ? "pi" : turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
       }
-      const cloudSelection = await selectOfflineCloudWorkspace(
+      // Member turns have no computer, so they never take a server workspace either.
+      const cloudSelection = memberUserId ? undefined : await selectOfflineCloudWorkspace(
         deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
         {
           agentEngine, dataDir: deps.dataDir,
@@ -3954,12 +3962,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ? await projectExecutionLeaseKey(deps.prisma, deps.sandbox, run, leaseTarget.computer)
         : undefined;
       const isolatedProjectRun = Boolean(projectLeaseKey);
+      // A member's conversation never holds the Mico's computer.
       // A side conversation of a Mico with lanes (Pi, or Codex, Claude Code and OpenCode while the
       // operator enables native concurrency) reserves the computer only before its first computer,
       // file or command tool and never shares it with another run. Every other turn reserves it here.
-      const privateLane = !isolatedProjectRun && (enginePiFallback || micoRunsLanes({ agentEngine: turnModel?.agentEngine ?? leaseTarget.agentEngine })) && Boolean(await deps.prisma.thread.findFirst({
+      const privateLane = Boolean(memberUserId) || (!isolatedProjectRun &&
+        (enginePiFallback || micoRunsLanes({ agentEngine: turnModel?.agentEngine ?? leaseTarget.agentEngine })) &&
+        Boolean(await deps.prisma.thread.findFirst({
         where: { id: run.threadId, taskBotId: run.botId, spaceId: run.spaceId, userId: run.userId }, select: { id: true },
-      }));
+      })));
       let pendingComputerReservation: Promise<void> | undefined;
       const reserveComputer = async () => {
         if (computerLease) return;
@@ -4124,6 +4135,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const channelId = messagingChannelId(sourceBlocks);
         const messagingChannelRun = isMessagingChannelRun(run.trigger, sourceBlocks);
         const thread = await deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } });
+        // Nothing private to the owner reaches a member's turn: no memory or memory review,
+        // connected accounts, secrets, computer, schedules, routines, workflows or other Micos.
+        const memberRun = Boolean(memberUserId);
+        const restrictedRun = messagingChannelRun || memberRun;
         const [
           bot,
           messages,
@@ -4152,22 +4167,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? loadBotMessageContext(deps.prisma, run.sourceMessageId)
             : Promise.resolve(undefined),
           deps.prisma.task.findUniqueOrThrow({ where: { id: run.taskId } }),
-          deps.prisma.connection.findMany({
-            where: { userId: run.userId, spaceId: run.spaceId },
-            select: {
-              id: true,
-              connectorId: true,
-              provider: true,
-              providerRef: true,
-              displayName: true,
-              status: true,
-            },
-          }),
+          memberRun
+            ? Promise.resolve([])
+            : deps.prisma.connection.findMany({
+                where: { userId: run.userId, spaceId: run.spaceId },
+                select: {
+                  id: true,
+                  connectorId: true,
+                  provider: true,
+                  providerRef: true,
+                  displayName: true,
+                  status: true,
+                },
+              }),
           resolveMemberMainModel(deps, run),
           deps.prisma.deploymentSettings.findUnique({
             where: { id: "default" },
           }),
-          deps.memoryProviders.resolve(run.spaceId),
+          memberRun ? Promise.resolve(null) : deps.memoryProviders.resolve(run.spaceId),
           deps.prisma.taughtSkill.findMany({
             where: { botId: run.botId, spaceId: run.spaceId, status: "saved" },
           }),
@@ -4176,14 +4193,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             spaceId: run.spaceId,
             userId: run.userId,
           }),
-          deps.prisma.agentSecret.findMany({
-            where: { spaceId: run.spaceId },
-            select: {
-              name: true,
-              secret: { select: { id: true, ciphertext: true } },
-            },
-          }),
-          loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
+          memberRun
+            ? Promise.resolve([])
+            : deps.prisma.agentSecret.findMany({
+                where: { spaceId: run.spaceId },
+                select: {
+                  name: true,
+                  secret: { select: { id: true, ciphertext: true } },
+                },
+              }),
+          memberRun
+            ? Promise.resolve({})
+            : loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
           loadLoginPasswordRedactions(deps.prisma, deps.secretStore, run),
         ]);
         const historySearchBeforeSeq =
@@ -4211,10 +4232,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // A login filled in an earlier run may still be on its page, and anything this run reads
         // or is given may contain it, so every run hides its saved passwords before the model runs.
         runSecrets.push(...savedLoginPasswordRedactions);
-        const agentEnvironmentInstruction = formatAgentEnvironmentInstruction({
-          ...agentEnvironment,
-          ...initialBotCommandEnvironment,
-        });
+        const agentEnvironmentInstruction = memberRun
+          ? undefined
+          : formatAgentEnvironmentInstruction({
+              ...agentEnvironment,
+              ...initialBotCommandEnvironment,
+            });
         // modelPinned distinguishes the captured choice from an attempt's recorded model.
         const modelChoice = runModelChoice(run, leaseTarget);
         const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
@@ -4290,7 +4313,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Mico, outside messaging channels and group threads. Grants are checked per run.
         const personalMemory =
           deps.personalMemory &&
-          !messagingChannelRun &&
+          !restrictedRun &&
           !thread.groupId &&
           bot.userId === run.userId
             ? await deps.personalMemory
@@ -4318,7 +4341,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           payload: { trigger: run.trigger, routineId: run.routineId },
         });
 
-        const discoveredPromise = deps.connector
+        // A member's turn reaches none of the owner's connected accounts or tool servers.
+        const discoveredPromise = deps.connector && !memberRun
           ? deps.connector.discoverTools(context)
           : Promise.resolve([]);
         const threadContext = threadContextForRun(
@@ -4422,16 +4446,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ] = await Promise.all([
           discoveredPromise,
           loadCurrentTurnImages(deps, turnBlocks, context),
-          messagingChannelRun
+          restrictedRun
             ? Promise.resolve("")
             : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
-          messagingChannelRun
+          restrictedRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
                 spaceId: run.spaceId,
                 botId: bot.id,
               }),
-          messagingChannelRun || !deps.ticketBoardEnabled
+          restrictedRun || !deps.ticketBoardEnabled
             ? Promise.resolve(undefined)
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
@@ -4444,7 +4468,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const personalMemoryContext = personalRecalled
           ? formatPersonalMemory(personalRecalled.hits)
           : "";
-        const semanticMemoryEnabled = Boolean(semanticMemory) && !messagingChannelRun;
+        const semanticMemoryEnabled = Boolean(semanticMemory) && !restrictedRun;
         let recalledMemory = "";
         let recallSucceeded = false;
         if (recalled) {
@@ -4530,6 +4554,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // An incompatible saved model is a configuration error. Record it on the run.
         // Leaving it for the setup catch would retry and replace the message.
         let resolved: Awaited<ReturnType<typeof resolveModelKey>>;
+        const requester: ModelCallRequester | undefined = memberUserId
+          ? { userId: memberUserId, botId: bot.id, runId }
+          : undefined;
         try {
           resolved = nativeEngine
             ? { apiKey: undefined, redact: [], callObserver: undefined }
@@ -4541,7 +4568,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 runModelProvider,
                 runModelId,
                 (values) => runSecrets.push(...values),
-                turnModel?.credentialId ? { requireStoredSecret: true, preservePayer: true } : undefined,
+                turnModel?.credentialId
+                  ? { requireStoredSecret: true, preservePayer: true, requester }
+                  : { requester },
               );
         } catch (error) {
           // A dead or account-switched credential is already deleted. Retrying
@@ -4555,6 +4584,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           return;
         }
         runSecrets.push(...resolved.redact);
+        // The owner pays a member's turns in Credits, admitted against the member's daily
+        // allowance by ordinary holds. A model on the owner's own key or sign-in has no hold to
+        // admit against, so it never serves a member (specs/space-members, phase 1).
+        if (memberUserId && !resolved.callObserver) {
+          await failRunBeforeModel(SHARED_MICO_PAYER_ERROR);
+          return;
+        }
         const effectiveThinkingLevel = turnModel ? turnModel.thinkingLevel : thinkingLevel ?? resolved.thinkingLevel ?? null;
         // Persist the effective model before invoking it. Later leases of this
         // turn keep the same engine and payer, including after a human pause.
@@ -4605,13 +4641,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           },
           () => runAbortController?.abort(),
         );
-        // A relay that gives no answer only holds back a Mico whose computer is the PC.
-        const provisionKind = await deps.sandbox.provisionKind?.(context).catch((error: unknown) => {
+        // A relay that gives no answer only holds back a Mico whose computer is the PC. A member's
+        // turn never uses the computer, so it does not ask.
+        const provisionKind = memberRun ? undefined : await deps.sandbox.provisionKind?.(context).catch((error: unknown) => {
           if (error instanceof DesktopUnreachableError && storedComputer.kind !== "desktop") return undefined;
           throw error;
         });
         const computerKind = provisionKind ?? storedComputer.kind;
-        const computerAvailable = !(context.isolatedWorkspace && ["desktop", "none"].includes(deps.sandbox.describe().id)) && admittedComputerAvailable(
+        const computerAvailable = !memberRun && !(context.isolatedWorkspace && ["desktop", "none"].includes(deps.sandbox.describe().id)) && admittedComputerAvailable(
           deps.sandbox.describe().id,
           provisionKind,
         );
@@ -4715,14 +4752,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const hasMessagingIdentity = deps.messaging
           ? await deps.messaging.hasIdentity(bot.id)
           : false;
-        const messagingContext = hasMessagingIdentity
-          ? [messagingDmSurfaceNote(), messagingChannelRun ? messagingChannelPrivacyBlock() : null]
-              .filter(Boolean)
-              .join("\n\n")
-          : // Desktop-linked WhatsApp chats carry a channel block without a messaging identity.
-            messagingChannelRun
-            ? messagingChannelPrivacyBlock()
-            : undefined;
+        // A member's conversation is never mirrored to the owner's messaging app.
+        const messagingContext = memberRun
+          ? spaceMemberPrivacyBlock(
+              (
+                await deps.prisma.user.findUnique({
+                  where: { id: memberUserId ?? "" },
+                  select: { name: true },
+                })
+              )?.name ?? "",
+            )
+          : hasMessagingIdentity
+            ? [messagingDmSurfaceNote(), messagingChannelRun ? messagingChannelPrivacyBlock() : null]
+                .filter(Boolean)
+                .join("\n\n")
+            : // Desktop-linked WhatsApp chats carry a channel block without a messaging identity.
+              messagingChannelRun
+              ? messagingChannelPrivacyBlock()
+              : undefined;
         if (heldForTakeover) {
           const held = await deps.prisma.run.findUnique({
             where: { id: runId },
@@ -4745,8 +4792,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : null;
         // Calls carry no schema flag: the sending client encodes them in the clientNonce.
         const sourceClientNonce = sourceMessage?.clientNonce ?? null;
-        // A follow-up can be queued by a bot (group handoffs); only the user's own counts.
-        const ownerStartedRun = isOwnerStartedRun(run.trigger, sourceMessage?.role === "user");
+        // A follow-up can be queued by a bot (group handoffs); only the user's own counts. A
+        // member's words are never the owner's: their turn starts as outside content.
+        const ownerStartedRun = !memberRun && isOwnerStartedRun(run.trigger, sourceMessage?.role === "user");
         const canCreateWebhookRoutine = run.trigger === "user" && ownerStartedRun &&
           sourceMessage?.threadId === thread.id && thread.botId === bot.id && !thread.groupId &&
           run.userId === bot.userId;
@@ -4795,7 +4843,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           : { folders: [], context: undefined };
         context.groupFolders = groupFolders.context;
         const hostEnvironment =
-          computerKind === "desktop"
+          computerKind === "desktop" && !memberRun
             ? await deps.sandbox
                 .environment?.(
                   {
@@ -4818,7 +4866,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const appControlAllowed =
           computerKind === "desktop" && hostEnvironment?.appControl === true && !routineConversation &&
           !isolatedProjectRun && !heldForTakeover && !context.projectSessionId && run.trigger !== "webhook" &&
-          !messagingChannelRun && !isBackgroundRunTrigger(run.trigger);
+          !restrictedRun && !isBackgroundRunTrigger(run.trigger);
         if (!appControlAllowed) for (const name of APP_CONTROL_TOOL_NAMES) disabledBuiltinTools.add(name);
         // The normal user takeover panel controls the assigned computer, not the
         // separate server workspace. Keep that control off this run.
@@ -4828,19 +4876,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if (thread.taskBotId) disabledBuiltinTools.add("call_user");
         // Tasks belong to the Mico's own main chat and routine conversations only.
         const agentTasksAllowed = await agentTaskToolsAllowed(deps.prisma, run, thread, {
-          messagingChannelRun,
+          messagingChannelRun: restrictedRun,
           backgroundRun: isBackgroundRunTrigger(run.trigger),
         });
         if (!agentTasksAllowed) for (const name of AGENT_TASK_TOOL_NAMES) disabledBuiltinTools.add(name);
         // History reaches the Mico's other conversations only from its main chat or an ordinary
-        // side conversation; a routine thread reads just the tasks it opened.
-        const historyAccess: HistoryAccess = historyAcrossAllowed(run, thread, { messagingChannelRun })
+        // side conversation; a routine thread reads just the tasks it opened. A member's turn
+        // reads only their own conversation.
+        const historyAccess: HistoryAccess = historyAcrossAllowed(run, thread, { messagingChannelRun: restrictedRun })
           ? "across"
           : agentTasksAllowed
             ? "own_tasks"
             : "current";
         // Pins are made only in the Mico's own main chat or side conversations.
-        const pinAllowed = !thread.groupId && !thread.externalConversationId && !messagingChannelRun &&
+        const pinAllowed = !thread.groupId && !thread.externalConversationId && !restrictedRun &&
           !isBackgroundRunTrigger(run.trigger) &&
           (thread.botId === bot.id || (!thread.botId && thread.taskBotId === bot.id));
         if (!pinAllowed) disabledBuiltinTools.add("pin_message");
@@ -4886,6 +4935,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             mediaVideoEnabled: Boolean(deps.artifacts && mediaGeneration?.capabilities.video),
             cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
             messagingChannelRun,
+            memberRun,
             voiceCall,
             disabledBuiltinTools: [...disabledBuiltinTools],
             fleetManagement: bot.fleetManagement,
@@ -4894,14 +4944,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // Cross-owner agent connections only exist for chat-linked bots.
           ...(hasMessagingIdentity &&
           bot.crossSpaceCommunication === true &&
+          !memberRun &&
           !isBackgroundRunTrigger(run.trigger) &&
           run.trigger !== "created"
             ? agentConnectionTools.filter((tool) => !disabledBuiltinTools.has(tool.name))
             : []),
         ];
-        const exposedConnectorTools = discovered.filter(
-          (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),
-        );
+        const exposedConnectorTools = memberRun
+          ? []
+          : discovered.filter(
+              (tool) => !builtinAgentTools.some((builtin) => builtin.name === tool.name),
+            );
         const connectorTools = new Map(
           exposedConnectorTools.map((tool) => [tool.name, tool] as const),
         );
@@ -5410,6 +5463,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           observer?: AgentToolExecutionObserver,
         ) => {
           context.signal.throwIfAborted();
+          // Whatever the model asks for, a member's turn runs only the tools offered to it.
+          if (memberRun && !MEMBER_RUN_TOOL_NAMES.has(name))
+            return { error: "This tool is not available in a conversation shared with you." };
           if (restartingTurn && pendingCommands.size && name !== "command_status" && (!READ_ONLY_AGENT_TOOLS.has(name) || name === "run_subagent"))
             return {error:"Inspect command_status for the interrupted commands before starting another action.",commandIds:[...pendingCommands]};
           if (awaitingDelegatedWork && name !== "work_status" && name !== "command_status")
@@ -8956,8 +9012,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           return { kind: "agent_tool_result", content: [{ type: "text", text: "Waiting for the computer to reconnect." }], details: { desktopUpdate: "paused" }, terminate: true };
         })();
 
-        const pluginLine =
-          connectedPlugins.length > 0
+        const pluginLine = memberRun
+          ? undefined
+          : connectedPlugins.length > 0
             ? `Connected plugins: ${connectedPlugins.map((row) => `${row.displayName} (${row.connectorId}:${row.provider})`).join(", ")}. Prefer those plugin tools over the computer browser or web search when reading app data (repos, releases, mail, calendar, and similar).`
             : "No plugins are connected yet.";
         const taughtSkillIndex = savedSkills.slice(0, 20);
@@ -9155,9 +9212,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             })
           : history;
         const runtimeHistory = [...historicalContext, ...historyWithImages];
-        // Without a roster a bot only knows the bots it spawned itself.
+        // Without a roster a bot only knows the bots it spawned itself. A member's turn messages
+        // no other Mico or group, so it hears of none.
         const [teammates, groupDirectory] = await Promise.all([
-          thread.groupId
+          thread.groupId || memberRun
             ? []
             : deps.prisma.bot.findMany({
                 where: {
@@ -9171,7 +9229,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 orderBy: { createdAt: "asc" },
                 take: BOT_DIRECTORY_LIMIT,
               }),
-          !thread.groupId ? loadBotGroupDirectory(deps.prisma, run) : undefined,
+          !thread.groupId && !memberRun ? loadBotGroupDirectory(deps.prisma, run) : undefined,
         ]);
         const botDirectory =
           [renderBotDirectory(teammates), groupDirectory].filter(Boolean).join("\n\n") || undefined;
@@ -9210,7 +9268,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
 
         let fallbackModels: ModelRoleChoice[] = [];
-        if (!scripted) {
+        // Backups may be the owner's own keys or sign-ins, which never serve a member's turn.
+        if (!scripted && !memberRun) {
           try {
             fallbackModels = (
               await effectiveModelRole(deps.prisma, run, "main", {
@@ -9270,6 +9329,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   spaceId: run.spaceId,
                   botId: bot.id,
                   userId: run.userId,
+                  ...(memberUserId ? { requestedByUserId: memberUserId } : {}),
                   runId,
                   parentRunId: runId,
                   operationId: runId,
@@ -9889,6 +9949,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 spaceId: run.spaceId,
                 botId: bot.id,
                 userId: run.userId,
+                ...(memberUserId ? { requestedByUserId: memberUserId } : {}),
                 runId,
                 parentRunId: runId,
                 operationId: runId,
@@ -10127,7 +10188,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           } catch (error) {
             getLogger().error("history.compact enqueue failed", error);
           }
-          if(!messagingChannelRun)await scheduleLocalMemoryReview({prisma:deps.prisma,jobs:deps.jobs},thread.id).catch(error=>getLogger().error("memory.review enqueue failed",error));
+          if(!restrictedRun)await scheduleLocalMemoryReview({prisma:deps.prisma,jobs:deps.jobs},thread.id).catch(error=>getLogger().error("memory.review enqueue failed",error));
         } catch (caughtError) {
           if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
           // A Desktop check that got no answer before the turn started or reached the PC is
@@ -10384,10 +10445,11 @@ async function runNotice(
     },
     select: {
       bot: { select: { notifyOnFinish: true } },
-      thread: { select: { groupId: true, taskBotId: true, taskKey: true } },
+      thread: { select: { groupId: true, taskBotId: true, taskKey: true, memberUserId: true } },
     },
   });
-  if (!source) return { enabled: false, groupId: null };
+  // A Space member's conversation is theirs: its turns never notify the Mico's owner.
+  if (!source || source.thread.memberUserId) return { enabled: false, groupId: null };
   return {
     enabled: routine ? routine.notify : Boolean(source.thread.groupId || source.bot.notifyOnFinish),
     groupId: source.thread.groupId,
@@ -10811,6 +10873,20 @@ function fleetPrepareDeps(
  */
 const CREATED_RUN_TOOL_NAMES = new Set(["ask_user", "update_bot"]);
 
+/**
+ * Everything a Space member's turn on a shared Mico may use (specs/space-members, phase 1): ask
+ * them, search the web and read their own conversation. Never the owner's memory, connected
+ * accounts, secrets, computer, files, schedules, routines, workflows, settings or other Micos,
+ * and nothing that would need the owner's approval.
+ */
+export const MEMBER_RUN_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "ask_user",
+  "web_search",
+  "search_history",
+  "read_history",
+  "skill_read",
+]);
+
 export function selectBuiltinToolsForRun(options: {
   ticketBoardEnabled?: boolean;
   phoneCallsEnabled?: boolean;
@@ -10830,6 +10906,8 @@ export function selectBuiltinToolsForRun(options: {
   mediaImagesEnabled?: boolean;
   mediaVideoEnabled?: boolean;
   messagingChannelRun: boolean;
+  /** A Space member's turn on a shared Mico: only MEMBER_RUN_TOOL_NAMES. */
+  memberRun?: boolean;
   /** Hanging up is only offered to a turn the caller spoke on a live call. */
   voiceCall?: boolean;
   /** Built-in names this bot turned off. Unknown names are ignored. */
@@ -10860,6 +10938,7 @@ export function selectBuiltinToolsForRun(options: {
     Boolean(options.cloudAgentEnabled),
   ).filter(
     (tool) =>
+      (!options.memberRun || MEMBER_RUN_TOOL_NAMES.has(tool.name)) &&
       !disabled.has(tool.name) &&
       (options.computerAvailable !== false || !COMPUTER_REQUIRED_TOOL_NAMES.has(tool.name)) &&
       (options.trigger !== "created" || CREATED_RUN_TOOL_NAMES.has(tool.name)) &&
@@ -12204,7 +12283,9 @@ async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMateria
     throw new UnavailableModelForAuthError(MISSING_MODEL_RUN_ERROR);
   }
   const callObserver =
-    !credential && billingEnabled ? await hostedModelCreditObserver(deps.prisma, scope) : undefined;
+    !credential && billingEnabled
+      ? await hostedModelCreditObserver(deps.prisma, scope, args[7]?.requester)
+      : undefined;
   return { ...material, apiKey: material.apiKey ?? runtimeKey, callObserver };
 }
 
@@ -12251,7 +12332,15 @@ async function resolveModelKeyMaterial(
   provider: string,
   modelId: string,
   registerSecrets?: (values: string[]) => void,
-  { requireStoredSecret = false, preservePayer = false }: { requireStoredSecret?: boolean; preservePayer?: boolean } = {},
+  {
+    requireStoredSecret = false,
+    preservePayer = false,
+  }: {
+    requireStoredSecret?: boolean;
+    preservePayer?: boolean;
+    /** A Space member's turn: metered calls check their access and allowance (resolveModelKey). */
+    requester?: ModelCallRequester;
+  } = {},
 ): Promise<{
   apiKey?: string;
   accountId?: string;

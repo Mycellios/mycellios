@@ -15167,6 +15167,14 @@ msgstr "Verify your email address to accept this invitation."
 msgid "Too many email invitations today. Try again tomorrow."
 msgstr "Too many email invitations today. Try again tomorrow."
 
+#: src/pages/SpaceInvite.tsx
+msgid "{owner} can read your conversations with their Micos."
+msgstr "{owner} can read your conversations with their Micos."
+
+#: src/lib/user-error.ts
+msgid "Only the person who started this conversation can write in it."
+msgstr "Only the person who started this conversation can write in it."
+
 #: src/pages/shell/native-engine-install.tsx
 msgid "Install {name}"
 msgstr "Install {name}"
@@ -15283,6 +15291,38 @@ msgstr "Ignored: a filter did not match"
 msgid "Ignored: routine paused"
 msgstr "Ignored: routine paused"
 
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Shared Micos"
+msgstr "Shared Micos"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Who can chat with this Mico"
+msgstr "Who can chat with this Mico"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Everyone in this Space"
+msgstr "Everyone in this Space"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Selected people"
+msgstr "Selected people"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Daily Credits per person, paid by the Mico owner"
+msgstr "Daily Credits per person, paid by the Mico owner"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Save sharing"
+msgstr "Save sharing"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "No Micos have been shared with you."
+msgstr "No Micos have been shared with you."
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Close conversation"
+msgstr "Close conversation"
+
 #: src/pages/shell/native-engine-install.tsx
 msgid "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
 msgstr "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
@@ -15298,6 +15338,7 @@ msgstr "Update {name}"
 #: src/pages/shell/native-engine-install.tsx
 msgid "This PC keeps {name} {current}."
 msgstr "This PC keeps {name} {current}."
+
 #: src/components/RoutineWebhookCard.tsx
 msgid "Copy webhook URL"
 msgstr "Copy webhook URL"
@@ -15361,3 +15402,55 @@ msgstr "Copy token"
 #: src/pages/shell/mico-scripts-section.tsx
 msgid "Hide token"
 msgstr "Hide token"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Created an invitation"
+msgstr "Created an invitation"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Revoked an invitation"
+msgstr "Revoked an invitation"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Joined the Space"
+msgstr "Joined the Space"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Left the Space"
+msgstr "Left the Space"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Removed a member"
+msgstr "Removed a member"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Changed a member's role"
+msgstr "Changed a member's role"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Changed Mico sharing"
+msgstr "Changed Mico sharing"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Space activity"
+msgstr "Space activity"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Hide activity"
+msgstr "Hide activity"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Show activity"
+msgstr "Show activity"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "No Space activity yet."
+msgstr "No Space activity yet."
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Load earlier activity"
+msgstr "Load earlier activity"
+
+#: src/pages/shell/dialogs.tsx
+msgid "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"
+msgstr "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"

@@ -2010,7 +2010,9 @@ export async function createPendingSteeringRun(
       runId: null,
       message: { threadId: input.threadId },
     },
-    include: { message: { select: { id: true, blocks: true, seq: true, clientNonce: true } } },
+    include: {
+      message: { select: { id: true, blocks: true, seq: true, clientNonce: true, authorUserId: true } },
+    },
     orderBy: [{ message: { seq: "asc" } }, { id: "asc" }],
   });
   if (pending.length === 0) return null;
@@ -2058,6 +2060,8 @@ export async function createPendingSteeringRun(
       threadId: input.threadId,
       taskId: task.id,
       userId: batch[0]!.userId,
+      // A Space member's next message in their conversation is still their turn (specs/space-members).
+      ...(source.message.authorUserId ? { requestedByUserId: source.message.authorUserId } : {}),
       status: "queued",
       // A private continuation is a follow-up the owner wrote only when every message in it came
       // from the app; one direct-line delivery keeps it messaging, so it is never owner-started.

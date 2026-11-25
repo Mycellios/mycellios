@@ -15550,6 +15550,14 @@ msgstr "Verifica tu dirección de correo para aceptar esta invitación."
 msgid "Too many email invitations today. Try again tomorrow."
 msgstr "Demasiadas invitaciones por correo hoy. Inténtalo mañana."
 
+#: src/pages/SpaceInvite.tsx
+msgid "{owner} can read your conversations with their Micos."
+msgstr "{owner} puede leer tus conversaciones con sus Micos."
+
+#: src/lib/user-error.ts
+msgid "Only the person who started this conversation can write in it."
+msgstr "Solo quien empezó esta conversación puede escribir en ella."
+
 #: src/pages/shell/native-engine-install.tsx
 msgid "Install {name}"
 msgstr "Instalar {name}"
@@ -15666,6 +15674,38 @@ msgstr "Ignorado: un filtro no coincidió"
 msgid "Ignored: routine paused"
 msgstr "Ignorado: la rutina estaba en pausa"
 
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Shared Micos"
+msgstr "Micos compartidos"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Who can chat with this Mico"
+msgstr "Quién puede chatear con este Mico"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Everyone in this Space"
+msgstr "Todo el mundo en este Space"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Selected people"
+msgstr "Personas seleccionadas"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Daily Credits per person, paid by the Mico owner"
+msgstr "Créditos diarios por persona, a cargo del propietario del Mico"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Save sharing"
+msgstr "Guardar acceso"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "No Micos have been shared with you."
+msgstr "Nadie ha compartido Micos contigo."
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Close conversation"
+msgstr "Cerrar conversación"
+
 #: src/pages/shell/native-engine-install.tsx
 msgid "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
 msgstr "¿Actualizar {name} a {version} en este PC? Mycellios descarga {size} de npm ({packageName}) y verifica el paquete antes de ejecutarlo. Los turnos nuevos de {name} esperan mientras se verifica."
@@ -15681,6 +15721,7 @@ msgstr "Actualizar {name}"
 #: src/pages/shell/native-engine-install.tsx
 msgid "This PC keeps {name} {current}."
 msgstr "Este PC conserva {name} {current}."
+
 #: src/components/RoutineWebhookCard.tsx
 msgid "Copy webhook URL"
 msgstr "Copiar URL del webhook"
@@ -15744,3 +15785,55 @@ msgstr "Copiar token"
 #: src/pages/shell/mico-scripts-section.tsx
 msgid "Hide token"
 msgstr "Ocultar token"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Created an invitation"
+msgstr "Creó una invitación"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Revoked an invitation"
+msgstr "Revocó una invitación"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Joined the Space"
+msgstr "Se unió al Espacio"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Left the Space"
+msgstr "Salió del Espacio"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Removed a member"
+msgstr "Quitó a un miembro"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Changed a member's role"
+msgstr "Cambió el rol de un miembro"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Changed Mico sharing"
+msgstr "Cambió quién puede usar el Mico"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Space activity"
+msgstr "Actividad del Espacio"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Hide activity"
+msgstr "Ocultar actividad"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Show activity"
+msgstr "Mostrar actividad"
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "No Space activity yet."
+msgstr "Aún no hay actividad en el Espacio."
+
+#: src/pages/SpaceMembersPanel.tsx
+msgid "Load earlier activity"
+msgstr "Cargar actividad anterior"
+
+#: src/pages/shell/dialogs.tsx
+msgid "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"
+msgstr "{otherMemberCount, plural, one {Otro miembro perderá el acceso. Esta acción no se puede deshacer.} other {# miembros más perderán el acceso. Esta acción no se puede deshacer.}}"

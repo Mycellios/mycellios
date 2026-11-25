@@ -64,6 +64,19 @@ describe("resolveNextArtifactVersion", () => {
     expect(result).toEqual({ rootArtifactId: "artifact-root", version: 3 });
   });
 
+  it("keeps a Space member's uploads and the owner's files of the same name in separate families", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const prisma = { artifact: { findFirst } } as unknown as Pick<PrismaClient, "artifact">;
+
+    await resolveNextArtifactVersion(prisma, params);
+    await resolveNextArtifactVersion(prisma, { ...params, memberUserId: "member-1" });
+
+    expect(findFirst.mock.calls.map(([query]) => query.where.memberUserId)).toEqual([
+      null,
+      "member-1",
+    ]);
+  });
+
   it("matches by name case-insensitively and scopes to the group when given one", async () => {
     const findFirst = vi.fn().mockResolvedValue(null);
     const prisma = { artifact: { findFirst } } as unknown as Pick<PrismaClient, "artifact">;

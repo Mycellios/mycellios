@@ -14,6 +14,8 @@ const SPACE_MEMBER_ERRORS: Record<string, () => string> = {
     t`Verify your email address to accept this invitation.`,
   "Too many email invitations today. Try again tomorrow.": () =>
     t`Too many email invitations today. Try again tomorrow.`,
+  "Only the person who started this conversation can write in it.": () =>
+    t`Only the person who started this conversation can write in it.`,
 };
 
 /** Text for a failure: human messages pass through; network and implementation detail become copy. */

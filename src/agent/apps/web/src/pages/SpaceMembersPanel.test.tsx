@@ -9,6 +9,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const members = vi.hoisted(() => ({
+  audit: vi.fn(),
   list: vi.fn(),
   remove: vi.fn(),
   setRole: vi.fn(),
@@ -76,6 +77,8 @@ vi.mock("@mycellios/ui-web", () => {
     DialogTitle: Box,
   };
 });
+
+vi.mock("./SpaceMicosPanel", () => ({ SpaceMicosPanel: () => null }));
 
 import { SpaceMembersPanel } from "./SpaceMembersPanel";
 
@@ -170,6 +173,26 @@ function button(label: string) {
   if (!found) throw new Error(`Missing button: ${label}`);
   return found;
 }
+
+it("loads the Space activity only when opened and requests earlier events by cursor", async () => {
+  members.list.mockResolvedValue(ownerView);
+  const event = {
+    type: "space.mico.shared", actorName: "Ana", targetName: null,
+    role: null, kind: null, micoName: "Writer", createdAt: "2026-11-25T00:00:00.000Z",
+  };
+  members.audit.mockResolvedValueOnce(Array.from({ length: 50 }, (_, index) => ({
+    ...event, id: `event-${index}`,
+  }))).mockResolvedValueOnce([{ ...event, id: "older", micoName: "Reader" }]);
+  await show();
+  expect(members.audit).not.toHaveBeenCalled();
+  await click("Show activity");
+  expect(container.textContent).toContain("Changed Mico sharing");
+  expect(container.textContent).toContain("Writer");
+  await click("Load earlier activity");
+  expect(members.audit).toHaveBeenLastCalledWith({ cursor: "event-49", limit: 50 });
+  expect(container.textContent).toContain("Reader");
+  expect(container.textContent).not.toContain("Load earlier activity");
+});
 
 async function click(label: string) {
   await act(async () => button(label).click());

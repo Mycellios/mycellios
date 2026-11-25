@@ -460,12 +460,22 @@
   binds an email invitation to that verified address and adds a `member` organization and
   Space membership; the default-Space trigger joins owners only, so nobody reaches a Personal
   Space. Nobody removes or changes the owner; only the owner changes roles. A non-owner
-  reaches only `spaces.members.*`/`spaces.invites.*` there (`assertSpaceRoleAllows`) and no
-  route outside RPC: their own identity would read Space rows and spend the owner
-  organization's Credits. Membership is read per request, so removal and leaving end access
-  at once. Audit changes in `security_events` with names, never addresses. Verify
-  scripts/verify-space-members-db.ts and the space-members, SpaceMembersPanel, SpaceInvite
-  and switcher tests.
+  reaches only `spaces.members.*`/`spaces.invites.*`/`spaces.shares.*` and `sharedMicos.*`
+  there (`assertSpaceRoleAllows`) and no route outside RPC: their own identity would read Space
+  rows and spend the owner organization's Credits. Membership is read per request, so removal
+  and leaving end access at once. Audit changes in `security_events` with names, never addresses.
+  The owner or an admin shares a Mico (`mico_shares`, default none, chat level) with people
+  or everyone; `sharedMicos.*` resolves that share on every call and runs as the Mico owner's
+  tenant on the member's own side threads (`Thread.memberUserId`) only, never its main chat,
+  settings or computer. Messages and runs name the member (`authorUserId`,
+  `requestedByUserId`). Any run in such a thread is a member turn: Pi only, no computer,
+  memory, reviews, connections, secrets, schedules, other Micos or backups, only
+  `MEMBER_RUN_TOOL_NAMES`, and only hosted Credits; each paid call rechecks the share and holds
+  against the member's UTC-day allowance under the account lock. The owner reads those threads
+  but never writes, answers or marks them read; they stay out of the owner's counts and
+  notifications. Unsharing, removal and leaving cancel the person's queued turns. Verify
+  scripts/verify-space-members-db.ts and the space-members, executor-space-members,
+  model-credit-observer, SpaceMembersPanel, SpaceInvite and switcher tests.
   The chat provider/model selection owns execution: saved API/OAuth connections
   use Pi automatically; installed account providers are selected in the same
   model menu. Do not expose a second Agent engine switch in Mico settings or

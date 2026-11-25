@@ -6,6 +6,8 @@ type UsageEvent = Extract<AgentRuntimeEvent, { type: "usage" }>;
 export interface UsageAttribution {
   spaceId: string;
   userId: string;
+  /** The Space member whose turn this was, when `userId` (the Mico's owner) paid for it. */
+  requestedByUserId?: string;
   botId?: string;
   runId?: string;
   parentRunId?: string;
@@ -42,6 +44,7 @@ export async function recordUsage(
     model: event.model,
     spaceId: attribution.spaceId,
     userId: attribution.userId,
+    ...(attribution.requestedByUserId ? { requestedByUserId: attribution.requestedByUserId } : {}),
     botId: attribution.botId,
     runId: attribution.runId,
     operationId: attribution.operationId,
