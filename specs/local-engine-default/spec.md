@@ -44,13 +44,27 @@ it is not, and let programs on the PC use the Mico's AI in both cases.
    with an action that opens that CLI's own login on the PC; the Mico never types
    credentials.
 2. Phase 2 — make the local engine safe to default to.
-   - The CLI runs in the Mico's own native folder. Loading the owner's personal
-     CLI configuration (`~/.claude` instructions, hooks, skills) is a visible,
-     per-device switch, off by default for new Micos and preserved for existing
-     native Micos that already ran with it. Login state is shared either way:
-     only configuration is isolated, never the credential store.
-   - Claude Code reads its authenticated model catalog into `Bot.nativeConfig`
-     and validates the choice again in the executing CLI, as Codex does.
+   - The CLI runs in the Mico's own native folder (the linked project when
+     there is one); session and system-prompt files stay in the private
+     conversation folder. Claude Code keeps sessions per working folder, so the
+     folder joins the session binding and the first turn after the move carries
+     the history into a fresh session.
+   - Loading the owner's personal CLI configuration (`~/.claude` instructions,
+     hooks, skills) is a visible switch in the chat model menu, stored as
+     `Bot.nativeConfig.userSettings` and honoured only on the owner's PC (the
+     Desktop host supplies `resolveNativeWorkspace`; a server never does). It is
+     off by default for every Mico: existing native Micos already ran with
+     `--restricted`, which ignores every settings file and CLAUDE.md. Switched
+     on, the CLI uses `--setting-sources user`, never project or local files the
+     Mico could write in its own folder. Login state is shared either way: only
+     configuration is isolated, never the credential store.
+   - Claude Code's authenticated model catalog comes from its `initialize`
+     control response (no model call), cached for five minutes. The model and
+     effort live in `Bot.nativeConfig` and are checked against that catalog
+     again before the CLI starts (`--model`, `--effort`); Claude Code offers no
+     Fast tier. Both Codex and Claude catalogs now travel with the Desktop's
+     engine report, so a This PC Mico lists its PC's models too; the API keeps
+     only bounded, well-formed entries of installed, signed-in engines.
 3. Phase 3 — default and migration.
    - New Micos created in Desktop on This PC take the first signed-in engine in
      the owner's order (default Claude Code, Codex, OpenCode). With none signed
@@ -113,9 +127,10 @@ Rejected:
 - Phase 1: native-agent-runtime discovery tests with fixture CLIs for signed
   in, signed out, timeout and malformed output; picker tests for the sign-in
   state. Fixtures do not qualify real CLI logins on Windows and macOS.
-- Phase 2: native-agent-process environment tests (Mico folder as working
-  directory, configuration switch), Claude catalog tests mirroring
-  native-codex-settings.
+- Phase 2: native-agent-runtime launch tests (Mico folder as working
+  directory, configuration switch only on the owner's PC, catalog refusal),
+  native-model-catalog and Claude native-codex-settings tests, the forBot
+  catalog sanitizing test and the chat-header-model picker tests.
 - Phase 3: migration idempotency and idle-only tests on isolated PostgreSQL,
   offline fallback tests in offline-cloud-workspace and executor, notice tests.
 - Phase 4: Desktop endpoint tests (token scope, loopback bind, closure),

@@ -93,9 +93,22 @@ export const NativeCodexConfigSchema = z.object({
   modelId: z.string().trim().min(1).max(200).nullable().optional(),
   thinkingLevel: ThinkingLevelSchema.nullable().optional(),
   fastMode: z.boolean().optional(),
+  /** Claude Code on the owner's PC loads their personal CLI configuration (instructions, hooks, skills). */
+  userSettings: z.boolean().optional(),
 });
 
-export const BusyMessageModeSchema = z.enum(["queue", "steer"]);
+/** One model a signed-in native CLI reported for its account. */
+export const NativeEngineModelSchema = z.object({
+  id: z.string().min(1).max(200),
+  label: z.string().min(1).max(200),
+  isDefault: z.boolean(),
+  thinkingLevels: z.array(z.string().max(32)).max(16),
+  defaultThinkingLevel: z.string().max(32).optional(),
+  fast: z.boolean(),
+});
+export type NativeEngineModelInfo = z.infer<typeof NativeEngineModelSchema>;
+
+export const BusyMessageModeSchema =z.enum(["queue", "steer"]);
 export type BusyMessageMode = z.infer<typeof BusyMessageModeSchema>;
 
 export const BotSchema = z.object({

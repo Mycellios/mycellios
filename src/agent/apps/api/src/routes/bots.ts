@@ -414,8 +414,12 @@ export function botsRoutes(ctx: RouterContext) {
           });
           if (!section) throw new IsolationError();
         }
-        if (input.nativeConfig && (input.agentEngine ?? existing.agentEngine) !== "codex") {
-          throw new ORPCError("BAD_REQUEST", { message: "Codex preferences require the Codex provider." });
+        const configEngine = input.agentEngine ?? existing.agentEngine;
+        if (input.nativeConfig && configEngine !== "codex" && configEngine !== "claude") {
+          throw new ORPCError("BAD_REQUEST", { message: "Model preferences require Codex or Claude Code." });
+        }
+        if (input.nativeConfig?.fastMode && configEngine !== "codex") {
+          throw new ORPCError("BAD_REQUEST", { message: "Fast mode requires Codex." });
         }
         const modelChange = await validateBotModelChange(botModelValidation(context.actor), {
           userId: context.actor.userId,

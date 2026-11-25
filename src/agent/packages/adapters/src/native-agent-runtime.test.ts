@@ -14,6 +14,7 @@ import { startHostComputerServer } from "./host-computer-server.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
 import { CONVERSATION_STYLE } from "./conversation-style.js";
+import { resetNativeModelCatalogCache } from "./native-model-catalog.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -417,6 +418,53 @@ it("forwards the saved model, effort and Fast tier through Codex turn/start", as
   expect(test.executeTool).toHaveBeenCalledOnce();
   expect(events.some(event => event.type === "done")).toBe(true);
 });
+
+it("runs Claude Code in the Mico's folder and loads the owner's settings only on their PC", async () => {
+  resetNativeModelCatalogCache();
+  const logRoot = await mkdtemp(join(tmpdir(), "mycellios-claude-launch-"));
+  roots.push(logRoot);
+  const folder = await realpath(await mkdtemp(join(tmpdir(), "mycellios-mico-folder-")));
+  roots.push(folder);
+  const log = join(logRoot, "launch.jsonl");
+  const test = await setup("claude", ["--claude-launch-log", log]);
+  const drain = async (context: typeof test.context & { resolveNativeWorkspace?: () => Promise<string | undefined> }) => {
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of test.runtime.run(test.request, context)) events.push(event);
+    return events;
+  };
+  test.request.nativeConfig = { modelId: "fixture-claude", thinkingLevel: "high", userSettings: true };
+  expect((await drain({ ...test.context, resolveNativeWorkspace: async () => folder })).at(-1)?.type).toBe("done");
+  // On a server the same saved switch never loads that host's personal configuration.
+  expect((await drain(test.context)).at(-1)?.type).toBe("done");
+  test.request.nativeConfig = { userSettings: false };
+  await drain({ ...test.context, resolveNativeWorkspace: async () => folder });
+  const launches = (await readFile(log, "utf8")).trim().split("\n").map(line => JSON.parse(line) as { cwd: string; args: string[] });
+  expect(launches).toHaveLength(3);
+  const [owned, server, isolated] = launches;
+  expect(owned!.cwd).toBe(folder);
+  expect(owned!.args).toEqual(expect.arrayContaining(["--setting-sources", "user", "--model", "fixture-claude", "--effort", "high"]));
+  expect(owned!.args).not.toContain("--restricted");
+  expect(server!.cwd).not.toBe(folder);
+  expect(server!.cwd).toContain("native-agents");
+  expect(server!.args).toContain("--restricted");
+  expect(server!.args).not.toContain("--setting-sources");
+  expect(isolated!.cwd).toBe(folder);
+  expect(isolated!.args).toContain("--restricted");
+  expect(isolated!.args).not.toContain("--model");
+  // Session and prompt files stay in the private folder, never in the Mico's own one.
+  expect(await readdir(folder)).toEqual([]);
+}, 25000);
+
+it("refuses a Claude Code model or effort the CLI's account catalog does not offer", async () => {
+  resetNativeModelCatalogCache();
+  const test = await setup("claude");
+  const consume = async () => { for await (const _event of test.runtime.run(test.request, test.context)) { /* drain */ } };
+  test.request.nativeConfig = { modelId: "gone" };
+  await expect(consume()).rejects.toThrow("Claude Code model is unavailable");
+  test.request.nativeConfig = { modelId: "fixture-plain", thinkingLevel: "high" };
+  await expect(consume()).rejects.toThrow("effort is unavailable");
+  expect(test.executeTool).not.toHaveBeenCalled();
+}, 25000);
 
 it("hands off conversation history when a native model or engine changes", async () => {
   const logRoot = await mkdtemp(join(tmpdir(), "mycellios-native-model-"));
