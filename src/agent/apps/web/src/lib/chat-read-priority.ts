@@ -1,8 +1,11 @@
+import { anySignal } from "@mycellios/core";
+
 const HISTORY_FIRST_LIMIT_MS = 3_500;
 const NAVIGATION_SETTLE_MS = 250;
+const SECONDARY_READ_TIMEOUT_MS = 15_000;
+const MAX_SECONDARY_READS = 2;
 
-// Secondary reads started by the chat chrome. Never hold sends, task actions,
-// authorization recovery, history, or realtime streams.
+// Only the reads started by the chat controls use this queue.
 const SECONDARY_CHAT_READS = new Set([
   "development/list",
   "links/favicon",
@@ -20,27 +23,34 @@ const SECONDARY_CHAT_READS = new Set([
 ]);
 
 type ChatReadHold = {
-  done: Promise<void>;
   release: () => void;
   users: number;
   settle?: ReturnType<typeof setTimeout>;
 };
 
 let hold: ChatReadHold | undefined;
+let runningReads = 0;
+const queuedReads: Array<() => void> = [];
+
+function drainSecondaryReads(): void {
+  if (hold) return;
+  while (runningReads < MAX_SECONDARY_READS && queuedReads.length) {
+    queuedReads.shift()!();
+  }
+}
 
 /** Let a new chat load its transcript before its surrounding controls fetch. */
 export function prioritizeChatHistory(): () => void {
   if (!hold) {
-    let resolve!: () => void;
-    const done = new Promise<void>((finish) => { resolve = finish; });
     const next: ChatReadHold = {
-      done,
       users: 0,
       release: () => {
         clearTimeout(deadline);
         clearTimeout(next.settle);
-        if (hold === next) hold = undefined;
-        resolve();
+        if (hold === next) {
+          hold = undefined;
+          drainSecondaryReads();
+        }
       },
     };
     const deadline = setTimeout(next.release, HISTORY_FIRST_LIMIT_MS);
@@ -59,17 +69,36 @@ export function prioritizeChatHistory(): () => void {
   };
 }
 
-export function waitForSecondaryChatRead(procedure: string | undefined, signal?: AbortSignal) {
-  const current = hold;
-  if (!current || !procedure || !SECONDARY_CHAT_READS.has(procedure)) return;
-  if (!signal) return current.done;
-  if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise<void>((resolve, reject) => {
-    const abort = () => reject(signal.reason);
-    signal.addEventListener("abort", abort, { once: true });
-    void current.done.then(() => {
-      signal.removeEventListener("abort", abort);
-      resolve();
-    });
+/** Limit only the reads deferred by a chat and new secondary reads during their drain. */
+export function runWithChatReadPriority<T>(
+  procedure: string | undefined,
+  signal: AbortSignal,
+  read: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const draining = runningReads > 0 || queuedReads.length > 0;
+  if (!procedure || !SECONDARY_CHAT_READS.has(procedure) || (!hold && !draining)) {
+    return read(signal);
+  }
+
+  const queuedSignal = anySignal([signal, AbortSignal.timeout(SECONDARY_READ_TIMEOUT_MS)]);
+  if (queuedSignal.aborted) return Promise.reject(queuedSignal.reason);
+
+  return new Promise<T>((resolve, reject) => {
+    const cancel = () => {
+      const index = queuedReads.indexOf(start);
+      if (index >= 0) queuedReads.splice(index, 1);
+      reject(queuedSignal.reason);
+    };
+    const start = () => {
+      queuedSignal.removeEventListener("abort", cancel);
+      runningReads += 1;
+      void Promise.resolve().then(() => read(queuedSignal)).then(resolve, reject).finally(() => {
+        runningReads -= 1;
+        drainSecondaryReads();
+      });
+    };
+    queuedSignal.addEventListener("abort", cancel, { once: true });
+    queuedReads.push(start);
+    drainSecondaryReads();
   });
 }

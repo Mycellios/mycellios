@@ -1,7 +1,7 @@
 import { desktopBridge } from "./desktop";
 import { eventAgentContext, eventAgentSpace, withEventAgentHeaders } from "./event-demo-agent";
 import { startupFetch } from "./startup-fetch";
-import { waitForSecondaryChatRead } from "./chat-read-priority";
+import { runWithChatReadPriority } from "./chat-read-priority";
 import { getGeneralPreferences } from "./general-preferences";
 import { shouldRestoreSavedSpace } from "./startup-space";
 import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
@@ -102,21 +102,20 @@ const link = new RPCLink<RpcClientContext>({
     if (CLIENT_BUILD) headers.set(CLIENT_BUILD_HEADER, formatClientBuild("web", CLIENT_BUILD));
     for (const [key, value] of Object.entries(correlation)) headers.set(key, value);
     const procedure = new URL(request.url).pathname.split("/rpc/")[1];
-    const waiting = waitForSecondaryChatRead(procedure, options.signal ?? request.signal);
-    if (waiting) await waiting;
-    let response: Response;
-    try {
-      response = await startupFetch(request, {
-        headers,
-        credentials: "include",
-        // Keep cancellation attached directly to fetch rather than only a cloned Request.
-        signal: options.signal,
-      });
-    } catch (error) {
-      if (!options.signal?.aborted)
-        reportClientError(error, "rpc.transport", responseCorrelation(new Headers(correlation)));
-      throw error;
-    }
+    const response = await runWithChatReadPriority(procedure, options.signal ?? request.signal, async (signal) => {
+      try {
+        return await startupFetch(request, {
+          headers,
+          credentials: "include",
+          // Keep cancellation attached directly to fetch rather than only a cloned Request.
+          signal,
+        });
+      } catch (error) {
+        if (!signal.aborted)
+          reportClientError(error, "rpc.transport", responseCorrelation(new Headers(correlation)));
+        throw error;
+      }
+    });
     // Server exceptions are reported by the API; do not report every HTTP failure twice.
     recheckSessionOnUnauthorized(response.status);
     if (response.status === 401 && spaceId && spaceId === selectedSpaceId())
