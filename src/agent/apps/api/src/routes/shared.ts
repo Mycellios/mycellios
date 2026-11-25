@@ -38,7 +38,7 @@ export async function codingEnginesForComputer(
     const context = { ...probe, signal: combined };
     const state = deps.sandbox.nativeEngineState
       ? await deps.sandbox.nativeEngineState(context).catch(() => undefined)
-      : { engines: await deps.sandbox.nativeEngines?.(context).catch(() => undefined), signedOut: [] };
+      : { engines: await deps.sandbox.nativeEngines?.(context).catch(() => undefined), signedOut: [], models: undefined };
     const known = (ids: unknown) => (Array.isArray(ids) ? ids : []).filter(
       (id): id is "codex" | "claude" | "opencode" => id === "codex" || id === "claude" || id === "opencode",
     );
