@@ -6,10 +6,13 @@ vi.mock("@mycellios/adapters", () => ({
   canInstallNativeOpenCode: vi.fn(), discoverNativeCodexModels: vi.fn(), discoverNativeEngines: () => fixtures.engines(),
   signedOutEngines: (engines: Array<{ id: string; signedIn?: boolean }>) => engines.flatMap(engine => engine.signedIn === false ? [engine.id] : []),
   nativeEngineModels: (engines: Array<{ id: string; models?: unknown }>) => Object.fromEntries(engines.flatMap(engine => engine.models ? [[engine.id, engine.models]] : [])),
+  defaultLocalEngine: (signedIn: string[] = []) => ["claude", "codex"].find(engine => signedIn.includes(engine)),
   installManagedOpenCode: vi.fn(), reconcileWorkStops: vi.fn(),
 }));
 import { localCapabilityRoutes } from "./routes/local-capabilities.js";
 import type { RouterContext } from "./routes/context.js";
+import { localEngineForNewMico } from "./routes/shared.js";
+import type { RouterDeps } from "./router.js";
 beforeEach(() => { fixtures.allowed = true; fixtures.read.mockReset().mockResolvedValue(null); fixtures.access.mockClear(); });
 function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn> }) {
   const procedure = { handler: (handler: unknown) => handler };
@@ -80,4 +83,18 @@ it("returns only well-formed catalogs of installed, signed-in engines a Desktop 
   expect(await list(request)).toEqual({
     computer: "desktop", engines: ["claude", "codex"], signedOut: ["codex"], models: { claude: [opus] },
   });
+});
+
+it("starts a new This PC Mico only on an installed CLI that confirmed a sign-in on that PC", async () => {
+  const actor = { userId: "user", spaceId: "space" };
+  const pick = (state: unknown) => localEngineForNewMico(
+    { sandbox: { nativeEngineState: vi.fn().mockResolvedValue(state) } } as unknown as RouterDeps, actor, "mico");
+  expect(await pick({ engines: ["claude", "codex"], signedOut: [], signedIn: ["codex", "claude"] })).toBe("claude");
+  expect(await pick({ engines: ["codex"], signedOut: [], signedIn: ["claude", "codex"] })).toBe("codex");
+  expect(await pick({ engines: ["claude", "codex"], signedOut: ["claude"], signedIn: ["claude"] })).toBeUndefined();
+  // An older Desktop reports no confirmed sign-in, and OpenCode cannot confirm one: both keep Pi.
+  expect(await pick({ engines: ["claude", "opencode"], signedOut: [] })).toBeUndefined();
+  expect(await pick({ engines: ["opencode"], signedOut: [], signedIn: ["opencode"] })).toBeUndefined();
+  const offline = { sandbox: { nativeEngineState: vi.fn().mockRejectedValue(Error("PC offline")) } } as unknown as RouterDeps;
+  expect(await localEngineForNewMico(offline, actor, "mico")).toBeUndefined();
 });

@@ -484,6 +484,7 @@ export async function startHostComputerServer(options: {
           chunkedWrites: true,
           nativeEngines: engineState?.engines ?? await options.agentRuntime?.nativeEngines?.(),
           ...(engineState?.signedOut.length ? { signedOutEngines: engineState.signedOut } : {}),
+          ...(engineState?.signedIn?.length ? { signedInEngines: engineState.signedIn } : {}),
           ...(engineState?.models && Object.keys(engineState.models).length ? { nativeModels: engineState.models } : {}),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),

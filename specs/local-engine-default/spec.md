@@ -69,6 +69,13 @@ it is not, and let programs on the PC use the Mico's AI in both cases.
    - New Micos created in Desktop on This PC take the first signed-in engine in
      the owner's order (default Claude Code, Codex, OpenCode). With none signed
      in they stay on Pi exactly as today.
+     Implemented (3a): at creation the API asks the PC that runs the Mico, in
+     one bounded read (4 s), which installed CLIs confirmed a sign-in (the
+     Desktop reports `signedInEngines`; an unknown answer is never counted). The
+     first of Claude Code, Codex becomes the engine; the general model stays the
+     server fallback. A model or engine chosen in the create dialog wins,
+     idempotent spawnKey creates keep what they made, and OpenCode is not chosen
+     automatically until it can report a sign-in.
    - Existing This PC Micos move once, on that PC, only when an engine is signed
      in and the Mico is idle (no active, queued or parked run). The move keeps
      the saved Pi model as the server fallback, starts a fresh native session

@@ -243,6 +243,22 @@ export function signedOutEngines(engines: Awaited<ReturnType<typeof discoverNati
     (engine.id === "codex" || engine.id === "claude") ? [engine.id] : []);
 }
 
+/** The installed engines whose CLI confirmed someone is signed in; an unknown answer is left out. */
+export function signedInEngines(engines: Awaited<ReturnType<typeof discoverNativeEngines>>) {
+  return engines.flatMap(engine =>
+    engine.available && "signedIn" in engine && engine.signedIn === true &&
+    (engine.id === "codex" || engine.id === "claude") ? [engine.id] : []);
+}
+
+/**
+ * The engine a new Mico on the owner's PC starts with: the first one in the owner's order whose
+ * CLI confirmed a sign-in. OpenCode cannot report one yet, so it is never chosen automatically.
+ */
+export const LOCAL_ENGINE_ORDER = ["claude", "codex"] as const;
+export function defaultLocalEngine(signedIn: readonly string[] | undefined) {
+  return LOCAL_ENGINE_ORDER.find(engine => signedIn?.includes(engine));
+}
+
 /** The model catalogs the installed, signed-in CLIs reported. */
 export function nativeEngineModels(engines: Awaited<ReturnType<typeof discoverNativeEngines>>): NativeEngineModels {
   const models: NativeEngineModels = {};

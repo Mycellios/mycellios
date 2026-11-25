@@ -119,6 +119,8 @@ export interface HostComputerEnvironment {
   nativeEngines?: NativeCodingEngine[];
   /** Installed engines whose CLI reported nobody signed in (older Desktops omit it). */
   signedOutEngines?: NativeCodingEngine[];
+  /** Installed engines whose CLI confirmed a sign-in (older Desktops omit it). */
+  signedInEngines?: NativeCodingEngine[];
   /** Model catalogs of the signed-in CLIs on this PC (older Desktops omit it). */
   nativeModels?: NativeEngineModels;
   /** The owner allowed accessibility control of this PC's applications. */

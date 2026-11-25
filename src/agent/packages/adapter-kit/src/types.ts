@@ -23,6 +23,8 @@ export type NativeEngineModels = Partial<Record<"codex" | "claude", NativeEngine
 export type NativeEngineState = {
   engines: NativeCodingEngine[];
   signedOut: NativeCodingEngine[];
+  /** Installed engines whose CLI confirmed someone is signed in (older hosts omit it). */
+  signedIn?: NativeCodingEngine[];
   models?: NativeEngineModels;
 };
 

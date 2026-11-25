@@ -450,7 +450,12 @@
   use Pi automatically; installed account providers are selected in the same
   model menu. Do not expose a second Agent engine switch in Mico settings or
   select an unrelated CLI merely because a PC is connected. New Micos inherit
-  the general connection unless the user selects an installed provider.
+  the general connection unless the user selects an installed provider, except
+  a new This PC Mico created with no model or engine: it starts on the first CLI
+  in the order Claude Code, Codex whose sign-in that PC confirmed
+  (localEngineForNewMico, specs/local-engine-default/spec.md), keeping the
+  general model as its server fallback. Unknown sign-in, an older Desktop, no
+  answer, OpenCode (no sign-in report) and idempotent spawnKey creates keep Pi.
   Conversational turns capture the resolved model, engine and owned connection
   before their first model call, with the Run lease fence. Resume uses that
   selection and rechecks credentials and native consent. A later turn reads the
