@@ -1,10 +1,19 @@
-import { DEFAULT_COMPOSE_PROJECT_NAME, isLocalImageTag } from "@mycellios/core";
+import { UPSTREAM_IMAGE_OWNER } from "@mycellios/contracts";
+import {
+  DEFAULT_COMPOSE_PROJECT_NAME,
+  IMAGE_ENV,
+  IMAGE_MOVE_ENV,
+  isLocalImageTag,
+  OFFICIAL_SERVER_IMAGE,
+  PREVIOUS_IMAGE_ENV,
+} from "@mycellios/core";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_COMPOSE_FILE,
   DEFAULT_UPDATER_PORT,
   missingSecretAssignments,
   readEnvAssignment,
+  readImageState,
   readTagState,
   resolveUpdaterConfig,
   truncateOutput,
@@ -207,6 +216,46 @@ describe("readTagState", () => {
    */
   it("falls back to a tag that is local-only, so nothing tries to pull it", () => {
     expect(isLocalImageTag(readTagState("").currentTag)).toBe(true);
+  });
+});
+
+describe("readImageState", () => {
+  const upstream = `${UPSTREAM_IMAGE_OWNER}legacy/app`;
+
+  it("reads the image Compose uses from .env, else the one the sidecar started with", () => {
+    expect(readImageState("", OFFICIAL_SERVER_IMAGE)).toEqual({
+      image: OFFICIAL_SERVER_IMAGE,
+      previousImage: null,
+      source: "official",
+      move: null,
+    });
+    expect(
+      readImageState(`${IMAGE_ENV}=registry.example.com/mirror/app\n`, OFFICIAL_SERVER_IMAGE),
+    ).toMatchObject({ image: "registry.example.com/mirror/app", source: "other", move: null });
+    expect(readImageState(`${IMAGE_ENV}=Not An Image\n`, upstream)).toMatchObject({
+      image: upstream,
+    });
+  });
+
+  it("offers the move off the upstream images until the owner declines it", () => {
+    expect(readImageState(`${IMAGE_ENV}=${upstream}\n`, OFFICIAL_SERVER_IMAGE)).toMatchObject({
+      source: "upstream",
+      move: "offered",
+    });
+    expect(
+      readImageState(
+        `${IMAGE_ENV}=${upstream}\n${IMAGE_MOVE_ENV}=declined\n`,
+        OFFICIAL_SERVER_IMAGE,
+      ),
+    ).toMatchObject({ source: "upstream", move: "declined" });
+    // An install on this repository's images has nothing to offer, whatever it once answered.
+    expect(readImageState(`${IMAGE_MOVE_ENV}=declined\n`, OFFICIAL_SERVER_IMAGE).move).toBeNull();
+  });
+
+  it("reads the previous image a move recorded", () => {
+    expect(
+      readImageState(`${PREVIOUS_IMAGE_ENV}=${upstream}\n`, OFFICIAL_SERVER_IMAGE).previousImage,
+    ).toBe(upstream);
   });
 });
 

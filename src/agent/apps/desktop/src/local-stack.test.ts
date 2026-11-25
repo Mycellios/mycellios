@@ -1,6 +1,15 @@
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import {
+  MIGRATION_HISTORY_COMMAND,
+  MIGRATION_HISTORY_UNKNOWN_EXIT,
+  SELF_HOST_APP_IMAGE,
+  SELF_HOST_COMPUTER_IMAGE,
+  SELF_HOST_IMAGE_NAMESPACE,
+  UPSTREAM_IMAGE_OWNER,
+} from "@mycellios/contracts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { RunDocker, RunDockerResult } from "./docker-cli.js";
 import {
@@ -23,6 +32,7 @@ import {
   stackDir,
   stackFailureMessage,
   stackResourceDir,
+  withoutUpstreamImages,
 } from "./local-stack.js";
 
 const COMPOSE_DIR = path.resolve(import.meta.dirname, "..", "..", "..", "infra", "compose");
@@ -79,8 +89,11 @@ describe("renderStackEnv", () => {
     }
     expect(lines.some((line) => line.startsWith("RAKAZO_IMAGE_TAG="))).toBe(false);
     expect(lines.some((line) => line.startsWith("RAKAZO_COMPUTER_IMAGE_TAG="))).toBe(false);
-    // Everything else, including the image names and empty optional keys, stays verbatim.
-    expect(lines).toContain("RAKAZO_IMAGE=ghcr.io/elie222/rakazo/app");
+    // Everything else, including this repository's image names and empty optional keys, stays
+    // verbatim.
+    expect(lines.filter((line) => line.endsWith(`=${SELF_HOST_APP_IMAGE}`))).toHaveLength(1);
+    expect(lines.filter((line) => line.endsWith(`=${SELF_HOST_COMPUTER_IMAGE}`))).toHaveLength(1);
+    expect(rendered).not.toContain(UPSTREAM_IMAGE_OWNER);
     expect(lines).toContain("SANDBOX_PROVIDER=docker");
     expect(lines).toContain("OPENROUTER_API_KEY=");
     expect(rendered.endsWith("\n")).toBe(template.endsWith("\n"));
@@ -90,6 +103,31 @@ describe("renderStackEnv", () => {
     expect(renderStackEnv("POSTGRES_PASSWORD=keep\n# note=\n", fakeHex)).toBe(
       "POSTGRES_PASSWORD=keep\n# note=\n",
     );
+  });
+});
+
+describe("withoutUpstreamImages", () => {
+  it("drops only image settings that name the upstream project's images", () => {
+    const upstream = `${UPSTREAM_IMAGE_OWNER}legacy`;
+    const env = [
+      "POSTGRES_PASSWORD=keep",
+      `APP_IMAGE=${upstream}/app`,
+      `  COMPUTER_IMAGE = "${upstream}/computer"`,
+      "MIRROR_IMAGE=registry.example.com/mirror/app",
+      `OTHER_SETTING=${upstream}/not-an-image-setting`,
+      `# NOTE_IMAGE=${upstream}/app`,
+      "",
+    ].join("\n");
+    expect(withoutUpstreamImages(env)).toBe(
+      [
+        "POSTGRES_PASSWORD=keep",
+        "MIRROR_IMAGE=registry.example.com/mirror/app",
+        `OTHER_SETTING=${upstream}/not-an-image-setting`,
+        `# NOTE_IMAGE=${upstream}/app`,
+        "",
+      ].join("\n"),
+    );
+    expect(withoutUpstreamImages("A=1\r\nB=2\r\n")).toBe("A=1\r\nB=2\r\n");
   });
 });
 
@@ -450,6 +488,104 @@ describe("LocalStackController", () => {
       expect((await stat(path.join(stackPath, STACK_ENV_FILE))).mode & 0o777).toBe(0o600);
       expect((await stat(stackPath)).mode & 0o777).toBe(0o700);
     }
+  });
+
+  describe("a stack created with the upstream images", () => {
+    const compose = [
+      "compose",
+      "--env-file",
+      ".env",
+      "-f",
+      STACK_COMPOSE_FILE,
+      "--project-name",
+      STACK_PROJECT_NAME,
+    ];
+    const up = ["up", "-d", "--wait", "--wait-timeout", String(COMPOSE_WAIT_TIMEOUT_S)];
+    const check = [
+      ...compose,
+      "run",
+      "--rm",
+      "--no-deps",
+      "-T",
+      "api",
+      ...MIGRATION_HISTORY_COMMAND,
+    ];
+    // What older builds wrote: the shipped template naming the upstream project's images.
+    async function oldStack() {
+      const template = await readFile(path.join(COMPOSE_DIR, STACK_ENV_TEMPLATE), "utf8");
+      const env = renderStackEnv(
+        template.replaceAll(SELF_HOST_IMAGE_NAMESPACE, `${UPSTREAM_IMAGE_OWNER}legacy`),
+        fakeHex,
+      );
+      const dir = path.join(root, "stack");
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, STACK_ENV_FILE), env);
+      return { env, file: path.join(dir, STACK_ENV_FILE) };
+    }
+
+    it("moves to this release's images once the database passes the migration check", async () => {
+      const { env, file } = await oldStack();
+      expect(env).toContain(UPSTREAM_IMAGE_OWNER);
+      const seen: string[] = [];
+      const stack = controller({}, (args) => {
+        if (args[7] === "pull" || args[7] === "run") seen.push(readFileSync(file, "utf8"));
+        return ok(args);
+      });
+      expect((await stack.start()).phase).toBe("ready");
+      expect(calls.map((call) => call.args).slice(2)).toEqual([
+        [...compose, "config", "--images"],
+        [...compose, "pull"],
+        [...compose, ...up, "postgres"],
+        check,
+        [...compose, ...up],
+      ]);
+      // Pull and check already use the bundled file's defaults, this repository's images.
+      for (const text of seen) expect(text).not.toContain(UPSTREAM_IMAGE_OWNER);
+      const moved = await readFile(file, "utf8");
+      expect(moved).toBe(withoutUpstreamImages(env));
+      expect(moved).toContain(`POSTGRES_PASSWORD=${"ab".repeat(16)}`);
+
+      // Moved once: the next start runs no check.
+      calls.length = 0;
+      expect((await controller().start()).phase).toBe("ready");
+      expect(calls.some((call) => call.args[7] === "run")).toBe(false);
+    });
+
+    it("refuses to start this release on a database another release migrated", async () => {
+      const { env, file } = await oldStack();
+      const stack = controller({}, (args) =>
+        args[7] === "run"
+          ? {
+              code: MIGRATION_HISTORY_UNKNOWN_EXIT,
+              lines: ["  29990101000000_from_another_release"],
+            }
+          : ok(args),
+      );
+      const state = await stack.start();
+      expect(state).toMatchObject({ phase: "failed" });
+      expect(state.message).toMatch(/changed by a newer or different release/);
+      expect(state.output).toContain("  29990101000000_from_another_release");
+      expect(calls.at(-1)?.args).toEqual(check);
+      expect(await readFile(file, "utf8")).toBe(env);
+    });
+
+    it("keeps the stack unchanged when its database cannot be checked", async () => {
+      for (const failing of ["up", "run"]) {
+        const { env, file } = await oldStack();
+        calls.length = 0;
+        const stack = controller({}, (args) =>
+          args[7] === failing && (failing === "run" || args.at(-1) === "postgres")
+            ? { code: 1, stderr: "failed" }
+            : ok(args),
+        );
+        const state = await stack.start();
+        expect(state.message, failing).toMatch(/Could not check this stack's database/);
+        expect(calls.some((call) => call.args.join(" ") === [...compose, ...up].join(" "))).toBe(
+          false,
+        );
+        expect(await readFile(file, "utf8")).toBe(env);
+      }
+    });
   });
 
   it("keeps lifecycle commands off the standalone project despite environment overrides", async () => {
