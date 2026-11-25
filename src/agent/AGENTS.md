@@ -246,6 +246,9 @@
 
 - Web entry keeps its React root in HMR data and disposes entry listeners on
   replacement; never create a second root on the existing container.
+- On Desktop startup, a bundled official cloud page that never mounts can retry
+  once on the original HTTPS protocol in the same native session. Preserve
+  explicit local renderers, self-hosted servers and connection-switch behavior.
 - Cold-start session/bootstrap/navigation reads use startup-fetch with a 15-second
   deadline so a stalled connection reaches existing retry/error handling. Preserve
   caller cancellation and keep auth writes, paid requests and event streams outside
