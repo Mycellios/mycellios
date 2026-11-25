@@ -490,6 +490,16 @@ def scope_directory(port: int) -> Path:
 ROUTINE_BROWSER_SECONDS = 15 * 60
 
 
+def routine_chromium_environment() -> dict[str, str]:
+    env = dict(os.environ)
+    # Match the interactive launcher: the sandbox identity wrapper hangs Chromium startup.
+    preloads = [entry for entry in re.split(r"[:\s]+", env.pop("LD_PRELOAD", ""))
+                if entry and not entry.endswith("libnss_wrapper.so")]
+    if preloads:
+        env["LD_PRELOAD"] = ":".join(preloads)
+    return env
+
+
 def routine_browser_keeper(directory: Path) -> None:
     """Own this run's Chromium process group, including on a disconnected worker."""
     chrome = os.environ.get("MYCELLIOS_ROUTINE_CHROMIUM") or shutil.which("chromium") or shutil.which("chromium-browser")
@@ -502,9 +512,11 @@ def routine_browser_keeper(directory: Path) -> None:
         process = subprocess.Popen([
             chrome, "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
             "--disable-gpu", "--disable-extensions", "--disable-background-networking",
-            "--no-first-run", "--no-default-browser-check", "--remote-debugging-address=127.0.0.1",
-            "--remote-debugging-port=0", f"--user-data-dir={profile}", "about:blank",
-        ], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            "--no-first-run", "--no-default-browser-check", "--password-store=basic",
+            "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0",
+            f"--user-data-dir={profile}", "about:blank",
+        ], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True, env=routine_chromium_environment())
         end = time.monotonic() + ROUTINE_BROWSER_SECONDS
         while process.poll() is None and time.monotonic() < end and not (directory / "stop").exists():
             time.sleep(0.2)

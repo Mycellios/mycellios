@@ -167,8 +167,9 @@ describe.skipIf(process.env.RUN_ISOLATED_COMPUTERS_DOCKER !== "1")("isolated Mic
           const routineUrl = new URL("#routine-private", address).href;
           expect(await sandbox.pageBrowser!(ref, { command: "capabilities" }, routine))
             .toMatchObject({ ok: true, features: expect.arrayContaining(["routine.isolated"]) });
-          expect(await sandbox.pageBrowser!(ref, { command: "navigate", url: routineUrl }, routine))
-            .toMatchObject({ ok: true, url: routineUrl });
+          const routineNavigation = await sandbox.pageBrowser!(ref, { command: "navigate", url: routineUrl }, routine);
+          expect(routineNavigation.ok, routineNavigation.error).toBe(true);
+          expect(routineNavigation.url).toBe(routineUrl);
           expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, routine))
             .toMatchObject({ ok: true, url: routineUrl });
           expect(await sandbox.pageBrowser!(ref, { command: "snapshot" }, context))

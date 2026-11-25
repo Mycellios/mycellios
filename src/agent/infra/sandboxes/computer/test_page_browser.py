@@ -25,6 +25,13 @@ loader.exec_module(helper)
 
 
 class PageBrowserTest(unittest.TestCase):
+    def test_routine_chromium_removes_only_the_incompatible_identity_preload(self):
+        with patch.dict(os.environ, {"LD_PRELOAD": "/lib/first.so:/opt/libnss_wrapper.so /lib/last.so"}):
+            self.assertEqual(helper.routine_chromium_environment()["LD_PRELOAD"], "/lib/first.so:/lib/last.so")
+            self.assertIn("libnss_wrapper.so", os.environ["LD_PRELOAD"])
+        with patch.dict(os.environ, {"LD_PRELOAD": "/opt/libnss_wrapper.so"}):
+            self.assertNotIn("LD_PRELOAD", helper.routine_chromium_environment())
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "managed browser runs on Linux")
     def test_isolated_browser_real(self):
         if os.environ.get("MYCELLIOS_REQUIRE_CHROMIUM") != "1":
