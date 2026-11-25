@@ -523,10 +523,21 @@
   engines from the Mico's authorized computer. An offline Desktop never offers
   the server's engines or delegates its run to them. Verify the scoped settings and
   native-agent-runtime tests. Protocol fixtures do not qualify real inference.
-  Managed OpenCode installs are explicitly admitted by allowOpenCodeInstall
-  in the host's native-agents.json and the same account/Space grant. Verify
-  both artifact digests and preserve operator command overrides, the published
-  version directory and the no-fallback model policy.
+  Managed CLIs (specs/native-engines/spec.md phase 3) live in one store per host user,
+  provider-runtimes/<engine>/<version> (Desktop's profile, a server's data folder), and come
+  only from the npm URL, sha512 integrity and size bounds in
+  packages/adapters/src/native-engines.lock.json (regenerate with scripts/native-engine-lock.mjs,
+  never by hand). Downloads are verified before unpacking into staging, every file's SHA-256 is
+  recorded and `--version` checked before the folder is used, and again before a session's first
+  start. No administrator rights, global npm or CLI updater. Resolution: an absolute
+  native-agents.json command, then the newer of the managed copy and PATH (the person's CLI wins
+  ties; macOS/Linux add the login shell's PATH), then the managed copy. A PC installs through
+  `engines.install` → the owned Desktop's `engineInstall` (`engineInstall: 1`) with the same
+  This PC, owner and consent checks as `engines.account`; server hosts keep installOpenCode
+  behind allowOpenCodeInstall and the account/Space grant, and the pre-store OpenCode 1.19.5
+  copy is adopted by its pinned hash. Preserve operator command overrides and the no-fallback
+  model policy. Verify native-engine-store, native-login-path, desktop-agent-engine,
+  host-computer, the engines route tests and chat-header-model.
   Signing a PC's Codex or Claude Code in or out (specs/native-engines/spec.md phase 1)
   goes through `engines.account` → the owned Desktop's `engineAccount` method, only
   for a This PC Mico (never server, Team or isolated computers) and under the PC's

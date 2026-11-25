@@ -1,4 +1,5 @@
-import { GroupFolderLabel, NativeEngineAccountRequestSchema } from "@mycellios/contracts";
+import type { NativeEngineInstallable, NativeEngineInstallProgress } from "@mycellios/contracts";
+import { GroupFolderLabel, NativeEngineAccountRequestSchema, NativeEngineInstallRequestSchema } from "@mycellios/contracts";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
 import type { NativeCodingEngine, NativeEngineModels } from "@mycellios/adapter-kit";
@@ -87,6 +88,8 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
   z.object({ ...base, method: z.literal("engineAccount"), account: NativeEngineAccountRequestSchema }),
   /** Plan usage of the PC's signed-in CLIs; older hosts answer 400 and show none. */
   z.object({ ...base, method: z.literal("engineUsage") }),
+  /** Install a missing CLI into the PC's own store for the person (hosts reporting engineInstall: 1). */
+  z.object({ ...base, method: z.literal("engineInstall"), install: NativeEngineInstallRequestSchema }),
   z.object({
     ...base,
     method: z.literal("readFile"),
@@ -129,6 +132,12 @@ export interface HostComputerEnvironment {
   nativeModels?: NativeEngineModels;
   /** The PC signs its CLIs in and out through engineAccount (older Desktops omit it). */
   engineAccount?: 1;
+  /** The PC installs missing CLIs through engineInstall (older Desktops omit it). */
+  engineInstall?: 1;
+  /** Missing CLIs this PC can install, with the pinned version, vendor package and size. */
+  installableEngines?: NativeEngineInstallable[];
+  /** Installs running on this PC, or why the last one failed. */
+  engineInstalls?: NativeEngineInstallProgress[];
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
   /** Shared group folders this PC grants to this run, mounted under group/<label>. */
@@ -161,6 +170,8 @@ export function hostComputerDeadlineMs(request: HostComputerRequest) {
   // A sign-in only starts on the PC; the person finishes it there or with a device code.
   if (request.method === "engineAccount") return 60_000;
   if (request.method === "engineUsage") return 30_000;
+  // An install only starts here; it reports progress with the PC's engines.
+  if (request.method === "engineInstall") return 60_000;
   return request.method === "execute"
     ? Math.max(boundedSandboxCommandTimeoutMs(request.command.timeoutMs), request.command.searchProgress?.maxMs ?? 0) + 30_000
     : 10 * 60_000;

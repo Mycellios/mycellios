@@ -15540,3 +15540,23 @@ msgstr "Verifica tu dirección de correo para aceptar esta invitación."
 #: src/lib/user-error.ts
 msgid "Too many email invitations today. Try again tomorrow."
 msgstr "Demasiadas invitaciones por correo hoy. Inténtalo mañana."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name}"
+msgstr "Instalar {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name} {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs."
+msgstr "¿Instalar {name} {version} en este PC? Se descargan {size} desde npm ({packageName}) y se comprueban antes de ejecutarlo."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install"
+msgstr "Instalar"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Downloading {name}: {received} of {total}"
+msgstr "Descargando {name}: {received} de {total}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Checking {name}…"
+msgstr "Comprobando {name}…"

@@ -2,11 +2,14 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentRuntime, NativeEngineState } from "@mycellios/adapter-kit";
-import { NativeEngineAccountRequestSchema } from "@mycellios/contracts";
+import { NativeEngineAccountRequestSchema, NativeEngineInstallRequestSchema } from "@mycellios/contracts";
 import { nativeEngineAccount, type NativeAccountHost } from "./native-account.js";
 import { nativeSignInState } from "./native-signin.js";
 import { nativeCodexUsageState } from "./native-usage.js";
+import { nativeCommandAvailable } from "./native-agent-process.js";
 import { discoverNativeEngines, NativeAgentRuntime, nativeEngineCommand, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
+import type { NativeEngineStoreOptions } from "./native-engine-store.js";
+import { installNativeEngine, nativeEngineInstallable, nativeEngineInstalls, nativeEngineStoreRoot } from "./native-engine-store.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 import { NATIVE_PROCESS_LIMIT, NativeProcessSlots } from "./native-process-slots.js";
@@ -18,23 +21,31 @@ const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(valu
  */
 export function createDesktopAgentEngine(profile: string, accessScope: () => string | undefined,
   createRuntime?: (directory: string, authorized: () => boolean, processSlots: NativeProcessSlots) => AgentRuntime,
-  accountHost: NativeAccountHost = {}, processSlots = new NativeProcessSlots(NATIVE_PROCESS_LIMIT)): AgentRuntime {
+  accountHost: NativeAccountHost = {}, processSlots = new NativeProcessSlots(NATIVE_PROCESS_LIMIT),
+  /** Tests only: a fixture lock, registry and version check for the store. */
+  store: NativeEngineStoreOptions = {}): AgentRuntime {
   const active = new Map<string, { runtime: AgentRuntime; localId: string }>();
+  // One store of managed CLIs per PC user, shared by the accounts signed in on this profile.
+  const storeRoot = nativeEngineStoreRoot(profile);
   const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) =>
-    new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots }));
+    new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots, storeRoot }));
   async function engineState(): Promise<NativeEngineState> {
     const scope = accessScope();
     if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return { engines: [], signedOut: [] };
-    const available = await discoverNativeEngines(path.join(profile, "agent-executor", scope));
+    const available = await discoverNativeEngines(path.join(profile, "agent-executor", scope), { ...store, storeRoot });
     if (accessScope() !== scope) return { engines: [], signedOut: [] };
+    const engines = available.flatMap(({ id, available }) =>
+      available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : []);
     return {
-      engines: available.flatMap(({ id, available }) =>
-        available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
-      ),
+      engines,
       signedOut: signedOutEngines(available),
       signedIn: signedInEngines(available),
       models: nativeEngineModels(available),
       account: true,
+      install: true,
+      installable: (["codex", "claude", "opencode"] as const).flatMap(engine =>
+        engines.includes(engine) ? [] : nativeEngineInstallable(engine, store) ?? []),
+      installs: nativeEngineInstalls(storeRoot),
     };
   }
   return {
@@ -48,7 +59,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       const scope = accessScope();
       if (!scope || !/^[a-f0-9]{64}$/.test(scope)) throw Error("Desktop account access is unavailable");
       const request = NativeEngineAccountRequestSchema.parse(input);
-      const command = await nativeEngineCommand(request.engine, path.join(profile, "agent-executor", scope));
+      const command = await nativeEngineCommand(request.engine, path.join(profile, "agent-executor", scope), { ...store, storeRoot });
       if (accessScope() !== scope) throw Error("Desktop account changed before signing in");
       return nativeEngineAccount(request, command, accountHost);
     },
@@ -56,10 +67,23 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
     async nativeEngineUsage() {
       const scope = accessScope();
       if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return {};
-      const command = await nativeEngineCommand("codex", path.join(profile, "agent-executor", scope));
+      const command = await nativeEngineCommand("codex", path.join(profile, "agent-executor", scope), { ...store, storeRoot });
       if (!command || await nativeSignInState("codex", command) !== true) return {};
       const codex = await nativeCodexUsageState(command);
       return accessScope() === scope && codex ? { codex } : {};
+    },
+    // Installs into this PC user's store only for the PC's own account, like sign-in.
+    async nativeEngineInstall(input) {
+      const scope = accessScope();
+      if (!scope || !/^[a-f0-9]{64}$/.test(scope)) throw Error("Desktop account access is unavailable");
+      const { engine } = NativeEngineInstallRequestSchema.parse(input);
+      const command = await nativeEngineCommand(engine, path.join(profile, "agent-executor", scope), { ...store, storeRoot });
+      if (accessScope() !== scope) throw Error("Desktop account changed before installing");
+      if (command && nativeCommandAvailable(command)) return { status: "installed" };
+      if (!nativeEngineInstallable(engine, store)) throw Error("Its maker publishes no version for this PC.");
+      // The download goes on after this answer; its progress and outcome come with the engines.
+      installNativeEngine(storeRoot, engine, store).catch(() => undefined);
+      return { status: "installing" };
     },
     abort: async runId => { const owned = active.get(runId); await owned?.runtime.abort(owned.localId); },
     async *run(request, context) {

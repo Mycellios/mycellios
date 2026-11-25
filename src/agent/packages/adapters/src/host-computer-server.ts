@@ -487,6 +487,11 @@ export async function startHostComputerServer(options: {
           ...(engineState?.signedIn?.length ? { signedInEngines: engineState.signedIn } : {}),
           ...(engineState?.models && Object.keys(engineState.models).length ? { nativeModels: engineState.models } : {}),
           ...(engineState?.account && options.agentRuntime?.nativeEngineAccount ? { engineAccount: 1 as const } : {}),
+          ...(engineState?.install && options.agentRuntime?.nativeEngineInstall ? {
+            engineInstall: 1 as const,
+            installableEngines: engineState.installable ?? [],
+            engineInstalls: engineState.installs ?? [],
+          } : {}),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
@@ -506,6 +511,13 @@ export async function startHostComputerServer(options: {
       case "engineUsage":
         yield (await options.agentRuntime?.nativeEngineUsage?.()) ?? {};
         break;
+      case "engineInstall": {
+        // The server already checked the Mico's owner; this host checks its own account scope.
+        if (!options.agentRuntime?.nativeEngineInstall)
+          throw new Error("This PC cannot install AI programs from Mycellios. Update Mycellios on this PC.");
+        yield await options.agentRuntime.nativeEngineInstall(input.install);
+        break;
+      }
       case "appControl":
         yield appControlOffered(input.projectSessionId)
           ? await appControl!.run(input.request, context.signal)

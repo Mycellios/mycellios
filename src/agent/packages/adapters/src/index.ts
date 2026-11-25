@@ -115,7 +115,7 @@ export * from "./lookup-failure.js";
 export * from "./mycellios-account.js";
 export * from "./mycellios-model-limits.js";
 export * from "./native-agent-runtime.js";
-export { installManagedOpenCode } from "./managed-opencode.js";
+export { installNativeEngine, nativeEngineStoreRoot } from "./native-engine-store.js";
 export * from "./none-sandbox.js";
 export * from "./openai-compatible-url.js";
 export * from "./openai-compatible-voice.js";
