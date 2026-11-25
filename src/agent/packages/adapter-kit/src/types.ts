@@ -52,6 +52,8 @@ export interface AdapterContext {
   runId?: string;
   /** Server-selected conversation for page tools on a shared browser display. */
   browserThreadId?: string;
+  /** Server-owned fence of the run's ephemeral Docker browser; never read from tool args. */
+  routineBrowserFence?: number;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
   /**
@@ -1247,7 +1249,7 @@ export interface BrowserActResult {
  * helper or supervisor fails it, which means none of the optional features.
  */
 export type PageBrowserCommand =
-  | { command: "focus" }
+  | { command: "focus" | "close" }
   | { command: "capabilities" }
   | { command: "navigate"; url: string }
   | { command: "snapshot"; from?: number }

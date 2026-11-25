@@ -7,3 +7,4 @@
 - Use Mycellios CLI from the Windows, macOS and Linux Desktop resources.
 - Declare typed answer fields and use their verified values in workflow conditions and later steps.
 - Repeat a workflow section from a condition, with a fixed limit on passes.
+- Let routines opt in to a fresh browser on a managed isolated computer.

@@ -187,9 +187,10 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
      Other branches and their completed work are preserved.
    - An output step can post its text to a messaging channel that the workflow's
      Mico already uses, or notify the owner.
-   - A managed routine browser requires a separate, revocable browser context.
-     The existing scoped browser route maps conversations to separate tabs in
-     one profile. It cannot serve as the routine isolation boundary.
+   - An opted-in routine can use a headless Chromium on its managed isolated
+     Docker computer. Its execution fence owns a temporary profile, which
+     starts signed out and closes at attempt cleanup or after fifteen minutes.
+     Ordinary browser and screen tools keep their existing interactive scope.
 6. Phase 6 — run callbacks (optional).
    - A webhook routine, a workflow or a script message can name an HTTPS callback.
      When the run ends or waits for a person, the server sends a Standard Webhooks

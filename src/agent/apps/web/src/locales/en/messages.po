@@ -15589,3 +15589,9 @@ msgstr "Do not repeat"
 
 msgid "Maximum passes"
 msgstr "Maximum passes"
+
+msgid "Use a separate browser"
+msgstr "Use a separate browser"
+
+msgid "Needs a managed isolated computer. Each run starts signed out."
+msgstr "Needs a managed isolated computer. Each run starts signed out."

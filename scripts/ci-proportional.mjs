@@ -138,6 +138,11 @@ export function planChecks(files, availableAgentTests) {
   }
   if (agent) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
+    if (files.some(pageBrowserFile)) {
+      add('src/agent', 'npm', ['run', 'check', '--workspace', '@mycellios/sandbox-supervisor'], 'sandbox supervisor types');
+      add('src/agent', 'npm', ['exec', '--', 'playwright', 'install', 'chromium'], 'Managed routine browser Chromium');
+      add('src/agent', 'env', ['MYCELLIOS_REQUIRE_CHROMIUM=1', 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'infra/sandboxes/computer', '-p', 'test_page_browser.py', '-k', 'isolated_browser_real'], 'real Chromium routine cookies, storage and cleanup');
+    }
     for (const file of agentScriptTests) add('.', 'node', ['--test',file], `test: ${file}`);
     add('src/agent', 'npm', ['run', 'generate', '--workspace', '@mycellios/db'], 'Prisma client generation (no database connection)');
     const shared = agentShared;
@@ -164,7 +169,7 @@ export function planChecks(files, availableAgentTests) {
       [/thread-lifecycle|side-threads|thread-deletion|20261122120000_thread_lifecycle/, 'verify-thread-lifecycle-db.ts', 'conversation lifecycle migration, archive, delete and lock races on isolated PostgreSQL'],
       [/routine-thread|routine-run-markers|verify-routine-isolation|webhook-inbound|20261122180000_routine_run_markers/, 'verify-routine-isolation-db.ts', 'routine conversations, run markers and migration on isolated PostgreSQL'],
       [/routine-events?[-.]|routine-event-filter|webhook-inbound|verify-routine-events|20261125120000_routine_signed_webhooks/, 'verify-routine-events-db.ts', 'signed routine events: signatures, receipts, filters, hourly limit and RLS on isolated PostgreSQL'],
-      [/(?:workflows|workflow-tools|workflow-stop|workflow-webhooks|workflow-answers|verify-workflow-thread-db)\.ts$|workflow_(?:revision_history|signed_webhooks)/, 'verify-workflow-thread-db.ts', 'workflow ownership, branches, version history and signed webhooks on PostgreSQL'],
+      [/(?:workflows|workflow-tools|workflow-stop|workflow-webhooks|workflow-answers|verify-workflow-thread-db)\.ts$|workflow_(?:revision_history|signed_webhooks)|routine_isolated_browser/, 'verify-workflow-thread-db.ts', 'workflow ownership, branches, version history and signed webhooks on PostgreSQL'],
       [/conversation-surfaces/, 'verify-conversation-surfaces-db.ts', 'sidebar counts, mark all read and mirrored requests on isolated PostgreSQL'],
       [/20261123090000_mico_requests_and_group_leads|verify-mico-requests-db|bot-message-requests|group-requests|group-handoff|team-awareness/, 'verify-mico-requests-db.ts', 'Mico request settlement, group leads and migration on isolated PostgreSQL'],
       [/message-queue|queue-order|mico-concurrency|routes\/threads\.ts|20261123090000_message_queue_controls|20261123100000_conversation_turn_model/, 'verify-message-queue-db.ts', 'queue operations and turn model persistence on isolated PostgreSQL'],

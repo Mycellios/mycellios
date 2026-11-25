@@ -687,6 +687,7 @@ export const RoutineSchema = z.object({
   timezone: z.string(),
   active: z.boolean(),
   notify: z.boolean(),
+  isolatedBrowser: z.boolean().optional(),
   webhookEnabled: z.boolean(),
   githubEnabled: z.boolean(),
   messageProvider: z
@@ -722,6 +723,7 @@ export const CreateRoutineInput = z
     crons: z.array(z.string().min(1)).default([]),
     timezone: TimeZoneSchema.default("UTC"),
     notify: z.boolean().default(true),
+    isolatedBrowser: z.boolean().optional(),
     active: z.boolean().default(false),
     webhookEnabled: z.boolean().default(false),
     githubEnabled: z.boolean().default(false),

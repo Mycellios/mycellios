@@ -4044,6 +4044,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
       let screenRelease:
         | { computer: ComputerRef; context: AdapterContext; keepWarm: boolean }
         | undefined;
+      let routineBrowserCleanup: { computer: ComputerRef; context: AdapterContext } | undefined;
       let runAbortController: AbortController | null = null;
       // Runtime cleanup can queue terminal events after the consumer has exited.
       // Track only helpers whose running state this attempt actually persisted.
@@ -4828,8 +4829,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }))
           ? BRANCH_HANDOFF_NOTE : undefined;
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
+        const routineBrowser = run.trigger === "routine" && Boolean(run.routineId) && ownedRoutine &&
+          computerKind === "docker" && storedComputer.scope === "isolated" &&
+          !messagingChannelRun && !thread.groupId && !heldForTakeover &&
+          browser.describe().id === "computer" && Boolean(deps.sandbox.pageBrowser) &&
+          Boolean(await deps.prisma.routine.findFirst({
+            where: { id: run.routineId!, spaceId: run.spaceId, userId: run.userId, botId: run.botId, isolatedBrowser: true },
+            select: { id: true },
+          }));
         const pageBrowserAllowed =
-          !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
+          (routineBrowser || (!routineConversation && !isolatedProjectRun && graphical)) &&
+          browser.describe().capabilities.page && !heldForTakeover;
         // Group shared folders (specs/group-shared-folders/spec.md): a member's own group turn,
         // started by the person, carries the group's folders to its PC, only on This PC.
         const groupFolders = thread.groupId
@@ -4909,7 +4919,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           for (const name of [...PROJECT_SHARED_SCREEN_TOOLS, ...PAGE_BROWSER_TOOL_NAMES]) disabledBuiltinTools.add(name);
         }
         if (routineConversation) {
-          for (const name of ["computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", ...PAGE_BROWSER_TOOL_NAMES])
+          for (const name of ["computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", ...(routineBrowser ? [] : PAGE_BROWSER_TOOL_NAMES)])
             disabledBuiltinTools.add(name);
         }
         if (!computerAvailable) {
@@ -5166,6 +5176,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? [
               isolatedProjectRun
                 ? "This project conversation has an independent Git worktree. Work only in that project copy, run its tests and use its preview. For requested Git operations, run the installed Git on this PC, using the user's configured credential helper or SSH agent. On the first authorized push, publish the task branch with an explicit remote and set its upstream. Do not change another conversation's files, start shared-screen interaction or merge into the original repository without the user's request. Shell commands retain the OS user's permissions; a worktree is not an OS sandbox."
+                : routineBrowser
+                ? "This routine has a separate browser that starts signed out. Use its page tools. Uploads, downloads, saved logins and screen control are unavailable."
                 : routineConversation
                 ? "This routine has its own conversation. Use its available files, shell and connected apps. Do not control the user's screen or browser, which belong to the interactive chat. If the task requires graphical interaction, explain that it needs the main chat. Shell commands retain the OS user's permissions; this tool policy is not an OS sandbox."
                 : "Use the computer only when the task needs files, commands, a browser, or an installed application. Answer directly from the conversation when sufficient; use connected tools for app data. A website with no connected app is still yours to use in the computer's browser, so a missing connection alone is never a reason to decline. Do not inspect the computer just to prepare for an unrelated task. If what you are about to buy, send or submit differs from what the user confirmed, such as a changed item or total, show the difference and confirm again first.",
@@ -7406,7 +7418,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const redactions = () => [...runSecrets];
             const desktopTools =
               graphicalToolsAllowed && builtinOffered(disabledBuiltinTools, "computer_act");
-            const browserContext = { ...context, browserThreadId: thread.id };
+            const browserContext = { ...context, browserThreadId: thread.id, ...(routineBrowser ? { routineBrowserFence: fence } : {}) };
             const tool =
               name === "browser_navigate"
                 ? browserNavigateFromTool
@@ -7414,16 +7426,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? browserSnapshotFromTool
                   : null;
             return computerScreenToolResult(async () => {
+              const computer = await getRunComputer("tool", name);
+              if (routineBrowser) {
+                if (computer.kind !== "docker") return { error: "The isolated routine browser requires a managed Docker workspace." };
+                routineBrowserCleanup = { computer, context: browserContext };
+              }
               const result = tool
                 ? redactConnectorPayload(
-                    await tool(browser, await getRunComputer("tool", name), browserContext, args, {
+                    await tool(browser, computer, browserContext, args, {
                       desktopTools,
                     }),
                     redactions(),
                   )
                 : await browserActFromTool(
                     browser,
-                    await getRunComputer("tool", name),
+                    computer,
                     browserContext,
                     args,
                     {
@@ -7440,6 +7457,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                           ? resolveBotUploadPath(computerMode, bot.id, path)
                           : path,
                       resolveSecretFill: async (step) => {
+                        if (routineBrowser) return { error: "Saved logins are unavailable in a routine browser." };
                         const resolved = await resolveLoginFill({
                           prisma: deps.prisma,
                           secretStore: deps.secretStore,
@@ -10398,6 +10416,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         detachShutdown?.();
         clearInterval(heartbeat);
+        if (routineBrowserCleanup) {
+          await deps.sandbox.pageBrowser?.(routineBrowserCleanup.computer, { command: "close" }, {
+            ...routineBrowserCleanup.context, signal: AbortSignal.timeout(5_000),
+          }).catch(() => undefined);
+        }
         if (!retainComputerLease) {
           if (screenRelease) {
             const releaseContext = screenRelease.keepWarm

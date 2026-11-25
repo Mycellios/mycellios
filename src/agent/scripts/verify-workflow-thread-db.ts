@@ -35,9 +35,10 @@ try {
   const migrationClient = new pg.Client({ connectionString: url });
   await migrationClient.connect();
   try {
-    await migrationClient.query("DROP TABLE workflow_webhooks; DROP TABLE workflow_versions");
+    await migrationClient.query('DROP TABLE workflow_webhooks; DROP TABLE workflow_versions; ALTER TABLE routines DROP COLUMN "isolatedBrowser"');
     await migrationClient.query(await readFile("packages/db/prisma/migrations/20261125200000_workflow_revision_history/migration.sql", "utf8"));
     await migrationClient.query(await readFile("packages/db/prisma/migrations/20261125210000_workflow_signed_webhooks/migration.sql", "utf8"));
+    await migrationClient.query(await readFile("packages/db/prisma/migrations/20261125220000_routine_isolated_browser/migration.sql", "utf8"));
   } finally { await migrationClient.end(); }
   db = createDb(url, { encryptContent: false, applicationName: "synthetic-workflow-thread-regression" });
   const prisma = asSystem(db.prisma, "isolated workflow thread regression");
@@ -47,6 +48,10 @@ try {
   await prisma.organization.create({ data: { id: suffix, name: "Synthetic", slug: suffix, createdAt: new Date() } });
   await prisma.space.create({ data: { id: scope.spaceId, organizationId: suffix, name: "Synthetic" } });
   const bot = await prisma.bot.create({ data: { ...scope, name: "Synthetic", color: "green" } });
+  const routine = await prisma.routine.create({ data: { ...scope, botId: bot.id, name: "Defaults", prompt: "Read only", crons: [] } });
+  assert.equal(routine.isolatedBrowser, false);
+  const enabledRoutine = await prisma.routine.update({ where: { id: routine.id }, data: { isolatedBrowser: true } });
+  assert.equal(enabledRoutine.isolatedBrowser, true);
   const flow = await prisma.workflow.create({ data: { ...scope, id: randomUUID(), name: "Synthetic", graph: {} } });
   const execution = await prisma.workflowExecution.create({ data: { ...scope, id: randomUUID(), workflowId: flow.id, version: 1, graph: {}, triggerId: "start", clientNonce: randomUUID() } });
   const taskKey = `workflow:${execution.id}:mico`;

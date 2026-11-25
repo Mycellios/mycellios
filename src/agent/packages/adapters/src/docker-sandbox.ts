@@ -252,9 +252,15 @@ export class DockerSandboxProvider implements SandboxProvider {
     request: PageBrowserCommand,
     context: AdapterContext,
   ): Promise<PageBrowserResult> {
-    const conversationKey = browserConversationKey(context);
+    const isolated = context.routineBrowserFence !== undefined;
+    if (isolated && (!context.runId || !context.botId || computer.kind !== "docker" || request.command === "focus"))
+      return { ok: false, error: "An isolated routine browser needs a managed Docker workspace." };
+    if (request.command === "close" && !isolated) return { ok: false };
+    const conversationKey = isolated
+      ? createHash("sha256").update(JSON.stringify([context.spaceId, context.userId, context.botId, context.runId, context.routineBrowserFence])).digest("hex")
+      : browserConversationKey(context);
     if (request.command === "focus" && !conversationKey) return { ok: false };
-    const endpoint = conversationKey ? "browser/scoped" : "browser";
+    const endpoint = isolated ? "browser/isolated" : conversationKey ? "browser/scoped" : "browser";
     const res = await fetch(this.url(`/computers/${computer.id}/${endpoint}`), {
       method: "POST",
       headers: { ...this.headers(context, computer.botId), "content-type": "application/json" },

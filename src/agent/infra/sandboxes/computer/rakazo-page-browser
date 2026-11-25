@@ -15,6 +15,8 @@ import json
 import os
 import re
 import select
+import shutil
+import signal
 import socket
 import stat
 import struct
@@ -478,6 +480,130 @@ def scope_directory(port: int) -> Path:
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
         raise RuntimeError("Browser tab storage is not private")
     return directory
+
+
+ROUTINE_BROWSER_SECONDS = 15 * 60
+
+
+def routine_browser_keeper(directory: Path) -> None:
+    """Own this run's Chromium process group, including on a disconnected worker."""
+    chrome = os.environ.get("MYCELLIOS_ROUTINE_CHROMIUM") or shutil.which("chromium") or shutil.which("chromium-browser")
+    profile = directory / "profile"
+    process = None
+    try:
+        if not chrome or (directory / "stop").exists():
+            return
+        profile.mkdir(mode=0o700)
+        process = subprocess.Popen([
+            chrome, "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
+            "--disable-gpu", "--disable-extensions", "--disable-background-networking",
+            "--no-first-run", "--no-default-browser-check", "--remote-debugging-address=127.0.0.1",
+            "--remote-debugging-port=0", f"--user-data-dir={profile}", "about:blank",
+        ], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        end = time.monotonic() + ROUTINE_BROWSER_SECONDS
+        while process.poll() is None and time.monotonic() < end and not (directory / "stop").exists():
+            time.sleep(0.2)
+    finally:
+        if process is not None and process.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=3)
+        shutil.rmtree(profile, ignore_errors=True)
+        (directory / "closed").touch(mode=0o600)
+
+
+def routine_browser_endpoint(directory: Path) -> str:
+    marker = directory / "profile" / "DevToolsActivePort"
+    end = time.monotonic() + 8
+    while time.monotonic() < end:
+        if (directory / "closed").exists() or (directory / "stop").exists():
+            raise RuntimeError("The routine browser has closed.")
+        try:
+            port, endpoint = marker.read_text(encoding="ascii").splitlines()[:2]
+            if not port.isdecimal() or not 0 < int(port) <= 65535 or not re.fullmatch(r"/devtools/browser/[a-f0-9-]{36}", endpoint):
+                raise RuntimeError("Invalid routine browser endpoint.")
+            url = discover_ws_url(int(port))
+            if urlsplit(url).path != endpoint:
+                raise RuntimeError("The routine browser endpoint changed.")
+            return url
+        except (FileNotFoundError, ValueError, OSError):
+            time.sleep(0.15)
+    raise RuntimeError("The routine browser did not start.")
+
+
+def run_isolated(port: int, command: str, args: dict[str, Any]) -> dict[str, Any]:
+    import fcntl
+
+    key = args.get("conversationKey")
+    if not isinstance(key, str) or not re.fullmatch(r"[a-f0-9]{64}", key):
+        raise RuntimeError("Invalid routine browser scope.")
+    if command == "act" and any(
+        isinstance(step, dict) and (step.get("kind") in ("upload", "dialog") or step.get("origin"))
+        for step in args.get("actions", [])
+    ):
+        raise RuntimeError("Uploads, saved logins, and dialogs are unavailable in routine browsers.")
+    root = scope_directory(port)
+    directory = root / f"routine-{key}"
+    lock_fd = os.open(root / "routine.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    with os.fdopen(lock_fd, "r+") as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise RuntimeError("Invalid routine browser lock.")
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if command == "close":
+            if not directory.exists():
+                directory.mkdir(mode=0o700)
+                (directory / "closed").touch(mode=0o600)
+            info = directory.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                raise RuntimeError("Invalid routine browser directory.")
+            (directory / "stop").touch(mode=0o600)
+            end = time.monotonic() + 4
+            while not (directory / "closed").exists() and time.monotonic() < end:
+                time.sleep(0.1)
+            if not (directory / "closed").exists() or (directory / "profile").exists():
+                return {"ok": False, "error": "Routine browser cleanup is still pending."}
+            return {"ok": True}
+        if not directory.exists():
+            if command != "navigate":
+                return {"ok": False, "error": "Open a page in this routine first."}
+            now = time.time()
+            for candidate in root.glob("routine-*"):
+                if candidate.is_dir() and not candidate.is_symlink():
+                    closed = candidate / "closed"
+                    if closed.is_file() and now - closed.stat().st_mtime > 86400:
+                        shutil.rmtree(candidate)
+            active = sum(1 for item in root.glob("routine-*") if item.is_dir() and not (item / "closed").exists())
+            if active >= 4:
+                raise RuntimeError("The routine browser session limit was reached.")
+            directory.mkdir(mode=0o700)
+            try:
+                child_env = {k: v for k, v in os.environ.items() if k not in ("RAKAZO_BROWSER_WATCH_STDIN", "RAKAZO_BROWSER_ARGS_STDIN")}
+                subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "isolated-keeper", str(directory)],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True, env=child_env,
+                )
+            except OSError:
+                (directory / "closed").touch(mode=0o600)
+                raise
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise RuntimeError("Invalid routine browser directory.")
+        client = CdpClient(routine_browser_endpoint(directory))
+        try:
+            client.connect()
+            client.call("Browser.setDownloadBehavior", {"behavior": "deny"})
+            result = run_page_command(client, attach_page(client), command, args)
+            if "dialog" in result:
+                settle_dialog(result, held=False)
+            return result
+        finally:
+            client.close()
 
 
 # A page that does not answer within this time is busy, or blocked by a dialog nobody here can answer.
@@ -2327,14 +2453,25 @@ def run(argv: list[str]) -> int:
         )
         return 2
     command = argv[1]
+    if command == "isolated-keeper" and len(argv) == 3:
+        directory = Path(argv[2])
+        if directory.parent != scope_directory(cdp_port()) or not re.fullmatch(r"routine-[a-f0-9]{64}", directory.name):
+            return 2
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            return 2
+        routine_browser_keeper(directory)
+        return 0
+    isolated = command.startswith("isolated-")
     scoped = command.startswith("scoped-")
-    command = command.removeprefix("scoped-")
-    if command not in ("navigate", "snapshot", "act", "focus", "capabilities") or (command == "focus" and not scoped):
+    command = command.removeprefix("scoped-").removeprefix("isolated-")
+    allowed = ("navigate", "snapshot", "act", "capabilities", "close") if isolated else ("navigate", "snapshot", "act", "focus", "capabilities")
+    if command not in allowed or (command == "focus" and not scoped):
         print(json.dumps({"ok": False, "error": "Unknown browser command.", "fallback": "computer_act"}))
         return 2
     if command == "capabilities":
         # Answered without the browser: what this image's helper can do.
-        print(json.dumps({"ok": True, "features": list(FEATURES)}))
+        print(json.dumps({"ok": True, "features": ["routine.isolated", *(f for f in FEATURES if f != "act.dialog")] if isolated else list(FEATURES)}))
         return 0
     args: dict[str, Any] = {}
     raw_args = stdin_args if stdin_args is not None else (argv[2] if len(argv) >= 3 else "")
@@ -2342,6 +2479,9 @@ def run(argv: list[str]) -> int:
         args = json.loads(raw_args)
     port = cdp_port()
     try:
+        if isolated:
+            print(json.dumps(run_isolated(port, command, args)))
+            return 0
         wait_for_cdp(port)
         ws_url = discover_ws_url(port)
         client = CdpClient(ws_url)

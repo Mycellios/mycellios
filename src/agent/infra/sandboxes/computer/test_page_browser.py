@@ -8,6 +8,8 @@ from pathlib import Path
 import socket
 import struct
 import os
+import shutil
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -23,6 +25,67 @@ loader.exec_module(helper)
 
 
 class PageBrowserTest(unittest.TestCase):
+    @unittest.skipUnless(sys.platform.startswith("linux"), "managed browser runs on Linux")
+    def test_isolated_browser_real(self):
+        if os.environ.get("MYCELLIOS_REQUIRE_CHROMIUM") != "1":
+            self.skipTest("selected separately on the hosted Chromium runner")
+        cache = Path.home() / ".cache" / "ms-playwright"
+        chrome = (os.environ.get("MYCELLIOS_ROUTINE_CHROMIUM") or shutil.which("chromium")
+                  or shutil.which("google-chrome")
+                  or next((str(path) for path in cache.glob("chromium-*/chrome-linux64/chrome")), None))
+        self.assertTrue(chrome, "this qualification requires a real Chromium binary")
+
+        class Site(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                if self.path == "/seed":
+                    html = "<body>seed<script>document.cookie='scope=first';localStorage.setItem('scope','first')</script>"
+                else:
+                    html = """<body><script>
+document.body.textContent = 'cookie=' + (document.cookie || 'empty') +
+    ' storage=' + (localStorage.getItem('scope') || 'empty')
+</script>"""
+                self.wfile.write(html.encode())
+
+            def log_message(self, *_args):
+                pass
+
+        with socket.socket() as spare:
+            spare.bind(("127.0.0.1", 0))
+            scope_port = spare.getsockname()[1]
+        first, second = "a" * 64, "b" * 64
+        with ThreadingHTTPServer(("127.0.0.1", 0), Site) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            root = helper.scope_directory(scope_port)
+            try:
+                with patch.dict(os.environ, {"MYCELLIOS_ROUTINE_CHROMIUM": chrome, "RAKAZO_CDP_PORT": str(scope_port)}):
+                    base = f"http://127.0.0.1:{server.server_port}"
+                    def run(key, command, path="/probe", **args):
+                        return helper.run_isolated(scope_port, command, {"conversationKey": key, "url": base + path, **args})
+                    try:
+                        self.assertTrue(run(first, "navigate", "/seed")["ok"])
+                        self.assertTrue(run(first, "navigate")["ok"])
+                        self.assertIn("cookie=scope=first storage=first", json.dumps(run(first, "snapshot")))
+                        self.assertTrue(run(second, "navigate")["ok"])
+                        self.assertIn("cookie=empty storage=empty", json.dumps(run(second, "snapshot")))
+                        with self.assertRaisesRegex(RuntimeError, "Uploads"):
+                            run(second, "act", actions=[{"kind": "upload"}])
+                        self.assertTrue(run(first, "close")["ok"])
+                        self.assertFalse((root / ("routine-" + first) / "profile").exists())
+                        with self.assertRaisesRegex(RuntimeError, "has closed"):
+                            run(first, "navigate")
+                        self.assertIn("cookie=empty storage=empty", json.dumps(run(second, "snapshot")))
+                    finally:
+                        run(first, "close")
+                        run(second, "close")
+            finally:
+                shutil.rmtree(root)
+                server.shutdown()
+                thread.join(timeout=5)
+
     def test_conversations_reuse_only_their_own_tabs(self):
         pages = []
 
