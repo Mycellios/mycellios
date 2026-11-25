@@ -1,4 +1,4 @@
-import type { NativeEngineInstallable, NativeEngineInstallProgress } from "@mycellios/contracts";
+import type { NativeEngineInstallable, NativeEngineInstallProgress, NativeEngineUpdate } from "@mycellios/contracts";
 import { GroupFolderLabel, NativeEngineAccountRequestSchema, NativeEngineInstallRequestSchema } from "@mycellios/contracts";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
@@ -137,8 +137,10 @@ export interface HostComputerEnvironment {
   engineInstall?: 1;
   /** Missing CLIs this PC can install, with the pinned version, vendor package and size. */
   installableEngines?: NativeEngineInstallable[];
-  /** Installs running on this PC, or why the last one failed. */
+  /** Installs and updates running on this PC, or why the last one failed. */
   engineInstalls?: NativeEngineInstallProgress[];
+  /** Newer versions of the CLIs this PC runs from its store; engineInstall with a version updates to one. */
+  engineUpdates?: NativeEngineUpdate[];
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
   /** Shared group folders this PC grants to this run, mounted under group/<label>. */

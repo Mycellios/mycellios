@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { i18n } from "@lingui/core";
-import type { Bot, Me, ModelCredential, ModelCatalogEntry } from "@mycellios/contracts";
+import type { Bot, Me, ModelCredential, ModelCatalogEntry, NativeEngineUpdate } from "@mycellios/contracts";
 import type { ChatModelChoice } from "@mycellios/core";
 import type { ReactNode } from "react";
 import { act } from "react";
@@ -17,7 +17,8 @@ const fixtures = vi.hoisted(() => ({
   engines: { computer: "server", engines: ["codex", "opencode"] } as { computer: string; engines: string[]; signedOut?: string[]; account?: boolean;
     models?: Record<string, Array<{ id: string; label: string; isDefault: boolean; thinkingLevels: string[]; fast: boolean }>>;
     install?: boolean; installable?: Array<{ engine: string; version: string; source: string; package: string; bytes: number }>;
-    installing?: Array<{ engine: string; state: string; receivedBytes?: number; totalBytes?: number; error?: string }> },
+    installing?: Array<{ engine: string; state: string; receivedBytes?: number; totalBytes?: number; error?: string }>;
+    updates?: NativeEngineUpdate[] },
 }));
 const connect = vi.hoisted(() => vi.fn());
 const account = vi.hoisted(() => vi.fn());
@@ -66,7 +67,7 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 async function render(engine: Bot["agentEngine"] = "codex") {
-  act(() => root.render(<ChatHeaderModel bot={{ agentEngine: engine, modelProvider: null, modelId: null, thinkingLevel: "medium" } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
+  act(() => root.render(<ChatHeaderModel bot={{ id: "bot", agentEngine: engine, modelProvider: null, modelId: null, thinkingLevel: "medium" } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
   await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
 }
 it("shows the installed provider instead of the unrelated general model", async () => {
@@ -258,6 +259,25 @@ it("does not offer a functional Fast switch for a provider that has no native pr
 });
 
 const claudeRelease = { engine: "claude", version: "2.1.326", source: "npm", package: "@anthropic-ai/claude-code-win32-x64", bytes: 174_663_115 };
+
+it("asks the owner to confirm the exact update offered by their PC", async () => {
+  fixtures.engines = {
+    computer: "desktop",
+    engines: ["claude"],
+    install: true,
+    updates: [{ ...claudeRelease, engine: "claude", source: "npm", current: "2.1.300" }],
+  };
+  install.mockReset().mockResolvedValue({ status: "installing" });
+  await render("claude");
+  const offer = container.querySelector('[data-testid="native-engine-update"]')!;
+  expect(offer.textContent).toContain("Claude Code 2.1.326 is available. This PC runs 2.1.300.");
+  await act(async () => offer.querySelector<HTMLButtonElement>("button")!.click());
+  expect(offer.textContent).toContain("Update Claude Code to 2.1.326 on this PC?");
+  expect(install).not.toHaveBeenCalled();
+  await act(async () => [...offer.querySelectorAll("button")].find(button => button.textContent === "Update")!.click());
+  expect(install).toHaveBeenCalledExactlyOnceWith({ botId: "bot", engine: "claude", version: "2.1.326" });
+  expect(save).not.toHaveBeenCalled();
+});
 
 it("installs a CLI missing on the owner's PC from its provider after showing its source and size", async () => {
   fixtures.engines = { computer: "desktop", engines: ["codex"], account: true, install: true, installable: [claudeRelease] };

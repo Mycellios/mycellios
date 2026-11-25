@@ -3496,9 +3496,12 @@ function fallbackIncompatibility(
   ) {
     return "The request exceeds the backup model's image limit.";
   }
-  const reasoningLevel = options?.reasoning ?? requestedThinkingLevel;
+  // Pi fills options.reasoning with the active model's default even when the
+  // request has no thinking preference. Only saved choices constrain a backup.
   const requiresReasoning =
-    (reasoningLevel !== undefined && reasoningLevel !== null && reasoningLevel !== "off") ||
+    (requestedThinkingLevel !== undefined &&
+      requestedThinkingLevel !== null &&
+      requestedThinkingLevel !== "off") ||
     (candidate.config.thinkingLevel !== undefined &&
       candidate.config.thinkingLevel !== null &&
       candidate.config.thinkingLevel !== "off");

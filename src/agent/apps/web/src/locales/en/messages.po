@@ -13621,6 +13621,15 @@ msgstr "Restore conversation"
 msgid "Conversations, new replies"
 msgstr "Conversations, new replies"
 
+msgid "All conversations"
+msgstr "All conversations"
+
+msgid "All conversations, new replies"
+msgstr "All conversations, new replies"
+
+msgid "Open tab"
+msgstr "Open tab"
+
 #: src/components/NewConversationIntro.tsx
 msgid "New conversation with {name}"
 msgstr "New conversation with {name}"
@@ -15285,6 +15294,22 @@ msgstr "AI Credits per Mico turn"
 #: src/pages/settings/MicoBehaviorSettings.tsx
 msgid "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
 msgstr "Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
+msgstr "Update {name} to {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs. New {name} turns wait while it is checked."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "{name} {version} is available. This PC runs {current}."
+msgstr "{name} {version} is available. This PC runs {current}."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Update {name}"
+msgstr "Update {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "This PC keeps {name} {current}."
+msgstr "This PC keeps {name} {current}."
 
 #: src/components/RoutineWebhookCard.tsx
 msgid "Copy webhook URL"
