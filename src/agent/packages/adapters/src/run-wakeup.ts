@@ -7,7 +7,7 @@ import type {
 } from "@mycellios/adapter-kit";
 import { dispatchBackgroundJob } from "@mycellios/adapter-kit";
 import type { Prisma, PrismaClient } from "@mycellios/db";
-import { isTooManyDatabaseConnections, runAsSystem } from "@mycellios/db";
+import { isTooManyDatabaseConnections, micoRunsLanes, nativeConcurrencyEnabled, runAsSystem } from "@mycellios/db";
 import { getLogger, runCorrelatedJob } from "@mycellios/logging";
 import { RunExecutionHost } from "./run-execution.js";
 import { projectTaskLeaseKey } from "./project-execution.js";
@@ -232,9 +232,12 @@ export class RunWorkerHost implements JobWorkerHost {
           select: { computerId: true, botId: true, runId: true },
         })
       : [];
+    // A side conversation of a Mico with lanes reserves the computer only when a tool needs it,
+    // so a lease another conversation holds never keeps it waiting here.
+    const nativeConcurrency = nativeConcurrencyEnabled();
     const runnable = rows.filter(
       (row) =>
-        (row.bot.agentEngine === "pi" && row.thread.taskBotId === row.botId && !row.thread.projectKey?.startsWith("project:")) || !leases.some(
+        (micoRunsLanes(row.bot, nativeConcurrency) && row.thread.taskBotId === row.botId && !row.thread.projectKey?.startsWith("project:")) || !leases.some(
           (lease) =>
             lease.botId === leaseKey(row) &&
             lease.computerId === row.bot.computerId &&

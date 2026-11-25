@@ -11,6 +11,7 @@ function fixture() {
     })),
     botSecret: [{ id: "bot-row", ciphertext: "fake-bot-ref" }],
     integrationProviderConfig: [{ id: "composio", ciphertext: "fake-config-ref" }],
+    routineWebhookSecret: [{ id: "routine-secret-row", ciphertext: "fake-routine-ref" }],
   };
   const client = Object.fromEntries(
     Object.entries(tables).map(([name, rows]) => [
@@ -55,17 +56,24 @@ describe("migration persistence", () => {
     const f = fixture();
     const rows = [];
     for await (const row of f.repository.rows()) rows.push(row);
-    expect(rows).toHaveLength(103);
+    expect(rows).toHaveLength(104);
     expect(rows[0]).toMatchObject({ ephemeral: true, id: "row-000", label: "secret" });
     // A location card's answer stays local like a one-time secret.
     expect(rows[1]).toMatchObject({ ephemeral: true, id: "row-001", label: "secret" });
     expect(rows[2]?.ephemeral).toBe(false);
-    expect(rows.at(-1)).toMatchObject({
+    expect(rows.find((row) => row.id === "composio")).toMatchObject({
       id: "composio",
       recordId: "integration-provider:composio",
       ref: "fake-config-ref",
     });
     expect(rows.find((row) => row.id === "bot-row")?.recordId).toBe("bot-row");
+    // A routine's webhook secret is bound to its own row id, as when it was stored.
+    expect(rows.at(-1)).toMatchObject({
+      id: "routine-secret-row",
+      label: "routineWebhookSecret",
+      recordId: "routine-secret-row",
+      ref: "fake-routine-ref",
+    });
   });
   it("compares the original ref so a concurrent update or delete wins", async () => {
     const f = fixture();
@@ -76,6 +84,7 @@ describe("migration persistence", () => {
     expect(await f.repository.replace(row, "fake-deleted")).toBe(false);
     expect(await f.repository.referenced("fake-bot-ref")).toBe(true);
     expect(await f.repository.referenced("fake-config-ref")).toBe(true);
+    expect(await f.repository.referenced("fake-routine-ref")).toBe(true);
     expect(await f.repository.referenced("fake-missing")).toBe(false);
   });
 });

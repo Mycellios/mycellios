@@ -301,6 +301,8 @@ export interface SendUserMessageInput {
   /** Internal authenticated routine delivery; never accepted from a chat request body. */
   routineId?: string;
   routineWebhookSource?: "webhook" | "github";
+  /** The person's Send test event: runs like Test, also while the routine is paused. */
+  routineTestEvent?: true;
   linkMessageToRun?: boolean;
   /** Internal bot sender: enforce both bots' cross-space policy in the write transaction. */
   crossSpaceSenderBotId?: string;
@@ -498,7 +500,8 @@ export async function sendUserMessage(
         if (!input.routineWebhookSource) throw new IsolationError();
         const routine = await tx.routine.findFirst({ where: {
           id: input.routineId, botId: input.botId, threadId: input.threadId,
-          spaceId: input.spaceId, userId: input.userId, active: true, bot: { archivedAt: null },
+          spaceId: input.spaceId, userId: input.userId, bot: { archivedAt: null },
+          ...(input.routineTestEvent && input.routineWebhookSource === "webhook" ? {} : { active: true }),
           ...(input.routineWebhookSource === "github" ? { githubEnabled: true } : { webhookEnabled: true }),
         }, select: { id: true } });
         if (!routine) throw new IsolationError();

@@ -1524,13 +1524,59 @@ model Routine {
   /// when the routine is turned on again or paused by the person.
   pausedByRunId  String?
   pausedByRunAt  DateTime?
+  /// Signed webhook events of only this Standard Webhooks type; null takes any type.
+  webhookEventType String?
+  /// RoutineEventFilter[] that every signed event's data must match; null has none.
+  webhookFilters Json?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   runs           Run[]
+  webhookSecrets RoutineWebhookSecret[]
+  eventReceipts  RoutineEventReceipt[]
 
   @@index([active, nextRunAt])
   @@index([spaceId, botId])
   @@map("routines")
+}
+
+/// A routine's own Standard Webhooks secret, encrypted like other credentials. The current one
+/// has no expiry; the one a rotation replaced keeps working until expiresAt.
+model RoutineWebhookSecret {
+  id         String    @id
+  spaceId    String
+  userId     String
+  routineId  String
+  routine    Routine   @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  ciphertext String
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+
+  @@index([routineId])
+  @@map("routine_webhook_secrets")
+}
+
+/// One signed event a routine accepted: the digest of its delivery id, what it did and the run
+/// it started. Never the body. Kept for ROUTINE_EVENT_RECEIPT_DAYS.
+model RoutineEventReceipt {
+  id        String   @id @default(cuid())
+  spaceId   String
+  userId    String
+  routineId String
+  routine   Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  keyDigest String
+  /// queued, ignored or paused.
+  result    String
+  /// Why an ignored event started nothing: event_type or filter.
+  reason    String?
+  runId     String?
+  /// Sent from the routine editor's Send test event.
+  test      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([routineId, keyDigest])
+  @@index([routineId, createdAt])
+  @@index([createdAt])
+  @@map("routine_event_receipts")
 }
 
 model ScratchpadItem {

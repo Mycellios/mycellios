@@ -10,7 +10,8 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@mycellios/adapter-kit";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
-import { AccountPlanLimitSchema, NativeEngineAccountResultSchema, type NativeEngineAccountRequest } from "@mycellios/contracts";
+import type { NativeEngineAccountRequest, NativeEngineInstallRequest } from "@mycellios/contracts";
+import { AccountPlanLimitSchema, NativeEngineAccountResultSchema, NativeEngineInstallResultSchema } from "@mycellios/contracts";
 import { getLogger } from "@mycellios/logging";
 import { describeDesktopSandbox } from "./desktop-sandbox.js";
 import { projectLeaseOwner } from "./project-execution.js";
@@ -196,7 +197,13 @@ export class HostComputerSandbox implements SandboxProvider {
     return { engines: environment.nativeEngines ?? [], signedOut: environment.signedOutEngines ?? [],
       ...(environment.signedInEngines ? { signedIn: environment.signedInEngines } : {}),
       ...(environment.nativeModels ? { models: environment.nativeModels } : {}),
-      ...(environment.engineAccount === 1 ? { account: true } : {}) };
+      ...(environment.engineAccount === 1 ? { account: true } : {}),
+      ...(environment.engineInstall === 1 ? {
+        install: true,
+        // The server checks each entry before a client sees it, as it does for model catalogs.
+        installable: environment.installableEngines ?? [],
+        installs: environment.engineInstalls ?? [],
+      } : {}) };
   }
   /** Asks the PC to sign one of its CLIs in or out; the answer is checked before it is passed on. */
   async nativeEngineAccount(context: AdapterContext, account: NativeEngineAccountRequest) {
@@ -212,6 +219,14 @@ export class HostComputerSandbox implements SandboxProvider {
     const answer = await this.one<{ codex?: unknown } | undefined>({ method: "engineUsage", botId: context.botId }, context);
     const codex = AccountPlanLimitSchema.safeParse(answer?.codex);
     return codex.success ? { codex: codex.data } : {};
+  }
+  /** Asks the PC to start installing a missing CLI; it reports progress with its engines. */
+  async nativeEngineInstall(context: AdapterContext, install: NativeEngineInstallRequest) {
+    if (!context.botId) throw new Error("No Mico names this PC.");
+    const answer = await this.one<unknown>({ method: "engineInstall", botId: context.botId, install }, context);
+    const parsed = NativeEngineInstallResultSchema.safeParse(answer);
+    if (!parsed.success) throw new Error("The PC returned an invalid install answer.");
+    return parsed.data;
   }
   environment(computer: ComputerRef, context: AdapterContext) {
     return this.one<HostComputerEnvironment>(

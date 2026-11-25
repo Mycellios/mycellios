@@ -1,0 +1,81 @@
+name: Public status
+
+# The public status page (specs/trusted-distribution/spec.md, phase 2). Every five minutes, which
+# GitHub may delay, a GitHub-hosted runner probes public endpoints only, with no credentials,
+# account, model call or user content, and deploys a static page, status.json and an Atom feed to
+# GitHub Pages, apart from the servers it reports on. Each run reads the published status.json as
+# its previous state, so nothing is committed. Incidents and maintenance are issues with the
+# `status` label that maintainers open and close. scripts/public-status.mjs holds the logic.
+#
+# Pages must publish from GitHub Actions (repository settings). Until it does, scheduled runs stop
+# after that check with a warning, and a manual run builds the page as an artifact only.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      reset_history:
+        description: Start a new history instead of reading the published status.json
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One run at a time, so each run reads the state the previous run published.
+concurrency:
+  group: public-status
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Probe public endpoints and build the page
+    if: github.repository == 'Mycellios/mycellios'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pages: read
+    outputs:
+      deploy: ${{ steps.pages.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+      - name: Check that Pages publishes from GitHub Actions
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/public-status.mjs pages
+      - name: Probe public endpoints and build the page
+        id: build
+        if: steps.pages.outputs.deploy == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS_PAGES_URL: ${{ steps.pages.outputs.url }}
+          STATUS_RESET: ${{ inputs.reset_history && 'true' || 'false' }}
+        run: node scripts/public-status.mjs build _site
+      - if: steps.build.outcome == 'success'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    # Only main publishes; a manual run of another branch stops at the artifact.
+    if: needs.build.outputs.deploy == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -111,7 +111,16 @@ Phases 3 to 5 start only after their open decision is settled.
      amd64 and arm64 from main (`sha-<commit>`, `edge`; deploy.yml's amd64 `computer` is
      extended, never replaced), `installer-release.yml` adds `v<version>` and tags the
      commit once the Desktop release is public, and `desktop-release.md` describes the
-     real release. The default switch and the move of existing installs follow later.
+     real release. The defaults now name this repository: `install-images.sh` fetches its
+     files at the tag it installs (`edge` from main, `--release v<version>`), the Compose
+     files and env examples name its images, the updater accepts only its `v<semver>` tags,
+     and Desktop's Docker stack asks for its own version's images. Installs on the upstream
+     images keep them until their owner moves: the installer asks once (recorded in `.env`),
+     the updater sidecar offers `POST /move`, and Desktop's stack moves on its next start.
+     Every move first runs the target image's migration check
+     (`apps/api/src/cli/check-migration-history.ts`) and is refused, changing nothing, when
+     the database records a migration the release lacks (`verify-migration-history-db.ts`
+     on isolated PostgreSQL). Rollback restores the exact cached image, under its old name.
 2. Phase 2 — a public status page.
    - A scheduled workflow on GitHub-hosted runners (every 5 minutes, which GitHub
      may delay) probes public endpoints only: the site `/`, the Agent app
@@ -131,6 +140,12 @@ Phases 3 to 5 start only after their open decision is settled.
    - Incidents and maintenance are issues with a `status` label that maintainers
      open and close; the page and the feed carry them. The page shows state,
      response time and incident text, and links to the Live network page.
+   - Implemented: `public-status.yml` runs `scripts/public-status.mjs` on that
+     schedule, and Agent answers `GET /api/v1/status` (`/agent/api/v1/status` through
+     the proxy) with only `ok` or `degraded`, reusing one database answer for 10
+     seconds. A run deploys only while Pages publishes from GitHub Actions; until the
+     owner sets that, the address and the `status` label, scheduled runs stop with a
+     warning and a manual run builds the page as an artifact.
 3. Phase 3 — signed Windows installers and unattended installs.
    - Prerequisite (open decision): a code-signing identity and route. Default:
      a cloud signing service that issues short-lived certificates to the release

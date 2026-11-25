@@ -49,3 +49,20 @@ export const APP_DOCUMENT_STATE_SCRIPT = `(() => {
 })()`;
 
 export type AppDocumentState = "ready" | "failed";
+
+export class AppDocumentReadyTimeout extends Error {}
+
+/** Give a stalled bundled cloud page one attempt through the original HTTPS protocol. */
+export async function loadWithCloudRendererRecovery(
+  load: () => Promise<AppDocumentState>,
+  restoreCloudRenderer?: () => void,
+): Promise<AppDocumentState> {
+  if (!restoreCloudRenderer) return load();
+  try {
+    return await load();
+  } catch (error) {
+    if (!(error instanceof AppDocumentReadyTimeout)) throw error;
+    restoreCloudRenderer();
+    return load();
+  }
+}

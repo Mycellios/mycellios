@@ -18,7 +18,7 @@ import {
 describe("normalizeRepoUrl", () => {
   it("accepts the official repository and https forks", () => {
     expect(normalizeRepoUrl(OFFICIAL_REPO_URL)).toEqual({
-      url: "https://github.com/elie222/rakazo",
+      url: "https://github.com/Mycellios/mycellios",
     });
     expect(normalizeRepoUrl("  https://github.com/me/rakazo.git/  ")).toEqual({
       url: "https://github.com/me/rakazo.git",
@@ -69,18 +69,19 @@ describe("normalizeRepoUrl", () => {
 
 describe("repoIdentity", () => {
   it("treats every spelling of the same remote as one repository", () => {
-    const identity = "github.com/elie222/rakazo";
-    expect(repoIdentity("https://github.com/elie222/rakazo")).toBe(identity);
-    expect(repoIdentity("https://github.com/elie222/rakazo.git")).toBe(identity);
-    expect(repoIdentity("git@github.com:elie222/rakazo.git")).toBe(identity);
-    expect(repoIdentity("ssh://git@github.com/Elie222/Rakazo")).toBe(identity);
+    const identity = "github.com/mycellios/mycellios";
+    expect(repoIdentity("https://github.com/Mycellios/mycellios")).toBe(identity);
+    expect(repoIdentity("https://github.com/Mycellios/mycellios.git")).toBe(identity);
+    expect(repoIdentity("git@github.com:Mycellios/mycellios.git")).toBe(identity);
+    expect(repoIdentity("ssh://git@github.com/MYCELLIOS/Mycellios")).toBe(identity);
     expect(repoIdentity("not a url")).toBeNull();
   });
 
-  it("only calls the real upstream official", () => {
-    expect(isOfficialRepoUrl("git@github.com:elie222/rakazo.git")).toBe(true);
-    expect(isOfficialRepoUrl("https://github.com/attacker/rakazo")).toBe(false);
-    expect(isOfficialRepoUrl("https://githubb.com/elie222/rakazo")).toBe(false);
+  it("only calls this repository official, not the project it was imported from", () => {
+    expect(isOfficialRepoUrl("git@github.com:Mycellios/mycellios.git")).toBe(true);
+    expect(isOfficialRepoUrl("https://github.com/attacker/mycellios")).toBe(false);
+    expect(isOfficialRepoUrl("https://githubb.com/Mycellios/mycellios")).toBe(false);
+    expect(isOfficialRepoUrl("git@github.com:elie222/rakazo.git")).toBe(false);
   });
 });
 
@@ -161,6 +162,20 @@ describe("updateSteps", () => {
       "merge",
       "--ff-only",
       "2".repeat(40),
+    ]);
+  });
+
+  it("installs, generates, builds and migrates with npm, the repository's package manager", () => {
+    const steps = updateSteps({
+      remoteUrl: OFFICIAL_REPO_URL,
+      branch: DEFAULT_UPDATE_BRANCH,
+      targetCommit: "2".repeat(40),
+    }).filter((step) => step.command !== "git");
+    expect(steps.map((step) => [step.command, ...step.args])).toEqual([
+      ["npm", "ci", "--no-audit", "--no-fund"],
+      ["npm", "run", "generate", "--workspace", "@mycellios/db"],
+      ["npm", "run", "build", "--workspace", "@mycellios/web"],
+      ["npm", "run", "migrate", "--workspace", "@mycellios/db"],
     ]);
   });
 

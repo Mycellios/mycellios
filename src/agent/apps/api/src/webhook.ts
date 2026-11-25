@@ -3,6 +3,7 @@ import { hasValidBearerToken } from "@mycellios/core";
 import type { Hono } from "hono";
 import { mountGithubWebhookRoute } from "./github-webhook.js";
 import { readBoundedBody } from "./http-body.js";
+import { mountRoutineEventRoutes } from "./routine-events.js";
 import {
   deliverWebhookEvent,
   formatWebhookPrompt,
@@ -69,6 +70,8 @@ export function mountWebhookHttpRoutes(app: Hono, deps: WebhookDeps) {
         spaceId: target.bot.spaceId,
         active: true,
         webhookEnabled: true,
+        // A routine with its own secret takes only events signed for it at its own URL.
+        webhookSecrets: { none: {} },
       },
       select: {
         id: true,
@@ -100,4 +103,6 @@ export function mountWebhookHttpRoutes(app: Hono, deps: WebhookDeps) {
   });
 
   mountGithubWebhookRoute(app, deps, secretCache);
+  // Routine secrets are cached by their own id, apart from the per-Mico ones.
+  mountRoutineEventRoutes(app, deps, new Map());
 }

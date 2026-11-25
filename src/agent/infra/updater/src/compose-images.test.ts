@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  SELF_HOST_APP_IMAGE,
+  SELF_HOST_COMPUTER_IMAGE,
+  SELF_HOST_IMAGE_NAMESPACE,
+  SELF_HOST_UPDATER_IMAGE,
+  UPSTREAM_IMAGE_OWNER,
+} from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
@@ -20,24 +27,21 @@ interface ComposeService {
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const composeFile = path.resolve(repoRoot, "infra/compose/docker-compose.images.yml");
-const publishWorkflowFile = path.resolve(repoRoot, ".github/workflows/publish-server-image.yml");
+// The repository root publishes the self-host images; src/agent/.github keeps only the imported
+// upstream reference, which never runs here.
+const publishWorkflowFile = path.resolve(repoRoot, "../../.github/workflows/self-host-images.yml");
 const compose = parse(readFileSync(composeFile, "utf8"), { merge: true }) as {
   services: Record<string, ComposeService>;
 };
 const publishWorkflow = parse(readFileSync(publishWorkflowFile, "utf8")) as {
-  jobs?: {
-    publish?: {
-      strategy?: {
-        matrix?: {
-          include?: Array<{ name?: string }>;
-        };
-      };
-    };
-  };
+  jobs?: { publish?: { strategy?: { matrix?: { image?: unknown[] } } } };
 };
 
 const appServices = ["api", "worker", "web", "supervisor"] as const;
-const FIRST_PARTY_IMAGE = /ghcr\.io\/elie222\/rakazo\/([a-z0-9][a-z0-9._-]*)/g;
+const FIRST_PARTY_IMAGE = new RegExp(
+  `${SELF_HOST_IMAGE_NAMESPACE.replaceAll(".", "\\.")}/([a-z0-9][a-z0-9._-]*)`,
+  "g",
+);
 
 function firstPartyImageNames(value: unknown): string[] {
   if (typeof value !== "string") return [];
@@ -61,10 +65,10 @@ describe("the images compose file", () => {
       "worker",
     ]);
     for (const service of appServices) {
-      expect(compose.services[service]?.image).toContain("ghcr.io/elie222/rakazo/app");
+      expect(compose.services[service]?.image).toContain(SELF_HOST_APP_IMAGE);
       expect(compose.services[service]?.image).toContain("RAKAZO_IMAGE_TAG");
     }
-    expect(compose.services.computer?.image).toContain("ghcr.io/elie222/rakazo/computer");
+    expect(compose.services.computer?.image).toContain(SELF_HOST_COMPUTER_IMAGE);
     expect(compose.services.computer?.image).toContain("RAKAZO_COMPUTER_IMAGE_TAG");
     expect(compose.services.postgres?.image).toMatch(
       /^\$\{POSTGRES_IMAGE:-postgres:16@sha256:[0-9a-f]{64}\}$/,
@@ -76,14 +80,14 @@ describe("the images compose file", () => {
     expect(firstPartyImageNames(null)).toEqual([]);
     expect(firstPartyImageNames(true)).toEqual([]);
     expect(firstPartyImageNames(7091)).toEqual([]);
-    expect(firstPartyImageNames("ghcr.io/elie222/rakazo/computer:edge")).toEqual(["computer"]);
+    expect(firstPartyImageNames(`${SELF_HOST_COMPUTER_IMAGE}:edge`)).toEqual(["computer"]);
   });
 
   it("only references first-party images that the publish matrix publishes", () => {
     const published = new Set(
-      (publishWorkflow.jobs?.publish?.strategy?.matrix?.include ?? [])
-        .map((entry) => entry.name)
-        .filter((name): name is string => typeof name === "string" && name.length > 0),
+      (publishWorkflow.jobs?.publish?.strategy?.matrix?.image ?? []).filter(
+        (name): name is string => typeof name === "string" && name.length > 0,
+      ),
     );
     const referenced = new Set<string>();
     for (const service of Object.values(compose.services)) {
@@ -188,5 +192,43 @@ describe("the images compose file", () => {
     expect(compose.services.computer?.environment?.AXIOM_TOKEN).toBeUndefined();
     expect(compose.services.computer?.environment?.SENTRY_DSN).toBeUndefined();
     expect(compose.services.computer?.environment?.LOG_LEVEL).toBeUndefined();
+  });
+});
+
+/**
+ * Self-host defaults pull only what this repository's workflows build from main
+ * (specs/trusted-distribution). Existing installs that name the upstream images keep them through
+ * their own `.env`, never through a default here.
+ */
+describe("self-host defaults", () => {
+  const defaults = [
+    "infra/compose/docker-compose.images.yml",
+    "infra/compose/docker-compose.prod.yml",
+    "infra/compose/docker-compose.prod.docker.yml",
+    "infra/compose/.env.images.example",
+    "infra/compose/stack-env.example",
+    ".env.example",
+  ];
+
+  it("name this repository's images and never the upstream ones", () => {
+    for (const file of defaults) {
+      const text = readFileSync(path.resolve(repoRoot, file), "utf8");
+      expect(text, file).not.toContain(UPSTREAM_IMAGE_OWNER);
+    }
+    const examples = ["infra/compose/.env.images.example", "infra/compose/stack-env.example"].map(
+      (file) => readFileSync(path.resolve(repoRoot, file), "utf8"),
+    );
+    for (const example of examples) {
+      expect(example).toContain(`=${SELF_HOST_APP_IMAGE}\n`);
+      expect(example).toContain(`=${SELF_HOST_COMPUTER_IMAGE}\n`);
+    }
+    // Desktop's Docker stack copies the same template the installer uses.
+    expect(examples[0]).toBe(examples[1]);
+    const prod = readFileSync(
+      path.resolve(repoRoot, "infra/compose/docker-compose.prod.yml"),
+      "utf8",
+    );
+    expect(prod).toContain(`:-${SELF_HOST_APP_IMAGE}}`);
+    expect(prod).toContain(`:-${SELF_HOST_UPDATER_IMAGE}}`);
   });
 });

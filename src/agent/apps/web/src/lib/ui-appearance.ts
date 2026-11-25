@@ -43,18 +43,23 @@ export function applyResolvedAppearance(
   }
 }
 
+function browserPanelAppearance(appearance: ResolvedAppearance): ResolvedAppearance {
+  const theme = typeof document !== "undefined" ? document.documentElement.dataset.browserPanelTheme : null;
+  return theme === "light" || theme === "dark" ? theme : appearance;
+}
+
 export function applyUiAppearance(
   preference: AppearancePreference = resolveAppearancePreference(),
   system: ResolvedAppearance = readSystemAppearance(),
 ): ResolvedAppearance {
-  const resolved = resolveAppearance(preference, system);
+  const resolved = browserPanelAppearance(resolveAppearance(preference, system));
   applyResolvedAppearance(resolved);
   return resolved;
 }
 
 export function setUiAppearance(preference: AppearancePreference): ResolvedAppearance {
   persistAppearancePreference(preference);
-  const appearance = resolveAppearance(preference, readSystemAppearance());
+  const appearance = browserPanelAppearance(resolveAppearance(preference, readSystemAppearance()));
   stopAppearanceTransition?.();
   const root = typeof document === "undefined" ? null : document.documentElement;
   if (

@@ -8,8 +8,13 @@ import type {
   RoutineRunInChoice,
   RoutineWatch,
   RoutineWatchInput,
+  RoutineWebhookState,
 } from "@mycellios/contracts";
-import { ROUTINE_WATCH_DEFAULT_MINUTES, ROUTINE_WATCH_MIN_MINUTES } from "@mycellios/contracts";
+import {
+  ROUTINE_EVENT_FILTER_MAX,
+  ROUTINE_WATCH_DEFAULT_MINUTES,
+  ROUTINE_WATCH_MIN_MINUTES,
+} from "@mycellios/contracts";
 import {
   type CronFreq,
   type CronPreset,
@@ -21,6 +26,14 @@ import {
   presetFromCron,
 } from "@mycellios/core";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +64,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { CopyButton } from "../components/CopyButton";
 import {
   connectedModelOptions,
   modelOptionKey,
@@ -60,6 +74,8 @@ import {
 import { rpc } from "../lib/rpc";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineSchedule } from "./RoutineSchedule";
+import type { RoutineEventFilterDraft } from "./routine-webhook-draft";
+import { filterDraftsFromWebhook } from "./routine-webhook-draft";
 
 function toDatetimeLocalValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -111,6 +127,9 @@ export type RoutineDraftState = {
   watch: RoutineWatchDraft | null;
   /** Undefined for a group routine, or from a server that does not say. */
   runIn?: RoutineRunInChoice;
+  /** Signed webhook events of only this type; empty takes any type. */
+  webhookEventType?: string;
+  webhookFilters?: RoutineEventFilterDraft[];
 };
 
 /** The change trigger as the editor holds it: free text until saved. */
@@ -206,6 +225,8 @@ export function emptyRoutineDraft(): RoutineDraftState {
     thinkingLevel: "",
     watch: null,
     runIn: "thread",
+    webhookEventType: "",
+    webhookFilters: [],
   };
 }
 
@@ -227,6 +248,8 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
     thinkingLevel: routine.thinkingLevel ?? "",
     watch: watchDraftFromRoutine(routine.watch),
     runIn: routine.runIn === "thread" || routine.runIn === "chat" ? routine.runIn : undefined,
+    webhookEventType: routine.webhook?.eventType ?? "",
+    webhookFilters: filterDraftsFromWebhook(routine.webhook),
   };
 }
 
@@ -325,6 +348,7 @@ export function RoutineEditor({
   editing,
   timezone,
   webhook,
+  routineWebhook,
   githubPath,
   messageProviders,
   saving,
@@ -341,7 +365,10 @@ export function RoutineEditor({
   onChange: (next: RoutineDraftState) => void;
   editing: Routine | null;
   timezone: string;
+  /** The Mico's own key, which GitHub events are signed with. */
   webhook: { path: string; secret: string | null; configured: boolean };
+  /** This routine's own signed webhook. */
+  routineWebhook: RoutineWebhookControls;
   githubPath: string;
   messageProviders: string[];
   saving: boolean;
@@ -403,11 +430,8 @@ export function RoutineEditor({
     onChange({ ...draft, schedules: [...draft.schedules, next] });
   }
 
-  async function addWebhook() {
+  function addWebhook() {
     onChange({ ...draft, webhookEnabled: true });
-    if (!webhook.configured) {
-      await onEnsureWebhook().catch(() => undefined);
-    }
   }
 
   async function addGithub() {
@@ -621,20 +645,17 @@ export function RoutineEditor({
           ))}
 
           {draft.webhookEnabled ? (
-            <InboundTriggerCard
-              kind="webhook"
-              saved={Boolean(editing)}
-              path={webhook.path}
-              secret={webhook.secret}
-              configured={webhook.configured}
+            <RoutineWebhookCard
+              draft={draft}
+              onChange={onChange}
+              state={editing?.webhookEnabled ? editing.webhook : undefined}
+              controls={routineWebhook}
               onRemove={() => onChange({ ...draft, webhookEnabled: false })}
-              onRotate={() => void onEnsureWebhook()}
             />
           ) : null}
 
           {draft.githubEnabled ? (
-            <InboundTriggerCard
-              kind="github"
+            <GithubTriggerCard
               saved={Boolean(editing)}
               path={githubPath}
               secret={webhook.secret}
@@ -743,7 +764,7 @@ export function RoutineEditor({
               <Trans>Git event</Trans>
             </DropdownMenuItem>
 
-            <DropdownMenuItem disabled={draft.webhookEnabled} onClick={() => void addWebhook()}>
+            <DropdownMenuItem disabled={draft.webhookEnabled} onClick={addWebhook}>
               <Globe />
               <Trans>Webhook</Trans>
             </DropdownMenuItem>
@@ -952,8 +973,7 @@ function MessageTriggerCard({ provider, onRemove }: { provider: string; onRemove
   );
 }
 
-function InboundTriggerCard({
-  kind,
+function GithubTriggerCard({
   saved,
   path,
   secret,
@@ -961,7 +981,6 @@ function InboundTriggerCard({
   onRemove,
   onRotate,
 }: {
-  kind: "webhook" | "github";
   saved: boolean;
   path: string;
   secret: string | null;
@@ -970,42 +989,26 @@ function InboundTriggerCard({
   onRotate: () => void;
 }) {
   const { t } = useLingui();
-  const pending = !saved;
   const placeholder = t`Available after the routine is saved`;
-  // GitHub delivery URL and signature header are fixed by bot id / protocol, so show
-  // them before save. The shared secret still needs a saved routine to mint.
-  const postValue = kind === "github" || !pending ? path : placeholder;
-  const keyValue = pending
+  // The GitHub delivery URL and signature header are fixed by bot id and protocol, so they show
+  // before save. The Mico's key still needs a saved routine to mint.
+  const keyValue = !saved
     ? placeholder
     : (secret ?? (configured ? t`Saved. Rotate to reveal.` : placeholder));
-  const headerValue =
-    kind === "github"
-      ? "X-Hub-Signature-256: sha256=…"
-      : pending
-        ? placeholder
-        : secret
-          ? `Authorization: Bearer ${secret}`
-          : configured
-            ? "Authorization: Bearer …"
-            : placeholder;
   const cellClass =
     "break-all rounded-lg bg-muted px-2.5 py-1.5 font-mono text-xs text-foreground/75";
 
   return (
     <div className="rounded-xl border border-border p-3">
       <div className="flex items-center gap-2.5 px-0.5">
-        {kind === "github" ? (
-          <GitBranch size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
-        ) : (
-          <Globe size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
-        )}
+        <GitBranch size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
         <span className="flex-1 text-[14.5px] text-foreground">
-          {kind === "github" ? <Trans>Git event</Trans> : <Trans>When a webhook fires</Trans>}
+          <Trans>Git event</Trans>
         </span>
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={kind === "github" ? t`Remove Git event` : t`Remove webhook`}
+          aria-label={t`Remove Git event`}
           onClick={onRemove}
           className="text-muted-foreground"
         >
@@ -1015,7 +1018,7 @@ function InboundTriggerCard({
       <div className="mt-2.5 space-y-2.5 text-[13.5px]">
         <div className="block text-muted-foreground/70">
           <Trans>POST to</Trans>
-          <div className={`mt-1 ${cellClass}`}>{postValue}</div>
+          <div className={`mt-1 ${cellClass}`}>{path}</div>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground/70">
           <span className="shrink-0">
@@ -1025,7 +1028,7 @@ function InboundTriggerCard({
         </div>
         <div className="block text-muted-foreground/70">
           <Trans>header</Trans>
-          <div className={`mt-1 ${cellClass}`}>{headerValue}</div>
+          <div className={`mt-1 ${cellClass}`}>X-Hub-Signature-256: sha256=…</div>
         </div>
         {saved && configured && !secret ? (
           <Button
@@ -1038,6 +1041,211 @@ function InboundTriggerCard({
           </Button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** What the editor does with a saved routine's own webhook secret. */
+export type RoutineWebhookControls = {
+  /** Where its signed events go; null until the routine is saved with its webhook. */
+  url: string | null;
+  /** The secret just created or rotated, shown this once. */
+  secret: string | null;
+  busy: boolean;
+  onRotate: () => void;
+  onRevoke: () => void;
+  onSendTest: () => void;
+};
+
+function RoutineWebhookCard({
+  draft,
+  onChange,
+  state,
+  controls,
+  onRemove,
+}: {
+  draft: RoutineDraftState;
+  onChange: (next: RoutineDraftState) => void;
+  /** The saved routine's webhook; undefined until it is saved with one, or from older servers. */
+  state: RoutineWebhookState | undefined;
+  controls: RoutineWebhookControls;
+  onRemove: () => void;
+}) {
+  const { t, i18n } = useLingui();
+  const fieldId = useId();
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const filters = draft.webhookFilters ?? [];
+  const eventType = draft.webhookEventType ?? "";
+  const formatTime = (value: string) =>
+    new Date(value).toLocaleString(i18n.locale || "en", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  const createdOn = state?.secretCreatedAt ? formatTime(state.secretCreatedAt) : null;
+  const until = state?.previousSecretExpiresAt ? formatTime(state.previousSecretExpiresAt) : null;
+  const cellClass =
+    "min-w-0 flex-1 break-all rounded-lg bg-muted px-2.5 py-1.5 font-mono text-xs text-foreground/75";
+  const setFilters = (next: RoutineEventFilterDraft[]) => onChange({ ...draft, webhookFilters: next });
+
+  return (
+    <div className="rounded-xl border border-border p-3" data-testid="routine-webhook-card">
+      <div className="flex items-center gap-2.5 px-0.5">
+        <Globe size={16} strokeWidth={1.6} className="text-muted-foreground" aria-hidden />
+        <span className="flex-1 text-[14.5px] text-foreground">
+          <Trans>When a webhook fires</Trans>
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t`Remove webhook`}
+          onClick={onRemove}
+          className="text-muted-foreground"
+        >
+          <X />
+        </Button>
+      </div>
+      <div className="mt-2.5 space-y-2.5 text-[13.5px] text-muted-foreground/70">
+        <div>
+          <Trans>POST to</Trans>
+          <div className="mt-1 flex items-center gap-2">
+            <div className={cellClass}>{controls.url ?? t`Available after the routine is saved`}</div>
+            {controls.url ? <CopyButton value={controls.url} label={t`Copy URL`} /> : null}
+          </div>
+        </div>
+        {controls.url && state ? (
+          <>
+            {controls.secret ? (
+              <section role="status" className="space-y-2">
+                <p className="text-foreground">{t`Copy the secret now. You will not be able to see it again.`}</p>
+                <div className="flex items-center gap-2">
+                  <div className={cellClass} data-testid="routine-webhook-secret">
+                    {controls.secret}
+                  </div>
+                  <CopyButton value={controls.secret} label={t`Copy secret`} />
+                </div>
+              </section>
+            ) : null}
+            {createdOn ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex-1">{t`Created ${createdOn}`}</span>
+                <Button size="sm" variant="outline" disabled={controls.busy} onClick={controls.onRotate}>
+                  <Trans>Rotate secret</Trans>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={controls.busy}
+                  onClick={() => setConfirmRevoke(true)}
+                >
+                  <Trans>Revoke</Trans>
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" disabled={controls.busy} onClick={controls.onRotate}>
+                <Trans>Create secret</Trans>
+              </Button>
+            )}
+            {until ? (
+              <p data-testid="routine-webhook-previous">{t`The previous secret works until ${until}.`}</p>
+            ) : null}
+          </>
+        ) : null}
+        <p>
+          <Trans>Sign events with Standard Webhooks.</Trans>
+        </p>
+        <details open={Boolean(eventType || filters.length) || undefined}>
+          <summary className="w-fit cursor-pointer">{t`Only some events`}</summary>
+          <div className="mt-2 space-y-2">
+            <label htmlFor={`${fieldId}-type`} className="block">
+              <Trans>Event type</Trans>
+              <Input
+                id={`${fieldId}-type`}
+                value={eventType}
+                placeholder={t`Any type`}
+                onChange={(event) => onChange({ ...draft, webhookEventType: event.target.value })}
+                className="mt-1"
+              />
+            </label>
+            {filters.map((filter, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  value={filter.pointer}
+                  placeholder="/status"
+                  aria-label={t`Data field`}
+                  onChange={(event) =>
+                    setFilters(
+                      filters.map((item, i) =>
+                        i === index ? { ...item, pointer: event.target.value } : item,
+                      ),
+                    )
+                  }
+                  className="min-w-0 flex-1 font-mono text-xs"
+                />
+                <span aria-hidden>=</span>
+                <Input
+                  value={filter.value}
+                  aria-label={t`Value`}
+                  onChange={(event) =>
+                    setFilters(
+                      filters.map((item, i) =>
+                        i === index ? { ...item, value: event.target.value } : item,
+                      ),
+                    )
+                  }
+                  className="min-w-0 flex-1 font-mono text-xs"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={t`Remove filter`}
+                  onClick={() => setFilters(filters.filter((_, i) => i !== index))}
+                  className="text-muted-foreground"
+                >
+                  <X />
+                </Button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={filters.length >= ROUTINE_EVENT_FILTER_MAX}
+              onClick={() => setFilters([...filters, { pointer: "", value: "" }])}
+            >
+              <Plus />
+              <Trans>Add filter</Trans>
+            </Button>
+          </div>
+        </details>
+        {controls.url && state?.secretCreatedAt ? (
+          <Button size="sm" variant="secondary" disabled={controls.busy} onClick={controls.onSendTest}>
+            <Trans>Send test event</Trans>
+          </Button>
+        ) : null}
+      </div>
+      <AlertDialog open={confirmRevoke} onOpenChange={setConfirmRevoke}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t`Revoke this routine's secrets?`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t`Events signed with the current or previous secret are refused from now on.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setConfirmRevoke(false);
+                controls.onRevoke();
+              }}
+            >
+              {t`Revoke`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

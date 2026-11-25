@@ -2,6 +2,8 @@ import type {
   AgentQuestion,
   CacheCapabilities as ConnectionCacheCapabilities,
   ConnectionCatalogItem,
+  NativeEngineInstallable,
+  NativeEngineInstallProgress,
   NotificationKind,
   SandboxKind,
 } from "@mycellios/contracts";
@@ -28,6 +30,12 @@ export type NativeEngineState = {
   models?: NativeEngineModels;
   /** The host can sign its CLIs in and out for the person (older hosts omit it). */
   account?: boolean;
+  /** The host installs missing CLIs into its own store for the person (older hosts omit it). */
+  install?: boolean;
+  /** Missing CLIs the host can install, with the pinned version, vendor package and size. */
+  installable?: NativeEngineInstallable[];
+  /** Installs running on the host, or why the last one failed. */
+  installs?: NativeEngineInstallProgress[];
 };
 
 export interface AdapterContext {
@@ -1103,13 +1111,31 @@ export interface BrowserNavigateRequest {
 export interface BrowserNavigateResult {
   url: string;
   title: string;
+  /** The first snapshot of the page, when the browser took one with the navigation. */
+  tree?: string;
+  elements?: BrowserSnapshotNode[];
+  loading?: boolean;
+  next?: number;
+  /** The page opened a dialog; nothing else runs on it until the dialog is answered. */
+  dialog?: BrowserDialog;
   /** When set, the page tool could not operate; use computer_act instead. */
   fallback?: "computer_act";
   error?: string;
 }
 
 export interface BrowserSnapshotRequest {
+  /** Reads a later part of a long page, as the previous snapshot's `next` names it. */
+  from?: number;
   signal?: AbortSignal;
+}
+
+/** A JavaScript dialog a page opened. Its message is untrusted page text. */
+export interface BrowserDialog {
+  type: "alert" | "confirm" | "prompt" | "beforeunload";
+  message: string;
+  defaultPrompt?: string;
+  /** Only a person can answer it: no step of this Mico opened it, or it can no longer answer. */
+  forPerson?: boolean;
 }
 
 export interface BrowserSnapshotNode {
@@ -1129,14 +1155,38 @@ export interface BrowserSnapshotResult {
   elements: BrowserSnapshotNode[];
   /** The page was still loading or waiting on its own requests when it was captured. */
   loading?: boolean;
+  /** The page continues: the part to read next with `from`. Refs of every part stay valid. */
+  next?: number;
+  dialog?: BrowserDialog;
+  /** The computer's browser cannot do this yet; it needs a newer computer image. Nothing ran. */
+  unsupported?: string;
   fallback?: "computer_act";
   error?: string;
 }
 
-export type BrowserActKind = "click" | "fill" | "type" | "upload";
+export type BrowserActKind =
+  | "click"
+  | "fill"
+  | "type"
+  | "upload"
+  | "press"
+  | "scroll"
+  | "hover"
+  | "wait"
+  | "dialog";
+
+/** Step kinds a computer's page browser runs only when it reports the matching `act.<kind>` feature. */
+export const BROWSER_ACT_FEATURE_KINDS = ["press", "scroll", "hover", "wait", "dialog"] as const;
 
 /** Most files one upload step may attach. */
 export const MAX_BROWSER_UPLOAD_FILES = 10;
+/** Longest one wait step may wait, in seconds; the waits of one call share as much. */
+export const MAX_BROWSER_WAIT_SECONDS = 15;
+/** A long page is read in at most this many snapshot parts. */
+export const MAX_BROWSER_SNAPSHOT_PARTS = 25;
+
+export type BrowserWaitCondition = "text" | "gone" | "url" | "quiet";
+export type BrowserScrollDirection = "up" | "down" | "left" | "right";
 
 export type BrowserActStep =
   | { kind: "click"; ref: string }
@@ -1150,7 +1200,17 @@ export type BrowserActStep =
       origin?: string;
       /** Which part of a saved login `text` is; a password is typed only into a password field. */
       field?: "username" | "password";
-    };
+    }
+  /** A real key press, such as Enter, Shift+Tab or Control+A, into ref or the focused element. */
+  | { kind: "press"; key: string; ref?: string }
+  /** Scrolls ref into view, or the page (or ref's own scroll area) by most of a screen. */
+  | { kind: "scroll"; ref?: string; direction?: BrowserScrollDirection }
+  /** Moves the real pointer over ref. */
+  | { kind: "hover"; ref: string }
+  /** Waits up to `timeout` seconds for text to appear or go, the address to change, or quiet. */
+  | { kind: "wait"; until: BrowserWaitCondition; text?: string; timeout?: number }
+  /** Answers the dialog an earlier step opened; `text` answers a prompt. */
+  | { kind: "dialog"; accept: boolean; text?: string };
 
 export interface BrowserActRequest {
   actions: BrowserActStep[];
@@ -1169,18 +1229,32 @@ export interface BrowserActResult {
   elements?: BrowserSnapshotNode[];
   /** The page was still loading or waiting on its own requests when that snapshot was taken. */
   loading?: boolean;
+  next?: number;
+  /** A step opened this dialog; the next call answers it with a dialog step. */
+  dialog?: BrowserDialog;
+  /** The step kind the computer's browser cannot run yet. The steps before it ran. */
+  unsupported?: string;
   fallback?: "computer_act";
   error?: string;
 }
 
-/** A sandbox must route these commands through its owned screen, never generic host execution. */
+/**
+ * A sandbox must route these commands through its owned screen, never generic host execution.
+ * `capabilities` reads what the computer's page helper supports without touching a tab; an older
+ * helper or supervisor fails it, which means none of the optional features.
+ */
 export type PageBrowserCommand =
   | { command: "focus" }
+  | { command: "capabilities" }
   | { command: "navigate"; url: string }
-  | { command: "snapshot" }
+  | { command: "snapshot"; from?: number }
   | { command: "act"; actions: BrowserActStep[] };
 
-export type PageBrowserResult = Partial<BrowserSnapshotResult & BrowserActResult> & { ok: boolean };
+export type PageBrowserResult = Partial<BrowserSnapshotResult & BrowserActResult> & {
+  ok: boolean;
+  /** Answers `capabilities`: names such as `act.press` or `snapshot.from`. */
+  features?: string[];
+};
 
 /** Vendor-neutral status for a remote cloud coding agent. */
 export type CloudAgentStatus = "running" | "finished" | "failed" | "cancelled" | "expired";

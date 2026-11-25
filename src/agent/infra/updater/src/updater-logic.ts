@@ -1,11 +1,17 @@
 import { randomBytes } from "node:crypto";
 import path from "node:path";
+import type { ImageSource } from "@mycellios/core";
 import {
   DEFAULT_IMAGE_TAG,
+  IMAGE_ENV,
+  IMAGE_MOVE_DECLINED,
+  IMAGE_MOVE_ENV,
   IMAGE_TAG_ENV,
+  imageSource,
   isValidImageName,
   isValidImageTag,
   OFFICIAL_SERVER_IMAGE,
+  PREVIOUS_IMAGE_ENV,
   PREVIOUS_IMAGE_TAG_ENV,
   RECREATED_SERVICES,
   resolveComposeProjectName,
@@ -48,9 +54,9 @@ export function resolveUpdaterConfig(env: NodeJS.ProcessEnv): UpdaterConfig {
   if (deployDir === "" || !path.posix.isAbsolute(deployDir)) {
     throw new Error("Set RAKAZO_DEPLOY_DIR to the absolute path of the deployment directory.");
   }
-  const image = env.RAKAZO_IMAGE?.trim() || OFFICIAL_SERVER_IMAGE;
+  const image = env[IMAGE_ENV]?.trim() || OFFICIAL_SERVER_IMAGE;
   if (!isValidImageName(image))
-    throw new Error(`RAKAZO_IMAGE is not a usable image name: ${image}`);
+    throw new Error(`${IMAGE_ENV} is not a usable image name: ${image}`);
   // Compose itself takes a list here (COMPOSE_FILE with COMPOSE_PATH_SEPARATOR), and a deployment
   // that layers an overlay must be reconciled with the same list the operator runs by hand. Every
   // entry is validated separately: one bad path in a list is still a path escape.
@@ -150,6 +156,33 @@ export function readTagState(envContents: string): TagState {
   return {
     currentTag: current !== null && isValidImageTag(current) ? current : DEFAULT_IMAGE_TAG,
     previousTag: previous !== null && isValidImageTag(previous) ? previous : null,
+  };
+}
+
+export interface ImageState {
+  /** The app image Compose interpolates: the `.env` value, else the one this sidecar started with. */
+  image: string;
+  /** The image the last update replaced; a rollback restores it together with the previous tag. */
+  previousImage: string | null;
+  source: ImageSource;
+  /**
+   * The move off the upstream images: offered until the owner answers once, then `declined`.
+   * Null when the deployment does not run them.
+   */
+  move: "offered" | "declined" | null;
+}
+
+export function readImageState(envContents: string, configuredImage: string): ImageState {
+  const named = readEnvAssignment(envContents, IMAGE_ENV);
+  const image = named !== null && isValidImageName(named) ? named : configuredImage;
+  const previous = readEnvAssignment(envContents, PREVIOUS_IMAGE_ENV);
+  const source = imageSource(image);
+  const declined = readEnvAssignment(envContents, IMAGE_MOVE_ENV) === IMAGE_MOVE_DECLINED;
+  return {
+    image,
+    previousImage: previous !== null && isValidImageName(previous) ? previous : null,
+    source,
+    move: source !== "upstream" ? null : declined ? "declined" : "offered",
   };
 }
 

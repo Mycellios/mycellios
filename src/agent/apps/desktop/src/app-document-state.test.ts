@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from "vitest";
-import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { APP_DOCUMENT_STATE_SCRIPT, AppDocumentReadyTimeout, loadWithCloudRendererRecovery } from "./app-document-state.js";
 
 function stateOf(html: string) {
   document.body.innerHTML = html;
@@ -36,5 +36,41 @@ describe("app document state", () => {
         '<div id="root"><div data-rakazo-app-state="failed"><p>Something went wrong. Try again.</p><button>Refresh</button></div></div>',
       ),
     ).toBe("failed");
+  });
+});
+
+describe("bundled cloud renderer recovery", () => {
+  const pending = new AppDocumentReadyTimeout("The server page did not become ready.");
+
+  it("retries with the original HTTPS protocol after a mount timeout", async () => {
+    const steps: string[] = [];
+    const load = vi.fn(async () => {
+      steps.push("load");
+      if (steps.length === 1) throw pending;
+      return "ready" as const;
+    });
+    await expect(loadWithCloudRendererRecovery(load, () => { steps.push("restore"); })).resolves.toBe("ready");
+    expect(steps).toEqual(["load", "restore", "load"]);
+  });
+
+  it("leaves successful loads and ordinary HTTP errors alone", async () => {
+    const restore = vi.fn();
+    const httpError = new Error("The server answered with HTTP 502.");
+    const load = vi.fn().mockResolvedValueOnce("ready").mockResolvedValueOnce("failed").mockRejectedValueOnce(httpError);
+    await expect(loadWithCloudRendererRecovery(load, restore)).resolves.toBe("ready");
+    await expect(loadWithCloudRendererRecovery(load, restore)).resolves.toBe("failed");
+    await expect(loadWithCloudRendererRecovery(load, restore)).rejects.toBe(httpError);
+    expect(restore).not.toHaveBeenCalled();
+  });
+
+  it("attempts recovery only once and only when a cloud fallback is available", async () => {
+    const load = vi.fn().mockRejectedValue(pending);
+    await expect(loadWithCloudRendererRecovery(load)).rejects.toBe(pending);
+    expect(load).toHaveBeenCalledOnce();
+    load.mockClear();
+    const restore = vi.fn();
+    await expect(loadWithCloudRendererRecovery(load, restore)).rejects.toBe(pending);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });

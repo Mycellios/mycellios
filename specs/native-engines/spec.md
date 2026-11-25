@@ -129,6 +129,14 @@ the store from phase 3.
    - A scheduled CI canary installs each engine's newest release per target,
      verifies it, starts it and runs the protocol handshake without an account or
      a model call. A failing version reaches the blocklist through a pull request.
+   - Implemented (3a): the store, lock file, resolution and Install in the model menu.
+     `native-engines.lock.json` pins Codex, Claude Code (its npm `stable` tag) and
+     OpenCode 1.19.5 for Windows x64/arm64, macOS arm64/x64 and Linux x64/arm64 from
+     their npm packages (`scripts/native-engine-lock.mjs`); `native-engine-store.ts`
+     installs and checks them, `native-engine-resolve.ts` applies the resolution order,
+     and `engines.install` reaches the owned Desktop's `engineInstall`. Update checks,
+     the blocklist, holding turns during an update, Install in Settings and the canary
+     remain.
 4. Phase 4 — several conversations at once.
    - `micoTurnLimit` uses `taskConcurrency` for native engines too, and their
      main chat becomes its own lane, as for Pi (`claimMicoRun`). Each conversation
@@ -140,6 +148,12 @@ the store from phase 3.
      above the bound waits with a visible reason instead of failing, and the existing
      usage-limit hold keeps that engine's queued turns waiting until the reset.
    - An ACP agent that does not support concurrent sessions stays at one turn.
+   - Implemented: behind the operator flag `MYCELLIOS_NATIVE_CONCURRENCY=1` on the API and
+     worker, off by default (one turn in total). `micoRunsLanes`
+     (`packages/db/src/mico-concurrency.ts`) gives Codex, Claude Code and OpenCode the Pi
+     lanes in `claimMicoRun`, the queue, delegation and wakeups, and their side conversations
+     the private computer lease; a generic ACP agent stays at one turn. Desktop's
+     `NativeProcessSlots` (`native-process-slots.ts`) bounds turn CLI processes per PC at 6.
 5. Phase 5 — more engines through ACP.
    - A PC owner adds an agent from the ACP Registry (metadata only today,
      `apps/api/src/acp-registry.ts`). When the registry entry names a distribution

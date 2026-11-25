@@ -16,7 +16,7 @@ import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
-import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread } from "@mycellios/db";
+import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, micoRunsLanes } from "@mycellios/db";
 import { createHash, randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -3962,7 +3962,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         : undefined;
       const isolatedProjectRun = Boolean(projectLeaseKey);
       // A member's conversation never holds the Mico's computer.
-      const privateLane = Boolean(memberUserId) || (!isolatedProjectRun && (enginePiFallback || (turnModel?.agentEngine ?? leaseTarget.agentEngine) === "pi") && Boolean(await deps.prisma.thread.findFirst({
+      // A side conversation of a Mico with lanes (Pi, or Codex, Claude Code and OpenCode while the
+      // operator enables native concurrency) reserves the computer only before its first computer,
+      // file or command tool and never shares it with another run. Every other turn reserves it here.
+      const privateLane = Boolean(memberUserId) || (!isolatedProjectRun &&
+        (enginePiFallback || micoRunsLanes({ agentEngine: turnModel?.agentEngine ?? leaseTarget.agentEngine })) &&
+        Boolean(await deps.prisma.thread.findFirst({
         where: { id: run.threadId, taskBotId: run.botId, spaceId: run.spaceId, userId: run.userId }, select: { id: true },
       })));
       let pendingComputerReservation: Promise<void> | undefined;

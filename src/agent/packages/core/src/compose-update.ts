@@ -1,4 +1,12 @@
 import {
+  SELF_HOST_APP_IMAGE,
+  SELF_HOST_COMPUTER_IMAGE,
+  SELF_HOST_IMAGE_NAMESPACE,
+  SELF_HOST_UPDATER_IMAGE,
+  UPSTREAM_IMAGE_OWNER,
+} from "@mycellios/contracts";
+import { legacyEnvName } from "./legacy-env.js";
+import {
   DEFAULT_UPDATE_REMOTE,
   isOfficialRepoUrl,
   normalizeRepoUrl,
@@ -6,29 +14,47 @@ import {
 } from "./self-update.js";
 
 /**
- * The GitHub repository whose CI fills the image namespace. `publish-server-image.yml` pushes to
- * `ghcr.io/${{ github.repository }}`, so the namespace always belongs to whichever repository ran
- * the workflow. Naming a different owner here points the deployment at packages nobody publishes.
- *
- * `OFFICIAL_REPO_URL` names the same repository, so the source commit selected from a release is
- * guaranteed to have been eligible for this repository's publishing workflow.
+ * The published server image: one image runs api, worker, web and the sandbox supervisor. The root
+ * workflow `.github/workflows/self-host-images.yml` pushes it, with `computer` and `updater`, to
+ * `ghcr.io/<owner>/<repo>` of the repository that ran it, and only from `main`. `OFFICIAL_REPO_URL`
+ * names the same repository, so the source commit selected from one of its releases is always one
+ * that workflow published.
  */
-export const PUBLISHED_IMAGE_REPO = "elie222/rakazo";
-
-/** The published server image. One image runs api, worker, and web. */
-export const OFFICIAL_SERVER_IMAGE = `ghcr.io/${PUBLISHED_IMAGE_REPO}/app`;
+export const OFFICIAL_SERVER_IMAGE = SELF_HOST_APP_IMAGE;
+export const OFFICIAL_COMPUTER_IMAGE = SELF_HOST_COMPUTER_IMAGE;
 /** The updater sidecar's image, published alongside the server image but tagged independently. */
-export const OFFICIAL_UPDATER_IMAGE = `ghcr.io/${PUBLISHED_IMAGE_REPO}/updater`;
+export const OFFICIAL_UPDATER_IMAGE = SELF_HOST_UPDATER_IMAGE;
 
 /**
- * The tag a deployment that has never run an update is on. It is deliberately *not* `latest`: no
- * registry serves this tag, so `docker compose up --build` builds it from the checkout and a fresh
- * install works with an empty registry. `latest` only exists once a release has been published.
+ * `official`: this repository's images. `upstream`: the images of the project Mycellios Agent was
+ * imported from, which installs created before this repository published its own still name in
+ * `.env` until their owner moves (specs/trusted-distribution, phase 1). `other`: a fork or mirror.
+ */
+export type ImageSource = "official" | "upstream" | "other";
+
+export function imageSource(name: string): ImageSource {
+  const image = name.trim().toLowerCase();
+  if (image.startsWith(`${SELF_HOST_IMAGE_NAMESPACE}/`)) return "official";
+  if (image.startsWith(UPSTREAM_IMAGE_OWNER)) return "upstream";
+  return "other";
+}
+
+/**
+ * The tag a deployment that has never run an update is on. No registry serves it, so
+ * `docker compose up --build` builds it from the checkout and a fresh install works with an empty
+ * registry. This repository publishes no `latest` either: releases are `v<version>` tags.
  */
 export const LOCAL_IMAGE_TAG = "local";
 export const DEFAULT_IMAGE_TAG = LOCAL_IMAGE_TAG;
+/** `.env` keys Compose interpolates. They keep the legacy prefix until legacy-name-migration phase 2. */
+export const IMAGE_ENV = legacyEnvName("IMAGE");
 export const IMAGE_TAG_ENV = "RAKAZO_IMAGE_TAG";
 export const PREVIOUS_IMAGE_TAG_ENV = "RAKAZO_IMAGE_TAG_PREVIOUS";
+/** The image an update replaced, so rolling back a move restores the exact image that ran before. */
+export const PREVIOUS_IMAGE_ENV = "MYCELLIOS_IMAGE_PREVIOUS";
+/** The owner's answer to the offer to move off the upstream images, so it is offered only once. */
+export const IMAGE_MOVE_ENV = "MYCELLIOS_IMAGE_MOVE";
+export const IMAGE_MOVE_DECLINED = "declined";
 
 /**
  * Matches the `name:` pinned in `infra/compose/docker-compose.prod.yml`. Used when Compose has not
@@ -118,10 +144,8 @@ export function isLocalImageTag(tag: string): boolean {
 }
 
 /**
- * The source-addressed per-commit tag the publish workflow pushes. This has to agree character for
- * character with `docker/metadata-action`'s `type=sha`. The workflow deliberately raises
- * `DOCKER_METADATA_SHORT_SHA_LENGTH` to 40 so source-addressed image tags cannot collide at the
- * action's unsafe seven-character default.
+ * The source-addressed per-commit tag `self-host-images.yml` writes once for every main commit. It
+ * carries the full commit, so two commits can never share a tag the way short hashes can.
  */
 export function commitImageTag(commit: string): string {
   if (!COMMIT.test(commit)) throw new Error("A commit tag needs a resolved commit.");
@@ -350,6 +374,21 @@ export function composeUpArgv(
 
 export function composePsArgv(target: ComposeTarget): ComposeInvocation {
   return { command: "docker", args: [...composeBase(target), "ps", "--format", "json"] };
+}
+
+/**
+ * One command in a fresh container of `service`, removed afterwards. Its dependencies are not
+ * started and its ports are not published, so it can run beside the stack it belongs to.
+ */
+export function composeRunArgv(
+  target: ComposeTarget,
+  service: string,
+  command: readonly string[],
+): ComposeInvocation {
+  return {
+    command: "docker",
+    args: [...composeBase(target), "run", "--rm", "--no-deps", "-T", service, ...command],
+  };
 }
 
 /**

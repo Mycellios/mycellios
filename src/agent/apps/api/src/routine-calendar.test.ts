@@ -118,6 +118,9 @@ describe("routine calendar", () => {
         createdAt: new Date(routine.createdAt),
         lastRunAt: null,
         nextRunAt: new Date(routine.nextRunAt!),
+        webhookEventType: null,
+        webhookFilters: null,
+        webhookSecrets: [],
       },
     ]);
     const findRuns = vi.fn().mockResolvedValue([

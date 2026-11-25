@@ -15165,3 +15165,119 @@ msgstr "{owner} can read your conversations with their Micos."
 #: src/lib/user-error.ts
 msgid "Only the person who started this conversation can write in it."
 msgstr "Only the person who started this conversation can write in it."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name}"
+msgstr "Install {name}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install {name} {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs."
+msgstr "Install {name} {version} on this PC? It downloads {size} from npm ({packageName}) and checks it before it runs."
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Install"
+msgstr "Install"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Downloading {name}: {received} of {total}"
+msgstr "Downloading {name}: {received} of {total}"
+
+#: src/pages/shell/native-engine-install.tsx
+msgid "Checking {name}…"
+msgstr "Checking {name}…"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Copy the secret now. You will not be able to see it again."
+msgstr "Copy the secret now. You will not be able to see it again."
+
+#: src/pages/RoutineEditor.tsx
+msgid "Copy secret"
+msgstr "Copy secret"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Rotate secret"
+msgstr "Rotate secret"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Create secret"
+msgstr "Create secret"
+
+#: src/pages/RoutineEditor.tsx
+msgid "The previous secret works until {until}."
+msgstr "The previous secret works until {until}."
+
+#: src/pages/RoutineEditor.tsx
+msgid "Sign events with Standard Webhooks."
+msgstr "Sign events with Standard Webhooks."
+
+#: src/pages/RoutineEditor.tsx
+msgid "Only some events"
+msgstr "Only some events"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Event type"
+msgstr "Event type"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Any type"
+msgstr "Any type"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Data field"
+msgstr "Data field"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Remove filter"
+msgstr "Remove filter"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Add filter"
+msgstr "Add filter"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Send test event"
+msgstr "Send test event"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Revoke this routine's secrets?"
+msgstr "Revoke this routine's secrets?"
+
+#: src/pages/RoutineEditor.tsx
+msgid "Events signed with the current or previous secret are refused from now on."
+msgstr "Events signed with the current or previous secret are refused from now on."
+
+#: src/pages/routine-webhook-draft.ts
+msgid "Enter the event type as the sender writes it, without spaces."
+msgstr "Enter the event type as the sender writes it, without spaces."
+
+#: src/pages/routine-webhook-draft.ts
+msgid "Enter a data field such as /status."
+msgstr "Enter a data field such as /status."
+
+#: src/pages/routine-webhook-draft.ts
+msgid "A routine can check up to {ROUTINE_EVENT_FILTER_MAX} filters."
+msgstr "A routine can check up to {ROUTINE_EVENT_FILTER_MAX} filters."
+
+#: src/pages/shell/use-routine-editor.ts
+msgid "Could not create the secret"
+msgstr "Could not create the secret"
+
+#: src/pages/shell/use-routine-editor.ts
+msgid "Could not revoke the secrets"
+msgstr "Could not revoke the secrets"
+
+#: src/pages/shell/use-routine-editor.ts
+msgid "Could not send the test event"
+msgstr "Could not send the test event"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ignored: other event type"
+msgstr "Ignored: other event type"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ignored: a filter did not match"
+msgstr "Ignored: a filter did not match"
+
+#: src/pages/RoutineRunHistory.tsx
+msgid "Ignored: routine paused"
+msgstr "Ignored: routine paused"

@@ -175,6 +175,14 @@ function RoutineShot() {
         editing={null}
         timezone="UTC"
         webhook={{ path: "/hooks/demo", secret: null, configured: false }}
+        routineWebhook={{
+          url: null,
+          secret: null,
+          busy: false,
+          onRotate: () => undefined,
+          onRevoke: () => undefined,
+          onSendTest: () => undefined,
+        }}
         githubPath=""
         messageProviders={[]}
         saving={false}

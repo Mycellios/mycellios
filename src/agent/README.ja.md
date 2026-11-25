@@ -58,22 +58,24 @@ https://github.com/user-attachments/assets/dccdeddb-2134-4a56-8eed-b2e591736b1c
 Docker Engine、Compose プラグイン、curl、OpenSSL が必要です。リポジトリのクローンや Node のインストールは不要です。
 
 ```bash
-mkdir -p rakazo && cd rakazo &&
-curl -fsSLO https://raw.githubusercontent.com/elie222/rakazo/main/infra/compose/install-images.sh &&
+mkdir -p mycellios && cd mycellios &&
+curl -fsSLO https://raw.githubusercontent.com/Mycellios/mycellios/main/src/agent/infra/compose/install-images.sh &&
 bash install-images.sh
 ```
 
-インストーラーは Compose ファイルをダウンロードし、ランダムなシークレットを含む `.env` を作成して Mycellios を起動します。
-再実行時は既存の `.env` をそのまま残します。
+インストーラーはこのリポジトリの Compose ファイルをダウンロードし、ランダムなシークレットを含む `.env` を作成して Mycellios を起動します。
+再実行時は既存の `.env` をそのまま残します。Mycellios Agent の取り込み元プロジェクトのイメージで動いているインストールは、
+移行するまでそのイメージを使い続けます（[上流イメージのインストール](./docs/self-host.md#installs-on-the-upstream-images)）。
 
 [http://127.0.0.1:5173](http://127.0.0.1:5173) を開き、アカウントを作成してモデルを接続します。
 ローカルの Docker コンピューターはデフォルトで有効です。リモートプロバイダーとして `e2b`、`daytona`、`createos`、`boat`、`railway`
 も、対応する API キーを設定すれば利用できます。
 
-デフォルトのイメージタグは `edge`（main ブランチのビルド、`linux/amd64` と `linux/arm64`）です。詳細とタグは
+デフォルトのイメージタグは `edge`（main ブランチのビルド、`linux/amd64` と `linux/arm64`）です。リリースを入れるには
+`bash install-images.sh --release v<version>` を使います。詳細とタグは
 [セルフホストガイド](./docs/self-host.md#published-images-no-checkout)を参照してください。
 
-制限のあるネットワークでは、インストーラーのダウンロード元（`RAKAZO_DOWNLOAD_BASE`）を上書きする、
+制限のあるネットワークでは、インストーラーのダウンロード元（`MYCELLIOS_DOWNLOAD_BASE`）を上書きする、
 既存の Compose ファイルをスキップする（`--local` / `RAKAZO_DOWNLOAD_SKIP_EXISTING`）、またはブートストラップ
 スクリプトの URL をミラーする方法があります。詳しくは
 [制限のあるネットワーク / ミラーからのダウンロード](./docs/self-host.md#restricted-networks--mirror-downloads)を参照してください。
@@ -100,7 +102,7 @@ bash install-images.sh
 ## ローカル開発（ソースから実行）
 
 Node.js 22.x 系の 22.22.2 以降、Node.js 24.x、または Node.js 26 以降と、
-pnpm 9、Docker が必要です。Node.js 23.x と 25.x はサポートしていません。
+npm、Docker が必要です。Node.js 23.x と 25.x はサポートしていません。
 
 ```bash
 git clone https://github.com/Mycellios/mycellios.git
@@ -135,15 +137,15 @@ docker compose --env-file .env \
   -f infra/compose/docker-compose.yml \
   -f infra/compose/docker-compose.postgres-host.yml \
   up postgres -d
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm sandbox:build
-pnpm dev
+npm ci
+npm run db:generate
+npm run db:migrate
+npm run sandbox:build
+npm run dev
 ```
 
 デフォルトの Compose ファイルでは、Postgres はネットワーク内部からのみアクセスできます（公開イメージと同じです）。
-`postgres-host` オーバーレイは、ホスト側の `pnpm` やデータベースツール向けに、ループバックの `127.0.0.1:5433` を公開します。
+`postgres-host` オーバーレイは、ホスト側の `npm` スクリプトやデータベースツール向けに、ループバックの `127.0.0.1:5433` を公開します。
 そのポートが使用中の場合は、`.env` の `POSTGRES_HOST_PORT` と、`DATABASE_URL` および
 `DATABASE_MIGRATION_URL` のポートを変更してください。
 オーバーレイを使わない場合は、次のコマンドでシェルを開きます。
@@ -188,7 +190,7 @@ Electron アプリと Expo アプリは、Web アプリと同じ Mycellios API �
 開発用スタックを起動した状態で、次のコマンドで Electron を起動します。
 
 ```bash
-pnpm --filter @mycellios/desktop dev
+npm run dev --workspace @mycellios/desktop
 ```
 
 初回起動時、デスクトップアプリは Mycellios をこのコンピューターで動かすか、既存のサーバーに接続するかを
@@ -196,7 +198,7 @@ pnpm --filter @mycellios/desktop dev
 インストールして起動します（`infra/compose/install-images.sh` と同じファイルを使います）。そのため Docker Desktop、
 OrbStack、Docker Engine のいずれかが必要です。インストールされていない場合、アプリからそれらへのリンクを案内します。インストール済みの
 ビルドはイメージタグを自身のバージョンに固定し、パッケージ化されていないビルドは `edge` を取得します。
-`pnpm dev` を実行している開発者は、代わりに **Existing instance**（既存のインスタンス）を選び `http://127.0.0.1:5173` を指定してください。公開サーバーは
+`npm run dev` を実行している開発者は、代わりに **Existing instance**（既存のインスタンス）を選び `http://127.0.0.1:5173` を指定してください。公開サーバーは
 HTTPS を使う必要があります。HTTP はループバックとプライベート LAN のアドレスでのみ受け付けます（リンクローカルは除く）。
 アプリは保存前に Mycellios のヘルスチェックエンドポイントを確認し、以降の起動ではそのインスタンスに直接接続します。
 アプリを終了してもスタックは動き続けます。停止するには、アプリケーションメニューの **Stop Local Stack**（ローカルスタックを停止）を使います。
@@ -243,11 +245,11 @@ docs/       architecture, operations, and release guides
 よく使うチェック：
 
 ```bash
-pnpm lint
-pnpm check
-pnpm test
-pnpm test:integration
-pnpm test:e2e
+npm run lint
+npm run check
+npm test
+npm run test:integration
+npm run test:e2e
 ```
 
 開発の流れとテストマトリクスについては [CONTRIBUTING.md](./CONTRIBUTING.md) を参照してください。
