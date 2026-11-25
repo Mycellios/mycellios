@@ -120,6 +120,7 @@ export const PRIVACY: LegalDocument = {
     { id: "chrome-extension", heading: "Chrome extension", paragraphs: [
       "The extension checks whether you have a Mycellios session and displays the hosted Agent workspace in Chrome’s side panel. Sign-in opens on Mycellios in a separate browser tab.",
       "The extension’s site access is limited to www.mycellios.com. It does not read the contents of other sites, your tabs or your browsing history. Account information and anything you enter into Agent through the panel are handled as described in this policy.",
+      "Our use of data obtained through the extension complies with the Chrome Web Store User Data Policy, including its Limited Use requirements.",
     ] },
     { id: "use", heading: "How we use it", list: [
       "to provide Mycellios and run your agents, routines and integrations;",
