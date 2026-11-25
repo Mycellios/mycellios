@@ -15036,3 +15036,11 @@ msgstr "Can't reach them (not on This PC): {away}"
 #: src/lib/user-error.ts
 msgid "A group can have up to 8 folders."
 msgstr "A group can have up to 8 folders."
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "Use my Claude Code settings"
+msgstr "Use my Claude Code settings"
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "Loads your instructions, hooks and skills from Claude Code on this PC."
+msgstr "Loads your instructions, hooks and skills from Claude Code on this PC."

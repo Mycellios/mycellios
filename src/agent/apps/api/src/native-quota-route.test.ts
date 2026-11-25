@@ -5,6 +5,7 @@ vi.mock("@mycellios/adapters", () => ({
   discoverNativeCodexQuota: () => fixtures.read(),
   canInstallNativeOpenCode: vi.fn(), discoverNativeCodexModels: vi.fn(), discoverNativeEngines: () => fixtures.engines(),
   signedOutEngines: (engines: Array<{ id: string; signedIn?: boolean }>) => engines.flatMap(engine => engine.signedIn === false ? [engine.id] : []),
+  nativeEngineModels: (engines: Array<{ id: string; models?: unknown }>) => Object.fromEntries(engines.flatMap(engine => engine.models ? [[engine.id, engine.models]] : [])),
   installManagedOpenCode: vi.fn(), reconcileWorkStops: vi.fn(),
 }));
 import { localCapabilityRoutes } from "./routes/local-capabilities.js";
@@ -43,16 +44,16 @@ it("queries only the owned Mico's selected Desktop and never substitutes server 
   const list = routes({ getBot, nativeEngines }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
   const actor = { userId: "user", spaceId: "space" };
   const request = { context: { actor }, input: { botId: "mico" } };
-  expect(await list(request)).toEqual({ computer: "desktop", engines: ["opencode"], signedOut: [] });
+  expect(await list(request)).toEqual({ computer: "desktop", engines: ["opencode"], signedOut: [], models: {} });
   expect(getBot).toHaveBeenCalledWith(actor, "mico");
   expect(nativeEngines).toHaveBeenCalledWith(expect.objectContaining({ ...actor, botId: "mico" }));
-  expect(await list(request)).toEqual({ computer: "desktop", engines: [], signedOut: [] });
+  expect(await list(request)).toEqual({ computer: "desktop", engines: [], signedOut: [], models: {} });
   expect(fixtures.engines).not.toHaveBeenCalled();
   getBot.mockRejectedValueOnce(new Error("Mico is outside this Space"));
   await expect(list(request)).rejects.toThrow("outside this Space");
   expect(nativeEngines).toHaveBeenCalledTimes(2);
   getBot.mockResolvedValueOnce({ id: "mico", computer: { kind: "docker", scope: "isolated" } });
-  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"], signedOut: [] });
+  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"], signedOut: [], models: {} });
   expect(nativeEngines).toHaveBeenCalledTimes(2);
 });
 
@@ -61,8 +62,22 @@ it("reports installed engines whose CLI is signed out, only among the installed 
   const nativeEngineState = vi.fn().mockResolvedValue({ engines: ["claude", "opencode"], signedOut: ["claude", "codex"] });
   const list = routes({ getBot, nativeEngineState }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
   const request = { context: { actor: { userId: "user", spaceId: "space" } }, input: { botId: "mico" } };
-  expect(await list(request)).toEqual({ computer: "desktop", engines: ["claude", "opencode"], signedOut: ["claude"] });
+  expect(await list(request)).toEqual({ computer: "desktop", engines: ["claude", "opencode"], signedOut: ["claude"], models: {} });
   fixtures.engines.mockReset().mockResolvedValue([{ id: "codex", available: true, signedIn: false }]);
   getBot.mockResolvedValueOnce({ id: "mico", computer: { kind: "docker", scope: "isolated" } });
-  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"], signedOut: ["codex"] });
+  expect(await list(request)).toEqual({ computer: "server", engines: ["codex"], signedOut: ["codex"], models: {} });
+});
+
+it("returns only well-formed catalogs of installed, signed-in engines a Desktop reports", async () => {
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const opus = { id: "opus", label: "Opus", isDefault: false, thinkingLevels: ["high"], fast: false };
+  const nativeEngineState = vi.fn().mockResolvedValue({
+    engines: ["claude", "codex"], signedOut: ["codex"],
+    models: { claude: [opus, { id: "", label: "broken" }, "text"], codex: [opus], opencode: [opus] },
+  });
+  const list = routes({ getBot, nativeEngineState }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
+  const request = { context: { actor: { userId: "user", spaceId: "space" } }, input: { botId: "mico" } };
+  expect(await list(request)).toEqual({
+    computer: "desktop", engines: ["claude", "codex"], signedOut: ["codex"], models: { claude: [opus] },
+  });
 });

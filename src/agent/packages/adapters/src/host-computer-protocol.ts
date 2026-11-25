@@ -1,7 +1,7 @@
 import { GroupFolderLabel } from "@mycellios/contracts";
 import { boundedSandboxCommandTimeoutMs } from "@mycellios/core";
 import { z } from "zod";
-import type { NativeCodingEngine } from "@mycellios/adapter-kit";
+import type { NativeCodingEngine, NativeEngineModels } from "@mycellios/adapter-kit";
 import { appControlRequest } from "./app-control.js";
 
 export const HOST_COMPUTER_MAX_BYTES = 12 * 1024 * 1024;
@@ -119,6 +119,8 @@ export interface HostComputerEnvironment {
   nativeEngines?: NativeCodingEngine[];
   /** Installed engines whose CLI reported nobody signed in (older Desktops omit it). */
   signedOutEngines?: NativeCodingEngine[];
+  /** Model catalogs of the signed-in CLIs on this PC (older Desktops omit it). */
+  nativeModels?: NativeEngineModels;
   /** The owner allowed accessibility control of this PC's applications. */
   appControl?: boolean;
   /** Shared group folders this PC grants to this run, mounted under group/<label>. */

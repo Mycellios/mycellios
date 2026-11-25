@@ -6,11 +6,12 @@ import {
   findConnectedModelCredential,
   hasHostedModelCredits,
   hostCredentialSource,
+  nativeEngineModels,
   nativeHostAccess,
   resolveMemberMainModel,
 } from "@mycellios/adapters";
-import type { Actor, Me } from "@mycellios/contracts";
-import { attachmentMaxBytes, canonicalPiProviderId, usableModelId } from "@mycellios/contracts";
+import type { Actor, Me, NativeEngineModelInfo } from "@mycellios/contracts";
+import { attachmentMaxBytes, canonicalPiProviderId, NativeEngineModelSchema, usableModelId } from "@mycellios/contracts";
 import type { RouterDeps } from "../router.js";
 
 export function computerContext(actor: Actor, botId: string, operationId: string): AdapterContext {
@@ -42,20 +43,40 @@ export async function codingEnginesForComputer(
       (id): id is "codex" | "claude" | "opencode" => id === "codex" || id === "claude" || id === "opencode",
     );
     const engines = known(state?.engines);
+    const signedOut = known(state?.signedOut).filter(id => engines.includes(id));
     return {
       computer: "desktop" as const,
       engines,
-      signedOut: known(state?.signedOut).filter(id => engines.includes(id)),
+      signedOut,
+      models: engineModels(state?.models, engines.filter(id => !signedOut.includes(id))),
     };
   }
   const engines = await nativeHostAccess(deps.dataDir, actor) ? await discoverNativeEngines(deps.dataDir) : [];
+  const installed = engines.flatMap(({ id, available }) =>
+    available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
+  );
+  const signedOut = signedOutEngines(engines) as Array<"codex" | "claude" | "opencode">;
   return {
     computer: "server" as const,
-    engines: engines.flatMap(({ id, available }) =>
-      available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
-    ),
-    signedOut: signedOutEngines(engines) as Array<"codex" | "claude" | "opencode">,
+    engines: installed,
+    signedOut,
+    models: engineModels(nativeEngineModels(engines), installed.filter(id => !signedOut.includes(id))),
   };
+}
+
+/** Keeps only well-formed, bounded catalogs of installed, signed-in engines: a PC reports them. */
+function engineModels(value: unknown, engines: string[]) {
+  const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const models: { codex?: NativeEngineModelInfo[]; claude?: NativeEngineModelInfo[] } = {};
+  for (const engine of ["codex", "claude"] as const) {
+    const list = source[engine];
+    if (!engines.includes(engine) || !Array.isArray(list)) continue;
+    models[engine] = list.slice(0, 128).flatMap(entry => {
+      const parsed = NativeEngineModelSchema.safeParse(entry);
+      return parsed.success ? [parsed.data] : [];
+    });
+  }
+  return models;
 }
 
 function hostCredentials(active: boolean, provider: string) {

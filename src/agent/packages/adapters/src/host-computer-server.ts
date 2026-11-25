@@ -157,6 +157,16 @@ export async function startHostComputerServer(options: {
     visibleRoot: options.micoFolders,
     stateFile: path.join(options.root, "mico-folders.json"),
   });
+  /** This Mico's folder when it exists on disk; never creates or chooses one. */
+  function existingMicoFolder(botId: string) {
+    if (!botId || botId.length > 256) return undefined;
+    const folder = folders.existing(createHash("sha256").update(botId).digest("hex"));
+    try {
+      return folder && statSync(folder).isDirectory() ? folder : undefined;
+    } catch {
+      return undefined;
+    }
+  }
   // Isolated project conversations never share the screen with other work.
   const appControlOffered = (projectSessionId: string | undefined) =>
     Boolean(appControl) && appControlAllowed && !projectSessionId;
@@ -348,10 +358,7 @@ export async function startHostComputerServer(options: {
         await agentHost.message(input.sessionId, input.message, input.botId, input.runId, input.projectSessionId);
         yield { accepted: true }; return;
       }
-      yield* agentHost.run(input.sessionId, input.request, input.botId, input.runId, {
-        ...context,
-        projectSessionId: input.projectSessionId,
-        resolveOpenCodeProject: async () => {
+      const resolveProject = async () => {
           const sessionId = input.projectSessionId;
           const task = sessionId ? taskProjects.get(sessionId) : undefined;
           if (sessionId && (!task?.active || task.botId !== input.botId))
@@ -369,7 +376,13 @@ export async function startHostComputerServer(options: {
               !current || current !== folder)
             throw new Error("The selected project changed. Open it again.");
           return current;
-        },
+        };
+      yield* agentHost.run(input.sessionId, input.request, input.botId, input.runId, {
+        ...context,
+        projectSessionId: input.projectSessionId,
+        resolveOpenCodeProject: resolveProject,
+        // The linked project, else this Mico's existing folder; never a newly chosen one.
+        resolveNativeWorkspace: async () => (await resolveProject()) ?? existingMicoFolder(input.botId),
       });
       return;
     }
@@ -471,6 +484,7 @@ export async function startHostComputerServer(options: {
           chunkedWrites: true,
           nativeEngines: engineState?.engines ?? await options.agentRuntime?.nativeEngines?.(),
           ...(engineState?.signedOut.length ? { signedOutEngines: engineState.signedOut } : {}),
+          ...(engineState?.models && Object.keys(engineState.models).length ? { nativeModels: engineState.models } : {}),
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
@@ -749,15 +763,7 @@ export async function startHostComputerServer(options: {
     /** SHA-256 keys of the Mico folders on this PC, so the server can route each Mico to it. */
     workspaceKeys: () => folders.keys(DESKTOP_WORKSPACE_REPORT_LIMIT),
     /** This Mico's folder when it exists on disk; never creates or chooses one. */
-    micoFolder(botId: string) {
-      if (!botId || botId.length > 256) return undefined;
-      const folder = folders.existing(createHash("sha256").update(botId).digest("hex"));
-      try {
-        return folder && statSync(folder).isDirectory() ? folder : undefined;
-      } catch {
-        return undefined;
-      }
-    },
+    micoFolder: existingMicoFolder,
     lockProject(botId: string) {
       if (
         projectLocks.has(botId) || providers.get(botId)?.hasActiveCommands() ||

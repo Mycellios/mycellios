@@ -8,6 +8,24 @@ import type {
 
 export type NativeCodingEngine = "codex" | "claude" | "opencode";
 
+/** One model the signed-in CLI account can use, as that CLI reported it. */
+export type NativeEngineModel = {
+  id: string;
+  label: string;
+  isDefault: boolean;
+  thinkingLevels: string[];
+  defaultThinkingLevel?: string;
+  fast: boolean;
+};
+/** Model catalogs of the installed CLIs that can list them without a model call. */
+export type NativeEngineModels = Partial<Record<"codex" | "claude", NativeEngineModel[]>>;
+/** The installed engines, those whose CLI reported nobody signed in, and their catalogs. */
+export type NativeEngineState = {
+  engines: NativeCodingEngine[];
+  signedOut: NativeCodingEngine[];
+  models?: NativeEngineModels;
+};
+
 export interface AdapterContext {
   operationId: string;
   traceId: string;
@@ -28,6 +46,11 @@ export interface AdapterContext {
   groupFolders?: { groupId: string; folders: Array<{ folderId: string; label: string }> };
   /** Resolved by the local Desktop host only, never received in a run request. */
   resolveOpenCodeProject?: () => Promise<string | undefined>;
+  /**
+   * Resolved by the local Desktop host only: the folder a native CLI works in for this run (the
+   * linked project, else the Mico's own folder). Its presence also marks a run on the owner's PC.
+   */
+  resolveNativeWorkspace?: () => Promise<string | undefined>;
   /** Server-selected workspace for this run, including after Desktop reconnects. */
   cloudWorkspace?: { workerId: string; runFence: number };
   /** Server-derived from the owned Computer scope; never supplied by a client. */
@@ -542,7 +565,7 @@ export interface AgentRunRequest {
   workState?: unknown;
   saveWorkState?: (state: unknown) => Promise<void>;
   agentEngine?: "pi" | "codex" | "claude" | "acp" | "opencode";
-  nativeConfig?: { modelId?: string | null; thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | null; fastMode?: boolean } | null;
+  nativeConfig?: { modelId?: string | null; thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | null; fastMode?: boolean; userSettings?: boolean } | null;
   /** Another engine ran this conversation since the saved native session. */
   resetNativeSession?: boolean;
   /** Awaited producer-side accounting, independent of event-consumer cancellation. */

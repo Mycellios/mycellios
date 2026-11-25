@@ -66,10 +66,14 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: Boolean(me) });
   const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: Boolean(me) });
   const enginesQuery = useQuery(queries.engines.forBot.queryOptions({ input: { botId: bot.id }, enabled: open }));
+  // Servers that predate per-computer catalogs only list Codex models of their own CLI.
   const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({
-    enabled: open && enginesQuery.data?.computer === "server" && enginesQuery.data.engines.includes("codex"),
+    enabled: open && enginesQuery.data?.computer === "server" && !enginesQuery.data.models && enginesQuery.data.engines.includes("codex"),
   }));
-  const nativeModels = enginesQuery.data?.computer === "server" ? nativeCatalog.data ?? [] : [];
+  const engineModels = (engine: "codex" | "claude") => enginesQuery.data?.models?.[engine] ??
+    (engine === "codex" && enginesQuery.data?.computer === "server" ? nativeCatalog.data ?? [] : []);
+  const catalogEngine = bot.agentEngine === "codex" || bot.agentEngine === "claude" ? bot.agentEngine : null;
+  const nativeModels = catalogEngine ? engineModels(catalogEngine) : [];
   const nativeModel = nativeModels.find(model => bot.nativeConfig?.modelId ? model.id === bot.nativeConfig.modelId : model.isDefault);
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
   const mycelliosConnection = credentials.find(connection => isMycelliosBaseUrl(connection.baseUrl));
@@ -96,8 +100,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const effectiveId = provider && model ? resolveSelectableModelId(catalog, provider, model) : null;
   const entry = provider && model ? selectableCatalogEntry(catalog, provider, model) : undefined;
   const credential = credentialForModel(credentials, provider ?? null, effectiveId ?? null);
-  const levels = nativeEngine === "codex" ? (nativeModel?.thinkingLevels ?? []).flatMap(level => { const parsed = ThinkingLevelSchema.safeParse(level); return parsed.success ? [parsed.data] : []; }) : nativeEngine ? [] : (credential?.thinkingLevels ?? entry?.thinkingLevels ?? []).filter(level => level !== "off");
-  const value = nativeEngine ? modelOptionKey(`native-${nativeEngine}`, nativeEngine === "codex" ? bot.nativeConfig?.modelId ?? nativeModel?.id ?? "default" : "default")
+  const levels = catalogEngine ? (nativeModel?.thinkingLevels ?? []).flatMap(level => { const parsed = ThinkingLevelSchema.safeParse(level); return parsed.success ? [parsed.data] : []; }) : nativeEngine ? [] : (credential?.thinkingLevels ?? entry?.thinkingLevels ?? []).filter(level => level !== "off");
+  const value = nativeEngine ? modelOptionKey(`native-${nativeEngine}`, catalogEngine ? bot.nativeConfig?.modelId ?? nativeModel?.id ?? "default" : "default")
     : bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
   const sources = new Map<string, { provider: string }>();
   sources.set("Mycellios", { provider: OPENAI_COMPATIBLE_PROVIDER_ID });
@@ -145,14 +149,16 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const signedOut = new Set<string>(enginesQuery.data?.signedOut ?? []);
   const signInRequired = (engine: NativeProvider) => signedOut.has(engine) && engine !== nativeEngine
     ? { unavailable: true, unavailableLabel: t`Sign in required` } : {};
-  const nativeChoices = nativeProviders.filter(engine => engine !== "codex" || !nativeModels.length).map(engine => ({
+  // An engine whose CLI listed its models offers each one; otherwise its account default.
+  const listed = (engine: NativeProvider) => engine === "codex" || engine === "claude" ? engineModels(engine) : [];
+  const nativeChoices = nativeProviders.filter(engine => !listed(engine).length).map(engine => ({
     key: modelOptionKey(`native-${engine}`, "default"), provider: `native-${engine}`,
     providerLabel: NATIVE_PROVIDERS[engine], label: NATIVE_PROVIDERS[engine] as string, title: t`Use this account`,
     ...signInRequired(engine),
   }));
-  if (nativeProviders.includes("codex")) nativeChoices.push(...nativeModels.map(model => ({
-    key: modelOptionKey("native-codex", model.id), provider: "native-codex", providerLabel: NATIVE_PROVIDERS.codex, label: model.label, title: model.label,
-    ...signInRequired("codex"),
+  for (const engine of nativeProviders) nativeChoices.push(...listed(engine).map(model => ({
+    key: modelOptionKey(`native-${engine}`, model.id), provider: `native-${engine}`, providerLabel: NATIVE_PROVIDERS[engine],
+    label: model.label, title: model.label, ...signInRequired(engine),
   })));
   const choices = [...chatModelChoices(
     connected,
@@ -165,8 +171,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     return unavailable ? { ...choice, title: choice.modelId?.startsWith("mycellios/") ? choice.modelId.split("/").at(-1) : choice.modelId,
       providerLabel: "Mycellios", unavailable: true } : choice;
   }), ...nativeChoices];
-  const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? connected.find(choice => choice.key === (value || defaultKey))?.title ?? entry?.label ?? (model?.startsWith("mycellios/") ? model.split("/").at(-1) : model) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
-  const headerEffort = ThinkingLevelSchema.safeParse(nativeEngine === "codex" ? bot.nativeConfig?.thinkingLevel ?? nativeModel?.defaultThinkingLevel : nativeEngine ? undefined : bot.thinkingLevel);
+  const label = recovery ? t`Change model` : (catalogEngine ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? connected.find(choice => choice.key === (value || defaultKey))?.title ?? entry?.label ?? (model?.startsWith("mycellios/") ? model.split("/").at(-1) : model) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
+  const headerEffort = ThinkingLevelSchema.safeParse(catalogEngine ? bot.nativeConfig?.thinkingLevel ?? nativeModel?.defaultThinkingLevel : nativeEngine ? undefined : bot.thinkingLevel);
   const effortLabel = headerEffort.success && headerEffort.data !== "off" ? thinkingLevelLabel(headerEffort.data) : null;
   const queryError = credentialsQuery.error ?? catalogQuery.error;
 
@@ -219,7 +225,10 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
       await onSave({
       agentEngine: engine ?? "pi",
       nativeConfig: engine === "codex" ? { modelId: selected?.modelId === "default" ? null : selected?.modelId,
-        fastMode: false, thinkingLevel: null } : null,
+        fastMode: false, thinkingLevel: null }
+        // Another Claude Code model keeps the owner's configuration switch as it was.
+        : engine === "claude" ? { modelId: selected?.modelId === "default" ? null : selected?.modelId, thinkingLevel: null,
+          ...(bot.agentEngine === "claude" && bot.nativeConfig?.userSettings ? { userSettings: true } : {}) } : null,
       modelProvider: engine ? null : selected?.provider ?? null,
       modelId: engine ? null : selected?.modelId ?? null,
       thinkingLevel: null,
@@ -259,7 +268,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 id={`${id}-model`}
                 choices={choices}
                 value={value || defaultKey}
-                defaultKey={nativeEngine === "codex" ? modelOptionKey("native-codex", nativeModels.find(model => model.isDefault)?.id ?? "default") : defaultKey}
+                defaultKey={catalogEngine ? modelOptionKey(`native-${catalogEngine}`, nativeModels.find(model => model.isDefault)?.id ?? "default") : defaultKey}
                 inline={!recovery}
                 onManage={() => { setOpen(false); onConnections(); }}
                 onChange={choose}
@@ -282,14 +291,14 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             <OptionSelect
               aria-label={t`Thinking`}
               className="w-48 min-w-48 shrink-0"
-              value={(nativeEngine === "codex" ? bot.nativeConfig?.thinkingLevel : bot.thinkingLevel) ?? ""}
+              value={(catalogEngine ? bot.nativeConfig?.thinkingLevel : bot.thinkingLevel) ?? ""}
               disabled={saving}
               options={[
                 { value: "", label: t`Default` },
                 ...levels.map((level) => ({ value: level, label: thinkingLevelLabel(level) })),
               ]}
-              onValueChange={(value) => void save(() => onSave(nativeEngine === "codex"
-                ? { agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, thinkingLevel: (value || null) as ThinkingLevel | null } }
+              onValueChange={(value) => void save(() => onSave(catalogEngine
+                ? { agentEngine: catalogEngine, modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, thinkingLevel: (value || null) as ThinkingLevel | null } }
                 : { modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (value || null) as ThinkingLevel | null }), false)}
             />
           </label> : null}
@@ -297,6 +306,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             <span title={t`Uses priority processing and may use more quota.`}>{t`Fast`}</span>
             <Switch aria-label={t`Fast`} checked={bot.nativeConfig?.fastMode === true} disabled={saving}
               onCheckedChange={fastMode => void save(() => onSave({ agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, fastMode } }), false)} />
+          </label> : null}
+          {!recovery && (!lastProvider || lastProvider === currentProvider) && nativeEngine === "claude" && enginesQuery.data?.computer === "desktop" ? <label className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+            <span title={t`Loads your instructions, hooks and skills from Claude Code on this PC.`}>{t`Use my Claude Code settings`}</span>
+            <Switch aria-label={t`Use my Claude Code settings`} checked={bot.nativeConfig?.userSettings === true} disabled={saving}
+              onCheckedChange={userSettings => void save(() => onSave({ agentEngine: "claude", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, userSettings } }), false)} />
           </label> : null}
           {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
           {!recovery && me && !queryError && (lastProvider ?? currentProvider) !== "Mycellios" ? <div className="border-t border-border px-4 py-3">
