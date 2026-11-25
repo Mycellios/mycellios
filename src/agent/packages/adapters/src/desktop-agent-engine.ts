@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentRuntime, NativeEngineState } from "@mycellios/adapter-kit";
-import { discoverNativeEngines, NativeAgentRuntime, nativeEngineModels, signedOutEngines } from "./native-agent-runtime.js";
+import { discoverNativeEngines, NativeAgentRuntime, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 
@@ -22,6 +22,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
         available && (id === "codex" || id === "claude" || id === "opencode") ? [id] : [],
       ),
       signedOut: signedOutEngines(available),
+      signedIn: signedInEngines(available),
       models: nativeEngineModels(available),
     };
   }

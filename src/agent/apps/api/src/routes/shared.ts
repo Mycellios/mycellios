@@ -1,5 +1,6 @@
 import type { AdapterContext } from "@mycellios/adapter-kit";
 import {
+  defaultLocalEngine,
   deploymentModelRole,
   discoverNativeEngines,
   signedOutEngines,
@@ -25,6 +26,31 @@ export function computerContext(actor: Actor, botId: string, operationId: string
   };
 }
 
+const known = (ids: unknown) => (Array.isArray(ids) ? ids : []).filter(
+  (id): id is "codex" | "claude" | "opencode" => id === "codex" || id === "claude" || id === "opencode",
+);
+
+/** One bounded read of the engines on the PC that runs this Mico; undefined when it does not answer. */
+async function desktopEngineState(deps: RouterDeps, actor: Actor, botId: string, signal?: AbortSignal) {
+  const probe = computerContext(actor, botId, "engine-discovery");
+  const combined = AbortSignal.any([signal ?? probe.signal, AbortSignal.timeout(4_000)]);
+  const context = { ...probe, signal: combined };
+  return deps.sandbox.nativeEngineState
+    ? await deps.sandbox.nativeEngineState(context).catch(() => undefined)
+    : { engines: await deps.sandbox.nativeEngines?.(context).catch(() => undefined), signedOut: [], models: undefined, signedIn: undefined };
+}
+
+/**
+ * The engine a new This PC Mico starts with: the first installed one, in the owner's order, whose
+ * CLI on that PC confirmed a sign-in. No answer, an older Desktop or none signed in keeps Pi.
+ */
+export async function localEngineForNewMico(deps: RouterDeps, actor: Actor, botId: string, signal?: AbortSignal) {
+  const state = await desktopEngineState(deps, actor, botId, signal);
+  const engines = known(state?.engines);
+  const signedOut = known(state?.signedOut);
+  return defaultLocalEngine(known(state?.signedIn).filter(id => engines.includes(id) && !signedOut.includes(id)));
+}
+
 /** Inspect the Mico's selected host. A PC without a live reply offers no server engines. */
 export async function codingEnginesForComputer(
   deps: RouterDeps,
@@ -33,15 +59,7 @@ export async function codingEnginesForComputer(
   signal?: AbortSignal,
 ) {
   if (bot.computer?.kind === "desktop" && bot.computer.scope !== "isolated") {
-    const probe = computerContext(actor, bot.id, "engine-discovery");
-    const combined = AbortSignal.any([signal ?? probe.signal, AbortSignal.timeout(4_000)]);
-    const context = { ...probe, signal: combined };
-    const state = deps.sandbox.nativeEngineState
-      ? await deps.sandbox.nativeEngineState(context).catch(() => undefined)
-      : { engines: await deps.sandbox.nativeEngines?.(context).catch(() => undefined), signedOut: [], models: undefined };
-    const known = (ids: unknown) => (Array.isArray(ids) ? ids : []).filter(
-      (id): id is "codex" | "claude" | "opencode" => id === "codex" || id === "claude" || id === "opencode",
-    );
+    const state = await desktopEngineState(deps, actor, bot.id, signal);
     const engines = known(state?.engines);
     const signedOut = known(state?.signedOut).filter(id => engines.includes(id));
     return {

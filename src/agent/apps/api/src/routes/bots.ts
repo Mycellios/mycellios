@@ -53,7 +53,7 @@ import { deleteAgentSecret, listAgentSecrets, putAgentSecret } from "../agent-se
 import type { RouterDeps } from "../router.js";
 import { loadMessagePage } from "../thread-message-pages.js";
 import type { RouterContext } from "./context.js";
-import { codingEnginesForComputer, computerContext, modelSetup, THREAD_MESSAGE_PAGE_SIZE } from "./shared.js";
+import { codingEnginesForComputer, computerContext, localEngineForNewMico, modelSetup, THREAD_MESSAGE_PAGE_SIZE } from "./shared.js";
 
 /** Surface a Space deletion race as a retryable conflict instead of a generic failure. */
 function mapSpaceLifecycleError(error: unknown): unknown {
@@ -302,6 +302,19 @@ export function botsRoutes(ctx: RouterContext) {
       });
     } catch (error) {
       throw mapSpaceLifecycleError(error);
+    }
+    // A new This PC Mico with no chosen model or engine starts on a CLI already signed in on that
+    // PC. The general model stays its server fallback. Idempotent creates keep what they made.
+    if (!profile.agentEngine && !model && !profile.spawnKey && bot.computerMode === "dedicated" &&
+        deps.desktopAgentAvailable?.(context.actor)) {
+      const engine = await localEngineForNewMico(deps, context.actor, bot.id).catch(() => undefined);
+      if (engine) {
+        const updated = await deps.prisma.bot.updateMany({
+          where: { id: bot.id, userId: context.actor.userId, spaceId: context.actor.spaceId, agentEngine: bot.agentEngine ?? "pi" },
+          data: { agentEngine: engine },
+        });
+        if (updated.count === 1) bot = { ...bot, agentEngine: engine };
+      }
     }
     if (intro) {
       await enqueueBotIntroRun(deps, context.actor, bot, context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined).catch((error) => {
