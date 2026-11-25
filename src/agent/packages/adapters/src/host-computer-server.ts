@@ -482,6 +482,7 @@ export async function startHostComputerServer(options: {
         yield {
           ...(await provider.environment()),
           chunkedWrites: true,
+          ...(agentHost ? { desktopToolModels: 1 as const } : {}),
           nativeEngines: engineState?.engines ?? await options.agentRuntime?.nativeEngines?.(),
           ...(engineState?.signedOut.length ? { signedOutEngines: engineState.signedOut } : {}),
           ...(engineState?.signedIn?.length ? { signedInEngines: engineState.signedIn } : {}),
@@ -600,6 +601,13 @@ export async function startHostComputerServer(options: {
             command,
           ];
         }
+        let localModelEnvironment: Record<string, string> | undefined;
+        if (input.command.useLocalModel) {
+          if (!agentHost || !input.runId || !input.command.commandId || input.groupId) {
+            throw Error("Local model access requires an owned Desktop command");
+          }
+          localModelEnvironment = await agentHost.toolModelEnvironment(input.botId, input.runId, input.projectSessionId);
+        }
         yield* provider.execute(
           computer,
           {
@@ -611,7 +619,7 @@ export async function startHostComputerServer(options: {
           context,
           // A shared folder may live outside the OS home (another drive, /srv, /tmp): this
           // command may start in the one granted folder it named, and nowhere else new.
-          sharedRoot ? { grantedRoots: [sharedRoot] } : {},
+          { ...(sharedRoot ? { grantedRoots: [sharedRoot] } : {}), localModelEnvironment },
         );
         break;
       }

@@ -85,6 +85,20 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
         control={<OptionSelect aria-label={t`Response style`} value={state.defaults.responseStyle ?? "natural"} disabled={saving}
           options={[{ value: "natural", label: t`Natural` }, { value: "classic", label: t`Classic` }]}
           onValueChange={value => { if (value === "natural" || value === "classic") void save({ kind: "defaults", patch: { responseStyle: value } }); }} />} /></SettingsGroup>
+      {desktopBridge() && <SettingsGroup title={t`Local programs`}>
+        <SettingsRow label={t`AI Credits per Mico turn`}
+          description={t`Allow programs your Micos launch on This PC to use their AI. This applies only in spaces where you own billing.`}
+          control={<OptionSelect aria-label={t`AI Credits per Mico turn`}
+            value={String(state.defaults.desktopToolCreditLimitMicros ?? 0)} disabled={saving}
+            options={[{ value: "0", label: t`Off` }, ...[10000, 50000, 100000].map(limit => ({
+              value: String(limit),
+              label: `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2 }).format(limit / 1_000_000)} ${t`Credits`}`,
+            }))]}
+            onValueChange={value => {
+              if (["0", "10000", "50000", "100000"].includes(value))
+                void save({ kind: "defaults", patch: { desktopToolCreditLimitMicros: Number(value) } });
+            }} />} />
+      </SettingsGroup>}
       <SettingsGroup title={t`Local memory`}>
         {memoryUsage?<SettingsRow label={t`Reserved today`} description={t`Daily budget resets at 00:00 UTC.`}
           control={<span className="text-sm tabular-nums">{new Intl.NumberFormat(undefined,{maximumFractionDigits:6}).format(memoryUsage.reservedMicrounits/1_000_000)} {t`Credits`}{memoryUsage.pending ? ` · ${memoryUsage.pending} ${t`Pending reviews`}`:""}</span>} />:null}

@@ -913,6 +913,14 @@
   with the stream end joined to the last lines, and the API rechecks all of a PC's
   bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,
   desktop-agent-runtime and the Desktop/API relay tests.
+  Phase 4 of specs/local-engine-default/spec.md gives only explicitly requested,
+  recoverable owned Desktop shell commands the ephemeral loopback model token.
+  Keep it out of the renderer, transcript and logs. The wallet transaction checks
+  current billing ownership, opt-in and lease. It excludes shared Mico member turns,
+  pins the approved turn ceiling and
+  counts tagged unsettled and settled entries across segments and restarts.
+  Verify desktop-tool-model, desktop-agent-runtime and model-credits.postgres
+  tests. SDK and local child fixtures do not qualify an installed Desktop.
   Disconnects must not silently substitute a cloud run for an admitted local run.
   Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
   Preserve local project and checkpoint bindings; a tool result payload alone

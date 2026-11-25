@@ -2,11 +2,13 @@ import type { AdapterContext, AgentRunRequest, AgentRuntime } from "@mycellios/a
 import { getLogger } from "@mycellios/logging";
 import { NativeEventQueue } from "./native-agent-process.js";
 import { desktopDiagnosticMessage } from "@mycellios/contracts";
+import { desktopToolModelCompletion } from "./desktop-tool-model-bridge.js";
+import { startDesktopToolModelEndpoint } from "./desktop-tool-model-endpoint.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import type { AgentRpcMessage, AgentWire } from "./desktop-agent-rpc.js";
 
 export type DesktopAgentFrame = { kind: "rpc"; message: AgentRpcMessage } | { kind: "event"; value: AgentWire } | { kind: "failure"; value: AgentWire };
-type Session = { botId: string; runId: string; projectSessionId?: string; rpc: DesktopAgentRpc; fail(error: unknown): void };
+type Session = { botId: string; runId: string; projectSessionId?: string; rpc: DesktopAgentRpc; fail(error: unknown): void; toolEnvironment?: () => Promise<Record<string, string>> };
 
 /** The native host owns the model loop; durable account effects remain scoped callbacks. */
 export class DesktopAgentHost {
@@ -52,7 +54,22 @@ export class DesktopAgentHost {
     // back to the server; an older server still sends steeringPending, so ignore it here.
     request.steeringPending = undefined;
     const fail = (error: unknown) => { queue.fail(error instanceof Error ? error : Error("Desktop agent failed")); controller.abort(); };
-    this.sessions.set(sessionId, { botId, runId, projectSessionId: context.projectSessionId, rpc, fail });
+    const model = request.desktopToolModel;
+    let endpoint: ReturnType<typeof startDesktopToolModelEndpoint> | undefined;
+    if (model && (typeof model.modelId !== "string" || typeof model.open !== "function")) {
+      rpc.close();
+      throw Error("Invalid Desktop model offer");
+    }
+    request.desktopToolModel = undefined;
+    this.sessions.set(sessionId, {
+      botId, runId, projectSessionId: context.projectSessionId, rpc, fail,
+      toolEnvironment: model ? async () => {
+        signal.throwIfAborted();
+        endpoint ??= startDesktopToolModelEndpoint({ modelId: model.modelId, signal,
+          complete: desktopToolModelCompletion(model) });
+        return (await endpoint).environment;
+      } : undefined,
+    });
     const abort = () => { controller.abort(); queue.end(); void this.runtime.abort(runId); };
     signal.addEventListener("abort", abort, { once: true });
     const work = (async () => {
@@ -79,6 +96,15 @@ export class DesktopAgentHost {
     })();
     try { if (signal.aborted) abort(); for await (const frame of queue) { queuedBytes -= sizes.get(frame) ?? 0; yield frame; } }
     finally { signal.removeEventListener("abort", abort); controller.abort(); rpc.close(); await this.runtime.abort(runId); await work; this.sessions.delete(sessionId); }
+  }
+
+  async toolModelEnvironment(botId: string, runId: string, projectSessionId?: string) {
+    const sessions = [...this.sessions.values()].filter(session =>
+      session.botId === botId && session.runId === runId && session.projectSessionId === projectSessionId);
+    if (sessions.length !== 1 || !sessions[0]?.toolEnvironment) {
+      throw Error("Local model access is unavailable for this Desktop turn");
+    }
+    return sessions[0].toolEnvironment();
   }
 
   hasSession(sessionId: string, botId: string, runId: string, projectSessionId?: string) {

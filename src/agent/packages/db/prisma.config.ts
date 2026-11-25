@@ -6,7 +6,7 @@ import { defineConfig } from "prisma/config";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootEnv = path.resolve(here, "../../.env");
-if (process.env.RAKAZO_PROJECT_LOCAL !== "1") {
+if (process.env.RAKAZO_PROJECT_LOCAL !== "1" && process.env.MYCELLIOS_ISOLATED_DATABASE !== "1") {
   if (existsSync(rootEnv)) config({ path: rootEnv });
   config();
 }

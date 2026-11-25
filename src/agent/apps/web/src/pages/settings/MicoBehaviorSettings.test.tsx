@@ -71,3 +71,22 @@ it("saves the response style with revision protection and displays the returned 
   expect(updateMicos).toHaveBeenCalledWith({kind:"defaults",revision:1,patch:{responseStyle:"classic"}});
   expect(select.value).toBe("classic");
 });
+
+it("approves and revokes the local model spend limit from Desktop settings", async () => {
+  let state = initial();
+  const updateMicos = vi.fn(async (input) => {
+    state = { ...state, revision: state.revision + 1, defaults: { ...state.defaults, ...input.patch } };
+    return state;
+  });
+  mocked.client = { preferences: { micos: vi.fn(async () => state), updateMicos } } as unknown as RpcClient;
+  await render();
+  expect(el.querySelector('[aria-label="AI Credits per Mico turn"]')).toBeNull();
+  window.mycelliosDesktop = {} as NonNullable<Window["mycelliosDesktop"]>;
+  await render();
+  const limit = el.querySelector<HTMLSelectElement>('[aria-label="AI Credits per Mico turn"]')!;
+  expect(limit.value).toBe("0");
+  await act(async () => { limit.value = "10000"; limit.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(updateMicos).toHaveBeenLastCalledWith({ kind: "defaults", revision: 1, patch: { desktopToolCreditLimitMicros: 10000 } });
+  await act(async () => { limit.value = "0"; limit.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(updateMicos).toHaveBeenLastCalledWith({ kind: "defaults", revision: 2, patch: { desktopToolCreditLimitMicros: 0 } });
+});

@@ -114,6 +114,22 @@ it is not, and let programs on the PC use the Mico's AI in both cases.
    (ChatGPT, Claude OAuth) are never forwarded to third-party programs; for
    those the Mico uses the signed-in CLI from phases 1–3.
 
+   Desktop Settings → Micos → Local programs records the owner's opt-in and
+   per-turn maximum (default off). A direct personal turn on an owned This PC
+   can explicitly set `use_local_model` on Mycellios' shell tool. The child
+   receives the loopback URL, temporary API key and `MYCELLIOS_MODEL`; the native
+   AI CLI itself keeps its own configuration and login. The command journal
+   redacts the key before publishing or persisting command output.
+
+   Both API formats support plain text, including streaming. The relay exposes
+   only normalized text and an output limit. The server uses the existing
+   metered connection and a conservative full-context quote. In one wallet
+   transaction it checks the active run lease, the PC and billing ownership,
+   current approval, the run's original cap and existing tool ledger entries.
+   Unknown accounting retains its hold. A new lease or worker uses the same
+   cap and ledger. The stream performs one provider attempt and the local
+   endpoint refuses retry attempts flagged by the SDK.
+
 Rejected:
 
 - Copying the reference app's model of "agent = local CLI only". It drops

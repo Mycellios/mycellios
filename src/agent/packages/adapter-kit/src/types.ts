@@ -164,6 +164,8 @@ export type WorkspaceDirectoryRequest =
   | { action: "remove"; parent: ".browser-profiles" | "bots"; names: string[] };
 
 export interface CommandRequest {
+  /** An explicit shell request for the current Desktop turn’s metered model. */
+  useLocalModel?: boolean;
   /** Stable effect identity on a capable native host; repeating it only reattaches. */
   commandId?: string;
   executionId?: string;
@@ -577,7 +579,20 @@ export interface AgentRunModel {
 export type AgentContextStrategy = "current" | "retrieval" | "snapshots" | "cache-aware";
 export const DEFAULT_CONTEXT_STRATEGY: AgentContextStrategy = "retrieval";
 
+export interface DesktopToolModelInput {
+  system?: string;
+  messages: { role: "user" | "assistant"; text: string }[];
+  maxTokens: number;
+}
+
+export interface DesktopToolModelTransport {
+  modelId: string;
+  open(input: DesktopToolModelInput): ReturnType<NonNullable<AgentRunModel["desktopTransport"]>["open"]>;
+}
 export interface AgentRunRequest {
+  /** Producer only. DesktopAgentRuntime replaces it with the scoped callback. */
+  desktopToolGrant?: AgentRunModel;
+  desktopToolModel?: DesktopToolModelTransport;
   /** Request metadata only; never grants new permissions or replays tools. */
   workState?: unknown;
   saveWorkState?: (state: unknown) => Promise<void>;
