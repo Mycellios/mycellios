@@ -7,7 +7,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import EmbeddedPostgres from "embedded-postgres";
+import { Hono } from "hono";
 import pg from "pg";
+import { mountMicoScriptsHttp } from "../apps/api/src/mico-scripts-http.js";
 
 process.env.NODE_ENV = "test";
 const {
@@ -62,6 +64,27 @@ try {
   assert.equal(issued.length, 5);
   assert.equal(results.filter((item) => item.status === "limit").length, 1);
   const { token, record } = issued[0]!;
+  await prisma.routine.create({ data: {
+    ...scope, name: "Synthetic routine", prompt: "Owner instructions", crons: [],
+  } });
+  const app = new Hono();
+  mountMicoScriptsHttp(app, db.prisma);
+  const path = `/api/v1/micos/${bot.id}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const info = await app.request(path, { headers });
+  assert.equal(info.status, 200);
+  assert.equal(info.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(await info.json(), {
+    mico: { id: bot.id, name: "Synthetic" },
+    routines: [{
+      id: (await prisma.routine.findFirstOrThrow({ where: scope })).id,
+      name: "Synthetic routine",
+      active: false,
+    }],
+    requestsPerHour: 60,
+  });
+  assert.equal((await app.request("/api/v1/micos/other", { headers })).status, 404);
+  assert.equal((await app.request(path)).status, 404);
   const stored = await prisma.micoScriptToken.findUniqueOrThrow({ where: { id: record.id } });
   assert.match(stored.digest, /^[0-9a-f]{64}$/);
   assert.ok(!JSON.stringify(stored).includes(token));
@@ -87,9 +110,11 @@ try {
   }
   await setMicoScriptsEnabled(prisma, scope, false, 60);
   assert.equal(await findMicoScriptCredential(prisma, bot.id, token), null);
+  assert.equal((await app.request(path, { headers })).status, 404);
   await setMicoScriptsEnabled(prisma, scope, true, 60);
   assert.ok(await revokeMicoScriptToken(prisma, scope, record.id));
   assert.equal(await findMicoScriptCredential(prisma, bot.id, token), null);
+  assert.equal((await app.request(path, { headers })).status, 404);
   console.log("Isolated PostgreSQL: migration and RLS policies, default off, owner scope, concurrent cap, hashing, disable and revoke passed.");
 } finally {
   await db?.prisma.$disconnect().catch(() => undefined);

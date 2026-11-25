@@ -188,6 +188,7 @@ import {
 } from "./team-chat-startup.js";
 import { mountVoiceHttpRoutes, voiceAccountErrorStatus } from "./voice.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
+import { mountMicoScriptsHttp } from "./mico-scripts-http.js";
 
 /**
  * Default API PostgreSQL pool size when DB_POOL_MAX is unset. Every Desktop relay
@@ -1025,6 +1026,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     return actor;
   });
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
+  if (env.micoScriptsEnabled) mountMicoScriptsHttp(app, prisma);
   if (billing && billingProvider) {
     mountBillingRoutes(app, {
       billing,
