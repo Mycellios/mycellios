@@ -166,6 +166,27 @@ test('downloads fail on a wrong size, a missing route, a bad catalog or a stalle
   assert.equal(stalled.reason, 'linux-x64: timeout');
 });
 
+test('between hourly byte checks the downloads probe reads the links, never a file', async () => {
+  const fake = await serve();
+  try {
+    const result = await probeService(SERVICES.find(service => service.id === 'downloads'), { origin: fake.origin, assets: false });
+    assert.equal(result.ok, true, result.reason);
+    assert.ok(!fake.requests.some(request => request.headers.range), 'no ranged read');
+    assert.ok(!fake.requests.some(request => request.path.startsWith('/files/')), 'redirects are not followed');
+    assert.ok(fake.requests.some(request => request.path === ANDROID.path));
+  } finally {
+    await fake.close();
+  }
+  const cases = [
+    [{ '/downloads/desktop/latest/linux-x64': partial(SIZES['linux-x64']) }, 'linux-x64: http_200'],
+    [{ [ANDROID.path]: (_req, res) => { res.writeHead(200, { 'content-length': 10 }); res.end(); } }, 'android: range_mismatch'],
+    [{ [ANDROID.path]: (_req, res) => { res.writeHead(404); res.end(); } }, 'android: http_404'],
+  ];
+  for (const [overrides, reason] of cases) {
+    assert.deepEqual(await probeWith(overrides, 'downloads', { assets: false }), { ok: false, ms: null, reason }, reason);
+  }
+});
+
 test('a cold download edge that ignores Range once is retried, as the release verifier does', async () => {
   let calls = 0;
   const waits = [];

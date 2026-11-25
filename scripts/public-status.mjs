@@ -136,6 +136,28 @@ function rangeFetch(origin, { fetchImpl = fetch, timeoutMs = PROBE_TIMEOUT_MS } 
   };
 }
 
+/**
+ * A stable desktop link must redirect (it is not followed, so no release host is reached) and
+ * the Android file must answer HEAD with its catalog size; neither request downloads a file.
+ */
+async function linkCheck(origin, file, { fetchImpl = fetch, timeoutMs = PROBE_TIMEOUT_MS } = {}) {
+  const android = file.id === 'android';
+  const response = await fetchImpl(new URL(file.path, origin), {
+    method: android ? 'HEAD' : 'GET',
+    headers: { 'User-Agent': USER_AGENT },
+    redirect: 'manual',
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  await response.body?.cancel().catch(() => {});
+  if (android) {
+    if (response.status !== 200) fail(`http_${response.status}`);
+    const length = Number(response.headers.get('content-length'));
+    if (Number.isSafeInteger(length) && length > 0 && length !== file.bytes) fail('range_mismatch');
+    return;
+  }
+  if (response.status < 300 || response.status > 399 || !response.headers.get('location')) fail(`http_${response.status}`);
+}
+
 const CHECKS = {
   async page(origin, probe, options) {
     const response = await request(origin, probe.path, options);
@@ -185,6 +207,14 @@ const CHECKS = {
         .map(item => ({ id: item.id, path: desktopLatestDownloadPath(item.id), bytes: item.bytes })),
       { id: 'android', path: android.path, bytes: android.bytes },
     ];
+    if (options.assets === false) {
+      // Between the hourly byte checks only the stable links are read, never the files: a
+      // download through a release host counts as one, and the counts are public.
+      const light = await Promise.allSettled(files.map(file => linkCheck(origin, file, options)));
+      const broken = light.flatMap((result, index) => (result.status === 'rejected' ? [`${files[index].id}: ${failureReason(result.reason)}`] : []));
+      if (broken.length) fail(broken.join(', '));
+      return;
+    }
     const fetchImpl = rangeFetch(origin, options);
     const results = await Promise.allSettled(files.map(file => verifyPublicInstallerRange(file, { fetchImpl, sleep: options.sleep })));
     const failed = results.flatMap((result, index) => (result.status === 'rejected' ? [`${files[index].id}: ${failureReason(result.reason)}`] : []));
@@ -670,7 +700,8 @@ export async function writeSite(directory, state, options) {
 /** One run: the previous published state, this run's probes and incidents, then the site files. */
 export async function buildSite({ directory, pagesUrl, repository, apiUrl, token, reset = false, origin = ORIGIN, fetchImpl = fetch, sleep, now = () => new Date(), log = console.log }) {
   const previous = reset || !pagesUrl ? emptyState() : await readPublishedState(pagesUrl, { fetchImpl });
-  const results = await probeAll({ origin, fetchImpl, sleep });
+  // Installer bytes are read in the first run of each hour; the other runs check the links only.
+  const results = await probeAll({ origin, fetchImpl, sleep, assets: now().getUTCMinutes() < 5 });
   let incidents = previous.incidents;
   try {
     incidents = await fetchIncidents({ repository, apiUrl, token, fetchImpl, now: now(), previous: previous.incidents });
