@@ -1,9 +1,11 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AgentRunRequest, AgentRuntime } from "@mycellios/adapter-kit";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDesktopAgentEngine } from "./desktop-agent-engine.js";
+import { resetNativeAccountLogins } from "./native-account.js";
 
 const roots: string[]=[];afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
 const input:AgentRunRequest={botId:"mico",threadId:"thread",runId:"same-run",prompt:"private-prompt",instructions:"private-instructions",history:[],tools:[],model:{provider:"fixture",id:"fixture"}};
@@ -49,4 +51,24 @@ it("continues a saved approval checkpoint once while preserving the parent run i
   await expect(async () => { for await (const _ of engine.run(resumed)) {} }).rejects.toThrow("already finished");
   await expect(async () => { for await (const _ of engine.run(input)) {} }).rejects.toThrow("already finished");
   expect(start).toHaveBeenCalledTimes(2);
+});
+
+it("signs a CLI in only under the PC's account scope, with the command discovery reads", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-engine-test-")); roots.push(root);
+  let scope: string | undefined;
+  const engine = createDesktopAgentEngine(root, () => scope, undefined, {});
+  const device = { action: "signIn", engine: "codex", flow: "device" } as const;
+  await expect(engine.nativeEngineAccount!(device)).rejects.toThrow("unavailable");
+  scope = "c".repeat(64);
+  const directory = path.join(root, "agent-executor", scope);
+  await mkdir(directory, { recursive: true });
+  const cli = fileURLToPath(new URL("./fixtures/native-agent.mjs", import.meta.url));
+  await writeFile(path.join(directory, "native-agents.json"), JSON.stringify({ codex: { command: process.execPath, args: [cli, "codex"] } }));
+  try {
+    await expect(engine.nativeEngineAccount!(device)).resolves.toEqual({
+      status: "device", userCode: "ABCD-1234", verificationUrl: "https://auth.example.test/device" });
+    await expect(engine.nativeEngineAccount!({ action: "signIn", engine: "opencode", flow: "device" } as never)).rejects.toThrow();
+  } finally {
+    await resetNativeAccountLogins();
+  }
 });

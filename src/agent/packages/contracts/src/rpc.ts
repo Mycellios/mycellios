@@ -175,6 +175,8 @@ import {
   VoiceInfoSchema,
   VoiceStatusSchema,
   NativeEngineModelSchema,
+  NativeAccountEngineSchema,
+  NativeEngineAccountResultSchema,
 } from "./domain.js";
 import {
   MemoryConnectionCreateInput,
@@ -453,7 +455,17 @@ export const appContract = {
         codex: z.array(NativeEngineModelSchema).optional(),
         claude: z.array(NativeEngineModelSchema).optional(),
       }).optional(),
+      /** The PC can sign its CLIs in and out from here (engines.account). Older servers omit it. */
+      account: z.boolean().optional(),
     })),
+    /**
+     * Signs Codex or Claude Code in or out on the PC that runs this Mico, for its owner.
+     * `browser` opens the CLI's sign-in on that PC; `device` returns a one-time code (Codex).
+     */
+    account: oc.input(z.discriminatedUnion("action", [
+      z.object({ botId: Id, action: z.literal("signIn"), engine: NativeAccountEngineSchema, flow: z.enum(["browser", "device"]) }),
+      z.object({ botId: Id, action: z.literal("signOut"), engine: NativeAccountEngineSchema }),
+    ])).output(NativeEngineAccountResultSchema),
     codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
     codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),
     list: oc.output(

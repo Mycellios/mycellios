@@ -2,14 +2,17 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentRuntime, NativeEngineState } from "@mycellios/adapter-kit";
-import { discoverNativeEngines, NativeAgentRuntime, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
+import { NativeEngineAccountRequestSchema } from "@mycellios/contracts";
+import { nativeEngineAccount, type NativeAccountHost } from "./native-account.js";
+import { discoverNativeEngines, NativeAgentRuntime, nativeEngineCommand, nativeEngineModels, signedInEngines, signedOutEngines } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 /** One owned native engine; account/server scopes and uncertain starts survive a restart. */
 export function createDesktopAgentEngine(profile: string, accessScope: () => string | undefined,
-  createRuntime?: (directory: string, authorized: () => boolean) => AgentRuntime): AgentRuntime {
+  createRuntime?: (directory: string, authorized: () => boolean) => AgentRuntime,
+  accountHost: NativeAccountHost = {}): AgentRuntime {
   const active = new Map<string, { runtime: AgentRuntime; localId: string }>();
   const makeRuntime = createRuntime ?? ((dataDir, authorized) => new NativeAgentRuntime({ dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized }));
   async function engineState(): Promise<NativeEngineState> {
@@ -24,6 +27,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       signedOut: signedOutEngines(available),
       signedIn: signedInEngines(available),
       models: nativeEngineModels(available),
+      account: true,
     };
   }
   return {
@@ -32,6 +36,15 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       return (await engineState()).engines;
     },
     nativeEngineState: () => engineState(),
+    // The same account scope as discovery: a PC signs its CLIs in or out only for its owner.
+    async nativeEngineAccount(input) {
+      const scope = accessScope();
+      if (!scope || !/^[a-f0-9]{64}$/.test(scope)) throw Error("Desktop account access is unavailable");
+      const request = NativeEngineAccountRequestSchema.parse(input);
+      const command = await nativeEngineCommand(request.engine, path.join(profile, "agent-executor", scope));
+      if (accessScope() !== scope) throw Error("Desktop account changed before signing in");
+      return nativeEngineAccount(request, command, accountHost);
+    },
     abort: async runId => { const owned = active.get(runId); await owned?.runtime.abort(owned.localId); },
     async *run(request, context) {
       const scope = accessScope();

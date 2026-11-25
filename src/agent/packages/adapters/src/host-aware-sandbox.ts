@@ -13,6 +13,7 @@ import type {
   TerminalRequest,
   WorkspaceDirectoryRequest,
 } from "@mycellios/adapter-kit";
+import type { NativeEngineAccountRequest } from "@mycellios/contracts";
 import type { PrismaClient } from "@mycellios/db";
 import { ComputerUpdatingError, DesktopUnreachableError } from "./computer-errors.js";
 import { cancelComputerRunWork } from "./computer-idle.js";
@@ -193,6 +194,11 @@ export class HostAwareSandbox implements SandboxProvider {
 
   async nativeEngineState(context: AdapterContext) {
     return this.host.nativeEngineState?.(context);
+  }
+
+  async nativeEngineAccount(context: AdapterContext, request: NativeEngineAccountRequest) {
+    if (!this.host.nativeEngineAccount) throw new Error("This server cannot reach the PC's AI programs.");
+    return this.host.nativeEngineAccount(context, request);
   }
 
   async environment(computer: ComputerRef, context: AdapterContext) {

@@ -14,10 +14,10 @@ import type { RouterContext } from "./routes/context.js";
 import { localEngineForNewMico } from "./routes/shared.js";
 import type { RouterDeps } from "./router.js";
 beforeEach(() => { fixtures.allowed = true; fixtures.read.mockReset().mockResolvedValue(null); fixtures.access.mockClear(); });
-function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn> }) {
+function routes(dependencies?: { getBot: ReturnType<typeof vi.fn>; nativeEngines?: ReturnType<typeof vi.fn>; nativeEngineState?: ReturnType<typeof vi.fn>; nativeEngineAccount?: ReturnType<typeof vi.fn> }) {
   const procedure = { handler: (handler: unknown) => handler };
-  const authed = { engines: { forBot: procedure, codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
-  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
+  const authed = { engines: { forBot: procedure, account: procedure, codexQuota: procedure, codexModels: procedure, list: procedure, installOpenCode: procedure, registry: procedure }, tasks: { overview: procedure, concurrency: procedure, work: procedure, controlWork: procedure, waits: procedure, cancelWait: procedure, awaitingReplies: procedure, stopAwaitingReply: procedure, hideAwaitingReplies: procedure, get: procedure, control: procedure } };
+  return localCapabilityRoutes({ authed, deps: { dataDir: "host", sandbox: { nativeEngines: dependencies?.nativeEngines, nativeEngineState: dependencies?.nativeEngineState, nativeEngineAccount: dependencies?.nativeEngineAccount } }, repos: { getBot: dependencies?.getBot } } as unknown as RouterContext);
 }
 function route() {
   return routes().engines.codexQuota as unknown as (input: { context: { actor: { userId: string; spaceId: string } } }) => Promise<unknown>;
@@ -97,4 +97,39 @@ it("starts a new This PC Mico only on an installed CLI that confirmed a sign-in 
   expect(await pick({ engines: ["opencode"], signedOut: [], signedIn: ["opencode"] })).toBeUndefined();
   const offline = { sandbox: { nativeEngineState: vi.fn().mockRejectedValue(Error("PC offline")) } } as unknown as RouterDeps;
   expect(await localEngineForNewMico(offline, actor, "mico")).toBeUndefined();
+});
+
+it("says when the owner's PC can sign its CLIs in from here", async () => {
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const nativeEngineState = vi.fn().mockResolvedValue({ engines: ["codex"], signedOut: ["codex"], account: true });
+  const list = routes({ getBot, nativeEngineState }).engines.forBot as unknown as (arg: unknown) => Promise<unknown>;
+  const request = { context: { actor: { userId: "user", spaceId: "space" } }, input: { botId: "mico" } };
+  expect(await list(request)).toEqual({ computer: "desktop", engines: ["codex"], signedOut: ["codex"], models: {}, account: true });
+});
+
+it("signs a CLI in or out only on the owner's own PC and never passes raw diagnostics on", async () => {
+  const actor = { userId: "user", spaceId: "space" };
+  const getBot = vi.fn().mockResolvedValue({ id: "mico", computer: { kind: "desktop", scope: "dedicated" } });
+  const device = { status: "device", userCode: "ABCD-1234", verificationUrl: "https://auth.example.test/device" };
+  const nativeEngineAccount = vi.fn().mockResolvedValue(device);
+  const account = routes({ getBot, nativeEngineAccount }).engines.account as unknown as (arg: unknown) => Promise<unknown>;
+  const signIn = { context: { actor }, input: { botId: "mico", action: "signIn", engine: "codex", flow: "device" } };
+  expect(await account(signIn)).toEqual(device);
+  expect(getBot).toHaveBeenCalledWith(actor, "mico");
+  expect(nativeEngineAccount).toHaveBeenCalledWith(expect.objectContaining({ ...actor, botId: "mico" }),
+    { action: "signIn", engine: "codex", flow: "device" });
+
+  nativeEngineAccount.mockRejectedValueOnce(new Error("Claude Code signs in on the PC. Open Mycellios on that PC to sign in."));
+  await expect(account(signIn)).rejects.toThrow("Claude Code signs in on the PC.");
+  nativeEngineAccount.mockRejectedValueOnce(new Error("Invalid enum value. Expected 'environment' | 'execute', received 'engineAccount'"));
+  await expect(account(signIn)).rejects.toThrow("That PC could not sign in. Update Mycellios on it and try again.");
+  nativeEngineAccount.mockRejectedValueOnce(new Error("Local computer disconnected. Check the result before retrying."));
+  await expect(account(signIn)).rejects.toThrow("Your PC is not connected.");
+
+  for (const computer of [{ kind: "docker", scope: "isolated" }, { kind: "desktop", scope: "isolated" }, null]) {
+    getBot.mockResolvedValueOnce({ id: "mico", computer });
+    await expect(account({ context: { actor }, input: { botId: "mico", action: "signOut", engine: "claude" } }))
+      .rejects.toThrow("This Mico does not run on your PC.");
+  }
+  expect(nativeEngineAccount).toHaveBeenCalledTimes(4);
 });

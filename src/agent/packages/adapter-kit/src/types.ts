@@ -26,6 +26,8 @@ export type NativeEngineState = {
   /** Installed engines whose CLI confirmed someone is signed in (older hosts omit it). */
   signedIn?: NativeCodingEngine[];
   models?: NativeEngineModels;
+  /** The host can sign its CLIs in and out for the person (older hosts omit it). */
+  account?: boolean;
 };
 
 export interface AdapterContext {

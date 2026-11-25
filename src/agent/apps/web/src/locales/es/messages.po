@@ -15427,3 +15427,39 @@ msgstr "Usar mi configuración de Claude Code"
 #: src/pages/shell/chat-header-model.tsx
 msgid "Loads your instructions, hooks and skills from Claude Code on this PC."
 msgstr "Carga tus instrucciones, hooks y skills de Claude Code en este PC."
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Sign in to {name}"
+msgstr "Iniciar sesión en {name}"
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Sign out of {name} on this PC? It also signs you out in your own terminal and in every Mico on this PC."
+msgstr "¿Cerrar la sesión de {name} en este PC? También se cierra en tu propia terminal y en todos los Micos de este PC."
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Enter this code on the sign-in page:"
+msgstr "Introduce este código en la página de inicio de sesión:"
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Copy code"
+msgstr "Copiar código"
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Open sign-in page"
+msgstr "Abrir la página de inicio de sesión"
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Finish signing in in the window that opened on the PC."
+msgstr "Termina de iniciar sesión en la ventana que se abrió en el PC."
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Finish signing in in your browser."
+msgstr "Termina de iniciar sesión en tu navegador."
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Open Mycellios on that PC to sign in to Claude Code."
+msgstr "Abre Mycellios en ese PC para iniciar sesión en Claude Code."
+
+#: src/pages/shell/native-engine-account.tsx
+msgid "Could not reach the PC. Try again."
+msgstr "No se pudo contactar con el PC. Inténtalo de nuevo."

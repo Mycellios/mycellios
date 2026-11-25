@@ -618,3 +618,32 @@ it("drains a completed result instead of cancelling the relay before the PC ackn
     .resolves.toMatchObject({ platform: "win32" });
   expect(cancelled).toBe(false);
 });
+
+it("signs the PC's CLIs in only with local consent and passes on only a checked answer", async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-host-account-")));
+  const nativeEngineAccount = vi.fn().mockResolvedValue({ status: "device", userCode: "ABCD-1234", verificationUrl: "https://auth.example.test/device" });
+  const agentRuntime = {
+    describe: () => ({ id: "fixture", contractVersion: "1", adapterVersion: "1", capabilities: { streaming: true, tools: true, compaction: true, scripted: true } }),
+    abort: vi.fn(), async *run() {},
+    nativeEngineState: async () => ({ engines: ["codex" as const], signedOut: ["codex" as const], account: true }),
+    nativeEngineAccount,
+  };
+  const server = await startHostComputerServer({ root, token, hostname: "127.0.0.1", agentRuntime });
+  const client = new HostComputerSandbox(`http://127.0.0.1:${server.port}`, token);
+  const scoped = { ...context, botId: "test-bot" };
+  const signIn = { action: "signIn", engine: "codex", flow: "device" } as const;
+  try {
+    await expect(client.nativeEngineAccount(scoped, signIn)).rejects.toThrow();
+    expect(nativeEngineAccount).not.toHaveBeenCalled();
+    server.setEnabled(true);
+    expect(await client.nativeEngineState(scoped)).toMatchObject({ engines: ["codex"], signedOut: ["codex"], account: true });
+    await expect(client.nativeEngineAccount(scoped, signIn)).resolves.toEqual({
+      status: "device", userCode: "ABCD-1234", verificationUrl: "https://auth.example.test/device" });
+    expect(nativeEngineAccount).toHaveBeenCalledWith(signIn);
+    nativeEngineAccount.mockResolvedValueOnce({ status: "device", userCode: "x", verificationUrl: "http://plain.example.test" });
+    await expect(client.nativeEngineAccount(scoped, signIn)).rejects.toThrow("invalid sign-in answer");
+  } finally {
+    await server.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  }
+});

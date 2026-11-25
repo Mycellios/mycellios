@@ -38,6 +38,17 @@ lines.on("line", (line) => {
         return;
       }
       if (message.method === "initialize") reply(message, { userAgent: "fixture" });
+      else if (message.method === "account/read") reply(message, { account: process.argv.includes("--fixture-signed-out") ? null : { type: "chatgpt" } });
+      else if (message.method === "account/login/start") {
+        if (message.params?.type === "chatgptDeviceCode")
+          reply(message, { type: "chatgptDeviceCode", loginId: "fixture-login", verificationUrl: "https://auth.example.test/device", userCode: "ABCD-1234" });
+        else reply(message, { type: "chatgpt", loginId: "fixture-login",
+          authUrl: process.argv.includes("--fixture-http-login") ? "http://auth.example.test/start" : "https://auth.example.test/start?state=synthetic" });
+        if (process.argv.includes("--fixture-login-completes"))
+          setTimeout(() => send({ method: "account/login/completed", params: { loginId: "fixture-login", success: true, error: null } }), 20);
+      }
+      else if (message.method === "account/login/cancel") reply(message, { status: "canceled" });
+      else if (message.method === "account/logout") reply(message, {});
       else if (message.method === "account/rateLimits/read") reply(message, { rateLimits: { primary: { usedPercent: 8, windowDurationMins: 10080, resetsAt: 1900000000 }, secondary: null, planType: "plus" }, accountId: "private-account" });
       else if (message.method === "model/list") reply(message, { data: [{ id: "fixture-model", model: "fixture-model", isDefault: true, serviceTiers: [{ id: "priority" }], supportedReasoningEfforts: [{ reasoningEffort: "medium" }] }] });
       else if (message.method === "thread/start" || message.method === "thread/resume")

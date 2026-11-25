@@ -62,6 +62,22 @@ export async function probeNativeSignIn(engine: SignInEngine, command: NativeCom
 
 type Entry = { at: number; value: boolean | undefined; pending?: Promise<boolean | undefined> };
 const cache = new Map<string, Entry>();
+/** While a sign-in may finish outside Mycellios (a browser or a terminal), answers last 2 s. */
+const WATCH_FRESH_MS = 2_000;
+const watched = new Map<string, number>();
+const cacheKey = (engine: SignInEngine, command: NativeCommand) =>
+  JSON.stringify([engine, command.command, command.args ?? []]);
+
+/** Drops the cached answer, so the next read asks the CLI again (after a sign-in or sign-out). */
+export function forgetNativeSignIn(engine: SignInEngine, command: NativeCommand) {
+  cache.delete(cacheKey(engine, command));
+}
+
+/** Until `until`, reads ask the CLI again every few seconds instead of once a minute. */
+export function watchNativeSignIn(engine: SignInEngine, command: NativeCommand, until: number) {
+  watched.set(cacheKey(engine, command), until);
+  forgetNativeSignIn(engine, command);
+}
 
 /**
  * Cached sign-in state, so engine discovery stays fast: a fresh answer is reused for a minute,
@@ -73,9 +89,12 @@ export async function nativeSignInState(
   options: { probe?: typeof probeNativeSignIn; now?: () => number; waitMs?: number } = {},
 ): Promise<boolean | undefined> {
   const now = options.now ?? Date.now;
-  const key = JSON.stringify([engine, command.command, command.args ?? []]);
+  const key = cacheKey(engine, command);
   const entry = cache.get(key);
-  if (entry && !entry.pending && now() - entry.at < FRESH_MS) return entry.value;
+  const watchedUntil = watched.get(key) ?? 0;
+  if (watchedUntil && watchedUntil <= now()) watched.delete(key);
+  const fresh = watchedUntil > now() ? WATCH_FRESH_MS : FRESH_MS;
+  if (entry && !entry.pending && now() - entry.at < fresh) return entry.value;
   let pending = entry?.pending;
   if (!pending) {
     pending = (options.probe ?? probeNativeSignIn)(engine, command).catch(() => undefined);
@@ -91,4 +110,4 @@ export async function nativeSignInState(
 }
 
 /** Tests only. */
-export function resetNativeSignInCache() { cache.clear(); }
+export function resetNativeSignInCache() { cache.clear(); watched.clear(); }

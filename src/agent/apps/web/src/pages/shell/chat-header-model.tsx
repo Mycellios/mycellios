@@ -5,7 +5,7 @@ import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptio
 import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Cpu } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { useSpaceQueries, writeSaved } from "../../lib/query";
 import { useSpaceRpc } from "../../lib/space-rpc";
@@ -15,6 +15,7 @@ import { ChatModelPicker } from "./chat-model-picker";
 import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-catalog";
 import { ProviderLogo } from "../../components/ProviderLogo";
 import { MycelliosProvider } from "../model-settings/mycellios-provider";
+import { NativeEngineAccount } from "./native-engine-account";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
@@ -66,6 +67,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), refetchOnMount: true, enabled: Boolean(me) });
   const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), refetchOnMount: true, enabled: Boolean(me) });
   const enginesQuery = useQuery(queries.engines.forBot.queryOptions({ input: { botId: bot.id }, enabled: open }));
+  const refetchEngines = enginesQuery.refetch;
+  const refreshEngines = useCallback(() => void refetchEngines(), [refetchEngines]);
   // Servers that predate per-computer catalogs only list Codex models of their own CLI.
   const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({
     enabled: open && enginesQuery.data?.computer === "server" && !enginesQuery.data.models && enginesQuery.data.engines.includes("codex"),
@@ -149,6 +152,12 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const signedOut = new Set<string>(enginesQuery.data?.signedOut ?? []);
   const signInRequired = (engine: NativeProvider) => signedOut.has(engine) && engine !== nativeEngine
     ? { unavailable: true, unavailableLabel: t`Sign in required` } : {};
+  // The PC's own CLI signs in and out from the provider it belongs to (older Desktops cannot).
+  const engineState = enginesQuery.data;
+  const accountEngine = engineState?.computer === "desktop" && engineState.account
+    ? (["codex", "claude"] as const).find(engine =>
+      NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && engineState.engines.includes(engine))
+    : undefined;
   // An engine whose CLI listed its models offers each one; otherwise its account default.
   const listed = (engine: NativeProvider) => engine === "codex" || engine === "claude" ? engineModels(engine) : [];
   const nativeChoices = nativeProviders.filter(engine => !listed(engine).length).map(engine => ({
@@ -312,6 +321,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             <Switch aria-label={t`Use my Claude Code settings`} checked={bot.nativeConfig?.userSettings === true} disabled={saving}
               onCheckedChange={userSettings => void save(() => onSave({ agentEngine: "claude", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, userSettings } }), false)} />
           </label> : null}
+          {!recovery && accountEngine ? <NativeEngineAccount botId={bot.id} engine={accountEngine}
+            signedOut={signedOut.has(accountEngine)} onChanged={refreshEngines} /> : null}
           {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
           {!recovery && me && !queryError && (lastProvider ?? currentProvider) !== "Mycellios" ? <div className="border-t border-border px-4 py-3">
             <Button variant="ghost" size="sm" disabled={saving} onClick={() => {

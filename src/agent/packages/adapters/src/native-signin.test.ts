@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claudeSignedIn, codexSignedIn, nativeSignInState, resetNativeSignInCache } from "./native-signin.js";
+import {
+  claudeSignedIn, codexSignedIn, forgetNativeSignIn, nativeSignInState, resetNativeSignInCache, watchNativeSignIn,
+} from "./native-signin.js";
 
 const claude = { command: "/bin/claude" };
 
@@ -43,6 +45,29 @@ describe("nativeSignInState", () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(await nativeSignInState("codex", claude, { probe, waitMs: 5 })).toBe(true);
     expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again after a sign-in change, and every few seconds while one may finish", async () => {
+    let now = 1_000;
+    const probe = vi.fn(async () => false);
+    const read = () => nativeSignInState("claude", claude, { probe, now: () => now });
+    expect(await read()).toBe(false);
+    forgetNativeSignIn("claude", claude);
+    probe.mockResolvedValueOnce(true);
+    expect(await read()).toBe(true);
+    expect(probe).toHaveBeenCalledTimes(2);
+    watchNativeSignIn("claude", claude, now + 60_000);
+    expect(await read()).toBe(false);
+    now += 2_500;
+    await read();
+    expect(probe).toHaveBeenCalledTimes(4);
+    now += 1_000;
+    await read();
+    expect(probe).toHaveBeenCalledTimes(4);
+    // After the watch ends, a fresh answer lasts a minute again.
+    now = 62_000;
+    await read();
+    expect(probe).toHaveBeenCalledTimes(4);
   });
 
   it("treats a failing probe as unknown, never as signed in", async () => {
