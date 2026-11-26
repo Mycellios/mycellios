@@ -122,6 +122,15 @@ it("does not offer an empty disclosure before the first recorded step", () => {
   expect(node.querySelector("details")).toBeNull();
   expect(node.textContent).not.toContain("known-model");
 });
+it("shows the active run's thinking status without a details panel", () => {
+  mount(run, false, [{
+    id: "progress:run", runId: "run", threadId: "thread", seq: 1,
+    role: "bot", botId: "bot", createdAt: at(0),
+    blocks: [{ kind: "progress", text: "Thinking…", activity: true }],
+  }]);
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking…");
+  expect(node.querySelector("details")).toBeNull();
+});
 it.each([
   ["quiet", run],
   ["unknown", { ...run, leaseExpiresAt: undefined }],

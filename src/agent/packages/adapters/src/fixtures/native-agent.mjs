@@ -19,6 +19,8 @@ const reply = (message, result) => send({ jsonrpc: "2.0", id: message.id, result
 setInterval(() => {}, 1000);
 const lines = readline.createInterface({ input: process.stdin });
 let bridge;
+let codexTurnNumber = 0;
+let codexTurnId;
 if (engine === "claude")
   bridge = JSON.parse(process.argv[process.argv.indexOf("--mcp-config") + 1]).mcpServers.rakazo;
 lines.on("line", (line) => {
@@ -60,19 +62,33 @@ lines.on("line", (line) => {
         const input = message.params.input?.[0]?.text;
         if (logIndex >= 0 && input?.includes("fixture history marker")) appendFileSync(process.argv[logIndex + 1], "history handoff\n");
         if (process.argv.includes("--fixture-fast") && (message.params.model !== "fixture-model" || message.params.effort !== "medium" || message.params.serviceTier !== "priority")) throw new Error("Fast settings were not forwarded");
-        reply(message, { turn: { id: "fixture-turn" } });
+        const previousTurn = codexTurnId;
+        codexTurnId = "fixture-turn-" + ++codexTurnNumber;
+        reply(message, { turn: { id: codexTurnId } });
+        if (previousTurn && process.argv.includes("--fixture-late-turn")) {
+          send({ method: "turn/started", params: { threadId: "fixture-thread", turn: { id: previousTurn } } });
+          send({
+            id: 902,
+            method: "item/tool/call",
+            params: { threadId: "fixture-thread", turnId: previousTurn, callId: "late", tool: "rakazo_0", arguments: toolArguments },
+          });
+          send({
+            method: "item/agentMessage/delta",
+            params: { threadId: "fixture-thread", turnId: previousTurn, delta: "stale output" },
+          });
+        }
         if (process.argv.includes("--fixture-hang")) return;
         if (process.argv.includes("--fixture-model-unavailable") || process.argv.includes("--fixture-quota")) {
           send({
             method: "turn/started",
-            params: { threadId: "fixture-thread", turn: { id: "fixture-turn" } },
+            params: { threadId: "fixture-thread", turn: { id: codexTurnId } },
           });
           send({
             method: "turn/completed",
             params: {
               threadId: "fixture-thread",
               turn: {
-                id: "fixture-turn",
+                id: codexTurnId,
                 status: "failed",
                 error: { message: JSON.stringify({ error: { code: process.argv.includes("--fixture-quota") ? "insufficient_quota" : "model_not_found", detail: "synthetic-private-token" } }) },
               },
@@ -82,14 +98,34 @@ lines.on("line", (line) => {
         }
         send({
           method: "turn/started",
-          params: { threadId: "fixture-thread", turn: { id: "fixture-turn" } },
+          params: { threadId: "fixture-thread", turn: { id: codexTurnId } },
         });
+        if (process.argv.includes("--fixture-reasoning")) {
+          send({
+            method: "item/reasoning/summaryTextDelta",
+            params: { threadId: "fixture-thread", turnId: codexTurnId, delta: "synthetic private summary" },
+          });
+          send({
+            method: "item/reasoning/textDelta",
+            params: { threadId: "fixture-thread", turnId: codexTurnId, delta: "synthetic private reasoning" },
+          });
+        }
+        if (process.argv.includes("--fixture-stale-reasoning")) {
+          send({
+            method: "item/reasoning/summaryTextDelta",
+            params: { threadId: "foreign-thread", turnId: codexTurnId, delta: "foreign thread" },
+          });
+          send({
+            method: "item/reasoning/textDelta",
+            params: { threadId: "fixture-thread", turnId: "stale-turn", delta: "stale turn" },
+          });
+        }
         send({
           id: 901,
           method: "item/tool/call",
           params: {
             threadId: "foreign-thread",
-            turnId: "fixture-turn",
+            turnId: codexTurnId,
             callId: "stale",
             tool: "rakazo_0",
             arguments: {},
@@ -100,7 +136,7 @@ lines.on("line", (line) => {
           method: "item/tool/call",
           params: {
             threadId: "fixture-thread",
-            turnId: "fixture-turn",
+            turnId: codexTurnId,
             callId: "call-1",
             tool: "rakazo_0",
             arguments: toolArguments,
@@ -112,13 +148,13 @@ lines.on("line", (line) => {
           method: "item/agentMessage/delta",
           params: {
             threadId: "fixture-thread",
-            turnId: "fixture-turn",
+            turnId: codexTurnId,
             delta: echoToolResult ? JSON.stringify(message.result.contentItems) : "Fixture complete",
           },
         });
         send({
           method: "turn/completed",
-          params: { threadId: "fixture-thread", turn: { id: "fixture-turn", status: "completed" } },
+          params: { threadId: "fixture-thread", turn: { id: codexTurnId, status: "completed" } },
         });
       }
     } else if (engine === "claude" && message.type === "control_request" && message.request?.subtype === "initialize") {

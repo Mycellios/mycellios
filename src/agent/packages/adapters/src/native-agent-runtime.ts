@@ -3,9 +3,9 @@ import { nativeCodexQuota } from "./native-codex-quota.js";
 import { turnStyleReminder, withConversationStyle } from "./conversation-style.js";
 import { prepareOpenCodeProfile } from "./opencode-profile.js";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { platform } from "node:os";
+import { homedir, platform } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { Message } from "@earendil-works/pi-ai";
 import type {
@@ -23,7 +23,7 @@ import { nativeAgentProtocolError } from "./native-agent-errors.js";
 import { BACKGROUND_WAIT_PROGRESS, deliverFinishedShells } from "./shell-command-stream.js";
 import { steeringToolContent, watchSteeringDuringTool } from "./steering-delivery.js";
 import { isToolPauseResult } from "./approval-effect.js";
-import type { NativeCommand } from "./native-agent-process.js";
+import type { NativeCommand, WireMessage } from "./native-agent-process.js";
 import { nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
 import { nativeSignInState } from "./native-signin.js";
 import { nativeModelCatalog } from "./native-model-catalog.js";
@@ -413,8 +413,50 @@ async function toolBridge(
   };
 }
 
+const CODEX_IDLE_MS = 30_000;
+const CODEX_RETAINED_TURNS = 32;
+type CodexProcess = {
+  process: NativeAgentProcess;
+  notify?: (message: WireMessage) => void;
+  fail?: (error: Error) => void;
+  finishedTurns: Set<string>;
+  releaseSlot?: () => void;
+};
+type IdleCodex = { key: string; sessionId: string; child: CodexProcess; timer: ReturnType<typeof setTimeout> };
+
+async function fileIdentity(path: string) {
+  return stat(path).then(file => [file.ino, file.size, file.mtimeMs, file.ctimeMs], () => null);
+}
+
+function startCodexProcess(command: NativeCommand, cwd: string, args: string[], releaseSlot?: () => void): CodexProcess {
+  const child: CodexProcess = {
+    finishedTurns: new Set(),
+    releaseSlot,
+    process: new NativeAgentProcess(
+      command,
+      [
+        "app-server",
+        "-c", "mcp_servers={}",
+        "-c", codexPermissionProfile(cwd),
+        "-c", "permissions.rakazo-runtime.network.enabled=false",
+        ...args,
+      ],
+      cwd,
+      message => {
+        if (child.notify) child.notify(message);
+        else if (message.id !== undefined && message.method)
+          child.process.send({ id: message.id, error: { code: -32601, message: "No active turn" } });
+      },
+      error => child.fail?.(error),
+    ),
+  };
+  return child;
+}
+
 export class NativeAgentRuntime implements AgentRuntime {
   private active = new Map<string, { controller: AbortController; stopped: Promise<void> }>();
+  private idleCodex?: IdleCodex;
+  private nativeEpoch = 0;
   constructor(
     private readonly options: {
       dataDir: string;
@@ -439,6 +481,22 @@ export class NativeAgentRuntime implements AgentRuntime {
     await active?.stopped;
     await this.options.fallback.abort(runId);
   }
+  private takeIdleCodex() {
+    const idle = this.idleCodex;
+    this.idleCodex = undefined;
+    if (idle) clearTimeout(idle.timer);
+    return idle;
+  }
+  private async discardIdleCodex() {
+    const idle = this.takeIdleCodex();
+    if (!idle) return;
+    try { await idle.child.process.stop(); }
+    finally { idle.child.releaseSlot?.(); }
+  }
+  async releaseIdleNativeProcesses() {
+    this.nativeEpoch += 1;
+    await this.discardIdleCodex();
+  }
   async *run(
     request: AgentRunRequest,
     context?: Partial<AdapterContext>,
@@ -451,6 +509,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       // while its engine is being updated, and counts as running until it ends. An operator's own
       // command is never updated, so its turns do not wait.
       const held = updates.held(engine);
+      if (held && engine === "codex") await this.releaseIdleNativeProcesses();
       if (held) yield { type: "progress", text: nativeEngineUpdateWaitText(engine), activity: true };
       const leave = await updates.enter(engine, context?.signal ?? new AbortController().signal).catch(() => undefined);
       if (!leave) return;
@@ -477,13 +536,15 @@ export class NativeAgentRuntime implements AgentRuntime {
     }
     if (!context?.spaceId || !context.userId)
       throw new Error("Native agents require an authenticated run scope");
-    if (
-      !(this.options.hostAccess ? this.options.hostAccess({ userId: context.userId, spaceId: context.spaceId }) : await nativeHostAccess(this.options.dataDir, {
-        spaceId: context.spaceId,
-        userId: context.userId,
-      }))
-    )
+    const scope = { spaceId: context.spaceId, userId: context.userId };
+    const authorized = () => this.options.hostAccess
+      ? this.options.hostAccess(scope)
+      : nativeHostAccess(this.options.dataDir, scope);
+    if (!await authorized()) {
+      await this.releaseIdleNativeProcesses();
       throw new Error("This user and Space are not authorized to use the server's native agents.");
+    }
+    const epoch = this.nativeEpoch;
     const config = {
       ...configuredCommands(await readNativeConfig(this.options.dataDir)),
       ...this.options.commands,
@@ -544,6 +605,10 @@ export class NativeAgentRuntime implements AgentRuntime {
     }));
     let prompt = request.prompt;
     let process: NativeAgentProcess | undefined;
+    let codex: CodexProcess | undefined;
+    let codexKey: string | undefined;
+    let codexCompleted = false;
+    let reusedCodex = false;
     let bridge: Awaited<ReturnType<typeof toolBridge>> | undefined;
     let systemPromptFile: string | undefined;
     let paused = false;
@@ -685,9 +750,31 @@ export class NativeAgentRuntime implements AgentRuntime {
     let releaseSlot: (() => void) | undefined;
     const stopped = (async () => {
       try {
+        if (engine === "codex" && !request.turnCheckpoint && !request.resetNativeSession) {
+          const codexHome = join(homedir(), ".codex");
+          const identity = await Promise.all([
+            fileIdentity(command.command), fileIdentity(join(codexHome, "auth.json")),
+            fileIdentity(join(codexHome, "config.toml")),
+            fileIdentity(join(cwd, ".codex", "config.toml")),
+          ]);
+          if (identity[0]) codexKey = hash([cwd, binding, command, this.options.codexArgs, identity]);
+        }
+        signal.throwIfAborted();
+        if (!await authorized()) throw new Error("Native agent access changed before execution.");
+        signal.throwIfAborted();
+        if (codexKey && sessionId && epoch === this.nativeEpoch &&
+          this.idleCodex?.key === codexKey && this.idleCodex.sessionId === sessionId &&
+          this.idleCodex.child.process.reusable) {
+          codex = this.takeIdleCodex()!.child;
+          process = codex.process;
+          releaseSlot = codex.releaseSlot;
+          reusedCodex = true;
+        } else {
+          await this.discardIdleCodex();
+        }
         // Above the PC's bound this turn waits here, with its reason shown, before anything runs.
         const slots = this.options.processSlots;
-        if (slots) {
+        if (slots && !reusedCodex) {
           let waited = false;
           releaseSlot = await slots.acquire(signal, () => {
             waited = true;
@@ -697,6 +784,8 @@ export class NativeAgentRuntime implements AgentRuntime {
           // An empty activity line clears the waiting status once the turn starts.
           if (waited) queue.push({ type: "progress", text: "", activity: true });
         }
+        if (!await authorized()) throw new Error("Native agent access changed before execution.");
+        signal.throwIfAborted();
         if (request.turnCheckpoint) {
           sessionId = undefined; // Restart from the durable tool transcript after a human pause.
           const saved = restoreTurnCheckpoint(request.turnCheckpoint, request.model);
@@ -758,6 +847,7 @@ export class NativeAgentRuntime implements AgentRuntime {
             await rename(temp, join(cwd, "session.json"));
           }
           await recordUsage();
+          codexCompleted = engine === "codex";
           queue.push({ type: "done" });
           queue.end();
         };
@@ -765,97 +855,114 @@ export class NativeAgentRuntime implements AgentRuntime {
         if (engine === "codex") {
           const responses = new Map<string, Promise<unknown>>();
           let turnId: string | undefined;
-          process = new NativeAgentProcess(
-            command,
-            [
-              "app-server",
-              "-c",
-              "mcp_servers={}",
-              "-c",
-              codexPermissionProfile(cwd),
-              "-c",
-              "permissions.rakazo-runtime.network.enabled=false",
-              ...(this.options.codexArgs ?? []),
-            ],
-            cwd,
-            (message) => {
-              const params = message.params ?? {};
-              if (message.method === "turn/started" && params.threadId === sessionId)
-                turnId = text(object(params.turn).id);
-              const currentTurn = Boolean(
-                turnId &&
-                  params.threadId === sessionId &&
-                  (params.turnId ?? object(params.turn).id) === turnId,
-              );
-              if (message.method === "item/agentMessage/delta" && currentTurn)
-                emitText(text(params.delta));
-              else if (message.method === "turn/completed" && currentTurn) {
-                const turn = object(params.turn);
-                if (turn.status === "completed") void finish(sessionId).catch(failure);
-                else {
-                  let providerCode = "";
-                  try {
-                    providerCode = text(
-                      object(object(JSON.parse(text(object(turn.error).message))).error).code,
-                    );
-                  } catch {
-                    /* Provider diagnostics are not always JSON. */
-                  }
-                  failure(
-                    providerCode === "model_not_found"
-                      ? new Error("The configured Codex model is unavailable for this CLI account. Select an available model in the CLI configuration and retry.")
-                      : nativeAgentProtocolError(turn.error, "The native Codex turn did not complete"),
+          let reasoningTurnId: string | undefined;
+          let startingTurn = false;
+          if (!codex) {
+            codex = startCodexProcess(command, cwd, this.options.codexArgs ?? [], releaseSlot);
+            process = codex.process;
+          }
+          const finishedTurns = codex.finishedTurns;
+          codex.notify = (message) => {
+            const params = message.params ?? {};
+            if (startingTurn && !turnId && message.method === "turn/started" && params.threadId === sessionId) {
+              const candidate = text(object(params.turn).id);
+              if (candidate && !finishedTurns.has(candidate)) turnId = candidate;
+            }
+            const currentTurn = Boolean(
+              turnId &&
+                params.threadId === sessionId &&
+                (params.turnId ?? object(params.turn).id) === turnId,
+            );
+            if (
+              currentTurn &&
+              !signal.aborted &&
+              !paused &&
+              !request.allowSilentEmpty &&
+              reasoningTurnId !== turnId &&
+              (message.method === "item/reasoning/summaryTextDelta" ||
+                message.method === "item/reasoning/textDelta") &&
+              text(params.delta).trim()
+            ) {
+              // The notification proves activity. Keep its reasoning content on the host.
+              reasoningTurnId = turnId;
+              queue.push({ type: "progress", text: "Thinking…", activity: true });
+            } else if (message.method === "item/agentMessage/delta" && currentTurn)
+              emitText(text(params.delta));
+            else if (message.method === "turn/completed" && currentTurn) {
+              finishedTurns.add(turnId!);
+              turnId = undefined;
+              const turn = object(params.turn);
+              if (turn.status === "completed") void finish(sessionId).catch(failure);
+              else {
+                let providerCode = "";
+                try {
+                  providerCode = text(
+                    object(object(JSON.parse(text(object(turn.error).message))).error).code,
                   );
+                } catch {
+                  /* Provider diagnostics are not always JSON. */
                 }
-              } else if (message.method === "item/tool/call" && message.id !== undefined) {
-                if (!currentTurn) {
+                failure(
+                  providerCode === "model_not_found"
+                    ? new Error("The configured Codex model is unavailable for this CLI account. Select an available model in the CLI configuration and retry.")
+                    : nativeAgentProtocolError(turn.error, "The native Codex turn did not complete"),
+                );
+              }
+            } else if (message.method === "item/tool/call" && message.id !== undefined) {
+              if (!currentTurn) {
+                process?.send({
+                  id: message.id,
+                  result: {
+                    contentItems: [{ type: "inputText", text: "Stale turn" }],
+                    success: false,
+                  },
+                });
+                return;
+              }
+              const id = String(params.callId ?? message.id);
+              const tool = tools.find((_, index) => `rakazo_${index}` === params.tool);
+              const result =
+                responses.get(id) ??
+                (tool
+                  ? orderedCall(tool.name, object(params.arguments), id)
+                  : Promise.reject(new Error("Unknown native tool")));
+              responses.set(id, result);
+              void result.then(
+                (value) => {
+                  if (signal.aborted) return;
+                  process?.send({
+                    id: message.id,
+                    result: { contentItems: codexToolContent(value), success: true },
+                  });
+                },
+                () => {
+                  if (signal.aborted) return;
                   process?.send({
                     id: message.id,
                     result: {
-                      contentItems: [{ type: "inputText", text: "Stale turn" }],
+                      contentItems: [{ type: "inputText", text: "Tool could not complete" }],
                       success: false,
                     },
                   });
-                  return;
-                }
-                const id = String(params.callId ?? message.id);
-                const tool = tools.find((_, index) => `rakazo_${index}` === params.tool);
-                const result =
-                  responses.get(id) ??
-                  (tool
-                    ? orderedCall(tool.name, object(params.arguments), id)
-                    : Promise.reject(new Error("Unknown native tool")));
-                responses.set(id, result);
-                void result.then(
-                  (value) =>
-                    process?.send({
-                      id: message.id,
-                      result: { contentItems: codexToolContent(value), success: true },
-                    }),
-                  () =>
-                    process?.send({
-                      id: message.id,
-                      result: {
-                        contentItems: [{ type: "inputText", text: "Tool could not complete" }],
-                        success: false,
-                      },
-                    }),
-                );
-              } else if (message.id !== undefined && message.method) {
-                // Native host actions never bypass the app's authorized tool executor.
-                process?.send({
-                  id: message.id,
-                  error: { code: -32601, message: "Use the application's provided tools" },
-                });
-              }
-            },
-            failure,
-          );
-          await process.request("initialize", {
-            clientInfo: { name: "rakazo", version: "0.1.0" },
-            capabilities: { experimentalApi: true },
-          });
-          process.send({ method: "initialized", params: {} });
+                },
+              );
+            } else if (message.id !== undefined && message.method) {
+              // Native host actions never bypass the app's authorized tool executor.
+              process?.send({
+                id: message.id,
+                error: { code: -32601, message: "Use the application's provided tools" },
+              });
+            }
+          };
+          codex.fail = failure;
+          if (!process) throw new Error("Codex process is unavailable");
+          if (!reusedCodex) {
+            await process.request("initialize", {
+              clientInfo: { name: "rakazo", version: "0.1.0" },
+              capabilities: { experimentalApi: true },
+            });
+            process.send({ method: "initialized", params: {} });
+          }
           const selection = request.nativeConfig
             ? codexTurnSettings(request.nativeConfig, nativeCodexModels(await process.request("model/list", { includeHidden: false }))) : {};
           const params = {
@@ -874,41 +981,47 @@ export class NativeAgentRuntime implements AgentRuntime {
               inputSchema: tool.inputSchema,
             })),
           };
-          let started: { thread: { id: string } };
-          try {
-            started = await process.request(sessionId ? "thread/resume" : "thread/start", {
-              ...params,
-              ...(sessionId ? { threadId: sessionId } : {}),
-            });
-          } catch {
-            if (!sessionId) throw new Error("Cannot start native Codex session");
-            started = await process.request("thread/start", params);
-            startPrompt = historicalPrompt();
+          if (!reusedCodex) {
+            let started: { thread: { id: string } };
+            try {
+              started = await process.request(sessionId ? "thread/resume" : "thread/start", {
+                ...params,
+                ...(sessionId ? { threadId: sessionId } : {}),
+              });
+            } catch {
+              if (!sessionId) throw new Error("Cannot start native Codex session");
+              started = await process.request("thread/start", params);
+              startPrompt = historicalPrompt();
+            }
+            sessionId = started.thread.id;
           }
-          sessionId = started.thread.id;
+          const startTurn = async (input: unknown[]) => {
+            signal.throwIfAborted();
+            startingTurn = true;
+            turnId = undefined;
+            try {
+              const reply = await process!.request<{ turn: { id: string } }>("turn/start", {
+                threadId: sessionId, ...selection, input,
+                approvalPolicy: "untrusted", permissions: "rakazo-runtime",
+              });
+              if (turnId && turnId !== reply.turn.id) throw new Error("Codex started a different turn");
+              if (!finishedTurns.has(reply.turn.id)) turnId = reply.turn.id;
+            } finally {
+              startingTurn = false;
+            }
+          };
           continueTurn = async (note) => {
             if (signal.aborted || paused) return;
-            const next = await process!.request<{ turn: { id: string } }>("turn/start", {
-              threadId: sessionId, ...selection, input: [{ type: "text", text: note }],
-              approvalPolicy: "untrusted", permissions: "rakazo-runtime",
-            });
-            turnId = next.turn.id;
+            await startTurn([{ type: "text", text: note }]);
           };
           startedModelTurn = true;
-          const startedTurn = await process.request<{ turn: { id: string } }>("turn/start", {
-            threadId: sessionId,
-            ...selection,
-            input: [
+          await startTurn([
               { type: "text", text: startPrompt },
               ...(request.currentTurnImages ?? []).map((image) => ({
                 type: "image",
                 url: `data:${image.mimeType};base64,${Buffer.from(image.data).toString("base64")}`,
               })),
-            ],
-            approvalPolicy: "untrusted",
-            permissions: "rakazo-runtime",
-          });
-          turnId = startedTurn.turn.id;
+          ]);
         } else {
           bridge = await toolBridge(tools, orderedCall, engine === "opencode");
           if (engine === "claude") {
@@ -1121,18 +1234,34 @@ export class NativeAgentRuntime implements AgentRuntime {
     };
     signal.addEventListener("abort", onAbort, { once: true });
     this.active.set(request.runId, { controller, stopped });
+    let consumed = false;
     try {
       yield* queue;
+      consumed = true;
     } finally {
+      const completed = consumed && codexCompleted && !signal.aborted && !paused && codex?.process.reusable;
+      if (completed) await stopped;
+      const stillAuthorized = completed && await Promise.resolve().then(authorized).catch(() => false);
+      const reusable = stillAuthorized && !signal.aborted &&
+        codex && codexKey && sessionId && epoch === this.nativeEpoch && !this.idleCodex &&
+        codex.finishedTurns.size < CODEX_RETAINED_TURNS && codex.process.reusable &&
+        !this.options.processSlots?.state.waiting && !this.options.engineUpdates?.held("codex");
+      signal.removeEventListener("abort", onAbort);
+      if (codex) {
+        codex.notify = undefined;
+        codex.fail = undefined;
+      }
       controller.abort();
-      await process?.stop();
+      if (reusable && codex && codexKey && sessionId) {
+        const timer = setTimeout(() => { void this.discardIdleCodex(); }, CODEX_IDLE_MS);
+        timer.unref();
+        this.idleCodex = { key: codexKey, sessionId, child: codex, timer };
+      } else await process?.stop();
       await stopped;
-      // The slot frees only once this turn's CLI has stopped.
-      releaseSlot?.();
+      if (!reusable) releaseSlot?.();
       await bridge?.close();
       if (systemPromptFile) await rm(systemPromptFile, { force: true }).catch(() => undefined);
       await recordUsage();
-      signal.removeEventListener("abort", onAbort);
       this.active.delete(request.runId);
     }
   }

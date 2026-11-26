@@ -15,13 +15,16 @@ import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
 import { CONVERSATION_STYLE } from "./conversation-style.js";
 import { resetNativeModelCatalogCache } from "./native-model-catalog.js";
+import { NativeProcessSlots } from "./native-process-slots.js";
 
 const roots: string[] = [];
+const runtimes: NativeAgentRuntime[] = [];
 afterEach(async () => {
+  await Promise.all(runtimes.splice(0).map(runtime => runtime.releaseIdleNativeProcesses()));
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 const fixture = fileURLToPath(new URL("./fixtures/native-agent.mjs", import.meta.url));
-async function setup(engine: NonNullable<AgentRunRequest["agentEngine"]>, extra: string[] = [], fixturePath = fixture) {
+async function setup(engine: NonNullable<AgentRunRequest["agentEngine"]>, extra: string[] = [], fixturePath = fixture, processSlots?: NativeProcessSlots) {
   const dataDir = await mkdtemp(join(tmpdir(), "rakazo-native-test-"));
   roots.push(dataDir);
   await writeFile(
@@ -31,8 +34,10 @@ async function setup(engine: NonNullable<AgentRunRequest["agentEngine"]>, extra:
   const runtime = new NativeAgentRuntime({
     dataDir,
     fallback: new ScriptedAgentRuntime(),
+    processSlots,
     commands: { [engine]: { command: process.execPath, args: [fixturePath, engine === "opencode" ? "acp" : engine, ...extra] } },
   });
+  runtimes.push(runtime);
   const executeTool = vi.fn<NonNullable<AgentRunRequest['executeTool']>>(async () => ({ content: "fixture file" }));
   const onCheckpoint = vi.fn();
   const onUsage = vi.fn();
@@ -65,6 +70,79 @@ async function setup(engine: NonNullable<AgentRunRequest["agentEngine"]>, extra:
 }
 
 describe("native agent protocol integration", () => {
+  it("reuses only the matching Codex process and rejects events from its previous turn", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mycellios-codex-process-"));
+    roots.push(root);
+    const log = join(root, "pids");
+    const slots = new NativeProcessSlots(1);
+    const test = await setup("codex", ["--fixture-pid-log", log, "--fixture-late-turn"], fixture, slots);
+    const turn = async (runId: string, threadId = test.request.threadId) => {
+      const events: AgentRuntimeEvent[] = [];
+      for await (const event of test.runtime.run({ ...test.request, runId, threadId }, test.context)) events.push(event);
+      expect(events.filter(event => event.type === "text")).toEqual([{ type: "text", text: "Fixture complete" }]);
+      expect(events.at(-1)?.type).toBe("done");
+    };
+    const pids = async () => (await readFile(log, "utf8")).trim().split("\n");
+    await turn("first");
+    expect(slots.state).toEqual({ running: 1, waiting: 0 });
+    await turn("second");
+    expect(await pids()).toHaveLength(1);
+    expect(test.executeTool).toHaveBeenCalledTimes(2);
+    await turn("other-thread", "private-other-thread");
+    expect(await pids()).toHaveLength(2);
+    await test.runtime.releaseIdleNativeProcesses();
+    expect(slots.state).toEqual({ running: 0, waiting: 0 });
+    await turn("after-revocation", "private-other-thread");
+    expect(await pids()).toHaveLength(3);
+  }, 30_000);
+
+  it("streams real Codex activity ahead of the reply over the Desktop host without exposing reasoning", async () => {
+    const test = await setup("codex", ["--fixture-reasoning"]);
+    await writeFile(join(test.dataDir, "native-agents.json"), JSON.stringify({
+      authorizedScopes: [{ userId: "local", spaceId: "local" }],
+    }));
+    const token = "a".repeat(64);
+    const host = await startHostComputerServer({
+      root: test.dataDir, token, hostname: "127.0.0.1", agentRuntime: test.runtime,
+    });
+    host.setEnabled(true);
+    const runtime = new DesktopAgentRuntime({
+      fallback: new ScriptedAgentRuntime(),
+      select: async () => ({ available: true, preferred: true }),
+      transport: (input, ctx) => fetch(`http://127.0.0.1:${host.port}/computer`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+        body: JSON.stringify(input),
+        signal: ctx.signal,
+      }),
+    });
+    const events: AgentRuntimeEvent[] = [];
+    try {
+      for await (const event of runtime.run(test.request, test.context)) {
+        if (!events.length) {
+          expect(event).toEqual({ type: "progress", text: "Thinking…", activity: true });
+          expect(test.executeTool).not.toHaveBeenCalled();
+        }
+        events.push(event);
+      }
+    } finally {
+      await host.close();
+    }
+    expect(events.filter(event => event.type === "progress" || event.type === "text")).toEqual([
+      { type: "progress", text: "Thinking…", activity: true },
+      { type: "text", text: "Fixture complete" },
+    ]);
+    expect(JSON.stringify(events)).not.toContain("synthetic private");
+  }, 25000);
+
+  it("ignores Codex reasoning from a foreign thread or a stale turn", async () => {
+    const test = await setup("codex", ["--fixture-stale-reasoning"]);
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of test.runtime.run(test.request, test.context)) events.push(event);
+    expect(events.some(event => event.type === "progress")).toBe(false);
+    expect(events).toContainEqual({ type: "text", text: "Fixture complete" });
+  });
+
   it.each(["codex", "claude", "acp"] as const)("pauses %s with a complete grouped questionnaire", async engine => {
     const test = await setup(engine, ["--fixture-questionnaire"]);
     test.request.tools = [builtinAgentTools.find(tool => tool.name === "ask_user")!];
@@ -480,13 +558,13 @@ it("hands off conversation history when a native model or engine changes", async
     return readFile(log, "utf8");
   };
   expect(await attempt()).toContain("history handoff");
-  expect(await attempt()).toContain("thread/resume");
+  expect(await attempt()).toBe("turn/start\n");
   test.request.nativeConfig = { modelId: "fixture-model", thinkingLevel: "medium" };
   const switched = await attempt();
   expect(switched).toContain("thread/start");
   expect(switched).toContain("history handoff");
   expect(switched).not.toContain("thread/resume");
-  expect(await attempt()).toContain("thread/resume");
+  expect(await attempt()).toBe("model/list\nturn/start\n");
   test.request.resetNativeSession = true;
   const returned = await attempt();
   expect(returned).toContain("thread/start");
@@ -505,7 +583,7 @@ it("starts a fresh native session after a new-chat context change and keeps the 
   const workspace = join(test.dataDir, "native-agents", directories[0]!);
   await writeFile(join(workspace, "kept-note.txt"), "Workspace survives");
   await writeFile(log, ""); await consume();
-  expect(await readFile(log, "utf8")).toContain("thread/resume");
+  expect(await readFile(log, "utf8")).toBe("turn/start\n");
   test.request.instructions += "\nConversation context begins at sequence 42. Earlier chat messages are outside this conversation; persistent memories and workspace files remain available.";
   await writeFile(log, ""); await consume();
   const calls = await readFile(log, "utf8");

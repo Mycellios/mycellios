@@ -901,7 +901,10 @@ export async function startHostComputerServer(options: {
         if (!isFileWrite(active.get(controller)?.method)) notice();
       for (const provider of providers.values()) provider.cancelAllCommands();
       const deadline = Date.now() + 15_000;
-      const settle = Promise.all([...providers.values()].map(provider => provider.settleCommands()));
+      const settle = Promise.all([
+        options.agentRuntime?.releaseIdleNativeProcesses?.(),
+        ...[...providers.values()].map(provider => provider.settleCommands()),
+      ]);
       let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
         await Promise.race([settle, new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("Local commands are still stopping")), 15_000); })]);
@@ -927,6 +930,7 @@ export async function startHostComputerServer(options: {
       ),
     setEnabled(value: boolean, interrupt = true) {
       enabled = value;
+      if (!value) void options.agentRuntime?.releaseIdleNativeProcesses?.();
       if (!value && interrupt) {
         for (const controller of active.keys()) controller.abort();
         for (const provider of providers.values()) provider.cancelAllCommands();
@@ -934,6 +938,7 @@ export async function startHostComputerServer(options: {
     },
     async close() {
       enabled = false;
+      await options.agentRuntime?.releaseIdleNativeProcesses?.();
       for (const provider of providers.values()) provider.cancelAllCommands();
       await Promise.all([...providers.values()].map(provider => provider.settleCommands()));
       for (const controller of active.keys()) controller.abort();

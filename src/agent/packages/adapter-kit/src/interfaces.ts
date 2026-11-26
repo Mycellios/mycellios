@@ -339,6 +339,8 @@ export interface AgentRuntime {
   nativeEngineUsage?(): Promise<{ codex?: AccountPlanLimit }>;
   /** Starts installing a missing CLI into this host's store, from the vendor channel its lock file pins. */
   nativeEngineInstall?(request: NativeEngineInstallRequest): Promise<NativeEngineInstallResult>;
+  /** Discards idle native processes and prevents an in-flight turn from retaining its process. */
+  releaseIdleNativeProcesses?(): Promise<void>;
   describe(): AdapterDescriptor<AgentRuntimeCapabilities>;
   run(
     request: AgentRunRequest,
