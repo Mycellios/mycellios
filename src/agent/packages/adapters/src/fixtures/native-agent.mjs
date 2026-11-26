@@ -21,6 +21,7 @@ const lines = readline.createInterface({ input: process.stdin });
 let bridge;
 let codexTurnNumber = 0;
 let codexTurnId;
+const codexFileTool = "rakazo_0";
 if (engine === "claude")
   bridge = JSON.parse(process.argv[process.argv.indexOf("--mcp-config") + 1]).mcpServers.rakazo;
 lines.on("line", (line) => {
@@ -70,7 +71,7 @@ lines.on("line", (line) => {
           send({
             id: 902,
             method: "item/tool/call",
-            params: { threadId: "fixture-thread", turnId: previousTurn, callId: "late", tool: "rakazo_0", arguments: toolArguments },
+            params: { threadId: "fixture-thread", turnId: previousTurn, callId: "late", tool: codexFileTool, arguments: toolArguments },
           });
           send({
             method: "item/agentMessage/delta",
@@ -127,7 +128,7 @@ lines.on("line", (line) => {
             threadId: "foreign-thread",
             turnId: codexTurnId,
             callId: "stale",
-            tool: "rakazo_0",
+            tool: codexFileTool,
             arguments: {},
           },
         });
@@ -138,7 +139,7 @@ lines.on("line", (line) => {
             threadId: "fixture-thread",
             turnId: codexTurnId,
             callId: "call-1",
-            tool: "rakazo_0",
+            tool: codexFileTool,
             arguments: toolArguments,
           },
         });
