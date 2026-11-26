@@ -356,3 +356,56 @@ exit $LASTEXITCODE`);
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 95_000);
+
+async function initFixture(label: string) {
+  const profile = await mkdtemp(path.join(os.tmpdir(), `mycellios update ${label} `));
+  const updates = path.join(profile, "updates");
+  await mkdir(updates);
+  const fileName = "Mycellios-Desktop-0.0.1-windows-x64-pilot.exe";
+  const installer = path.join(updates, fileName);
+  await writeFile(installer, "fixture, never executable");
+  const jobs = async () => (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
+  const launch = (launcher: { executable: string; args(helper: string, config: string): string[] }, retryDelaysMs: number[]) =>
+    launchManualUpdate({ profile, executable: process.execPath, oldPid: process.pid, installer,
+      release: { version: "0.0.1", fileName, bytes: 1, sha256: "a".repeat(64), url: "https://example.test/fixture" },
+      reopenUrl: "https://example.test", retryDelaysMs, launcher });
+  return { profile, updates, jobs, launch };
+}
+
+// Windows exit codes are 32-bit; POSIX truncates 0xC0000142 to 8 bits.
+it.runIf(process.platform === "win32")("retries a launcher that Windows could not initialize, in a fresh job folder", async () => {
+  const fixture = await initFixture("init");
+  try {
+    const counter = path.join(fixture.profile, "attempts.txt");
+    // Exits twice exactly like an uninitialized PowerShell, then acknowledges.
+    const script = `const fs=require("fs"),path=require("path");const [counter,config]=process.argv.slice(1);
+const n=Number(fs.existsSync(counter)?fs.readFileSync(counter,"utf8"):0)+1;fs.writeFileSync(counter,String(n));
+if(n<3)process.exit(-1073741502);
+fs.writeFileSync(path.join(path.dirname(config),"progress.json"),JSON.stringify({phase:"waiting-for-app"}));
+setTimeout(()=>{},1000);`;
+    await fixture.launch({ executable: process.execPath, args: (_helper, config) => ["-e", script, counter, config] }, [10, 10, 10]);
+    expect(await readFile(counter, "utf8")).toBe("3");
+    const jobs = await fixture.jobs();
+    expect(jobs).toHaveLength(3);
+    const files = await Promise.all(jobs.map(job => readdir(path.join(fixture.updates, job.name))));
+    expect(files.filter(list => list.includes("handoff-error.json"))).toHaveLength(2);
+    expect(files.filter(list => list.includes("commit.json"))).toHaveLength(1);
+  } finally {
+    await rm(fixture.profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  }
+}, 30_000);
+
+it.runIf(process.platform === "win32")("does not retry a launcher that failed after starting, and bounds init retries", async () => {
+  const fixture = await initFixture("noretry");
+  try {
+    const exit = (code: number) => ({ executable: process.execPath, args: () => ["-e", `process.exit(${code})`] });
+    const ordinary = await fixture.launch(exit(1), [10, 10]).catch((error: unknown) => error);
+    expect((ordinary as Error).message).toContain("The update helper exited before handoff (1)");
+    expect(await fixture.jobs()).toHaveLength(1);
+    const exhausted = await fixture.launch(exit(-1073741502), [10]).catch((error: unknown) => error);
+    expect((exhausted as Error).message).toContain("Windows did not initialize PowerShell");
+    expect(await fixture.jobs()).toHaveLength(3);
+  } finally {
+    await rm(fixture.profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  }
+}, 30_000);

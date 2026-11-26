@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, open, readFile, realpath } from "node:fs/promises";
+import { access, mkdir, open, readFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
@@ -36,12 +36,38 @@ export async function launchManualUpdate(options: {
   release: ManualRelease; reopenUrl: string;
   ownerWindow?: string;
   prepareToQuit?(): Promise<void>;
+  /** Test seam: the launcher command. Defaults to Windows PowerShell 5.1. */
+  launcher?: { executable: string; args(helper: string, config: string): string[] };
+  retryDelaysMs?: readonly number[];
 }): Promise<void> {
   // Windows process APIs report long paths, while TEMP/profile inputs can use
   // 8.3 aliases. Resolve the same files before the worker checks process identity.
   const profile = await realpath(options.profile);
   const appExecutable = await realpath(options.executable);
   const installer = await realpath(options.installer);
+  const delays = options.retryDelaysMs ?? LAUNCHER_INIT_RETRY_DELAYS_MS;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await launchManualUpdateOnce(options, profile, appExecutable, installer);
+    } catch (error) {
+      // Windows can briefly refuse to initialize a new PowerShell process
+      // (STATUS_DLL_INIT_FAILED, e.g. while many console processes exhaust the
+      // desktop heap). That launcher ran no script line: nothing was verified,
+      // locked or installed, so a fresh attempt in a new job folder is safe.
+      if (!(error instanceof LauncherInitFailure) || attempt >= delays.length) throw error;
+      await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+    }
+  }
+}
+
+/** Windows STATUS_DLL_INIT_FAILED (0xC0000142), as Node reports the exit code. */
+export const STATUS_DLL_INIT_FAILED = 0xC0000142;
+const LAUNCHER_INIT_RETRY_DELAYS_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000, 15_000];
+
+class LauncherInitFailure extends Error {}
+
+async function launchManualUpdateOnce(options: Parameters<typeof launchManualUpdate>[0],
+  profile: string, appExecutable: string, installer: string): Promise<void> {
   await requireNoManualUpdate(profile);
   const directory = path.join(profile, "updates", randomUUID());
   const helper = path.join(directory, "manual-update-helper.ps1");
@@ -53,13 +79,16 @@ export async function launchManualUpdate(options: {
     profile, executable: appExecutable, oldPid: options.oldPid, ownerWindow: options.ownerWindow,
     installer, version: options.release.version, sha256: options.release.sha256,
     bytes: options.release.bytes, reopenUrl: options.reopenUrl }));
-  const executable = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const executable = options.launcher?.executable ??
+    path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const args = options.launcher?.args(helper, config) ??
+    ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper, "-ConfigFile", config, "-Launch"];
   // Detached PowerShell 5.1 can exit before running the script. A hidden
   // launcher starts the actual helper outside Electron's direct-child job.
   const output = await open(path.join(directory, "launcher.log"), "wx", 0o600);
   const child = (() => {
     try {
-      return spawn(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper, "-ConfigFile", config, "-Launch"], {
+      return spawn(executable, args, {
         windowsHide: true, cwd: tmpdir(), stdio: ["ignore", output.fd, output.fd],
       });
     } finally {
@@ -82,6 +111,11 @@ export async function launchManualUpdate(options: {
           .then(contents => JSON.parse(contents.replace(/^\uFEFF/, "")) as { error?: unknown })
           .catch(() => null);
         const detail = typeof failure?.error === "string" ? `: ${failure.error.slice(0, 500)}` : "";
+        // No progress, result or worker log: the launcher died before its first line.
+        if (child.exitCode === STATUS_DLL_INIT_FAILED && lastPhase === null && failure === null &&
+            !await access(path.join(directory, "helper.log")).then(() => true, () => false)) {
+          throw new LauncherInitFailure("The update helper could not start: Windows did not initialize PowerShell");
+        }
         throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})${detail}`);
       }
       if (phase === "waiting-for-app") {

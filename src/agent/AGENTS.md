@@ -1006,6 +1006,9 @@
   An asynchronously failed helper defers that release until an explicit retry or
   a newer package; never relaunch it on every idle tick. Preserve the bounded
   local handoff-error.json process receipt when PowerShell exits without logs.
+  Retry the handoff in a fresh job folder only when the launcher exits with
+  STATUS_DLL_INIT_FAILED before any progress, result or worker log, with bounded
+  backoff; any other helper failure keeps the existing explicit retry.
   Restart now transfers the queued policy intent to the manual controller before
   handoff, so its failure cannot leave a second idle restart waiting or retrying.
   A pending restart is cancellable. The hidden same-user helper waits for normal
