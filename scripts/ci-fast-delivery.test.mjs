@@ -71,6 +71,13 @@ test('the stdlib two-host link probe runs its loopback test', () => {
   assert.ok(planChecks(files).some(c => c.args.includes('test_link_probe.py') && c.args.includes('-I')));
   assert.deepEqual(uncoveredNativeFiles(['python/distributed_runtime/server_extra.py']), ['python/distributed_runtime/server_extra.py']);
 });
+test('stage artifact cache and seed source run their CPU tests from the locked wheels', () => {
+  const files = ['python/distributed_runtime/stage_artifact_cache.py', 'python/distributed_runtime/stage_seed_source.py', 'python/tests/test_stage_seed_source.py'];
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  const checks = planChecks(files);
+  assert.ok(checks.some(c => c.args.includes('scripts/wheel-locks/linux-x64-cp312.txt')));
+  for (const test of ['test_stage_seed_source.py', 'test_stage_artifact_cache.py']) assert.ok(checks.some(c => c.args.includes(test)));
+});
 test('documentation requires no dependency installation', () => {
   const plan = planChecks(['docs/DEVELOPMENT.md', 'AGENTS.md']);
   assert.ok(plan.some(c => c.label === 'CI policy tests'));

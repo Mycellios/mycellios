@@ -36,8 +36,12 @@ const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'py
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
 // The two-host TCP link probe and its test use only Python's standard library.
 const linkProbePython = new Set(['python/distributed_runtime/link_probe.py', 'python/tests/test_link_probe.py']);
+// Stage artifact cache and its loopback seed source: CPU tests from the hash-locked runtime wheels.
+const stageSeedPython = new Set(['python/distributed_runtime/stage_artifact_cache.py', 'python/distributed_runtime/stage_seed_source.py',
+  'python/tests/test_stage_artifact_cache.py', 'python/tests/test_stage_seed_source.py']);
+const stageSeedTests = ['test_stage_seed_source.py', 'test_stage_artifact_cache.py'];
 const pageBrowserFile = file => /^src\/agent\/infra\/sandboxes\/computer\/(?:[^/]+-page-browser|test_page_browser\.py)$/.test(file);
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !linkProbePython.has(f) && !pageBrowserFile(f));
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !linkProbePython.has(f) && !stageSeedPython.has(f) && !pageBrowserFile(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -95,7 +99,8 @@ export function planChecks(files, availableAgentTests) {
   const speculationChanged = files.some(f => speculationPython.has(f));
   const llamaCppChanged = files.some(f => llamaCppPython.has(f));
   const kokoroChanged = files.some(f => kokoroPython.has(f));
-  if (speculationChanged || llamaCppChanged || kokoroChanged) {
+  const stageSeedChanged = files.some(f => stageSeedPython.has(f));
+  if (speculationChanged || llamaCppChanged || kokoroChanged || stageSeedChanged) {
     const venv = '.ci/speculation-venv';
     add('.', 'python3', ['-c', 'import sys; assert sys.version_info[:2] == (3, 12), sys.version'], 'speculation runtime interpreter is CPython 3.12');
     add('.', 'python3', ['-m', 'venv', venv], 'speculation runtime virtual environment');
@@ -103,6 +108,7 @@ export function planChecks(files, availableAgentTests) {
     if (speculationChanged) for (const test of speculationTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `speculation runtime ${test} (CPU, no model or GPU)`);
     if (llamaCppChanged) for (const test of llamaCppTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `llama.cpp native stage ${test} (no binary, model or GPU)`);
     if (kokoroChanged) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_kokoro_engine.py'], 'Kokoro speech engine (fake pipelines, no model or GPU)');
+    if (stageSeedChanged) for (const test of stageSeedTests) add('python', `../${venv}/bin/python`, ['-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', test], `stage artifact cache ${test} (CPU, loopback only)`);
   }
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);
