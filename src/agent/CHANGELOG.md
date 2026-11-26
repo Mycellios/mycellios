@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-26
+
+### Changed
+
+- A Mico on Claude Code answers the next message of the same conversation sooner: for 30
+  seconds after a reply, Claude Code stays started instead of launching again for each
+  message, as Codex already does.
+
+### Fixed
+
+- Load short conversations in one history response when opening them in Mycellios.
+- A message that waits while its Mico is busy in another conversation now starts as soon as
+  that conversation finishes. Before, it could wait up to 30 more seconds.
+- A waiting message names the conversation it waits for, such as "Waiting for “Daily scout”
+  to finish", instead of only "Queued".
+- Opening a conversation shows its messages and starts receiving the reply sooner: status
+  reads for the header, rail and composer menus now wait until the messages load.
+- A Mico on Claude Code, Codex or OpenCode no longer makes your messages wait while one of
+  its routines with a separate browser runs. Those routines run on a server computer with
+  the Mico's server model, so they now run beside your conversation instead of taking its
+  turn.
+- On Windows, Restart to update no longer fails with "Could not restart. Try again." when
+  Windows briefly refuses to start the update helper. The app now tries again by itself for
+  about 30 seconds before it shows the error.
+- A Mico working on your computer can resume from a saved tool checkpoint when
+  the server connection drops. Commands with an uncertain result are checked
+  before the Mico can make more changes.
+- On Windows, the installers of earlier updates are deleted again after an update. Before, a
+  backup left by an older update stopped the cleanup, and each new version added about 590 MB
+  that stayed on disk.
+
 ## [0.33.0] - 2026-11-26
 
 ### Added
