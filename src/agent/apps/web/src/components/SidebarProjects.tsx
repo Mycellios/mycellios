@@ -3,10 +3,10 @@ import type { ProjectSummary } from "@mycellios/contracts";
 import { Button, Input, OptionSelect, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ChevronDown, Folder, MessageSquare, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { projectHistoryPreloads, readLastProjectThread } from "../lib/project-history-preload";
+import {
+  createProjectHistoryPreloader, projectHistoryPreloads, readLastProjectThread, scopedProjectHistoryPreloader,
+} from "../lib/project-history-preload";
 import type { RpcClient } from "../lib/rpc";
-
-const PROJECT_HISTORY_PRELOAD_CONCURRENCY = 2;
 
 export function SidebarProjects({ projects, rpc, bots, activeThread, historyPreferenceKey, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
   projects: ProjectSummary[]; rpc: RpcClient; bots: { id: string; name: string }[];
@@ -27,7 +27,8 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, historyPref
   const projectId = useRef(crypto.randomUUID());
   const alive = useRef(true);
   const saving = useRef(false);
-  const preloading = useRef(new Map<string, Promise<void>>());
+  const [unscopedPreloader] = useState(createProjectHistoryPreloader);
+  const preloader = historyPreferenceKey ? scopedProjectHistoryPreloader(historyPreferenceKey) : unscopedPreloader;
   const warmingIntent = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
@@ -43,37 +44,10 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, historyPref
   ));
   useEffect(() => {
     if (!onWarm) return;
-    let cancelled = false;
-    let scheduled = false;
-    const pending = JSON.parse(warmTargets) as [string, string][];
-    const inFlight = preloading.current;
-    const canRead = () => !cancelled && pending.length > 0 && document.visibilityState === "visible";
-    const readNext = async () => {
-      while (canRead()) {
-        if (inFlight.size >= PROJECT_HISTORY_PRELOAD_CONCURRENCY) {
-          await Promise.race(inFlight.values());
-          continue;
-        }
-        const [botId, threadId] = pending.shift()!;
-        if (inFlight.has(threadId)) continue;
-        const read = onWarm(botId, threadId).catch(() => undefined).finally(() => inFlight.delete(threadId));
-        inFlight.set(threadId, read);
-        await read;
-      }
-    };
-    const resume = () => {
-      if (scheduled || !canRead()) return;
-      scheduled = true;
-      // A folder change shares the same limit, skipping queued work from the previous folder.
-      void Promise.all(Array.from({ length: PROJECT_HISTORY_PRELOAD_CONCURRENCY }, readNext))
-        .finally(() => { scheduled = false; });
-    };
-    resume();
-    document.addEventListener("visibilitychange", resume);
-    return () => { cancelled = true; document.removeEventListener("visibilitychange", resume); };
-  }, [onWarm, warmTargets]);
+    return preloader.schedule(JSON.parse(warmTargets) as [string, string][], onWarm);
+  }, [onWarm, preloader, warmTargets]);
   function warmFromIntent(botId: string, threadId: string) {
-    if (!onWarm || threadId === activeThread || warmingIntent.current || preloading.current.has(threadId)) return;
+    if (!onWarm || threadId === activeThread || warmingIntent.current || preloader.isInFlight(threadId)) return;
     warmingIntent.current = true;
     void onWarm(botId, threadId).catch(() => undefined).finally(() => { warmingIntent.current = false; });
   }

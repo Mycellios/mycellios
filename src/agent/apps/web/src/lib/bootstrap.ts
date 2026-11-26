@@ -7,7 +7,7 @@ import { initialBootstrapTarget } from "./bootstrap-target";
 import { identityLabels } from "./identity-display";
 import { markOnce } from "./performance";
 import { rpc, selectedSpaceId } from "./rpc";
-import { warmRememberedProjectHistory } from "./use-projects";
+import { warmInitialProjectHistories } from "./use-projects";
 
 let ticketBoardEnabled = false;
 let maxUploadSizeBytes = ATTACHMENT_MAX_BYTES;
@@ -44,7 +44,7 @@ if (initialTarget) {
   void promise.catch(() => undefined);
   primedBootstrap = { botId, promise };
   if (initialRoute === "/app" && !window.location.search && !desktop?.chatWindow) {
-    void promise.then(({ me }) => warmRememberedProjectHistory(me.userId, me.spaceId)).catch(() => undefined);
+    void promise.then(({ me }) => warmInitialProjectHistories(me.userId, me.spaceId)).catch(() => undefined);
   }
 }
 
