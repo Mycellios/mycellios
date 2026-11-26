@@ -1156,16 +1156,20 @@ export async function sendThreadMessage(
     throw error;
   });
   if ("replay" in committed) return committed.replay;
-  await deps.events.notify(target.threadId, committed.eventSeq).catch((error) => {
+  const notification = deps.events.notify(target.threadId, committed.eventSeq).catch((error) => {
     // Subscribers catch up from the durable event cursor after a missed realtime wake.
     getLogger().error("thread send realtime notification", error);
   });
   if (releaseTakeover && input.delivery !== "queue") {
     for (const run of committed.runs) {
-      if (steersUserMessage(run)) await releaseTakeover(run.id);
+      if (!steersUserMessage(run)) continue;
+      await notification;
+      await releaseTakeover(run.id);
     }
   }
-  await enqueueRunsNeedingContinue(deps.jobs, committed.runs);
+  // The message and its event already committed. A slow subscriber wake must
+  // not delay the worker; subscribers read the durable events in sequence.
+  await Promise.all([notification, enqueueRunsNeedingContinue(deps.jobs, committed.runs)]);
   return sendResult(committed.message, committed.runs);
 }
 

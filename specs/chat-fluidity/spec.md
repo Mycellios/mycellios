@@ -48,3 +48,31 @@ queue/steering semantics and authoritative event reducer.
 Use existing components and CSS; add no animation dependency or artificial
 typewriter delay. Publish exact integrated API/worker/web artifacts with rollback
 and public health checks, preserving active configuration and immutable assets.
+
+## First visible agent activity
+
+Display the first observed model activity and the first reply text as separate
+milestones. Native Codex emits one content-free activity event on its first
+reasoning fragment for the current turn. Tool activity and reply text continue
+through the existing stream. Activity does not count as a first response.
+After the send commits, wake the worker without waiting on realtime fanout.
+The persisted sequence orders browser delivery. Steering that releases a
+takeover retains its existing notification, release and wake order.
+
+For a live comparison, hold model, reasoning effort, service tier and prompt
+constant. Measure fresh and warm conversations separately for both server and
+Desktop routes. Record send to acknowledgement, queue wait, native process and
+session preparation, provider request to first activity and text, and delivery
+to the first visible activity and text. Correlate by run ID using durations
+without prompt, reply, reasoning or credential data. Aim for useful activity
+within two seconds on a warm direct chat. Record text latency separately.
+
+A reusable Codex process must be scoped to the same account, Space, Mico,
+conversation, private CLI home and sandbox configuration. Recheck authorization
+before reuse. Revoke on any binding or runtime change, Stop, timeout or protocol
+failure. Keep one active turn per process and ensure stale notifications and
+callbacks cannot enter a later turn. Qualify idle expiry and resource limits
+alongside latency. One clean Codex process may stay warm for 30 seconds. It
+retains its Desktop process slot, is evicted for a different native conversation,
+and discards the previous turn's callbacks. The persisted session receipt allows
+a new process to resume the conversation after eviction.

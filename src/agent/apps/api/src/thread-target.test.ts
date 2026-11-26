@@ -1566,7 +1566,7 @@ function groupTarget() {
 }
 
 describe("sendThreadMessage", () => {
-  it("answers a waiting question with a free-text chat message", async () => {
+  it("wakes a waiting question on a free-text answer while the chat notification is pending", async () => {
     const tx = {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
@@ -1625,22 +1625,27 @@ describe("sendThreadMessage", () => {
       bot: { computer: null },
     } as ThreadTarget;
     const enqueue = vi.fn().mockResolvedValue(undefined);
+    const notification = Promise.withResolvers<void>();
 
-    await expect(
-      sendThreadMessage(
-        {
-          prisma,
-          events: { notify: vi.fn().mockResolvedValue(undefined) } as never,
-          jobs: { enqueue } as never,
-        },
-        actor,
-        target,
-        {
-          text: "Paris",
-          clientNonce: "nonce-ask",
-        },
-      ),
-    ).resolves.toMatchObject({
+    const sent = sendThreadMessage(
+      {
+        prisma,
+        events: { notify: vi.fn(() => notification.promise) } as never,
+        jobs: { enqueue } as never,
+      },
+      actor,
+      target,
+      {
+        text: "Paris",
+        clientNonce: "nonce-ask",
+      },
+    );
+    try {
+      await vi.waitFor(() => expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "run.continue" })));
+    } finally {
+      notification.resolve();
+    }
+    await expect(sent).resolves.toMatchObject({
       runId: "run-waiting",
       taskId: "task-1",
       seq: 1,
@@ -1658,7 +1663,6 @@ describe("sendThreadMessage", () => {
     );
     expect(tx.steeringMessage.create).not.toHaveBeenCalled();
     expect(tx.task.create).not.toHaveBeenCalled();
-    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "run.continue" }));
     expect(tx.event.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "thread.message.created",
@@ -2217,13 +2221,15 @@ describe("sendThreadMessage", () => {
       threadId: "thread-1",
       bot: { computer: null },
     } as ThreadTarget;
+    const notify = vi.fn().mockResolvedValue(undefined);
+    const releaseTakeover = vi.fn().mockResolvedValue(undefined);
     const enqueue = vi.fn().mockResolvedValue(undefined);
 
     await expect(
       sendThreadMessage(
         {
           prisma,
-          events: { notify: vi.fn().mockResolvedValue(undefined) } as never,
+          events: { notify } as never,
           jobs: { enqueue } as never,
         },
         actor,
@@ -2232,6 +2238,7 @@ describe("sendThreadMessage", () => {
           text: "skip that",
           clientNonce: "nonce-takeover",
         },
+        releaseTakeover,
       ),
     ).resolves.toMatchObject({
       runId: "run-waiting",
@@ -2248,6 +2255,9 @@ describe("sendThreadMessage", () => {
       },
     });
     expect(tx.task.create).not.toHaveBeenCalled();
+    expect(releaseTakeover).toHaveBeenCalledWith("run-waiting");
+    expect(notify).toHaveBeenCalledBefore(releaseTakeover);
+    expect(releaseTakeover).toHaveBeenCalledBefore(enqueue);
     expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "run.continue" }));
   });
   it.each(["routine", "bot_message"])(

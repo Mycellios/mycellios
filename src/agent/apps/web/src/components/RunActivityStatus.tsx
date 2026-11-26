@@ -191,7 +191,8 @@ export function RunActivityStatus({
   const backgroundWait = Number.isFinite(backgroundSince) || (tail?.kind === "progress" && tail.waiting === "background");
   const legacyActivity = messages.some(message => message.id.startsWith("progress:")) ? undefined : activity;
   const latestActivity = scopedActivity || latestTool || legacyActivity;
-  const showActivity = latestActivity && ["running", "quiet", "unknown", "recovering"].includes(health.state);
+  const thinking = scopedActivity === "Thinking…";
+  const showActivity = !thinking && latestActivity && ["running", "quiet", "unknown", "recovering"].includes(health.state);
   const labels = {
     idle: t`Finished`,
     waiting: t`Waiting for your response`,
@@ -249,6 +250,7 @@ export function RunActivityStatus({
     ? t`Live updates stopped. The task was not cancelled.`
     : backgroundWait && (health.state === "running" || health.state === "quiet") ? t`Waiting for background work…`
     : health.state === "quiet" ? t`Waiting for an activity update…`
+    : health.state === "running" && thinking ? t`Thinking…`
     : health.state === "running" && specificNow ? specificNow
     : health.state === "running" && settledTool?.outcome === "paused" ? t`A tool is waiting for input`
     : labels[health.state];
