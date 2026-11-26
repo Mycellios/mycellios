@@ -8,7 +8,7 @@ import { appendEventInTransaction, createThreadMessageInTransaction } from "@myc
 import { DesktopUnreachableError } from "./computer-errors.js";
 import { desktopRelayAvailable, desktopRelayKey } from "./desktop-relay.js";
 import { HostAwareSandbox } from "./host-aware-sandbox.js";
-import { OFFLINE_CLOUD_NOTICE, offlineEngineFallbackNotice, selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
+import { OFFLINE_CLOUD_NOTICE, offlineEngineFallbackNotice, RoutineBrowserComputerError, selectOfflineCloudWorkspace, selectRoutineCloudWorkspace, selectRunCloudWorkspace } from "./offline-cloud-workspace.js";
 
 vi.mock("@mycellios/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mycellios/db")>()),
@@ -27,6 +27,7 @@ function fixture(kind: "desktop" | "docker" = "docker", presence?: "connected" |
   const database = {
     thread: { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "thread", taskBotId: null }) },
     task: { findUniqueOrThrow: vi.fn().mockResolvedValue({ resources: [] }) },
+    routine: { findFirst: vi.fn().mockResolvedValue({ id: "routine" }) },
     computer: {
       upsert: vi.fn(({ create }) => ({ ...create, id: "cloud" })),
       findFirstOrThrow: vi.fn().mockResolvedValue({ id: "cloud", kind: "docker" }),
@@ -39,10 +40,77 @@ function fixture(kind: "desktop" | "docker" = "docker", presence?: "connected" |
   const hostPresence = vi.fn().mockResolvedValue(presence);
   const sandbox = {
     describe: () => ({ id: "docker" }), provisionKind, ...(presence ? { hostPresence } : {}),
+    pageBrowser: vi.fn(),
   } as unknown as SandboxProvider;
   const prisma = database as unknown as PrismaClient;
   return { database, provisionKind, hostPresence, sandbox, prisma };
 }
+
+describe("routine server workspaces", () => {
+  const routineRun = { ...run, trigger: "routine", routineId: "routine" };
+
+  it("pins a Docker workspace for an opted-in routine even while This PC is connected", async () => {
+    const { prisma, database, sandbox, hostPresence, provisionKind } = fixture("desktop", "connected");
+    const selected = await selectRunCloudWorkspace(prisma, sandbox, routineRun, desktop, lease, { agentEngine: "codex" });
+    expect(selected).toMatchObject({
+      id: "cloud", kind: "docker", scope: "isolated", piFallback: true,
+      scopeKey: "cloud:isolated:space:owner:mico",
+      homeKey: expect.stringMatching(/^cloud-[a-f0-9]{32}$/),
+    });
+    expect(hostPresence).not.toHaveBeenCalled();
+    expect(provisionKind).not.toHaveBeenCalled();
+    expect(database.run.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        bot: { archivedAt: null, computerSwitching: false, computerId: "local" },
+        leaseOwner: "worker", leaseFence: 3, cloudComputerId: null,
+        routine: expect.objectContaining({
+          isolatedBrowser: true, threadId: "thread",
+          thread: expect.objectContaining({
+            taskBotId: "mico", projectKey: "routine:routine", taskKey: "routine:routine",
+            groupId: null, memberUserId: null, externalConversationId: null,
+          }),
+        }),
+      }),
+      data: { cloudComputerId: "cloud" },
+    });
+    expect(createThreadMessageInTransaction).toHaveBeenLastCalledWith(database, expect.objectContaining({
+      clientNonce: "routine-cloud:run",
+      blocks: [{ kind: "meta", text: "This routine uses a separate server computer with its own files." }],
+    }));
+
+    database.computer.findFirstOrThrow.mockResolvedValueOnce(selected);
+    const resumed = { ...routineRun, cloudComputerId: "cloud", startedAt: new Date() };
+    expect(await selectRunCloudWorkspace(prisma, sandbox, resumed, desktop, lease, { agentEngine: "codex" }))
+      .toMatchObject({ id: "cloud", kind: "docker", scope: "isolated", piFallback: true });
+    expect(database.computer.upsert).toHaveBeenCalledOnce();
+  });
+
+  it("keeps existing isolated assignments and leaves ordinary or already-started runs alone", async () => {
+    const { prisma, database, sandbox } = fixture();
+    expect(await selectRoutineCloudWorkspace(prisma, sandbox, routineRun,
+      { id: "private", scope: "isolated", kind: "docker" }, lease)).toBeUndefined();
+    expect(await selectRoutineCloudWorkspace(prisma, sandbox,
+      { ...routineRun, trigger: "webhook" }, desktop, lease)).toBeUndefined();
+    expect(await selectRoutineCloudWorkspace(prisma, sandbox,
+      { ...routineRun, startedAt: new Date() }, desktop, lease)).toBeUndefined();
+    database.routine.findFirst.mockResolvedValueOnce(null);
+    expect(await selectRoutineCloudWorkspace(prisma, sandbox, routineRun, desktop, lease)).toBeUndefined();
+    expect(database.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses an invalid conversation, PC resources or a missing Docker browser", async () => {
+    const { prisma, database, sandbox } = fixture();
+    database.routine.findFirst.mockResolvedValueOnce({ id: "routine" }).mockResolvedValueOnce(null);
+    await expect(selectRoutineCloudWorkspace(prisma, sandbox, routineRun, desktop, lease))
+      .rejects.toBeInstanceOf(RoutineBrowserComputerError);
+    database.task.findUniqueOrThrow.mockResolvedValueOnce({ resources: ["workspace:linked-project"] });
+    await expect(selectRoutineCloudWorkspace(prisma, sandbox, routineRun, desktop, lease))
+      .rejects.toBeInstanceOf(RoutineBrowserComputerError);
+    await expect(selectRoutineCloudWorkspace(prisma, { ...sandbox, pageBrowser: undefined },
+      routineRun, desktop, lease)).rejects.toBeInstanceOf(RoutineBrowserComputerError);
+    expect(database.$transaction).not.toHaveBeenCalled();
+  });
+});
 
 describe("offline cloud workspaces", () => {
   it("keeps an assigned isolated computer instead of manufacturing a Desktop/cloud fallback", async () => {
