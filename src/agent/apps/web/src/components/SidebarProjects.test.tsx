@@ -3,6 +3,7 @@ import type { ProjectSummary } from "@mycellios/contracts";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
+import { projectHistoryPreloads } from "../lib/project-history-preload";
 import type { RpcClient } from "../lib/rpc";
 import { SidebarProjects } from "./SidebarProjects";
 
@@ -24,45 +25,66 @@ it("warms the intended folder before opening it while another read is still pend
   const root = createRoot(host);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const complete = new Map<string, () => void>();
-  const warm = vi.fn((_botId: string, threadId: string) =>
+  const fetchHistory = vi.fn((_botId: string, threadId: string) =>
     new Promise<void>(resolve => complete.set(threadId, resolve)));
+  const cachedReads = new Map<string, Promise<void>>();
+  function warm(botId: string, threadId: string): Promise<void> {
+    const cached = cachedReads.get(threadId);
+    if (cached) return cached;
+    const read = fetchHistory(botId, threadId);
+    cachedReads.set(threadId, read);
+    return read;
+  }
   const select = vi.fn();
   try {
-    await act(() => root.render(<SidebarProjects projects={[project("Second", 8), project("First", 3)]}
+    await act(() => root.render(<SidebarProjects projects={[project("Second", 16), project("First", 3)]}
       rpc={{} as RpcClient} bots={[]} creating={false} onCreating={() => undefined} onRefresh={() => undefined}
       onSelect={select} onWarm={warm} failed={false} />));
-    expect(warm.mock.calls).toEqual([["First", "First 1"], ["First", "First 2"]]);
+    expect(fetchHistory.mock.calls).toEqual([["First", "First 1"], ["First", "First 2"]]);
     expect(select).not.toHaveBeenCalled();
 
     const secondFolder = Array.from(host.querySelectorAll("button")).find(button => button.textContent === "Second")!;
     await act(() => secondFolder.focus());
     expect(secondFolder.getAttribute("aria-expanded")).toBe("false");
-    expect(warm).toHaveBeenCalledTimes(2);
+    expect(fetchHistory).toHaveBeenCalledTimes(2);
     await act(() => complete.get("First 1")!());
-    expect(warm).toHaveBeenLastCalledWith("Second", "Second 1");
+    expect(fetchHistory).toHaveBeenLastCalledWith("Second", "Second 1");
     expect(select).not.toHaveBeenCalled();
     await act(() => secondFolder.click());
     await act(() => complete.get("First 2")!());
-    expect(warm).toHaveBeenLastCalledWith("Second", "Second 2");
+    expect(fetchHistory).toHaveBeenLastCalledWith("Second", "Second 2");
 
-    for (let index = 1; index <= 5; index += 1) {
-      await act(() => complete.get(`Second ${index}`)!());
-    }
-    expect(warm.mock.calls.slice(2)).toEqual(
-      Array.from({ length: 5 }, (_, index) => ["Second", `Second ${index + 1}`]),
-    );
-
-    const laterChat = host.querySelector<HTMLButtonElement>('button[title="Second 8"]')!;
+    const laterChat = host.querySelector<HTMLButtonElement>('button[title="Second 16"]')!;
     await act(() => laterChat.focus());
-    expect(warm).toHaveBeenLastCalledWith("Second", "Second 8");
+    expect(fetchHistory).toHaveBeenLastCalledWith("Second", "Second 16");
     await act(() => laterChat.click());
-    expect(select).toHaveBeenCalledWith("Second", "Second 8");
-    await act(() => complete.get("Second 8")!());
+    expect(select).toHaveBeenCalledWith("Second", "Second 16");
+    await act(() => complete.get("Second 16")!());
   } finally {
     await act(() => root.unmount());
     host.remove();
     vi.unstubAllGlobals();
   }
+});
+
+it("plans every other conversation in small projects, including rows past five", () => {
+  const targets = projectHistoryPreloads(
+    [project("First", 3), project("Second", 6)], undefined, undefined, "Second 5", "Second 3",
+  );
+  expect(targets.map(([, id]) => id)).toEqual([
+    "Second 5", "Second 1", "First 1", "First 2",
+    "Second 2", "Second 4", "First 3", "Second 6",
+  ]);
+});
+
+it("reserves the initial slots for the intended folder and bounds the background queue", () => {
+  const targets = projectHistoryPreloads(
+    [project("Intended", 20), project("Usual", 20)], "Intended", undefined, "Usual 19", undefined,
+  );
+  expect(targets).toHaveLength(12);
+  expect(targets.slice(0, 4)).toEqual([
+    ["Intended", "Intended 1"], ["Intended", "Intended 2"], ["Usual", "Usual 19"], ["Usual", "Usual 1"],
+  ]);
 });
 
 it("starts with the last opened project chat only in its own account and Space", async () => {
