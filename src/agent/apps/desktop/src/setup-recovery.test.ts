@@ -78,7 +78,8 @@ it("refreshes the folded diagnostic after an unsuccessful retry", async () => {
 
 it("closes from recovery without requiring a connection", async () => {
   const { bridge } = await mount();
-  (document.querySelector("#close") as HTMLButtonElement).click();
+  expect(document.querySelector("#close")).toBeNull();
+  (document.querySelector("#quit") as HTMLButtonElement).click();
   expect(bridge.quit).toHaveBeenCalledOnce();
   expect(bridge.retry).not.toHaveBeenCalled();
 });
@@ -138,4 +139,19 @@ it("prevents a manual connection while a retry is in flight", async () => {
   finish({ ok: false });
   await vi.waitFor(() => expect((document.querySelector("#continue") as HTMLButtonElement).disabled).toBe(false));
   expect(bridge.save).not.toHaveBeenCalled();
+});
+
+it("switches between a shared link and preparing this computer from one link", async () => {
+  await mount();
+  const toggle = document.querySelector("#mode-toggle") as HTMLButtonElement;
+  expect((document.querySelector("#panel-existing") as HTMLElement).hidden).toBe(false);
+  expect(document.querySelector("fieldset")?.hidden).toBe(true);
+  toggle.click();
+  expect((document.querySelector("#mode-new") as HTMLInputElement).checked).toBe(true);
+  expect((document.querySelector("#panel-existing") as HTMLElement).hidden).toBe(true);
+  expect(document.querySelector("#continue")?.textContent).toBe("Preparar este equipo");
+  expect(toggle.textContent).toBe("Usar un enlace");
+  toggle.click();
+  expect((document.querySelector("#mode-existing") as HTMLInputElement).checked).toBe(true);
+  expect(document.querySelector("#continue")?.textContent).toBe("Conectar");
 });

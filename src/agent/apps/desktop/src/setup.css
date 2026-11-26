@@ -103,7 +103,8 @@ html[data-platform="win32"] .titlebar-quit {
 
 .connection-mark { width: 48px; height: 48px; object-fit: contain; margin-bottom: 24px; }
 .main-action { width: 100%; min-height: 44px; }
-.connection-help { margin: 4px 0 24px; color: var(--muted-foreground); font-size: 13px; }
+.connection-help { margin: 4px 0 8px; color: var(--muted-foreground); font-size: 13px; }
+.mode-toggle { display: block; margin: 20px auto 0; font-size: 13px; }
 .choice-description { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted-foreground); }
 .optional-label { font-weight: 400; color: var(--muted-foreground); }
 .saved-connection { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
