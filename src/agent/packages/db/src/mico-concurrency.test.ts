@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  isServerRoutineRun,
   mainChatCountsTowardLimit,
+  routineBrowserRunsOnServer,
   micoRunsLanes,
   micoTurnLimit,
   nativeConcurrencyEnabled,
@@ -57,6 +59,56 @@ describe("Mico lanes", () => {
       // Without a main chat every turn uses a slot.
       expect(slotRunsWhere({ agentEngine, mainThreadId: null }, true)).toEqual({});
     }
+  });
+
+  it("leaves separate-browser routine turns on the server out of a native Mico's slot", () => {
+    const serverRoutine = {
+      NOT: {
+        trigger: "routine",
+        routine: { is: { isolatedBrowser: true } },
+        OR: [{ cloudComputerId: { not: null } }, { startedAt: null, checkpoint: null }],
+      },
+    };
+    const pc = { scope: "dedicated", kind: "desktop" };
+    for (const agentEngine of ["codex", "claude", "opencode", "acp"]) {
+      expect(slotRunsWhere({ agentEngine, mainThreadId: main, computer: pc }, false)).toEqual(serverRoutine);
+      expect(slotRunsWhere({ agentEngine, mainThreadId: main, computer: null }, false)).toEqual(serverRoutine);
+    }
+    expect(slotRunsWhere({ agentEngine: "claude", mainThreadId: main, computer: pc }, true)).toEqual({
+      threadId: { not: main },
+      ...serverRoutine,
+    });
+    // Pi already runs them on its own model; an isolated Docker Mico keeps them on its computer.
+    expect(slotRunsWhere({ agentEngine: "pi", mainThreadId: main, computer: pc }, false)).toEqual({
+      threadId: { not: main },
+    });
+    expect(
+      slotRunsWhere(
+        { agentEngine: "claude", mainThreadId: main, computer: { scope: "isolated", kind: "docker" } },
+        false,
+      ),
+    ).toEqual({});
+    // A caller that did not read the computer keeps counting them.
+    expect(slotRunsWhere({ agentEngine: "claude", mainThreadId: main }, false)).toEqual({});
+  });
+
+  it("recognises a separate-browser routine turn that runs or will run on the server", () => {
+    const base = {
+      trigger: "routine",
+      cloudComputerId: null,
+      startedAt: null,
+      checkpoint: null,
+      routine: { isolatedBrowser: true },
+    };
+    expect(routineBrowserRunsOnServer({ agentEngine: "codex", computer: null })).toBe(true);
+    expect(isServerRoutineRun(base)).toBe(true);
+    expect(isServerRoutineRun({ ...base, startedAt: new Date(), cloudComputerId: "cloud" })).toBe(true);
+    // A turn that already began elsewhere keeps its place.
+    expect(isServerRoutineRun({ ...base, startedAt: new Date() })).toBe(false);
+    expect(isServerRoutineRun({ ...base, checkpoint: "{}" })).toBe(false);
+    expect(isServerRoutineRun({ ...base, routine: { isolatedBrowser: false } })).toBe(false);
+    expect(isServerRoutineRun({ ...base, routine: null })).toBe(false);
+    expect(isServerRoutineRun({ ...base, trigger: "user" })).toBe(false);
   });
 
   it("keeps a generic ACP agent and unknown engines at one turn in total", () => {

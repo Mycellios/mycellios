@@ -50,6 +50,7 @@ import {
   recordThreadTurnOutcome,
   retireWaitingQuestionInTransaction,
   settleStoppedRecipientsInTransaction,
+  slotRunsWhere,
   touchGroupUpdatedAt,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
@@ -655,15 +656,22 @@ export async function threadSnapshot(
  * is never named, so a shared Mico never reveals one person's chats to another.
  */
 export async function queuedBehindConversation(
-  prisma: Pick<PrismaClient, "run" | "thread">,
+  prisma: Pick<PrismaClient, "run" | "thread" | "bot">,
   target: { botId: string; threadId: string },
   queuedRunId: string,
 ): Promise<{ threadId: string; title: string | null; main: boolean } | null> {
-  const own = await prisma.thread.findUnique({
-    where: { id: target.threadId },
-    select: { memberUserId: true },
-  });
-  if (!own || own.memberUserId) return null;
+  const [own, bot] = await Promise.all([
+    prisma.thread.findUnique({ where: { id: target.threadId }, select: { memberUserId: true } }),
+    prisma.bot.findUnique({
+      where: { id: target.botId },
+      select: {
+        agentEngine: true,
+        thread: { select: { id: true } },
+        computer: { select: { scope: true, kind: true } },
+      },
+    }),
+  ]);
+  if (!own || own.memberUserId || !bot) return null;
   const blocker = await prisma.run.findFirst({
     where: {
       botId: target.botId,
@@ -671,6 +679,14 @@ export async function queuedBehindConversation(
       threadId: { not: target.threadId },
       status: { in: ["leased", "running"] },
       leaseExpiresAt: { gt: new Date() },
+      // Only turns that take one of the Mico's slots keep this one waiting.
+      AND: [
+        slotRunsWhere({
+          agentEngine: bot.agentEngine,
+          mainThreadId: bot.thread?.id,
+          computer: bot.computer,
+        }),
+      ],
     },
     orderBy: [{ startedAt: "asc" }, { id: "asc" }],
     select: {

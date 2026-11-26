@@ -179,6 +179,33 @@ try {
   await endAll(codex.id);
   checks.push("switching the flag off restores one turn in total for the next admission");
 
+  // 5. Off: a separate-browser routine turn runs on a server workspace with a Pi model, so it
+  // neither takes nor waits for the native Mico's single slot. Other routines still do.
+  const routineTurn = async (isolatedBrowser: boolean, key: string) => {
+    const thread = await side(claude.id, key);
+    const routine = await system.routine.create({ data: { ...scope, botId: claude.id, threadId: thread.id, name: key,
+      prompt: "Synthetic routine", isolatedBrowser } });
+    const task = await system.task.create({ data: { ...scope, botId: claude.id, threadId: thread.id, prompt: "Synthetic", status: "queued" } });
+    return system.run.create({ data: { ...scope, botId: claude.id, threadId: thread.id, taskId: task.id, status: "queued",
+      trigger: "routine", routineId: routine.id } });
+  };
+  const [claudeA, claudeB] = [await side(claude.id, "a"), await side(claude.id, "b")];
+  assert.equal((await admit(await routineTurn(true, "browser-1"))).count, 1);
+  assert.equal(await admitted(claudeA.id, claude.id), true);
+  assert.equal((await admit(await routineTurn(true, "browser-2"))).count, 1);
+  assert.equal(await admitted(claudeB.id, claude.id), false);
+  await waitingMessage(claudeB.id, claude.id);
+  assert.deepEqual(await queueState(claude.id, claudeB.id).then((state) => [state.waiting, state.slots]), ["slot", { running: 1, limit: 1 }]);
+  assert.equal((await admit(await routineTurn(false, "plain"))).count, 0);
+  await endAll(claude.id);
+  // A separate-browser routine turn that already began on this PC keeps counting.
+  const begun = await routineTurn(true, "begun");
+  assert.equal((await admit(begun)).count, 1);
+  await system.run.update({ where: { id: begun.id }, data: { status: "running", startedAt: new Date() } });
+  assert.equal(await admitted(claudeA.id, claude.id), false);
+  await endAll(claude.id);
+  checks.push("off: separate-browser routine turns on the server neither take nor wait for a native Mico's slot; plain and already-begun routine turns still count");
+
   const result = { passed: true, checks, productionAccess: false, modelsCalled: false, directory };
   await writeFile(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));

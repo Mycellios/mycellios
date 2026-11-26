@@ -19,9 +19,12 @@ function blocker(
   const prisma = {
     run: { findFirst },
     thread: { findUnique: vi.fn(async () => own) },
-  } as unknown as Pick<PrismaClient, "run" | "thread">;
+    bot: { findUnique: vi.fn(async () => micoBot) },
+  } as unknown as Pick<PrismaClient, "run" | "thread" | "bot">;
   return { prisma, findFirst };
 }
+
+const micoBot = { agentEngine: "claude", thread: { id: "main-1" }, computer: null };
 
 describe("queuedBehindConversation", () => {
   it("names the same Mico's live turn in another conversation", async () => {
@@ -38,6 +41,8 @@ describe("queuedBehindConversation", () => {
           id: { not: "run-q" },
           threadId: { not: "side-1" },
           status: { in: ["leased", "running"] },
+          // A separate-browser routine turn on the server never holds a native Mico's slot.
+          AND: [{ NOT: expect.objectContaining({ trigger: "routine" }) }],
         }),
       }),
     );
@@ -76,7 +81,8 @@ describe("queuedBehindConversation", () => {
     const prisma = {
       run: { findFirst: vi.fn(async () => null) },
       thread: { findUnique: vi.fn(async () => ({ memberUserId: null })) },
-    } as unknown as Pick<PrismaClient, "run" | "thread">;
+      bot: { findUnique: vi.fn(async () => micoBot) },
+    } as unknown as Pick<PrismaClient, "run" | "thread" | "bot">;
     await expect(queuedBehindConversation(prisma, target, "run-q")).resolves.toBeNull();
   });
 });
