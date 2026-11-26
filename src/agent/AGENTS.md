@@ -1904,8 +1904,8 @@
   Restored turns must synchronize transcript tool deltas before continue(). Budget
   non-reasoning compatible chat against the same collapsed system/tool state the
   transport sends, preserving current instructions and correlated results.
-  Keep authorized memory and user-clarification schemas in the initial catalog;
-  basic interactions should not require discovering their own core tools.
+  Keep authorized memory, user-clarification and page-browser schemas in the
+  initial catalog. Schema paging never admits a tool the run cannot use.
 - Micos created in Desktop default to This PC (`dedicated`), each in its own
   native folder, as the reference app's agents work on the owner's computer (behavior
   reference only); local-access consent is still requested before binding.

@@ -51,6 +51,19 @@ describe("runtime schema catalog", () => {
     expect(accept).toHaveBeenCalledOnce();
   });
 
+  it("keeps the authorized page tools visible when schemas are paged", () => {
+    const pageTools = ["browser_navigate", "browser_snapshot", "browser_act"].map(definition);
+    const other = definition("render_plot");
+    const catalog = new RuntimeToolCatalog([...pageTools, other], {
+      wireName: (tool) => tool.name,
+      pendingTools: () => new Set(),
+      accept: () => undefined,
+    });
+    expect(catalog.definitionsForModel()).toEqual([...pageTools, ...catalog.controls]);
+    catalog.load({ id: other.name });
+    expect(catalog.definitionsForModel()).toEqual([...pageTools, other, ...catalog.controls]);
+  });
+
   it("retains in-flight tool definitions and pages out only resolved schemas", () => {
     const tools = [definition("list_fleet"), definition("render_plot"), definition("run_subagent")];
     const pending = new Set<ConnectorTool>([tools[1]!]);
@@ -78,6 +91,8 @@ describe("runtime schema catalog", () => {
     });
     expect(() => catalog.load({ id: "run_subagent" })).toThrow("not authorized");
     expect(catalog.search({ query: "run_subagent" })).toMatchObject({ tools: [] });
+    expect(() => catalog.load({ id: "browser_navigate" })).toThrow("not authorized");
+    expect(catalog.search({ query: "browser_navigate" })).toMatchObject({ tools: [] });
   });
 
   it("preserves normalized wire identities and does not execute while loading", () => {
