@@ -746,6 +746,10 @@
   Start a cold same-Space history read at roster selection and consume its fresh,
   scoped result in the incoming shell. Keep writes, auth recovery and realtime
   direct. Reuse fresh model and account queries within their existing scope.
+  Roster rows warm that same read on press, focus or a 120 ms hover, and once the
+  open chat has history the first four visible Micos of the current Space warm
+  one at a time while the window is visible (not on phones). Never cross a Space
+  boundary or mark them read. Verify roster-history-preload tests.
   Projects warm up to twelve conversations across folders with two concurrent
   background reads per account and Space. On the default route this starts when
   authenticated bootstrap retrieves the Projects list, while the shell mounts.
