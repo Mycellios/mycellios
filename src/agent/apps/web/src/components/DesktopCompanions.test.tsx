@@ -77,3 +77,26 @@ it("reads a waiting Mico's questions once until its roster state changes", async
     expect(fixture.get).toHaveBeenCalledTimes(2);
   } finally { await act(async () => root.unmount()); delete window.mycelliosDesktop; vi.unstubAllGlobals(); }
 });
+
+it("keeps a waiting Mico's questions across a shell remount in the same scope", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const scope = JSON.stringify(["remount-owner", "space"]);
+  const snapshot = { botId: "mico", messages: [{ id: "message", runId: "run", blocks: [{ kind: "ask", text: "Where?", actions: [{ id: "a", label: "Paris" }], status: "pending" }] }], run: { id: "run", status: "waiting_input" } };
+  fixture.get.mockReset(); fixture.get.mockResolvedValue(snapshot); fixture.avatar.mockResolvedValue(undefined);
+  window.mycelliosDesktop = { companions: { publish: vi.fn(async () => {}), state: vi.fn(async () => ({ island: { shown: true } })),
+    onQuestion: () => () => {}, questionResult: vi.fn(async () => undefined), onSelect: () => () => {} } } as unknown as MycelliosDesktop;
+  const bot = { id: "mico", spaceId: "space", name: "Mico", color: "#3f9f78", status: "waiting_input", preview: "Where?", unread: false, updatedAt: "2026-01-01T00:00:00.000Z" } as Bot;
+  try {
+    for (const owner of [scope, scope]) {
+      const div = document.createElement("div"); const root = createRoot(div);
+      await act(async () => root.render(<DesktopCompanions bots={[{ ...bot }]} spaceId="space" scope={owner} />));
+      await act(async () => root.unmount());
+    }
+    expect(fixture.get).toHaveBeenCalledTimes(1);
+    // Another account never reuses those questions.
+    const div = document.createElement("div"); const root = createRoot(div);
+    await act(async () => root.render(<DesktopCompanions bots={[{ ...bot }]} spaceId="space" scope={JSON.stringify(["other-owner", "space"])} />));
+    await act(async () => root.unmount());
+    expect(fixture.get).toHaveBeenCalledTimes(2);
+  } finally { delete window.mycelliosDesktop; vi.unstubAllGlobals(); }
+});

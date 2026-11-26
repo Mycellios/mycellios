@@ -16,6 +16,27 @@ export function companionQuestionKey(
   return JSON.stringify([scope, bot.id, bot.status, bot.updatedAt, bot.preview]);
 }
 
+type CachedQuestions = Map<string, { key: string; prompts: DesktopQuestionPrompt[] }>;
+const questionCaches = new Map<string, CachedQuestions>();
+const QUESTION_CACHE_SCOPES = 4;
+
+/**
+ * A waiting Mico's island questions, kept per account/Space scope across shell remounts:
+ * opening a project chat remounts the shell, and a component-local cache would read every
+ * waiting Mico's history again. Entries still revalidate through companionQuestionKey.
+ */
+function companionQuestionCache(scope: string): CachedQuestions {
+  let cache = questionCaches.get(scope);
+  if (cache) questionCaches.delete(scope);
+  else cache = new Map();
+  questionCaches.set(scope, cache);
+  for (const oldest of questionCaches.keys()) {
+    if (questionCaches.size <= QUESTION_CACHE_SCOPES) break;
+    questionCaches.delete(oldest);
+  }
+  return cache;
+}
+
 export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
   bots: Bot[]; spaceId: string | null; scope: string;
   onOpen?: (spaceId: string, path: string) => void;
@@ -25,7 +46,6 @@ export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
   const bridge = desktopBridge()?.companions;
   const requestScope = useRef(scope);
   requestScope.current = scope;
-  const questionCache = useRef(new Map<string, { key: string; prompts: DesktopQuestionPrompt[] }>());
   useEffect(() => {
     if (!bridge?.onQuestion || !bridge.questionResult) return;
     return bridge.onQuestion(async (request: DesktopQuestionRequest) => {
@@ -76,7 +96,7 @@ export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
         const waiting = bots.filter(bot => !bot.archivedAt && bot.spaceId === spaceId && bot.status === "waiting_input").slice(0, 20);
         // The roster refreshes often; a waiting Mico's questions only change with its
         // status, newest activity or preview, so its history is read again only then.
-        const known = questionCache.current;
+        const known = companionQuestionCache(scope);
         for (const id of [...known.keys()]) if (!waiting.some(bot => bot.id === id)) known.delete(id);
         for (let offset = 0; offset < waiting.length && alive; offset += 4) {
           await Promise.all(waiting.slice(offset, offset + 4).map(async bot => {
