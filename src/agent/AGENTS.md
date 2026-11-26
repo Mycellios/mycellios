@@ -1208,7 +1208,10 @@
   single-turn in total, main chat included, unless the operator sets
   MYCELLIOS_NATIVE_CONCURRENCY=1 on API and worker (specs/native-engines/spec.md phase 4):
   then Codex, Claude Code and OpenCode get the same lanes (micoRunsLanes) and side-
-  conversation private lane, while a generic ACP agent stays single-turn. Each run keeps
+  conversation private lane, while a generic ACP agent stays single-turn. Either way a
+  separate-browser routine turn that runs on its server workspace with a Pi model
+  (routineBrowserRunsOnServer/isServerRoutineRun in slotRunsWhere) neither takes nor waits
+  for a native Mico's slots; one already begun elsewhere keeps counting. Each run keeps
   its own session folder, CLI process and MCP bridge token; Desktop bounds turn CLI
   processes per PC (NativeProcessSlots, default 6) and a turn above it waits visibly. The
   Desktop relay's unchanged lanes still deliver at most 2 agent runs per Mico and 4 per API

@@ -157,6 +157,7 @@ async function waitReason(
       taskConcurrency: true,
       computerSwitching: true,
       thread: { select: { id: true } },
+      computer: { select: { scope: true, kind: true } },
     },
   });
   if (!bot) return { waiting: "busy" };
@@ -168,7 +169,10 @@ async function waitReason(
   if (thread?.lastError && normalizeRunError(thread.lastError).kind === "maintenance")
     return { waiting: "restart" };
   const nativeConcurrency = nativeConcurrencyEnabled();
-  const slotsWhere = slotRunsWhere({ agentEngine: bot.agentEngine, mainThreadId: bot.thread?.id }, nativeConcurrency);
+  const slotsWhere = slotRunsWhere(
+    { agentEngine: bot.agentEngine, mainThreadId: bot.thread?.id, computer: bot.computer },
+    nativeConcurrency,
+  );
   // The main chat of a Mico with lanes (Pi, or a native engine with native concurrency on) has
   // its own lane and never waits for a slot.
   if ("threadId" in slotsWhere && bot.thread?.id === target.threadId) return { waiting: "busy" };

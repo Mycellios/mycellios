@@ -254,11 +254,11 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
           continue;
         }
         if (task.dependencies.some(id => !tasks.some(dependency => dependency.id === id && dependency.delegationState === "completed"))) continue;
-        const destination = await tx.bot.findFirst({ where: { id: task.botId, ...scope, archivedAt: null }, select: { agentEngine: true, taskConcurrency: true, thread: { select: { id: true } } } });
+        const destination = await tx.bot.findFirst({ where: { id: task.botId, ...scope, archivedAt: null }, select: { agentEngine: true, taskConcurrency: true, thread: { select: { id: true } }, computer: { select: { scope: true, kind: true } } } });
         // Delegated work uses the Mico's conversation slots; with lanes, its main chat has one of its own.
         const nativeConcurrency = nativeConcurrencyEnabled();
         if (!destination || await tx.run.count({ where: { botId: task.botId, ...scope, status: { in: ["queued", "leased", "running"] },
-          ...slotRunsWhere({ agentEngine: destination.agentEngine, mainThreadId: destination.thread?.id }, nativeConcurrency) } }) >= micoTurnLimit(destination, nativeConcurrency)) continue;
+          ...slotRunsWhere({ agentEngine: destination.agentEngine, mainThreadId: destination.thread?.id, computer: destination.computer }, nativeConcurrency) } }) >= micoTurnLimit(destination, nativeConcurrency)) continue;
         if (reservations.some(other => other.id !== task.id && workResourcesConflict(task.resources, other.resources))) continue;
         const bot = await tx.bot.findFirst({ where: { id: task.botId, ...scope, archivedAt: null } });
         if (!bot) { await tx.task.update({ where: { id: task.id }, data: { delegationState: "paused" } }); continue; }
