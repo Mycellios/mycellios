@@ -134,6 +134,9 @@ test("a project chat shows its own preloaded messages on its first opening", asy
   const botId = await createNamedBot(page, "Mico");
   const projectId = randomUUID();
   await rpc(page, "development/saveProject", { id: projectId, name: "Preloaded project" });
+  const oldest = await rpc<{ threadId: string }>(page, "development/open", {
+    botId, projectKey: `project:${projectId}`, taskKey: `project-task:${randomUUID()}`, title: "Oldest chat",
+  });
   const sibling = await rpc<{ threadId: string }>(page, "development/open", {
     botId, projectKey: `project:${projectId}`, taskKey: `project-task:${randomUUID()}`, title: "Other chat",
   });
@@ -144,13 +147,13 @@ test("a project chat shows its own preloaded messages on its first opening", asy
   const message: ThreadMessage = { id: "warm-project-message", threadId, seq: 0, role: "user",
     blocks: [{ kind: "text", text }], createdAt: new Date().toISOString() };
   let historyReads = 0;
-  let siblingReads = 0;
+  let oldestReads = 0;
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/rpc/threads/get", async route => {
     const input = route.request().postDataJSON()?.json;
-    if (input?.taskThreadId === sibling.threadId) {
-      siblingReads += 1;
+    if (input?.taskThreadId === sibling.threadId || input?.taskThreadId === oldest.threadId) {
+      if (input.taskThreadId === oldest.threadId) oldestReads += 1;
       await held;
     }
     if (input?.taskThreadId !== threadId) return route.continue();
@@ -164,8 +167,8 @@ test("a project chat shows its own preloaded messages on its first opening", asy
   const transcript = page.getByTestId("transcript");
   try {
     await page.reload();
-    // The second automatic request only starts after the first snapshot is in memory.
-    await expect.poll(() => siblingReads).toBe(1);
+    // With one slot held by the sibling, starting the oldest read proves the first snapshot is in memory.
+    await expect.poll(() => oldestReads).toBe(1);
     expect(historyReads).toBe(1);
     await expect(transcript.getByText(text, { exact: true })).toHaveCount(0);
     await project.getByRole("button", { name: "Preloaded project", exact: true }).click();
