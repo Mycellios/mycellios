@@ -158,6 +158,7 @@ import { notificationTarget } from "../pwa/notification-target";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
+import { projectHistoryPreferenceKey } from "../lib/project-history-preload";
 import { authClient } from "../lib/auth";
 import { autoReadStillWanted } from "../lib/auto-read";
 import {
@@ -4999,7 +5000,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               ) : null}
               {!miniSidebar && !activityMode && !showSpaceSearch ? <NeedsYouGroup groups={sidebarGroups} mobile={isMobileSidebar} openSpaceChat={openSpaceChat} /> : null}
               {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, currentSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
-                historyPreferenceKey={userId && currentSpaceId ? `mycellios:last-project-thread:${JSON.stringify([userId, currentSpaceId])}` : undefined}
+                historyPreferenceKey={userId && currentSpaceId ? projectHistoryPreferenceKey(userId, currentSpaceId) : undefined}
                 activeThread={taskScope?.taskThreadId} creating={creatingProject} onCreating={setCreatingProject} onRefresh={projectCollection.refresh} failed={projectCollection.error}
                 onWarm={readingFirstHistory ? undefined : warmProjectConversation}
                 onSelect={(botId, threadId) => {

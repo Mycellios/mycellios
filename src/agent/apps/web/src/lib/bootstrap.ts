@@ -7,6 +7,7 @@ import { initialBootstrapTarget } from "./bootstrap-target";
 import { identityLabels } from "./identity-display";
 import { markOnce } from "./performance";
 import { rpc, selectedSpaceId } from "./rpc";
+import { warmRememberedProjectHistory } from "./use-projects";
 
 let ticketBoardEnabled = false;
 let maxUploadSizeBytes = ATTACHMENT_MAX_BYTES;
@@ -32,10 +33,9 @@ let primedBootstrap: {
   seed?: AppBootstrap;
 } | null = null;
 
-const initialTarget = initialBootstrapTarget(
-  appRoute(window.location.pathname),
-  Boolean(desktopBridge()),
-);
+const initialRoute = appRoute(window.location.pathname);
+const desktop = desktopBridge();
+const initialTarget = initialBootstrapTarget(initialRoute, Boolean(desktop));
 if (initialTarget) {
   const { botId } = initialTarget;
   const promise = requestBootstrap(botId);
@@ -43,6 +43,9 @@ if (initialTarget) {
   // Register a rejection handler immediately while preserving rejection for a consumer.
   void promise.catch(() => undefined);
   primedBootstrap = { botId, promise };
+  if (initialRoute === "/app" && !window.location.search && !desktop?.chatWindow) {
+    void promise.then(({ me }) => warmRememberedProjectHistory(me.userId, me.spaceId)).catch(() => undefined);
+  }
 }
 
 /** The speculative first-load bootstrap, left in place for the shell to take. */
