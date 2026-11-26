@@ -78,7 +78,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       if (!scope || !/^[a-f0-9]{64}$/.test(scope)) throw Error("Desktop account access is unavailable");
       const request = NativeEngineAccountRequestSchema.parse(input);
       const command = await nativeEngineCommand(request.engine, path.join(profile, "agent-executor", scope), { ...store, storeRoot });
-      if (request.engine === "codex") await releaseIdleNativeProcesses();
+      if (request.engine === "codex" || request.engine === "claude") await releaseIdleNativeProcesses();
       if (accessScope() !== scope) throw Error("Desktop account changed before signing in");
       return nativeEngineAccount(request, command, accountHost);
     },
@@ -101,7 +101,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
         if (accessScope() !== scope) throw Error("Desktop account changed before installing");
       };
       authorize();
-      if (engine === "codex") await releaseIdleNativeProcesses();
+      if (engine === "codex" || engine === "claude") await releaseIdleNativeProcesses();
       // The download goes on after this answer; its progress and outcome come with the engines.
       if (version) {
         // Only the version this PC offers, verified like a first install before any turn runs it.

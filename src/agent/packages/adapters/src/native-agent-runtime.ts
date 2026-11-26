@@ -298,12 +298,20 @@ export function nativeEngineModels(engines: Awaited<ReturnType<typeof discoverNa
 const openCodeFileTools = new Set(["list_files", "read_file", "write_file", "edit_file"]);
 const nativeMcpServerName = "rakazo";
 
-/** A short-lived, authenticated MCP bridge exposes only this run's authorized catalog. */
+type BridgeCall = (name: string, args: Record<string, unknown>, id: string) => Promise<unknown>;
+
+/**
+ * An authenticated MCP bridge exposes only the current run's authorized catalog. A kept
+ * Claude Code process keeps its bridge between turns of the same conversation: bind(undefined)
+ * refuses every call while it is idle, and the next turn binds its own executor.
+ */
 async function toolBridge(
   tools: ConnectorTool[],
-  call: (name: string, args: Record<string, unknown>, id: string) => Promise<unknown>,
+  call: BridgeCall,
   namedFileTools = false,
 ) {
+  let current: BridgeCall | undefined = call;
+  let generation = 0;
   const registered = new Map<string, ConnectorTool>();
   for (const [index, tool] of tools.entries()) {
     const { type } = tool.inputSchema;
@@ -365,6 +373,8 @@ async function toolBridge(
         const params = object(message.params);
         const tool = typeof params.name === "string" ? registered.get(params.name) : undefined;
         if (!tool) throw new Error("Unknown tool");
+        const execute = current;
+        if (!execute) throw new Error("No active turn");
         const id = JSON.stringify(message.id);
         const fingerprint = JSON.stringify(params);
         let cached = calls.get(id);
@@ -373,7 +383,7 @@ async function toolBridge(
           if (calls.size >= 4096) throw new Error("Tool request limit exceeded");
           cached = {
             fingerprint,
-            result: call(tool.name, object(params.arguments), `${bridgeId}:${id}`),
+            result: execute(tool.name, object(params.arguments), `${bridgeId}:${generation}:${id}`),
           };
           calls.set(id, cached);
         }
@@ -406,6 +416,12 @@ async function toolBridge(
   return {
     url: `http://127.0.0.1:${address.port}/mcp`,
     token,
+    /** Hands the bridge to another turn's executor, or to none; earlier results never carry over. */
+    bind: (next: BridgeCall | undefined) => {
+      current = next;
+      generation += 1;
+      calls.clear();
+    },
     close: async () => {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -423,6 +439,32 @@ type CodexProcess = {
   releaseSlot?: () => void;
 };
 type IdleCodex = { key: string; sessionId: string; child: CodexProcess; timer: ReturnType<typeof setTimeout> };
+/**
+ * A Claude Code process in stream-json mode reads one user message per turn from stdin, so a
+ * finished conversation can take its next turn without starting the CLI, its MCP bridge or its
+ * model catalog again. It keeps its bridge and private system prompt file while idle.
+ */
+type ClaudeProcess = {
+  process: NativeAgentProcess;
+  bridge: Awaited<ReturnType<typeof toolBridge>>;
+  systemPromptFile: string;
+  notify?: (message: WireMessage) => void;
+  fail?: (error: Error) => void;
+  turns: number;
+  releaseSlot?: () => void;
+};
+type IdleClaude = { key: string; sessionId: string; child: ClaudeProcess; timer: ReturnType<typeof setTimeout> };
+const CLAUDE_RETAINED_TURNS = 32;
+
+async function stopClaudeProcess(child: ClaudeProcess) {
+  try {
+    await child.process.stop();
+    await child.bridge.close();
+    await rm(child.systemPromptFile, { force: true }).catch(() => undefined);
+  } finally {
+    child.releaseSlot?.();
+  }
+}
 
 async function fileIdentity(path: string) {
   return stat(path).then(file => [file.ino, file.size, file.mtimeMs, file.ctimeMs], () => null);
@@ -456,6 +498,7 @@ function startCodexProcess(command: NativeCommand, cwd: string, args: string[], 
 export class NativeAgentRuntime implements AgentRuntime {
   private active = new Map<string, { controller: AbortController; stopped: Promise<void> }>();
   private idleCodex?: IdleCodex;
+  private idleClaude?: IdleClaude;
   private nativeEpoch = 0;
   constructor(
     private readonly options: {
@@ -493,9 +536,19 @@ export class NativeAgentRuntime implements AgentRuntime {
     try { await idle.child.process.stop(); }
     finally { idle.child.releaseSlot?.(); }
   }
+  private takeIdleClaude() {
+    const idle = this.idleClaude;
+    this.idleClaude = undefined;
+    if (idle) clearTimeout(idle.timer);
+    return idle;
+  }
+  private async discardIdleClaude() {
+    const idle = this.takeIdleClaude();
+    if (idle) await stopClaudeProcess(idle.child);
+  }
   async releaseIdleNativeProcesses() {
     this.nativeEpoch += 1;
-    await this.discardIdleCodex();
+    await Promise.all([this.discardIdleCodex(), this.discardIdleClaude()]);
   }
   async *run(
     request: AgentRunRequest,
@@ -509,7 +562,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       // while its engine is being updated, and counts as running until it ends. An operator's own
       // command is never updated, so its turns do not wait.
       const held = updates.held(engine);
-      if (held && engine === "codex") await this.releaseIdleNativeProcesses();
+      if (held && (engine === "codex" || engine === "claude")) await this.releaseIdleNativeProcesses();
       if (held) yield { type: "progress", text: nativeEngineUpdateWaitText(engine), activity: true };
       const leave = await updates.enter(engine, context?.signal ?? new AbortController().signal).catch(() => undefined);
       if (!leave) return;
@@ -609,6 +662,10 @@ export class NativeAgentRuntime implements AgentRuntime {
     let codexKey: string | undefined;
     let codexCompleted = false;
     let reusedCodex = false;
+    let claude: ClaudeProcess | undefined;
+    let claudeKey: string | undefined;
+    let claudeCompleted = false;
+    let reusedClaude = false;
     let bridge: Awaited<ReturnType<typeof toolBridge>> | undefined;
     let systemPromptFile: string | undefined;
     let paused = false;
@@ -759,6 +816,16 @@ export class NativeAgentRuntime implements AgentRuntime {
           ]);
           if (identity[0]) codexKey = hash([cwd, binding, command, this.options.codexArgs, identity]);
         }
+        if (engine === "claude" && !request.turnCheckpoint && !request.resetNativeSession) {
+          // The CLI, its sign-in and the owner's loaded settings must be the same ones it started with.
+          const claudeHome = join(homedir(), ".claude");
+          const identity = await Promise.all([
+            fileIdentity(command.command), fileIdentity(join(claudeHome, ".credentials.json")),
+            claudeUserSettings ? fileIdentity(join(claudeHome, "settings.json")) : null,
+          ]);
+          if (identity[0])
+            claudeKey = hash([cwd, binding, command, claudeWorkspace ?? null, request.nativeConfig ?? null, identity]);
+        }
         signal.throwIfAborted();
         if (!await authorized()) throw new Error("Native agent access changed before execution.");
         signal.throwIfAborted();
@@ -769,12 +836,23 @@ export class NativeAgentRuntime implements AgentRuntime {
           process = codex.process;
           releaseSlot = codex.releaseSlot;
           reusedCodex = true;
-        } else {
+          await this.discardIdleClaude();
+        } else if (claudeKey && sessionId && epoch === this.nativeEpoch &&
+          this.idleClaude?.key === claudeKey && this.idleClaude.sessionId === sessionId &&
+          this.idleClaude.child.process.reusable) {
+          claude = this.takeIdleClaude()!.child;
+          process = claude.process;
+          releaseSlot = claude.releaseSlot;
+          bridge = claude.bridge;
+          systemPromptFile = claude.systemPromptFile;
+          reusedClaude = true;
           await this.discardIdleCodex();
+        } else {
+          await Promise.all([this.discardIdleCodex(), this.discardIdleClaude()]);
         }
         // Above the PC's bound this turn waits here, with its reason shown, before anything runs.
         const slots = this.options.processSlots;
-        if (slots && !reusedCodex) {
+        if (slots && !reusedCodex && !reusedClaude) {
           let waited = false;
           releaseSlot = await slots.acquire(signal, () => {
             waited = true;
@@ -848,6 +926,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           }
           await recordUsage();
           codexCompleted = engine === "codex";
+          claudeCompleted = engine === "claude";
           queue.push({ type: "done" });
           queue.end();
         };
@@ -1022,9 +1101,29 @@ export class NativeAgentRuntime implements AgentRuntime {
                 url: `data:${image.mimeType};base64,${Buffer.from(image.data).toString("base64")}`,
               })),
           ]);
-        } else {
-          bridge = await toolBridge(tools, orderedCall, engine === "opencode");
-          if (engine === "claude") {
+        } else if (engine === "claude") {
+          const handle = (message: WireMessage) => {
+            const raw = message as unknown as Record<string, unknown>;
+            if (raw.type === "system" && raw.subtype === "init")
+              sessionId = text(raw.session_id) || sessionId;
+            const event = object(raw.event);
+            const delta = object(event.delta);
+            if (
+              raw.type === "stream_event" &&
+              event.type === "content_block_delta" &&
+              delta.type === "text_delta"
+            )
+              emitText(text(delta.text));
+            if (raw.type === "result") {
+              if (raw.is_error || raw.subtype !== "success")
+                failure(nativeAgentProtocolError({ errors: raw.errors, message: raw.result }, "The native Claude turn did not complete"));
+              else void finish(sessionId).catch(failure);
+            }
+          };
+          if (claude) {
+            claude.bridge.bind(orderedCall);
+          } else {
+            bridge = await toolBridge(tools, orderedCall);
             const config = JSON.stringify({
               mcpServers: {
                 rakazo: {
@@ -1066,30 +1165,23 @@ export class NativeAgentRuntime implements AgentRuntime {
               systemPromptFile,
             ];
             if (sessionId) args.push("--resume", sessionId);
-            process = new NativeAgentProcess(
-              command,
-              args,
-              claudeWorkspace ?? cwd,
-              (message) => {
-                const raw = message as unknown as Record<string, unknown>;
-                if (raw.type === "system" && raw.subtype === "init")
-                  sessionId = text(raw.session_id) || sessionId;
-                const event = object(raw.event);
-                const delta = object(event.delta);
-                if (
-                  raw.type === "stream_event" &&
-                  event.type === "content_block_delta" &&
-                  delta.type === "text_delta"
-                )
-                  emitText(text(delta.text));
-                if (raw.type === "result") {
-                  if (raw.is_error || raw.subtype !== "success")
-                    failure(nativeAgentProtocolError({ errors: raw.errors, message: raw.result }, "The native Claude turn did not complete"));
-                  else void finish(sessionId).catch(failure);
-                }
-              },
-              failure,
-            );
+            // Messages go to whichever turn holds the process; an idle one has none to receive them.
+            const child: Omit<ClaudeProcess, "process"> = { bridge, systemPromptFile, turns: 0, releaseSlot };
+            claude = Object.assign(child, {
+              process: new NativeAgentProcess(
+                command,
+                args,
+                claudeWorkspace ?? cwd,
+                (message) => child.notify?.(message),
+                (error) => child.fail?.(error),
+              ),
+            });
+          }
+          claude.notify = handle;
+          claude.fail = failure;
+          claude.turns += 1;
+          process = claude.process;
+          {
             startedModelTurn = true;
             continueTurn = async (note) => {
               if (signal.aborted || paused) return;
@@ -1112,7 +1204,10 @@ export class NativeAgentRuntime implements AgentRuntime {
                 ],
               },
             });
-          } else {
+          }
+        } else {
+          bridge = await toolBridge(tools, orderedCall, engine === "opencode");
+          {
             // OpenCode discovers credentials and plugins through the host's home directory.
             // Keep its fresh profile inside the same account/Space/chat boundary as this run.
             const openCodeHome = engine === "opencode" ? join(cwd, ".opencode-home") : null;
@@ -1239,28 +1334,47 @@ export class NativeAgentRuntime implements AgentRuntime {
       yield* queue;
       consumed = true;
     } finally {
-      const completed = consumed && codexCompleted && !signal.aborted && !paused && codex?.process.reusable;
+      const completed = consumed && !signal.aborted && !paused &&
+        ((codexCompleted && codex?.process.reusable) || (claudeCompleted && claude?.process.reusable));
       if (completed) await stopped;
       const stillAuthorized = completed && await Promise.resolve().then(authorized).catch(() => false);
-      const reusable = stillAuthorized && !signal.aborted &&
-        codex && codexKey && sessionId && epoch === this.nativeEpoch && !this.idleCodex &&
+      const keepable = stillAuthorized && !signal.aborted && sessionId && epoch === this.nativeEpoch &&
+        !this.options.processSlots?.state.waiting;
+      const reusable = keepable &&
+        codex && codexKey && !this.idleCodex &&
         codex.finishedTurns.size < CODEX_RETAINED_TURNS && codex.process.reusable &&
-        !this.options.processSlots?.state.waiting && !this.options.engineUpdates?.held("codex");
+        !this.options.engineUpdates?.held("codex");
+      const claudeReusable = keepable && claudeCompleted &&
+        claude && claudeKey && !this.idleClaude &&
+        claude.turns < CLAUDE_RETAINED_TURNS && claude.process.reusable &&
+        !this.options.engineUpdates?.held("claude");
       signal.removeEventListener("abort", onAbort);
       if (codex) {
         codex.notify = undefined;
         codex.fail = undefined;
+      }
+      if (claude) {
+        claude.notify = undefined;
+        claude.fail = undefined;
+        // Between turns the kept bridge answers no tool call.
+        claude.bridge.bind(undefined);
       }
       controller.abort();
       if (reusable && codex && codexKey && sessionId) {
         const timer = setTimeout(() => { void this.discardIdleCodex(); }, CODEX_IDLE_MS);
         timer.unref();
         this.idleCodex = { key: codexKey, sessionId, child: codex, timer };
+      } else if (claudeReusable && claude && claudeKey && sessionId) {
+        const timer = setTimeout(() => { void this.discardIdleClaude(); }, CODEX_IDLE_MS);
+        timer.unref();
+        this.idleClaude = { key: claudeKey, sessionId, child: claude, timer };
       } else await process?.stop();
       await stopped;
-      if (!reusable) releaseSlot?.();
-      await bridge?.close();
-      if (systemPromptFile) await rm(systemPromptFile, { force: true }).catch(() => undefined);
+      if (!reusable && !claudeReusable) releaseSlot?.();
+      if (!claudeReusable) {
+        await bridge?.close();
+        if (systemPromptFile) await rm(systemPromptFile, { force: true }).catch(() => undefined);
+      }
       await recordUsage();
       this.active.delete(request.runId);
     }

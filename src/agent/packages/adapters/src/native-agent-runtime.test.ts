@@ -96,6 +96,75 @@ describe("native agent protocol integration", () => {
     expect(await pids()).toHaveLength(3);
   }, 30_000);
 
+  it("keeps a Claude Code process for the same conversation and refuses its bridge while idle", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mycellios-claude-process-"));
+    roots.push(root);
+    const log = join(root, "pids");
+    const launches = join(root, "launches");
+    const slots = new NativeProcessSlots(1);
+    const test = await setup("claude", ["--fixture-pid-log", log, "--claude-launch-log", launches], fixture, slots);
+    const turn = async (runId: string, threadId = test.request.threadId) => {
+      const events: AgentRuntimeEvent[] = [];
+      for await (const event of test.runtime.run({ ...test.request, runId, threadId }, test.context)) events.push(event);
+      expect(events.filter(event => event.type === "text")).toEqual([{ type: "text", text: "Fixture complete" }]);
+      expect(events.at(-1)?.type).toBe("done");
+    };
+    const pids = async () => (await readFile(log, "utf8")).trim().split("\n");
+    const promptFiles = async () => {
+      const found: string[] = [];
+      for (const entry of await readdir(test.dataDir, { recursive: true }))
+        if (/system-[^/\\]+\.txt$/.test(String(entry))) found.push(String(entry));
+      return found;
+    };
+    await turn("first");
+    expect(slots.state).toEqual({ running: 1, waiting: 0 });
+    expect(await promptFiles()).toHaveLength(1);
+    // While idle, the kept bridge answers no tool call, even with its own token.
+    const launch = JSON.parse((await readFile(launches, "utf8")).trim().split("\n")[0]!) as { args: string[] };
+    const mcp = JSON.parse(launch.args[launch.args.indexOf("--mcp-config") + 1]!).mcpServers.rakazo;
+    const idleCall = await fetch(mcp.url, {
+      method: "POST",
+      headers: { Authorization: mcp.headers.Authorization, "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "tool_0", arguments: { path: "x" } } }),
+    });
+    expect(idleCall.ok).toBe(false);
+    expect(test.executeTool).toHaveBeenCalledTimes(1);
+    // The next turn binds its own executor; the CLI's repeated request id is a new call.
+    await turn("second");
+    expect(await pids()).toHaveLength(1);
+    expect(test.executeTool).toHaveBeenCalledTimes(2);
+    expect(test.executeTool.mock.calls.map(call => call[2])).toSatisfy(
+      (ids: string[]) => new Set(ids).size === 2,
+    );
+    await turn("other-thread", "private-other-thread");
+    expect(await pids()).toHaveLength(2);
+    expect(await promptFiles()).toHaveLength(1);
+    await test.runtime.releaseIdleNativeProcesses();
+    expect(slots.state).toEqual({ running: 0, waiting: 0 });
+    expect(await promptFiles()).toHaveLength(0);
+    await turn("after-revocation", "private-other-thread");
+    expect(await pids()).toHaveLength(3);
+  }, 30_000);
+
+  it("starts Claude Code again when its model settings change", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mycellios-claude-settings-"));
+    roots.push(root);
+    const log = join(root, "pids");
+    const test = await setup("claude", ["--fixture-pid-log", log]);
+    const turn = async (runId: string, nativeConfig?: AgentRunRequest["nativeConfig"]) => {
+      for await (const event of test.runtime.run({ ...test.request, runId, nativeConfig }, test.context)) void event;
+    };
+    const started = async () => (await readFile(log, "utf8")).trim().split("\n").length;
+    await turn("first");
+    expect(await started()).toBe(1);
+    // A new model starts a new CLI (after this CLI's own catalog probe), which the next turn keeps.
+    await turn("second", { modelId: "fixture-claude" });
+    const afterChange = await started();
+    expect(afterChange).toBeGreaterThan(1);
+    await turn("third", { modelId: "fixture-claude" });
+    expect(await started()).toBe(afterChange);
+  }, 30_000);
+
   it("streams real Codex activity ahead of the reply over the Desktop host without exposing reasoning", async () => {
     const test = await setup("codex", ["--fixture-reasoning"]);
     await writeFile(join(test.dataDir, "native-agents.json"), JSON.stringify({

@@ -531,6 +531,12 @@
   slot, clear it on host disable/account changes, and reject retired turn events.
   Verify native runtime, Desktop engine and process-slot regressions. Use the
   opt-in VERIFY_CODEX_REUSE live check for first activity and first text.
+  Claude Code gets the same 30-second idle reuse after a successful turn: its stream-json
+  process, MCP bridge and private system prompt file stay with the exact account, Space,
+  Mico, conversation, binding, workspace, settings, model choice and CLI/credential
+  identity. The idle bridge refuses every call; each turn binds its own executor and
+  clears earlier call ids. Failed, stopped or paused turns, a waiting slot, an update,
+  sign-in/out or install, and host disable never keep it.
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
