@@ -243,6 +243,16 @@ it("offers the browser path without polling or controlling a native node on a pa
   });
 });
 
+it("offers the browser path instead of an endless retry when Desktop refuses a page that is not the official app", async () => {
+  f.native.mockRejectedValue(new Error("Error invoking remote method 'desktop.runtime.status': Error: Contribution requires the Mycellios application."));
+  await rendered(async host => {
+    expect(f.native).toHaveBeenCalled();
+    expect(f.status).not.toHaveBeenCalled();
+    expect(f.control).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector('[data-testid="browser-contribution-control"]')).not.toBeNull();
+  });
+});
 it("exposes one direct contribution control without a disclosure", async () => {
  f.capabilities.mockResolvedValue({ sso: null });
  await rendered(host => {

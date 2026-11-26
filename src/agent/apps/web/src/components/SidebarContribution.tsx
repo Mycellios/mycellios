@@ -10,6 +10,11 @@ import { rpc } from "../lib/rpc";
 import { BrowserContributionControl } from "./BrowserContributionControl";
 import { setContributionActivity } from "../lib/contribution-activity";
 
+/** Desktop's refusal for a page that is not the official Mycellios app (apps/desktop main.ts). */
+function isOfficialPageRefusal(cause: unknown) {
+  return cause instanceof Error && cause.message.includes("Contribution requires the Mycellios application");
+}
+
 
 type Status = Awaited<ReturnType<typeof rpc.models.contributionStatus>>;
 
@@ -43,8 +48,16 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
         if (mounted.current && epoch === revision.current) { setAccountUnavailable(true); setNode(null); setError(false); }
         return;
       }
+      let local: Awaited<ReturnType<typeof runtime.status>>;
+      try { local = await runtime.status(); }
+      catch (cause) {
+        // Desktop runs the contributor only for the official Mycellios page; another server
+        // (self-hosted or a local preview) is refused every time, so offer the browser path.
+        if (!isOfficialPageRefusal(cause)) throw cause;
+        if (mounted.current && epoch === revision.current) { setAccountUnavailable(true); setNode(null); setError(false); }
+        return;
+      }
       if (mounted.current && epoch === revision.current) setAccountUnavailable(false);
-      const local = await runtime.status();
       const missingRuntime = local.enrolled && !local.installed;
       if (mounted.current && epoch === revision.current) {
         setSupported(local.supported);
