@@ -728,6 +728,9 @@
   without a whole-page loading frame.
   A seeded tab switch reads the destination's history directly without duplicating it
   through bootstrap. Cold web history and bootstrap request the recent window.
+  The direct history read for a selected side conversation returns a normal
+  bounded page so short conversations arrive in one response. It checks account,
+  Space and Mico ownership while selecting only fields needed for the snapshot.
   Inactive threads read 24 stored messages first and can page back normally.
   Active runs and explicit history reads keep their current window. Preserve the
   snapshot cursor and avoid evicting already loaded history on this first read.
