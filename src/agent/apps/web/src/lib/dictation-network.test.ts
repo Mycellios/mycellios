@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const session = vi.hoisted(() => vi.fn());
 vi.mock("./auth", () => ({ authClient: { getSession: session } }));
+// Readiness checks have their own tests; here the recorder must see only its own requests.
+vi.mock("./dictation-readiness", () => ({
+  MICROPHONE_SILENT: "silent",
+  microphoneDeliversSignal: async () => undefined,
+  transcriptionProblem: async () => null,
+}));
 import { Dictation } from "./dictation";
 import { GENERAL_PREFERENCES_KEY } from "./general-preferences";
 

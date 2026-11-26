@@ -220,6 +220,15 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   -webkit-app-region: no-drag;
 }
 
+/* Electron builds the window's drag regions from the whole page, not only from what is on top:
+   a dialog, sheet, menu or popover opened over a drag row (the macOS top row) would otherwise
+   hand clicks on its own controls to the OS. Their own .app-drag rows still drag the window. */
+:is([data-slot="dialog-content"], [data-slot="alert-dialog-content"], [data-slot="sheet-content"],
+  [data-slot="popover-content"], [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"], [data-slot="select-content"]) {
+  -webkit-app-region: no-drag;
+}
+
 /* Shared web/Desktop workspace: page rail, chat list and compact title row. */
 .rk-workspace-rail { display: none; }
 .rk-sidebar-topbar { min-height: 51px; border-bottom: 1px solid var(--border); }
@@ -301,6 +310,11 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
    window buttons itself (7px inset + 59px group + 12px). */
 @media (max-width: 767px) {
   [data-window-buttons="darwin"] .rk-window-buttons-clear { padding-inline-start: 78px; }
+}
+/* Settings covers the whole window: its title takes the 51px top row beside the macOS window
+   buttons (7px inset + 59px group + 12px) instead of sitting under them. */
+[data-window-buttons="darwin"] .rk-settings-title {
+  display: flex; align-items: center; height: 51px; margin: -16px -16px 0; padding-inline: 78px 16px;
 }
 @media (min-width: 1100px) {
   .rk-chat-tools-panel {

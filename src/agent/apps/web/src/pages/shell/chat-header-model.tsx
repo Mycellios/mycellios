@@ -9,6 +9,7 @@ import { useCallback, useId, useRef, useState } from "react";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { useSpaceQueries, writeSaved } from "../../lib/query";
 import { useSpaceRpc } from "../../lib/space-rpc";
+import { readCachedMycelliosCatalog, writeCachedMycelliosCatalog } from "../../lib/mycellios-catalog-cache";
 import { errorText } from "../../lib/user-error";
 import { enableCompatibleModel, savedModelIds } from "../model-settings/enable-compatible-model";
 import { ChatModelPicker } from "./chat-model-picker";
@@ -81,9 +82,16 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const nativeModel = nativeModels.find(model => bot.nativeConfig?.modelId ? model.id === bot.nativeConfig.modelId : model.isDefault);
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
   const mycelliosConnection = credentials.find(connection => isMycelliosBaseUrl(connection.baseUrl));
+  const catalogScope = [me?.userId, me?.spaceId, mycelliosConnection?.id] as const;
   const mycelliosCatalog = useQuery({
-    queryKey: ["mycellios-chat-catalog", me?.userId, me?.spaceId, mycelliosConnection?.id],
-    queryFn: ({ signal }) => rpc.models.mycelliosModels(undefined, { context: { spaceId: me!.spaceId }, signal }),
+    queryKey: ["mycellios-chat-catalog", ...catalogScope],
+    queryFn: async ({ signal }) => {
+      const models = await rpc.models.mycelliosModels(undefined, { context: { spaceId: me!.spaceId }, signal });
+      writeCachedMycelliosCatalog(catalogScope, models);
+      return models;
+    },
+    // The last catalog read on this device shows at once while the live one loads.
+    placeholderData: () => readCachedMycelliosCatalog(catalogScope),
     enabled: (open || Boolean((bot.modelId ?? me?.defaultModel)?.startsWith("mycellios/"))) && Boolean(me && mycelliosConnection),
     staleTime: 60_000,
     retry: false,
@@ -303,6 +311,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 }} /></ul> : null}
                 mycelliosCatalogReady={mycelliosCatalog.isSuccess}
                 modelOrigins={Object.fromEntries((mycelliosCatalog.data ?? []).map(entry => [modelOptionKey(entry.provider, entry.id), entry.mycelliosProcessing === "external" ? "antseed" : "network"]))}
+                freeModels={new Set((mycelliosCatalog.data ?? []).filter(entry => entry.mycelliosProcessing === "external" && entry.mycelliosPricing
+                  && [entry.mycelliosPricing.input, entry.mycelliosPricing.output, entry.mycelliosPricing.request ?? "0"].every(price => Number(price) === 0))
+                  .map(entry => modelOptionKey(entry.provider, entry.id)))}
               />}
             </fieldset>}
           {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}

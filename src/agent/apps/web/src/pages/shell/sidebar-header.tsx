@@ -146,7 +146,9 @@ export function SidebarHeader({
     <div
       data-testid="sidebar-topbar"
       className={mobile
-        ? "flex shrink-0 flex-wrap items-center gap-2 px-5 pt-3 pb-1"
+        // On macOS the window buttons sit in this corner; the sheet may render outside the shell,
+        // so it clears them itself (7px inset + 59px group + 12px) and drags the window.
+        ? `flex shrink-0 flex-wrap items-center gap-2 px-5 pt-3 pb-1 ${hiddenTitleBar ? "app-drag ps-[78px]" : ""}`
         : `${hiddenTitleBar ? "app-drag" : ""} rk-sidebar-topbar shrink-0 items-center gap-1 ${mini ? "flex flex-col px-1 py-2" : "grid grid-cols-[minmax(0,1fr)_auto] px-2"}`}
     >
       {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={onOpenNavigation ? t`Workspace navigation` : t`Close navigation`} onClick={onOpenNavigation ?? (() => setMobileSidebarOpen(false))}><PanelLeftOpen size={22} /></Button> : null}

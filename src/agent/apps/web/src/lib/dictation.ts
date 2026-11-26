@@ -10,6 +10,7 @@ import { getActiveUiLocale } from "./i18n.js";
 import { readUiLocalePreference } from "./ui-locale";
 import { selectedSpaceId, withSpaceHeaders } from "./rpc.js";
 import { errorText, voiceAccountErrorText } from "./user-error.js";
+import { MICROPHONE_SILENT, microphoneDeliversSignal, transcriptionProblem } from "./dictation-readiness";
 
 export type DictationMode = "hold" | "endpoint";
 
@@ -581,6 +582,7 @@ export class Dictation {
       };
       media.start(mode === "endpoint" ? 250 : undefined);
       if (mode === "hold" && (this.onRecording || this.onSpeechStart)) this.armSilence(stream, mine, null);
+      if (!this.skipRecordingTranscription) this.checkReadiness(stream, mine, spaceId);
       this.recordingLimit = setTimeout(() => { if (this.token === mine && media && media.state !== "inactive") media.stop(); }, this.networkTarget ? 29_000 : 60_000);
     } catch (error) {
       if (media) {
@@ -593,6 +595,33 @@ export class Dictation {
       this.stopVad();
       this.failListening(mine, errorText(error, "Dictation failed."));
     }
+  }
+
+  /**
+   * Proves, while the person starts talking, that this recording can become text: the
+   * microphone delivers signal and the transcription path answers. A failure cancels the
+   * recording at once with its reason, instead of after the person has said everything.
+   */
+  private checkReadiness(stream: MediaStream, mine: number, spaceId: string | null) {
+    const cancel = (message: string) => {
+      if (this.token !== mine) return;
+      this.stop();
+      this.set({ ...IDLE, error: message });
+    };
+    void microphoneDeliversSignal(stream).then(delivers => {
+      if (delivers === false) cancel(MICROPHONE_SILENT);
+    });
+    const probe = transcriptionProblem({
+      local: this.useLocalTranscription,
+      native: desktopBridge()?.localVoice,
+      network: this.networkTarget,
+      spaceId,
+    });
+    void probe.then(
+      problem => { if (problem) cancel(problem); },
+      // A slow or unreachable check is not a refusal; the recording keeps going.
+      () => undefined,
+    );
   }
 
   private armSilence(

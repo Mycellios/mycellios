@@ -211,7 +211,10 @@ export const MessageView = memo(function MessageView({
     textAnchorIndex === -1
       ? message.blocks.findIndex((block) => block.kind === "ask")
       : textAnchorIndex;
-  const hoverActions = hideHoverActions || isPeerReceiptBlocks(message.blocks) ? null : (
+  // A note that a Mico was created, archived or deleted is a status line, like a routine run:
+  // nothing to reply to or react to, so it carries no actions (which also reserve a row below).
+  const statusNoteOnly = message.blocks.length > 0 && message.blocks.every((block) => block.kind === "child_bot");
+  const hoverActions = hideHoverActions || statusNoteOnly || isPeerReceiptBlocks(message.blocks) ? null : (
     <MessageHoverActions
       message={message}
       side={message.role === "user" ? "start" : "end"}
@@ -506,14 +509,15 @@ export const MessageView = memo(function MessageView({
           }
           if (block.kind === "child_bot") {
             return (
-              <div key={i} className="flex items-center gap-1.5 text-[15.5px]">
+              <div key={i} data-testid="child-bot-note" className="flex min-h-6 w-fit max-w-full items-center gap-1.5 py-0.5 text-[12px] text-muted-foreground">
                 <BotMention
                   block={block}
                   color={peerBot(block.botId)?.color}
                   onShowBot={onShowBot}
+                  compact
                 />
                 {block.status === "created" ? null : (
-                  <span className="text-muted-foreground">
+                  <span>
                     {block.status === "archived" ? <Trans>archived</Trans> : <Trans>deleted</Trans>}
                   </span>
                 )}
@@ -765,16 +769,19 @@ function BotMention({
   block,
   color,
   onShowBot,
+  compact = false,
 }: {
   block: ChildBotBlock;
   color: string | undefined;
   onShowBot: (botId: string) => void;
+  /** Status-line size, matching routine run notes. */
+  compact?: boolean;
 }) {
   const live = block.status === "created" && color;
   const name = (
     <span
       dir="auto"
-      className="font-medium"
+      className={compact ? "font-medium text-foreground/80" : "font-medium"}
       style={live ? { color: resolvePersonaColorDef(block.botId, color).light } : undefined}
     >
       {block.name}
@@ -783,7 +790,7 @@ function BotMention({
   if (!live) {
     return (
       <span data-testid="bot-mention" className="inline-flex items-baseline gap-1.5">
-        <UserRound className="size-4 self-center text-muted-foreground" aria-hidden="true" />
+        <UserRound className={`${compact ? "size-[13px]" : "size-4"} self-center text-muted-foreground`} aria-hidden="true" />
         {name}
       </span>
     );
@@ -796,7 +803,7 @@ function BotMention({
       className="-mx-1 inline-flex items-baseline gap-1.5 rounded-md px-1 transition-colors hover:bg-accent"
     >
       <span className="self-center">
-        <BotAvatar color={color} identity={block.botId} size={18} />
+        <BotAvatar color={color} identity={block.botId} size={compact ? 14 : 18} />
       </span>
       {name}
     </button>

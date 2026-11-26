@@ -533,6 +533,36 @@ export async function synthesizeVoice(
   );
 }
 
+/**
+ * The checks transcribeVoice makes before it sends audio, without audio: dictation runs
+ * them when recording starts, so a missing provider or connection is reported before the
+ * person speaks. Credentials are not used, so nothing is billed.
+ */
+export async function checkTranscription(
+  deps: VoiceDeps,
+  actor: Actor,
+  input: { networkAccountId?: string; botId?: string },
+) {
+  if (input.networkAccountId !== undefined) {
+    if (input.networkAccountId !== actor.userId || !input.botId || !(await deps.prisma.bot.findFirst({
+      where: { id: input.botId, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null }, select: { id: true },
+    }))) throw new IsolationError();
+    let token: string | undefined;
+    try { token = (await ownedMycelliosConnection(deps, actor.userId))?.saved.apiKey; }
+    catch { throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Your Mycellios connection could not be read." }); }
+    if (!token) throw new ORPCError("CONFLICT", { message: "Connect your Mycellios account in Models to use network dictation." });
+    return;
+  }
+  const loaded = await loadDefaultVoiceCredential(deps, actor);
+  if (!loaded) throw new NoVoiceConfigured("key");
+  const provider = await voiceProviderFor(deps, actor, loaded.cred.provider);
+  if (!provider.transcribe) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "This voice provider does not transcribe audio. Use on-device dictation instead.",
+    });
+  }
+}
+
 export async function transcribeVoice(
   deps: VoiceDeps,
   actor: Actor,
@@ -614,6 +644,23 @@ export function mountVoiceHttpRoutes(
           "cache-control": "no-store",
         },
       });
+    } catch (error) {
+      return voiceHttpError(c, error);
+    }
+  });
+
+  app.post("/api/voice/transcribe/check", async (c) => {
+    const actor = await authenticate(c);
+    if (!actor) return c.json({ error: "Unauthorized" }, 401);
+    const raw = await readBoundedBody(c.req.raw, 4 * 1024);
+    if (raw === null) return c.json({ error: "Request body is too large." }, 413);
+    const body = parseVoiceRequestBody(raw);
+    try {
+      await runAsTenant(actor, () => checkTranscription(deps, actor, {
+        networkAccountId: optionalString(body.networkAccountId),
+        botId: optionalString(body.botId),
+      }));
+      return c.json({ ok: true });
     } catch (error) {
       return voiceHttpError(c, error);
     }

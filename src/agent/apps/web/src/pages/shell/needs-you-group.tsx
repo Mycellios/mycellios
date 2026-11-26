@@ -1,8 +1,9 @@
 import { useLingui } from "@lingui/react/macro";
 import { BotAvatar } from "@mycellios/ui-web";
-import { Hand, MessageCircleQuestion, MessagesSquare } from "lucide-react";
+import { ChevronDown, Hand, MessageCircleQuestion, MessagesSquare } from "lucide-react";
 import { useMemo } from "react";
 import { type NeedsYouEntry, needsYouEntries, needsYouPath } from "../../lib/needs-you";
+import { useSidebarSectionCollapsed } from "../../lib/sidebar-sections";
 
 type RosterRow = {
   kind: "bot" | "group";
@@ -20,6 +21,7 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
   openSpaceChat: (spaceId: string, path: string) => void;
 }) {
   const { t } = useLingui();
+  const [collapsed, toggle] = useSidebarSectionCollapsed("needs-you");
   const entries = useMemo(() => needsYouEntries([{
     bots: groups.flatMap(group => group.bots.flatMap(row => row.kind === "bot" ? [{
       id: row.chat.id, spaceId: row.chat.spaceId, name: row.chat.name, color: row.chat.color ?? "",
@@ -34,8 +36,16 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
     : entry.action === "takeover" ? t`Take over` : t`Review`;
   const Icon = (entry: NeedsYouEntry) => entry.action === "answer" ? MessageCircleQuestion : entry.action === "takeover" ? Hand : MessagesSquare;
   return <section data-testid="sidebar-needs-you" aria-label={t`Needs you`} className="flex flex-col gap-0.5 pb-1">
-    <h2 className={`px-2.5 pt-3 pb-0.5 ${mobile ? "text-[13px] font-semibold text-muted-foreground" : "text-xs font-medium text-foreground"}`}>{t`Needs you`}</h2>
-    {entries.map(entry => {
+    <h2 className="px-1 pt-2">
+      {/* Folding hides the rows; the count keeps waiting work visible while folded. */}
+      <button type="button" aria-expanded={!collapsed} data-testid="sidebar-needs-you-toggle" onClick={toggle}
+        className={`group/section flex min-h-7 w-full items-center gap-1 rounded-md px-1.5 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "text-[13px] font-semibold text-muted-foreground" : "text-xs font-medium text-foreground"}`}>
+        <span>{t`Needs you`}</span>
+        {collapsed ? <span className="rounded-full bg-[#94620f] px-1.5 text-[10.5px] font-medium leading-4 text-white">{entries.length}</span> : null}
+        <ChevronDown aria-hidden="true" size={13} className={`shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${collapsed ? "-rotate-90" : "opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100"}`} />
+      </button>
+    </h2>
+    {collapsed ? null : entries.map(entry => {
       const ActionIcon = Icon(entry);
       return <button key={entry.key} type="button" data-needs-you={entry.action} data-needs-you-bot={entry.botId}
         aria-label={`${actionLabel(entry)}: ${entry.name}. ${describe(entry)}`}

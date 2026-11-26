@@ -4660,6 +4660,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const renderToolsExtras = (dismiss: () => void) => {
           const closeTools = () => { dismiss(); };
           return <>
+            {active && !inGroup && !desktopBridge()?.chatWindow ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} inMenu onOpened={closeTools} /> : null}
             {active && !inGroup && !taskScope && !activeProject ? <OpenMycelliosDev key={`dev:${userId}:${shellSpaceId}:${active.id}`} botId={active.id} /> : null}
             {isMobileSidebar ? renderTaskTabs(closeTools) : null}
             {active && !inGroup && !activeProject ? <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc} inMenu
@@ -4674,15 +4675,19 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         };
   const renderHeaderActions = (close?: () => void) => (
     <>
-    {!inGroup && active ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
-      {active && !inGroup && !activeProject ? <MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
-        onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /> : null}
+    {/* A narrow header (a side panel open, a small window) drops secondary actions before they
+        overlap the tabs: first Tasks (also in the rail), then search and pins. The model and Chat
+        tools always stay. Opening the floating window lives in Chat tools; inside that window the
+        header keeps its way back to the main window. */}
+    {!inGroup && active && desktopBridge()?.chatWindow ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
+      {active && !inGroup && !activeProject ? <span className="contents @max-[36rem]:hidden"><MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
+        onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /></span> : null}
       {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-      {pinTarget && activeSnapshot && !newConversation ? <ChatSearchButton key={`search:${activeSnapshot.threadId}`} rpc={rpc}
-        scope={JSON.stringify([userId, shellSpaceId, pinTarget])} target={pinTarget} threadId={activeSnapshot.threadId} onJump={jumpToReplyMessage} /> : null}
-      {(active || activeGroup) && activeSnapshot && !newConversation ? <PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage}
+      {pinTarget && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ChatSearchButton key={`search:${activeSnapshot.threadId}`} rpc={rpc}
+        scope={JSON.stringify([userId, shellSpaceId, pinTarget])} target={pinTarget} threadId={activeSnapshot.threadId} onJump={jumpToReplyMessage} /></span> : null}
+      {(active || activeGroup) && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage}
         mico={!inGroup && active ? { rpc, scope: JSON.stringify([userId, shellSpaceId]), botId: active.id, name: active.name,
-          threadId: activeSnapshot.threadId, onOpen: pin => void openPinnedConversation(pin) } : undefined} /> : null}
+          threadId: activeSnapshot.threadId, onOpen: pin => void openPinnedConversation(pin) } : undefined} /></span> : null}
       {(active || activeGroup) ? <ChatHeaderTools triggerRef={mobileBrowserTrigger}
         attention={conversationsWaiting > 0 && panel !== "conversations"}
         open={panel === "tools"} onToggle={() => {
@@ -5128,7 +5133,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         /> : null}</RoutinesAvailability> : <>
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div data-testid="conversation-header" className={`${desktopDragClass()} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
+          <div data-testid="conversation-header" className={`${desktopDragClass()} rk-conversation-header rk-window-buttons-clear @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
             <div className={floatingChat ? "hidden" : "flex items-center"}>
               <Button
                 variant="floating"

@@ -546,8 +546,9 @@ export function MicoTaskTabs({
     </ContextMenu>;
   }
 
-  function pickerRow(tab: TaskTab) {
-    const kind = kindLabel(tab);
+  /** `grouped`: the row sits under its kind's own heading, so it needs no kind badge. */
+  function pickerRow(tab: TaskTab, grouped = false) {
+    const kind = grouped ? null : kindLabel(tab);
     const closed = isClosedConversation(tab);
     const status = conversationStatus(tab);
     const busy = busyIds.has(tab.threadId);
@@ -561,9 +562,10 @@ export function MicoTaskTabs({
         title={closed ? t`Restore and open` : undefined}
         onPointerEnter={() => warmThread(tab.threadId)} onPointerDown={() => warmThread(tab.threadId)} onFocus={() => warmThread(tab.threadId)}
         onClick={() => closed ? void restore(tab) : select(tab.threadId)}>
-        {status ? <ThreadStatusMark status={status} /> : null}
+        {/* A fixed slot keeps every title aligned whether or not the row has a status mark. */}
+        <span data-status-slot className="flex w-3.5 shrink-0 justify-center">{status ? <ThreadStatusMark status={status} /> : null}</span>
         <span className="min-w-0 flex-1">
-          <span className="line-clamp-2 whitespace-normal break-words" title={titleOf(tab)} dir="auto">{titleOf(tab)}</span>
+          <span className={inMenu ? "line-clamp-2 whitespace-normal break-words" : "block truncate"} title={titleOf(tab)} dir="auto">{titleOf(tab)}</span>
           {!closed && tabIds.includes(tab.threadId) ? <span data-open-tab className="block text-xs text-muted-foreground"><Trans>Open tab</Trans></span> : null}
         </span>
         {inMenu && !closed && tab.unread && status !== "unread" ? <ThreadStatusMark status="unread" /> : null}
@@ -590,6 +592,9 @@ export function MicoTaskTabs({
   }
 
   const allConversationsLabel = t`All conversations`;
+  // Desktop groups routine runs apart from conversations, each group in its usual order.
+  const conversationRows = picker.open.filter(tab => tab.kind !== "routine");
+  const routineRows = picker.open.filter(tab => tab.kind === "routine");
   const pickerLabel = inMenu
     ? (hiddenReplies ? t`Conversations, new replies` : t`Conversations`)
     : (hiddenReplies ? t`All conversations, new replies` : allConversationsLabel);
@@ -617,17 +622,26 @@ export function MicoTaskTabs({
           <WaitingForYouBadge count={picker.open.filter(row => row.state === "waiting").length} className="mx-2 my-1 self-start" />
           {unread.length ? <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Unread</Trans> · {unread.length}</legend>
-            {unread.map(pickerRow)}
+            {unread.map(tab => pickerRow(tab))}
           </fieldset> : null}
           {read.length ? <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Read</Trans></legend>
-            {read.map(pickerRow)}
+            {read.map(tab => pickerRow(tab))}
           </fieldset> : null}
-        </> : picker.open.map(pickerRow)}
+        </> : <>
+          {conversationRows.length ? <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Conversations</Trans></legend>
+            {conversationRows.map(tab => pickerRow(tab))}
+          </fieldset> : null}
+          {routineRows.length ? <fieldset className="m-0 mt-1 min-w-0 border-0 border-t border-border p-0 pt-1">
+            <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Routines</Trans></legend>
+            {routineRows.map(tab => pickerRow(tab, true))}
+          </fieldset> : null}
+        </>}
         {picker.archived.length ? <div className="mt-1 border-t border-border pt-1">
           <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="px-2.5 py-1 text-xs font-medium text-muted-foreground"><Trans>Archived</Trans></legend>
-            {picker.archived.map(pickerRow)}
+            {picker.archived.map(tab => pickerRow(tab))}
           </fieldset>
         </div> : null}
         {loadFailed ? <Button size="sm" variant="ghost" onClick={() => setRevision(value => value + 1)}><Trans>Retry</Trans></Button> : null}

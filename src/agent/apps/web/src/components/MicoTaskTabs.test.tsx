@@ -136,9 +136,12 @@ describe("Mico task navigation", () => {
     await act(() => root.render(<MicoTaskTabs botId="mico" scope="kinds" rpc={rpc} onSelect={select} />));
     await act(() => button("All conversations", host).click());
     const rows = Array.from(picker().querySelectorAll<HTMLButtonElement>("button:not([aria-label])")).map(item => item.textContent);
-    expect(rows).toEqual(["New conversation", "Main chat", "Plan", "Daily digestRoutine", "Publish stepWorkflow",
-      "Check pricesDelegated", "Legacy", "Compare offers", "Old budget", "Nightly reportRoutine"]);
-    const archived = picker().querySelector("fieldset")!;
+    // Routine runs have their own group on desktop, so only archived ones keep the badge.
+    expect(rows).toEqual(["New conversation", "Main chat", "Plan", "Publish stepWorkflow",
+      "Check pricesDelegated", "Legacy", "Compare offers", "Daily digest", "Old budget", "Nightly reportRoutine"]);
+    const groups = Array.from(picker().querySelectorAll("fieldset")).map(group => group.querySelector("legend")!.textContent);
+    expect(groups).toEqual(["Conversations", "Routines", "Archived"]);
+    const archived = Array.from(picker().querySelectorAll("fieldset")).find(group => group.querySelector("legend")!.textContent === "Archived")!;
     expect(archived.querySelector("legend")!.textContent).toBe("Archived");
     // Conversations the person or their Mico started take a title; routine and delegated threads do not.
     const renames = Array.from(picker().querySelectorAll('button[aria-label="Rename conversation"]'))
