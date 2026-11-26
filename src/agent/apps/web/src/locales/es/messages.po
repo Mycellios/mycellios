@@ -762,6 +762,11 @@ msgstr "Apariencia"
 msgid "Apply"
 msgstr "Aplicar"
 
+#: src/pages/WorkflowWorkspace.tsx
+#: src/pages/workflows/WorkflowCanvas.tsx
+msgid "Approval"
+msgstr "Aprobación"
+
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Approval boundaries"
 msgstr "Límites de aprobación"
@@ -3263,6 +3268,10 @@ msgstr "Medio"
 msgid "Member"
 msgstr "Miembro"
 
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Member conversations"
+msgstr "Conversaciones de miembros"
+
 #. placeholder {0}: selected.length
 #: src/pages/GroupPanel.tsx
 msgid "Members ({0})"
@@ -3728,6 +3737,10 @@ msgstr "No funciona"
 #: src/pages/KnowledgeSection.tsx
 msgid "Nothing remembered yet"
 msgstr "Aún no hay recuerdos"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Nobody"
+msgstr "Nadie"
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Notifications"
@@ -4218,6 +4231,14 @@ msgstr "Actualizar vista"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Refreshing…"
 msgstr "Actualizando…"
+
+#: src/pages/workflows/WorkflowAnswerFields.tsx
+msgid "Number"
+msgstr "Número"
+
+#: src/pages/workflows/WorkflowWorkspace.tsx
+msgid "Reject"
+msgstr "Rechazar"
 
 #: src/lib/user-error.ts
 msgid "Registration is closed"
