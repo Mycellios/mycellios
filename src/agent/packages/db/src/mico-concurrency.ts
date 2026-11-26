@@ -1,14 +1,14 @@
 import type { Prisma, PrismaClient } from "./client.js";
 
 /**
- * Whether the operator lets native engines run several conversations at once
- * (specs/native-engines/spec.md phase 4). Off unless MYCELLIOS_NATIVE_CONCURRENCY is 1 or true
- * on both the API and the worker; while it is off every native Mico runs one turn at a time in
- * total, main chat included.
+ * Whether native engines run several conversations at once (specs/native-engines/spec.md
+ * phase 4), as the reference app's agents do by default. On unless the operator sets
+ * MYCELLIOS_NATIVE_CONCURRENCY to 0 or false on the API and the worker; while it is off every
+ * native Mico runs one turn at a time in total, main chat included.
  */
 export function nativeConcurrencyEnabled(env: Record<string, string | undefined> = process.env) {
-  const value = env.MYCELLIOS_NATIVE_CONCURRENCY;
-  return value === "1" || value === "true";
+  const value = env.MYCELLIOS_NATIVE_CONCURRENCY?.trim().toLowerCase();
+  return value !== "0" && value !== "false";
 }
 
 /**

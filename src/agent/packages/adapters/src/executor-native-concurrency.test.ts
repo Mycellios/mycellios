@@ -119,7 +119,7 @@ async function turn(thread: ThreadShape, engine: string, options: { flag?: strin
 describe("computer lease of native turns", () => {
   it("keeps reserving the computer before every native turn while native concurrency is off", async () => {
     for (const thread of [MAIN, SIDE]) {
-      const { runtimeRun, leasedBeforeTurn } = await turn(thread, "codex");
+      const { runtimeRun, leasedBeforeTurn } = await turn(thread, "codex", { flag: "0" });
       expect(runtimeRun).toHaveBeenCalled();
       expect(leasedBeforeTurn).toBe(1);
     }

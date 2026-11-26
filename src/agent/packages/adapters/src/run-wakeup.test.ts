@@ -352,7 +352,8 @@ describe("durable direct run wakeups", () => {
   });
 
   it.each([
-    { flag: undefined, engine: "codex", admitted: false },
+    { flag: "0", engine: "codex", admitted: false },
+    { flag: undefined, engine: "codex", admitted: true },
     { flag: "1", engine: "codex", admitted: true },
     { flag: "1", engine: "claude", admitted: true },
     { flag: "1", engine: "acp", admitted: false },

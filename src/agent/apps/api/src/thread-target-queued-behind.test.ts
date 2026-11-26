@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@mycellios/db";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { queuedBehindConversation } from "./thread-target.js";
 
 const target = { botId: "bot-1", threadId: "side-1" };
@@ -26,8 +26,12 @@ function blocker(
 
 const micoBot = { agentEngine: "claude", thread: { id: "main-1" }, computer: null };
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("queuedBehindConversation", () => {
   it("names the same Mico's live turn in another conversation", async () => {
+    // With native concurrency off, every other live turn of the Mico (main chat included) counts.
+    vi.stubEnv("MYCELLIOS_NATIVE_CONCURRENCY", "0");
     const { prisma, findFirst } = blocker("side-2", { title: "Daily scout" });
     await expect(queuedBehindConversation(prisma, target, "run-q")).resolves.toEqual({
       threadId: "side-2",

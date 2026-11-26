@@ -429,7 +429,7 @@ async function toolBridge(
   };
 }
 
-const CODEX_IDLE_MS = 30_000;
+const CODEX_IDLE_MS = 5 * 60_000;
 const CODEX_RETAINED_TURNS = 32;
 type CodexProcess = {
   process: NativeAgentProcess;
