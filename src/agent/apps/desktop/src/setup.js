@@ -20,7 +20,6 @@
   const quitButton = document.getElementById("quit");
   const recovery = document.getElementById("recovery");
   const retryButton = document.getElementById("retry");
-  const closeButton = document.getElementById("close");
   const advanced = document.getElementById("advanced");
   const subheading = document.getElementById("subheading");
   const recoveryMessage = document.getElementById("recovery-message");
@@ -28,6 +27,7 @@
   const diagnosticDetails = document.getElementById("diagnostic-details");
   const welcome = document.getElementById("welcome");
   const quickConnect = document.getElementById("quick-connect");
+  const modeToggle = document.getElementById("mode-toggle");
   let retrying = false;
   let recovering = true;
 
@@ -107,6 +107,7 @@
     panelExisting.hidden = mode !== "existing";
     checkButton.hidden = mode !== "existing";
     continueButton.textContent = mode === "new" ? "Preparar este equipo" : "Conectar";
+    modeToggle.textContent = mode === "new" ? "Usar un enlace" : "¿Prefieres instalar Mycellios en este equipo?";
     setStatus("");
   }
 
@@ -311,6 +312,14 @@
     }
   });
 
+  /** The radios stay the source of truth; this link switches them through the same change path. */
+  modeToggle.addEventListener("click", () => {
+    const target = document.getElementById(selectedMode() === "new" ? "mode-existing" : "mode-new");
+    if (target.disabled || (setupBusy && selectedMode() === "existing")) return;
+    target.checked = true;
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
   checkButton.addEventListener("click", () => {
     void check();
   });
@@ -334,7 +343,6 @@
     void bridge.quit();
   });
 
-  closeButton.addEventListener("click", () => void bridge?.quit());
   retryButton.addEventListener("click", async () => {
     if (retrying || setupBusy || bridge === undefined) return;
     retrying = true;
@@ -405,7 +413,7 @@
         savedServers.replaceChildren();
         const entries = await bridge.servers?.().catch(() => []) ?? [];
         if (!entries.length) return;
-        const heading = document.createElement("h2"); heading.textContent = "Tus conexiones"; savedServers.append(heading);
+        const heading = document.createElement("h2"); heading.textContent = "Conexiones guardadas"; savedServers.append(heading);
         for (const entry of entries) {
           const row = document.createElement("div"); row.className = "saved-connection";
           const button = document.createElement("button"); button.type = "button"; button.className = "saved-connection-name";
@@ -431,6 +439,7 @@
         document.getElementById("heading").textContent = "Conecta tu espacio";
         subheading.textContent = "Abre Mycellios o usa un enlace que te hayan compartido.";
         form.querySelector("fieldset").hidden = true;
+        modeToggle.hidden = true;
         document.getElementById("mode-existing").checked = true;
       }
       recovering = state.recovery === true;

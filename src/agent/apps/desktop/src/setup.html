@@ -28,30 +28,22 @@
       <section id="recovery" hidden aria-labelledby="heading">
         <p id="recovery-message" class="subheading" role="alert">No hemos podido abrir tu espacio. Vuelve a intentarlo en unos momentos.</p>
         <div class="actions recovery-actions">
-          <button id="retry" class="button button-primary main-action" type="button">Volver a intentar</button>
-          <button id="close" class="button button-quiet" type="button">Salir</button>
-        </div>
+          <button id="retry" class="button button-primary main-action" type="button">Volver a intentar</button>        </div>
       </section>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
       <details id="advanced">
-        <summary>Opciones de conexión</summary>
-        <p class="connection-help">¿Te han compartido un enlace para conectar con otro espacio? Puedes añadirlo aquí.</p>
-      <section id="saved-servers" aria-label="Tus conexiones"></section>
+        <summary>Conectar con otro espacio</summary>
+      <section id="saved-servers" aria-label="Conexiones guardadas"></section>
       <form id="setup" novalidate>
-          <fieldset class="choices">
+          <fieldset class="choices" hidden>
             <legend class="sr-only">Cómo quieres conectar</legend>
-            <label class="choice" for="mode-new">
-              <input id="mode-new" type="radio" name="mode" value="new" />
-              <span class="choice-title">Preparar en este equipo<span class="choice-description">Para configurar tu propia instalación.</span></span>
-            </label>
-            <label class="choice" for="mode-existing">
-              <input id="mode-existing" type="radio" name="mode" value="existing" checked />
-              <span class="choice-title">Usar un enlace<span class="choice-description">Para un espacio que ya está preparado.</span></span>
-            </label>
+            <input id="mode-new" type="radio" name="mode" value="new" />
+            <input id="mode-existing" type="radio" name="mode" value="existing" checked />
           </fieldset>
 
         <section id="panel-new" class="panel">
+          <p class="connection-help">Instala Mycellios en este equipo para usarlo sin depender de otro servidor.</p>
           <div id="stack" hidden>
             <div class="stack-head">
               <p id="stack-phase" class="stack-phase" role="status" aria-live="polite"></p>
@@ -91,9 +83,8 @@
           </div>
         </section>
 
-        <label class="field-label" for="server-name">Nombre <span class="optional-label">(opcional)</span></label><input id="server-name" class="field" maxlength="80" autocomplete="off" placeholder="Por ejemplo, Trabajo" />
         <section id="panel-existing" class="panel" hidden>
-          <label class="field-label" for="server-url">Enlace de conexión</label>
+          <label class="field-label" for="server-url">Enlace del espacio</label>
           <input
             id="server-url"
             class="field"
@@ -102,12 +93,15 @@
             autocomplete="off"
             placeholder="Pega aquí el enlace que te han compartido"
           />
+          <label class="field-label" for="server-name">Nombre <span class="optional-label">(opcional)</span></label>
+          <input id="server-name" class="field" maxlength="80" autocomplete="off" placeholder="Por ejemplo, Trabajo" />
         </section>
 
         <div class="actions">
           <button id="check" class="button button-quiet" type="button">Probar conexión</button>
           <button id="continue" class="button button-primary" type="submit">Conectar</button>
         </div>
+        <button id="mode-toggle" class="link mode-toggle" type="button">¿Prefieres instalar Mycellios en este equipo?</button>
       </form>
         <details id="diagnostic-details" class="diagnostic-details" hidden>
           <summary>Detalles técnicos</summary>
