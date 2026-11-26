@@ -11,14 +11,16 @@ vi.mock("@mycellios/db", async (original) => ({
   markAllThreadsRead,
   markNewestReplyUnread,
 }));
-const { resolveThreadTarget, markThreadUnreadFrom } = vi.hoisted(() => ({
+const { resolveThreadTarget, markThreadUnreadFrom, threadSnapshot } = vi.hoisted(() => ({
   resolveThreadTarget: vi.fn(),
   markThreadUnreadFrom: vi.fn(),
+  threadSnapshot: vi.fn(),
 }));
 vi.mock("./thread-target.js", async (original) => ({
   ...(await original<object>()),
   resolveThreadTarget,
   markThreadUnreadFrom,
+  threadSnapshot,
 }));
 import { threadsRoutes } from "./routes/threads.js";
 
@@ -27,17 +29,46 @@ type Handler = (input: { context: { actor: typeof actor }; input: unknown }) => 
 /** Every route handler is returned as written, so the test calls it directly. */
 const passthrough: unknown = new Proxy({}, { get: () => new Proxy({}, { get: () => ({ handler: (fn: unknown) => fn }) }) });
 
-function routes() {
-  const all = threadsRoutes({ deps: { prisma: {} }, authed: passthrough, callsEnabled: passthrough } as never) as unknown as { threads: Record<string, Handler> };
+function routes(prisma: object = {}) {
+  const all = threadsRoutes({ deps: { prisma }, authed: passthrough, callsEnabled: passthrough } as never) as unknown as { threads: Record<string, Handler> };
   return all.threads;
 }
 
 beforeEach(() => {
-  for (const mock of [getBot, markAllThreadsRead, markNewestReplyUnread, resolveThreadTarget, markThreadUnreadFrom]) mock.mockReset();
+  for (const mock of [getBot, markAllThreadsRead, markNewestReplyUnread, resolveThreadTarget, markThreadUnreadFrom, threadSnapshot]) mock.mockReset();
   getBot.mockResolvedValue({ id: "mico" });
   markAllThreadsRead.mockResolvedValue(4);
   markNewestReplyUnread.mockResolvedValue(1);
   resolveThreadTarget.mockResolvedValue({ kind: "bot", botId: "mico", threadId: "main" });
+  threadSnapshot.mockResolvedValue({ messages: [], olderCursor: null });
+});
+
+describe("Conversation history", () => {
+  it("looks up the side chat within both the account and Space and requests the normal page", async () => {
+    const bot = { name: "Mico", computer: null };
+    const findFirst = vi.fn().mockResolvedValue({ id: "side", taskBot: bot });
+    const prisma = { thread: { findFirst } };
+    const get = routes(prisma).get!;
+    await get({ context: { actor }, input: { botId: "mico", taskThreadId: "side", history: "recent" } });
+    expect(findFirst).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      where: {
+        id: "side", taskBotId: "mico", ...actor,
+        taskBot: { is: { ...actor, thread: { isNot: null } } },
+      },
+    }));
+    expect(threadSnapshot).toHaveBeenCalledExactlyOnceWith({ prisma }, {
+      kind: "bot", botId: "mico", threadId: "side", bot,
+    }, undefined);
+    expect(getBot).not.toHaveBeenCalled();
+  });
+
+  it("rejects a side chat outside that scope before loading any messages", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    await expect(routes({ thread: { findFirst } }).get!({
+      context: { actor }, input: { botId: "mico", taskThreadId: "foreign", history: "recent" },
+    })).rejects.toThrow();
+    expect(threadSnapshot).not.toHaveBeenCalled();
+  });
 });
 
 describe("reading in bulk", () => {

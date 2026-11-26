@@ -416,9 +416,54 @@ export async function threadHead(prisma: PrismaClient, target: ThreadTarget) {
   return { threadId: target.threadId, cursor: latest?.seq ?? -1 };
 }
 
+type SnapshotTarget = ThreadTarget | {
+  kind: "bot";
+  botId: string;
+  threadId: string;
+  bot: { name: string; computer: Parameters<typeof toComputerStatus>[1] & { id: string } | null };
+};
+
+/** Read-only side-chat admission. History doesn't need project execution metadata. */
+export async function resolveThreadSnapshotTarget(
+  prisma: PrismaClient,
+  actor: Actor,
+  input: { botId?: string; groupId?: string; taskThreadId?: string },
+): Promise<SnapshotTarget> {
+  if (!input.taskThreadId) {
+    return resolveThreadTarget(prisma, actor, input, { includeArchived: true, memberConversation: "read" });
+  }
+  if (!input.botId || input.groupId) throw new IsolationError();
+  const scope = { userId: actor.userId, spaceId: actor.spaceId };
+  const thread = await prisma.thread.findFirst({
+    where: {
+      id: input.taskThreadId,
+      taskBotId: input.botId,
+      ...scope,
+      taskBot: { is: { ...scope, thread: { isNot: null } } },
+    },
+    select: {
+      id: true,
+      taskBot: {
+        select: {
+          name: true,
+          computer: {
+            select: {
+              id: true, kind: true, state: true, scope: true, controlHolder: true,
+              controlBotId: true, controlRunId: true, homeRevision: true, maintenanceId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  // As with the general read route, the Mico owner can read its member conversations.
+  if (!thread?.taskBot) throw new IsolationError();
+  return { kind: "bot", botId: input.botId, threadId: thread.id, bot: thread.taskBot };
+}
+
 export async function threadSnapshot(
   deps: { prisma: PrismaClient },
-  target: ThreadTarget,
+  target: SnapshotTarget,
   history?: "recent",
 ): Promise<ThreadSnapshot> {
   // Read messages, the event cursor, runs and progress from one MVCC snapshot.
