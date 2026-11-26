@@ -21,6 +21,13 @@ import { TaskControls } from "../pages/TaskControls";
 
 type Overview = Awaited<ReturnType<RpcClient["tasks"]["overview"]>>;
 const observed = new Map<string, Map<string, string>>();
+// Run outcomes that need no watching; any other state (queued, running, waiting...) may still move.
+const SETTLED_TASK_STATUSES = new Set(["completed", "failed", "cancelled", "stopped", "interrupted", "expired"]);
+const ACTIVE_TASK_OVERVIEW_POLL_MS = 5000;
+const IDLE_TASK_OVERVIEW_POLL_MS = 15_000;
+function taskOverviewPollMs(active: boolean) {
+  return active ? ACTIVE_TASK_OVERVIEW_POLL_MS : IDLE_TASK_OVERVIEW_POLL_MS;
+}
 export function MicoWorkMenu({
   botId,
   runId,
@@ -53,12 +60,14 @@ export function MicoWorkMenu({
     const initialized = observed.has(scope);
     let ready = initialized;
     observed.set(scope, previous);
+    let active = true;
     const refresh = async () => {
       if (pending || (document.visibilityState !== "visible" && !ready)) return;
       pending = true;
       try {
         const rows = await readTaskOverview(userId ?? null, spaceId, rpc.tasks);
         if (!current) return;
+        active = rows.some((row) => !SETTLED_TASK_STATUSES.has(row.status));
         setWork(rows);
         for (const row of rows) {
           const state = `${row.runId}:${row.status}`;
@@ -102,11 +111,18 @@ export function MicoWorkMenu({
         pending = false;
       }
     };
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 5000);
+    // Unfinished work is watched closely; an idle Space only needs an occasional look,
+    // which keeps every open chat from reading the overview every five seconds.
+    let timer: number | undefined;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        void refresh().finally(() => { if (current) schedule(); });
+      }, taskOverviewPollMs(active));
+    };
+    void refresh().finally(() => { if (current) schedule(); });
     return () => {
       current = false;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
   }, [rpc, userId, spaceId, threadId]);
   useEffect(() => {
