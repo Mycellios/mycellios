@@ -120,7 +120,11 @@ function validateEngineRuntimeChallengeRequest(
   if (
     !(ENGINE_RUNTIME_PROBE_BACKENDS[challenge.probeKind] as readonly string[]).includes(challenge.backend)
     ||
-    challenge.hiddenSize !== challenge.attentionHeads * challenge.headDim
+    // The synthetic qwen3-dense kernels project hidden states with a square
+    // attention matrix. A llama.cpp probe runs the real GGUF, whose attention
+    // width may differ from the hidden size (Qwen3-4B: 32 x 128 vs 2560).
+    (challenge.probeKind !== "llama-cpp-gguf-v1"
+      && challenge.hiddenSize !== challenge.attentionHeads * challenge.headDim)
     || challenge.attentionHeads % challenge.kvHeads !== 0
     || challenge.expectedKvBytesPerToken
       !== 2 * challenge.kvHeads * challenge.headDim * 2 * layerCount
