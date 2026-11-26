@@ -143,8 +143,8 @@ export function buildEngineRuntimeActivationPlans(
   if (
     !modelBound
     || authority.descriptor.model.modelId !== result.profile.source.model
-    || result.manifest.hiddenSize
-      !== authority.probe.attentionHeads * authority.probe.headDim
+    || (!llamaCpp && result.manifest.hiddenSize
+      !== authority.probe.attentionHeads * authority.probe.headDim)
   ) throw new Error("engine_activation_authority_model_binding_is_invalid");
 
   const descriptorDigest = sha256CanonicalEvidence(authority.descriptor) as `sha256:${string}`;
