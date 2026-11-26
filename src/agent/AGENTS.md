@@ -490,7 +490,9 @@
   by Desktop per account/Space start): only idle ones (no active run or unfinished
   delegated work, checked under the bot row lock), recorded in
   bots.localEngineAdoptedAt so a later manual choice is never overridden, with a
-  system note in the main chat. Verify local-engine-adoption tests.
+  system note in the main chat. Verify local-engine-adoption tests, including
+  local-engine-adoption.postgres.test.ts with VERIFY_DATABASE=1 against an isolated
+  migrated database to check concurrent adoption and the return to a manual model.
   Conversational turns capture the resolved model, engine and owned connection
   before their first model call, with the Run lease fence. Resume uses that
   selection and rechecks credentials and native consent. A later turn reads the
