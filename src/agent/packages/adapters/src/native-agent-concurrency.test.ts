@@ -12,7 +12,10 @@ import { ScriptedAgentRuntime } from "./scripted-runtime.js";
 // Several conversations of one native Mico at once (specs/native-engines/spec.md phase 4),
 // with the fixture CLI: separate processes, sessions and bridge tokens, and the PC's bound.
 const roots: string[] = [];
+// Kept idle CLIs hold their folders open; end them before removing the folders.
+const runtimes: { releaseIdleNativeProcesses?: () => Promise<void> }[] = [];
 afterEach(async () => {
+  await Promise.all(runtimes.splice(0).map((runtime) => runtime.releaseIdleNativeProcesses?.()));
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 const fixture = fileURLToPath(new URL("./fixtures/native-agent.mjs", import.meta.url));
@@ -90,6 +93,7 @@ describe("native engines running two conversations at once", () => {
           },
         },
       });
+      runtimes.push(runtime);
       // Neither tool call answers until both conversations are inside theirs: both CLIs run at once.
       const bothInside = deferred();
       let inside = 0;
@@ -170,6 +174,7 @@ describe("the PC's bound on native CLI processes", () => {
       commands: { claude: { command: process.execPath, args: [fixture, "claude", "--fixture-pid-log", pids] } },
       processSlots: slots,
     });
+    runtimes.push(runtime);
     return { runtime, slots, pids };
   }
 
@@ -202,6 +207,9 @@ describe("the PC's bound on native CLI processes", () => {
     expect(secondEvents[1]).toEqual({ type: "progress", text: "", activity: true });
     expect(secondTool).toHaveBeenCalledTimes(1);
     expect(await lines(pids)).toHaveLength(2);
+    // The first turn did not keep its CLI while a turn waited; the last one keeps its slot idle.
+    expect(slots.state).toEqual({ running: 1, waiting: 0 });
+    await runtime.releaseIdleNativeProcesses();
     expect(slots.state).toEqual({ running: 0, waiting: 0 });
   }, 40_000);
 
@@ -231,6 +239,9 @@ describe("the PC's bound on native CLI processes", () => {
     expect((await first).at(-1)?.type).toBe("done");
     expect(stoppedTool).not.toHaveBeenCalled();
     expect(await lines(pids)).toHaveLength(1);
+    // Its finished CLI stays idle for the same conversation until released.
+    expect(slots.state).toEqual({ running: 1, waiting: 0 });
+    await runtime.releaseIdleNativeProcesses();
     expect(slots.state).toEqual({ running: 0, waiting: 0 });
   }, 40_000);
 
@@ -264,6 +275,7 @@ describe("the PC's bound on native CLI processes", () => {
     }));
     const slots = new NativeProcessSlots(1);
     const engine = createDesktopAgentEngine(root, () => scope, undefined, {}, slots);
+    runtimes.push(engine);
     const release = deferred();
     const firstInside = deferred();
     const first = collect(engine, request("claude", "a", async () => {
@@ -284,6 +296,8 @@ describe("the PC's bound on native CLI processes", () => {
     await second;
     expect(secondEvents.at(-1)?.type).toBe("done");
     expect(await lines(pids)).toHaveLength(2);
+    expect(slots.state).toEqual({ running: 1, waiting: 0 });
+    await engine.releaseIdleNativeProcesses?.();
     expect(slots.state).toEqual({ running: 0, waiting: 0 });
   }, 40_000);
 });
