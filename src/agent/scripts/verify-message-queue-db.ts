@@ -298,8 +298,9 @@ try {
       agentEngine: "claude", taskConcurrency: 4, thread: { create: { spaceId: "space", userId: "owner" } } }, include: { thread: true } });
     const nativeSide = await system.thread.create({ data: { spaceId: "space", userId: "owner", taskBotId: "native-mico", projectKey: "mico:native-mico", taskKey: "mico-task:native-mico:a" } });
     await system.run.update({ where: { id: (await liveRun(nativeSide.id, "native-mico")).id }, data: { status: "leased" } });
-    assert.equal((await admit(await queuedRun(native.thread!.id, "native-mico"))).count, 0);
-    checks.push("a Pi Mico's main chat never waits behind its side conversations (one turn at a time there), side conversations past the limit wait for a free slot, and native engines stay one turn in total");
+    // Native engines get the same lanes by default (MYCELLIOS_NATIVE_CONCURRENCY unset).
+    assert.equal((await admit(await queuedRun(native.thread!.id, "native-mico"))).count, 1);
+    checks.push("a Pi Mico's main chat never waits behind its side conversations (one turn at a time there), side conversations past the limit wait for a free slot, and native engines get the same main-chat lane by default");
 
     // 12. An unsaved edit is sealed with the Space key like message content.
     const masterKey = { id: "synthetic-queue", key: randomBytes(32) };

@@ -15,7 +15,7 @@ import EmbeddedPostgres from "embedded-postgres";
 // and the usage-limit hold, through the real transactions and routes.
 process.env.NODE_ENV = "test";
 process.env.CONTENT_ENCRYPTION = "off";
-delete process.env.MYCELLIOS_NATIVE_CONCURRENCY;
+process.env.MYCELLIOS_NATIVE_CONCURRENCY = "0";
 const { createDb, asSystem, runAsTenant, createThreadEvents, claimMicoRun, delegateWork, reconcileWork, finalizeRun } =
   await import("@mycellios/db");
 const { HOSTED_MODEL_CREDITS_REQUIRED_ERROR } = await import("@mycellios/core");
@@ -34,8 +34,8 @@ const postgres = new EmbeddedPostgres({ databaseDir: path.join(directory, "pg"),
 let db: ReturnType<typeof createDb> | undefined;
 const checks: string[] = [];
 const flag = (on: boolean) => {
-  if (on) process.env.MYCELLIOS_NATIVE_CONCURRENCY = "1";
-  else delete process.env.MYCELLIOS_NATIVE_CONCURRENCY;
+  if (on) delete process.env.MYCELLIOS_NATIVE_CONCURRENCY;
+  else process.env.MYCELLIOS_NATIVE_CONCURRENCY = "0";
 };
 try {
   await postgres.initialise();
@@ -94,7 +94,7 @@ try {
   const [codexA, codexB, codexC] = [await side(codex.id, "a"), await side(codex.id, "b"), await side(codex.id, "c")];
   const [acpA, acpB] = [await side(acp.id, "a"), await side(acp.id, "b")];
 
-  // 1. Off (the default): every native Mico runs one turn at a time in total, main chat included.
+  // 1. Off (MYCELLIOS_NATIVE_CONCURRENCY=0): every native Mico runs one turn at a time in total, main chat included.
   flag(false);
   assert.equal(await admitted(codexA.id, codex.id), true);
   assert.equal(await admitted(codex.thread!.id, codex.id), false);
@@ -120,7 +120,7 @@ try {
   assert.equal((await system.task.findUniqueOrThrow({ where: { id: delegated.taskId } })).delegatedRunId, null);
   checks.push("off: delegated work waits behind a native Mico's main-chat turn");
 
-  // 2. On: Codex, Claude Code and OpenCode get the Pi lanes.
+  // 2. On (the default, variable unset): Codex, Claude Code and OpenCode get the Pi lanes.
   flag(true);
   await reconcileWork(system);
   const started = await system.task.findUniqueOrThrow({ where: { id: delegated.taskId } });

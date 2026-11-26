@@ -88,7 +88,7 @@ try {
     await assert.rejects(system.computer.create({ data: { ...probe, scope: "invalid" } }), /computers_scope_check/);
     checks.push("real legacy scope CHECK migration preserves existing rows, admits isolated and rejects unknown scopes");
   } finally { await scopeSql.end(); }
-  const bot = await system.bot.create({ data: { ...actor, name: "Fixture Mico", color: "#10B981", agentEngine: "codex", thread: { create: actor } }, include: { thread: true } });
+  const bot = await system.bot.create({ data: { ...actor, name: "Fixture Mico", color: "#10B981", agentEngine: "codex", taskConcurrency: 1, thread: { create: actor } }, include: { thread: true } });
   const handler = { handler: (fn: unknown) => fn };
   const taskInbox = Object.fromEntries(["followUp", "available", "list", "start", "messages", "read", "send", "markRead", "archive", "stop", "answer"].map(name => [name, handler]));
   const jobs = { enqueue: async () => undefined };

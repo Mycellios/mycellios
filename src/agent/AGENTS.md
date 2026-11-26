@@ -526,12 +526,12 @@
   Forward one content-free status per turn through existing progress events; keep
   reasoning fragments on the host and outside the first-response timing.
   Verify stale notification rejection and delivery through the Desktop host.
-  Keep one idle Codex process for up to 30 seconds, scoped to its authorized
+  Keep one idle Codex process for up to 5 minutes, scoped to its authorized
   account, Space, Mico, conversation and exact runtime binding. Retain its process
   slot, clear it on host disable/account changes, and reject retired turn events.
   Verify native runtime, Desktop engine and process-slot regressions. Use the
   opt-in VERIFY_CODEX_REUSE live check for first activity and first text.
-  Claude Code gets the same 30-second idle reuse after a successful turn: its stream-json
+  Claude Code gets the same 5-minute idle reuse after a successful turn: its stream-json
   process, MCP bridge and private system prompt file stay with the exact account, Space,
   Mico, conversation, binding, workspace, settings, model choice and CLI/credential
   identity. The idle bridge refuses every call; each turn binds its own executor and
@@ -1217,10 +1217,10 @@
   bounded timeout, including its description and validation.
   Pi concurrency is admitted atomically per Bot and serialized per thread; a Pi
   Mico's main chat is its own lane outside its 1-4 conversation slots (claimMicoRun,
-  delegation capacity), so it never waits behind side work. Native engines remain
-  single-turn in total, main chat included, unless the operator sets
-  MYCELLIOS_NATIVE_CONCURRENCY=1 on API and worker (specs/native-engines/spec.md phase 4):
-  then Codex, Claude Code and OpenCode get the same lanes (micoRunsLanes) and side-
+  delegation capacity), so it never waits behind side work. Native engines get the
+  same lanes by default, as the reference app does; MYCELLIOS_NATIVE_CONCURRENCY=0 (or false)
+  on API and worker returns them to one turn in total, main chat included
+  (specs/native-engines/spec.md phase 4). While on, Codex, Claude Code and OpenCode get the same lanes (micoRunsLanes) and side-
   conversation private lane, while a generic ACP agent stays single-turn. Either way a
   separate-browser routine turn that runs on its server workspace with a Pi model
   (routineBrowserRunsOnServer/isServerRoutineRun in slotRunsWhere) neither takes nor waits
@@ -1231,7 +1231,7 @@
   instance; further admitted turns wait unclaimed there, as Pi tasks do.
   Private Pi and native tasks reserve the existing computer lease
   before computer/file/command tools, never share it between runs, so screen and browser
-  tools stay serialized. Verify scripts/verify-native-concurrency-db.ts with both flag
+  tools stay serialized. Verify scripts/verify-native-concurrency-db.ts with both switch
   states, native-process-slots and the native runtime/Desktop engine tests. Workflows reuse
   existing Micos, owner/Space RPCs and the existing reconciler, freeze graph versions
   and persist private step runs. Stop commits cancellation and process teardown

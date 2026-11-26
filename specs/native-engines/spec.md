@@ -148,8 +148,8 @@ the store from phase 3.
      above the bound waits with a visible reason instead of failing, and the existing
      usage-limit hold keeps that engine's queued turns waiting until the reset.
    - An ACP agent that does not support concurrent sessions stays at one turn.
-   - Implemented: behind the operator flag `MYCELLIOS_NATIVE_CONCURRENCY=1` on the API and
-     worker, off by default (one turn in total). `micoRunsLanes`
+   - Implemented and on by default, as the reference app does; the operator can set
+     `MYCELLIOS_NATIVE_CONCURRENCY=0` on the API and worker to return to one turn in total. `micoRunsLanes`
      (`packages/db/src/mico-concurrency.ts`) gives Codex, Claude Code and OpenCode the Pi
      lanes in `claimMicoRun`, the queue, delegation and wakeups, and their side conversations
      the private computer lease; a generic ACP agent stays at one turn. Desktop's

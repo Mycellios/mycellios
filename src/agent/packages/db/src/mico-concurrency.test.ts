@@ -12,21 +12,21 @@ import {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("native concurrency switch", () => {
-  it("is off unless the operator sets 1 or true", () => {
-    expect(nativeConcurrencyEnabled({})).toBe(false);
-    for (const value of ["", "0", "false", "yes", "TRUE", " 1"])
+  it("is on unless the operator sets 0 or false", () => {
+    expect(nativeConcurrencyEnabled({})).toBe(true);
+    for (const value of ["", "1", "true", "yes"])
+      expect(nativeConcurrencyEnabled({ MYCELLIOS_NATIVE_CONCURRENCY: value })).toBe(true);
+    for (const value of ["0", "false", "FALSE", " 0 "])
       expect(nativeConcurrencyEnabled({ MYCELLIOS_NATIVE_CONCURRENCY: value })).toBe(false);
-    expect(nativeConcurrencyEnabled({ MYCELLIOS_NATIVE_CONCURRENCY: "1" })).toBe(true);
-    expect(nativeConcurrencyEnabled({ MYCELLIOS_NATIVE_CONCURRENCY: "true" })).toBe(true);
   });
 
   it("reads the process environment by default", () => {
     vi.stubEnv("MYCELLIOS_NATIVE_CONCURRENCY", "");
-    expect(nativeConcurrencyEnabled()).toBe(false);
-    expect(micoTurnLimit({ agentEngine: "codex", taskConcurrency: 4 })).toBe(1);
-    vi.stubEnv("MYCELLIOS_NATIVE_CONCURRENCY", "1");
     expect(nativeConcurrencyEnabled()).toBe(true);
     expect(micoTurnLimit({ agentEngine: "codex", taskConcurrency: 4 })).toBe(4);
+    vi.stubEnv("MYCELLIOS_NATIVE_CONCURRENCY", "0");
+    expect(nativeConcurrencyEnabled()).toBe(false);
+    expect(micoTurnLimit({ agentEngine: "codex", taskConcurrency: 4 })).toBe(1);
   });
 });
 
