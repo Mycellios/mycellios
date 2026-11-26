@@ -80,6 +80,7 @@ import {
   FLEET_WRITE_TOOL_NAMES,
   isAttachmentImageMimeType,
   isOpenAiCompatibleProvider,
+  parseDesktopDiagnostic,
 } from "@mycellios/contracts";
 import type { ActionApprovalRule, ToolCallStreak } from "@mycellios/core";
 import {
@@ -10282,6 +10283,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if(!restrictedRun)await scheduleLocalMemoryReview({prisma:deps.prisma,jobs:deps.jobs},thread.id).catch(error=>getLogger().error("memory.review enqueue failed",error));
         } catch (caughtError) {
           if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
+          const desktopFailure = caughtError instanceof Error ? parseDesktopDiagnostic(caughtError.message) : undefined;
+          // Recover one new segment from actual tool context. A cold replay could
+          // repeat a command whose result was lost with the server connection.
+          // Runtime cleanup already aborted the signal; checkpoint writes fence the run.
+          if (desktopRunDispatched && leaseValid && !restartingTurn &&
+              latestRestartCapture && desktopFailure?.operationId && desktopFailure.phase === "run" &&
+              (desktopFailure.code === "native_transport_interrupted" || desktopFailure.code === "relay_restarted")) {
+            await pauseForRestart();
+            return;
+          }
           // A Desktop check that got no answer before the turn started or reached the PC is
           // a setup failure: retry it with the others instead of failing the message. A relay
           // handing its PCs to a new server version is a busy computer: the run waits for it.

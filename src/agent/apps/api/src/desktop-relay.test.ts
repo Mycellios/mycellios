@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import { afterEach, expect, it } from "vitest";
-import { desktopDeviceKey, desktopRelayKey, signDesktopRelay } from "../../../packages/adapters/src/desktop-relay.js";
+import { serve } from "@hono/node-server";
+import { afterEach, expect, it, vi } from "vitest";
+import { desktopAgentSelection, desktopDeviceKey, desktopRelayKey, desktopRelayTransport, signDesktopRelay } from "../../../packages/adapters/src/desktop-relay.js";
+import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { HostComputerSandbox } from "../../../packages/adapters/src/host-computer-sandbox.js";
 import { startHostComputerServer } from "../../../packages/adapters/src/host-computer-server.js";
 import { DesktopRelayClient } from "../../desktop/src/desktop-relay.js";
@@ -597,3 +599,141 @@ it("hands the relay to a new server version only on a signed request from inside
   expect(await (await handoff("cancel")).json()).toMatchObject({ instance: idle.instance, handingOff: false });
   expect((await signed("/api/desktop-relay/internal", { probe: "test-bot", scope, nonce: randomUUID() })).status).toBe(200);
 });
+
+it("finishes an active conversation exactly once before replacing its relay, then accepts a follow-up", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "mc-relay-"));
+  const project = path.join(root, "project");
+  const token = "a".repeat(64);
+  const secret = desktopRelayKey("test-purpose-secret");
+  const signal = new AbortController();
+  const closeRelays: Array<() => Promise<void>> = [];
+  const startApi = async () => {
+    const app = fixture(true, async () => true);
+    const closeBroker = close;
+    let server!: ReturnType<typeof serve>;
+    const base = await new Promise<string>((resolve) => {
+      server = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }, ({port}) => resolve(`http://127.0.0.1:${port}`));
+    });
+    let closed = false;
+    closeRelays.push(async () => {
+      if (closed) return;
+      closed = true;
+      closeBroker();
+      await new Promise<void>(resolve => {
+        server.close(() => resolve());
+        if ("closeAllConnections" in server) server.closeAllConnections();
+      });
+    });
+    return base;
+  };
+  let base = await startApi();
+  const handoff = async (action: "start" | "status") => {
+    const body = JSON.stringify({ action });
+    const time = String(Date.now());
+    const response = await fetch(`${base}/internal/desktop-relay/handoff`, {
+      method: "POST",
+      headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(secret, time, body) },
+      body,
+    });
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  const descriptor = () => ({ id: "restart-rehearsal", contractVersion: "1", adapterVersion: "1", capabilities: {
+    streaming: true, tools: true, compaction: false, scripted: false,
+  } });
+  const fallback = { describe: descriptor, abort: async () => {}, run: vi.fn() };
+  const host = await startHostComputerServer({
+    root: path.join(root, "home"), token, hostname: "127.0.0.1",
+    agentRuntime: {
+      describe: descriptor, abort: async () => {},
+      async *run(input) {
+        if (input.prompt === "Start the operation") {
+          await input.executeTool!("shell", {}, "write-once");
+          yield { type: "text", text: "The operation finished." };
+        } else {
+          expect(input.history).toEqual([expect.objectContaining({ content: "The operation finished." })]);
+          yield { type: "text", text: "The conversation continued." };
+        }
+        yield { type: "done" };
+      },
+    },
+  });
+  host.setEnabled(true);
+  const native = new DesktopRelayClient({
+    base: "http://desktop-fixture", agentExecution: 1,
+    fetch: (url, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set("x-test-auth", "yes");
+      return fetch(`${base}${new URL(url).pathname}`, { ...init, headers });
+    },
+    localUrl: `http://127.0.0.1:${host.port}`, localToken: token, revoked: () => host.setEnabled(false),
+  });
+  const relayUrl = () => `${base}/api/desktop-relay/internal`;
+  const context = {
+    operationId: "operation", traceId: "trace", userId: owner.userId, spaceId: owner.spaceId,
+    botId: "test-bot", runId: "active-run", signal: signal.signal,
+  };
+  const adapter = new HostComputerSandbox("", "", (input, ctx) => desktopRelayTransport(relayUrl(), secret)(input, ctx));
+  const runtime = new DesktopAgentRuntime({
+    fallback, select: ctx => desktopAgentSelection(relayUrl(), secret)(ctx),
+    transport: (input, ctx) => desktopRelayTransport(relayUrl(), secret)(input, ctx),
+  });
+  const input = {
+    botId: context.botId, threadId: "same-thread", runId: context.runId, instructions: "Restart rehearsal",
+    prompt: "Start the operation", history: [], tools: [], model: { provider: "openai", id: "fixture" },
+  };
+  const commandOutput = path.join(project, "command-receipt.txt");
+  let activeTurn: Promise<unknown> | undefined;
+  try {
+    await mkdir(project);
+    await host.selectProject("test-bot", project);
+    await native.registerAccount(await native.identity());
+    await native.bind("test-bot");
+    await vi.waitFor(async () => expect((await desktopAgentSelection(relayUrl(), secret)(context)).available).toBe(true), { timeout: 10_000 });
+    const computer = await adapter.provision({ botId: "test-bot", homePath: "" }, context);
+    const events: string[] = [];
+    activeTurn = (async () => {
+      for await (const event of runtime.run({
+        ...input,
+        executeTool: async () => {
+          for await (const chunk of adapter.execute(computer, { argv: [
+            process.execPath, "-e",
+            "const fs=require('node:fs');fs.appendFileSync('command-receipt.txt','executed;');const timer=setInterval(()=>{if(fs.existsSync('finish'))clearInterval(timer)},25);",
+          ] }, context)) if (chunk.type === "exit") expect(chunk.code).toBe(0);
+          return { ok: true };
+        },
+      }, context)) if (event.type === "text") events.push(event.text);
+    })();
+    await Promise.race([
+      activeTurn.then(() => { throw new Error("The turn ended before the controlled shutdown"); }),
+      vi.waitFor(async () => expect(await readFile(commandOutput, "utf8")).toBe("executed;"), { timeout: 8_000 }),
+    ]);
+    const draining = await handoff("start");
+    expect(draining).toMatchObject({ handingOff: true, agentRuns: 1, openOperations: 2 });
+    await expect(desktopAgentSelection(relayUrl(), secret)(context)).rejects.toMatchObject({ name: "ComputerUpdatingError", dispatched: false });
+    await writeFile(path.join(project, "finish"), "");
+    await activeTurn;
+    expect(events).toEqual(["The operation finished."]);
+    expect(await handoff("status")).toMatchObject({ instance: draining.instance, handingOff: true, openOperations: 0 });
+
+    await closeRelays[0]!();
+    base = await startApi();
+    expect((await handoff("status")).instance).not.toBe(draining.instance);
+    await vi.waitFor(async () => expect((await desktopAgentSelection(relayUrl(), secret)(context)).available).toBe(true), { timeout: 10_000 });
+    for await (const event of runtime.run({
+      ...input, runId: "follow-up-run", prompt: "Continue the conversation",
+      history: [{ role: "assistant", content: events[0]! }],
+    }, context)) if (event.type === "text") events.push(event.text);
+    expect(events).toEqual(["The operation finished.", "The conversation continued."]);
+    expect(await readFile(commandOutput, "utf8")).toBe("executed;");
+    expect(fallback.run).not.toHaveBeenCalled();
+  } finally {
+    await writeFile(path.join(project, "finish"), "").catch(() => undefined);
+    signal.abort();
+    native.stop();
+    for (const closeApi of closeRelays.reverse()) await closeApi();
+    await activeTurn?.catch(() => undefined);
+    await host.close();
+    await removeProjectFixture(root, "mc-relay-");
+  }
+}, 35_000);
