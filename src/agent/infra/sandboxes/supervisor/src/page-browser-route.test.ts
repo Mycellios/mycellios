@@ -59,8 +59,9 @@ async function snapshot(
   conversationKey?: string,
   command = "snapshot",
   fields: Record<string, unknown> = {},
+  isolated = false,
 ) {
-  return supervisorApp.request(`/computers/${id}/browser${conversationKey ? "/scoped" : ""}`, {
+  return supervisorApp.request(`/computers/${id}/browser${isolated ? "/isolated" : conversationKey ? "/scoped" : ""}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${resolveSupervisorToken(process.env)}`,
@@ -138,6 +139,19 @@ it("forwards only a validated scoped command without weakening the display fence
   mock.exec.mockClear();
   expect(await (await snapshot("scoped", "first", "run:1", "home", key)).json()).toMatchObject({ ok: false });
   expect((await snapshot("scoped", "first", "run:2", "home", "../outside")).status).toBeGreaterThanOrEqual(400);
+  expect(mock.exec).not.toHaveBeenCalled();
+});
+
+it("isolates routine browser commands and keeps the exact screen lease", async () => {
+  const key = "c".repeat(64);
+  expect(await (await snapshot("routine", "first", "run:2", "home", key, "close", {}, true)).json()).toMatchObject({ ok: true });
+  expect(mock.exec.mock.calls.at(-1)?.[0].Cmd.slice(-3)).toEqual([
+    pageBrowserHelper, "isolated-close", JSON.stringify({ command: "close", conversationKey: key }),
+  ]);
+  mock.exec.mockClear();
+  expect((await snapshot("routine", "first", "run:2", "home", key, "focus", {}, true)).status).toBe(404);
+  expect((await snapshot("routine", "first", "run:2", "home", key, "close")).status).toBe(404);
+  expect(await (await snapshot("routine", "first", "run:1", "home", key, "snapshot", {}, true)).json()).toMatchObject({ ok: false });
   expect(mock.exec).not.toHaveBeenCalled();
 });
 

@@ -1,7 +1,9 @@
 # Automate Micos with routines, signed events, scripts and workflows
 
-Status: phase 1 implemented; phase 2 implemented except creation from chat; phases 3 to 6
-are a proposed design.
+Status: routines and signed events are implemented. Mico Scripts has an operator gate
+and individual opt-in credentials. Workflow draft transfer, approval, parallel execution,
+revision history, signed triggers, typed steps, and bounded loops are implemented in the
+workflow candidate. Optional callbacks remain proposed.
 
 This spec builds on `specs/mico-routine-runs/spec.md` (routine conversations,
 main-chat markers, quiet and failed runs) and on the workflow engine and
@@ -159,8 +161,10 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
    - An approval step pauses the execution and shows Approve and Reject to the
      owner in the workflow's conversation; Reject stops the execution. Automatic
      approval reviewers never answer it.
-   - A webhook trigger uses phase 2's signed URL with the workflow as its owner,
-     with one open execution per workflow, as for cron.
+   - Signed workflow events use Standard Webhooks. The owner enables a saved
+     revision and can rotate or revoke its secret. Saving or restoring a new
+     revision requires enabling its webhook again. Duplicate deliveries return
+     the original execution. One execution per workflow may be open at a time.
    - Independent branches run their agent steps at the same time, within each
      Mico's concurrency.
    - A version is saved when the newest is older than 5 minutes, on restore, and
@@ -174,13 +178,19 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
      integer, yes/no, list or fixed labels). The Mico returns them with a
      `workflow_answer` tool, checked in the same turn; one corrective turn follows
      when it does not.
-   - Conditions can test declared fields (`priority = high and count > 2`)
-     without a model call, and `{{name}}` in later steps inserts a value as data.
-   - A loop is an edge back to an earlier step, through a condition only, with a
-     pass limit per run (default 10, at most 50); reaching it fails the step with
-     that reason.
+   - A condition can compare one declared field without a model call. Compound
+     expressions remain proposed. References such as `{{name}}` in an agent's
+     instructions pass the resolved value in a separate data section.
+   - A workflow can have one loop with one entry and one exit, through a condition
+     branch back to an earlier step. The run has a total pass limit (default 10,
+     maximum 50). A true repeat branch after the last pass fails with that reason.
+     Other branches and their completed work are preserved.
    - An output step can post its text to a messaging channel that the workflow's
      Mico already uses, or notify the owner.
+   - An opted-in routine can use a headless Chromium on its managed isolated
+     Docker computer. Its execution fence owns a temporary profile, which
+     starts signed out and closes at attempt cleanup or after fifteen minutes.
+     Ordinary browser and screen tools keep their existing interactive scope.
 6. Phase 6 — run callbacks (optional).
    - A webhook routine, a workflow or a script message can name an HTTPS callback.
      When the run ends or waits for a person, the server sends a Standard Webhooks

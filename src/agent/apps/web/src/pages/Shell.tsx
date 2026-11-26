@@ -1139,6 +1139,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     editingRoutine,
     restoreRoutine,
     startRoutine,
+    prepareMorningBriefing,
     resetRoutineTarget,
     leaveRoutine,
     addSkillRoutine,
@@ -5094,6 +5095,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           selectedId={searchParams.get("flow")}
           onSelect={routineId => { const next = new URLSearchParams(searchParams); next.set("flow", routineId); setSearchParams(next, { replace: true }); }}
           onEdit={startRoutine}
+          onPrepareMorningBriefing={prepareMorningBriefing}
           onAsk={routine => { reviewWorkspace?.comment(t`I want to edit the routine “${routine.name}”. Changes: `); exitRoutineView(); }}
           onExit={exitRoutineView}
           onNavigation={() => setMobileSidebarOpen(true)}

@@ -177,7 +177,7 @@ describe("builtin tools", () => {
 
   it("exposes the tools the executor actually applies", async () => {
     expect([...BUILTIN_TOOL_NAMES].sort()).toEqual(
-      [...builtinAgentTools, ...agentConnectionTools].map((tool) => tool.name).sort(),
+      [...builtinAgentTools.map(tool => tool.name), ...agentConnectionTools.map(tool => tool.name), "workflow_answer"].sort(),
     );
     expect(builtinAgentTools.map((t) => t.name)).toEqual(
       expect.arrayContaining([

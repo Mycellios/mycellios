@@ -51,6 +51,8 @@ export const AUDITED_PROCEDURES: Record<string, AuditedProcedure> = {
     kind: "bot_secret",
     fields: ["botId", "name"],
   },
+  "workflows.rotateWebhook": { type: "credential.changed", kind: "workflow_webhook", fields: ["id"] },
+  "workflows.revokeWebhook": { type: "credential.deleted", kind: "workflow_webhook", fields: ["id"] },
   "bots.rotateWebhookSecret": { type: "credential.changed", kind: "webhook", fields: ["botId"] },
   "routines.rotateWebhookSecret": {
     type: "credential.changed",

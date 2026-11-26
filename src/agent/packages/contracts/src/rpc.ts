@@ -50,7 +50,7 @@ import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-cal
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
 import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
-import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema } from "./workflows.js";
+import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema, WorkflowVersionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
 import {
   AgentImportCreateInput,
@@ -1187,6 +1187,15 @@ export const appContract = {
     archive: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
     execute: oc.input(z.object({ id: Id, triggerId: Id, expectedVersion: z.number().int().positive(), clientNonce: z.string().min(1).max(160) })).output(WorkflowExecutionSchema),
     runs: oc.input(z.object({ id: Id })).output(z.array(WorkflowExecutionSchema)),
+    versions: oc.input(z.object({ id: Id })).output(z.array(WorkflowVersionSchema)),
+    webhook: oc.input(z.object({ id: Id })).output(z.object({ version: z.number().int().nullable(), path: z.string() })),
+    rotateWebhook: oc.input(z.object({ id: Id, expectedVersion: z.number().int().positive() }))
+      .output(z.object({ version: z.number().int(), path: z.string(), secret: z.string() })),
+    revokeWebhook: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    restoreVersion: oc.input(z.object({
+      id: Id, version: z.number().int().positive(), expectedVersion: z.number().int().positive(),
+    })).output(WorkflowSchema),
+    decideApproval: oc.input(z.object({ executionId: Id, stepId: Id, decision: z.enum(["approved", "rejected"]) })).output(WorkflowExecutionSchema),
     stop: oc.input(z.object({ executionId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   routines: {
@@ -1210,6 +1219,7 @@ export const appContract = {
             timezone: TimeZoneSchema.optional(),
             active: z.boolean().optional(),
             notify: z.boolean().optional(),
+            isolatedBrowser: z.boolean().optional(),
             webhookEnabled: z.boolean().optional(),
             githubEnabled: z.boolean().optional(),
             messageProvider: z

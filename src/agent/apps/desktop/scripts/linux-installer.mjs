@@ -30,6 +30,7 @@ export async function prepareLinuxInstaller({ desktopRoot, runtimeDeb, runtimeSh
     files: ['dist/**/*', '!dist/**/*.map', 'package.json'],
     extraMetadata: { name: 'mycellios-desktop', version, main: 'dist/main.js', homepage: 'https://www.mycellios.com', desktopName: 'mycellios-desktop.desktop' },
     extraResources: [
+      { from: path.join(agentRoot, 'scripts/mycellios-cli.mjs'), to: 'cli/mycellios-cli.mjs' },
       { from: path.join(desktopRoot, 'local-server'), to: 'local-server', filter: ['**/*', '!node_modules{,/**/*}'] },
       { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
       ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),

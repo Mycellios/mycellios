@@ -23,6 +23,7 @@ test('Intel packages the current local server and excludes the incompatible ARM 
  assert.equal(config.extraResources.some(r=>r.to.startsWith('contribution/')),false);
  assert.equal(config.extraResources.some(r=>r.to==='local-server'),true);
  assert.equal(config.extraResources.some(r=>r.to==='development-source'),true);
+ assert.ok(config.extraResources.find(x=>x.to==='cli/mycellios-cli.mjs')?.from.endsWith(path.join('scripts','mycellios-cli.mjs')));
  assert.equal(config.extraResources.some(r=>r.to==='development-tools/npm'),true);
  assert.ok(config.beforePack.endsWith('verify-release.cjs'));
  await assert.rejects(prepareMacInstaller({desktopRoot:'/fixture',arch:'x64',version:'0.3.48',runtimePkg:'arm.pkg'}),/ARM/);

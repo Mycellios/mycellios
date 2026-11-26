@@ -15,8 +15,9 @@ import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
+import { saveWorkflowAnswer, workflowAnswerEffect, workflowAnswerFields, workflowAnswerTool } from "./workflow-answers.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
-import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, micoRunsLanes } from "@mycellios/db";
+import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, isSignedWorkflowThread, micoRunsLanes } from "@mycellios/db";
 import { createHash, randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -3892,7 +3893,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       // conversation, whoever's message started it, gets the member policy below.
       const memberUserId = current.thread?.memberUserId ?? null;
       // Member turns run on the server's Pi model only: never a CLI or sign-in on the owner's PC.
-      let agentEngine = (memberUserId ? "pi" : turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
+      const workflowCorrection = run.trigger === "workflow" && Boolean(run.clientNonce?.startsWith("workflow-correction:"));
+      let agentEngine = (memberUserId || workflowCorrection ? "pi" : turnModel?.agentEngine ?? leaseTarget.agentEngine ?? "pi") as NonNullable<AgentRunRequest["agentEngine"]>;
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
@@ -4042,6 +4044,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
       let screenRelease:
         | { computer: ComputerRef; context: AdapterContext; keepWarm: boolean }
         | undefined;
+      let routineBrowserCleanup: { computer: ComputerRef; context: AdapterContext } | undefined;
       let runAbortController: AbortController | null = null;
       // Runtime cleanup can queue terminal events after the consumer has exited.
       // Track only helpers whose running state this attempt actually persisted.
@@ -4278,10 +4281,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           storedConnections,
           connectedComposio.map((connection) => connection.provider),
         );
+        const ownedRoutine = await isOwnedRoutineThread(deps.prisma, run, thread);
+        const ownedWorkflow = !ownedRoutine && await isOwnedWorkflowThread(deps.prisma, run, thread);
+        const externalWebhook = run.trigger === "webhook" ||
+          (ownedWorkflow && await isSignedWorkflowThread(deps.prisma, run, thread));
         const context = {
           operationId: runId,
-          projectSessionId: (await isOwnedRoutineThread(deps.prisma, run, thread)) || (await isOwnedWorkflowThread(deps.prisma, run, thread))
-            ? undefined : nativeWorkProjectSession(thread, task),
+          projectSessionId: ownedRoutine || ownedWorkflow ? undefined : nativeWorkProjectSession(thread, task),
           traceId: runId,
           spaceId: run.spaceId,
           userId: run.userId,
@@ -4327,7 +4333,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : null;
         // An external webhook's text could choose what gets saved, so those runs only read.
         const personalWriteTarget =
-          personalMemory && run.trigger !== "webhook" ? personalMemory.writeTarget : null;
+          personalMemory && !externalWebhook && !workflowCorrection ? personalMemory.writeTarget : null;
         // Ids recalled from personal memory in this run, so forget_memory reaches the same memory.
         const personalMemoryIds = new Set<string>();
         const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
@@ -4823,8 +4829,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }))
           ? BRANCH_HANDOFF_NOTE : undefined;
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
+        const routineBrowser = run.trigger === "routine" && Boolean(run.routineId) && ownedRoutine &&
+          computerKind === "docker" && storedComputer.scope === "isolated" &&
+          !messagingChannelRun && !thread.groupId && !heldForTakeover &&
+          browser.describe().id === "computer" && Boolean(deps.sandbox.pageBrowser) &&
+          Boolean(await deps.prisma.routine.findFirst({
+            where: { id: run.routineId!, spaceId: run.spaceId, userId: run.userId, botId: run.botId, isolatedBrowser: true },
+            select: { id: true },
+          }));
         const pageBrowserAllowed =
-          !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
+          (routineBrowser || (!routineConversation && !isolatedProjectRun && graphical)) &&
+          browser.describe().capabilities.page && !heldForTakeover;
         // Group shared folders (specs/group-shared-folders/spec.md): a member's own group turn,
         // started by the person, carries the group's folders to its PC, only on This PC.
         const groupFolders = thread.groupId
@@ -4904,7 +4919,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           for (const name of [...PROJECT_SHARED_SCREEN_TOOLS, ...PAGE_BROWSER_TOOL_NAMES]) disabledBuiltinTools.add(name);
         }
         if (routineConversation) {
-          for (const name of ["computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", ...PAGE_BROWSER_TOOL_NAMES])
+          for (const name of ["computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", ...(routineBrowser ? [] : PAGE_BROWSER_TOOL_NAMES)])
             disabledBuiltinTools.add(name);
         }
         if (!computerAvailable) {
@@ -4939,7 +4954,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
         const savedPlanWait = ownerDefaults.planAutoStartSeconds;
         const planWaitSeconds = savedPlanWait === undefined ? DEFAULT_PLAN_AUTO_START_SECONDS : savedPlanWait;
+        const answerFields = ownedWorkflow ? await workflowAnswerFields(deps.prisma, run, thread) : undefined;
         const builtins = [
+          ...(answerFields?.length && !disabledBuiltinTools.has(workflowAnswerEffect) ? [workflowAnswerTool(answerFields)] : []),
           ...(canCreateWebhookRoutine && !disabledBuiltinTools.has("schedule_create")
             ? [createWebhookRoutineTool] : []),
           ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).agentNewChat && run.trigger === "user" && thread.botId === bot.id && !thread.groupId && !disabledBuiltinTools.has("start_new_chat") ? [agentNewChatTool] : []),
@@ -5140,7 +5157,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // The creation intro only asks what the bot is for (see selectBuiltinToolsForRun),
         // so it gets no connector tools either.
         const tools =
-          run.trigger === "created" ? builtins : [...builtins, ...exposedConnectorTools];
+          workflowCorrection ? builtins.filter(tool => tool.name === workflowAnswerEffect)
+            : run.trigger === "created" ? builtins : [...builtins, ...exposedConnectorTools];
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
           : undefined;
@@ -5191,6 +5209,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? [
               isolatedProjectRun
                 ? "This project conversation has an independent Git worktree. Work only in that project copy, run its tests and use its preview. For requested Git operations, run the installed Git on this PC, using the user's configured credential helper or SSH agent. On the first authorized push, publish the task branch with an explicit remote and set its upstream. Do not change another conversation's files, start shared-screen interaction or merge into the original repository without the user's request. Shell commands retain the OS user's permissions; a worktree is not an OS sandbox."
+                : routineBrowser
+                ? "This routine has a separate browser that starts signed out. Use its page tools. Uploads, downloads, saved logins and screen control are unavailable."
                 : routineConversation
                 ? "This routine has its own conversation. Use its available files, shell and connected apps. Do not control the user's screen or browser, which belong to the interactive chat. If the task requires graphical interaction, explain that it needs the main chat. Shell commands retain the OS user's permissions; this tool policy is not an OS sandbox."
                 : "Use the computer only when the task needs files, commands, a browser, or an installed application. Answer directly from the conversation when sufficient; use connected tools for app data. A website with no connected app is still yours to use in the computer's browser, so a missing connection alone is never a reason to decline. Do not inspect the computer just to prepare for an unrelated task. If what you are about to buy, send or submit differs from what the user confirmed, such as a changed item or total, show the difference and confirm again first.",
@@ -5826,10 +5846,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const declaredReadOnlyFor = (toolName: string) =>
             toolName === name ? declaredReadOnly : connectorTools.get(toolName)?.readOnly;
           const requiresUnattendedApproval =
-            (unidentifiedAction && run.trigger === "webhook") ||
+            (unidentifiedAction && externalWebhook) ||
             approvalToolNames.some((toolName) =>
               unattendedTriggerToolRequiresApproval(
-                run.trigger,
+                externalWebhook ? "webhook" : run.trigger,
                 toolName,
                 viaConnector,
                 declaredReadOnlyFor(toolName),
@@ -7440,7 +7460,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const redactions = () => [...runSecrets];
             const desktopTools =
               graphicalToolsAllowed && builtinOffered(disabledBuiltinTools, "computer_act");
-            const browserContext = { ...context, browserThreadId: thread.id };
+            const browserContext = { ...context, browserThreadId: thread.id, ...(routineBrowser ? { routineBrowserFence: fence } : {}) };
             const tool =
               name === "browser_navigate"
                 ? browserNavigateFromTool
@@ -7448,16 +7468,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? browserSnapshotFromTool
                   : null;
             return computerScreenToolResult(async () => {
+              const computer = await getRunComputer("tool", name);
+              if (routineBrowser) {
+                if (computer.kind !== "docker") return { error: "The isolated routine browser requires a managed Docker workspace." };
+                routineBrowserCleanup = { computer, context: browserContext };
+              }
               const result = tool
                 ? redactConnectorPayload(
-                    await tool(browser, await getRunComputer("tool", name), browserContext, args, {
+                    await tool(browser, computer, browserContext, args, {
                       desktopTools,
                     }),
                     redactions(),
                   )
                 : await browserActFromTool(
                     browser,
-                    await getRunComputer("tool", name),
+                    computer,
                     browserContext,
                     args,
                     {
@@ -7474,6 +7499,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                           ? resolveBotUploadPath(computerMode, bot.id, path)
                           : path,
                       resolveSecretFill: async (step) => {
+                        if (routineBrowser) return { error: "Saved logins are unavailable in a routine browser." };
                         const resolved = await resolveLoginFill({
                           prisma: deps.prisma,
                           secretStore: deps.secretStore,
@@ -8767,6 +8793,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish({ ...delegated, note: "The child task is durable. End this turn; its result will resume this request automatically. Do not send progress acknowledgements or poll." });
           }
           if (name === "work_status") return finish(await workStatus(deps.prisma, { ...run, taskId: run.taskId }));
+          if (name === workflowAnswerEffect) {
+            if (!answerFields?.length || disabledBuiltinTools.has(name))
+              return finish({ error: "This workflow step has no defined answer fields." });
+            return finish(await saveWorkflowAnswer(deps.prisma, { ...run, workerId, fence }, answerFields, args,
+              text => redactSecrets(text, runSecrets)));
+          }
           if ((WORKFLOW_TOOL_NAMES as readonly string[]).includes(name)) {
             if (!workflowToolsAllowed) return finish({ error: "Workflow changes and execution require the owner's direct request in a Mico conversation." });
             return finish(await executeWorkflowTool(deps.prisma, run, name, args, effectKey));
@@ -10427,6 +10459,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         detachShutdown?.();
         clearInterval(heartbeat);
+        if (routineBrowserCleanup) {
+          await deps.sandbox.pageBrowser?.(routineBrowserCleanup.computer, { command: "close" }, {
+            ...routineBrowserCleanup.context, signal: AbortSignal.timeout(5_000),
+          }).catch(() => undefined);
+        }
         if (!retainComputerLease) {
           if (screenRelease) {
             const releaseContext = screenRelease.keepWarm

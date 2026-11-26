@@ -15466,3 +15466,144 @@ msgstr "Load earlier activity"
 #: src/pages/shell/dialogs.tsx
 msgid "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"
 msgstr "{otherMemberCount, plural, one {This removes access for # other member and cannot be undone.} other {This removes access for # other members and cannot be undone.}}"
+
+msgid "Prepare morning briefing"
+msgstr "Prepare morning briefing"
+
+msgid "Read today's calendar and the emails that need a reply using the connected accounts I have authorized. Summarize meetings that need preparation, schedule conflicts, and messages that need a decision. Keep it short and identify the source of each item. If a source is unavailable, state which one. If all selected sources are available and there is nothing I need to act on, finish without posting an update. Read only. Do not send, modify, or delete anything."
+msgstr "Read today's calendar and the emails that need a reply using the connected accounts I have authorized. Summarize meetings that need preparation, schedule conflicts, and messages that need a decision. Keep it short and identify the source of each item. If a source is unavailable, state which one. If all selected sources are available and there is nothing I need to act on, finish without posting an update. Read only. Do not send, modify, or delete anything."
+
+msgid "Workflow file"
+msgstr "Workflow file"
+
+msgid "Import workflow"
+msgstr "Import workflow"
+
+msgid "Choose a Mico for each unassigned step before running the workflow."
+msgstr "Choose a Mico for each unassigned step before running the workflow."
+
+msgid "Could not import this workflow file."
+msgstr "Could not import this workflow file."
+
+msgid "What needs approval?"
+msgstr "What needs approval?"
+
+msgid "Workflow approval"
+msgstr "Workflow approval"
+
+msgid "Waiting for your approval"
+msgstr "Waiting for your approval"
+
+msgid "Choose an instruction, condition, approval, Mico or result as the destination."
+msgstr "Choose an instruction, condition, approval, Mico or result as the destination."
+
+msgid "Could not load workflow versions."
+msgstr "Could not load workflow versions."
+
+msgid "Loading workflow versions…"
+msgstr "Loading workflow versions…"
+
+msgid "No saved versions yet."
+msgstr "No saved versions yet."
+
+msgid "Save your edits before restoring a version."
+msgstr "Save your edits before restoring a version."
+
+msgid "Restore version {target} and pause its schedule?"
+msgstr "Restore version {target} and pause its schedule?"
+
+msgid "Confirm restore"
+msgstr "Confirm restore"
+
+msgid "Workflow webhook"
+msgstr "Workflow webhook"
+
+msgid "Could not load the workflow webhook."
+msgstr "Could not load the workflow webhook."
+
+msgid "Could not update the workflow webhook."
+msgstr "Could not update the workflow webhook."
+
+msgid "Active for version {version}"
+msgstr "Active for version {version}"
+
+msgid "Webhook is off"
+msgstr "Webhook is off"
+
+msgid "Enable the webhook again for this version."
+msgstr "Enable the webhook again for this version."
+
+msgid "Save your edits before enabling the webhook."
+msgstr "Save your edits before enabling the webhook."
+
+msgid "Enable webhook"
+msgstr "Enable webhook"
+
+msgid "The current secret will stop working."
+msgstr "The current secret will stop working."
+
+msgid "Incoming events will stop starting this workflow."
+msgstr "Incoming events will stop starting this workflow."
+
+msgid "Loading webhook…"
+msgstr "Loading webhook…"
+
+msgid "Copy this signing secret now. It is shown only once."
+msgstr "Copy this signing secret now. It is shown only once."
+
+msgid "Integer"
+msgstr "Integer"
+
+msgid "Yes or no"
+msgstr "Yes or no"
+
+msgid "Text list"
+msgstr "Text list"
+
+msgid "Fixed labels"
+msgstr "Fixed labels"
+
+msgid "Answer fields"
+msgstr "Answer fields"
+
+msgid "Field name"
+msgstr "Field name"
+
+msgid "Field type"
+msgstr "Field type"
+
+msgid "Labels, separated by commas"
+msgstr "Labels, separated by commas"
+
+msgid "Remove field"
+msgstr "Remove field"
+
+msgid "Add answer field"
+msgstr "Add answer field"
+
+msgid "Compare answer field"
+msgstr "Compare answer field"
+
+msgid "Answer field"
+msgstr "Answer field"
+
+msgid "Comparison"
+msgstr "Comparison"
+
+msgid "Use one loop with a single entry and exit. Repeat from an earlier step."
+msgstr "Use one loop with a single entry and exit. Repeat from an earlier step."
+
+msgid "Repeat from"
+msgstr "Repeat from"
+
+msgid "Do not repeat"
+msgstr "Do not repeat"
+
+msgid "Maximum passes"
+msgstr "Maximum passes"
+
+msgid "Use a separate browser"
+msgstr "Use a separate browser"
+
+msgid "Needs a managed isolated computer. Each run starts signed out."
+msgstr "Needs a managed isolated computer. Each run starts signed out."

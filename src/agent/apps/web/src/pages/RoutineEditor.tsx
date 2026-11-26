@@ -119,6 +119,7 @@ export type RoutineDraftState = {
   messageProvider: string | null;
   active: boolean;
   notify?: boolean;
+  isolatedBrowser?: boolean;
   runAtLocal: string;
   /** Empty runs this routine on the bot's model. */
   modelKey: string;
@@ -240,6 +241,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
     messageProvider: routine.messageProvider,
     active: routine.active,
     notify: routine.notify,
+    isolatedBrowser: routine.isolatedBrowser,
     runAtLocal: routineNeedsOneShotArm(routine, routine.crons) ? defaultArmRunAtLocal() : "",
     modelKey:
       routine.modelProvider && routine.modelId
@@ -508,11 +510,15 @@ export function RoutineEditor({
         <Switch checked={draft.notify ?? true} onCheckedChange={notify => onChange({ ...draft, notify })} />
         {t`Notify me when there are results or a problem`}
       </label>
+      <label className="mt-5 flex items-start gap-2 text-sm">
+        <Switch checked={draft.isolatedBrowser ?? false} onCheckedChange={isolatedBrowser => onChange({ ...draft, isolatedBrowser, ...(isolatedBrowser ? { runIn: "thread" as const } : {}) })} />
+        <span>{t`Use a separate browser`} <span className="block text-xs text-muted-foreground">{t`Needs a managed isolated computer. Each run starts signed out.`}</span></span>
+      </label>
       {draft.runIn ? (
         <label className="mt-5 flex items-center gap-2 text-sm">
           <Switch
             checked={draft.runIn === "thread"}
-            onCheckedChange={(own) => onChange({ ...draft, runIn: own ? "thread" : "chat" })}
+            onCheckedChange={(own) => onChange({ ...draft, runIn: own ? "thread" : "chat", ...(own ? {} : { isolatedBrowser: false }) })}
           />
           {t`Run in its own conversation`}
         </label>

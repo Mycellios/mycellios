@@ -612,6 +612,11 @@
   tab for its exact waiting run and takes control under the existing lease. Never
   silently open another tab when that target is gone. Update the API, supervisor
   and computer image together. Verify the supervisor, helper, and browser handoff tests.
+  A routine can opt into a headless browser only in its own conversation on a managed
+  isolated Docker computer. The run fence keys a separate Chromium user-data directory.
+  Close it before releasing the lease and retain the helper lifetime cap after disconnects.
+  Keep saved login, upload, desktop focus and download actions outside that browser.
+  Qualify the supervisor fence and prove cookie/storage separation and cleanup in Chromium.
   The handoff then shows only that tab: the page-browser helper's `tab-stream` screencasts
   it over CDP through the control gateway (`tab.html`, sealed like the embed page),
   follows popups it opens and replays only validated input. It belongs to the control
@@ -1196,6 +1201,13 @@
   receipts together. Verify workflow contracts, affected wakeup/control tests and
   the synthetic PostgreSQL/browser acceptance scripts through compilar.ps1; never
   use production accounts, credentials or models in these fixtures.
+  Workflow approvals pause admission of new steps. Independent branches join only after their
+  inputs settle; stop, rejection and failure preserve exact teardown receipts. Workflow
+  history keeps 50 revisions, and restore writes a paused version. Signed workflow webhooks
+  authorize only the revision the owner enabled; secret rotation is immediate and concurrent
+  deliveries share an execution bound to the sender's id. Workflow answer receipts bind the
+  run lease. A corrective turn offers only the answer tool and does not replay the instruction.
+  A bounded loop has one entry and exit, and never resets work outside that region.
   Workflow thread ownership queries project only userId/spaceId from a Run actor;
   preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
   Delegation from ordinary Mico tabs uses internal work scope; explicit project

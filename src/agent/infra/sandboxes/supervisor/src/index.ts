@@ -516,9 +516,10 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
   const signal = c.req.raw.signal;
   signal.throwIfAborted();
   const mode = c.req.param("mode");
-  if (mode && mode !== "scoped") return c.notFound();
+  if (mode && mode !== "scoped" && mode !== "isolated") return c.notFound();
+  const isolated = mode === "isolated";
   const input = await c.req.json();
-  const conversationKey = mode === "scoped"
+  const conversationKey = mode
     ? z.object({ conversationKey: z.string().regex(/^[a-f0-9]{64}$/) }).parse(input).conversationKey
     : undefined;
   const body = z
@@ -538,6 +539,7 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
       // A later part of a long page; the helper keeps at most 25 parts.
       z.object({ command: z.literal("snapshot"), from: z.number().int().min(1).max(24).optional() }),
       z.object({ command: z.literal("focus") }),
+      z.object({ command: z.literal("close") }),
       // What the helper of this computer's image supports; it touches no tab.
       z.object({ command: z.literal("capabilities") }),
       z.object({
@@ -598,8 +600,11 @@ app.post("/computers/:id/browser/:mode?", async (c) => {
       }),
     ])
     .parse(input);
-  if (body.command === "focus" && !conversationKey) return c.notFound();
-  const browserCommand = conversationKey ? `scoped-${body.command}` : body.command;
+  if ((body.command === "focus" && (!conversationKey || isolated)) || (body.command === "close" && !isolated)) return c.notFound();
+  if (isolated && body.command === "act" && body.actions.some(step =>
+    step.kind === "upload" || step.kind === "dialog" || ("origin" in step && step.origin),
+  )) return c.json({ ok: false, error: "This action is unavailable in a routine browser." }, 400);
+  const browserCommand = isolated ? `isolated-${body.command}` : conversationKey ? `scoped-${body.command}` : body.command;
   const browserArgs = JSON.stringify({ ...body, ...(conversationKey ? { conversationKey } : {}) });
   const carriesSavedLogin =
     body.command === "act" && body.actions.some((step) => "origin" in step && step.origin);

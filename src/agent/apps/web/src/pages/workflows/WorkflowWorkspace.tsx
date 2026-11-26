@@ -19,6 +19,7 @@ import {
   Plus,
   Save,
   Square,
+  Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { desktopDragClass } from "../../lib/desktop";
@@ -26,6 +27,9 @@ import type { RpcClient } from "../../lib/rpc";
 import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { useWorkflows } from "./use-workflows";
 import { WorkflowCanvas } from "./WorkflowCanvas";
+import { WorkflowVersionHistory } from "./WorkflowVersionHistory";
+import { WorkflowWebhook } from "./WorkflowWebhook";
+import { exportWorkflowDraft, importWorkflowDraft } from "./workflow-transfer";
 
 export function WorkflowWorkspace({
   client,
@@ -50,8 +54,13 @@ export function WorkflowWorkspace({
   const state = useWorkflows(client, scope),
     { doc } = state;
   const [history, setHistory] = useState(false),
+    [versions, setVersions] = useState(false),
+    [webhook, setWebhook] = useState(false),
     [renaming, setRenaming] = useState(false);
   const nameInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<{ text: string; error: boolean; draftId?: string } | null>(null);
+  const workspaceMicos = bots.filter(bot => bot.spaceId === spaceId);
   useEffect(() => {
     if (renaming) nameInput.current?.focus();
   }, [renaming]);
@@ -59,7 +68,7 @@ export function WorkflowWorkspace({
   const name = doc.name === "Untitled workflow" ? t`Untitled workflow` : doc.name;
   function exportDraft() {
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
+      new Blob([JSON.stringify(exportWorkflowDraft(doc, workspaceMicos), null, 2)], { type: "application/json" }),
     );
     const link = document.createElement("a");
     link.href = url;
@@ -67,6 +76,25 @@ export function WorkflowWorkspace({
     link.click();
     URL.revokeObjectURL(url);
   }
+  async function importDraft(file: File) {
+    setImportStatus(null);
+    try {
+      if (file.size > 1024 * 1024) throw new Error("Workflow file too large");
+      const draft = importWorkflowDraft(JSON.parse(await file.text()), workspaceMicos);
+      if (!draft) throw new Error("Invalid workflow file");
+      const draftId = state.importDraft({ name: draft.name, graph: draft.graph });
+      if (draft.unassigned) {
+        setImportStatus({ text: t`Choose a Mico for each unassigned step before running the workflow.`, error: false, draftId });
+      }
+    } catch {
+      setImportStatus({ text: t`Could not import this workflow file.`, error: true });
+    }
+  }
+  const approval = state.execution?.status === "running"
+    ? Object.entries(state.execution.steps).find(([, step]) =>
+        step.status === "running" && step.approval?.state === "waiting",
+      )
+    : undefined;
   const statuses = {
     queued: t`Queued`,
     running: t`Running`,
@@ -80,6 +108,18 @@ export function WorkflowWorkspace({
       aria-label={t`Workflows`}
       data-testid="workflow-workspace"
     >
+      <input
+        ref={importInput}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        aria-label={t`Workflow file`}
+        onChange={event => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file) void importDraft(file);
+        }}
+      />
       <header
         data-testid="conversation-header"
         className={`${desktopDragClass()} rk-workflow-header rk-window-buttons-clear flex h-[51px] min-w-0 shrink-0 items-center gap-2 border-b border-border px-3`}
@@ -162,6 +202,10 @@ export function WorkflowWorkspace({
               <Download size={15} />
               {t`Export workflow`}
             </DropdownMenuItem>
+            <DropdownMenuItem disabled={locked} onClick={() => importInput.current?.click()}>
+              <Upload size={15} />
+              {t`Import workflow`}
+            </DropdownMenuItem>
             {state.available && doc.version ? (
               <DropdownMenuItem
                 onClick={() => void state.reload()}
@@ -226,7 +270,7 @@ export function WorkflowWorkspace({
             size="icon-sm"
             aria-label={t`Execution history`}
             aria-expanded={history}
-            onClick={() => setHistory((value) => !value)}
+            onClick={() => { setVersions(false); setHistory(value => !value); }}
           >
             <ChevronDown size={15} />
           </Button>
@@ -262,16 +306,51 @@ export function WorkflowWorkspace({
           <Button size="xs" variant="ghost" onClick={state.retry}>{t`Retry`}</Button>
         </div>
       ) : null}
+      {importStatus && (!importStatus.draftId || importStatus.draftId === doc.id) ? (
+        <p role={importStatus.error ? "alert" : "status"} className={`border-b border-border px-4 py-2 text-xs ${importStatus.error ? "text-destructive" : "text-muted-foreground"}`}>
+          {importStatus.text}
+        </p>
+      ) : null}
       {state.error || state.historyError ? (
         <p role="alert" className="border-b border-border px-4 py-2 text-xs text-destructive">
           {state.error ||
             t`Execution status unavailable. Running is disabled until the connection returns.`}
         </p>
       ) : null}
+      {approval && state.execution ? (
+        <section aria-label={t`Workflow approval`} className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-medium">{t`Waiting for your approval`}</h2>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm">{approval[1].approval?.message}</p>
+          {approval[1].output ? (
+            <pre className="rk-scroll mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{approval[1].output}</pre>
+          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" disabled={state.busy} onClick={() => void state.decideApproval(state.execution!.id, approval[0], "approved")}>{t`Approve`}</Button>
+            <Button size="sm" variant="outline" disabled={state.busy} onClick={() => void state.decideApproval(state.execution!.id, approval[0], "rejected")}>{t`Reject`}</Button>
+          </div>
+        </section>
+      ) : null}
+      {doc.version > 0 && state.available ? (
+        <div className="border-b border-border px-4">
+          <Button size="xs" variant="ghost" aria-expanded={versions} onClick={() => { setHistory(false); setVersions(value => !value); }}>
+            {t`Version history`}
+          </Button>
+          {doc.graph.nodes.some(node => node.kind === "trigger" && node.trigger === "webhook") || webhook ? (
+            <Button size="xs" variant="ghost" aria-expanded={webhook} onClick={() => setWebhook(value => !value)}>{t`Workflow webhook`}</Button>
+          ) : null}
+        </div>
+      ) : null}
       {doc.active && doc.nextRunAt ? (
         <p className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
           {t`Next execution`}: {new Date(doc.nextRunAt).toLocaleString(i18n.locale || "en")}
         </p>
+      ) : null}
+      {webhook && doc.version > 0 ? (
+        <WorkflowWebhook key={`${doc.id}:${doc.version}`} client={client} id={doc.id} version={doc.version} dirty={Boolean(doc.dirty)} />
+      ) : null}
+      {versions && doc.version > 0 ? (
+        <WorkflowVersionHistory key={`${doc.id}:${doc.version}`} client={client} id={doc.id} version={doc.version}
+          dirty={Boolean(doc.dirty)} locked={locked} onRestore={state.restoreVersion} />
       ) : null}
       {history ? (
         <section

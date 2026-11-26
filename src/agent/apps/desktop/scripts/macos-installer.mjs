@@ -32,6 +32,7 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
     files:['dist/**/*','!dist/**/*.map','package.json'],
     extraMetadata:{name:'mycellios-desktop',version,main:'dist/main.js',homepage:'https://www.mycellios.com'},
     extraResources:[
+      {from:path.join(agent,'scripts/mycellios-cli.mjs'),to:'cli/mycellios-cli.mjs'},
       ...(compact ? compactResourceLayout(compact) : [
       {from:path.join(desktopRoot,'local-server'),to:'local-server',filter:['**/*','!node_modules{,/**/*}']},
       {from:path.join(desktopRoot,'local-server/node_modules'),to:'local-server/node_modules',filter:['**/*','!**/.bin{,/**/*}']},

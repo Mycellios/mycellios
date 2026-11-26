@@ -95,6 +95,7 @@ export function mapRoutine(row: {
   timezone: string;
   active: boolean;
   notify: boolean;
+  isolatedBrowser?: boolean;
   webhookEnabled: boolean;
   githubEnabled: boolean;
   messageProvider: string | null;
@@ -122,6 +123,7 @@ export function mapRoutine(row: {
     timezone: row.timezone,
     active: row.active,
     notify: row.notify,
+    isolatedBrowser: row.isolatedBrowser ?? false,
     webhookEnabled: row.webhookEnabled,
     githubEnabled: row.githubEnabled,
     messageProvider: row.messageProvider,

@@ -8,6 +8,8 @@ from pathlib import Path
 import socket
 import struct
 import os
+import shutil
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -23,6 +25,89 @@ loader.exec_module(helper)
 
 
 class PageBrowserTest(unittest.TestCase):
+    def test_routine_chromium_removes_only_the_incompatible_identity_preload(self):
+        with patch.dict(os.environ, {"LD_PRELOAD": "/lib/first.so:/opt/libnss_wrapper.so /lib/last.so"}):
+            self.assertEqual(helper.routine_chromium_environment()["LD_PRELOAD"], "/lib/first.so:/lib/last.so")
+            self.assertIn("libnss_wrapper.so", os.environ["LD_PRELOAD"])
+        with patch.dict(os.environ, {"LD_PRELOAD": "/opt/libnss_wrapper.so"}):
+            self.assertNotIn("LD_PRELOAD", helper.routine_chromium_environment())
+
+    def test_routine_endpoint_uses_the_private_profile_and_loopback(self):
+        with TemporaryDirectory() as directory:
+            scope = Path(directory)
+            profile = scope / "profile"
+            profile.mkdir()
+            marker = profile / "DevToolsActivePort"
+            endpoint = "/devtools/browser/61b990ee-310c-44ae-9a00-5438b182a9cb"
+            marker.write_text(f"34115\n{endpoint}\n", encoding="ascii")
+            with patch.object(helper, "discover_ws_url") as discover:
+                self.assertEqual(helper.routine_browser_endpoint(scope), f"ws://127.0.0.1:34115{endpoint}")
+                discover.assert_not_called()
+            marker.write_text("34115\nws://192.0.2.1:34115/browser\n", encoding="ascii")
+            with self.assertRaisesRegex(RuntimeError, "Invalid routine browser endpoint"):
+                helper.routine_browser_endpoint(scope)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "managed browser runs on Linux")
+    def test_isolated_browser_real(self):
+        if os.environ.get("MYCELLIOS_REQUIRE_CHROMIUM") != "1":
+            self.skipTest("selected separately on the hosted Chromium runner")
+        chrome = os.environ.get("MYCELLIOS_ROUTINE_CHROMIUM") or subprocess.check_output(
+            ["node", "-p", "require('playwright').chromium.executablePath()"],
+            cwd=Path(__file__).resolve().parents[3], text=True,
+        ).strip()
+        self.assertTrue(os.access(chrome, os.X_OK), "this qualification requires the installed Chromium binary")
+
+        class Site(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                if self.path == "/seed":
+                    html = "<body>seed<script>document.cookie='scope=first';localStorage.setItem('scope','first')</script>"
+                else:
+                    html = """<body><script>
+document.body.textContent = 'cookie=' + (document.cookie || 'empty') +
+    ' storage=' + (localStorage.getItem('scope') || 'empty')
+</script>"""
+                self.wfile.write(html.encode())
+
+            def log_message(self, *_args):
+                pass
+
+        with socket.socket() as spare:
+            spare.bind(("127.0.0.1", 0))
+            scope_port = spare.getsockname()[1]
+        first, second = "a" * 64, "b" * 64
+        with ThreadingHTTPServer(("127.0.0.1", 0), Site) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            root = helper.scope_directory(scope_port)
+            try:
+                with patch.dict(os.environ, {"MYCELLIOS_ROUTINE_CHROMIUM": chrome}):
+                    base = f"http://127.0.0.1:{server.server_port}"
+                    def run(key, command, path="/probe", **args):
+                        return helper.run_isolated(scope_port, command, {"conversationKey": key, "url": base + path, **args})
+                    try:
+                        self.assertTrue(run(first, "navigate", "/seed")["ok"])
+                        self.assertTrue(run(first, "navigate")["ok"])
+                        self.assertIn("cookie=scope=first storage=first", json.dumps(run(first, "snapshot")))
+                        self.assertTrue(run(second, "navigate")["ok"])
+                        self.assertIn("cookie=empty storage=empty", json.dumps(run(second, "snapshot")))
+                        with self.assertRaisesRegex(RuntimeError, "Uploads"):
+                            run(second, "act", actions=[{"kind": "upload"}])
+                        self.assertTrue(run(first, "close")["ok"])
+                        self.assertFalse((root / ("routine-" + first) / "profile").exists())
+                        with self.assertRaisesRegex(RuntimeError, "has closed"):
+                            run(first, "navigate")
+                        self.assertIn("cookie=empty storage=empty", json.dumps(run(second, "snapshot")))
+                    finally:
+                        run(first, "close")
+                        run(second, "close")
+            finally:
+                shutil.rmtree(root)
+                server.shutdown()
+                thread.join(timeout=5)
+
     def test_conversations_reuse_only_their_own_tabs(self):
         pages = []
 

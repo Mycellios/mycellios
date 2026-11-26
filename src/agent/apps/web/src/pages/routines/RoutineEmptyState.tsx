@@ -5,8 +5,8 @@ import { CalendarClock, Check, FileText, Pause, Play, Plus, Sparkles } from "luc
 import { useEffect, useRef, useState } from "react";
 import "./routine-empty-state.css";
 
-/** A labelled, inert example. Only Create can open a real, unsaved routine. */
-export function RoutineEmptyState({ bot, onCreate }: { bot: Bot; onCreate: () => void }) {
+/** The illustration is inert. The actions open unsaved routine drafts. */
+export function RoutineEmptyState({ bot, onCreate, onPrepareMorningBriefing }: { bot: Bot; onCreate: () => void; onPrepareMorningBriefing: () => void }) {
   const { t } = useLingui();
   const root = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(true);
@@ -57,6 +57,7 @@ export function RoutineEmptyState({ bot, onCreate }: { bot: Bot; onCreate: () =>
         <h1>{t`Set it up once.`}<br/><span>{t`Let your Mico take it from here.`}</span></h1>
         <p>{t`Choose when. Tell your Mico what to do.`}<br/>{t`Find the result right in your chat.`}</p>
         <Button size="lg" onClick={() => onCreate()}><Plus size={17} aria-hidden />{t`Create Routine`}</Button>
+        <Button variant="ghost" size="sm" className="mt-2" onClick={onPrepareMorningBriefing}>{t`Prepare morning briefing`}</Button>
         <span className="rk-routine-empty-reassurance">{t`Review everything before activating it.`}</span>
       </div>
     </div>

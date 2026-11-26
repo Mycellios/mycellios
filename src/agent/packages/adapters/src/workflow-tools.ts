@@ -7,6 +7,8 @@ import {
   createWorkflowExecution,
   ownedWorkflow,
   scheduledWorkflow,
+  saveWorkflowRevision,
+  snapshotWorkflow,
   workflowDto,
   workflowExecutionDto,
   type WorkflowRow,
@@ -87,12 +89,20 @@ export async function executeWorkflowTool(
         })()
       : null;
     if (!args.id) {
-      await prisma.$executeRaw`INSERT INTO workflows (id,"spaceId","userId",name,graph,active,"nextRunAt") VALUES (${id},${actor.spaceId},${actor.userId},${args.name},${JSON.stringify(args.graph)}::jsonb,${args.active},${nextRunAt}) ON CONFLICT (id) DO NOTHING`;
+      return prisma.$transaction(async tx => {
+        await tx.$executeRaw`INSERT INTO workflows (id,"spaceId","userId",name,graph,active,"nextRunAt") VALUES (${id},${actor.spaceId},${actor.userId},${args.name},${JSON.stringify(args.graph)}::jsonb,${args.active},${nextRunAt}) ON CONFLICT (id) DO NOTHING`;
+        const row = await ownedWorkflow(tx, actor, id);
+        if (!row) throw new Error("Workflow unavailable");
+        if (row.version === 1) await snapshotWorkflow(tx, row, true);
+        return workflowDto(row);
+      });
     } else {
       if (!args.expectedVersion)
         throw new Error("Read the saved workflow and provide expectedVersion");
-      const changed =
-        await prisma.$executeRaw`UPDATE workflows SET name=${args.name},graph=${JSON.stringify(args.graph)}::jsonb,active=${args.active},"nextRunAt"=${nextRunAt},version=version+1,"updatedAt"=now() WHERE id=${id} AND "userId"=${actor.userId} AND "spaceId"=${actor.spaceId} AND version=${args.expectedVersion} AND "archivedAt" IS NULL`;
+      const expectedVersion = args.expectedVersion;
+      const changed = await prisma.$transaction(tx => saveWorkflowRevision(tx, actor, {
+        ...args, id, expectedVersion, nextRunAt,
+      }));
       if (!changed)
         throw new Error("The workflow changed or is unavailable. Reload before editing.");
     }

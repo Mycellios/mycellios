@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Routine, ThinkingLevel, ThreadSnapshot } from "@mycellios/contracts";
 import { routineEventsPath } from "@mycellios/contracts";
-import { cronFromPreset } from "@mycellios/core";
+import { cronFromPreset, defaultCronPreset } from "@mycellios/core";
 import type { ComponentProps, Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useRef, useState } from "react";
 import { appPath } from "../../lib/app-path";
@@ -83,13 +83,22 @@ export function useRoutineEditor({
     setRoutineWebhookSecret(null);
     setRoutineEventSecret(null);
   }
-  function startRoutine(routine?: Routine) {
-    setRoutineDraft(routine ? draftFromRoutine(routine) : emptyRoutineDraft());
+  function startRoutine(routine?: Routine, draft = emptyRoutineDraft()) {
+    setRoutineDraft(routine ? draftFromRoutine(routine) : draft);
     setRoutineWebhookSecret(null);
     setRoutineEventSecret(null);
     setEditingRoutine(routine ?? null);
     setRoutineError(null);
     setPanel("routine");
+  }
+  function prepareMorningBriefing() {
+    startRoutine(undefined, {
+      ...emptyRoutineDraft(),
+      name: t`Morning briefing`,
+      prompt: t`Read today's calendar and the emails that need a reply using the connected accounts I have authorized. Summarize meetings that need preparation, schedule conflicts, and messages that need a decision. Keep it short and identify the source of each item. If a source is unavailable, state which one. If all selected sources are available and there is nothing I need to act on, finish without posting an update. Read only. Do not send, modify, or delete anything.`,
+      schedules: [{ ...defaultCronPreset(), freq: "Weekdays" }],
+      active: false,
+    });
   }
   function resetRoutineTarget() {
     setEditingRoutine(null);
@@ -260,6 +269,7 @@ export function useRoutineEditor({
                 crons,
                 active: armOneShot ? true : routineDraft.active,
                 notify: routineDraft.notify ?? targetRoutine.notify,
+                isolatedBrowser: routineDraft.isolatedBrowser,
                 webhookEnabled: routineDraft.webhookEnabled,
                 githubEnabled: routineDraft.githubEnabled,
                 messageProvider: routineDraft.messageProvider,
@@ -285,6 +295,7 @@ export function useRoutineEditor({
                 timezone: timezone ?? localTimezone(),
                 active: routineDraft.active,
                 notify: routineDraft.notify ?? true,
+                isolatedBrowser: routineDraft.isolatedBrowser,
                 webhookEnabled: routineDraft.webhookEnabled,
                 githubEnabled: routineDraft.githubEnabled,
                 messageProvider: routineDraft.messageProvider,
@@ -373,6 +384,7 @@ export function useRoutineEditor({
     editingRoutine,
     restoreRoutine,
     startRoutine,
+    prepareMorningBriefing,
     resetRoutineTarget,
     leaveRoutine,
     addSkillRoutine,
