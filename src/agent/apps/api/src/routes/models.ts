@@ -1,7 +1,7 @@
 import { readBoundedJsonResponse,readBoundedResponseBytes } from "@mycellios/core";
 import { createModelPlanLimits } from "../model-plan-limits.js";
 import { discoverLocalModels } from "../local-model-discovery.js";
-import { nativeHostAccess } from "@mycellios/adapters";
+import { nativeHostAccess, refreshExpiredModelCredential } from "@mycellios/adapters";
 import { ORPCError } from "@orpc/server";
 import { contributionAccount } from "../contribution-account.js";
 import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
@@ -65,6 +65,9 @@ import { readMycelliosChatModels } from "../mycellios-model-catalog.js";
 import { ownedMycelliosConnection } from "../mycellios-owned-connection.js";
 import { createMycelliosAccountCache } from "../mycellios-account-cache.js";
 
+/** Bounds the quota rail's wait for a subscription token renewal. */
+const PLAN_LIMITS_RENEWAL_TIMEOUT_MS = 8_000;
+
 export function modelsRoutes(ctx: RouterContext) {
   const {
     deps,
@@ -77,14 +80,20 @@ export function modelsRoutes(ctx: RouterContext) {
     validateRoleChoices,
     authed,
   } = ctx;
-  const planLimits = createModelPlanLimits(deps);
+  // An expired subscription token is renewed through the runtime's locked refresh
+  // (bounded), so an account that is still connected never reads as signed out.
+  const planLimits = createModelPlanLimits(deps, Date.now, (scope, secretId, provider) =>
+    refreshExpiredModelCredential(deps.prisma, deps.secrets, scope, secretId, provider, {
+      signal: AbortSignal.timeout(PLAN_LIMITS_RENEWAL_TIMEOUT_MS),
+    }),
+  );
   // A compatible provider can now have several independent connections.
   // Select an owned Mycellios endpoint, never the newest arbitrary gateway.
   const ownedMycellios = (actor: Actor) => ownedMycelliosConnection(deps, actor.userId);
   const readAccountCached = createMycelliosAccountCache();
   return {
     models: {
-      planLimits: authed.models.planLimits.handler(({ context, input }) => planLimits(context.actor.userId, input?.refresh)),
+      planLimits: authed.models.planLimits.handler(({ context, input }) => planLimits(context.actor, input?.refresh)),
       discoverLocal: authed.models.discoverLocal.handler(async ({ context }) => {
         if (!(await nativeHostAccess(deps.dataDir, context.actor)))
           throw new ORPCError("FORBIDDEN");

@@ -1,8 +1,8 @@
 import { expect, it, vi } from "vitest";
-import { createModelPlanLimits } from "./model-plan-limits.js";
+import { createModelPlanLimits, type PlanLimitsCredentialRenewal } from "./model-plan-limits.js";
 import type { RouterDeps } from "./router.js";
 
-function fixture() {
+function fixture(renew?: PlanLimitsCredentialRenewal) {
   let clock = Date.now();
   let ciphertext = "version-1";
   const rows = [{ id: "owned", provider: "openai-codex", label: "Work", secretId: "secret" }];
@@ -29,9 +29,11 @@ function fixture() {
     secrets: { load },
     modelConnectionFetch: transport,
   } as unknown as Pick<RouterDeps, "prisma" | "secrets" | "modelConnectionFetch">;
-  const read = createModelPlanLimits(deps, () => clock);
+  const readScoped = createModelPlanLimits(deps, () => clock, renew);
   return {
-    read,
+    read: (userId: string, refresh?: boolean) =>
+      readScoped({ userId, spaceId: `${userId}-space` }, refresh),
+    now: () => clock,
     rows,
     secret,
     credentials,
@@ -86,6 +88,48 @@ it("never uses expired tokens or API keys for subscription quota, and never read
   h.secrets.mockResolvedValue([]);
   expect((await h.read("member")).accounts[0]?.reason).toBe("secret_unavailable");
   expect(h.load).not.toHaveBeenCalled();
+});
+it("renews an expired subscription token through the scoped refresh and reads the fresh token", async () => {
+  const renew = vi.fn<PlanLimitsCredentialRenewal>(async () => {
+    f.secret.credential.access = "renewed";
+    f.secret.credential.expires = f.now() + 3600_000;
+  });
+  const f = fixture(renew);
+  f.rows[0]!.provider = "anthropic";
+  f.secret.credential.expires = 0;
+  f.transport.mockImplementation(async () =>
+    Response.json({ five_hour: { utilization: 10, resets_at: null } }),
+  );
+  const account = (await f.read("member")).accounts[0];
+  expect(renew).toHaveBeenCalledWith(
+    { userId: "member", spaceId: "member-space" },
+    "secret",
+    "anthropic",
+  );
+  expect(account?.status).not.toBe("reconnect");
+  expect(f.transport).toHaveBeenCalledTimes(1);
+  expect(f.transport.mock.calls[0]?.[1]).toMatchObject({
+    headers: expect.objectContaining({ authorization: "Bearer renewed" }),
+  });
+  // The fresh token is read again under the member's own scope.
+  expect(f.secrets).toHaveBeenLastCalledWith(
+    expect.objectContaining({ where: { id: { in: ["secret"] }, userId: "member", spaceId: null } }),
+  );
+});
+it("asks to reconnect when a renewal fails or no refresh token is stored", async () => {
+  const failing = fixture(async () => {
+    throw new Error("refused");
+  });
+  failing.secret.credential.expires = 0;
+  expect((await failing.read("member")).accounts[0]?.status).toBe("reconnect");
+  expect(failing.transport).not.toHaveBeenCalled();
+  const renew = vi.fn<PlanLimitsCredentialRenewal>(async () => undefined);
+  const missing = fixture(renew);
+  missing.secret.credential.expires = 0;
+  missing.secret.credential.refresh = "";
+  expect((await missing.read("member")).accounts[0]?.status).toBe("reconnect");
+  expect(renew).not.toHaveBeenCalled();
+  expect(missing.transport).not.toHaveBeenCalled();
 });
 it("keeps account and user caches independent and respects provider Retry-After on manual refresh", async () => {
   const f = fixture();
