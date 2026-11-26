@@ -30,7 +30,7 @@ type Run = Pick<NonNullable<Awaited<ReturnType<PrismaClient["run"]["findUnique"]
   "id" | "spaceId" | "userId" | "botId" | "threadId" | "taskId" | "startedAt" | "checkpoint" | "cloudComputerId">;
 type Assignment = { id: string; scope: string; kind: string } | null;
 type Lease = { workerId: string; fence: number };
-type RoutineRun = Run & { trigger: string; routineId: string | null };
+type RoutineRun = Run & { trigger: string; routineId: string | null; isolatedBrowser: boolean };
 type NativeCloudFallback = {
   agentEngine?: string | null;
   dataDir?: string;
@@ -62,14 +62,13 @@ export async function selectRoutineCloudWorkspace(
   lease: Lease,
 ) {
   // Keep the recorded destination on resume, including runs made before this policy.
-  if (run.trigger !== "routine" || !run.routineId || run.cloudComputerId || run.startedAt || run.checkpoint)
+  if (!run.isolatedBrowser || run.trigger !== "routine" || !run.routineId ||
+    run.cloudComputerId || run.startedAt || run.checkpoint)
     return;
   const routine = {
     id: run.routineId, spaceId: run.spaceId, userId: run.userId, botId: run.botId,
     isolatedBrowser: true,
   };
-  if (!(await prisma.routine.findFirst({ where: routine, select: { id: true } }))) return;
-
   const threadKey = `routine:${run.routineId}`;
   const thread = {
     id: run.threadId, spaceId: run.spaceId, userId: run.userId, taskBotId: run.botId,

@@ -47,7 +47,7 @@ function fixture(kind: "desktop" | "docker" = "docker", presence?: "connected" |
 }
 
 describe("routine server workspaces", () => {
-  const routineRun = { ...run, trigger: "routine", routineId: "routine" };
+  const routineRun = { ...run, trigger: "routine", routineId: "routine", isolatedBrowser: true };
 
   it("pins a Docker workspace for an opted-in routine even while This PC is connected", async () => {
     const { prisma, database, sandbox, hostPresence, provisionKind } = fixture("desktop", "connected");
@@ -93,14 +93,15 @@ describe("routine server workspaces", () => {
       { ...routineRun, trigger: "webhook" }, desktop, lease)).toBeUndefined();
     expect(await selectRoutineCloudWorkspace(prisma, sandbox,
       { ...routineRun, startedAt: new Date() }, desktop, lease)).toBeUndefined();
-    database.routine.findFirst.mockResolvedValueOnce(null);
-    expect(await selectRoutineCloudWorkspace(prisma, sandbox, routineRun, desktop, lease)).toBeUndefined();
+    expect(await selectRoutineCloudWorkspace(prisma, sandbox,
+      { ...routineRun, isolatedBrowser: false }, desktop, lease)).toBeUndefined();
+    expect(database.routine.findFirst).toHaveBeenCalledOnce();
     expect(database.$transaction).not.toHaveBeenCalled();
   });
 
   it("refuses an invalid conversation, PC resources or a missing Docker browser", async () => {
     const { prisma, database, sandbox } = fixture();
-    database.routine.findFirst.mockResolvedValueOnce({ id: "routine" }).mockResolvedValueOnce(null);
+    database.routine.findFirst.mockResolvedValueOnce(null);
     await expect(selectRoutineCloudWorkspace(prisma, sandbox, routineRun, desktop, lease))
       .rejects.toBeInstanceOf(RoutineBrowserComputerError);
     database.task.findUniqueOrThrow.mockResolvedValueOnce({ resources: ["workspace:linked-project"] });

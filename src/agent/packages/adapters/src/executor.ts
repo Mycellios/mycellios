@@ -3851,7 +3851,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
       const current = await deps.prisma.run.findUniqueOrThrow({
         where: { id: runId },
-        include: { thread: { select: { memberUserId: true } } },
+        include: {
+          thread: { select: { memberUserId: true } },
+          routine: { select: { isolatedBrowser: true } },
+        },
       });
       if (
         current.status === "queued" ||
@@ -3903,7 +3906,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       // An opted-in routine chooses Docker before the ordinary Desktop presence check.
       // Member turns have no computer, so they never take either server route.
       const cloudSelection = memberUserId ? undefined : await selectRunCloudWorkspace(
-        deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
+        deps.prisma, deps.sandbox, { ...run, isolatedBrowser: current.routine?.isolatedBrowser === true },
+        leaseTarget.computer, { workerId, fence },
         {
           agentEngine, dataDir: deps.dataDir,
           // The Mico's own Pi model, else the account's main model, can stand in for its PC's CLI.
