@@ -209,3 +209,36 @@ button.secondary {
   color: var(--muted);
   font-size: 12px;
 }
+
+.tabs-consent {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+}
+
+.tabs-consent[hidden] {
+  display: none;
+}
+
+.tabs-consent-text {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.tabs-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tabs-consent button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.tabs-consent button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

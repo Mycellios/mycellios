@@ -15,6 +15,7 @@ const PAGE_STATE_TOOL_NAMES = new Set([
   "browser_navigate",
   "browser_snapshot",
   "browser_act",
+  "chrome_snapshot",
   "computer_observe",
   "computer_act",
 ]);

@@ -5,8 +5,8 @@
  * contract test feeds its real message shapes through these parsers.
  */
 
-/** The capability versions a panel advertises. Phase 1 lists tabs only. */
-export interface BrowserTabsCapabilities { tabs: 1 }
+/** The capability versions a panel advertises: tab list (phase 1) and page reading (phase 2). */
+export interface BrowserTabsCapabilities { tabs: 1; read?: 1 }
 /**
  * The browser that shares: one account and one sign-in session (sha256 of its id). Not
  * bound to a Space: the panel does not choose one, and only the account owner's own runs
@@ -14,7 +14,7 @@ export interface BrowserTabsCapabilities { tabs: 1 }
  */
 export interface BrowserTabsOwner { userId: string; sessionKey: string }
 
-export type BrowserTabsRequest = { op: "list" };
+export type BrowserTabsRequest = { op: "list" } | { op: "snapshot"; tab: string };
 export interface BrowserTabsOperation { id: string; request: BrowserTabsRequest }
 export interface BrowserTab {
   /** Opaque handle for later phases: "t" and Chrome's numeric tab id. */
@@ -25,11 +25,21 @@ export interface BrowserTab {
   active: boolean;
   audible: boolean;
 }
+export interface BrowserPage { title: string; url: string; text: string; truncated: boolean }
 export type BrowserTabsResult =
   | { tabs: BrowserTab[]; omitted: number }
+  | { page: BrowserPage }
   | { error: BrowserTabsFailure };
-/** Settled failures reported by the extension; nothing ran. */
-export type BrowserTabsFailure = "chrome_not_shared" | "tabs_permission_missing" | "unsupported";
+/** Settled failures reported by the extension; nothing ran (or only a read). */
+export const BROWSER_TABS_FAILURES = [
+  "chrome_not_shared", "tabs_permission_missing", "unsupported",
+  // Page reading: the person declined or did not answer, the page is refused or not a web
+  // page, the tab closed or moved to another site, or Chrome refused the script.
+  "declined", "consent_timeout", "refused_site", "not_web_page", "tab_gone", "tab_changed", "not_scriptable",
+] as const;
+export type BrowserTabsFailure = (typeof BROWSER_TABS_FAILURES)[number];
+/** The page text a snapshot may carry, in characters. */
+export const BROWSER_TABS_PAGE_MAX = 48_000;
 
 export const BROWSER_TABS_MAX_TABS = 50;
 export const BROWSER_TABS_TITLE_MAX = 200;
@@ -50,9 +60,10 @@ function object(value: unknown, fields: readonly string[], message = "Invalid br
 /** Panel → API: one connection of one panel document (`generation` is new per connection). */
 export function parseBrowserTabsRegister(value: unknown): { generation: string; capabilities: BrowserTabsCapabilities } {
   const input = object(value, ["generation", "capabilities"]);
-  const capabilities = object(input.capabilities, ["tabs"]);
-  if (!uuid(input.generation) || capabilities.tabs !== 1) throw new Error("Invalid browser tabs registration");
-  return { generation: input.generation.toLowerCase(), capabilities: { tabs: 1 } };
+  const capabilities = object(input.capabilities, ["tabs", "read"]);
+  if (!uuid(input.generation) || capabilities.tabs !== 1 || (capabilities.read !== undefined && capabilities.read !== 1))
+    throw new Error("Invalid browser tabs registration");
+  return { generation: input.generation.toLowerCase(), capabilities: { tabs: 1, ...(capabilities.read === 1 ? { read: 1 as const } : {}) } };
 }
 
 /** Panel → API: long poll, release (panel closing) and revoke (Stop sharing). */
@@ -90,12 +101,22 @@ function parseTab(value: unknown): BrowserTab {
 export function parseBrowserTabsResult(value: unknown): { generation: string; id: string; result: BrowserTabsResult } {
   const input = object(value, ["generation", "id", "result"]);
   if (!uuid(input.generation) || !uuid(input.id)) throw new Error("Invalid browser tabs result");
-  const result = object(input.result, ["tabs", "omitted", "error"], "Invalid browser tabs result");
+  const result = object(input.result, ["tabs", "omitted", "error", "page"], "Invalid browser tabs result");
+  const ids = { generation: input.generation.toLowerCase(), id: input.id.toLowerCase() };
   if (result.error !== undefined) {
-    if (result.tabs !== undefined || result.omitted !== undefined ||
-        (result.error !== "chrome_not_shared" && result.error !== "tabs_permission_missing" && result.error !== "unsupported"))
+    if (Object.keys(result).length !== 1 || !(BROWSER_TABS_FAILURES as readonly unknown[]).includes(result.error))
       throw new Error("Invalid browser tabs result");
-    return { generation: input.generation.toLowerCase(), id: input.id.toLowerCase(), result: { error: result.error } };
+    return { ...ids, result: { error: result.error as BrowserTabsFailure } };
+  }
+  if (result.page !== undefined) {
+    if (Object.keys(result).length !== 1) throw new Error("Invalid browser tabs result");
+    const page = object(result.page, ["title", "url", "text", "truncated"], "Invalid browser page");
+    if (typeof page.title !== "string" || page.title.length > BROWSER_TABS_TITLE_MAX || typeof page.url !== "string" ||
+        typeof page.text !== "string" || page.text.length > BROWSER_TABS_PAGE_MAX || typeof page.truncated !== "boolean")
+      throw new Error("Invalid browser page");
+    const url = browserTabAddress(page.url);
+    if (!url) throw new Error("Invalid browser page");
+    return { ...ids, result: { page: { title: page.title, url, text: page.text, truncated: page.truncated } } };
   }
   if (!Array.isArray(result.tabs) || result.tabs.length > BROWSER_TABS_MAX_TABS || typeof result.omitted !== "number" ||
       !Number.isSafeInteger(result.omitted) || result.omitted < 0 || result.omitted > 100_000)
@@ -104,23 +125,24 @@ export function parseBrowserTabsResult(value: unknown): { generation: string; id
 }
 
 export function parseBrowserTabsRequest(value: unknown): BrowserTabsRequest {
-  const input = object(value, ["op"], "Invalid browser tabs request");
-  if (input.op !== "list") throw new Error("Invalid browser tabs request");
-  return { op: "list" };
+  const input = object(value, ["op", "tab"], "Invalid browser tabs request");
+  if (input.op === "list" && input.tab === undefined) return { op: "list" };
+  if (input.op === "snapshot" && typeof input.tab === "string" && /^t\d{1,12}$/.test(input.tab)) return { op: "snapshot", tab: input.tab };
+  throw new Error("Invalid browser tabs request");
 }
 
 /** Worker → API (signed): probe whether a browser shares tabs, or run one operation. */
-export function parseBrowserTabsDispatch(value: unknown): { scope: BrowserTabsOwner; nonce: string; probe?: "tabs"; request?: BrowserTabsRequest } {
+export function parseBrowserTabsDispatch(value: unknown): { scope: BrowserTabsOwner; nonce: string; probe?: "tabs" | "read"; request?: BrowserTabsRequest } {
   const input = object(value, ["scope", "nonce", "probe", "request"]);
   const scope = object(input.scope, ["userId", "sessionKey"]);
   if (!id(scope.userId) || !sessionKey(scope.sessionKey) || !uuid(input.nonce))
     throw new Error("Invalid browser tabs dispatch");
-  if ((input.probe === undefined) === (input.request === undefined) || (input.probe !== undefined && input.probe !== "tabs"))
+  if ((input.probe === undefined) === (input.request === undefined) || (input.probe !== undefined && input.probe !== "tabs" && input.probe !== "read"))
     throw new Error("Invalid browser tabs dispatch");
   return {
     scope: { userId: scope.userId, sessionKey: scope.sessionKey },
     nonce: input.nonce,
-    ...(input.probe === "tabs" ? { probe: "tabs" as const } : {}),
+    ...(input.probe === "tabs" || input.probe === "read" ? { probe: input.probe } : {}),
     ...(input.request !== undefined ? { request: parseBrowserTabsRequest(input.request) } : {}),
   };
 }

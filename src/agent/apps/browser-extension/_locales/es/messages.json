@@ -24,5 +24,9 @@
   "shareTabsStandby": { "message": "Compartiendo desde otra ventana" },
   "shareTabsSignedOut": { "message": "Inicia sesión para compartir pestañas" },
   "shareTabsOffline": { "message": "Reconectando…" },
-  "shareTabsDetail": { "message": "Los Micos de los chats que empieces desde este navegador pueden ver los títulos y las direcciones de tus pestañas abiertas. No pueden leer ni usar tus páginas. Las ventanas de incógnito nunca se comparten." }
+  "shareTabsDetail": { "message": "Los Micos de los chats que empieces desde este navegador pueden ver los títulos y las direcciones de tus pestañas abiertas, y te preguntan aquí antes de leer un sitio. No pueden hacer clic ni escribir en tus páginas. Las ventanas de incógnito nunca se comparten." },
+  "consentQuestion": { "message": "Tu Mico quiere leer {site} en este navegador." },
+  "consentOnce": { "message": "Permitir una vez" },
+  "consentAlways": { "message": "Permitir siempre" },
+  "consentDeny": { "message": "Denegar" }
 }

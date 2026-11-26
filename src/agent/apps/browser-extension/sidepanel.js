@@ -174,13 +174,49 @@ function showShareState(state) {
 async function syncSharing() {
   const wanted = shareChosen() && await chrome.permissions.contains({ permissions: ["tabs"] }).catch(() => false);
   if (wanted && !stopSharing) {
-    stopSharing = startSharing(showShareState);
+    stopSharing = startSharing(showShareState, askSite);
   } else if (!wanted && stopSharing) {
     const stop = stopSharing;
     stopSharing = null;
     await stop();
   }
   if (!wanted) showShareState("off");
+}
+
+// The site question for page reading. Only this extension page can answer it: the framed app
+// and the pages themselves cannot reach these buttons. Buttons arm after 500 ms so a click
+// meant for something else cannot answer, and the question expires before the server gives up.
+const consent = document.getElementById("tabs-consent");
+const consentText = document.getElementById("tabs-consent-text");
+const consentButtons = ["once", "always", "deny"].map((choice) => [choice, document.getElementById(`tabs-consent-${choice}`)]);
+const CONSENT_ARM_MS = 500;
+const CONSENT_TIMEOUT_MS = 75_000;
+let consentQueue = Promise.resolve();
+
+function askSite({ site, origins }) {
+  const asked = consentQueue.then(() => new Promise((resolve) => {
+    consentText.textContent = t("consentQuestion").replace("{site}", site);
+    consent.hidden = false;
+    for (const [, button] of consentButtons) button.disabled = true;
+    const arm = setTimeout(() => { for (const [, button] of consentButtons) button.disabled = false; }, CONSENT_ARM_MS);
+    const finish = (answer) => {
+      clearTimeout(arm);
+      clearTimeout(expire);
+      consent.hidden = true;
+      for (const [, button] of consentButtons) button.onclick = null;
+      resolve(answer);
+    };
+    const expire = setTimeout(() => finish("timeout"), CONSENT_TIMEOUT_MS);
+    for (const [choice, button] of consentButtons) {
+      button.onclick = () => {
+        if (choice === "deny") return finish("deny");
+        // Chrome's own site prompt needs this click's user gesture.
+        chrome.permissions.request({ origins }).then((granted) => finish(granted ? choice : "deny"), () => finish("deny"));
+      };
+    }
+  }));
+  consentQueue = asked.catch(() => {});
+  return asked;
 }
 
 shareToggle.addEventListener("click", async () => {

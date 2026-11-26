@@ -24,5 +24,9 @@
   "shareTabsStandby": { "message": "Sharing from another window" },
   "shareTabsSignedOut": { "message": "Sign in to share tabs" },
   "shareTabsOffline": { "message": "Reconnecting…" },
-  "shareTabsDetail": { "message": "Micos in chats you start from this browser can see the titles and addresses of your open tabs. They cannot read or use your pages. Incognito windows are never shared." }
+  "shareTabsDetail": { "message": "Micos in chats you start from this browser can see the titles and addresses of your open tabs, and ask here before reading a site. They cannot click or type in your pages. Incognito windows are never shared." },
+  "consentQuestion": { "message": "Your Mico wants to read {site} in this browser." },
+  "consentOnce": { "message": "Allow once" },
+  "consentAlways": { "message": "Always allow" },
+  "consentDeny": { "message": "Deny" }
 }

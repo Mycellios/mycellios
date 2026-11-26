@@ -109,7 +109,7 @@ describe("browser tabs contract", () => {
   });
 
   it("rejects extra fields, foreign addresses and unsigned shapes", () => {
-    expect(() => parseBrowserTabsRegister({ generation, capabilities: { tabs: 1, read: 1 } })).toThrow();
+    expect(() => parseBrowserTabsRegister({ generation, capabilities: { tabs: 1, act: 1 } })).toThrow();
     expect(() => parseBrowserTabsRegister({ generation, capabilities: { tabs: 1 }, code: "x" })).toThrow();
     const id = "33333333-3333-4333-8333-333333333333";
     expect(() => parseBrowserTabsResult({ generation, id, result: { tabs: [{ tab: "t1", title: "x", url: "javascript:alert(1)", active: true, audible: false }], omitted: 0 } })).toThrow();
@@ -118,5 +118,91 @@ describe("browser tabs contract", () => {
     expect(() => parseBrowserTabsDispatch({ scope: { userId: "u", sessionKey: "short" }, nonce: id, probe: "tabs" })).toThrow();
     expect(() => parseBrowserTabsDispatch({ scope: { userId: "u", sessionKey: "a".repeat(64) }, nonce: id, probe: "tabs", request: { op: "list" } })).toThrow();
     expect(() => parseBrowserTabsDispatch({ scope: { userId: "u", sessionKey: "a".repeat(64) }, nonce: id, request: { op: "click" } })).toThrow();
+  });
+});
+
+describe("reading pages", () => {
+  let broker: BrowserTabsBroker;
+  afterEach(() => broker?.close());
+
+  it("reads only through a panel that advertises reading, one read per tab", async () => {
+    broker = new BrowserTabsBroker();
+    broker.register(owner, generation, { tabs: 1 });
+    await expect(broker.dispatch(owner, { op: "snapshot", tab: "t1" }, never)).rejects.toMatchObject({ code: "chrome_not_shared" });
+    broker.register(owner, generation, { tabs: 1, read: 1 });
+    const first = broker.dispatch(owner, { op: "snapshot", tab: "t1" }, never);
+    await expect(broker.dispatch(owner, { op: "snapshot", tab: "t1" }, never)).rejects.toMatchObject({ code: "chrome_busy" });
+    const { operations } = await broker.waitPoll(owner, generation, never);
+    const page = { title: "Laptop", url: "https://shop.example/laptop", text: "Price 900", truncated: false };
+    broker.result(owner, generation, operations[0]!.id, { page });
+    await expect(first).resolves.toEqual({ page });
+  });
+
+  it("parses snapshot requests and page results strictly", () => {
+    const id = "33333333-3333-4333-8333-333333333333";
+    expect(parseBrowserTabsRegister({ generation, capabilities: { tabs: 1, read: 1 } }).capabilities).toEqual({ tabs: 1, read: 1 });
+    expect(() => parseBrowserTabsDispatch({ scope: { userId: "u", sessionKey: "a".repeat(64) }, nonce: id, request: { op: "snapshot", tab: "1" } })).toThrow();
+    expect(parseBrowserTabsDispatch({ scope: { userId: "u", sessionKey: "a".repeat(64) }, nonce: id, request: { op: "snapshot", tab: "t12" } }).request)
+      .toEqual({ op: "snapshot", tab: "t12" });
+    expect(parseBrowserTabsResult({ generation, id, result: { page: { title: "x", url: "https://a.example/p?token=1", text: "hi", truncated: false } } }).result)
+      .toEqual({ page: { title: "x", url: "https://a.example/p", text: "hi", truncated: false } });
+    expect(() => parseBrowserTabsResult({ generation, id, result: { page: { title: "x", url: "https://a.example/", text: "x".repeat(48_001), truncated: true } } })).toThrow();
+    expect(() => parseBrowserTabsResult({ generation, id, result: { error: "declined", page: {} } })).toThrow();
+    expect(parseBrowserTabsResult({ generation, id, result: { error: "consent_timeout" } }).result).toEqual({ error: "consent_timeout" });
+    expect(() => parseBrowserTabsResult({ generation, id, result: { error: "anything" } })).toThrow();
+  });
+
+  describe("the extension's site question", () => {
+    const load = async () => {
+      // @ts-expect-error The extension is plain JavaScript without declarations.
+      return (await import("../../../apps/browser-extension/tabs-bridge.js")) as { snapshotTab(tab: string, ask: (q: { site: string }) => Promise<string>): Promise<unknown> };
+    };
+    const stub = (url: string, granted: boolean, href = url) => {
+      const chrome = {
+        tabs: { get: vi.fn(async () => ({ id: 5, url, incognito: false })) },
+        permissions: { contains: vi.fn(async () => granted), remove: vi.fn(async () => true) },
+        scripting: { executeScript: vi.fn(async () => [{ result: { title: "Shop", href, text: "Price 900", truncated: false } }]) },
+      };
+      vi.stubGlobal("chrome", chrome);
+      return chrome;
+    };
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("never reads Mycellios, the Web Store or password managers, and asks nothing", async () => {
+      const { snapshotTab } = await load();
+      const ask = vi.fn(async () => "always");
+      for (const url of ["https://www.mycellios.com/agent/app", "https://chromewebstore.google.com/detail/x", "https://vault.bitwarden.com/", "chrome://settings"]) {
+        const chrome = stub(url, true);
+        expect(await snapshotTab("t5", ask)).toMatchObject({ error: expect.stringMatching(/refused_site|not_web_page/) });
+        expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+      }
+      expect(ask).not.toHaveBeenCalled();
+    });
+
+    it("asks before a new site and respects a refusal", async () => {
+      const { snapshotTab } = await load();
+      const chrome = stub("https://shop.example/laptop?id=9", false);
+      const ask = vi.fn(async () => "deny");
+      expect(await snapshotTab("t5", ask)).toEqual({ error: "declined" });
+      expect(ask).toHaveBeenCalledWith({ site: "shop.example", origins: ["https://shop.example/*"] });
+      expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+    });
+
+    it("removes a one-time grant after reading and parses as a page result", async () => {
+      const { snapshotTab } = await load();
+      const chrome = stub("https://shop.example/laptop?id=9", false);
+      const result = await snapshotTab("t5", async () => "once");
+      expect(chrome.permissions.remove).toHaveBeenCalledWith({ origins: ["https://shop.example/*"] });
+      expect(parseBrowserTabsResult({ generation, id: "33333333-3333-4333-8333-333333333333", result }).result)
+        .toEqual({ page: { title: "Shop", url: "https://shop.example/laptop", text: "Price 900", truncated: false } });
+    });
+
+    it("does not ask for an allowed site, and refuses a tab that moved elsewhere", async () => {
+      const { snapshotTab } = await load();
+      const ask = vi.fn(async () => "deny");
+      stub("https://shop.example/a", true, "https://evil.example/");
+      expect(await snapshotTab("t5", ask)).toEqual({ error: "tab_changed" });
+      expect(ask).not.toHaveBeenCalled();
+    });
   });
 });
