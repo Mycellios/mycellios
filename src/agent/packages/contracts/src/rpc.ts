@@ -50,7 +50,7 @@ import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-cal
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { SporeRewardsSchema } from "./spore-rewards.js";
 import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
-import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema, WorkflowVersionSchema } from "./workflows.js";
+import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema, WorkflowRestartRequestSchema, WorkflowVersionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
 import {
   AgentImportCreateInput,
@@ -1186,6 +1186,7 @@ export const appContract = {
     save: oc.input(z.object({ id: Id, expectedVersion: z.number().int().positive(), name: z.string().trim().min(1).max(160), graph: WorkflowGraphSchema, active: z.boolean() })).output(WorkflowSchema),
     archive: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
     execute: oc.input(z.object({ id: Id, triggerId: Id, expectedVersion: z.number().int().positive(), clientNonce: z.string().min(1).max(160) })).output(WorkflowExecutionSchema),
+    restart: oc.input(WorkflowRestartRequestSchema).output(WorkflowExecutionSchema),
     runs: oc.input(z.object({ id: Id })).output(z.array(WorkflowExecutionSchema)),
     versions: oc.input(z.object({ id: Id })).output(z.array(WorkflowVersionSchema)),
     webhook: oc.input(z.object({ id: Id })).output(z.object({ version: z.number().int().nullable(), path: z.string() })),

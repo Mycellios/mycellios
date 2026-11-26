@@ -1226,6 +1226,11 @@
   deliveries share an execution bound to the sender's id. Workflow answer receipts bind the
   run lease. A corrective turn offers only the answer tool and does not replay the instruction.
   A bounded loop has one entry and exit, and never resets work outside that region.
+  Workflow templates create paused, unassigned drafts. Step tests and restarts create a
+  new execution from the current saved version and reuse only settled checkpoint data.
+  Keep original run IDs and authorization receipts in their source execution. Ask
+  for upstream approval again, fence cleanup, and retry uncertain requests by nonce.
+  Verify the synthetic workflow PostgreSQL and workspace browser fixtures.
   Workflow thread ownership queries project only userId/spaceId from a Run actor;
   preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
   Delegation from ordinary Mico tabs uses internal work scope; explicit project

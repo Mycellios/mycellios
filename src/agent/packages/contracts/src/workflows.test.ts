@@ -4,6 +4,7 @@ import {
   validateWorkflowAnswer,
   workflowCondition,
   workflowPlan,
+  workflowRestartSteps,
   type WorkflowGraph,
 } from "./workflows.js";
 const node = (id: string, kind: "trigger" | "agent" | "condition" | "approval" | "output") => ({
@@ -89,4 +90,36 @@ describe("workflow execution plan", () => {
       }).success,
     ).toBe(false);
   });
+});
+
+it("tests one reached step or restarts its downstream branch without repeating siblings", () => {
+  const graph: WorkflowGraph = {
+    nodes: [node("start", "trigger"), node("selected", "agent"), node("sibling", "agent"), node("join", "output")],
+    edges: [
+      { id: "a", from: "start", to: "selected" },
+      { id: "b", from: "start", to: "sibling" },
+      { id: "c", from: "selected", to: "join" },
+      { id: "d", from: "sibling", to: "join" },
+    ],
+  };
+  const source = {
+    status: "failed" as const,
+    triggerId: "start",
+    steps: {
+      start: { status: "completed" as const, output: "Original input" },
+      selected: { status: "failed" as const, runId: "original-selected" },
+      sibling: { status: "completed" as const, runId: "original-sibling", output: "Keep this" },
+    },
+  };
+  const restart = workflowRestartSteps(graph, source, "selected", "downstream");
+  expect(restart?.start?.output).toBe("Original input");
+  expect(restart?.sibling?.output).toBe("Keep this");
+  expect(restart?.sibling?.runId).toBeUndefined();
+  expect(restart?.selected).toBeUndefined();
+  expect(restart?.join).toBeUndefined();
+  expect(workflowRestartSteps(graph, source, "selected", "step")?.join).toEqual({ status: "skipped" });
+  const interrupted = { ...source, steps: { ...source.steps, sibling: { status: "cancelled" as const } } };
+  expect(workflowRestartSteps(graph, interrupted, "selected", "downstream")).toBeUndefined();
+  expect(workflowRestartSteps(graph, interrupted, "selected", "step")?.sibling).toEqual({ status: "skipped" });
+  expect(workflowRestartSteps(graph, source, "start", "step")).toBeUndefined();
 });
