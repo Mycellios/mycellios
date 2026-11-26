@@ -58,6 +58,26 @@ try {
   await expect.poll(() => page.evaluate(() => window.__workspaceFixture.calls.filter(call => call.path === "workflows/create").length)).toBe(1);
   assert.ok(await page.evaluate(() => window.__workspaceFixture.calls.find(call => call.path === "workflows/create").input.graph.nodes.some(node => node.kind === "condition" && node.condition.operator === "contains" && node.condition.value === "ready")));
   await page.screenshot({ path: path.join(output, "workflow-condition.png"), animations: "disabled" });
+  await page.getByRole("button", { name: "Untitled workflow", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Summarize a text", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__workspaceFixture.calls.filter(call => call.path === "workflows/create").length), 1);
+  await expect(page.getByTestId("workflow-node-agent")).toContainText("Choose a Mico");
+  await page.getByRole("button", { name: "Fit diagram", exact: true }).click();
+  await page.getByTestId("workflow-node-agent").getByRole("button", { name: /^Edit/ }).click();
+  await page.getByRole("combobox", { name: /^Mico/ }).selectOption("fixture-mico");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByTestId("workflow-node-agent")).toContainText("Synthetic summary");
+  await page.getByRole("button", { name: "Test this step", exact: true }).click();
+  const stepTest = page.getByRole("alertdialog");
+  await expect(stepTest).toContainText("Any actions in the steps you run can happen again.");
+  await page.screenshot({ path: path.join(output, "workflow-step-test.png"), animations: "disabled" });
+  await stepTest.getByRole("button", { name: "Cancel", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__workspaceFixture.calls.filter(call => call.path === "workflows/restart").length), 0);
+  await page.getByRole("button", { name: "Run from this step", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Run", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__workspaceFixture.calls.find(call => call.path === "workflows/restart")?.input)).toMatchObject({
+    executionId: "fixture-execution", expectedVersion: 1, stepId: "mico", mode: "downstream",
+  });
 
   await rail.getByRole("button", { name: "Routines", exact: true }).click();
   await expect(page.getByTestId("routine-workspace")).toContainText("Fixture reminder");

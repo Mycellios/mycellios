@@ -126,6 +126,7 @@ export const WorkflowExecutionSchema = z.object({
   id: Key,
   workflowId: Key,
   version: z.number(),
+  triggerId: Key.optional(),
   status: z.enum(["queued", "running", "completed", "failed", "cancelled"]),
   steps: z.record(z.string(), WorkflowStepSchema),
   error: z.string().nullable(),
@@ -227,6 +228,69 @@ export function workflowPlan(graph: WorkflowGraph, triggerId: string): WorkflowN
     if (node.kind === "approval" && !node.text.trim()) throw new Error("Say what the workflow owner needs to approve");
   }
   return result;
+}
+
+export const WorkflowRestartModeSchema = z.enum(["step", "downstream"]);
+export type WorkflowRestartMode = z.infer<typeof WorkflowRestartModeSchema>;
+export const WorkflowRestartRequestSchema = z.object({
+  id: Key,
+  executionId: Key,
+  stepId: Key,
+  mode: WorkflowRestartModeSchema,
+  expectedVersion: z.number().int().positive(),
+  clientNonce: z.uuid(),
+});
+export type WorkflowRestartRequest = z.infer<typeof WorkflowRestartRequestSchema>;
+
+/** Seed only settled results from the same saved graph. Every replay gets new run IDs. */
+export function workflowRestartSteps(
+  graph: WorkflowGraph,
+  source: Pick<WorkflowExecution, "status" | "steps" | "triggerId">,
+  stepId: string,
+  mode: WorkflowRestartMode,
+): Record<string, WorkflowStep> | undefined {
+  if (!source.triggerId || !["completed", "failed"].includes(source.status)) return;
+  if (graph.edges.some(edge => edge.loop)) return;
+  let plan: WorkflowNode[];
+  try {
+    plan = workflowPlan(graph, source.triggerId);
+  } catch {
+    return;
+  }
+  if (!plan.some(node => node.id === stepId && node.kind !== "trigger")) return;
+  const previous = new Map(Object.entries(source.steps));
+  const selected = previous.get(stepId);
+  if (selected?.status !== "completed" && selected?.status !== "failed") return;
+
+  const replay = new Set([stepId]);
+  if (mode === "downstream") {
+    for (const node of plan) {
+      for (const edge of graph.edges) {
+        if (edge.from === node.id && replay.has(edge.from)) replay.add(edge.to);
+      }
+    }
+  }
+  const ancestors = new Set(replay);
+  for (const node of [...plan].reverse()) {
+    if (!ancestors.has(node.id)) continue;
+    for (const edge of graph.edges) {
+      if (edge.to === node.id) ancestors.add(edge.from);
+    }
+  }
+  const seed: Record<string, WorkflowStep> = Object.create(null);
+  for (const node of plan) {
+    if (replay.has(node.id)) continue;
+    const step = previous.get(node.id);
+    if (mode === "step" && !ancestors.has(node.id)) {
+      seed[node.id] = { status: "skipped" };
+      continue;
+    }
+    if (step?.status !== "completed" && step?.status !== "skipped") return;
+    if (node.kind === "approval" && step.status === "completed" && ancestors.has(node.id)) continue;
+    const { status, output, fields, branch } = step;
+    seed[node.id] = { status, output, fields, branch };
+  }
+  return seed;
 }
 
 export function workflowCondition(node: WorkflowNode, input: string, fields: WorkflowValues = {}): "yes" | "no" {

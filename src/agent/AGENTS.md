@@ -728,6 +728,9 @@
   without a whole-page loading frame.
   A seeded tab switch reads the destination's history directly without duplicating it
   through bootstrap. Cold web history and bootstrap request the recent window.
+  The direct history read for a selected side conversation returns a normal
+  bounded page so short conversations arrive in one response. It checks account,
+  Space and Mico ownership while selecting only fields needed for the snapshot.
   Inactive threads read 24 stored messages first and can page back normally.
   Active runs and explicit history reads keep their current window. Preserve the
   snapshot cursor and avoid evicting already loaded history on this first read.
@@ -737,13 +740,13 @@
   Start a cold same-Space history read at roster selection and consume its fresh,
   scoped result in the incoming shell. Keep writes, auth recovery and realtime
   direct. Reuse fresh model and account queries within their existing scope.
-  The Projects sidebar warms up to twelve conversations across its folders with
-  two concurrent background reads in the destination Space after visible history
-  settles. The intended folder gets the first two slots, then other folders
-  receive a turn before older conversations. Hover or focus prioritizes a folder.
-  On the default startup route, the authenticated bootstrap starts the scoped
-  Projects list and warms only the last opened project conversation once listed.
-  The sidebar reuses both reads. Store only the conversation ID.
+  Projects warm up to twelve conversations across folders with two concurrent
+  background reads per account and Space. On the default route this starts when
+  authenticated bootstrap retrieves the Projects list, while the shell mounts.
+  The remembered conversation leads the initial queue. The sidebar takes over
+  the same queue without restarting in-flight reads, prioritizing the intended
+  folder's first two slots before giving the other folders a turn. Store only
+  the conversation ID.
   Pointer and keyboard intent can warm another row. Reuse the same memory-only
   snapshot and never mark a conversation read until it is opened. Verify the
   preload limit and folder changes with SidebarProjects.test.tsx.
@@ -1205,7 +1208,10 @@
   single-turn in total, main chat included, unless the operator sets
   MYCELLIOS_NATIVE_CONCURRENCY=1 on API and worker (specs/native-engines/spec.md phase 4):
   then Codex, Claude Code and OpenCode get the same lanes (micoRunsLanes) and side-
-  conversation private lane, while a generic ACP agent stays single-turn. Each run keeps
+  conversation private lane, while a generic ACP agent stays single-turn. Either way a
+  separate-browser routine turn that runs on its server workspace with a Pi model
+  (routineBrowserRunsOnServer/isServerRoutineRun in slotRunsWhere) neither takes nor waits
+  for a native Mico's slots; one already begun elsewhere keeps counting. Each run keeps
   its own session folder, CLI process and MCP bridge token; Desktop bounds turn CLI
   processes per PC (NativeProcessSlots, default 6) and a turn above it waits visibly. The
   Desktop relay's unchanged lanes still deliver at most 2 agent runs per Mico and 4 per API
@@ -1226,6 +1232,11 @@
   deliveries share an execution bound to the sender's id. Workflow answer receipts bind the
   run lease. A corrective turn offers only the answer tool and does not replay the instruction.
   A bounded loop has one entry and exit, and never resets work outside that region.
+  Workflow templates create paused, unassigned drafts. Step tests and restarts create a
+  new execution from the current saved version and reuse only settled checkpoint data.
+  Keep original run IDs and authorization receipts in their source execution. Ask
+  for upstream approval again, fence cleanup, and retry uncertain requests by nonce.
+  Verify the synthetic workflow PostgreSQL and workspace browser fixtures.
   Workflow thread ownership queries project only userId/spaceId from a Run actor;
   preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
   Delegation from ordinary Mico tabs uses internal work scope; explicit project

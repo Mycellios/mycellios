@@ -54,17 +54,62 @@ export function mainChatCountsTowardLimit(
   return !micoRunsLanes(bot, nativeConcurrency);
 }
 
+type SlotComputer = { scope: string; kind: string } | null;
+
+/**
+ * Whether this Mico's separate-browser routine turns leave its computer: they take a private
+ * server workspace and answer with a server Pi model (selectRoutineCloudWorkspace), so they
+ * never use the PC's native CLI that the Mico's turn limit protects. A Pi Mico keeps counting
+ * them, and so does a Mico already on its own isolated Docker computer, where they stay.
+ * Unknown (undefined) computers keep counting them too.
+ */
+export function routineBrowserRunsOnServer(bot: {
+  agentEngine: string;
+  computer?: SlotComputer;
+}) {
+  if (bot.agentEngine === "pi" || bot.computer === undefined) return false;
+  return !(bot.computer?.scope === "isolated" && bot.computer.kind === "docker");
+}
+
+/**
+ * Separate-browser routine turns that run (or, not started yet, will run) in their server
+ * workspace. A resumed turn that began elsewhere keeps its place and stays outside this filter.
+ */
+const SERVER_ROUTINE_RUN = {
+  trigger: "routine",
+  routine: { is: { isolatedBrowser: true } },
+  OR: [{ cloudComputerId: { not: null } }, { startedAt: null, checkpoint: null }],
+} satisfies Prisma.RunWhereInput;
+
+export function isServerRoutineRun(run: {
+  trigger: string;
+  cloudComputerId: string | null;
+  startedAt: Date | null;
+  checkpoint: string | null;
+  routine: { isolatedBrowser: boolean } | null;
+}) {
+  return (
+    run.trigger === "routine" &&
+    run.routine?.isolatedBrowser === true &&
+    (run.cloudComputerId !== null || (run.startedAt === null && run.checkpoint === null))
+  );
+}
+
 /** Run filter for the turns that use one of the Mico's conversation slots. */
 export function slotRunsWhere(
   bot: {
     agentEngine: string;
     mainThreadId: string | null | undefined;
+    computer?: SlotComputer;
   },
   nativeConcurrency = nativeConcurrencyEnabled(),
 ): Prisma.RunWhereInput {
-  return mainChatCountsTowardLimit(bot, nativeConcurrency) || !bot.mainThreadId
-    ? {}
-    : { threadId: { not: bot.mainThreadId } };
+  return {
+    ...(mainChatCountsTowardLimit(bot, nativeConcurrency) || !bot.mainThreadId
+      ? {}
+      : { threadId: { not: bot.mainThreadId } }),
+    ...(routineBrowserRunsOnServer(bot) ? { NOT: SERVER_ROUTINE_RUN } : {}),
+  };
 }
 
 /** Admission is atomic across worker processes; queued runs do not consume slots. */
@@ -80,9 +125,28 @@ export async function claimMicoRun(
     await tx.$queryRaw`SELECT id FROM bots WHERE id=${run.botId} AND "spaceId"=${run.spaceId} AND "userId"=${run.userId} FOR UPDATE`;
     const bot = await tx.bot.findFirst({
       where: { id: run.botId, spaceId: run.spaceId, userId: run.userId, archivedAt: null },
-      select: { taskConcurrency: true, agentEngine: true, thread: { select: { id: true } } },
+      select: {
+        taskConcurrency: true,
+        agentEngine: true,
+        thread: { select: { id: true } },
+        computer: { select: { scope: true, kind: true } },
+      },
     });
     if (!bot) return { count: 0 };
+    const serverRoutine =
+      routineBrowserRunsOnServer(bot) &&
+      isServerRoutineRun(
+        await tx.run.findUniqueOrThrow({
+          where: { id: run.id },
+          select: {
+            trigger: true,
+            cloudComputerId: true,
+            startedAt: true,
+            checkpoint: true,
+            routine: { select: { isolatedBrowser: true } },
+          },
+        }),
+      );
     const live = {
       botId: run.botId,
       spaceId: run.spaceId,
@@ -92,15 +156,17 @@ export async function claimMicoRun(
       leaseExpiresAt: { gt: new Date() },
     };
     // The main chat's lane: one turn at a time there, never counted against the slots.
-    const mainLane =
-      !mainChatCountsTowardLimit(bot, nativeConcurrency) && bot.thread?.id === run.threadId;
+    // A separate-browser routine turn on the server never takes the PC's slot either.
+    const ownLane =
+      (!mainChatCountsTowardLimit(bot, nativeConcurrency) && bot.thread?.id === run.threadId) ||
+      serverRoutine;
     if (
-      (!mainLane &&
+      (!ownLane &&
         (await tx.run.count({
           where: {
             ...live,
             ...slotRunsWhere(
-              { agentEngine: bot.agentEngine, mainThreadId: bot.thread?.id },
+              { agentEngine: bot.agentEngine, mainThreadId: bot.thread?.id, computer: bot.computer },
               nativeConcurrency,
             ),
           },

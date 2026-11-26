@@ -95,6 +95,7 @@ it("starts with the last opened project chat only in its own account and Space",
   const projects = [project("Usual", 5), project("Newest", 4)];
   const rememberedKey = "test:project-history:account:personal";
   const otherKey = "test:project-history:account:team";
+  const removedKey = "test:project-history:account:removed";
   const warm = vi.fn((_botId: string, _threadId: string) => new Promise<void>(() => {}));
   const select = vi.fn();
   function mount(key: string, historyPreferenceKey: string, activeThread?: string, load = true, listed = projects) {
@@ -112,13 +113,15 @@ it("starts with the last opened project chat only in its own account and Space",
     await mount("team", otherKey);
     expect(warm.mock.calls).toEqual([["Newest", "Newest 1"], ["Newest", "Newest 2"]]);
     warm.mockClear();
-    await mount("removed", rememberedKey, undefined, true, [projects[1]!]);
+    localStorage.setItem(removedKey, "Usual 4");
+    await mount("removed", removedKey, undefined, true, [projects[1]!]);
     expect(warm.mock.calls).toEqual([["Newest", "Newest 1"], ["Newest", "Newest 2"]]);
     expect(select).not.toHaveBeenCalled();
   } finally {
     await act(() => root.unmount());
     localStorage.removeItem(rememberedKey);
     localStorage.removeItem(otherKey);
+    localStorage.removeItem(removedKey);
     host.remove();
     vi.unstubAllGlobals();
   }

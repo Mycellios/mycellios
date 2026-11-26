@@ -1376,6 +1376,13 @@ export const ThreadSnapshotSchema = z.object({
   run: RunSchema.nullable(),
   activeRuns: z.array(RunSchema).optional(),
   computer: ComputerStatusSchema.optional(),
+  /**
+   * While the visible turn is queued: the owner's other conversation of this Mico whose
+   * turn it waits for. title is null for the main chat and for hidden conversations.
+   */
+  queuedBehind: z
+    .object({ threadId: Id, title: z.string().nullable(), main: z.boolean() })
+    .optional(),
 });
 export type ThreadSnapshot = z.infer<typeof ThreadSnapshotSchema>;
 

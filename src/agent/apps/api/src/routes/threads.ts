@@ -24,7 +24,7 @@ import {
   markNewestReplyUnread,
   touchGroupUpdatedAt,
 } from "@mycellios/db";
-import { getLogger } from "@mycellios/logging";
+import { enrichLogContext, getLogger } from "@mycellios/logging";
 import {
   ownedProjectPreparation,
   prepareProject,
@@ -54,6 +54,7 @@ import {
   markThreadRead,
   markThreadUnreadFrom,
   reactToThreadMessage,
+  resolveThreadSnapshotTarget,
   resolveThreadTarget,
   sendThreadMessage,
   stopThreadRuns,
@@ -148,12 +149,18 @@ export function threadsRoutes(ctx: RouterContext) {
         return threadHead(deps.prisma, target);
       }),
       get: authed.threads.get.handler(async ({ context, input }) => {
-        // The owner of a shared Mico reads its members' conversations with it, never writes.
-        const target = await resolveThreadTarget(deps.prisma, context.actor, input, {
-          includeArchived: true,
-          memberConversation: "read",
+        const started = performance.now();
+        const target = await resolveThreadSnapshotTarget(deps.prisma, context.actor, input);
+        const resolved = performance.now();
+        // A selected side chat can fit in one normal page even when the client requests recent history.
+        const snapshot = await threadSnapshot(deps, target, input.taskThreadId ? undefined : input.history);
+        enrichLogContext({
+          "history.resolve_ms": Math.round(resolved - started),
+          "history.snapshot_ms": Math.round(performance.now() - resolved),
+          "history.message_count": snapshot.messages.length,
+          "history.has_older": snapshot.olderCursor !== null,
         });
-        return threadSnapshot(deps, target, input.history);
+        return snapshot;
       }),
       messages: authed.threads.messages.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input, {

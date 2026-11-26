@@ -4,6 +4,8 @@ import {
   createWorkflowExecution,
   decideWorkflowApproval,
   ownedWorkflow,
+  restartWorkflowExecution,
+  workflowRestartNoncePrefix,
   scheduledWorkflow,
   saveWorkflowRevision,
   restoreWorkflowVersion,
@@ -82,7 +84,7 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
         return { ok: true as const };
       }),
       execute: authed.workflows.execute.handler(async ({ context, input }) => {
-        if (input.clientNonce.startsWith("workflow-event:")) throw new ORPCError("BAD_REQUEST", { message: "Reserved execution nonce" });
+        if (["workflow-event:", workflowRestartNoncePrefix].some(prefix => input.clientNonce.startsWith(prefix))) throw new ORPCError("BAD_REQUEST", { message: "Reserved execution nonce" });
         return deps.prisma.$transaction(async (tx) => {
           const flow = (
             await tx.$queryRaw<
@@ -113,6 +115,13 @@ export function workflowsRoutes({ deps, repos, authed }: RouterContext) {
             });
           }
         });
+      }),
+      restart: authed.workflows.restart.handler(async ({ context, input }) => {
+        const result = await restartWorkflowExecution(deps.prisma, context.actor, input);
+        if (result === "not_found") throw new ORPCError("NOT_FOUND");
+        if (result === "conflict") throw new ORPCError("CONFLICT", { message: "Reload the saved workflow and wait for any previous work to stop." });
+        if (result === "unavailable") throw new ORPCError("BAD_REQUEST", { message: "This step does not have the saved results needed to restart." });
+        return workflowExecutionDto(result);
       }),
       runs: authed.workflows.runs.handler(async ({ context, input }) => {
         if (!(await ownedWorkflow(deps.prisma, context.actor, input.id)))

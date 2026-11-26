@@ -10,7 +10,7 @@ import { BranchOriginDivider } from "../../components/BranchOriginDivider";
 import { type BranchOriginBlock, branchableMessageIds, branchOriginBlock } from "../../lib/conversation-branch";
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
-import type { MessageReaction, ThreadMessage, Run } from "@mycellios/contracts";
+import type { MessageReaction, ThreadMessage, ThreadSnapshot, Run } from "@mycellios/contracts";
 import type { FoldedTranscript } from "@mycellios/core";
 import {
   expandPeerReplies,
@@ -90,6 +90,7 @@ export const Transcript = memo(function Transcript({
   workingElsewhere = false,
   workingBots,
   activeRun,
+  queuedBehind,
   lastRun,
   missingComputer,
   userBubble,
@@ -145,6 +146,8 @@ export const Transcript = memo(function Transcript({
   workingElsewhere?: boolean;
   workingBots: GroupAvatarMember[];
   activeRun?: Run;
+  /** The owner's other conversation whose turn the queued activeRun waits for. */
+  queuedBehind?: ThreadSnapshot["queuedBehind"];
   lastRun?: Run | null;
   missingComputer?: boolean;
   /** Your bubbles take the bot's color in its own chat. */
@@ -865,6 +868,7 @@ export const Transcript = memo(function Transcript({
               activity={liveActivityLine(messages) ?? undefined}
               cost={taskCosts.get(activeRun.id)}
               missingComputer={missingComputer}
+              queuedBehind={queuedBehind}
               onRefresh={onRefresh}
               onOpenComputer={() => onOpenComputer(activeRun.botId)}
             />

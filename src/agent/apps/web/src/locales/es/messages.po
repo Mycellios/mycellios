@@ -4103,6 +4103,18 @@ msgstr "Solicitud de incorporación"
 msgid "Queued"
 msgstr "En cola"
 
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for “{conversation}” to finish"
+msgstr "Esperando a que termine «{conversation}»"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for the main chat to finish"
+msgstr "Esperando a que termine el chat principal"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for another conversation to finish"
+msgstr "Esperando a que termine otra conversación"
+
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
 msgid "rakazo-shared and IDs starting with bot- are reserved for Mycellios."
 msgstr ""
@@ -16011,3 +16023,63 @@ msgstr "Usar un navegador separado"
 
 msgid "Runs on an isolated server computer. Each run starts signed out."
 msgstr "Se ejecuta en un ordenador aislado del servidor. Cada ejecución empieza sin sesión iniciada."
+
+#. js-lingui-explicit-id
+#. msgid: Templates
+msgid "workflow.templates"
+msgstr "Plantillas"
+
+#. js-lingui-explicit-id
+#. msgid: Summarize a text
+msgid "workflow.template.summary"
+msgstr "Resumir un texto"
+
+#. js-lingui-explicit-id
+#. msgid: Draft and review
+msgid "workflow.template.review"
+msgstr "Redactar y revisar"
+
+#. js-lingui-explicit-id
+#. msgid: Add your text here
+msgid "workflow.template.input"
+msgstr "Añade aquí tu texto"
+
+#. js-lingui-explicit-id
+#. msgid: Write a concise draft using only the supplied text.
+msgid "workflow.template.draft"
+msgstr "Redacta un borrador breve usando solo el texto proporcionado."
+
+#. js-lingui-explicit-id
+#. msgid: Summarize the supplied text in three bullets.
+msgid "workflow.template.summarize"
+msgstr "Resume el texto proporcionado en tres puntos."
+
+#. js-lingui-explicit-id
+#. msgid: Approve this draft to finish the workflow.
+msgid "workflow.template.approve"
+msgstr "Aprueba este borrador para finalizar el flujo."
+
+#. js-lingui-explicit-id
+#. msgid: Test this step
+msgid "workflow.step.test"
+msgstr "Probar este paso"
+
+#. js-lingui-explicit-id
+#. msgid: Run from this step
+msgid "workflow.step.restart"
+msgstr "Ejecutar desde este paso"
+
+#. js-lingui-explicit-id
+#. msgid: This uses saved inputs and starts a new execution. Any actions in the steps you run can happen again.
+msgid "workflow.step.confirm"
+msgstr "Se usarán las entradas guardadas y se iniciará una nueva ejecución. Las acciones de los pasos que ejecutes pueden repetirse."
+
+#. js-lingui-explicit-id
+#. msgid: Show steps
+msgid "workflow.history.steps"
+msgstr "Ver pasos"
+
+#. js-lingui-explicit-id
+#. msgid: Retry step request
+msgid "workflow.step.retry"
+msgstr "Reintentar solicitud del paso"

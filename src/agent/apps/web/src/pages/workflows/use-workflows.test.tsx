@@ -48,6 +48,7 @@ const api = {
   create: vi.fn(),
   runs: vi.fn(),
   execute: vi.fn(),
+  restart: vi.fn(),
   stop: vi.fn(),
 };
 const client = { workflows: api } as unknown as RpcClient;
@@ -88,6 +89,21 @@ it("retains an uncertain nonce across remount and only retries when requested", 
   await act(async () => state.run());
   expect(api.execute.mock.calls[1]![0]).toEqual(request);
   expect(localStorage.getItem(`${key}:pending:flow`)).toBeNull();
+});
+it("retries an uncertain step request without converting it to a full workflow run", async () => {
+  api.restart.mockRejectedValueOnce(new Error("Connection lost"));
+  const request = { id: saved.id, executionId: receipt.id, stepId: "agent", mode: "step" as const, expectedVersion: 1 };
+  await act(async () => state.restart(request));
+  const original = api.restart.mock.calls[0]![0];
+  await act(async () => root.unmount());
+  await mount();
+  await act(async () => state.run());
+  expect(api.execute).not.toHaveBeenCalled();
+  expect(state.pendingRestart).toEqual(original);
+  api.restart.mockResolvedValue(receipt);
+  await act(async () => state.restart(state.pendingRestart!));
+  expect(api.restart.mock.calls[1]![0]).toEqual(original);
+  expect(state.pendingRestart).toBeUndefined();
 });
 it("allows a corrected graph to save and run after a definitive validation refusal", async () => {
   api.execute.mockRejectedValueOnce(

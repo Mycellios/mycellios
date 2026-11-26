@@ -1,6 +1,8 @@
 import {
   type Workflow,
   type WorkflowExecution,
+  type WorkflowRestartRequest,
+  WorkflowRestartRequestSchema,
   WorkflowGraphSchema,
   WorkflowSchema,
 } from "@mycellios/contracts";
@@ -19,6 +21,19 @@ const blank = (): Draft => ({
   updatedAt: new Date().toISOString(),
   dirty: true,
 });
+function isDefinitiveRejection(cause: unknown) {
+  const code = cause && typeof cause === "object" && "code" in cause ? cause.code : undefined;
+  return ["BAD_REQUEST", "CONFLICT", "NOT_FOUND", "FORBIDDEN", "UNAUTHORIZED"].includes(String(code));
+}
+
+function readPendingRestart(key: string) {
+  try {
+    return WorkflowRestartRequestSchema.safeParse(JSON.parse(localStorage.getItem(key) ?? "null")).data;
+  } catch {
+    return undefined;
+  }
+}
+
 export function useWorkflows(client: RpcClient, scope: string) {
   const key = `mycellios:workflows:${scope}`;
   const [docs, setDocs] = useState<Draft[]>(() => {
@@ -176,6 +191,28 @@ export function useWorkflows(client: RpcClient, scope: string) {
       if (mounted.current) setBusy(false);
     }
   }
+  async function restart(request: Omit<WorkflowRestartRequest, "clientNonce">) {
+    const source = current.current;
+    const nonceKey = `${key}:restart:${source.id}`;
+    const pending = readPendingRestart(nonceKey);
+    if (source.id !== request.id) return;
+    if (!pending && (source.dirty || source.version !== request.expectedVersion || historyError)) return;
+    if (localStorage.getItem(`${key}:pending:${source.id}`))
+      throw new Error("Resuelve primero la ejecución anterior.");
+    const next = pending ?? { ...request, clientNonce: crypto.randomUUID() };
+    localStorage.setItem(nonceKey, JSON.stringify(next));
+    let result: WorkflowExecution;
+    try {
+      result = await client.workflows.restart(next);
+    } catch (cause) {
+      if (isDefinitiveRejection(cause)) localStorage.removeItem(nonceKey);
+      throw cause;
+    }
+    localStorage.removeItem(nonceKey);
+    if (mounted.current && current.current.id === result.workflowId)
+      setRuns(items => [result, ...items.filter(item => item.id !== result.id)]);
+  }
+
   const execution = runs[0];
   const running =
     execution?.status === "queued" ||
@@ -193,6 +230,8 @@ export function useWorkflows(client: RpcClient, scope: string) {
     runs,
     running,
     execution,
+    pendingRestart: readPendingRestart(`${key}:restart:${doc.id}`),
+    restart: (request: Omit<WorkflowRestartRequest, "clientNonce">) => action(() => restart(request)),
     update,
     retry: () => setProbe((value) => value + 1),
     create: () => {
@@ -228,6 +267,8 @@ export function useWorkflows(client: RpcClient, scope: string) {
             "No se puede comprobar si ya hay una ejecución. Reintenta cuando vuelva la conexión.",
           );
         const source = current.current;
+        if (readPendingRestart(`${key}:restart:${source.id}`))
+          throw new Error("Reintenta la ejecución del paso antes de iniciar otra.");
         const nonceKey = `${key}:pending:${source.id}`;
         const prior = localStorage.getItem(nonceKey);
         // A retry after an uncertain response replays the same version and request, never a new run.
@@ -256,14 +297,7 @@ export function useWorkflows(client: RpcClient, scope: string) {
           });
         } catch (cause) {
           // A definitive rejection created no execution. Retain uncertain requests only.
-          const code =
-            cause && typeof cause === "object" && "code" in cause ? cause.code : undefined;
-          if (
-            ["BAD_REQUEST", "CONFLICT", "NOT_FOUND", "FORBIDDEN", "UNAUTHORIZED"].includes(
-              String(code),
-            )
-          )
-            localStorage.removeItem(nonceKey);
+          if (isDefinitiveRejection(cause)) localStorage.removeItem(nonceKey);
           throw cause;
         }
         localStorage.removeItem(nonceKey);

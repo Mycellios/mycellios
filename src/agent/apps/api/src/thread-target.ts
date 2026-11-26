@@ -50,6 +50,7 @@ import {
   recordThreadTurnOutcome,
   retireWaitingQuestionInTransaction,
   settleStoppedRecipientsInTransaction,
+  slotRunsWhere,
   touchGroupUpdatedAt,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
@@ -416,9 +417,54 @@ export async function threadHead(prisma: PrismaClient, target: ThreadTarget) {
   return { threadId: target.threadId, cursor: latest?.seq ?? -1 };
 }
 
+type SnapshotTarget = ThreadTarget | {
+  kind: "bot";
+  botId: string;
+  threadId: string;
+  bot: { name: string; computer: Parameters<typeof toComputerStatus>[1] & { id: string } | null };
+};
+
+/** Read-only side-chat admission. History doesn't need project execution metadata. */
+export async function resolveThreadSnapshotTarget(
+  prisma: PrismaClient,
+  actor: Actor,
+  input: { botId?: string; groupId?: string; taskThreadId?: string },
+): Promise<SnapshotTarget> {
+  if (!input.taskThreadId) {
+    return resolveThreadTarget(prisma, actor, input, { includeArchived: true, memberConversation: "read" });
+  }
+  if (!input.botId || input.groupId) throw new IsolationError();
+  const scope = { userId: actor.userId, spaceId: actor.spaceId };
+  const thread = await prisma.thread.findFirst({
+    where: {
+      id: input.taskThreadId,
+      taskBotId: input.botId,
+      ...scope,
+      taskBot: { is: { ...scope, thread: { isNot: null } } },
+    },
+    select: {
+      id: true,
+      taskBot: {
+        select: {
+          name: true,
+          computer: {
+            select: {
+              id: true, kind: true, state: true, scope: true, controlHolder: true,
+              controlBotId: true, controlRunId: true, homeRevision: true, maintenanceId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  // As with the general read route, the Mico owner can read its member conversations.
+  if (!thread?.taskBot) throw new IsolationError();
+  return { kind: "bot", botId: input.botId, threadId: thread.id, bot: thread.taskBot };
+}
+
 export async function threadSnapshot(
   deps: { prisma: PrismaClient },
-  target: ThreadTarget,
+  target: SnapshotTarget,
   history?: "recent",
 ): Promise<ThreadSnapshot> {
   // Read messages, the event cursor, runs and progress from one MVCC snapshot.
@@ -501,6 +547,10 @@ export async function threadSnapshot(
         readOptions,
       ),
     ]);
+    const queuedBehind =
+      core.run?.status === "queued"
+        ? await queuedBehindConversation(deps.prisma, target, core.run.id)
+        : null;
     return {
       botId: target.botId,
       threadId: target.threadId,
@@ -510,6 +560,7 @@ export async function threadSnapshot(
       run: core.run ? mapRun(core.run) : null,
       activeRuns: core.activeRuns.map(mapRun),
       computer: toComputerStatus(target.botId, target.bot.computer, busyBotName),
+      ...(queuedBehind ? { queuedBehind } : {}),
     };
   }
 
@@ -596,6 +647,64 @@ export async function threadSnapshot(
           ? mapRun(primaryActiveRun)
           : null,
     activeRuns: core.activeRuns.map(mapRun),
+  };
+}
+
+/**
+ * The owner's conversation whose live turn keeps this queued turn waiting: the oldest turn of
+ * the same Mico working in another of the owner's conversations. A Space member's conversation
+ * is never named, so a shared Mico never reveals one person's chats to another.
+ */
+export async function queuedBehindConversation(
+  prisma: Pick<PrismaClient, "run" | "thread" | "bot">,
+  target: { botId: string; threadId: string },
+  queuedRunId: string,
+): Promise<{ threadId: string; title: string | null; main: boolean } | null> {
+  const [own, bot] = await Promise.all([
+    prisma.thread.findUnique({ where: { id: target.threadId }, select: { memberUserId: true } }),
+    prisma.bot.findUnique({
+      where: { id: target.botId },
+      select: {
+        agentEngine: true,
+        thread: { select: { id: true } },
+        computer: { select: { scope: true, kind: true } },
+      },
+    }),
+  ]);
+  if (!own || own.memberUserId || !bot) return null;
+  const blocker = await prisma.run.findFirst({
+    where: {
+      botId: target.botId,
+      id: { not: queuedRunId },
+      threadId: { not: target.threadId },
+      status: { in: ["leased", "running"] },
+      leaseExpiresAt: { gt: new Date() },
+      // Only turns that take one of the Mico's slots keep this one waiting.
+      AND: [
+        slotRunsWhere({
+          agentEngine: bot.agentEngine,
+          mainThreadId: bot.thread?.id,
+          computer: bot.computer,
+        }),
+      ],
+    },
+    orderBy: [{ startedAt: "asc" }, { id: "asc" }],
+    select: {
+      threadId: true,
+      thread: {
+        select: { title: true, memberUserId: true, archivedAt: true, deleteAfter: true },
+      },
+      routine: { select: { name: true } },
+      bot: { select: { thread: { select: { id: true } } } },
+    },
+  });
+  if (!blocker || blocker.thread.memberUserId) return null;
+  const main = blocker.threadId === blocker.bot.thread?.id;
+  const hidden = Boolean(blocker.thread.archivedAt || blocker.thread.deleteAfter);
+  return {
+    threadId: blocker.threadId,
+    title: main || hidden ? null : (blocker.thread.title ?? blocker.routine?.name ?? null),
+    main,
   };
 }
 

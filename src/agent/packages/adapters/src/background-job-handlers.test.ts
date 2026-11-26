@@ -177,6 +177,40 @@ describe("createBackgroundJobHandlers", () => {
     expect(continueRun).toHaveBeenCalledTimes(2);
   });
 
+  it("continues the Mico's next queued run as soon as a run leaves its slot, even after a failure", async () => {
+    const order: string[] = [];
+    const continueRun = vi.fn(async () => {
+      order.push("continue");
+      throw new Error("turn failed");
+    });
+    const run = {
+      findUnique: vi.fn(async () => ({ ...owner, botId: "bot-1", status: "failed" })),
+      findMany: vi.fn(async () => [{ id: "run-2" }]),
+    };
+    const enqueue = vi.fn(async () => {
+      order.push("wake");
+    });
+    const handlers = createBackgroundJobHandlers({
+      executor: { continueRun } as unknown as ReturnType<typeof createRunExecutor>,
+      prisma: { run } as unknown as PrismaClient,
+      sandbox: {} as unknown as SandboxProvider,
+      home: {} as unknown as AgentHomeStore,
+      artifacts: {} as unknown as ArtifactStore,
+      jobs: { enqueue } as unknown as JobPublisher,
+      events: {} as unknown as ThreadEvents,
+      workerId: "worker-1",
+      runtime: {} as unknown as AgentRuntime,
+      secretStore: {} as unknown as EncryptedSecretStore,
+      memoryProviders: { resolve: vi.fn(async () => null) },
+    });
+
+    await expect(handlers["run.continue"]({ runId: "run-1" })).rejects.toThrow("turn failed");
+    expect(order).toEqual(["continue", "wake"]);
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "run.continue", payload: { runId: "run-2" }, keepExisting: true }),
+    );
+  });
+
   it("resolves the deployment model when no user credential is configured", async () => {
     const prisma = {
       userModelPreference: { findFirst: vi.fn(async () => null) },
