@@ -27,7 +27,8 @@ import {
 } from "@mycellios/ui-web";
 import { Check, ChevronDown, ChevronRight, CircleAlert, Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
-import { Fragment, Suspense, useMemo, useState } from "react";
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { ROSTER_HOVER_INTENT_MS, type RosterHistoryTarget, rosterHistoryPreloads } from "../../lib/roster-history-preload";
 import { IconTooltip } from "../../components/IconTooltip";
 import { RosterReplyIndicator } from "../../components/RosterReplyIndicator";
 import { RosterMessagePreview } from "../../components/RosterMessagePreview";
@@ -80,6 +81,8 @@ export function SidebarRoster({
   activeThreadId,
   onOpenConversation,
   conversationClient = rpcForSpace,
+  onWarmChat,
+  onPreloadChats,
 }: {
   sidebarGroups: ReturnType<
     typeof sidebarGroupsForSpaces<Space["bots"][number], Space["groups"][number]>
@@ -124,6 +127,10 @@ export function SidebarRoster({
   onOpenConversation?: (spaceId: string, botId: string, threadId: string) => void;
   /** Reads an expanded Mico's conversations in its own Space. */
   conversationClient?: (spaceId: string) => Pick<RpcClient, "development">;
+  /** Warms the history a click on this row would open, without marking it read. */
+  onWarmChat?: (spaceId: string, botId: string, taskThreadId?: string) => void;
+  /** Warms the first visible Micos in the background; returns a cancel function. */
+  onPreloadChats?: (targets: RosterHistoryTarget[]) => (() => void) | undefined;
 }) {
   const { t } = useLingui();
   const { sidebarChatOrder } = useGeneralPreferences();
@@ -140,6 +147,19 @@ export function SidebarRoster({
   const allGroups = filtering ? filterSidebarGroups(orderedChats, sidebarFilter, allFolders) : orderedChats;
   const orderedGroups = allGroups.filter(group => mini || filtering || !group.ancestorKeys.some(key => collapsedSidebarSections.has(key)));
   const conversationsOf = (spaceId: string, botId: string, threadId: string) => onOpenConversation?.(spaceId, botId, threadId);
+  const preloadTargets = JSON.stringify(onPreloadChats && !filtering
+    ? rosterHistoryPreloads(orderedGroups, activeSpaceId, inGroup ? undefined : active?.id) : []);
+  useEffect(() => onPreloadChats?.(JSON.parse(preloadTargets) as RosterHistoryTarget[]), [onPreloadChats, preloadTargets]);
+  const hoverIntent = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(hoverIntent.current), []);
+  const warmRow = (item: (typeof orderedGroups)[number]["bots"][number], delay = 0) => {
+    clearTimeout(hoverIntent.current);
+    if (!onWarmChat || item.kind !== "bot") return;
+    const waiting = item.chat.status === "waiting_input" ? item.chat.waitingTaskThreadId ?? undefined : undefined;
+    const warm = () => onWarmChat(item.chat.spaceId, item.chat.id, waiting);
+    if (delay) hoverIntent.current = setTimeout(warm, delay);
+    else warm();
+  };
   return (
     <>
       {filtering && orderedGroups.every(group => group.bots.length === 0) ? (
@@ -489,6 +509,10 @@ export function SidebarRoster({
                         item.kind === "bot" ? `/app/${item.chat.id}${params.size ? `?${params}` : ""}` : `/app/g/${item.chat.id}`,
                       );
                     }}
+                    onPointerEnter={selected ? undefined : () => warmRow(item, ROSTER_HOVER_INTENT_MS)}
+                    onPointerLeave={() => clearTimeout(hoverIntent.current)}
+                    onPointerDown={selected ? undefined : () => warmRow(item)}
+                    onFocus={selected ? undefined : () => warmRow(item)}
                     // Focus the row so closing the menu returns focus here.
                     onContextMenu={(event) => event.currentTarget.focus()}
                     className={`flex items-center ${

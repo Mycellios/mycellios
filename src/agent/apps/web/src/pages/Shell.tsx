@@ -2277,6 +2277,22 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     if (cached && (!pendingQuestion || answerableAskMessageIds(cached).size > 0)) return;
     await readConversationHistory(userId, spaceId, id, scope).catch(() => undefined);
   }, [userId, shellSpaceId]);
+  // Roster rows warm only the current Space: another Space is an auth boundary
+  // whose bootstrap loads first. The cache keys match this shell's own scope.
+  const warmRosterChat = useCallback((spaceId: string, id: string, threadId?: string) => {
+    if (spaceId === currentSpaceId) void warmConversation(id, threadId);
+  }, [currentSpaceId, warmConversation]);
+  const preloadRosterChats = useCallback((targets: [string, string | null][]) => {
+    let cancelled = false;
+    void (async () => {
+      // One read at a time, behind the open chat's own history.
+      for (const [id, threadId] of targets) {
+        if (cancelled || document.visibilityState !== "visible") break;
+        await warmConversation(id, threadId ?? undefined);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [warmConversation]);
   const warmProjectConversation = useCallback(async (id: string, threadId: string) => {
     if (currentSpaceId) await warmConversation(id, threadId, false, currentSpaceId);
   }, [currentSpaceId, warmConversation]);
@@ -5048,6 +5064,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 activeThreadId={taskScope?.taskThreadId}
                 onOpenConversation={(spaceId, botId, threadId) => openSpaceChat(spaceId,
                   `/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}&taskSpace=${encodeURIComponent(spaceId)}`)}
+                onWarmChat={readingFirstHistory ? undefined : warmRosterChat}
+                onPreloadChats={readingFirstHistory || isMobileSidebar ? undefined : preloadRosterChats}
               />
             </>
           )}
