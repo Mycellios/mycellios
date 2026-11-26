@@ -18,7 +18,7 @@ function project(name: string, numberOfChats: number): ProjectSummary {
   }) };
 }
 
-it("warms at most five chats in the background and abandons the previous folder's queued reads", async () => {
+it("warms the intended folder before opening it while another read is still pending", async () => {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -31,19 +31,26 @@ it("warms at most five chats in the background and abandons the previous folder'
     await act(() => root.render(<SidebarProjects projects={[project("First", 3), project("Second", 8)]}
       rpc={{} as RpcClient} bots={[]} creating={false} onCreating={() => undefined} onRefresh={() => undefined}
       onSelect={select} onWarm={warm} failed={false} />));
-    expect(warm.mock.calls).toEqual([["First", "First 1"]]);
+    expect(warm.mock.calls).toEqual([["First", "First 1"], ["First", "First 2"]]);
     expect(select).not.toHaveBeenCalled();
 
     const secondFolder = Array.from(host.querySelectorAll("button")).find(button => button.textContent === "Second")!;
-    await act(() => secondFolder.click());
-    expect(warm).toHaveBeenCalledTimes(1);
+    await act(() => secondFolder.focus());
+    expect(secondFolder.getAttribute("aria-expanded")).toBe("false");
+    expect(warm).toHaveBeenCalledTimes(2);
     await act(() => complete.get("First 1")!());
+    expect(warm).toHaveBeenLastCalledWith("Second", "Second 1");
+    expect(select).not.toHaveBeenCalled();
+    await act(() => secondFolder.click());
+    await act(() => complete.get("First 2")!());
+    expect(warm).toHaveBeenLastCalledWith("Second", "Second 2");
+
     for (let index = 1; index <= 5; index += 1) {
-      const threadId = `Second ${index}`;
-      expect(warm).toHaveBeenLastCalledWith("Second", threadId);
-      await act(() => complete.get(threadId)!());
+      await act(() => complete.get(`Second ${index}`)!());
     }
-    expect(warm).toHaveBeenCalledTimes(6);
+    expect(warm.mock.calls.slice(2)).toEqual(
+      Array.from({ length: 5 }, (_, index) => ["Second", `Second ${index + 1}`]),
+    );
 
     const laterChat = host.querySelector<HTMLButtonElement>('button[title="Second 8"]')!;
     await act(() => laterChat.focus());

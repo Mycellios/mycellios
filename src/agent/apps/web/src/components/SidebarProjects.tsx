@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 
 const PROJECT_HISTORY_PRELOAD_LIMIT = 5;
+const PROJECT_HISTORY_PRELOAD_CONCURRENCY = 2;
 
 export function SidebarProjects({ projects, rpc, bots, activeThread, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
   projects: ProjectSummary[]; rpc: RpcClient; bots: { id: string; name: string }[];
@@ -17,19 +18,21 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
   const { t } = useLingui();
   const activeProjectId = projects.find(p => p.conversations.some(c => c.threadId === activeThread))?.id;
   const [expanded, expand] = useState<string[]>(() => activeProjectId ? [activeProjectId] : []);
+  const [intendedProjectId, setIntendedProjectId] = useState<string>();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const projectId = useRef(crypto.randomUUID());
   const alive = useRef(true);
   const saving = useRef(false);
-  const preloadTail = useRef(Promise.resolve());
+  const preloading = useRef(new Map<string, Promise<void>>());
   const warmingIntent = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
     if (activeProjectId) expand(ids => ids.includes(activeProjectId) ? ids : [...ids, activeProjectId]);
   }, [activeProjectId, activeThread]);
-  const currentProject = projects.find(project => project.id === expanded.at(-1) && project.conversations.length)
+  const currentProject = projects.find(project => project.id === intendedProjectId && project.conversations.length)
+    ?? projects.find(project => project.id === expanded.at(-1) && project.conversations.length)
     ?? projects.find(project => project.conversations.length);
   const warmTargets = JSON.stringify((currentProject?.conversations ?? [])
     .filter(chat => chat.threadId !== activeThread)
@@ -40,26 +43,39 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
     let cancelled = false;
     let scheduled = false;
     const pending = JSON.parse(warmTargets) as [string, string][];
-    const resume = () => {
-      if (scheduled || cancelled || !pending.length || document.visibilityState !== "visible") return;
-      scheduled = true;
-      // Changing folders stops the old sequence after its current read.
-      preloadTail.current = preloadTail.current.then(async () => {
-        while (!cancelled && pending.length && document.visibilityState === "visible") {
-          const [botId, threadId] = pending.shift()!;
-          await onWarm(botId, threadId).catch(() => undefined);
+    const inFlight = preloading.current;
+    const canRead = () => !cancelled && pending.length > 0 && document.visibilityState === "visible";
+    const readNext = async () => {
+      while (canRead()) {
+        if (inFlight.size >= PROJECT_HISTORY_PRELOAD_CONCURRENCY) {
+          await Promise.race(inFlight.values());
+          continue;
         }
-        scheduled = false;
-      });
+        const [botId, threadId] = pending.shift()!;
+        if (inFlight.has(threadId)) continue;
+        const read = onWarm(botId, threadId).catch(() => undefined).finally(() => inFlight.delete(threadId));
+        inFlight.set(threadId, read);
+        await read;
+      }
+    };
+    const resume = () => {
+      if (scheduled || !canRead()) return;
+      scheduled = true;
+      // A folder change shares the same limit, skipping queued work from the previous folder.
+      void Promise.all(Array.from({ length: PROJECT_HISTORY_PRELOAD_CONCURRENCY }, readNext))
+        .finally(() => { scheduled = false; });
     };
     resume();
     document.addEventListener("visibilitychange", resume);
     return () => { cancelled = true; document.removeEventListener("visibilitychange", resume); };
   }, [onWarm, warmTargets]);
   function warmFromIntent(botId: string, threadId: string) {
-    if (!onWarm || threadId === activeThread || warmingIntent.current) return;
+    if (!onWarm || threadId === activeThread || warmingIntent.current || preloading.current.has(threadId)) return;
     warmingIntent.current = true;
     void onWarm(botId, threadId).catch(() => undefined).finally(() => { warmingIntent.current = false; });
+  }
+  function clearProjectIntent(projectId: string) {
+    setIntendedProjectId(id => id === projectId ? undefined : id);
   }
   if (!projects.length && !creating) return null;
   return <section aria-label={t`Projects`} className="min-w-0 py-2">
@@ -85,7 +101,10 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
     </form> : null}
     {projects.map(project => <div key={project.id} className="min-w-0">
       <div className="flex min-w-0 items-center gap-1">
-        <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2" aria-expanded={expanded.includes(project.id)} onClick={() => expand(ids => ids.includes(project.id) ? ids.filter(id => id !== project.id) : [...ids, project.id])}>
+        <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2" aria-expanded={expanded.includes(project.id)}
+          onPointerEnter={() => setIntendedProjectId(project.id)} onPointerLeave={() => clearProjectIntent(project.id)}
+          onFocus={() => setIntendedProjectId(project.id)} onBlur={() => clearProjectIntent(project.id)}
+          onClick={() => expand(ids => ids.includes(project.id) ? ids.filter(id => id !== project.id) : [...ids, project.id])}>
           <ChevronDown size={13} className={expanded.includes(project.id) ? "shrink-0" : "shrink-0 -rotate-90"} /><Folder size={15} className="shrink-0" /><span className="truncate">{project.name}</span>
         </Button>
         <NewProjectConversation project={project} bots={bots} rpc={rpc} onCreated={(botId, threadId) => { onRefresh(); onSelect(botId, threadId); }} />
