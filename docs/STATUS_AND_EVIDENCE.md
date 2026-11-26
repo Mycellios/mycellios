@@ -109,6 +109,36 @@ physical computers, bait detection in practice, and protection against an
 owner who reads process memory or runs a modified worker, which the design
 explicitly does not claim.
 
+## Qwen3-4B Q4_K_M llama.cpp stages on one machine — exploratory, 2026-11-26
+
+Not a physical claim under the evidence policy below: one Windows PC (AMD
+Radeon 890M integrated GPU), llama.cpp b12613, the pinned
+[Qwen3-4B-Q4_K_M.gguf](https://huggingface.co/Qwen/Qwen3-4B-GGUF/blob/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf)
+and its [tensor manifest](https://github.com/Mycellios/mycellios/releases/tag/gguf-qwen3-4b-q4-k-m-456ad55a32c3)
+(id , 398 tensors).
+
+Split at block 18 against the unsplit model, 48 greedy tokens, 8 mixed and 8
+copy prompts:
+
+| Backend | Split == unsplit | Rollback redo | 17-position waves |
+| --- | ---: | ---: | --- |
+| CPU | 16/16 | 16/16 | 45–47 of 47 positions (batch classes) |
+| Vulkan | 15/16 | 15/16 | 45–47 of 47 positions |
+
+The one Vulkan difference is a flip where the reference margin was 0.023
+logits, the batch coupling already recorded below.
+
+ on the stage package for blocks 0–18, built by
+ with range requests from the Hub:
+
+| Backend | Decode p50 | Prefill p50 | Exact micro-batches |
+| --- | ---: | ---: | --- |
+| Vulkan | 122 ms/token | 13.0 ms/token | 1 |
+| CPU, 8 threads | 98 ms/token | 21.1 ms/token | 1–3 |
+
+ turns these into an engine
+activation authority with reference costs of 100 and 15 ms/token.
+
 ## Quantized llama.cpp stages on one machine — exploratory, 2026-11-22
 
 Not a physical claim under the evidence policy below: both stages ran on one
