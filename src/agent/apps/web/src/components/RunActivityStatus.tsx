@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Run, TaskCost, ThreadMessage } from "@mycellios/contracts";
+import type { Run, TaskCost, ThreadMessage, ThreadSnapshot } from "@mycellios/contracts";
 import { lastRunOutput, runHealth } from "@mycellios/core/run-health";
 import { observedTools, type ToolObservation } from "@mycellios/core";
 import { Button, GroupAvatar } from "@mycellios/ui-web";
@@ -120,6 +120,7 @@ export function RunActivityStatus({
   activity,
   cost,
   missingComputer,
+  queuedBehind,
   onRefresh,
   onOpenComputer,
 }: {
@@ -129,6 +130,8 @@ export function RunActivityStatus({
   activity?: string;
   cost?: TaskCost;
   missingComputer?: boolean;
+  /** The owner's other conversation whose turn this queued turn waits for. */
+  queuedBehind?: ThreadSnapshot["queuedBehind"];
   onRefresh: () => Promise<void>;
   onOpenComputer?: () => void;
 }) {
@@ -193,10 +196,17 @@ export function RunActivityStatus({
   const latestActivity = scopedActivity || latestTool || legacyActivity;
   const thinking = scopedActivity === "Thinking…";
   const showActivity = !thinking && latestActivity && ["running", "quiet", "unknown", "recovering"].includes(health.state);
+  const conversation = queuedBehind?.title;
   const labels = {
     idle: t`Finished`,
     waiting: t`Waiting for your response`,
-    queued: t`Queued`,
+    queued: !queuedBehind
+      ? t`Queued`
+      : queuedBehind.main
+        ? t`Waiting for the main chat to finish`
+        : conversation
+          ? t`Waiting for “${conversation}” to finish`
+          : t`Waiting for another conversation to finish`,
     blocked: t`Cannot start: virtual computer unavailable`,
     starting: t`Waiting to start`,
     recovering: t`Checking connection…`,

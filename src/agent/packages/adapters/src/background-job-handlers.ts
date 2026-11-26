@@ -28,6 +28,7 @@ import type { ExpoPushProvider } from "./expo-push.js";
 import { compactHistory } from "./history-compaction.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { deliverMessagingOutbound, mirrorMessagingOutbound } from "./messaging-delivery.js";
+import { wakeQueuedMicoRuns } from "./mico-queue-wake.js";
 import { mirrorWhatsAppDeviceRun } from "./whatsapp-device-delivery.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
 import { purgeDeletedThread } from "./thread-deletion.js";
@@ -124,9 +125,15 @@ export function createBackgroundJobHandlers(deps: {
 
   return {
     "run.continue": asOwner(run, async (payload, execution) => {
-      if (execution)
-        await deps.executor.continueRun(payload.runId, deps.workerId, execution.onRunStarted);
-      else await deps.executor.continueRun(payload.runId, deps.workerId);
+      try {
+        if (execution)
+          await deps.executor.continueRun(payload.runId, deps.workerId, execution.onRunStarted);
+        else await deps.executor.continueRun(payload.runId, deps.workerId);
+      } finally {
+        await wakeQueuedMicoRuns(deps, payload.runId).catch((error) =>
+          getLogger().error("queued mico run wake error", error),
+        );
+      }
       // Automatic messaging mirror: once the run's bot messages are durable,
       // copy them into the outbox. Never let mirror failures fail the run.
       if (messagingDeps) {

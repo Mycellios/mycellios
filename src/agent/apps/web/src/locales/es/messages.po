@@ -4103,6 +4103,18 @@ msgstr "Solicitud de incorporación"
 msgid "Queued"
 msgstr "En cola"
 
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for “{conversation}” to finish"
+msgstr "Esperando a que termine «{conversation}»"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for the main chat to finish"
+msgstr "Esperando a que termine el chat principal"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for another conversation to finish"
+msgstr "Esperando a que termine otra conversación"
+
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
 msgid "rakazo-shared and IDs starting with bot- are reserved for Mycellios."
 msgstr ""

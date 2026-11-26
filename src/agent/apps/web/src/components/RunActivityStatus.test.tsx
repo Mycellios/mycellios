@@ -53,7 +53,12 @@ afterEach(() => {
   if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
   else Reflect.deleteProperty(document, "hidden");
 });
-function mount(value: Run, missingComputer = false, messages: import("@mycellios/contracts").ThreadMessage[] = []) {
+function mount(
+  value: Run,
+  missingComputer = false,
+  messages: import("@mycellios/contracts").ThreadMessage[] = [],
+  queuedBehind?: import("@mycellios/contracts").ThreadSnapshot["queuedBehind"],
+) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.useFakeTimers();
   vi.setSystemTime(now);
@@ -70,6 +75,7 @@ function mount(value: Run, missingComputer = false, messages: import("@mycellios
         messages={messages}
         bots={[]}
         missingComputer={missingComputer}
+        queuedBehind={queuedBehind}
         onRefresh={refresh}
         onOpenComputer={open}
       />,
@@ -77,6 +83,16 @@ function mount(value: Run, missingComputer = false, messages: import("@mycellios
   );
   return { refresh, open };
 }
+it.each([
+  [{ threadId: "other", title: "Forocoches", main: false }, "Waiting for “Forocoches” to finish"],
+  [{ threadId: "main", title: null, main: true }, "Waiting for the main chat to finish"],
+  [{ threadId: "hidden", title: null, main: false }, "Waiting for another conversation to finish"],
+  [undefined, "Queued"],
+] as const)("names what a queued turn waits for (%o)", (queuedBehind, label) => {
+  mount({ ...run, status: "queued", startedAt: null } as Run, false, [], queuedBehind);
+  expect(node.querySelector("[role=status]")?.textContent).toContain(label);
+});
+
 it("explains a preflight block instead of a working animation", () => {
   const { open } = mount({ ...run, startedAt: null }, true);
   expect(node.textContent).toContain("Cannot start: virtual computer unavailable");

@@ -4054,6 +4054,18 @@ msgstr "Pull request"
 msgid "Queued"
 msgstr "Queued"
 
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for “{conversation}” to finish"
+msgstr "Waiting for “{conversation}” to finish"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for the main chat to finish"
+msgstr "Waiting for the main chat to finish"
+
+#: src/components/RunActivityStatus.tsx
+msgid "Waiting for another conversation to finish"
+msgstr "Waiting for another conversation to finish"
+
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
 msgid "rakazo-shared and IDs starting with bot- are reserved for Mycellios."
 msgstr "rakazo-shared and IDs starting with bot- are reserved for Mycellios."
