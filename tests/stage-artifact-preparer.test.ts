@@ -248,6 +248,39 @@ describe("worker-local stage artifact preparation", () => {
   });
 });
 
+describe("planned seed blobs during stage preparation", () => {
+  it("passes only the loopback seed endpoint to the stage cache, never its token", async () => {
+    const description = fixture();
+    const local = description.launchOrder.filter((process) => process.anchor.memberId === "node-a");
+    const runner = vi.fn(async (_executable: string, args: readonly string[]) => {
+      const layerStart = Number(flagValue(args, "--layer-start"));
+      const layerEnd = Number(flagValue(args, "--layer-end"));
+      const process = local.find((candidate) => candidate.layerStart === layerStart && candidate.layerEnd === layerEnd)!;
+      return JSON.stringify({ destination: flagDestination(args), package_id: "a".repeat(64),
+        artifact_identity: `sha256:${"a".repeat(64)}`, model_identity: description.runtimeModel.artifactIdentity!,
+        layer_start: layerStart, layer_end: layerEnd, total_layers: process.totalLayers, weights_size_bytes: 1_024 });
+    });
+    const token = "s".repeat(43);
+    const cacheRunner = vi.fn(async (_executable: string, args: readonly string[]) => {
+      const packageId = flagValue(args, "--expected-package-id");
+      const cacheRoot = flagValue(args, "--cache-root");
+      return JSON.stringify({ cache_root: cacheRoot, package_directory: join(cacheRoot, "packages", packageId),
+        package_id: packageId, artifact_identity: `sha256:${packageId}`, manifest_sha256: "c".repeat(64),
+        downloaded_bytes: 0, resumed_bytes: 0, materialized: true, objects: [] });
+    });
+    await prepareNodeStageArtifacts(description, {
+      nodeId: "node-a", pythonExecutable: "python", cacheDirectory: temporaryDirectory(),
+      compilerRunner: runner, artifactCacheRunner: cacheRunner,
+      artifactSeed: async () => ({ url: "http://127.0.0.1:41000", token }),
+    });
+    expect(cacheRunner).toHaveBeenCalled();
+    for (const [, args] of cacheRunner.mock.calls) {
+      expect(flagValue(args, "--seed-endpoint")).toBe("http://127.0.0.1:41000");
+      expect(args.join(" ")).not.toContain(token);
+    }
+  });
+});
+
 describe("stages built by each node from a pinned GGUF", () => {
   const modelIdentity = `sha256:${"7".repeat(64)}`;
   const source = (executor: "torch" | "llama-cpp" = "llama-cpp") => ({

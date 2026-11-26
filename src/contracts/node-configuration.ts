@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createPublicKey } from "node:crypto";
 import { DEFAULT_NODE_WORK_POLICY, nodeWorkPolicySchema } from "./node-work-policy.js";
+import { nodeArtifactSeedConfigurationSchema } from "./artifact-seed.js";
 
 export const MYCELLIOS_NODE_CONFIGURATION_SCHEMA = "mycellios-node-configuration/1" as const;
 
@@ -65,6 +66,8 @@ export const nodeConfigurationSchema = z.object({
     maxTemperatureC: z.number().int().min(40).max(110),
   }).strict(),
   policy: nodeWorkPolicySchema.optional(),
+  /** Owner opt-in: offer verified stage blobs to planned peers (specs/artifact-seed-nodes). */
+  artifactSeed: nodeArtifactSeedConfigurationSchema.optional(),
   isolation: z.discriminatedUnion("mode", [
     z.object({
       mode: z.literal("windows-job-object"),

@@ -50,6 +50,13 @@ export function mergeCurrentSessionEvidence(
 ): WorkerCapabilities {
   const sanitized = stripWorkerDeclaredEvidence(incoming);
   if (!current) return sanitized;
+  // Delta seed heartbeats omit an unchanged digest list; keep only an exact match.
+  const seed = sanitized.artifactSeed;
+  if (seed && seed.verifiedBlobSha256s === undefined
+      && current.artifactSeed?.inventoryRevision === seed.inventoryRevision
+      && current.artifactSeed.verifiedBlobSha256s !== undefined) {
+    sanitized.artifactSeed = { ...seed, verifiedBlobSha256s: [...current.artifactSeed.verifiedBlobSha256s] };
+  }
   if (!sameBuildIdentity(sanitized, current)) {
     // A build-cohort change is a new executable claim even when the transport
     // session and deployment identifiers were reused. Coordinator-observed

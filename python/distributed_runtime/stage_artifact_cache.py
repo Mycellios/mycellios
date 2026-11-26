@@ -18,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from .stage_seed_source import StageSeedSource
 from .stage_artifact import (
     STAGE_ARTIFACT_MANIFEST,
     SafeTensorsStageArtifact,
@@ -155,9 +156,12 @@ class StageArtifactCache:
         root: str | os.PathLike[str],
         *,
         limits: StageArtifactCacheLimits | None = None,
+        seed: StageSeedSource | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         self.limits = limits or StageArtifactCacheLimits()
+        # Optional planned peer seed; the origin stays authoritative fallback.
+        self._seed = seed
         self.root.mkdir(parents=True, exist_ok=True)
         if not self.root.is_dir() or self.root.is_symlink():
             raise StageArtifactCacheError(
@@ -448,6 +452,18 @@ class StageArtifactCache:
                     downloaded_bytes=0,
                     resumed_from_bytes=0,
                     reused=True,
+                )
+            if source_kind == "http" and self._acquire_from_seed(
+                object_path, digest=digest, expected_size=expected_size
+            ):
+                return CachedStageObject(
+                    path=logical_path,
+                    role=role,
+                    sha256=digest,
+                    size_bytes=expected_size,
+                    downloaded_bytes=expected_size,
+                    resumed_from_bytes=0,
+                    reused=False,
                 )
             part_path, state_path = self._partial_paths(digest)
             state = self._load_or_create_partial(
@@ -852,6 +868,34 @@ class StageArtifactCache:
             output_handle.flush()
             os.fsync(output_handle.fileno())
 
+    def _acquire_from_seed(
+        self,
+        object_path: Path,
+        *,
+        digest: str,
+        expected_size: int,
+    ) -> bool:
+        """Ask the planned seed first; any failure leaves the origin route."""
+
+        if self._seed is None:
+            return False
+        try:
+            if not self._seed.fetch(digest, expected_size):
+                return False
+            # The worker verified the bytes; verify them again before use.
+            self._verify_existing_object(
+                object_path, digest=digest, expected_size=expected_size
+            )
+            return True
+        except StageArtifactIntegrityError:
+            try:
+                object_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return False
+        except Exception:
+            return False
+
     def _verify_existing_object(
         self,
         path: Path,
@@ -998,10 +1042,11 @@ def prepare_stage_artifact(
     destination: str | os.PathLike[str] | None = None,
     expected_package_id: str | None = None,
     limits: StageArtifactCacheLimits | None = None,
+    seed: StageSeedSource | None = None,
 ) -> StageArtifactAcquisition:
     """Prepare and verify a native stage directory before creating StageRunner."""
 
-    return StageArtifactCache(cache_root, limits=limits).acquire(
+    return StageArtifactCache(cache_root, limits=limits, seed=seed).acquire(
         manifest_source,
         destination=destination,
         expected_package_id=expected_package_id,
@@ -1268,6 +1313,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=int,
         default=default_limits.max_package_bytes,
     )
+    # Loopback worker endpoint; its token comes only from the environment.
+    acquire.add_argument("--seed-endpoint")
 
     cleanup = subparsers.add_parser(
         "cleanup", help="remove one exact package or unreferenced digest"
@@ -1293,6 +1340,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             destination=args.destination,
             expected_package_id=args.expected_package_id,
             limits=limits,
+            seed=StageSeedSource.from_environment(args.seed_endpoint),
         )
     else:
         cache = StageArtifactCache(args.cache_root)

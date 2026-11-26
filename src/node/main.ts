@@ -40,6 +40,7 @@ import { probeLlamaCppEngineRuntimeProfile } from "../worker/llama-cpp-engine-pr
 import { createNodeMemoryEmbeddingReplica, trackStageActivity, type MemoryEmbeddingNodeReplica } from "./memory-embedding-replica.js";
 import { MemoryEmbeddingArtifactStore } from "./memory-embedding-artifact.js";
 import { measureCacheDiskBytes } from "./cache-disk-usage.js";
+import { seedOnlyExecutor, startNodeArtifactSeed, type NodeArtifactSeed } from "./artifact-seed-node.js";
 
 const configPath = argument("--config") ?? defaultNodeConfigurationPath();
 const allowLegacyMigration = process.argv.includes("--confirm-legacy-migration");
@@ -102,6 +103,7 @@ process.on("message", (message: unknown) => {
 });
 process.once("disconnect", stopForSupervisor);
 let governor: NodeResourceGovernor | null = null;
+let artifactSeed: NodeArtifactSeed | undefined;
 let commandClientAbort: AbortController | null = null;
 let commandClient: Promise<void> | null = null;
 let failure: unknown = null;
@@ -114,19 +116,27 @@ try {
     componentInUseLease = await acquireComponentInUseLease(componentLifecycle.storageRoot, ["python-product"]);
     environment.pythonPath = componentInUseLease.roots["python-product"]!;
   }
-  const accelerator = config.runtime.executionBackend === "cpu" ? undefined : await prepareNativeNodeAccelerator({
+  // Seed transfers (specs/artifact-seed-nodes). A seed-only node never probes
+  // or launches the Python runtime; it only verifies and serves stored blobs.
+  artifactSeed = await startNodeArtifactSeed(config);
+  const seedOnly = artifactSeed.seedOnly;
+  const seedPeer = artifactSeed.peer;
+  if (!seedOnly) environment.artifactSeedEndpoint = () => seedPeer.requesterEndpoint();
+  const accelerator = seedOnly || config.runtime.executionBackend === "cpu" ? undefined : await prepareNativeNodeAccelerator({
     configPath,
     pythonProductPath: environment.pythonPath,
     installRoot: dirname(dirname(config.runtime.pythonExecutable)),
     allowProvisioning: false,
   });
   if (accelerator) environment = activateNativeNodeAccelerator(environment, accelerator);
-  const runtime = await createNativeNodeRuntime(environment);
+  const runtime: Omit<Awaited<ReturnType<typeof createNativeNodeRuntime>>, "physicalProbe" | "acceleration"> & {
+    physicalProbe?: Awaited<ReturnType<typeof createNativeNodeRuntime>>["physicalProbe"];
+  } = seedOnly ? { executor: seedOnlyExecutor(config) } : await createNativeNodeRuntime(environment);
   if (config.runtime.transport === "relay-only") runtime.executor.directTransport = { enabled: false };
   // Distributed stages have priority: the memory embedding replica yields before one prepares or starts.
   const stageActivity = trackStageActivity(runtime.executor.launchAgent, async () => { await memoryReplica?.yieldToStage(); });
   runtime.executor.launchAgent = stageActivity.agent;
-  const device = runtime.verifiedGpuRuntime ? runtime.physicalProbe.devices[0] : undefined;
+  const device = runtime.verifiedGpuRuntime ? runtime.physicalProbe?.devices[0] : undefined;
   const detectedVramMiB = device
     ? Math.floor(Math.min(device.totalMemoryBytes, device.runtimeTotalMemoryBytes) / (1024 * 1024))
     : 0;
@@ -135,7 +145,7 @@ try {
     : Math.max(512, Math.floor(config.limits.maxRamMiB / 2));
   const workerConfig = loadWorkerConfig(environment.configPath);
   // Operator memory embeddings start here only on demand from this node's owner (specs/memory-embedding-qwen06).
-  memoryReplica = createNodeMemoryEmbeddingReplica({
+  memoryReplica = seedOnly ? null : createNodeMemoryEmbeddingReplica({
     nodeId: config.nodeId, coordinatorUrl: environment.coordinatorUrl, cachePath: config.runtime.cachePath,
     workspace: join(host.stateDirectory, "memory-embedding-replica"), pythonExecutable: environment.pythonExecutable,
     pythonPath: environment.pythonPath, windowsJobBrokerExecutable: environment.windowsJobBrokerExecutable,
@@ -167,12 +177,13 @@ try {
   }, {
     coordinatorUrl: environment.coordinatorUrl,
     offeredHostMemoryBytes: () => config.limits.maxRamMiB * 1024 * 1024,
+    artifactSeed: seedPeer,
     identity: { kind: "device", id: config.nodeId },
     admissionSigner,
     beforeSignedAdmission: (input) => enrollmentBootstrap.redeem(input),
     reconnect: true,
     advertiseDeployment: false,
-    nativeReplica: memoryReplica,
+    nativeReplica: memoryReplica ?? undefined,
     agentVersion: version,
     ...(runtimeMetadata.buildIdentity ? { buildIdentity: runtimeMetadata.buildIdentity } : {}),
     ...(runtime.verifiedGpuRuntime ? { verifiedGpuRuntime: runtime.verifiedGpuRuntime } : {}),
@@ -185,7 +196,8 @@ try {
       ...(runtime.verifiedGpuRuntime?.backend === "directml" && runtime.preferredHardwareGpu.vendor === "intel" ? { sharedMemoryMb: detectedVramMiB, unifiedMemory: true } : {}),
     } } : {}),
     distributedExecutor: runtime.executor,
-    runtimePerformanceProfileProbe: () => probeRuntimePerformanceProfile({
+    // A seed-only node claims no runtime performance; its probes would start Python.
+    ...(seedOnly ? {} : { runtimePerformanceProfileProbe: () => probeRuntimePerformanceProfile({
       pythonExecutable: environment.pythonExecutable,
       pythonPath: [environment.pythonPath],
       backend: runtime.verifiedGpuRuntime?.backend ?? "cpu",
@@ -204,7 +216,7 @@ try {
         cwd: process.cwd(),
         env: { HF_HOME: environment.cachePath },
       })
-      : undefined,
+      : undefined }),
     contributionControl: {
       initialEnabled: controlState.contributionEnabled && !controlState.draining,
       onRemoteChange: async (enabled) => { await controlStore.setContributionEnabled(enabled); },
@@ -238,18 +250,21 @@ try {
   const commandApplicator = new NodeCommandApplicator(agent, controlStore, store, config, componentLifecycle ?? undefined, uninstall);
   if (controlState.draining) await commandApplicator.restoreDrain();
   await host.writeHealth("ready", config.revision);
-  await writeNodeDiagnosticSnapshot(
-    join(host.stateDirectory, "diagnostics.json"),
-    buildNodeDiagnosticSnapshot({
-      config,
-      version,
-      state: "ready",
-      physicalProbe: runtime.physicalProbe,
-    }),
-  );
+  // A seed-only node has no physical runtime probe to describe.
+  if (runtime.physicalProbe) {
+    await writeNodeDiagnosticSnapshot(
+      join(host.stateDirectory, "diagnostics.json"),
+      buildNodeDiagnosticSnapshot({
+        config,
+        version,
+        state: "ready",
+        physicalProbe: runtime.physicalProbe,
+      }),
+    );
+  }
   snapshotResourceObserver.resetCpuBaseline();
   governor.start();
-  memoryReplica.start();
+  memoryReplica?.start();
   if (pendingComponentActivation && componentLifecycle) {
     await componentLifecycle.markActivationHealthy();
     pendingComponentActivation = false;
@@ -308,7 +323,7 @@ try {
               capturedAt: new Date().toISOString(),
               configRevision: currentConfig.config.revision,
               capacity: {
-                acceleratorCount: runtime.physicalProbe.devices.length,
+                acceleratorCount: runtime.physicalProbe?.devices.length ?? 0,
                 primaryAccelerator: device ? { name: device.name, totalMemoryMiB: detectedVramMiB,
                   offeredMemoryMiB: Math.min(detectedVramMiB, currentConfig.config.limits.maxVramMiB || detectedVramMiB) } : null,
               },
@@ -372,6 +387,7 @@ try {
   commandClientAbort?.abort();
   await commandClient?.catch(() => undefined);
   governor?.stop();
+  await artifactSeed?.stop().catch(() => undefined);
   await memoryReplica?.stop().catch(() => undefined);
   await agent?.stop().catch(() => undefined);
   await componentInUseLease?.release().catch(() => undefined);

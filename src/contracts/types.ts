@@ -3,6 +3,7 @@ import type { DeploymentCanaryEvidence } from "./deployment-canary.js";
 import type { NativeReplicaEvidence } from "./native-replica-evidence.js";
 import type { NativeBuildIdentity } from "./build-identity.js";
 import type { HostMemoryObservation } from "./host-memory.js";
+import type { ArtifactSeedObservation } from "./artifact-seed.js";
 import type { EngineRuntimeProfile } from "./engine-runtime-profile.js";
 export type WorkloadClass = "interactive" | "batch" | "benchmark";
 export type AdapterKind = "mycellios-native" | "kokoro" | "transcription" | "mycellios-pipeline" | "mock" | "embedding" | "decision";
@@ -217,6 +218,7 @@ export interface WorkerPhysicalIdentity {
 }
 export interface WorkerCapabilities {
     hostMemory?: HostMemoryObservation | undefined;
+    artifactSeed?: ArtifactSeedObservation | undefined;
     region: string;
     agentVersion: string;
     /** Exact sealed source identity. Missing only on legacy or development nodes. */

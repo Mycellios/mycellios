@@ -10,8 +10,13 @@ export function observeHostMemory(offeredBytes?: number): HostMemoryObservation 
   return observation.success ? observation.data : undefined;
 }
 
-/** Registration always stays compatible with coordinators predating this field. */
-export function withoutHostMemory<T extends { hostMemory?: unknown }>(capabilities: T): Omit<T, "hostMemory"> {
-  const { hostMemory: _observation, ...legacy } = capabilities;
+/**
+ * Registration always stays compatible with coordinators predating these
+ * optional heartbeat observations, and they never alter the signed identity.
+ */
+export function withoutDynamicObservations<T extends { hostMemory?: unknown; artifactSeed?: unknown }>(
+  capabilities: T,
+): Omit<T, "hostMemory" | "artifactSeed"> {
+  const { hostMemory: _observation, artifactSeed: _seed, ...legacy } = capabilities;
   return legacy;
 }

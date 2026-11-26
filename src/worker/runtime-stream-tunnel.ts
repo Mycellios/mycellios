@@ -168,6 +168,15 @@ const CONNECT_TIMEOUT_MS = 15_000;
 const MAX_SOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
 export const MAX_RUNTIME_STREAM_REPLAY_BYTES = 8 * 1024 * 1024;
 
+/** Loopback seed server reachable only through coordinator-authorized streams. */
+export interface ArtifactSeedTunnelService {
+  port: number;
+  /** Owner seeding enabled and not paused. */
+  active(): boolean;
+  /** Called with the tunnel's loopback client socket for each admitted stream. */
+  onIncoming(streamId: string, socket: Socket): void;
+}
+
 export interface RuntimeStreamTunnelOptions {
   /** Primarily configurable for deterministic memory-boundary tests. */
   maxReplayBytes?: number;
@@ -215,6 +224,9 @@ export class RuntimeStreamTunnel {
   private readonly completedTransportSnapshots: RuntimeStreamTransportSnapshot[] = [];
   private transportAvailable: boolean;
   private readonly runtimeLinkFailures: RuntimeLinkFailureEvidence[] = [];
+  private artifactSeedService: ArtifactSeedTunnelService | null = null;
+  /** Seed transfers outlive stage runtime resets; they end on their own. */
+  private readonly artifactSeedStreams = new Set<string>();
 
   constructor(
     private readonly nodeId: string,
@@ -242,7 +254,9 @@ export class RuntimeStreamTunnel {
         send: (type, payload) => this.sendEnvelope(type, payload),
         // Remapped APIs use the existing authenticated relay; a direct grant
         // must never reach the unrelated service on the original local port.
-        isTargetPortAuthorized: (targetPort) => this.allowedTargetPorts.has(targetPort) && !this.localApiPorts.has(targetPort),
+        isTargetPortAuthorized: (targetPort) => (this.allowedTargetPorts.has(targetPort) && !this.localApiPorts.has(targetPort))
+          || this.seedPortAuthorized(targetPort),
+        onDestinationSocket: (streamId, targetPort, socket) => this.attachArtifactSeedStream(streamId, targetPort, socket),
         onSourceCommitted: (streamId) => {
           const session = this.sessions.get(streamId);
           if (!session || session.transportMode !== "negotiating") return;
@@ -265,6 +279,45 @@ export class RuntimeStreamTunnel {
       },
       options.directTransport,
     );
+  }
+
+  /**
+   * Register this node's loopback seed port. Incoming streams may target it only
+   * while `active()` holds; the coordinator still authorizes every stream.
+   */
+  setArtifactSeedService(service: ArtifactSeedTunnelService | null): void {
+    this.artifactSeedService = service;
+  }
+
+  /**
+   * Requester side: open a coordinator-authorized runtime stream to a seed's
+   * loopback port over the existing relay or direct route, as a local socket.
+   */
+  async openArtifactSeedStream(destinationNodeId: string, targetPort: number): Promise<Socket> {
+    const server = createServer();
+    await listenLoopback(server);
+    try {
+      const accepted = new Promise<Socket>((resolve) => server.once("connection", resolve));
+      const client = await connectPreparedLoopback((server.address() as AddressInfo).port, CONNECT_TIMEOUT_MS,
+        new AbortController().signal, () => true);
+      const socket = await accepted;
+      this.openOutgoing(socket, destinationNodeId, targetPort, true);
+      return client;
+    } finally {
+      server.close();
+    }
+  }
+
+  /** The seed port is reachable only over a granted direct channel, never relay. */
+  private seedPortAuthorized(targetPort: number): boolean {
+    return this.artifactSeedService !== null && this.artifactSeedService.port === targetPort
+      && this.artifactSeedService.active();
+  }
+
+  private attachArtifactSeedStream(streamId: string, targetPort: number, socket: Socket): void {
+    if (!this.seedPortAuthorized(targetPort)) return;
+    this.artifactSeedStreams.add(streamId);
+    this.artifactSeedService!.onIncoming(streamId, socket);
   }
 
   startDirectTransport(): Promise<DirectTransportAdvertisement | null> {
@@ -348,6 +401,12 @@ export class RuntimeStreamTunnel {
       case "runtime.stream.opened": {
         const session = this.sessions.get(message.payload.streamId);
         if (!session || session.opened) return;
+        // A relay open means the coordinator would carry the bytes: a seed
+        // stream is abandoned instead and the requester uses its origin.
+        if (this.artifactSeedStreams.has(session.streamId)) {
+          this.closeSession(session.streamId, true, new Error("artifact_seed_direct_required"));
+          return;
+        }
         if (
           session.recovery
           && message.payload.generation === undefined
@@ -547,7 +606,9 @@ export class RuntimeStreamTunnel {
     const pending = [...this.pendingIncoming.values()];
     for (const opening of pending) opening.controller.abort();
     await Promise.allSettled(pending.map(opening => opening.finished));
-    for (const session of [...this.sessions.values()]) this.closeSession(session.streamId, true);
+    for (const session of [...this.sessions.values()]) {
+      if (!this.artifactSeedStreams.has(session.streamId)) this.closeSession(session.streamId, true);
+    }
     const servers = [...this.proxyServers];
     this.proxyServers.clear();
     await Promise.all(servers.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
@@ -563,12 +624,13 @@ export class RuntimeStreamTunnel {
     return (server.address() as AddressInfo).port;
   }
 
-  private openOutgoing(socket: Socket, destinationNodeId: string, targetPort: number): void {
+  private openOutgoing(socket: Socket, destinationNodeId: string, targetPort: number, artifactSeed = false): void {
     if (this.sessions.size + this.pendingIncoming.size >= MAX_STREAMS) {
       socket.destroy(new Error("runtime_stream_capacity_exceeded"));
       return;
     }
     const streamId = `${shortNodeId(this.nodeId)}-${randomUUID()}`;
+    if (artifactSeed) this.artifactSeedStreams.add(streamId);
     const recoveryToken = randomUUID();
     this.attachSocket(
       streamId,
@@ -1218,6 +1280,7 @@ export class RuntimeStreamTunnel {
 
   private closeSession(streamId: string, notify: boolean, error?: Error): void {
     const session = this.sessions.get(streamId);
+    this.artifactSeedStreams.delete(streamId);
     if (!session || !this.sessions.delete(streamId)) return;
     session.endedAt = Date.now();
     if (session.transportMode !== "direct") {

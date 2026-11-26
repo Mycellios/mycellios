@@ -14,6 +14,7 @@ import type { StoredWorker } from "../storage/store.js";
 import type { MeasuredModelActivationEvidence } from "./measured-model-activation.js";
 import { plannerScalesFromCoordinatorEvidence } from "../performance/runtime-profile.js";
 import { applyMeasuredRuntimePolicy } from "./measured-runtime-policy.js";
+import { collectFleetResourceEvidence } from "./fleet-resource-evidence.js";
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const catalogSchema = z.object({
@@ -154,7 +155,10 @@ export function buildMeasuredActivationCatalogEvidence(
     candidates.set(candidate.id, compilation);
   }
   if (candidates.size === 0 && unavailableRouteError) throw unavailableRouteError;
-  return { candidates, pythonExecutable: input.pythonExecutable, pythonPath: input.config.runtime.pythonPath,
+  // Spare seed-capable nodes join the role planner; selected devices keep their admission state.
+  const resourceContributions = collectFleetResourceEvidence({ workers: input.workers,
+    connectedWorkerIds: input.connectedWorkerIds, nowMs: now * 1_000, devices });
+  return { candidates, pythonExecutable: input.pythonExecutable, pythonPath: input.config.runtime.pythonPath, resourceContributions,
     candidateRuntimePolicies: new Map(row.candidates.filter(candidate => candidates.has(candidate.id))
       .map(candidate => [candidate.id, { stagePackageIdentities: candidate.stagePackageIdentities, tcpWriteChunkBytes: candidate.tcpWriteChunkBytes, independentParallelStartup: candidate.independentParallelStartup, rootStartupDelayMs: candidate.rootStartupDelayMs, prefillInflightChunks: candidate.prefillInflightChunks }])),
     candidateThreadsPerStage: new Map(row.candidates.filter(candidate =>
