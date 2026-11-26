@@ -298,7 +298,7 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   [data-window-buttons="darwin"] { --rk-rail-width: 72px; }
 }
 /* Below 768px the rail is hidden, so a top row that starts at the window edge clears the macOS
-   window buttons itself (12px inset + 59px group + 7px). */
+   window buttons itself (7px inset + 59px group + 12px). */
 @media (max-width: 767px) {
   [data-window-buttons="darwin"] .rk-window-buttons-clear { padding-inline-start: 78px; }
 }

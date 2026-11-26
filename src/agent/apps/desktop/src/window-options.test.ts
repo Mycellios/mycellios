@@ -12,7 +12,7 @@ describe("desktop window chrome", () => {
     const opts = browserWindowOptions("darwin");
     expect(opts.frame).toBe(true);
     expect(opts.titleBarStyle).toBe("hidden");
-    expect(opts.trafficLightPosition).toEqual({ x: 12, y: 19 });
+    expect(opts.trafficLightPosition).toEqual({ x: 7, y: 19 });
   });
 
   it("uses the standard native title bar on Windows and Linux", () => {

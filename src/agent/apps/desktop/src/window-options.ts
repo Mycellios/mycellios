@@ -11,11 +11,12 @@ export function warmWindowTtlMs(value: string | undefined) {
 
 /**
  * The macOS window buttons are drawn over the page, so their position is a layout value. macOS
- * spaces the three 13px buttons 23px apart, so the group is 59px wide: x 12 keeps it inside the
- * 72px page rail (`--rk-rail-width` on macOS), and y 19 puts its centre line on the centre of the
- * 51px top row, (51 - 13) / 2. Change these with that rail and row.
+ * spaces the three 13px buttons 23px apart, so the group is 59px wide: x 7 centres it in the 72px
+ * page rail (`--rk-rail-width` on macOS), (72 - 59) / 2, so the last button clears the rail's
+ * 1px border instead of touching it, and y 19 puts its centre line on the centre of the 51px top
+ * row, (51 - 13) / 2. Change these with that rail and row.
  */
-export const MAC_WINDOW_BUTTON_INSET = { x: 12, y: 19 } as const;
+export const MAC_WINDOW_BUTTON_INSET = { x: 7, y: 19 } as const;
 
 function windowChrome(platform: NodeJS.Platform) {
   const mac = platform === "darwin";
