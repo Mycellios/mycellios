@@ -835,6 +835,8 @@ export async function sendThreadMessage(
      * the turn it starts name them, while `actor` (the Mico's owner) owns and pays for both.
      */
     author?: string;
+    /** sha256 of the owner's sign-in session that sent it (specs/agent-chrome-tabs). */
+    browserSessionKey?: string;
   },
   releaseTakeover?: (runId: string) => Promise<void>,
   beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>,
@@ -928,6 +930,7 @@ export async function sendThreadMessage(
           replyQuote,
           clientNonce: input.clientNonce,
           authorUserId,
+          browserSessionKey: input.browserSessionKey,
         });
         const activeRuns = await tx.run.findMany({
           where: {

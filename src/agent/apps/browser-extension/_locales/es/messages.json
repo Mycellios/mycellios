@@ -15,5 +15,14 @@
   "themeSystem": { "message": "Sistema" },
   "discreet": { "message": "Modo discreto" },
   "signInTitleDiscreet": { "message": "Inicia sesión para continuar" },
-  "unavailableTitleDiscreet": { "message": "No se puede conectar" }
+  "unavailableTitleDiscreet": { "message": "No se puede conectar" },
+  "shareTabsOff": { "message": "Las pestañas no se comparten" },
+  "shareTabsOn": { "message": "Compartir pestañas" },
+  "shareTabsStop": { "message": "Dejar de compartir" },
+  "shareTabsSharing": { "message": "Compartiendo pestañas" },
+  "shareTabsConnecting": { "message": "Conectando…" },
+  "shareTabsStandby": { "message": "Compartiendo desde otra ventana" },
+  "shareTabsSignedOut": { "message": "Inicia sesión para compartir pestañas" },
+  "shareTabsOffline": { "message": "Reconectando…" },
+  "shareTabsDetail": { "message": "Los Micos de los chats que empieces desde este navegador pueden ver los títulos y las direcciones de tus pestañas abiertas. No pueden leer ni usar tus páginas. Las ventanas de incógnito nunca se comparten." }
 }

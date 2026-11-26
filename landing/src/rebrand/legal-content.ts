@@ -103,7 +103,7 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   kind: "privacy",
   title: "Mycellios Privacy Policy",
-  updated: "25 November 2026",
+  updated: "26 November 2026",
   intro:
     "This policy explains what personal data Mycellios processes, why, who receives it and the choices you have. It covers the website, the Agent workspace, the Chrome extension, the Desktop and Android apps, the API and the compute network.",
   sections: [
@@ -119,7 +119,8 @@ export const PRIVACY: LegalDocument = {
     ] },
     { id: "chrome-extension", heading: "Chrome extension", paragraphs: [
       "The extension checks whether you have a Mycellios session and displays the hosted Agent workspace in Chrome’s side panel. Sign-in opens on Mycellios in a separate browser tab.",
-      "The extension’s site access is limited to www.mycellios.com. It does not read the contents of other sites, your tabs or your browsing history. Account information and anything you enter into Agent through the panel are handled as described in this policy.",
+      "The extension’s site access is limited to www.mycellios.com. It does not read the contents of other sites or your browsing history. Account information and anything you enter into Agent through the panel are handled as described in this policy.",
+      "Tab sharing is off by default. If you turn on Share tabs in the panel, Chrome asks you to allow the extension to see your tabs. While a Mycellios panel is open, the titles and addresses (without query strings or fragments) of your open tabs, excluding incognito windows, can be sent to Mycellios when a Mico in a chat you started from that browser lists them. They are handled as part of that conversation, including by the model provider that runs the Mico. The extension does not read page contents. Stop sharing, or remove the permission in Chrome, ends it at once.",
       "Our use of data obtained through the extension complies with the Chrome Web Store User Data Policy, including its Limited Use requirements.",
     ] },
     { id: "use", heading: "How we use it", list: [

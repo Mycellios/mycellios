@@ -101,7 +101,10 @@ function fixture({
   routines = [] as { name: string; prompt: string }[],
   connectedApps = [] as string[],
   pcAppControl,
+  chromeTabs,
 }: {
+  /** The browser that sent the source message (sessionKey) and whether it shares tabs now. */
+  chromeTabs?: { sessionKey?: string; shared: boolean };
   /** A connected PC whose environment reports the owner's app control opt-in (or not). */
   pcAppControl?: boolean;
   /** Apps connected through Composio. */
@@ -238,6 +241,10 @@ function fixture({
   let outsideSteering = false;
   let offeredTools: string[] = [];
   const appControl = vi.fn(async () => ({ ok: true, confirmed: true, data: {} }));
+  const chromeTabsClient = {
+    available: vi.fn(async () => chromeTabs?.shared === true),
+    list: vi.fn(async () => ({ tabs: [{ tab: "t7", title: "Laptop", url: "https://shop.example/laptop", active: true, audible: false }], omitted: 0 })),
+  };
   const prisma = {
     botSkillPin: { findMany: vi.fn(async () => []) },
 
@@ -306,7 +313,7 @@ function fixture({
     message: {
       findFirst: vi.fn(async () => null),
       findUnique: vi.fn(async () =>
-        sourceRole ? { role: sourceRole, blocks: [{ kind: "text", text: prompt }] } : null,
+        sourceRole ? { role: sourceRole, blocks: [{ kind: "text", text: prompt }], ...(chromeTabs?.sessionKey ? { browserSessionKey: chromeTabs.sessionKey } : {}) } : null,
       ),
       findMany: vi.fn(async () => []),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -483,6 +490,7 @@ function fixture({
         catalog ? resolveCatalogCall(call, catalogEntries([tool])) : undefined,
       execute,
     },
+    ...(chromeTabs ? { chromeTabs: chromeTabsClient } : {}),
     sandbox: {
       describe: () => ({ capabilities: { graphical: false } }),
       ...(pcAppControl === undefined
@@ -543,6 +551,7 @@ function fixture({
     },
     offeredTools: () => offeredTools,
     appControl,
+    chromeTabsClient,
     cancelAtInstructionCommit() {
       transactionalPrisma.$queryRaw.mockImplementation(async (...values: unknown[]) => {
         if (String(values[0]).includes("FROM threads")) run.status = "cancelled";
@@ -2380,6 +2389,43 @@ vi.mock("@mycellios/db", async (load) => ({
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));
+
+describe("the owner's shared Chrome tabs", () => {
+  const key = "a".repeat(64);
+  it("lists tabs only for the owner's turn from the browser that shares them", async () => {
+    const on = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true } });
+    on.setCalls([{ name: "chrome_tabs", args: {}, executionId: "call-1" }]);
+    await on.run();
+    expect(on.offeredTools()).toContain("chrome_tabs");
+    expect(on.chromeTabsClient.available).toHaveBeenCalledWith({ userId: expect.any(String), sessionKey: key }, expect.anything());
+    expect(on.chromeTabsClient.list).toHaveBeenCalledWith({ userId: expect.any(String), sessionKey: key }, expect.anything());
+    expect(JSON.stringify(on.results)).toContain("shop.example/laptop");
+    expect(on.results.some(isApprovalPausedResult)).toBe(false);
+  });
+
+  it("is not offered when that browser is not sharing or the message came from elsewhere", async () => {
+    const notSharing = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: false } });
+    await notSharing.run();
+    expect(notSharing.offeredTools()).not.toContain("chrome_tabs");
+    const otherDevice = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", chromeTabs: { shared: true } });
+    await otherDevice.run();
+    expect(otherDevice.offeredTools()).not.toContain("chrome_tabs");
+    expect(otherDevice.chromeTabsClient.available).not.toHaveBeenCalled();
+  });
+
+  it.each(["routine", "webhook", "messaging", "agent_task"])("is never offered to a %s run", async (trigger) => {
+    const f = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", trigger, chromeTabs: { sessionKey: key, shared: true } });
+    await f.run();
+    expect(f.offeredTools()).not.toContain("chrome_tabs");
+    expect(f.chromeTabsClient.available).not.toHaveBeenCalled();
+  });
+
+  it("is not offered when the Mico disabled it", async () => {
+    const f = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", disabledBuiltinTools: ["chrome_tabs"], chromeTabs: { sessionKey: key, shared: true } });
+    await f.run();
+    expect(f.offeredTools()).not.toContain("chrome_tabs");
+  });
+});
 
 describe("app control on the owner's PC", () => {
   it("offers PC app tools only when the connected PC reports the owner's opt-in", async () => {

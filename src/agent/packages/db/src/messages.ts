@@ -83,6 +83,8 @@ export interface CreateThreadMessageInput {
   allowCancelledRun?: boolean;
   /** The Space member who wrote a user message in their conversation with a shared Mico. */
   authorUserId?: string;
+  /** sha256 of the owner's sign-in session that sent it (specs/agent-chrome-tabs). */
+  browserSessionKey?: string;
 }
 
 export async function createThreadMessage(prisma: PrismaClient, input: CreateThreadMessageInput) {
@@ -131,6 +133,7 @@ export async function createThreadMessageInTransaction(
       runId: input.runId,
       clientNonce: input.clientNonce,
       ...(input.authorUserId ? { authorUserId: input.authorUserId } : {}),
+      ...(input.browserSessionKey && input.role === "user" && !input.authorUserId ? { browserSessionKey: input.browserSessionKey } : {}),
     },
   });
 }

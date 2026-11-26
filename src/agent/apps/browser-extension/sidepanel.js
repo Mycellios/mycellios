@@ -1,6 +1,8 @@
 // Opens the hosted Mycellios Agent in the side panel. The hosted app's CSP lets only this
 // extension's origin frame it; sign-in happens in a normal tab because the identity pages refuse
 // to be framed, and the panel picks up the shared session once it exists.
+import { startSharing } from "./tabs-bridge.js";
+
 const AGENT_ORIGIN = "https://www.mycellios.com";
 const AGENT_URL = `${AGENT_ORIGIN}/agent/app`;
 const SESSION_URL = `${AGENT_ORIGIN}/agent/api/auth/get-session`;
@@ -78,6 +80,8 @@ discreet.addEventListener("change", saveAppearance);
 systemDark.addEventListener("change", applyAppearance);
 window.addEventListener("storage", event => {
   if (event.key === appearanceKey || event.key === null) loadAppearance();
+  // Another panel turned sharing on or off for this profile.
+  if ((event.key === "mycellios.panel.shareTabs" || event.key === null) && !shareStrip.hidden) syncSharing();
 });
 app.addEventListener("load", sendAppearance);
 loadAppearance();
@@ -119,7 +123,86 @@ function showApp() {
   notice.hidden = true;
   if (!app.src) app.src = AGENT_URL;
   app.hidden = false;
+  shareStrip.hidden = false;
+  syncSharing();
 }
+
+// Tab sharing (specs/agent-chrome-tabs): off until the person turns it on in this browser
+// profile. The choice is kept here; the connection exists only while a panel is open.
+const shareKey = "mycellios.panel.shareTabs";
+const shareStrip = document.getElementById("tabs-share");
+const shareStatus = document.getElementById("tabs-share-status");
+const shareToggle = document.getElementById("tabs-share-toggle");
+const shareDetail = document.getElementById("tabs-share-detail");
+const shareLabels = {
+  connecting: "shareTabsConnecting",
+  sharing: "shareTabsSharing",
+  standby: "shareTabsStandby",
+  "signed-out": "shareTabsSignedOut",
+  offline: "shareTabsOffline",
+};
+let stopSharing = null;
+
+function shareChosen() {
+  try {
+    return localStorage.getItem(shareKey) === "on";
+  } catch {
+    return false;
+  }
+}
+
+function chooseSharing(on) {
+  try {
+    if (on) localStorage.setItem(shareKey, "on");
+    else localStorage.removeItem(shareKey);
+  } catch {
+    // Without storage the choice lasts while this panel is open.
+  }
+}
+
+function showShareState(state) {
+  const on = state !== "off";
+  root.toggleAttribute("data-sharing", state === "sharing" || state === "standby");
+  shareStatus.textContent = t(on ? shareLabels[state] : "shareTabsOff");
+  shareToggle.textContent = t(on ? "shareTabsStop" : "shareTabsOn");
+  shareToggle.classList.toggle("secondary", on);
+  shareDetail.hidden = on;
+  chrome.action.setBadgeText({ text: state === "sharing" ? "•" : "" }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ color: "#2f7d4f" }).catch(() => {});
+}
+
+async function syncSharing() {
+  const wanted = shareChosen() && await chrome.permissions.contains({ permissions: ["tabs"] }).catch(() => false);
+  if (wanted && !stopSharing) {
+    stopSharing = startSharing(showShareState);
+  } else if (!wanted && stopSharing) {
+    const stop = stopSharing;
+    stopSharing = null;
+    await stop();
+  }
+  if (!wanted) showShareState("off");
+}
+
+shareToggle.addEventListener("click", async () => {
+  if (stopSharing || shareChosen()) {
+    chooseSharing(false);
+    const stop = stopSharing;
+    stopSharing = null;
+    showShareState("off");
+    await stop?.({ revoke: true });
+    return;
+  }
+  // Chrome's own prompt explains the tabs permission; it needs this click's user gesture.
+  const granted = await chrome.permissions.request({ permissions: ["tabs"] }).catch(() => false);
+  if (!granted) return;
+  chooseSharing(true);
+  await syncSharing();
+});
+chrome.permissions.onRemoved.addListener(({ permissions = [] }) => {
+  if (!permissions.includes("tabs")) return;
+  chooseSharing(false);
+  syncSharing();
+});
 
 function stopPolling() {
   if (pollTimer !== null) clearInterval(pollTimer);

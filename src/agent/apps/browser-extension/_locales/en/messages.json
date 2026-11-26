@@ -15,5 +15,14 @@
   "themeSystem": { "message": "System" },
   "discreet": { "message": "Discreet mode" },
   "signInTitleDiscreet": { "message": "Sign in to continue" },
-  "unavailableTitleDiscreet": { "message": "Unable to connect" }
+  "unavailableTitleDiscreet": { "message": "Unable to connect" },
+  "shareTabsOff": { "message": "Tabs are not shared" },
+  "shareTabsOn": { "message": "Share tabs" },
+  "shareTabsStop": { "message": "Stop sharing" },
+  "shareTabsSharing": { "message": "Sharing tabs" },
+  "shareTabsConnecting": { "message": "Connecting…" },
+  "shareTabsStandby": { "message": "Sharing from another window" },
+  "shareTabsSignedOut": { "message": "Sign in to share tabs" },
+  "shareTabsOffline": { "message": "Reconnecting…" },
+  "shareTabsDetail": { "message": "Micos in chats you start from this browser can see the titles and addresses of your open tabs. They cannot read or use your pages. Incognito windows are never shared." }
 }

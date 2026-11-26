@@ -36,6 +36,7 @@ import { withResponseLanguage } from "../response-language.js";
 import { retryThreadRun } from "../retry-thread-run.js";
 import { threadEventStream } from "../thread-event-stream.js";
 import { stopWorkForThread } from "../work-controls.js";
+import { browserSessionKey } from "../browser-tabs-relay.js";
 import {
   cancelQueuedMessageEdit,
   deleteQueuedMessageNow,
@@ -269,6 +270,7 @@ export function threadsRoutes(ctx: RouterContext) {
           {
             ...input,
             responseLocale: context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined,
+            browserSessionKey: ownerBrowserSession(context),
           },
           target.kind === "bot"
             ? (runId) => releaseComputerControl(deps, context.actor, target.botId, "done", runId)
@@ -440,6 +442,7 @@ export function threadsRoutes(ctx: RouterContext) {
             ),
             trigger: "follow_up",
             clientNonce: input.clientNonce,
+            browserSessionKey: ownerBrowserSession(context),
           });
           if (sent.taskId && sent.runId) {
             await deps.jobs.enqueue(runContinueJob(sent.runId)).catch((error) => {
@@ -750,4 +753,13 @@ export function threadsRoutes(ctx: RouterContext) {
     },
     ...micoPinRoutes(ctx),
   };
+}
+
+/**
+ * The owner's own sign-in session that sent a message: only that browser's shared Chrome
+ * tabs can reach the turn (specs/agent-chrome-tabs). Space members never share tabs.
+ */
+function ownerBrowserSession(context: { sessionId?: string; spaceRole?: string }): string | undefined {
+  if (!context.sessionId || (context.spaceRole !== undefined && context.spaceRole !== "owner")) return undefined;
+  return browserSessionKey(context.sessionId);
 }
