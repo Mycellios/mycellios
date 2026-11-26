@@ -1,7 +1,7 @@
 {
   "name": "@mycellios/desktop",
   "productName": "Mycellios Desktop",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "author": {
     "name": "Mycellios"
   },
@@ -54,7 +54,10 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "../../scripts/mycellios-cli.mjs", "to": "cli/mycellios-cli.mjs" },
+      {
+        "from": "../../scripts/mycellios-cli.mjs",
+        "to": "cli/mycellios-cli.mjs"
+      },
       {
         "from": "../web/dist",
         "to": "web"
