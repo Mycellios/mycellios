@@ -767,9 +767,7 @@ function formatRosterTime(isoDate?: string | null): string {
       d.getDate() === now.getDate() &&
       d.getMonth() === now.getMonth() &&
       d.getFullYear() === now.getFullYear();
-    if (isToday) {
-      return d.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
-    }
+    if (isToday) return rosterTimeFormat(locale, "time").format(d);
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
     const isYesterday =
@@ -778,13 +776,29 @@ function formatRosterTime(isoDate?: string | null): string {
       d.getFullYear() === yesterday.getFullYear();
     if (isYesterday) return t`Yesterday`;
     const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays < 7) {
-      return d.toLocaleDateString(locale, { weekday: "short" });
-    }
-    return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+    if (diffDays < 7) return rosterTimeFormat(locale, "weekday").format(d);
+    return rosterTimeFormat(locale, "date").format(d);
   } catch {
     return "";
   }
+}
+
+const ROSTER_TIME_OPTIONS = {
+  time: { hour: "numeric", minute: "2-digit" },
+  weekday: { weekday: "short" },
+  date: { month: "short", day: "numeric" },
+} satisfies Record<string, Intl.DateTimeFormatOptions>;
+const rosterTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** One formatter per locale and kind: building an Intl formatter for every row is costly. */
+function rosterTimeFormat(locale: string, kind: keyof typeof ROSTER_TIME_OPTIONS) {
+  const key = `${locale}\u0000${kind}`;
+  let format = rosterTimeFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, ROSTER_TIME_OPTIONS[kind]);
+    rosterTimeFormats.set(key, format);
+  }
+  return format;
 }
 
 /** A Mico row's hover card part: its conversations as already loaded, never read on hover. */
