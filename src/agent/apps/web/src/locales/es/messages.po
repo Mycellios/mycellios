@@ -16009,5 +16009,5 @@ msgstr "Número máximo de pasadas"
 msgid "Use a separate browser"
 msgstr "Usar un navegador separado"
 
-msgid "Needs a managed isolated computer. Each run starts signed out."
-msgstr "Requiere un ordenador aislado gestionado. Cada ejecución empieza sin sesión iniciada."
+msgid "Runs on an isolated server computer. Each run starts signed out."
+msgstr "Se ejecuta en un ordenador aislado del servidor. Cada ejecución empieza sin sesión iniciada."

@@ -188,7 +188,13 @@ ship alone. Phase 4 needs phase 2's signed URLs; phase 6 needs phase 3.
    - An output step can post its text to a messaging channel that the workflow's
      Mico already uses, or notify the owner.
    - An opted-in routine can use a headless Chromium on its managed isolated
-     Docker computer. Its execution fence owns a temporary profile, which
+     Docker computer. A new routine run in its own conversation uses a private
+     server Pi workspace when the Mico normally uses This PC or a shared computer.
+     It pins that workspace before selecting the model and preserves the Mico's
+     normal assignment. A resumed run keeps its original workspace. This routing
+     requires Docker page tools and refuses tasks requiring linked PC resources.
+     Signed webhook runs retain their separate tool policy.
+     Its execution fence owns a temporary profile, which
      starts signed out and closes at attempt cleanup or after fifteen minutes.
      Ordinary browser and screen tools keep their existing interactive scope.
 6. Phase 6 — run callbacks (optional).

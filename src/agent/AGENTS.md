@@ -622,7 +622,11 @@
   silently open another tab when that target is gone. Update the API, supervisor
   and computer image together. Verify the supervisor, helper, and browser handoff tests.
   A routine can opt into a headless browser only in its own conversation on a managed
-  isolated Docker computer. The run fence keys a separate Chromium user-data directory.
+  isolated Docker computer. Fresh routine runs that would use This PC or a shared
+  computer pin a private server workspace under the run lease and use a server Pi
+  model. The Mico keeps its computer assignment. Resumes keep the recorded workspace.
+  Verify offline-cloud-workspace tests for assignment, ownership, and forbidden fallbacks.
+  The run fence keys a separate Chromium user-data directory.
   Close it before releasing the lease and retain the helper lifetime cap after disconnects.
   Keep saved login, upload, desktop focus and download actions outside that browser.
   Qualify the supervisor fence and prove cookie/storage separation and cleanup in Chromium.
