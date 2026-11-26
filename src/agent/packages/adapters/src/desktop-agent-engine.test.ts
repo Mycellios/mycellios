@@ -47,12 +47,12 @@ it("continues a saved approval checkpoint once while preserving the parent run i
   for await (const _ of engine.run(input)) {}
   const resumed = { ...input, turnCheckpoint: "server-owned-approval-checkpoint" };
   for await (const _ of engine.run(resumed)) {}
-  expect(start).toHaveBeenCalledTimes(2);
+  expect(start).toHaveBeenCalledTimes(1);
   expect(new Set(starts).size).toBe(1);
   engine = createDesktopAgentEngine(root, () => scope, start);
   await expect(async () => { for await (const _ of engine.run(resumed)) {} }).rejects.toThrow("already finished");
   await expect(async () => { for await (const _ of engine.run(input)) {} }).rejects.toThrow("already finished");
-  expect(start).toHaveBeenCalledTimes(2);
+  expect(start).toHaveBeenCalledTimes(1);
 });
 
 it("signs a CLI in only under the PC's account scope, with the command discovery reads", async () => {

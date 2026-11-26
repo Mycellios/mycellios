@@ -234,16 +234,20 @@ describe("the PC's bound on native CLI processes", () => {
     expect(slots.state).toEqual({ running: 0, waiting: 0 });
   }, 40_000);
 
-  it("shares one bound of six across every run a Desktop starts", async () => {
+  it("reuses the Desktop runtime within a scope and shares one bound of six across scopes", async () => {
     const root = await folder("mycellios-desktop-bound-");
-    const scope = "e".repeat(64);
+    let scope = "e".repeat(64);
     const seen: NativeProcessSlots[] = [];
     const engine = createDesktopAgentEngine(root, () => scope, (_directory, _authorized, slots) => {
       seen.push(slots);
       return { describe: () => new ScriptedAgentRuntime().describe(), abort: async () => undefined, async *run() { yield { type: "done" as const }; } };
     });
     for (const conversation of ["a", "b"])
-      for await (const _ of engine.run(request("claude", conversation, async () => ({ content: "" })))) { /* drain */ }
+      expect((await collect(engine, request("claude", conversation, async () => ({ content: "" })))).at(-1)?.type).toBe("done");
+    expect(seen).toHaveLength(1);
+
+    scope = "f".repeat(64);
+    expect((await collect(engine, request("claude", "c", async () => ({ content: "" })))).at(-1)?.type).toBe("done");
     expect(seen).toHaveLength(2);
     expect(seen[0]).toBe(seen[1]);
     expect(seen[0]!.limit).toBe(6);

@@ -39,6 +39,10 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
   const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) => new NativeAgentRuntime({
     dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots, storeRoot, engineUpdates: updates,
   }));
+  let current: { scope: string; runtime: AgentRuntime } | undefined;
+  const releaseIdleNativeProcesses = async () => {
+    await current?.runtime.releaseIdleNativeProcesses?.();
+  };
   async function engineState(): Promise<NativeEngineState> {
     const scope = accessScope();
     if (!scope || !/^[a-f0-9]{64}$/.test(scope)) return { engines: [], signedOut: [] };
@@ -63,6 +67,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
   }
   return {
     describe: () => new PiAgentRuntime().describe(),
+    releaseIdleNativeProcesses,
     async nativeEngines() {
       return (await engineState()).engines;
     },
@@ -73,6 +78,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       if (!scope || !/^[a-f0-9]{64}$/.test(scope)) throw Error("Desktop account access is unavailable");
       const request = NativeEngineAccountRequestSchema.parse(input);
       const command = await nativeEngineCommand(request.engine, path.join(profile, "agent-executor", scope), { ...store, storeRoot });
+      if (request.engine === "codex") await releaseIdleNativeProcesses();
       if (accessScope() !== scope) throw Error("Desktop account changed before signing in");
       return nativeEngineAccount(request, command, accountHost);
     },
@@ -95,6 +101,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
         if (accessScope() !== scope) throw Error("Desktop account changed before installing");
       };
       authorize();
+      if (engine === "codex") await releaseIdleNativeProcesses();
       // The download goes on after this answer; its progress and outcome come with the engines.
       if (version) {
         // Only the version this PC offers, verified like a first install before any turn runs it.
@@ -132,7 +139,14 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
         throw Error("Desktop could not record ownership of this run");
       }
       if (accessScope() !== scope || context?.signal?.aborted) throw Error("Desktop account changed before execution");
-      const runtime = makeRuntime(directory, () => accessScope() === scope, processSlots), localId = hash([scope, request.runId]);
+      if (current?.scope !== scope) {
+        const previous = current;
+        current = { scope, runtime: makeRuntime(directory, () => accessScope() === scope, processSlots) };
+        await previous?.runtime.releaseIdleNativeProcesses?.();
+      }
+      if (accessScope() !== scope || current.scope !== scope || context?.signal?.aborted)
+        throw Error("Desktop account changed before execution");
+      const runtime = current.runtime, localId = hash([scope, request.runId]);
       active.set(request.runId, { runtime, localId });
       let completed = false;
       try {

@@ -222,6 +222,10 @@ export class NativeAgentProcess {
     if (!this.failure && !this.child.stdin.destroyed)
       this.child.stdin.write(`${JSON.stringify(message)}\n`);
   }
+  get reusable() {
+    return !this.failure && !this.stopping && !this.pending.size && !this.child.stdin.destroyed &&
+      this.child.exitCode === null && this.child.signalCode === null;
+  }
   request<T>(method: string, params: unknown, timeoutMs = 30000): Promise<T> {
     if (this.failure) return Promise.reject(this.failure);
     const id = ++this.sequence;

@@ -522,6 +522,15 @@
   Desktop dispatch and continuation turns; do not substitute an API model or
   lower reasoning effort to simulate speed. Verify native-codex-settings and
   native-agent-runtime regression tests.
+  Publish live Codex reasoning activity only for the active thread and turn.
+  Forward one content-free status per turn through existing progress events; keep
+  reasoning fragments on the host and outside the first-response timing.
+  Verify stale notification rejection and delivery through the Desktop host.
+  Keep one idle Codex process for up to 30 seconds, scoped to its authorized
+  account, Space, Mico, conversation and exact runtime binding. Retain its process
+  slot, clear it on host disable/account changes, and reject retired turn events.
+  Verify native runtime, Desktop engine and process-slot regressions. Use the
+  opt-in VERIFY_CODEX_REUSE live check for first activity and first text.
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
