@@ -12,7 +12,7 @@ import { inboundRoutineBlock } from "@mycellios/core";
 import { approvalEffectKey, toolEffectIdempotencyKey } from "@mycellios/core/node/approval-effect-key";
 import type { PrismaClient } from "@mycellios/db";
 import { createPendingSteeringRun, sendUserMessage } from "@mycellios/db";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isApprovalPausedResult } from "./approval-effect.js";
 import { MAX_SHARED_MEMORY_CHARS } from "./builtin-tools.js";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
@@ -104,7 +104,7 @@ function fixture({
   chromeTabs,
 }: {
   /** The browser that sent the source message (sessionKey) and whether it shares tabs now. */
-  chromeTabs?: { sessionKey?: string; shared: boolean };
+  chromeTabs?: { sessionKey?: string; shared: boolean; read?: boolean };
   /** A connected PC whose environment reports the owner's app control opt-in (or not). */
   pcAppControl?: boolean;
   /** Apps connected through Composio. */
@@ -242,7 +242,8 @@ function fixture({
   let offeredTools: string[] = [];
   const appControl = vi.fn(async () => ({ ok: true, confirmed: true, data: {} }));
   const chromeTabsClient = {
-    available: vi.fn(async () => chromeTabs?.shared === true),
+    available: vi.fn(async () => ({ tabs: chromeTabs?.shared === true, read: chromeTabs?.shared === true && chromeTabs.read === true })),
+    snapshot: vi.fn(async () => ({ page: { title: "Laptop", url: "https://shop.example/laptop", text: "Price 900", truncated: false } })),
     list: vi.fn(async () => ({ tabs: [{ tab: "t7", title: "Laptop", url: "https://shop.example/laptop", active: true, audible: false }], omitted: 0 })),
   };
   const prisma = {
@@ -2390,7 +2391,11 @@ vi.mock("@mycellios/db", async (load) => ({
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));
 
+const pageRoute = vi.hoisted(() => ({ value: "third_party" as "own" | "managed" | "third_party" }));
+vi.mock("./chrome-page-route.js", () => ({ chromePageRoute: () => pageRoute.value }));
+
 describe("the owner's shared Chrome tabs", () => {
+  afterEach(() => { pageRoute.value = "third_party"; });
   const key = "a".repeat(64);
   it("lists tabs only for the owner's turn from the browser that shares them", async () => {
     const on = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true } });
@@ -2418,6 +2423,32 @@ describe("the owner's shared Chrome tabs", () => {
     await f.run();
     expect(f.offeredTools()).not.toContain("chrome_tabs");
     expect(f.chromeTabsClient.available).not.toHaveBeenCalled();
+  });
+
+  it("reads a page only from a browser that advertises reading", async () => {
+    const off = fixture({ name: "chrome_snapshot", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true } });
+    await off.run();
+    expect(off.offeredTools()).toContain("chrome_tabs");
+    expect(off.offeredTools()).not.toContain("chrome_snapshot");
+  });
+
+  it("reads a page through the browser without an approval card on the person's own model", async () => {
+    pageRoute.value = "own";
+    const f = fixture({ name: "chrome_snapshot", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true, read: true } });
+    f.setCalls([{ name: "chrome_snapshot", args: { tab: "t7" }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.offeredTools()).toContain("chrome_snapshot");
+    expect(f.chromeTabsClient.snapshot).toHaveBeenCalledWith({ userId: expect.any(String), sessionKey: key }, "t7", expect.anything());
+    expect(JSON.stringify(f.results)).toContain("Price 900");
+    expect(f.results.some(isApprovalPausedResult)).toBe(false);
+  });
+
+  it("never reads pages for a model served by unidentified sellers or the network", async () => {
+    pageRoute.value = "third_party";
+    const f = fixture({ name: "chrome_snapshot", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true, read: true } });
+    await f.run();
+    expect(f.offeredTools()).toContain("chrome_tabs");
+    expect(f.offeredTools()).not.toContain("chrome_snapshot");
   });
 
   it("is not offered when the Mico disabled it", async () => {

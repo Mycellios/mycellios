@@ -585,6 +585,7 @@ import { WORK_PLAN_TOOL, workPlanBlock } from "./work-continuation.js";
 import { createWebProvider } from "./web-provider-factory.js";
 import { webFetchFromTool, webSearchFromTool } from "./web-tools.js";
 import type { BrowserTabsClient } from "./browser-tabs-relay.js";
+import { chromePageRoute } from "./chrome-page-route.js";
 import { APP_CONTROL_TOOL_NAMES, appControlRequest } from "./app-control.js";
 import { readVideoFromTool, sharedVideoReader } from "./video-reader.js";
 import type { VideoReader } from "./video-reader.js";
@@ -662,6 +663,7 @@ const READ_ONLY_AGENT_TOOLS = new Set([
   "pc_windows",
   "pc_snapshot",
   "chrome_tabs",
+  "chrome_snapshot",
   "command_status",
   "work_status",
   "computer_observe",
@@ -4905,9 +4907,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           sourceMessage?.role === "user" && sourceMessage.browserSessionKey
             ? { userId: run.userId, sessionKey: sourceMessage.browserSessionKey }
             : undefined;
-        const chromeTabsAllowed = chromeTabsScope !== undefined &&
-          await deps.chromeTabs!.available(chromeTabsScope, context.signal);
-        if (!chromeTabsAllowed) disabledBuiltinTools.add("chrome_tabs");
+        const chromeShared = chromeTabsScope !== undefined
+          ? await deps.chromeTabs!.available(chromeTabsScope, context.signal)
+          : { tabs: false, read: false };
+        if (!chromeShared.tabs) disabledBuiltinTools.add("chrome_tabs");
+        // Page text from the person's signed-in browser goes only to their own provider or a
+        // contracted managed one, never to unidentified sellers or the contributor network.
+        const chromePageRouteClass = chromePageRoute({
+          agentEngine, provider: runModelProvider, modelId: runModelId,
+          ownCredential: resolved.ownCredential === true, baseUrl: resolved.baseUrl,
+          deploymentProvider: runDeployment?.provider,
+        });
+        const chromeReadAllowed = chromeShared.read && chromePageRouteClass !== "third_party" && !disabledBuiltinTools.has("chrome_snapshot");
+        if (!chromeReadAllowed) disabledBuiltinTools.add("chrome_snapshot");
         // The normal user takeover panel controls the assigned computer, not the
         // separate server workspace. Keep that control off this run.
         if (cloudComputer) disabledBuiltinTools.add("request_takeover");
@@ -6626,6 +6638,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
               output: outcome.error ? redactSecrets(outcome.error, runSecrets) : "",
               ...(outcome.bytes === undefined ? {} : { bytes: outcome.bytes }),
             });
+          if (name === "chrome_snapshot") {
+            if (!chromeTabsScope || !deps.chromeTabs || !chromeReadAllowed) return { error: "Reading Chrome pages is not available in this conversation." };
+            // A backup model can take over mid-turn; it never inherits the right to read pages.
+            const current = await deps.prisma.run.findUnique({ where: { id: run.id }, select: { modelProvider: true, modelId: true } });
+            if (current?.modelProvider && runModelProvider && (current.modelProvider !== runModelProvider || current.modelId !== runModelId))
+              return { error: "This turn moved to a backup model, which may not read the person's pages. Ask them to check the page or try again later." };
+            const tab = typeof args.tab === "string" && /^t\d{1,12}$/.test(args.tab) ? args.tab : undefined;
+            if (!tab) return { error: "chrome_snapshot needs tab, as chrome_tabs lists it (for example t123)." };
+            return deps.chromeTabs.snapshot(chromeTabsScope, tab, context.signal);
+          }
           if (name === "chrome_tabs") {
             if (!chromeTabsScope || !deps.chromeTabs) return { error: "Chrome tabs are not shared with this conversation." };
             return deps.chromeTabs.list(chromeTabsScope, context.signal);

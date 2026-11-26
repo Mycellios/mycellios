@@ -20,6 +20,8 @@ export const BROWSER_TABS_LEASE_MS = 90_000;
 const POLL_WAIT_MS = 25_000;
 const MAX_OPERATIONS = 4;
 const OPERATION_TIMEOUT_MS = 20_000;
+/** Reading a page may wait for the person to answer the site question in the panel. */
+const SNAPSHOT_TIMEOUT_MS = 90_000;
 
 export type BrowserTabsErrorCode = "chrome_not_shared" | "chrome_busy" | "chrome_uncertain";
 export class BrowserTabsError extends Error {
@@ -169,9 +171,13 @@ export class BrowserTabsBroker {
     if (registration) this.drop(registration, "revoked");
   }
 
-  dispatch(owner: BrowserTabsOwner, request: BrowserTabsRequest, signal: AbortSignal, timeoutMs = OPERATION_TIMEOUT_MS): Promise<BrowserTabsResult> {
+  dispatch(owner: BrowserTabsOwner, request: BrowserTabsRequest, signal: AbortSignal, timeoutMs = request.op === "snapshot" ? SNAPSHOT_TIMEOUT_MS : OPERATION_TIMEOUT_MS): Promise<BrowserTabsResult> {
     const registration = this.live(owner);
-    if (!registration || registration.capabilities.tabs !== 1) return Promise.reject(new BrowserTabsError("chrome_not_shared", NOT_SHARED));
+    if (!registration || registration.capabilities.tabs !== 1 || (request.op === "snapshot" && registration.capabilities.read !== 1))
+      return Promise.reject(new BrowserTabsError("chrome_not_shared", NOT_SHARED));
+    // One operation per tab: a second read of the same tab waits for the person's first answer.
+    if (request.op === "snapshot" && [...registration.operations.values()].some(item => item.request.op === "snapshot" && item.request.tab === request.tab))
+      return Promise.reject(new BrowserTabsError("chrome_busy", "This tab is already being read. Wait for that result.", 429));
     if (registration.operations.size >= MAX_OPERATIONS)
       return Promise.reject(new BrowserTabsError("chrome_busy", "Chrome is busy with other requests. Try again in a moment.", 429));
     return new Promise<BrowserTabsResult>((resolve, reject) => {
@@ -219,6 +225,20 @@ export const verifyBrowserTabs = verifyDesktopRelay;
 export type ChromeTabsListResult =
   | { tabs: { tab: string; title: string; url: string; active: boolean; audible: boolean }[]; omitted: number }
   | { error: string; code: string };
+export type ChromeSnapshotResult =
+  | { page: { title: string; url: string; text: string; truncated: boolean } }
+  | { error: string; code: string };
+const FAILURE_TEXT: Record<string, string> = {
+  tabs_permission_missing: "Chrome has not granted the tabs permission. Ask the person to turn Share tabs on again in the Mycellios side panel.",
+  declined: "The person declined reading this site. Do not ask to read it again in this turn unless they say so.",
+  consent_timeout: "The person did not answer the question about reading this site in the Mycellios side panel. Ask them in the chat before trying again.",
+  refused_site: "This site is never read in the person's Chrome (Mycellios itself, the Chrome Web Store or a password manager).",
+  not_web_page: "Only http(s) pages can be read.",
+  tab_gone: "That tab is closed or not shared. Call chrome_tabs again.",
+  tab_changed: "The tab moved to another site while the person answered. Call chrome_tabs again.",
+  not_scriptable: "Chrome did not let the extension read this page.",
+  unsupported: "The Mycellios extension in that Chrome cannot do this yet. Ask the person to update it.",
+};
 
 /** Worker side: probe and run operations for the browser that sent the owner's message. */
 export function browserTabsClient(url: string, key: string) {
@@ -231,40 +251,49 @@ export function browserTabsClient(url: string, key: string) {
       body, signal, redirect: "error",
     });
   };
+  const operation = async (scope: BrowserTabsOwner, request: BrowserTabsRequest, signal: AbortSignal, timeoutMs: number) => {
+    let response: Response;
+    try {
+      response = await post({ scope, request }, AbortSignal.any([signal, AbortSignal.timeout(timeoutMs + 5_000)]));
+    } catch (error) {
+      if (signal.aborted) throw error;
+      return { error: UNCERTAIN, code: "chrome_uncertain" } as const;
+    }
+    const value = await response.json().catch(() => null) as { result?: BrowserTabsResult; error?: unknown; code?: unknown } | null;
+    if (!response.ok || !value?.result) {
+      const code = typeof value?.code === "string" ? value.code : "chrome_not_shared";
+      return { error: typeof value?.error === "string" ? value.error : NOT_SHARED, code } as const;
+    }
+    const result = value.result;
+    if ("error" in result) return { error: FAILURE_TEXT[result.error] ?? NOT_SHARED, code: result.error } as const;
+    return result;
+  };
   return {
-    /** Whether that browser shares tabs now. No answer counts as not sharing. */
-    async available(scope: BrowserTabsOwner, signal: AbortSignal): Promise<boolean> {
+    /** Whether that browser shares tabs now, and can read pages. No answer counts as not sharing. */
+    async available(scope: BrowserTabsOwner, signal: AbortSignal): Promise<{ tabs: boolean; read: boolean }> {
       try {
         const response = await post({ scope, probe: "tabs" }, AbortSignal.any([signal, AbortSignal.timeout(1_500)]));
         if (!response.ok) {
           await response.body?.cancel();
-          return false;
+          return { tabs: false, read: false };
         }
-        return ((await response.json()) as { available?: unknown }).available === true;
+        const value = (await response.json()) as { available?: unknown; read?: unknown };
+        return { tabs: value.available === true, read: value.available === true && value.read === true };
       } catch {
-        return false;
+        return { tabs: false, read: false };
       }
     },
+    async snapshot(scope: BrowserTabsOwner, tab: string, signal: AbortSignal): Promise<ChromeSnapshotResult> {
+      const result = await operation(scope, { op: "snapshot", tab }, signal, SNAPSHOT_TIMEOUT_MS);
+      if ("page" in result) return { page: result.page };
+      if ("error" in result) return result;
+      return { error: "Unexpected answer from Chrome.", code: "unsupported" };
+    },
     async list(scope: BrowserTabsOwner, signal: AbortSignal): Promise<ChromeTabsListResult> {
-      let response: Response;
-      try {
-        response = await post({ scope, request: { op: "list" } }, AbortSignal.any([signal, AbortSignal.timeout(OPERATION_TIMEOUT_MS + 5_000)]));
-      } catch (error) {
-        if (signal.aborted) throw error;
-        return { error: UNCERTAIN, code: "chrome_uncertain" };
-      }
-      const value = await response.json().catch(() => null) as { result?: BrowserTabsResult; error?: unknown; code?: unknown } | null;
-      if (!response.ok || !value?.result) {
-        const code = typeof value?.code === "string" ? value.code : "chrome_not_shared";
-        return { error: typeof value?.error === "string" ? value.error : NOT_SHARED, code };
-      }
-      const result = value.result;
-      if ("error" in result) {
-        return result.error === "tabs_permission_missing"
-          ? { error: "Chrome has not granted the tabs permission. Ask the person to turn Share tabs on again in the Mycellios side panel.", code: result.error }
-          : { error: NOT_SHARED, code: result.error };
-      }
-      return result;
+      const result = await operation(scope, { op: "list" }, signal, OPERATION_TIMEOUT_MS);
+      if ("tabs" in result) return result;
+      if ("error" in result) return result;
+      return { error: "Unexpected answer from Chrome.", code: "unsupported" };
     },
   };
 }

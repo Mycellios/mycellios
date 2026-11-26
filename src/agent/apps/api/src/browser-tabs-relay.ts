@@ -57,7 +57,7 @@ export function mountBrowserTabsRelay(
     if (replay.has(input.nonce) || replay.size >= 10_000) return c.json({ error: "Duplicate request" }, 409);
     replay.set(input.nonce, Date.now() + 60_000);
     if (!deps.enabled) return c.json({ available: false }, 404);
-    if (input.probe) return c.json({ available: broker.available(input.scope, input.probe) });
+    if (input.probe) return c.json({ available: broker.available(input.scope, "tabs"), read: broker.available(input.scope, "read") });
     try {
       return c.json({ result: await broker.dispatch(input.scope, input.request!, c.req.raw.signal) });
     } catch (error) {

@@ -8,6 +8,8 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "pc_snapshot",
   // Titles and addresses of the owner's own shared Chrome tabs; nothing leaves the account.
   "chrome_tabs",
+  // Reading a page asks the person in their browser for every new site (browser consent).
+  "chrome_snapshot",
   "browser_navigate",
   "browser_snapshot",
   "browser_act",

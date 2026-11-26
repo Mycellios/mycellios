@@ -1,6 +1,10 @@
 # Micos working in the person's Chrome tabs
 
-Status: phase 1 (sharing and tab list) implemented. Deviations from this design:
+Status: phases 1 (sharing and tab list) and 2 (reading pages, `chrome_snapshot`)
+implemented. Phase 2 asks for site consent inside the extension (the operation waits
+up to 75 s for the person) instead of through a run waiting state, and does not yet
+add tab groups or the page overlay. Owner decision for open question 1: pages are
+read only on the person's own providers or contracted managed routes. Deviations from this design:
 the registration is keyed by account and sign-in session, not by Space (the panel
 chooses no Space and only the owner's own runs reach it), and the session key is
 recorded on the owner's message (`messages.browserSessionKey`) rather than on the

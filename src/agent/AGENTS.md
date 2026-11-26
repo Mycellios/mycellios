@@ -1833,8 +1833,13 @@
   Agent account preference. Accept live visual overrides only from the exact
   approved extension origin and the parent window. Keep the existing host
   permissions, signing IDs and normal web/Desktop appearance.
-- Chrome tab sharing follows specs/agent-chrome-tabs; phase 1 only lists tabs
-  (`chrome_tabs`). It is off by default, needs the optional `tabs` permission and
+- Chrome tab sharing follows specs/agent-chrome-tabs: `chrome_tabs` lists tabs and
+  `chrome_snapshot` reads one page. Reading asks in the panel for every site the
+  browser has not allowed (once/always/deny, armed after 500 ms; once removes the
+  grant), refuses Mycellios, the Web Store and password managers before injecting,
+  and hides secret/payment values. Offer `chrome_snapshot` only on the person's own
+  provider or a contracted managed route (`chromePageRoute`), never on free or other
+  AntSeed sellers, the contributor network or after a backup model takes over. It is off by default, needs the optional `tabs` permission and
   an open side panel, and connects one panel per profile through a Web Lock.
   Bridge routes accept only the exact extension origins plus
   `x-mycellios-extension: 1`, send no CORS grant and never send code. Offer the

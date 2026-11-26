@@ -1,8 +1,13 @@
-// Chrome tab sharing (specs/agent-chrome-tabs, phase 1: tab list only). Runs in the side
+// Chrome tab sharing (specs/agent-chrome-tabs, phases 1-2: tab list and page reading). Runs in the side
 // panel document, so tabs are shared only while a Mycellios panel is open and the strip shows
 // it. One panel per profile holds the connection through a Web Lock; the others stand by.
 // The server sends JSON operations only; this file never runs code it receives.
+import { snapshotPage } from "./page-agent.js";
+import { refusedPage } from "./sensitive.js";
+
 const API = "https://www.mycellios.com/agent/api/browser-tabs";
+/** A whole snapshot, in characters, before it is cut with `truncated`. */
+const SNAPSHOT_LIMIT = 48_000;
 const LOCK = "mycellios-browser-tabs";
 const MAX_TABS = 50;
 const TITLE_MAX = 200;
@@ -65,8 +70,42 @@ export async function listTabs() {
   return { tabs: listed, omitted };
 }
 
-async function run(request) {
+/**
+ * Reads one tab. A site this browser has not allowed asks the person in the panel first
+ * (`ask` resolves "once", "always" or "deny"); "once" removes the site's access again after
+ * reading. Nothing the server sends can skip that question.
+ */
+export async function snapshotTab(handle, ask) {
+  const id = typeof handle === "string" && /^t\d{1,12}$/.test(handle) ? Number(handle.slice(1)) : NaN;
+  const tab = Number.isSafeInteger(id) ? await chrome.tabs.get(id).catch(() => null) : null;
+  if (!tab || tab.incognito || !tab.url) return { error: "tab_gone" };
+  const refused = refusedPage(tab.url);
+  if (refused) return { error: refused };
+  const origin = new URL(tab.url).origin;
+  const origins = [`${origin}/*`];
+  let once = false;
+  if (!(await chrome.permissions.contains({ origins }))) {
+    const answer = await ask({ site: new URL(tab.url).host, origins });
+    if (answer === "timeout") return { error: "consent_timeout" };
+    if (answer !== "once" && answer !== "always") return { error: "declined" };
+    once = answer === "once";
+  }
+  try {
+    const [injection] = await chrome.scripting.executeScript({ target: { tabId: id }, func: snapshotPage, args: [SNAPSHOT_LIMIT] });
+    const page = injection?.result;
+    // The tab may have moved to another site while the person answered.
+    if (!page || typeof page.href !== "string" || refusedPage(page.href) || new URL(page.href).origin !== origin) return { error: "tab_changed" };
+    return { page: { title: page.title, url: tabAddress(page.href), text: page.text, truncated: page.truncated === true } };
+  } catch {
+    return { error: "not_scriptable" };
+  } finally {
+    if (once) await chrome.permissions.remove({ origins }).catch(() => {});
+  }
+}
+
+async function run(request, ask) {
   if (request?.op === "list") return listTabs();
+  if (request?.op === "snapshot") return snapshotTab(request.tab, ask);
   return { error: "unsupported" };
 }
 
@@ -76,11 +115,11 @@ const pause = (ms, signal) => new Promise((resolve) => {
 });
 
 /**
- * Starts sharing for this panel. `onState` receives "connecting", "sharing", "standby" (another
+ * Starts sharing for this panel. `ask` puts a site question in front of the person. `onState` receives "connecting", "sharing", "standby" (another
  * panel holds the connection), "signed-out" or "offline". Returns a stop function; `revoke`
  * also tells the server to drop this browser at once (Stop sharing).
  */
-export function startSharing(onState) {
+export function startSharing(onState, ask) {
   const controller = new AbortController();
   const { signal } = controller;
   let generation = null;
@@ -93,7 +132,7 @@ export function startSharing(onState) {
       generation = crypto.randomUUID();
       onState("connecting");
       try {
-        const registered = await post("register", { generation, capabilities: { tabs: 1 } }, signal);
+        const registered = await post("register", { generation, capabilities: { tabs: 1, read: 1 } }, signal);
         if (registered.status === 401) {
           onState("signed-out");
           await pause(30_000, signal);
@@ -111,7 +150,7 @@ export function startSharing(onState) {
           if (!response.ok) throw new Error("poll");
           const { operations = [] } = await response.json();
           await Promise.all(operations.map(async ({ id, request }) => {
-            const result = await run(request).catch(() => ({ error: "unsupported" }));
+            const result = await run(request, ask).catch(() => ({ error: "unsupported" }));
             await post("result", { generation, id, result }, signal).catch(() => {});
           }));
         }
