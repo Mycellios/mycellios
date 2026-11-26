@@ -251,10 +251,10 @@ export function ChatModelPicker({
               group.length ? <div key={index} className={`flex flex-col items-center gap-1 ${index ? "mt-1 border-t border-border pt-2" : ""}`}>
                 {group.map((name) => {
                   const native = index === 1;
-                  const label = native ? `${name} · ${t`This PC`}` : name;
+                  // The accessible name stays the provider; the tooltip and the mark say it runs on this PC.
                   return <Button key={name} type="button" size="sm" variant={activeProvider === name ? "secondary" : "ghost"}
                     className="relative h-8 w-8 shrink-0 rounded-md p-0"
-                    aria-pressed={activeProvider === name} aria-label={label} title={label}
+                    aria-pressed={activeProvider === name} aria-label={name} title={native ? `${name} · ${t`This PC`}` : name}
                     onClick={() => { setProvider(name); onProviderChange?.(name); setQuery(""); }}>
                     <ProviderLogo name={name} providerId={providerIds?.[name]} />
                     {native ? <Monitor aria-hidden size={10} strokeWidth={2.4} className="absolute -end-0.5 -bottom-0.5 rounded-sm bg-background p-px text-muted-foreground" /> : null}
