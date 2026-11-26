@@ -372,7 +372,8 @@ async function initFixture(label: string) {
   return { profile, updates, jobs, launch };
 }
 
-it("retries a launcher that Windows could not initialize, in a fresh job folder", async () => {
+// Windows exit codes are 32-bit; POSIX truncates 0xC0000142 to 8 bits.
+it.runIf(process.platform === "win32")("retries a launcher that Windows could not initialize, in a fresh job folder", async () => {
   const fixture = await initFixture("init");
   try {
     const counter = path.join(fixture.profile, "attempts.txt");
@@ -394,7 +395,7 @@ setTimeout(()=>{},1000);`;
   }
 }, 30_000);
 
-it("does not retry a launcher that failed after starting, and bounds init retries", async () => {
+it.runIf(process.platform === "win32")("does not retry a launcher that failed after starting, and bounds init retries", async () => {
   const fixture = await initFixture("noretry");
   try {
     const exit = (code: number) => ({ executable: process.execPath, args: () => ["-e", `process.exit(${code})`] });
