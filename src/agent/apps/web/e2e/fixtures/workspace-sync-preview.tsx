@@ -60,11 +60,20 @@ window.fetch = async (resource, init) => {
   else if (path === "workflows/create") { value = { ...input, version: 1, active: false, nextRunAt: null, updatedAt: stamp }; flows.push(value); }
   else if (path === "workflows/save") { value = { ...input, version: input.expectedVersion + 1, nextRunAt: null, updatedAt: stamp }; flows = flows.map(flow => flow.id === value.id ? value : flow); }
   else if (path === "workflows/execute") {
+    const flow = flows.find(flow => flow.id === input.id);
+    const summary = flow?.name === "Summarize a text";
     value = workflowExecution = {
-      id: "fixture-execution", workflowId: input.id, version: input.expectedVersion, status: "running",
-      steps: { review: { status: "running", approval: { state: "waiting", message: "Review the result" } } },
+      id: "fixture-execution", workflowId: input.id, version: input.expectedVersion, triggerId: input.triggerId,
+      status: summary ? "completed" : "running",
+      steps: summary
+        ? { start: { status: "completed" }, input: { status: "completed", output: "Synthetic text" },
+            mico: { status: "completed", output: "Synthetic summary" }, output: { status: "completed" } }
+        : { review: { status: "running", approval: { state: "waiting", message: "Review the result" } } },
       error: null, createdAt: stamp, updatedAt: stamp,
     };
+  }
+  else if (path === "workflows/restart" && workflowExecution) {
+    value = workflowExecution = { ...workflowExecution, id: "fixture-restart", status: "queued" };
   }
   else if (path === "workflows/decideApproval" && workflowExecution) {
     value = workflowExecution = {
