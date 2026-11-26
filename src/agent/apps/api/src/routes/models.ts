@@ -68,9 +68,6 @@ import { createMycelliosAccountCache, createMycelliosModelsCache } from "../myce
 /** Bounds the quota rail's wait for a subscription token renewal. */
 const PLAN_LIMITS_RENEWAL_TIMEOUT_MS = 8_000;
 
-/** Bounds the quota rail's wait for a subscription token renewal. */
-const PLAN_LIMITS_RENEWAL_TIMEOUT_MS = 8_000;
-
 export function modelsRoutes(ctx: RouterContext) {
   const {
     deps,
