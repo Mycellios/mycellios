@@ -512,7 +512,7 @@ export function RoutineEditor({
       </label>
       <label className="mt-5 flex items-start gap-2 text-sm">
         <Switch checked={draft.isolatedBrowser ?? false} onCheckedChange={isolatedBrowser => onChange({ ...draft, isolatedBrowser, ...(isolatedBrowser ? { runIn: "thread" as const } : {}) })} />
-        <span>{t`Use a separate browser`} <span className="block text-xs text-muted-foreground">{t`Needs a managed isolated computer. Each run starts signed out.`}</span></span>
+        <span>{t`Use a separate browser`} <span className="block text-xs text-muted-foreground">{t`Runs on an isolated server computer. Each run starts signed out.`}</span></span>
       </label>
       {draft.runIn ? (
         <label className="mt-5 flex items-center gap-2 text-sm">
