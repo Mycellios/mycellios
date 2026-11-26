@@ -737,13 +737,13 @@
   Start a cold same-Space history read at roster selection and consume its fresh,
   scoped result in the incoming shell. Keep writes, auth recovery and realtime
   direct. Reuse fresh model and account queries within their existing scope.
-  The Projects sidebar warms up to twelve conversations across its folders with
-  two concurrent background reads in the destination Space after visible history
-  settles. The intended folder gets the first two slots, then other folders
-  receive a turn before older conversations. Hover or focus prioritizes a folder.
-  On the default startup route, the authenticated bootstrap starts the scoped
-  Projects list and warms only the last opened project conversation once listed.
-  The sidebar reuses both reads. Store only the conversation ID.
+  Projects warm up to twelve conversations across folders with two concurrent
+  background reads per account and Space. On the default route this starts when
+  authenticated bootstrap retrieves the Projects list, while the shell mounts.
+  The remembered conversation leads the initial queue. The sidebar takes over
+  the same queue without restarting in-flight reads, prioritizing the intended
+  folder's first two slots before giving the other folders a turn. Store only
+  the conversation ID.
   Pointer and keyboard intent can warm another row. Reuse the same memory-only
   snapshot and never mark a conversation read until it is opened. Verify the
   preload limit and folder changes with SidebarProjects.test.tsx.
