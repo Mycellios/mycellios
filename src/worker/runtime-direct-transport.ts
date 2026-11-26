@@ -106,6 +106,8 @@ interface DirectRecord {
 export interface RuntimeDirectTransportCallbacks {
   send(type: string, payload: unknown): boolean | void;
   isTargetPortAuthorized(targetPort: number): boolean;
+  /** Destination loopback socket connected for an accepted direct stream. */
+  onDestinationSocket?(streamId: string, targetPort: number, socket: Socket): void;
   onSourceCommitted(streamId: string): void;
   onSourceFailed(streamId: string, error: Error): void;
   onSourceClosed(streamId: string, error?: Error): void;
@@ -502,6 +504,7 @@ export class RuntimeDirectTransport {
         ),
       ]);
       if (stream.id !== offer.streamId) throw new Error("direct_stream_identity_mismatch");
+      this.callbacks.onDestinationSocket?.(offer.streamId, grant.targetPort, socket);
       const record = this.createRecord({
         streamId: offer.streamId,
         role: "destination",

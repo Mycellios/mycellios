@@ -58,6 +58,11 @@ export interface StageArtifactPreparationOptions {
     executable: string,
     args: readonly string[],
   ) => Promise<string>;
+  /**
+   * Optional loopback endpoint of this worker's artifact seed requester. The
+   * stage cache asks it before an HTTP origin and re-verifies every blob.
+   */
+  artifactSeed?: () => Promise<{ url: string; token: string }>;
   /** Verification is independent of compilation and never materializes tensors. */
   localPackageVerifierRunner?: (executable: string, args: readonly string[]) => Promise<string>;
   /**
@@ -268,23 +273,16 @@ export async function prepareNodeStageArtifacts(
         throw new Error("stage_artifact_compiler_returned_wrong_model_identity");
       }
       requirePinnedStageArtifactIdentity(process, prepared);
+      const seed = options.artifactSeed ? await options.artifactSeed().catch(() => null) : null;
+      const cacheArgs = stageArtifactCacheArgs(resolve(options.cacheDirectory, "stage-cas"), prepared, seed?.url);
       const cacheResult = parseArtifactCacheResult(await (
         options.artifactCacheRunner
-          ? options.artifactCacheRunner(
-              options.pythonExecutable,
-              stageArtifactCacheArgs(
-                resolve(options.cacheDirectory, "stage-cas"),
-                prepared,
-              ),
-            )
-          : runCompiler(
-              options.pythonExecutable,
-              stageArtifactCacheArgs(
-                resolve(options.cacheDirectory, "stage-cas"),
-                prepared,
-              ),
-              options,
-            )
+          ? options.artifactCacheRunner(options.pythonExecutable, cacheArgs)
+          : runCompiler(options.pythonExecutable, cacheArgs, seed ? {
+              ...options,
+              // The token travels only in the child environment, never in argv.
+              environment: { ...options.environment, MYCELLIOS_ARTIFACT_SEED_TOKEN: seed.token },
+            } : options)
       ));
       if (
         cacheResult.package_id !== prepared.package_id
@@ -319,7 +317,9 @@ export async function prepareNodeStageArtifacts(
 function stageArtifactCacheArgs(
   cacheRoot: string,
   artifact: StageArtifactCompilerResult,
+  seedEndpoint?: string,
 ): string[] {
+  const seed = seedEndpoint ? ["--seed-endpoint", seedEndpoint] : [];
   return [
     "-u",
     "-m",
@@ -331,6 +331,7 @@ function stageArtifactCacheArgs(
     resolve(artifact.destination, STAGE_ARTIFACT_MANIFEST),
     "--expected-package-id",
     artifact.package_id,
+    ...seed,
   ];
 }
 

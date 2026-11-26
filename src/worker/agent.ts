@@ -32,7 +32,8 @@ import { SEALED_LEASES_HEADER, sealedLeaseSchema } from "../contracts/sealed-lea
 import { leaseOfferJob, sealingHello, type WorkerSealingKey } from "./sealed-lease-offer.js";
 import { sha256Text } from "../core/json.js";
 import { estimateInputTokens } from "../core/request.js";
-import { observeHostMemory, withoutHostMemory } from "./host-memory.js";
+import { observeHostMemory, withoutDynamicObservations } from "./host-memory.js";
+import { artifactSeedAgentMessageSchemas } from "./artifact-seed-peer.js";
 import { defaultWorkerIdentity } from "./default-identity.js";
 import { safeVramBudget } from "../core/tiers.js";
 import {
@@ -108,6 +109,8 @@ export interface WorkerAgentOptions {
   coordinatorUrl: string;
   /** Optional current host RAM offer, bounded by the persisted node policy. */
   offeredHostMemoryBytes?: () => number;
+  /** Owner opt-in blob seeding observation (specs/artifact-seed-nodes); paused nodes offer nothing. */
+  artifactSeed?: import("./artifact-seed-peer.js").ArtifactSeedPeer | undefined;
   networkToken?: string;
   heartbeatIntervalMs?: number;
   /** How often to probe the coordinator RTT with a WebSocket ping. */
@@ -505,6 +508,7 @@ const serverMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("runtime.checkpoint.restore.commit"),
     payload: activationCheckpointCommitSchema,
   }).strict(),
+  ...artifactSeedAgentMessageSchemas,
 ]);
 
 const registrationResponseSchema = z
@@ -618,6 +622,7 @@ export class WorkerAgent {
           },
         )
       : null;
+    options.artifactSeed?.attach({ send: (type, payload) => this.sendMessage(type, payload), tunnel: this.runtimeTunnel });
   }
 
   async start(): Promise<void> {
@@ -1129,7 +1134,7 @@ export class WorkerAgent {
     if (!this.capabilities) throw new Error("Worker capabilities are not initialized");
     // Dynamic observations must not change the signed registration identity or
     // prevent reconnection to a coordinator predating this optional field.
-    this.capabilities = withoutHostMemory(this.capabilities);
+    this.capabilities = withoutDynamicObservations(this.capabilities);
     const protocol = { min: WORKER_PROTOCOL_MIN, max: WORKER_PROTOCOL_MAX } as const;
     const registration = {
       ...(identity ? { identity } : {}),
@@ -1306,7 +1311,7 @@ export class WorkerAgent {
         if (this.socket === socket) this.socket = null;
         this.clearRuntimeLinkProbes();
         this.clearActivationCheckpointRestores();
-        this.runtimeTunnel?.transportDisconnected();
+        this.runtimeTunnel?.transportDisconnected(); this.options.artifactSeed?.disconnected();
         void this.abortActiveJobs("Coordinator disconnected");
         if (
           opened
@@ -1429,11 +1434,7 @@ export class WorkerAgent {
         break;
       case "runtime.prepare":
         if (!this.baseAcceptsNewWork()) {
-          this.sendMessage("runtime.prepared", {
-            requestId: message.payload.requestId,
-            ok: false,
-            error: "contribution_paused",
-          });
+          this.sendMessage("runtime.prepared", { requestId: message.payload.requestId, ok: false, error: "contribution_paused" });
           break;
         }
         {
@@ -1522,6 +1523,8 @@ export class WorkerAgent {
       case "runtime.checkpoint.restore.commit":
         await this.commitActivationCheckpointRestore(message.payload);
         break;
+      case "artifact.seed.ready": case "artifact.seed.grant": case "artifact.seed.unavailable": case "artifact.seed.revoke": case "artifact.seed.bind":
+        this.options.artifactSeed?.handle(message); break;
     }
   }
 
@@ -2479,6 +2482,7 @@ export class WorkerAgent {
     this.capabilities = {
       ...this.capabilities,
       hostMemory: observeHostMemory(this.options.offeredHostMemoryBytes?.()),
+      ...(this.options.artifactSeed ? { artifactSeed: this.options.artifactSeed.observe(this.acceptsNewWork()) } : {}),
       ...(this.options.nativeReplica ? { deployments: this.options.nativeReplica.deployments() } : {}),
     };
     const [observedMetrics, liveHardware] = await Promise.all([

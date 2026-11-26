@@ -82,6 +82,7 @@ import type { EngineRuntimeActivationPlan } from "../contracts/engine-runtime-ac
 import type { ActivationCheckpointCompatibility } from "../contracts/activation-checkpoint.js";
 export type { EngineRuntimeChallengeRequest } from "../contracts/evidence-challenge.js";
 import { ActivationCheckpointTransferAuthority } from "./activation-checkpoint-transfer.js";
+import { ArtifactSeedBroker } from "./artifact-seed-broker.js";
 import {
   activationCheckpointChunks,
   activationCheckpointRestoreBeginSchema,
@@ -318,6 +319,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       this.runtimeLinkProbeTimer.unref();
     }
   }
+  /** Coordinator authority for seed blob transfers (specs/artifact-seed-nodes). */
+  readonly artifactSeeds = new ArtifactSeedBroker({ listWorkers: () => this.store.listWorkers(),
+    connectedWorkerIds: () => this.connectedWorkerIds(), linkObservations: (now) => this.runtimeLinkObservations(now),
+    send: (workerId, type, payload) => this.send(workerId, type, payload) });
   private readonly maintenance = new WorkerMaintenance();
   isWorkerInMaintenance(workerId: string): boolean { return this.maintenance.blocked(workerId); }
   async setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> { await this.maintenance.set(workerId, enabled, this.store, this.isConnected(workerId)); }
@@ -905,6 +910,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         state.socket.close(1000, envelope.payload.reason);
         return;
       }
+      if (envelope.type === "artifact.seed.demand" || envelope.type === "artifact.seed.complete") {
+        await this.artifactSeeds.handle(envelope.workerId, envelope.type, envelope.payload);
+        return;
+      }
       if (envelope.type.startsWith("runtime.stream.")) {
         if ((await this.store.getWorker(envelope.workerId))?.capabilities.distributedExecutor?.protocol
           !== "gdlp-worker-tunnel/2") {
@@ -1023,6 +1032,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         status,
       );
     });
+    this.artifactSeeds.observeHeartbeat(workerId, state.sessionId, payload.capabilities, status);
   }
 
   private async closeInvalid(state: ConnectionState, reason: string, code = 4400): Promise<void> {
@@ -1046,6 +1056,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     if (state.workerId && this.connections.get(state.workerId) === state) {
       const disconnectedWorkerId = state.workerId;
       this.activationCheckpointTransfers?.abortSession(disconnectedWorkerId, state.sessionId);
+      this.artifactSeeds.revokeWorker(disconnectedWorkerId);
       this.rejectActivationCheckpointRestoreSession(
         disconnectedWorkerId,
         state.sessionId,
@@ -1857,6 +1868,11 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       const sourceExecutor = source?.capabilities.distributedExecutor;
       const destinationExecutor = destination.capabilities.distributedExecutor;
       const targetPort = payload.targetPort as number;
+      if (this.artifactSeeds.authorizeStream({ sourceWorkerId: envelope.workerId, sourceNodeId: sourceExecutor?.nodeId,
+        destination, targetPort, streamId }) === "denied") {
+        this.send(envelope.workerId, "runtime.stream.error", { streamId, message: "artifact_seed_stream_not_authorized" });
+        return;
+      }
       const directSupported =
         sourceExecutor?.directTransport?.protocol === "mycellios-direct/1"
         && sourceExecutor.directTransport.commitAck === "destination-v1"
@@ -2194,6 +2210,8 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   private async startRuntimeRelay(session: RuntimeStreamSession): Promise<void> {
     if (!this.runtimeStreams.has(session.streamId)) return;
     session.transportMode = "relay";
+    // Weights never cross the coordinator: a seed stream without direct ends here.
+    if (this.artifactSeeds.abandonRelay(session.streamId)) return await this.terminateRuntimeStream(session, "artifact_seed_direct_required");
     session.direct = null;
     if (!this.send(session.destinationWorkerId, "runtime.stream.open", {
       streamId: session.streamId,

@@ -2,6 +2,7 @@ import { TRANSCRIPTION_MODEL, TRANSCRIPTION_DIGEST, transcriptionWorkerAdapterSc
 import { z } from "zod";
 import { DECISION_CONTEXT_LIMIT, DECISION_DEADLINE_MS, DECISION_DIGEST, DECISION_MODEL, decisionWorkerAdapterSchema, parseDecisionRequest } from "./decision.js";
 import { hostMemoryObservationSchema } from "./host-memory.js";
+import { artifactSeedObservationSchema } from "./artifact-seed.js";
 import { embeddingDigestFor, embeddingWorkerAdapterSchema, EMBEDDING_MODEL } from "./embedding.js";
 import { approvedMemoryEmbeddingExecution, MEMORY_EMBEDDING_MODEL } from "./memory-embedding.js";
 import { kokoroWorkerAdapterSchema, KOKORO_WEIGHT_DIGEST, KOKORO_MODEL, speechOptionsSchema, resolveSpeechOptions } from "./speech.js";
@@ -338,6 +339,8 @@ export const gpuSchema = z
 
 export const workerCapabilitiesSchema = z.object({
   hostMemory: hostMemoryObservationSchema.optional(),
+  /** Owner opt-in blob seeding observation; a claim, never transfer proof. */
+  artifactSeed: artifactSeedObservationSchema.optional(),
   region: z.string().min(1),
   agentVersion: z.string().min(1),
   buildIdentity: nativeBuildIdentitySchema.optional(),

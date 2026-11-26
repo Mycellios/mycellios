@@ -114,6 +114,8 @@ export const NATIVE_PYTHON_PRODUCT_FILES = Object.freeze([
   "distributed_runtime/stage_artifact.py",
   "distributed_runtime/stage_artifact_cache.py",
   "distributed_runtime/stage_cli.py",
+  // Loopback request for a planned peer seed blob (specs/artifact-seed-nodes).
+  "distributed_runtime/stage_seed_source.py",
   "distributed_runtime/tcp_writes.py",
   "distributed_runtime/tokenizer_coordinates.py",
   "distributed_runtime/torch_ram_expert_store.py",

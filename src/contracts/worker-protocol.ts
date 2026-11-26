@@ -1,4 +1,5 @@
 import { sealingAnnouncementSchema } from "./sealed-lease.js";
+import { artifactSeedCompletePayloadSchema, artifactSeedDemandPayloadSchema } from "./artifact-seed.js";
 import { z } from "zod";
 import {
   activationCheckpointBeginSchema,
@@ -540,6 +541,10 @@ export const runtimeCheckpointRestoreFailedEnvelopeSchema = envelopeSchema(
   activationCheckpointRestoreFailedSchema,
 );
 
+/** Seed transfers (specs/artifact-seed-nodes); sent only after `artifact.seed.ready`. */
+export const artifactSeedDemandEnvelopeSchema = envelopeSchema("artifact.seed.demand", artifactSeedDemandPayloadSchema);
+export const artifactSeedCompleteEnvelopeSchema = envelopeSchema("artifact.seed.complete", artifactSeedCompletePayloadSchema);
+
 export const workerEnvelopeSchema = z.discriminatedUnion("type", [
   workerHelloEnvelopeSchema,
   workerHeartbeatEnvelopeSchema,
@@ -582,6 +587,8 @@ export const workerEnvelopeSchema = z.discriminatedUnion("type", [
   runtimeLinkProbePingEnvelopeSchema,
   runtimeLinkProbePongEnvelopeSchema,
   runtimeLinkProbeResultEnvelopeSchema,
+  artifactSeedDemandEnvelopeSchema,
+  artifactSeedCompleteEnvelopeSchema,
 ]);
 
 export type ValidatedWorkerEnvelope = z.infer<typeof workerEnvelopeSchema>;

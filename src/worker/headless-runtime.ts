@@ -49,6 +49,8 @@ export interface HeadlessWorkerEnvironment {
   maxWorkspaceBytes: number;
   windowsJobBrokerExecutable?: string;
   appVersion: string;
+  /** Loopback seed requester for stage preparation (specs/artifact-seed-nodes). */
+  artifactSeedEndpoint?: () => Promise<{ url: string; token: string }>;
 }
 
 export interface HeadlessRuntime {
@@ -105,7 +107,7 @@ export class HeadlessStageLaunchAgent implements LaunchAgent {
     private readonly processAgent: LaunchAgent,
     private readonly config: Pick<
       HeadlessWorkerEnvironment,
-      "nodeId" | "pythonExecutable" | "pythonPath" | "cachePath"
+      "nodeId" | "pythonExecutable" | "pythonPath" | "cachePath" | "artifactSeedEndpoint"
     >,
     private readonly prepareArtifacts: StageArtifactPreparer = prepareNodeStageArtifacts,
   ) {
@@ -134,6 +136,7 @@ export class HeadlessStageLaunchAgent implements LaunchAgent {
       },
       ...(onProgress ? { onProgress } : {}),
       ...(signal ? { signal } : {}),
+      ...(this.config.artifactSeedEndpoint ? { artifactSeed: this.config.artifactSeedEndpoint } : {}),
     });
   }
 
