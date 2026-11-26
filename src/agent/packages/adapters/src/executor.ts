@@ -16,7 +16,7 @@ import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { saveWorkflowAnswer, workflowAnswerEffect, workflowAnswerFields, workflowAnswerTool } from "./workflow-answers.js";
-import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
+import { RoutineBrowserComputerError, selectRunCloudWorkspace } from "./offline-cloud-workspace.js";
 import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread, isSignedWorkflowThread, micoRunsLanes } from "@mycellios/db";
 import { createHash, randomUUID } from "node:crypto";
 import type {
@@ -3852,7 +3852,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
       const current = await deps.prisma.run.findUniqueOrThrow({
         where: { id: runId },
-        include: { thread: { select: { memberUserId: true } } },
+        include: {
+          thread: { select: { memberUserId: true } },
+          routine: { select: { isolatedBrowser: true } },
+        },
       });
       if (
         current.status === "queued" ||
@@ -3901,9 +3904,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
       }
-      // Member turns have no computer, so they never take a server workspace either.
-      const cloudSelection = memberUserId ? undefined : await selectOfflineCloudWorkspace(
-        deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
+      // An opted-in routine chooses Docker before the ordinary Desktop presence check.
+      // Member turns have no computer, so they never take either server route.
+      const cloudSelection = memberUserId ? undefined : await selectRunCloudWorkspace(
+        deps.prisma, deps.sandbox, { ...run, isolatedBrowser: current.routine?.isolatedBrowser === true },
+        leaseTarget.computer, { workerId, fence },
         {
           agentEngine, dataDir: deps.dataDir,
           // The Mico's own Pi model, else the account's main model, can stand in for its PC's CLI.
@@ -3911,7 +3916,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             Boolean(await resolveMemberMainModel(deps, run).catch(() => null)),
         },
       ).catch((error: unknown) => {
-        if (error instanceof ComputerLimitError || error instanceof DesktopUnreachableError) return error;
+        if (error instanceof ComputerLimitError || error instanceof DesktopUnreachableError ||
+          error instanceof RoutineBrowserComputerError) return error;
         throw error;
       });
       if (cloudSelection instanceof DesktopUnreachableError) {
@@ -3920,15 +3926,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         return;
       }
-      const cloudLimitReached = cloudSelection instanceof ComputerLimitError;
-      const cloudComputer = cloudLimitReached ? undefined : cloudSelection;
+      const cloudComputerError = cloudSelection instanceof Error ? cloudSelection : undefined;
+      const cloudComputer = cloudSelection instanceof Error ? undefined : cloudSelection;
       // This turn runs on the server's Pi model; the capture below keeps it there on resume.
       const enginePiFallback = Boolean(cloudComputer && "piFallback" in cloudComputer && cloudComputer.piFallback);
       if (enginePiFallback) agentEngine = "pi";
       const assignedComputerId = cloudComputer?.id ?? leaseTarget.computerId;
-      if (!assignedComputerId || cloudLimitReached) {
+      if (!assignedComputerId || cloudComputerError) {
         // An unavailable assignment or exhausted quota must settle instead of retrying.
-        const error = cloudLimitReached ? cloudSelection.message : "Bot has no computer";
+        const error = cloudComputerError?.message ?? "Bot has no computer";
         // Recheck ownership before recording an attempt; never settle a stolen lease.
         const claimed = await deps.prisma.run.updateMany({
           where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },

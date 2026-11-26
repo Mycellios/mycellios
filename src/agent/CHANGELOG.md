@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.31.3] - 2026-11-26
+
+### Fixed
+
+- Routines with a separate browser can see their navigation tools from the start of the run.
+
+## [0.31.2] - 2026-11-26
+
+### Fixed
+
+- Start loading the last opened project conversation earlier when launching Mycellios.
+
+## [0.31.1] - 2026-11-26
+
+### Fixed
+
+- Mycellios prioritizes the last project chat you opened when preparing conversation histories at startup.
+
 ## [0.31.0] - 2026-11-26
 
 ### Changed

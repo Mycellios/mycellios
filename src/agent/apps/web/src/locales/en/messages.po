@@ -729,6 +729,11 @@ msgstr "Appearance"
 msgid "Apply"
 msgstr "Apply"
 
+#: src/pages/WorkflowWorkspace.tsx
+#: src/pages/workflows/WorkflowCanvas.tsx
+msgid "Approval"
+msgstr "Approval"
+
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Approval boundaries"
 msgstr "Approval boundaries"
@@ -3223,6 +3228,10 @@ msgstr "Medium"
 msgid "Member"
 msgstr "Member"
 
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Member conversations"
+msgstr "Member conversations"
+
 #. placeholder {0}: selected.length
 #: src/pages/GroupPanel.tsx
 msgid "Members ({0})"
@@ -3688,6 +3697,10 @@ msgstr "Not working"
 #: src/pages/KnowledgeSection.tsx
 msgid "Nothing remembered yet"
 msgstr "Nothing remembered yet"
+
+#: src/pages/SpaceMicosPanel.tsx
+msgid "Nobody"
+msgstr "Nobody"
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Notifications"
@@ -4169,6 +4182,14 @@ msgstr "Refresh view"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Refreshing…"
 msgstr "Refreshing…"
+
+#: src/pages/workflows/WorkflowAnswerFields.tsx
+msgid "Number"
+msgstr "Number"
+
+#: src/pages/workflows/WorkflowWorkspace.tsx
+msgid "Reject"
+msgstr "Reject"
 
 #: src/lib/user-error.ts
 msgid "Registration is closed"
@@ -15605,5 +15626,5 @@ msgstr "Maximum passes"
 msgid "Use a separate browser"
 msgstr "Use a separate browser"
 
-msgid "Needs a managed isolated computer. Each run starts signed out."
-msgstr "Needs a managed isolated computer. Each run starts signed out."
+msgid "Runs on an isolated server computer. Each run starts signed out."
+msgstr "Runs on an isolated server computer. Each run starts signed out."

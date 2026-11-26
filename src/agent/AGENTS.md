@@ -622,7 +622,11 @@
   silently open another tab when that target is gone. Update the API, supervisor
   and computer image together. Verify the supervisor, helper, and browser handoff tests.
   A routine can opt into a headless browser only in its own conversation on a managed
-  isolated Docker computer. The run fence keys a separate Chromium user-data directory.
+  isolated Docker computer. Fresh routine runs that would use This PC or a shared
+  computer pin a private server workspace under the run lease and use a server Pi
+  model. The Mico keeps its computer assignment. Resumes keep the recorded workspace.
+  Verify offline-cloud-workspace tests for assignment, ownership, and forbidden fallbacks.
+  The run fence keys a separate Chromium user-data directory.
   Close it before releasing the lease and retain the helper lifetime cap after disconnects.
   Keep saved login, upload, desktop focus and download actions outside that browser.
   Qualify the supervisor fence and prove cookie/storage separation and cleanup in Chromium.
@@ -736,6 +740,9 @@
   The Projects sidebar warms up to five recent chats of one project with two
   concurrent background reads in the destination Space after the visible history
   settles. Hover or focus gives the intended folder priority before it opens.
+  On the default startup route, the authenticated bootstrap starts the scoped
+  Projects list and warms only the last opened project conversation once listed.
+  The sidebar reuses both reads. Store only the conversation ID.
   Pointer and keyboard intent can warm another row. Reuse the same memory-only
   snapshot and never mark a conversation read until it is opened. Verify the
   preload limit and folder changes with SidebarProjects.test.tsx.
@@ -1901,8 +1908,8 @@
   Restored turns must synchronize transcript tool deltas before continue(). Budget
   non-reasoning compatible chat against the same collapsed system/tool state the
   transport sends, preserving current instructions and correlated results.
-  Keep authorized memory and user-clarification schemas in the initial catalog;
-  basic interactions should not require discovering their own core tools.
+  Keep authorized memory, user-clarification and page-browser schemas in the
+  initial catalog. Schema paging never admits a tool the run cannot use.
 - Micos created in Desktop default to This PC (`dedicated`), each in its own
   native folder, as the reference app's agents work on the owner's computer (behavior
   reference only); local-access consent is still requested before binding.

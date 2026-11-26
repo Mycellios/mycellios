@@ -3,13 +3,14 @@ import type { ProjectSummary } from "@mycellios/contracts";
 import { Button, Input, OptionSelect, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ChevronDown, Folder, MessageSquare, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { projectHistoryPreloads, readLastProjectThread } from "../lib/project-history-preload";
 import type { RpcClient } from "../lib/rpc";
 
-const PROJECT_HISTORY_PRELOAD_LIMIT = 5;
 const PROJECT_HISTORY_PRELOAD_CONCURRENCY = 2;
 
-export function SidebarProjects({ projects, rpc, bots, activeThread, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
+export function SidebarProjects({ projects, rpc, bots, activeThread, historyPreferenceKey, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
   projects: ProjectSummary[]; rpc: RpcClient; bots: { id: string; name: string }[];
+  historyPreferenceKey?: string;
   activeThread?: string; creating: boolean; onCreating(value: boolean): void; onRefresh(): void;
   onSelect(botId: string, threadId: string): void;
   onWarm?(botId: string, threadId: string): Promise<void>;
@@ -19,6 +20,7 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
   const activeProjectId = projects.find(p => p.conversations.some(c => c.threadId === activeThread))?.id;
   const [expanded, expand] = useState<string[]>(() => activeProjectId ? [activeProjectId] : []);
   const [intendedProjectId, setIntendedProjectId] = useState<string>();
+  const [lastProjectThread, setLastProjectThread] = useState(() => readLastProjectThread(historyPreferenceKey));
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -31,13 +33,14 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, creating, o
   useEffect(() => {
     if (activeProjectId) expand(ids => ids.includes(activeProjectId) ? ids : [...ids, activeProjectId]);
   }, [activeProjectId, activeThread]);
-  const currentProject = projects.find(project => project.id === intendedProjectId && project.conversations.length)
-    ?? projects.find(project => project.id === expanded.at(-1) && project.conversations.length)
-    ?? projects.find(project => project.conversations.length);
-  const warmTargets = JSON.stringify((currentProject?.conversations ?? [])
-    .filter(chat => chat.threadId !== activeThread)
-    .slice(0, PROJECT_HISTORY_PRELOAD_LIMIT)
-    .map(({ botId, threadId }) => [botId, threadId]));
+  useEffect(() => {
+    if (!activeProjectId || !activeThread || !historyPreferenceKey) return;
+    setLastProjectThread(activeThread);
+    try { localStorage.setItem(historyPreferenceKey, activeThread); } catch { /* Keep the in-memory hint. */ }
+  }, [activeProjectId, activeThread, historyPreferenceKey]);
+  const warmTargets = JSON.stringify(projectHistoryPreloads(
+    projects, intendedProjectId, expanded.at(-1), lastProjectThread, activeThread,
+  ));
   useEffect(() => {
     if (!onWarm) return;
     let cancelled = false;
