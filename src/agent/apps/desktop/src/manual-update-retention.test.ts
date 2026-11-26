@@ -57,6 +57,15 @@ it.runIf(process.platform === "win32")("removes nothing while an update helper h
   expect(await readdir(path.join(updates, "manual"))).toHaveLength(1);
 }, 30_000);
 
+it("removes old installation backups that contain asar archives", async () => {
+  for (let n = 1; n <= 4; n++) await job(n, 60 - n);
+  const backup = path.join(updates, id(1), "backup", "installation", "resources");
+  await mkdir(backup, { recursive: true });
+  await writeFile(path.join(backup, "app.asar"), "not an archive");
+  expect(await pruneManualUpdates(profile, "0.7.0")).toEqual({ jobs: 1, installers: 0 });
+  expect(await readdir(updates)).not.toContain(id(1));
+});
+
 it("does nothing when the profile has no updates", async () => {
   await rm(updates, { recursive: true });
   expect(await pruneManualUpdates(profile, "0.7.0")).toEqual({ jobs: 0, installers: 0 });
