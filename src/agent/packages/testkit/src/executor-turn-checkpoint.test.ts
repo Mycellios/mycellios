@@ -2,6 +2,7 @@ import type { PrismaClient as AdmissionPrismaClient } from "@mycellios/db";
 import { ComputerUpdatingError } from "../../adapters/src/computer-errors.js";
 import type { AdapterContext, AgentRunModel } from "@mycellios/adapter-kit";
 import { APPROVED_ACTION_NOT_RUN_ERROR } from "@mycellios/core";
+import { desktopDiagnosticMessage } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycle from "../../adapters/src/computer-lifecycle.js";
 import { createRunExecutor } from "../../adapters/src/executor.js";
@@ -26,6 +27,7 @@ function fixture(
   encryptedCheckpoint = false,
   toolName = "fixture_write",
   requireApproval = true,
+  runtime = new PiAgentRuntime({ maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER }),
 ) {
   const run = {
     id: "fixture-run",
@@ -242,7 +244,7 @@ function fixture(
   );
   const executor = createRunExecutor({
     prisma,
-    runtime: new PiAgentRuntime({ maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER }),
+    runtime,
     mcpAllowPrivateEndpoint: true,
     deploymentModelKey: "fixture-key",
     secretStore: {
@@ -973,6 +975,54 @@ it("queues the same run during a Desktop update and resumes its checkpoint witho
     expect(state.run.status).toBe("completed");
     expect(state.reads).toHaveBeenCalledTimes(1);
   } finally {await model.close();}
+});
+
+it.each([
+  { code: "native_transport_interrupted", capture: true, resumes: true },
+  { code: "relay_restarted", capture: true, resumes: true },
+  { code: "native_transport_interrupted", capture: false, resumes: false },
+  { code: "access_revoked", capture: true, resumes: false },
+] as const)("recovers only an interrupted Desktop turn with a checkpoint ($code, capture $capture)", async ({code, capture, resumes}) => {
+  const model = await startModelEmulator({ steps: [] });
+  const runtime = new PiAgentRuntime({ maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER });
+  const diagnostic = desktopDiagnosticMessage({
+    code, phase: "run", stage: "native_stream", operationId: "a59091ab-9912-4953-93d4-a5d59d4526f7",
+  });
+  const runtimeRun = vi.spyOn(runtime, "run")
+    .mockImplementationOnce(async function* (request, context) {
+      context?.onDesktopRunDispatched?.();
+      if (capture) {
+        await request.onCheckpoint?.(() => JSON.stringify({
+          version: 1, provider: model.model.provider, model: model.model.id,
+          systemPrompt: "Fixture", pendingToolCallId: "desktop-read",
+          messages: [{
+            role: "assistant", stopReason: "toolUse",
+            content: [{ type: "toolCall", id: "desktop-read", name: "read_file", arguments: { path: "evidence.txt" } }],
+          }],
+        }), "desktop-read");
+        await request.executeTool?.("read_file", { path: "evidence.txt" }, "desktop-read");
+      }
+      yield { type: "progress", text: "Checking the local evidence." };
+      throw Error(diagnostic);
+    })
+    .mockImplementationOnce(async function* (request) {
+      expect(request.turnCheckpoint).toContain("The action may have completed");
+      yield { type: "done", text: "Resumed from the retained checkpoint." };
+    });
+  try {
+    const state = fixture(model.model, false, "read_file", false, runtime);
+    await state.executor.continueRun(state.run.id, "fixture-worker");
+    expect(state.run.status, JSON.stringify(state.finalizeRun.mock.calls)).toBe(resumes ? "queued" : "failed");
+    if (resumes) {
+      expect(state.finalizeRun).not.toHaveBeenCalled();
+      await state.executor.continueRun(state.run.id, "fixture-worker");
+      expect(state.run.status).toBe("completed");
+    }
+    expect(runtimeRun).toHaveBeenCalledTimes(resumes ? 2 : 1);
+    expect(state.reads).toHaveBeenCalledTimes(capture ? 1 : 0);
+  } finally {
+    await model.close();
+  }
 });
 
 it("refuses a new mutation while a restarted run still has an uncertain command receipt", async () => {

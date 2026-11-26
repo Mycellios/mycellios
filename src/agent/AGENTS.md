@@ -2280,6 +2280,11 @@
   setup limit, PC work pauses and continues) and are never read as offline; callbacks of
   agent runs open on that instance still pass. Every answer carries the instance, revision
   and open/delivered/agent-run operations a handoff waits for; `cancel` is the rollback.
+  If an active Desktop turn loses the relay without a handoff, only a correlated
+  run transport interruption with a captured tool checkpoint starts a recovery
+  segment. Mark pending calls uncertain and reuse the command-receipt checks.
+  A second interruption of that recovery or a missing checkpoint keeps the
+  existing manual recovery path. Verify executor-turn-checkpoint tests.
 
 - Only the relay's own answer (200, or 404 unavailable) says whether a PC is available.
   A probe that times out, loses its connection or finds the relay busy (409, 429, 5xx)
