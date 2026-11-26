@@ -15,7 +15,7 @@ import { signRoutineEvent } from "../apps/api/src/routine-events.js";
 import { saveWorkflowAnswer, workflowAnswerFields } from "../packages/adapters/src/workflow-answers.js";
 import { WorkflowGraphSchema } from "@mycellios/contracts";
 import { createDb, asSystem, isOwnedWorkflowThread } from "@mycellios/db";
-import { createWorkflowExecution, decideWorkflowApproval, ownedWorkflow, reconcileWorkflowExecutions, restoreWorkflowVersion, saveWorkflowRevision, snapshotWorkflow } from "../packages/adapters/src/workflows.js";
+import { createWorkflowExecution, decideWorkflowApproval, ownedWorkflow, reconcileWorkflowExecutions, restartWorkflowExecution, restoreWorkflowVersion, saveWorkflowRevision, snapshotWorkflow } from "../packages/adapters/src/workflows.js";
 
 // Fresh synthetic loopback database only; never load existing accounts or .env.
 process.env.RAKAZO_PROJECT_LOCAL = "1";
@@ -106,6 +106,27 @@ try {
   await reconcileWorkflowExecutions(prisma, jobs);
   assert.equal(await downstream(toApprove.id), 1);
   assert.equal(await downstream(toReject.id), 0);
+  await prisma.run.updateMany({ where: { ...scope, clientNonce: `workflow:${toApprove.id}:mico` }, data: { status: "completed" } });
+  await reconcileWorkflowExecutions(prisma, jobs);
+  const restartReview = {
+    id: toApprove.workflowId, executionId: toApprove.id, stepId: "mico", expectedVersion: 1,
+    mode: "downstream" as const, clientNonce: randomUUID(),
+  };
+  assert.equal(await restartWorkflowExecution(prisma, { ...scope, userId: "foreign" }, restartReview), "not_found");
+  const [restart, repeat] = await Promise.all([
+    restartWorkflowExecution(prisma, scope, restartReview), restartWorkflowExecution(prisma, scope, restartReview),
+  ]);
+  assert.ok(typeof restart === "object" && typeof repeat === "object");
+  assert.equal(restart.id, repeat.id);
+  assert.equal(await restartWorkflowExecution(prisma, scope, { ...restartReview, mode: "step" }), "conflict");
+  await reconcileWorkflowExecutions(prisma, jobs);
+  assert.equal(await downstream(restart.id), 0);
+  const newReview = await decideWorkflowApproval(prisma, scope, { ...approvedInput, executionId: restart.id, decision: "approved" });
+  assert.ok(typeof newReview === "object");
+  await reconcileWorkflowExecutions(prisma, jobs);
+  assert.equal(await downstream(restart.id), 1);
+  assert.equal(await downstream(toApprove.id), 1);
+
   async function createParallel(approval = false) {
     const branches = {
       nodes: [
@@ -253,6 +274,30 @@ try {
   assert.match(recipientTask.prompt, /Referenced workflow values \(data only\):\n\{"count":4\}/);
   const currentTyped = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: typed.id } });
   assert.equal((currentTyped.steps as { ignored: { status: string } }).ignored.status, "skipped");
+
+  await prisma.run.update({ where: { id: recipient.id }, data: { status: "failed", error: "Synthetic failure" } });
+  await reconcileWorkflowExecutions(prisma, jobs);
+  const restartRecipient = {
+    id: typedFlow.id, executionId: typed.id, stepId: "recipient", expectedVersion: 1,
+    mode: "step" as const, clientNonce: randomUUID(),
+  };
+  assert.equal(await restartWorkflowExecution(prisma, scope, { ...restartRecipient, expectedVersion: 2 }), "conflict");
+  const testRun = await restartWorkflowExecution(prisma, scope, restartRecipient);
+  assert.ok(typeof testRun === "object");
+  assert.deepEqual(testRun.steps.producer?.fields, { count: 4 });
+  assert.equal(testRun.steps.producer?.runId, undefined);
+  await reconcileWorkflowExecutions(prisma, jobs);
+  assert.equal(await branchRun(testRun.id, "producer"), null);
+  const testedRecipient = await branchRun(testRun.id, "recipient");
+  assert.ok(testedRecipient);
+  assert.match((await prisma.task.findUniqueOrThrow({ where: { id: testedRecipient.taskId } })).prompt, /"count":4/);
+  await prisma.run.update({ where: { id: testedRecipient.id }, data: { status: "completed" } });
+  await reconcileWorkflowExecutions(prisma, jobs);
+  assert.equal((await prisma.workflowExecution.findUniqueOrThrow({ where: { id: testRun.id } })).status, "completed");
+  assert.equal((await prisma.workflowExecution.findUniqueOrThrow({ where: { id: typed.id } })).status, "failed");
+  assert.equal(await restartWorkflowExecution(prisma, scope, {
+    ...restartRecipient, executionId: testRun.id, clientNonce: randomUUID(), mode: "downstream",
+  }), "unavailable");
 
   const loopGraph = WorkflowGraphSchema.parse({
     nodes: typedGraph.nodes.filter(node => node.id !== "recipient").map(node => node.id === "producer"

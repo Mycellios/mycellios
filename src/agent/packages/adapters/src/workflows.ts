@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { JobPublisher } from "@mycellios/adapter-kit";
 import { runContinueJob } from "@mycellios/adapter-kit";
 import type {
@@ -6,9 +6,10 @@ import type {
   Workflow,
   WorkflowExecution,
   WorkflowGraph,
+  WorkflowRestartRequest,
   WorkflowStep,
 } from "@mycellios/contracts";
-import { validateWorkflowAnswer, WorkflowGraphSchema, workflowCondition, workflowLoop, workflowPlan, type WorkflowValues } from "@mycellios/contracts";
+import { validateWorkflowAnswer, WorkflowGraphSchema, workflowCondition, workflowLoop, workflowPlan, workflowRestartSteps, type WorkflowValues } from "@mycellios/contracts";
 import { workflowAnswerEffect } from "./workflow-answers.js";
 import { nextCronDate } from "@mycellios/core";
 import type { PrismaClient } from "@mycellios/db";
@@ -24,6 +25,7 @@ export type WorkflowRow = Omit<Workflow, "updatedAt" | "nextRunAt"> & {
 export type ExecutionRow = Omit<WorkflowExecution, "createdAt" | "updatedAt"> & {
   graph: WorkflowGraph;
   triggerId: string;
+  clientNonce: string;
   userId: string;
   spaceId: string;
   createdAt: Date;
@@ -42,6 +44,7 @@ export const workflowExecutionDto = (row: ExecutionRow): WorkflowExecution => ({
   id: row.id,
   workflowId: row.workflowId,
   version: row.version,
+  triggerId: isWorkflowStepTest(row) ? undefined : row.triggerId,
   status: row.status,
   steps: row.steps,
   error: row.error,
@@ -155,19 +158,88 @@ export async function createWorkflowExecution(
       throw new Error("Request belongs to a different workflow");
     return previous;
   }
+  workflowPlan(workflow.graph, triggerId);
+  const steps = triggerOutput === undefined ? {} : { [triggerId]: { status: "completed" as const, output: triggerOutput } };
+  return insertWorkflowExecution(tx, workflow, triggerId, nonce, steps);
+}
+
+class WorkflowAlreadyRunning extends Error {
+  constructor() {
+    super("This workflow is already running");
+  }
+}
+
+async function insertWorkflowExecution(
+  tx: Prisma.TransactionClient,
+  workflow: WorkflowRow,
+  triggerId: string,
+  nonce: string,
+  steps: Record<string, WorkflowStep>,
+): Promise<ExecutionRow> {
   const active = await tx.$queryRaw<
     Array<{ id: string }>
   >`SELECT id FROM workflow_executions WHERE "workflowId"=${workflow.id} AND status IN ('queued','running') LIMIT 1`;
-  if (active.length) throw new Error("This workflow is already running");
-  workflowPlan(workflow.graph, triggerId);
+  if (active.length) throw new WorkflowAlreadyRunning();
   await snapshotWorkflow(tx, workflow, true);
   const id = randomUUID();
-  const steps = triggerOutput === undefined ? {} : { [triggerId]: { status: "completed", output: triggerOutput } };
   return (
     await tx.$queryRaw<
       ExecutionRow[]
     >`INSERT INTO workflow_executions (id,"workflowId","spaceId","userId",version,graph,"triggerId","clientNonce",steps) VALUES (${id},${workflow.id},${workflow.spaceId},${workflow.userId},${workflow.version},${JSON.stringify(workflow.graph)}::jsonb,${triggerId},${nonce},${JSON.stringify(steps)}::jsonb) RETURNING *`
   )[0]!;
+}
+
+export const workflowRestartNoncePrefix = "workflow-restart:";
+
+function isWorkflowStepTest(row: Pick<ExecutionRow, "clientNonce">) {
+  return row.clientNonce.startsWith(workflowRestartNoncePrefix) && row.clientNonce.endsWith(":step");
+}
+
+export async function restartWorkflowExecution(
+  prisma: PrismaClient,
+  actor: Pick<Actor, "userId" | "spaceId">,
+  input: WorkflowRestartRequest,
+): Promise<ExecutionRow | "not_found" | "conflict" | "unavailable"> {
+  const { userId, spaceId } = actor;
+  const key = `${workflowRestartNoncePrefix}${input.clientNonce}:`;
+  return prisma.$transaction(async tx => {
+    const [flow] = await tx.$queryRaw<WorkflowRow[]>`SELECT * FROM workflows WHERE id=${input.id} AND "userId"=${userId} AND "spaceId"=${spaceId} AND "archivedAt" IS NULL FOR UPDATE`;
+    if (!flow) return "not_found";
+
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify([input.id, input.executionId, input.expectedVersion, input.stepId, input.mode]))
+      .digest("hex");
+    const nonce = `${key}${fingerprint}:${input.mode}`;
+    const replay = await tx.workflowExecution.findFirst({
+      where: { workflowId: flow.id, spaceId, userId, clientNonce: { startsWith: key } },
+      select: { id: true, clientNonce: true },
+    });
+    if (replay) {
+      if (replay.clientNonce !== nonce) return "conflict";
+      const [row] = await tx.$queryRaw<ExecutionRow[]>`SELECT * FROM workflow_executions WHERE id=${replay.id} AND "userId"=${userId} AND "spaceId"=${spaceId}`;
+      return row ?? "conflict";
+    }
+
+    const [source] = await tx.$queryRaw<ExecutionRow[]>`SELECT * FROM workflow_executions WHERE id=${input.executionId} AND "workflowId"=${flow.id} AND "userId"=${userId} AND "spaceId"=${spaceId}`;
+    if (!source) return "not_found";
+    if (isWorkflowStepTest(source)) return "unavailable";
+    if (flow.version !== input.expectedVersion || source.version !== flow.version) return "conflict";
+    const steps = workflowRestartSteps(WorkflowGraphSchema.parse(source.graph), source, input.stepId, input.mode);
+    if (!steps) return "unavailable";
+
+    const runIds = Object.values(source.steps).flatMap(step => step.runId ? [step.runId] : []);
+    const stopping = await tx.task.findFirst({
+      where: { spaceId, userId, workStopPending: true, runs: { some: { id: { in: runIds } } } },
+      select: { id: true },
+    });
+    if (stopping) return "conflict";
+    try {
+      return await insertWorkflowExecution(tx, { ...flow, graph: source.graph }, source.triggerId, nonce, steps);
+    } catch (error) {
+      if (error instanceof WorkflowAlreadyRunning) return "conflict";
+      throw error;
+    }
+  });
 }
 
 export async function decideWorkflowApproval(

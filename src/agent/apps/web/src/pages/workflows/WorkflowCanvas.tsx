@@ -6,6 +6,8 @@ import {
   type WorkflowExecution,
   type WorkflowGraph,
   type WorkflowNode,
+  type WorkflowRestartMode,
+  workflowRestartSteps,
 } from "@mycellios/contracts";
 import { NativeSelectOption, NativeSelect, Textarea, Input,
   Button,
@@ -49,12 +51,14 @@ export function WorkflowCanvas({
   onChange,
   bots,
   execution,
+  onRestart,
   locked,
 }: {
   graph: WorkflowGraph;
   onChange: (graph: WorkflowGraph) => void;
   bots: Bot[];
   execution?: WorkflowExecution;
+  onRestart?: (stepId: string, mode: WorkflowRestartMode) => void;
   locked: boolean;
 }) {
   const { t } = useLingui();
@@ -959,6 +963,20 @@ export function WorkflowCanvas({
                         ))}
                     </NativeSelect>
                   </label>
+                ) : null}
+                {execution && onRestart ? (
+                  <div className="flex flex-wrap gap-2">
+                    {workflowRestartSteps(graph, execution, node.id, "step") ? (
+                      <Button size="xs" variant="outline" onClick={() => onRestart(node.id, "step")}>
+                        {t({ id: "workflow.step.test", message: "Test this step" })}
+                      </Button>
+                    ) : null}
+                    {workflowRestartSteps(graph, execution, node.id, "downstream") ? (
+                      <Button size="xs" variant="outline" onClick={() => onRestart(node.id, "downstream")}>
+                        {t({ id: "workflow.step.restart", message: "Run from this step" })}
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : null}
                 {execution?.steps[node.id]?.output ? (
                   <div>

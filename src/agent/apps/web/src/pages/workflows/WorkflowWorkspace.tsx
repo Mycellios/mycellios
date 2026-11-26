@@ -1,7 +1,17 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Space } from "@mycellios/contracts";
+import type { Bot, Space, WorkflowGraph, WorkflowRestartRequest } from "@mycellios/contracts";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -57,6 +67,13 @@ export function WorkflowWorkspace({
     [versions, setVersions] = useState(false),
     [webhook, setWebhook] = useState(false),
     [renaming, setRenaming] = useState(false);
+  const [shownRunId, setShownRunId] = useState<string>();
+  const [restart, setRestart] = useState<Omit<WorkflowRestartRequest, "clientNonce">>();
+  const shownRun = state.runs.find(run => run.id === shownRunId) ?? state.execution;
+  const canvasExecution = shownRun?.workflowId === doc.id && shownRun.version === doc.version && !doc.dirty
+    ? shownRun
+    : undefined;
+
   const nameInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ text: string; error: boolean; draftId?: string } | null>(null);
@@ -66,6 +83,44 @@ export function WorkflowWorkspace({
   }, [renaming]);
   const locked = state.busy || state.running;
   const name = doc.name === "Untitled workflow" ? t`Untitled workflow` : doc.name;
+  const summaryTemplate = t({ id: "workflow.template.summary", message: "Summarize a text" });
+  const reviewTemplate = t({ id: "workflow.template.review", message: "Draft and review" });
+  function createTemplate(kind: "summary" | "review") {
+    const review = kind === "review";
+    const graph: WorkflowGraph = {
+      nodes: [
+        { id: "start", kind: "trigger", trigger: "manual", title: "", text: "", x: 0, y: 0 },
+        {
+          id: "input", kind: "prompt", title: t({ id: "workflow.template.input", message: "Add your text here" }),
+          text: "", x: 320, y: 0,
+        },
+        {
+          id: "mico", kind: "agent", title: "", x: 640, y: 0,
+          text: review
+            ? t({ id: "workflow.template.draft", message: "Write a concise draft using only the supplied text." })
+            : t({ id: "workflow.template.summarize", message: "Summarize the supplied text in three bullets." }),
+        },
+        ...(review ? [{
+          id: "review", kind: "approval" as const, title: "", x: 960, y: 0,
+          text: t({ id: "workflow.template.approve", message: "Approve this draft to finish the workflow." }),
+        }] : []),
+        { id: "output", kind: "output", title: "", text: "", x: review ? 1280 : 960, y: 0 },
+      ],
+      edges: [
+        { id: "start-input", from: "start", to: "input" },
+        { id: "input-mico", from: "input", to: "mico" },
+        ...(review ? [{ id: "mico-review", from: "mico", to: "review" }] : []),
+        { id: "to-output", from: review ? "review" : "mico", to: "output" },
+      ],
+    };
+    const draftId = state.importDraft({ name: review ? reviewTemplate : summaryTemplate, graph });
+    setImportStatus({
+      text: t`Choose a Mico for each unassigned step before running the workflow.`,
+      error: false,
+      draftId,
+    });
+  }
+
   function exportDraft() {
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(exportWorkflowDraft(doc, workspaceMicos), null, 2)], { type: "application/json" }),
@@ -194,6 +249,13 @@ export function WorkflowWorkspace({
               <Plus size={15} />
               {t`New workflow`}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t({ id: "workflow.templates", message: "Templates" })}</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => createTemplate("summary")}>{summaryTemplate}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => createTemplate("review")}>{reviewTemplate}</DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={locked}
               onClick={() => setRenaming(true)}
@@ -257,7 +319,7 @@ export function WorkflowWorkspace({
             <Button
               size="sm"
               disabled={
-                !state.available || state.busy || state.historyError || !doc.graph.nodes.length
+                !state.available || state.busy || state.historyError || Boolean(state.pendingRestart) || !doc.graph.nodes.length
               }
               onClick={() => void state.run()}
             >
@@ -366,6 +428,11 @@ export function WorkflowWorkspace({
                     {t`Version`} {run.version}
                   </span>
                   {run.error ? <span className="text-destructive">{run.error}</span> : null}
+                  {run.version === doc.version && !doc.dirty ? (
+                    <Button size="xs" variant="ghost" aria-pressed={shownRun?.id === run.id} onClick={() => setShownRunId(run.id)}>
+                      {t({ id: "workflow.history.steps", message: "Show steps" })}
+                    </Button>
+                  ) : null}
                 </div>
               ))
             : t`No runs yet`}
@@ -376,12 +443,46 @@ export function WorkflowWorkspace({
           {state.execution.error}
         </p>
       ) : null}
+      {state.pendingRestart ? (
+        <div className="border-b border-border px-4 py-2">
+          <Button size="xs" variant="outline" disabled={state.busy || !state.available} onClick={() => void state.restart(state.pendingRestart!)}>
+            {t({ id: "workflow.step.retry", message: "Retry step request" })}
+          </Button>
+        </div>
+      ) : null}
+      {restart?.id === doc.id ? (
+        <AlertDialog open onOpenChange={open => { if (!open) setRestart(undefined); }}>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {restart.mode === "step"
+                  ? t({ id: "workflow.step.test", message: "Test this step" })
+                  : t({ id: "workflow.step.restart", message: "Run from this step" })}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t({ id: "workflow.step.confirm", message: "This uses saved inputs and starts a new execution. Any actions in the steps you run can happen again." })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
+              <AlertDialogAction disabled={locked || doc.dirty || state.historyError || Boolean(state.pendingRestart)} onClick={() => {
+                setRestart(undefined);
+                setShownRunId(undefined);
+                void state.restart(restart);
+              }}>{t`Run`}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
       <WorkflowCanvas
         key={doc.id}
         graph={doc.graph}
         onChange={(graph) => state.update({ graph })}
         bots={bots}
-        execution={state.execution?.version === doc.version ? state.execution : undefined}
+        execution={canvasExecution}
+        onRestart={canvasExecution && !locked && !state.historyError && !state.pendingRestart
+          ? (stepId, mode) => setRestart({ id: doc.id, executionId: canvasExecution.id, stepId, mode, expectedVersion: doc.version })
+          : undefined}
         locked={locked}
       />
     </section>
