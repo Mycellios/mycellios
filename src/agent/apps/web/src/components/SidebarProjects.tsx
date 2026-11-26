@@ -7,6 +7,7 @@ import {
   createProjectHistoryPreloader, projectHistoryPreloads, readLastProjectThread, scopedProjectHistoryPreloader,
 } from "../lib/project-history-preload";
 import type { RpcClient } from "../lib/rpc";
+import { useSidebarSectionCollapsed } from "../lib/sidebar-sections";
 
 export function SidebarProjects({ projects, rpc, bots, activeThread, historyPreferenceKey, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
   projects: ProjectSummary[]; rpc: RpcClient; bots: { id: string; name: string }[];
@@ -18,6 +19,7 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, historyPref
 }) {
   const { t } = useLingui();
   const activeProjectId = projects.find(p => p.conversations.some(c => c.threadId === activeThread))?.id;
+  const [sectionCollapsed, toggleSection] = useSidebarSectionCollapsed("projects");
   const [expanded, expand] = useState<string[]>(() => activeProjectId ? [activeProjectId] : []);
   const [intendedProjectId, setIntendedProjectId] = useState<string>();
   const [lastProjectThread, setLastProjectThread] = useState(() => readLastProjectThread(historyPreferenceKey));
@@ -56,8 +58,12 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, historyPref
   }
   if (!projects.length && !creating) return null;
   return <section aria-label={t`Projects`} className="min-w-0 py-2">
-    <div className="flex items-center justify-between px-2 text-xs font-medium text-muted-foreground">
-      <span><Trans>Projects</Trans></span>
+    <div className="flex items-center justify-between gap-1 ps-1 pe-2 text-xs font-medium text-muted-foreground">
+      <button type="button" aria-expanded={!sectionCollapsed} data-testid="sidebar-projects-toggle" onClick={toggleSection}
+        className="group/section flex min-h-7 min-w-0 items-center gap-1 rounded-md px-1.5 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">
+        <span><Trans>Projects</Trans></span>
+        <ChevronDown aria-hidden="true" size={13} className={`shrink-0 transition-transform motion-reduce:transition-none ${sectionCollapsed ? "-rotate-90" : "opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100"}`} />
+      </button>
       <Button variant="ghost" size="icon-sm" aria-label={t`New project`} onClick={() => onCreating(true)}><Plus size={14} /></Button>
     </div>
     {creating ? <form className="space-y-2 p-2" onSubmit={async event => {
@@ -76,7 +82,7 @@ export function SidebarProjects({ projects, rpc, bots, activeThread, historyPref
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
       {failed ? <p role="alert" className="text-xs text-destructive"><Trans>Projects are unavailable. Try again.</Trans></p> : null}
     </form> : null}
-    {projects.map(project => <div key={project.id} className="min-w-0">
+    {sectionCollapsed ? null : projects.map(project => <div key={project.id} className="min-w-0">
       <div className="flex min-w-0 items-center gap-1">
         <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2" aria-expanded={expanded.includes(project.id)}
           onPointerEnter={() => setIntendedProjectId(project.id)} onPointerLeave={() => clearProjectIntent(project.id)}

@@ -19,12 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@mycellios/ui-web";
-import { Check, ChevronDownIcon, Circle, Plus } from "lucide-react";
+import { Check, ChevronDownIcon, Circle, Monitor, Plus } from "lucide-react";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { TextOnlyMark } from "../../components/TextOnlyMark";
 import { ProviderLogo } from "../../components/ProviderLogo";
 
 /** A chat's model: a themed select, with search once there are too many choices to scan. */
+
 export function ChatModelPicker({
   id,
   choices,
@@ -39,6 +40,7 @@ export function ChatModelPicker({
   initialProvider,
   onProviderChange,
   modelOrigins,
+  freeModels,
   providerContent,
   mycelliosCatalogReady = true,
   catalogProviders,
@@ -58,6 +60,8 @@ export function ChatModelPicker({
   initialProvider?: string | null;
   onProviderChange?: (provider: string) => void;
   modelOrigins?: Readonly<Record<string, "network" | "antseed">>;
+  /** AntSeed models with an exact-zero price; they lead the AntSeed group. */
+  freeModels?: ReadonlySet<string>;
   providerContent?: (provider: string) => ReactNode;
   mycelliosCatalogReady?: boolean;
   catalogProviders?: readonly string[];
@@ -73,6 +77,9 @@ export function ChatModelPicker({
     initialProvider ?? choices.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? null,
   );
   const activeProvider = provider && providers.includes(provider) ? provider : providers[0];
+  /** Agent programs on the Mico's PC are offered as native-<engine> providers. */
+  const nativeProviders = new Set(choices.filter(choice => choice.provider?.startsWith("native-") && choice.providerLabel).map(choice => choice.providerLabel!));
+  const isNativeProvider = (name: string) => nativeProviders.has(name) || providerIds?.[name]?.startsWith("native-") === true;
   const unavailableKeys = new Map(choices.filter(choice => choice.unavailable).map(choice => [choice.key, choice.unavailableLabel] as const));
   const inheritedProvider = choices.find(choice => choice.key === defaultKey)?.providerLabel;
   const grouped = useMemo(() => groupModelChoices(
@@ -82,11 +89,14 @@ export function ChatModelPicker({
   const networkHeading = t`Mycellios network`;
   const antseedHeading = "AntSeed";
   const showNetworkSection = inline && activeProvider === "Mycellios" && modelOrigins !== undefined;
+  const antseedChoices = showNetworkSection ? grouped.flatMap(section => section.data.filter(choice => modelOrigins[choice.key] === "antseed")) : [];
   const keepNetworkSection = showNetworkSection && !query.trim();
   const sections = showNetworkSection
     ? [
       { key: "mycellios-network", heading: networkHeading, data: grouped.flatMap(section => section.data.filter(choice => modelOrigins[choice.key] === "network")) },
-      { key: "mycellios-antseed", heading: antseedHeading, data: grouped.flatMap(section => section.data.filter(choice => modelOrigins[choice.key] === "antseed")) },
+      // Free AntSeed models get their own heading, so people find them without reading prices.
+      { key: "mycellios-antseed-free", heading: `${antseedHeading} · ${t`Free`}`, data: antseedChoices.filter(choice => freeModels?.has(choice.key)) },
+      { key: "mycellios-antseed", heading: antseedHeading, data: antseedChoices.filter(choice => !freeModels?.has(choice.key)) },
       ...grouped.map(section => ({ ...section, data: section.data.filter(choice => !modelOrigins[choice.key]) })),
     ].filter(section => section.data.length || keepNetworkSection && section.key === "mycellios-network")
     : grouped;
@@ -235,14 +245,22 @@ export function ChatModelPicker({
         {imagesHint}
         {providers.length || onManage ? (
           <div className="flex w-11 flex-col items-center gap-1 border-e border-border bg-muted/30 px-1 py-2" role="group" aria-label={t`Providers`}>
-            {providers.map((name) => (
-              <Button key={name} type="button" size="sm" variant={activeProvider === name ? "secondary" : "ghost"}
-                className="h-8 w-8 shrink-0 rounded-md p-0"
-                aria-pressed={activeProvider === name} aria-label={name} title={name}
-                onClick={() => { setProvider(name); onProviderChange?.(name); setQuery(""); }}>
-                <ProviderLogo name={name} providerId={providerIds?.[name]} />
-              </Button>
-            ))}
+            {/* Connections first, then the agent programs installed on this PC (Claude Code, Codex,
+                OpenCode), set apart and marked: they share logos with the API connections. */}
+            {[providers.filter(name => !isNativeProvider(name)), providers.filter(isNativeProvider)].map((group, index) =>
+              group.length ? <div key={index} className={`flex flex-col items-center gap-1 ${index ? "mt-1 border-t border-border pt-2" : ""}`}>
+                {group.map((name) => {
+                  const native = index === 1;
+                  const label = native ? `${name} · ${t`This PC`}` : name;
+                  return <Button key={name} type="button" size="sm" variant={activeProvider === name ? "secondary" : "ghost"}
+                    className="relative h-8 w-8 shrink-0 rounded-md p-0"
+                    aria-pressed={activeProvider === name} aria-label={label} title={label}
+                    onClick={() => { setProvider(name); onProviderChange?.(name); setQuery(""); }}>
+                    <ProviderLogo name={name} providerId={providerIds?.[name]} />
+                    {native ? <Monitor aria-hidden size={10} strokeWidth={2.4} className="absolute -end-0.5 -bottom-0.5 rounded-sm bg-background p-px text-muted-foreground" /> : null}
+                  </Button>;
+                })}
+              </div> : null)}
             {onManage ? (
               <Button type="button" size="icon-sm" variant="ghost" className="h-8 w-8 rounded-md text-muted-foreground" aria-label={t`Manage providers`} title={t`Manage providers`} onClick={onManage}>
                 <Plus size={16} aria-hidden />

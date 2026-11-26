@@ -84,9 +84,10 @@ export function ToolActivityDisclosure({
       data-live={live || undefined}
       className="group"
     >
+      {/* While the turn is open only a quiet chevron shows; its name stays for tooltips and readers. */}
       <CollapsibleTrigger
-        className={`flex min-h-6 w-fit cursor-pointer list-none items-center gap-1 rounded-md py-0.5 pe-1.5 text-[12px] font-normal outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-          live ? "text-foreground/75" : "text-muted-foreground"
+        className={`flex min-h-6 w-fit cursor-pointer list-none items-center gap-1 rounded-md py-0.5 text-[12px] font-normal text-muted-foreground outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          live ? "px-0.5 opacity-70 hover:opacity-100" : "pe-1.5"
         }`}
       >
         <ChevronRight
@@ -95,7 +96,7 @@ export function ToolActivityDisclosure({
           strokeWidth={1.8}
           className="transition-transform duration-150 group-data-panel-open:rotate-90 motion-reduce:transition-none"
         />
-        <span>{live ? <Trans>Activity</Trans> : <Plural value={toolCount} one="# step" other="# steps" />}</span>
+        {live ? <span className="sr-only"><Trans>Activity</Trans></span> : <span><Plural value={toolCount} one="# step" other="# steps" /></span>}
         {!live && duration ? <span className="tabular-nums">· {duration}</span> : null}
       </CollapsibleTrigger>
       <CollapsibleContent hiddenUntilFound>

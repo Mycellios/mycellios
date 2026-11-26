@@ -63,7 +63,10 @@ import { withSerializableRetry } from "../serializable-retry.js";
 import type { RouterContext } from "./context.js";
 import { readMycelliosChatModels } from "../mycellios-model-catalog.js";
 import { ownedMycelliosConnection } from "../mycellios-owned-connection.js";
-import { createMycelliosAccountCache } from "../mycellios-account-cache.js";
+import { createMycelliosAccountCache, createMycelliosModelsCache } from "../mycellios-account-cache.js";
+
+/** Bounds the quota rail's wait for a subscription token renewal. */
+const PLAN_LIMITS_RENEWAL_TIMEOUT_MS = 8_000;
 
 /** Bounds the quota rail's wait for a subscription token renewal. */
 const PLAN_LIMITS_RENEWAL_TIMEOUT_MS = 8_000;
@@ -91,6 +94,7 @@ export function modelsRoutes(ctx: RouterContext) {
   // Select an owned Mycellios endpoint, never the newest arbitrary gateway.
   const ownedMycellios = (actor: Actor) => ownedMycelliosConnection(deps, actor.userId);
   const readAccountCached = createMycelliosAccountCache();
+  const readModelsCached = createMycelliosModelsCache<Awaited<ReturnType<typeof readMycelliosChatModels>>>();
   return {
     models: {
       planLimits: authed.models.planLimits.handler(({ context, input }) => planLimits(context.actor, input?.refresh)),
@@ -193,14 +197,18 @@ export function modelsRoutes(ctx: RouterContext) {
           : null);
         if (!token) throw new ORPCError("UNAUTHORIZED");
         try {
-          const account = await readMycelliosAccount({ baseUrl: productBrand.apiBaseUrl, apiKey: token }, {
-            fetch: deps.modelConnectionFetch, signal: context.signal,
-          });
-          if (!account?.contributionFundingSupported) throw new Error("Credit funding is unavailable");
-          return await readMycelliosChatModels(token, {
-            fetch: deps.modelConnectionFetch, signal: context.signal,
-            credentialId: owned?.credential.id,
-          });
+          // One shared read per owner and minute; it keeps its own deadlines, not the caller's signal.
+          return await readModelsCached(
+            { userId: context.actor.userId, baseUrl: productBrand.apiBaseUrl, apiKey: token, credentialId: owned?.credential.id },
+            async () => {
+              const account = await readMycelliosAccount({ baseUrl: productBrand.apiBaseUrl, apiKey: token }, {
+                fetch: deps.modelConnectionFetch, signal: AbortSignal.timeout(15_000),
+              });
+              if (!account?.contributionFundingSupported) throw new Error("Credit funding is unavailable");
+              return readMycelliosChatModels(token, { fetch: deps.modelConnectionFetch, credentialId: owned?.credential.id });
+            },
+            { signal: context.signal },
+          );
         } catch (error) {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             cause: error,

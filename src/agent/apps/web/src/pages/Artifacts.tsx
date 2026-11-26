@@ -264,7 +264,7 @@ export function ArtifactsPage({ onOpenNavigation, workspaceBots }: {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground" data-testid="file-library">
-      <header className={`${desktopDragClass()} px-4 py-4 md:px-8 md:pt-7`}>
+      <header className={`${desktopDragClass()} rk-window-buttons-clear px-4 py-4 md:px-8 md:pt-7`}>
         <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
           <div className="flex min-w-0 items-center gap-2">
             {embedded ? (

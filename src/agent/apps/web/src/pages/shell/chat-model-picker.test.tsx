@@ -99,6 +99,25 @@ describe("ChatModelPicker", () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith(list[1]!.key);
   });
 
+  it("lists free AntSeed models under their own heading without reordering the network group", () => {
+    const model = (id: string) => ({ key: `openai-compatible::${id}`, label: `${id} (Mycellios)`, title: id, provider: "openai-compatible", providerLabel: "Mycellios", modelId: id });
+    const list = [model("b-net"), model("a-net"), model("alpha"), model("beta"), model("gamma")];
+    const origins = { [list[0]!.key]: "network", [list[1]!.key]: "network", [list[2]!.key]: "antseed", [list[3]!.key]: "antseed", [list[4]!.key]: "antseed" } as const;
+    const groups = () => [...container.querySelectorAll("[cmdk-group]")].map(group =>
+      [...group.querySelectorAll('[role="option"]')].map(node => node.getAttribute("aria-label")));
+    act(() => root.render(<ChatModelPicker id="model" inline choices={list} value={list[0]!.key} onChange={onChange} modelOrigins={origins} />));
+    const [networkBefore, antseedBefore] = groups();
+    expect(antseedBefore).toEqual(["alpha (Mycellios)", "beta (Mycellios)", "gamma (Mycellios)"]);
+    // a-net is free too, but only the AntSeed group moves free models first.
+    act(() => root.render(<ChatModelPicker id="model" inline choices={list} value={list[0]!.key} onChange={onChange} modelOrigins={origins}
+      freeModels={new Set([list[4]!.key, list[1]!.key])} />));
+    const [network, free, paid] = groups();
+    expect([...container.querySelectorAll("[cmdk-group-heading]")].map(node => node.textContent)).toEqual(["Mycellios network", "AntSeed · Free", "AntSeed"]);
+    expect(free).toEqual(["gamma (Mycellios)"]);
+    expect(paid).toEqual(["alpha (Mycellios)", "beta (Mycellios)"]);
+    expect(network).toEqual(networkBefore);
+  });
+
   it("uses the themed menu for a short list and preserves the inherited option", async () => {
     render(choices(9), "openrouter::vendor/model-1");
     const trigger = container.querySelector<HTMLButtonElement>("button#model")!;

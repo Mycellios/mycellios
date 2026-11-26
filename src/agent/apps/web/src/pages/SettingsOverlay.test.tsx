@@ -200,6 +200,28 @@ it("hides developer navigation and a direct logs URL until enabled", async () =>
   }
 });
 
+it("keeps the macOS window buttons clear of the title and lets the header move the window", async () => {
+  const host = window as unknown as { mycelliosDesktop?: { platform: string } };
+  host.mycelliosDesktop = { platform: "darwin" };
+  const view = await render({ section: "general" });
+  try {
+    const panel = view.container.querySelector('[data-testid="user-settings"]');
+    expect(panel?.getAttribute("data-window-buttons")).toBe("darwin");
+    expect(view.container.querySelector(".rk-settings-title")?.classList.contains("app-drag")).toBe(true);
+    expect(view.container.querySelector('[data-testid="settings-header"]')?.classList.contains("app-drag")).toBe(true);
+  } finally {
+    delete host.mycelliosDesktop;
+    await view.cleanup();
+  }
+  const web = await render({ section: "general" });
+  try {
+    expect(web.container.querySelector('[data-testid="user-settings"]')?.hasAttribute("data-window-buttons")).toBe(false);
+    expect(web.container.querySelector('[data-testid="settings-header"]')?.classList.contains("app-drag")).toBe(false);
+  } finally {
+    await web.cleanup();
+  }
+});
+
 it("reveals the active section after the settings portal mounts", async () => {
   delayedDialog.enabled = true;
   const reveal = vi.fn();

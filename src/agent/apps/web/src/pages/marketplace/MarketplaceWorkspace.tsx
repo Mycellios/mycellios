@@ -64,7 +64,7 @@ export function MarketplaceWorkspace(props: {
   return (
     <section className="rk-marketplace" data-testid="marketplace-workspace">
       <header
-        className={`rk-market-topbar ${desktopDragClass()}`}
+        className={`rk-market-topbar rk-window-buttons-clear ${desktopDragClass()}`}
         data-testid="conversation-header"
       >
         <span>Marketplace</span>

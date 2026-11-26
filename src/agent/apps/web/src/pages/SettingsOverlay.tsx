@@ -3,7 +3,7 @@ import { ProfileOverview } from "./settings/ProfileOverview";
 import { Disclosure, ExpandedSettings } from "@mycellios/ui-web/components/ui/disclosure";
 import { DesktopCompanionsPanel } from "./settings/DesktopCompanionsPanel";
 import { AppBehaviorPanel } from "./settings/GeneralPreferences";
-import { desktopBridge } from "../lib/desktop";
+import { desktopBridge, desktopHidesTitleBar } from "../lib/desktop";
 import { useLingui } from "@lingui/react/macro";
 import { spaceLabel } from "../lib/space-label";
 import type { Bot, BusyMessageMode, SpaceMemoryConfig } from "@mycellios/contracts";
@@ -300,6 +300,8 @@ export function SettingsOverlay({
   }, [section, requestedSection, onUsageOpen]);
 
   const settingsTitle = serverSettings ? t`Space settings` : t`Your settings`;
+  // macOS draws the window buttons over the top-left of this full-window panel.
+  const macWindowButtons = desktopHidesTitleBar();
   const navItems: NavItem[] = serverSettings ? sharedSpace ? [
     { id: "space-members", label: t`Members`, icon: Users },
   ] : [
@@ -455,6 +457,7 @@ export function SettingsOverlay({
         data-testid="user-settings"
         data-settings-section={section}
         data-settings-scope={serverSettings ? "space" : "account"}
+        data-window-buttons={macWindowButtons ? "darwin" : undefined}
         showCloseButton={false}
         initialFocus={() =>
           requestedSection === "usage" ? (usageRef.current ?? panelRef.current) : panelRef.current
@@ -464,7 +467,7 @@ export function SettingsOverlay({
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <div className="flex min-h-0 shrink-0 flex-col border-b border-border md:w-[232px] md:border-b-0 md:border-e">
             <div className="space-y-3 px-4 pt-4 pb-2">
-              <p className="text-sm font-semibold">{settingsTitle}</p>
+              <p className={macWindowButtons ? "rk-settings-title app-drag text-sm font-semibold" : "text-sm font-semibold"}>{settingsTitle}</p>
               <div className="relative">
                 <Search className="pointer-events-none absolute start-2.5 top-2.5 size-3.5 text-muted-foreground" />
                 <Input
@@ -547,7 +550,8 @@ export function SettingsOverlay({
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div
               data-testid="settings-header"
-              className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 pb-5 pt-6 sm:px-8 sm:pt-7"
+              // On macOS the panel covers the top row, so its header moves the window instead.
+              className={`${macWindowButtons ? "app-drag " : ""}flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 pb-5 pt-6 sm:px-8 sm:pt-7`}
             >
               <div className="flex min-w-0 flex-col gap-2">
                 <DialogTitle className="text-heading2 font-medium text-foreground">

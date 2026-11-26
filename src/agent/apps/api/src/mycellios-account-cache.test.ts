@@ -1,6 +1,6 @@
 import type { MycelliosAccount } from "@mycellios/contracts";
 import { describe, expect, it, vi } from "vitest";
-import { createMycelliosAccountCache } from "./mycellios-account-cache.js";
+import { createMycelliosAccountCache, createMycelliosModelsCache } from "./mycellios-account-cache.js";
 
 const account = (balanceMicrounits: number): MycelliosAccount => ({
   object: "economic_account",
@@ -95,5 +95,23 @@ describe("Mycellios account cache", () => {
     const evicted = vi.fn().mockResolvedValue(account(2));
     await expect(f.read({ ...owner, userId: "user-1" }, evicted)).resolves.toEqual(account(2));
     expect(evicted).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Mycellios models cache", () => {
+  it("shares one catalog read per owner for a minute and never keeps an empty catalog", async () => {
+    let time = 0;
+    const read = createMycelliosModelsCache<string[]>({ now: () => time });
+    const load = vi.fn().mockResolvedValueOnce(["a"]).mockResolvedValueOnce(["b"]);
+    await expect(Promise.all([read(owner, load), read(owner, load)])).resolves.toEqual([["a"], ["a"]]);
+    time += 59_999;
+    await expect(read(owner, load)).resolves.toEqual(["a"]);
+    time += 2;
+    await expect(read(owner, load)).resolves.toEqual(["b"]);
+    expect(load).toHaveBeenCalledTimes(2);
+    const empty = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce(["ready"]);
+    const other = { ...owner, userId: "user-b" };
+    await expect(read(other, empty)).resolves.toEqual([]);
+    await expect(read(other, empty)).resolves.toEqual(["ready"]);
   });
 });

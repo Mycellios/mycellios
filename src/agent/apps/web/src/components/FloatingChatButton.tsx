@@ -4,8 +4,9 @@ import { ExternalLink, PanelsTopLeft } from "lucide-react";
 import { useState } from "react";
 import { desktopBridge } from "../lib/desktop";
 
-export function FloatingChatButton({ userId, spaceId, botId }: {
-  userId?: string; spaceId: string | null; botId?: string;
+/** `inMenu`: a labelled row in Chat tools, which then closes. Without it, the header icon. */
+export function FloatingChatButton({ userId, spaceId, botId, inMenu = false, onOpened }: {
+  userId?: string; spaceId: string | null; botId?: string; inMenu?: boolean; onOpened?: () => void;
 }) {
   const { t } = useLingui();
   const desktop = desktopBridge();
@@ -21,16 +22,24 @@ export function FloatingChatButton({ userId, spaceId, botId }: {
     try {
       if (floating) await floating.returnToMain();
       else await desktop!.companions!.openChat!({ scope: JSON.stringify([userId, spaceId]), botId: botId! });
+      onOpened?.();
     } catch {
       setFailed(true);
     } finally {
       setBusy(false);
     }
   }
+  if (inMenu) return <>
+    <Button variant="ghost" data-mobile-chat-action disabled={busy} onClick={() => void open()}>
+      {floating ? <PanelsTopLeft size={16} aria-hidden /> : <ExternalLink size={16} aria-hidden />}{label}
+    </Button>
+    {failed && <p role="alert" className="px-3 text-xs text-destructive">{t`Could not open the chat window. Try again.`}</p>}
+  </>;
   return <span className="flex min-w-0 items-center gap-2">
-    <Button size="icon-lg" variant="floating" disabled={busy} aria-label={label} title={label}
-      className="app-no-drag rk-chat-action" onClick={() => void open()}>
-      {floating ? <PanelsTopLeft size={18} /> : <ExternalLink size={18} />}
+    {/* Same plain icon button as the other header actions, without a frame of its own. */}
+    <Button size="icon-sm" variant="ghost" disabled={busy} aria-label={label} title={label}
+      className="app-no-drag" onClick={() => void open()}>
+      {floating ? <PanelsTopLeft size={16} /> : <ExternalLink size={16} />}
     </Button>
     {failed && <span role="alert" className="max-w-40 text-xs text-destructive">{t`Could not open the chat window. Try again.`}</span>}
   </span>;

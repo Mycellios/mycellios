@@ -102,9 +102,10 @@ describe("ToolActivityDisclosure", () => {
     expect(visibleText(html.match(/<button[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "")).toBe("3 steps");
   });
 
-  it("shows the live label while working", () => {
+  it("shows only a quiet named chevron while working", () => {
     const html = markup({ live: true, stepCount: 2 });
-    expect(visibleText(html)).toContain("Activity");
+    // The name stays for screen readers; on screen there is only the chevron.
+    expect(html).toContain('<span class="sr-only">Activity</span>');
     expect(html).toContain('data-live="true"');
   });
 
