@@ -32,6 +32,22 @@ describe("cold chat read priority", () => {
     await expect(deferred).resolves.toBe("models");
   });
 
+  it("holds header, rail and composer status reads behind the transcript", async () => {
+    const finish = prioritizeChatHistory();
+    const procedures = [
+      "computer/updates", "models/planLimits", "engines/codexQuota", "models/mycelliosAccount",
+      "messaging/status", "memory/providerConfig", "voice/status", "connections/catalog",
+    ];
+    const calls = procedures.map(() => vi.fn(async () => undefined));
+    const reads = procedures.map((procedure, index) =>
+      runWithChatReadPriority(procedure, requestSignal(), calls[index]!));
+    for (const call of calls) expect(call).not.toHaveBeenCalled();
+    finish();
+    await vi.advanceTimersByTimeAsync(250);
+    await Promise.all(reads);
+    for (const call of calls) expect(call).toHaveBeenCalledOnce();
+  });
+
   it("keeps a rapid switch together but starts secondary reads by the original deadline", async () => {
     const leaveFirst = prioritizeChatHistory();
     const background = vi.fn(async () => "tasks");

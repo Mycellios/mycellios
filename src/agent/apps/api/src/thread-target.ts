@@ -546,6 +546,10 @@ export async function threadSnapshot(
         readOptions,
       ),
     ]);
+    const queuedBehind =
+      core.run?.status === "queued" && !target.memberUserId
+        ? await queuedBehindConversation(deps.prisma, target, core.run.id)
+        : null;
     return {
       botId: target.botId,
       threadId: target.threadId,
@@ -555,6 +559,7 @@ export async function threadSnapshot(
       run: core.run ? mapRun(core.run) : null,
       activeRuns: core.activeRuns.map(mapRun),
       computer: toComputerStatus(target.botId, target.bot.computer, busyBotName),
+      ...(queuedBehind ? { queuedBehind } : {}),
     };
   }
 
@@ -641,6 +646,41 @@ export async function threadSnapshot(
           ? mapRun(primaryActiveRun)
           : null,
     activeRuns: core.activeRuns.map(mapRun),
+  };
+}
+
+/**
+ * The owner's conversation whose live turn keeps this queued turn waiting: the oldest turn of
+ * the same Mico working in another of the owner's conversations. A Space member's conversation
+ * is never named, so a shared Mico never reveals one person's chats to another.
+ */
+export async function queuedBehindConversation(
+  prisma: Pick<PrismaClient, "run">,
+  target: Extract<ThreadTarget, { kind: "bot" }>,
+  queuedRunId: string,
+): Promise<{ threadId: string; title: string | null; main: boolean } | null> {
+  const blocker = await prisma.run.findFirst({
+    where: {
+      botId: target.botId,
+      id: { not: queuedRunId },
+      threadId: { not: target.threadId },
+      status: { in: ["leased", "running"] },
+      leaseExpiresAt: { gt: new Date() },
+    },
+    orderBy: [{ startedAt: "asc" }, { id: "asc" }],
+    select: {
+      threadId: true,
+      thread: { select: { title: true, memberUserId: true, archivedAt: true, deleteAfter: true } },
+      routine: { select: { name: true } },
+    },
+  });
+  if (!blocker || blocker.thread.memberUserId) return null;
+  const main = blocker.threadId === target.bot.thread?.id;
+  const hidden = Boolean(blocker.thread.archivedAt || blocker.thread.deleteAfter);
+  return {
+    threadId: blocker.threadId,
+    title: main || hidden ? null : (blocker.thread.title ?? blocker.routine?.name ?? null),
+    main,
   };
 }
 

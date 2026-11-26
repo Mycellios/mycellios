@@ -5225,6 +5225,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               workingBots={workingBots}
               lastRun={activeSnapshot?.run}
               activeRun={workingRuns.find((run) => Boolean(run.startedAt)) ?? workingRuns[0]}
+              queuedBehind={activeSnapshot?.run?.status === "queued" && activeSnapshot.run.id === (workingRuns.find((run) => Boolean(run.startedAt)) ?? workingRuns[0])?.id ? activeSnapshot.queuedBehind : undefined}
               missingComputer={
                 !inGroup &&
                 Boolean(activeSnapshot?.computer && activeSnapshot.computer.homeRevision === null)

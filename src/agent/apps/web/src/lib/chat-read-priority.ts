@@ -6,12 +6,25 @@ const SECONDARY_READ_TIMEOUT_MS = 15_000;
 const MAX_SECONDARY_READS = 2;
 
 // Only the reads started by the chat controls use this queue.
+// Status reads for the header, rail and composer menus also wait: fired together they
+// slowed the transcript read (threads/get) that the reply stream waits for.
 const SECONDARY_CHAT_READS = new Set([
+  "agentSkills/list",
+  "computer/updates",
+  "connections/catalog",
+  "connections/list",
   "development/list",
+  "development/projects",
+  "engines/codexQuota",
   "links/favicon",
   "me",
+  "memory/providerConfig",
+  "messaging/status",
   "models/credentials",
   "models/list",
+  "models/mycelliosAccount",
+  "models/planLimits",
+  "routines/history",
   "routines/list",
   "skills/list",
   "tasks/awaitingReplies",
@@ -20,6 +33,7 @@ const SECONDARY_CHAT_READS = new Set([
   "threads/pinned",
   "threads/queueState",
   "usage/tasks",
+  "voice/status",
 ]);
 
 type ChatReadHold = {
