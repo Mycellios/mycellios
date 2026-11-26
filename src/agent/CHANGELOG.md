@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-26
+
+### Changed
+
+- Codex conversations show when the model starts thinking, even before the first reply text arrives.
+- Follow-up messages can reuse the Codex process and loaded conversation, so the model can start sooner.
+
+### Fixed
+
+- Agents can start processing a saved message while the live chat notification is still being delivered.
+
 ## [0.30.0] - 2026-11-26
 
 ### Security
