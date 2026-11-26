@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-26
+
+### Added
+
+- Start workflows from text summary and draft review templates.
+- Test a step or run from it using saved inputs and a new execution.
+
+### Fixed
+
+- Start preparing recent project messages as soon as Desktop opens so older chats do not have to wait for the sidebar.
+
 ## [0.32.0] - 2026-11-26
 
 ### Added
