@@ -2,6 +2,15 @@ import type { ProjectSummary } from "@mycellios/contracts";
 
 const PROJECT_HISTORY_PRELOAD_LIMIT = 5;
 
+export function projectHistoryPreferenceKey(userId: string, spaceId: string): string {
+  return `mycellios:last-project-thread:${JSON.stringify([userId, spaceId])}`;
+}
+
+export function readLastProjectThread(key: string | undefined): string | null {
+  if (!key) return null;
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
 export function projectHistoryPreloads(
   projects: readonly ProjectSummary[],
   intendedProjectId: string | undefined,

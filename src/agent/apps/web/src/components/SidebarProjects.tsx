@@ -3,15 +3,10 @@ import type { ProjectSummary } from "@mycellios/contracts";
 import { Button, Input, OptionSelect, Popover, PopoverContent, PopoverTrigger } from "@mycellios/ui-web";
 import { ChevronDown, Folder, MessageSquare, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { projectHistoryPreloads } from "../lib/project-history-preload";
+import { projectHistoryPreloads, readLastProjectThread } from "../lib/project-history-preload";
 import type { RpcClient } from "../lib/rpc";
 
 const PROJECT_HISTORY_PRELOAD_CONCURRENCY = 2;
-
-function readLastProjectThread(key: string | undefined): string | null {
-  if (!key) return null;
-  try { return localStorage.getItem(key); } catch { return null; }
-}
 
 export function SidebarProjects({ projects, rpc, bots, activeThread, historyPreferenceKey, creating, onCreating, onRefresh, onSelect, onWarm, failed }: {
   projects: ProjectSummary[]; rpc: RpcClient; bots: { id: string; name: string }[];

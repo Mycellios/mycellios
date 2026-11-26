@@ -736,8 +736,9 @@
   The Projects sidebar warms up to five recent chats of one project with two
   concurrent background reads in the destination Space after the visible history
   settles. Hover or focus gives the intended folder priority before it opens.
-  A cold session prefers the last opened project conversation in that account and
-  Space, after checking it against the current project list. Store only its ID.
+  On the default startup route, the authenticated bootstrap starts the scoped
+  Projects list and warms only the last opened project conversation once listed.
+  The sidebar reuses both reads. Store only the conversation ID.
   Pointer and keyboard intent can warm another row. Reuse the same memory-only
   snapshot and never mark a conversation read until it is opened. Verify the
   preload limit and folder changes with SidebarProjects.test.tsx.
