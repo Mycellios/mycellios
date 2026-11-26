@@ -4999,6 +4999,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               ) : null}
               {!miniSidebar && !activityMode && !showSpaceSearch ? <NeedsYouGroup groups={sidebarGroups} mobile={isMobileSidebar} openSpaceChat={openSpaceChat} /> : null}
               {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, currentSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
+                historyPreferenceKey={userId && currentSpaceId ? `mycellios:last-project-thread:${JSON.stringify([userId, currentSpaceId])}` : undefined}
                 activeThread={taskScope?.taskThreadId} creating={creatingProject} onCreating={setCreatingProject} onRefresh={projectCollection.refresh} failed={projectCollection.error}
                 onWarm={readingFirstHistory ? undefined : warmProjectConversation}
                 onSelect={(botId, threadId) => {
