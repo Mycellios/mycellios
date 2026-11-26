@@ -45,11 +45,17 @@ it("starts only the remembered history after the scoped project list confirms it
   );
 });
 
-it("skips the preload when the preference is absent, hidden or no longer listed", async () => {
+it("loads the list before the sidebar even without a preference, and skips history", async () => {
+  fetchQuery.mockResolvedValue([project]);
   getItem.mockReturnValue(null);
   await warmRememberedProjectHistory("account", "other-space");
-  expect(fetchQuery).not.toHaveBeenCalled();
+  expect(fetchQuery).toHaveBeenCalledWith(expect.objectContaining({
+    queryKey: ["development-projects", "account", "other-space"],
+  }));
+  expect(readConversationHistory).not.toHaveBeenCalled();
+});
 
+it("skips the preload when hidden or when the remembered chat is no longer listed", async () => {
   getItem.mockReturnValue("remembered");
   vi.stubGlobal("document", { visibilityState: "hidden" });
   await warmRememberedProjectHistory("account", "space");

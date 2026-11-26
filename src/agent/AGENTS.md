@@ -737,9 +737,10 @@
   Start a cold same-Space history read at roster selection and consume its fresh,
   scoped result in the incoming shell. Keep writes, auth recovery and realtime
   direct. Reuse fresh model and account queries within their existing scope.
-  The Projects sidebar warms up to five recent chats of one project with two
-  concurrent background reads in the destination Space after the visible history
-  settles. Hover or focus gives the intended folder priority before it opens.
+  The Projects sidebar warms up to twelve conversations across its folders with
+  two concurrent background reads in the destination Space after visible history
+  settles. The intended folder gets the first two slots, then other folders
+  receive a turn before older conversations. Hover or focus prioritizes a folder.
   On the default startup route, the authenticated bootstrap starts the scoped
   Projects list and warms only the last opened project conversation once listed.
   The sidebar reuses both reads. Store only the conversation ID.
