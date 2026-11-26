@@ -2219,6 +2219,10 @@
   With remembered consent, closing Desktop hides its window and retains drafts;
   packaged Windows login startup restores the connection. Desktop has no tray
   icon. Launching it again reveals the existing window and File → Quit disconnects.
+  Closing a window that would quit Desktop and choosing Quit from the application
+  menu both require explicit confirmation while local or relayed work is active.
+  A hidden Mac window keeps its relay alive while work is active. Verify the
+  quit-with-active-work tests along with the account computer background tests.
   Revocation disables host access and background login startup.
   Verify account-computer.test.ts, account-computer-background.test.ts and the
   native/API/broker desktop-relay tests, plus upgrade-continuity.test.ts.

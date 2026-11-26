@@ -32,6 +32,7 @@ import { videoStudioEnabled } from "@mycellios/contracts";
 import type { Session } from "electron";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, safeStorage, session, shell, utilityProcess } from "electron";
 import { startDesktopDiagnostics, recordDesktopDiagnostic, desktopDiagnosticsText, desktopExceptionFields, type DesktopDiagnostics } from "./diagnostics.js";
+import { createDesktopQuitGuard } from "./quit-with-active-work.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT, AppDocumentReadyTimeout, loadWithCloudRendererRecovery } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -200,6 +201,30 @@ const catalogPackage: ManualPackageKind | null =
 // verified disk image and reopens, as Windows does; otherwise the disk image opens.
 const macosSelfUpdate = process.platform === "darwin" && app.isPackaged ? macosSelfUpdateBundle(process.execPath) : null;
 const desktopUpdateBusy = () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy());
+const deferQuitIfBusy = createDesktopQuitGuard({
+  busy: desktopUpdateBusy,
+  confirm: async () => {
+    const spanish = app.getLocale().toLowerCase().startsWith("es");
+    const options: Electron.MessageBoxOptions = {
+      type: "warning",
+      title: "Mycellios Desktop",
+      message: spanish ? "Hay trabajo en curso en este equipo." : "This computer is still working.",
+      detail: spanish
+        ? "Si sales ahora, las ejecuciones activas se interrumpirán. Algunos cambios ya podrían haberse aplicado."
+        : "Quitting now interrupts active runs. Some changes may already have been made.",
+      buttons: spanish ? ["Seguir trabajando", "Salir de todos modos"] : ["Keep working", "Quit anyway"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    };
+    const win = mainWindow;
+    const { response } = win && !win.isDestroyed() && win.isVisible()
+      ? await dialog.showMessageBox(win, options)
+      : await dialog.showMessageBox(options);
+    return response === 1;
+  },
+  quit: () => app.quit(),
+});
 const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
   ? new ManualUpdateController({
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
@@ -586,19 +611,25 @@ function createWindow(url: string, partition: string | null, restoreCloudRendere
     if (!ISOLATED_DEV && !quitting && (keepRunningInBackground || (floatingChats?.liveWindows().length ?? 0) > 0)) {
       event.preventDefault(); win.hide(); return;
     }
+    const keepMacWindowWarm = process.platform === "darwin" && process.env.RAKAZO_DISABLE_WARM_WINDOW !== "1";
+    if (!ISOLATED_DEV && !quitting && !keepMacWindowWarm && deferQuitIfBusy()) {
+      event.preventDefault();
+      return;
+    }
     desktopCompanions?.clear();
-    if (
-      process.platform === "darwin" &&
-      !ISOLATED_DEV &&
-      !quitting &&
-      process.env.RAKAZO_DISABLE_WARM_WINDOW !== "1"
-    ) {
+    if (!ISOLATED_DEV && !quitting && keepMacWindowWarm) {
       event.preventDefault();
       win.hide();
       clearTimeout(warmWindowTimer);
-      warmWindowTimer = setTimeout(() => {
-        if (mainWindow === win && !win.isDestroyed() && !win.isVisible()) win.destroy();
-      }, WARM_WINDOW_TTL_MS);
+      const retireHiddenWindow = () => {
+        if (mainWindow !== win || win.isDestroyed() || win.isVisible()) return;
+        if (desktopUpdateBusy()) {
+          warmWindowTimer = setTimeout(retireHiddenWindow, WARM_WINDOW_TTL_MS);
+          return;
+        }
+        win.destroy();
+      };
+      warmWindowTimer = setTimeout(retireHiddenWindow, WARM_WINDOW_TTL_MS);
     }
   });
   win.once("closed", () => {
@@ -1030,6 +1061,11 @@ function installApplicationMenu() {
     label: "Contribute compute…",
     click: () => { if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL("https://www.mycellios.com/dashboard?view=contribute"); },
   };
+  const quitDesktop: Electron.MenuItemConstructorOptions = {
+    label: app.getLocale().toLowerCase().startsWith("es") ? "Salir de Mycellios Desktop" : "Quit Mycellios Desktop",
+    accelerator: "CommandOrControl+Q",
+    click: () => { if (!deferQuitIfBusy()) app.quit(); },
+  };
   const template: Electron.MenuItemConstructorOptions[] =
     process.platform === "darwin"
       ? [
@@ -1049,7 +1085,7 @@ function installApplicationMenu() {
               { role: "hideOthers" },
               { role: "unhide" },
               { type: "separator" },
-              { role: "quit" },
+              quitDesktop,
             ],
           },
           { role: "editMenu" },
@@ -1079,7 +1115,7 @@ function installApplicationMenu() {
               checkForUpdates,
               keepRunningBackground,
               { type: "separator" },
-              { role: "quit" },
+              quitDesktop,
             ],
           },
           { role: "editMenu" },
