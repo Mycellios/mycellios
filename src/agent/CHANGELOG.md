@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-26
+
+### Security
+
+- Changing a remote MCP server's address no longer keeps its saved bearer token. Enter the token again for the new address.
+
+### Added
+
+- Share your Chrome tabs with your Micos from the Mycellios side panel. Turn on **Share tabs** and a
+  Mico in a chat you start from that browser can see the titles and addresses of your open tabs. It
+  cannot read or use the pages. Sharing is off by default and stops with **Stop sharing**, when you
+  close the panel or when you remove the permission in Chrome.
+
+### Fixed
+
+- Make the Desktop reconnection screen easier to follow. Connecting with a shared link is now
+  the only form shown, preparing this computer is a secondary link, and the duplicate Quit
+  button is gone.
+- Show the Claude and ChatGPT subscription quota after the sign-in token expires. Before, the
+  Usage panel asked to reconnect the account a few hours after each use, even though it was
+  still connected; it now renews the token first.
+- Opening a Mico from the sidebar is faster: the first Micos in the list load their history in the
+  background, and hovering or pressing any other Mico starts loading it before the chat opens.
+- Centre the macOS window buttons in the left navigation bar. Before, the third button touched
+  the bar's border line.
+
 ## [0.34.0] - 2026-11-26
 
 ### Changed
