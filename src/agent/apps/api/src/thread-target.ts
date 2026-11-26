@@ -547,7 +547,7 @@ export async function threadSnapshot(
       ),
     ]);
     const queuedBehind =
-      core.run?.status === "queued" && !target.memberUserId
+      core.run?.status === "queued"
         ? await queuedBehindConversation(deps.prisma, target, core.run.id)
         : null;
     return {
@@ -655,10 +655,15 @@ export async function threadSnapshot(
  * is never named, so a shared Mico never reveals one person's chats to another.
  */
 export async function queuedBehindConversation(
-  prisma: Pick<PrismaClient, "run">,
-  target: Extract<ThreadTarget, { kind: "bot" }>,
+  prisma: Pick<PrismaClient, "run" | "thread">,
+  target: { botId: string; threadId: string },
   queuedRunId: string,
 ): Promise<{ threadId: string; title: string | null; main: boolean } | null> {
+  const own = await prisma.thread.findUnique({
+    where: { id: target.threadId },
+    select: { memberUserId: true },
+  });
+  if (!own || own.memberUserId) return null;
   const blocker = await prisma.run.findFirst({
     where: {
       botId: target.botId,
@@ -670,12 +675,15 @@ export async function queuedBehindConversation(
     orderBy: [{ startedAt: "asc" }, { id: "asc" }],
     select: {
       threadId: true,
-      thread: { select: { title: true, memberUserId: true, archivedAt: true, deleteAfter: true } },
+      thread: {
+        select: { title: true, memberUserId: true, archivedAt: true, deleteAfter: true },
+      },
       routine: { select: { name: true } },
+      bot: { select: { thread: { select: { id: true } } } },
     },
   });
   if (!blocker || blocker.thread.memberUserId) return null;
-  const main = blocker.threadId === target.bot.thread?.id;
+  const main = blocker.threadId === blocker.bot.thread?.id;
   const hidden = Boolean(blocker.thread.archivedAt || blocker.thread.deleteAfter);
   return {
     threadId: blocker.threadId,
