@@ -212,6 +212,7 @@ import {
 } from "./agent-environment.js";
 import type { FleetCardSummary } from "./approval-ask.js";
 import { buildApprovalAskBlock, MAX_FETCH_URL_LENGTH } from "./approval-ask.js";
+import { privateApprovalTarget, requiresPrivateApproval } from "./private-required-approval.js";
 import type { ApprovalPausedToolResult } from "./approval-effect.js";
 import {
   approvalPausedToolResult,
@@ -5908,7 +5909,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (name === "schedule_create" || (name === "schedule_update" && Boolean(args.prompt))) &&
             (await isRunTainted()) &&
             (await routineNamesNewSite(String(args.prompt ?? "")));
+          const privateApproval = requiresPrivateApproval(
+            privateApprovalTarget,
+            { userId: run.userId, spaceId: run.spaceId, botId: bot.id },
+            liveRoute,
+          );
           const requiresApprovalByDefault =
+            privateApproval ||
             commandWatch ||
             requiresUnattendedApproval ||
             siteGate === "new" ||
@@ -5919,6 +5926,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // A gated read still fails closed when its review errors, and keeps its approval key.
           const gated = requiresApprovalByDefault || connectorReadGated;
           const requiresMandatoryApproval =
+            privateApproval ||
             commandWatch ||
             scheduleNamesNewSite ||
             requiresUnattendedApproval ||
@@ -5940,7 +5948,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             unidentifiedAction && resolvedRules.decision === "allow"
               ? { ...resolvedRules, decision: "ask" as const }
               : resolvedRules;
-          const mode = approvalModeFromPreference(await loadAutoReviewPreference());
+          const mode = privateApproval
+            ? "ask"
+            : approvalModeFromPreference(await loadAutoReviewPreference());
           const reviewable = mode === "auto" && !requiresMandatoryApproval;
           const injectedReview = reviewable ? deps.autoReview : undefined;
           const reviewSettings = !reviewable || injectedReview ? null : await loadApprovalModel();
@@ -6433,7 +6443,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     name,
                     name === "propose_instructions_update" ? { ...args, botId: bot.id } : args,
                     runSecrets,
-                    { reviewReason, summary: fleetSummary },
+                    { reviewReason, summary: fleetSummary, requireOnce: privateApproval },
                   ),
                 ),
               ],
