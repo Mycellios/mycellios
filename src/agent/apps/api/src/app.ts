@@ -158,6 +158,8 @@ import {
 } from "./client-ip.js";
 import { cspReportRoutes } from "./csp-report.js";
 import { mountDesktopRelay } from "./desktop-relay.js";
+import { mountBrowserTabsRelay } from "./browser-tabs-relay.js";
+import { browserTabsClient, browserTabsKey } from "../../../packages/adapters/src/browser-tabs-relay.js";
 import { mountDesktopWhatsApp } from "./desktop-whatsapp.js";
 import { mountDiagramScript } from "./diagram-script.js";
 import { configuredEmailProvider } from "./email.js";
@@ -598,6 +600,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   // models.dev describes models newer than the bundled Pi list; warm it in the background.
   void modelsDevCatalog.read(0);
   const executor = createRunExecutor({
+    // In-process runs (self-host) reach this API's own tab-sharing route.
+    chromeTabs: process.env.MYCELLIOS_BROWSER_TABS_ENABLED !== "false"
+      ? browserTabsClient(
+          `${(process.env.DESKTOP_RELAY_API_URL ?? env.apiUrl).replace(/\/$/, "")}/api/browser-tabs/internal`,
+          browserTabsKey(env.screenProxySecret),
+        )
+      : undefined,
     webPresence,
     billingEnabled: modelCreditsEnabled,
     maxUploadSizeBytes: env.maxUploadSizeBytes,
@@ -953,6 +962,16 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       ),
   });
   desktopHostProbe = stopDesktopRelay.hasAgentDevice;
+  // Chrome tab sharing (specs/agent-chrome-tabs): off only when the operator says so; each
+  // browser still shares only after the person turns it on in the side panel.
+  const stopBrowserTabsRelay = mountBrowserTabsRelay(app, {
+    enabled: process.env.MYCELLIOS_BROWSER_TABS_ENABLED !== "false",
+    secret: env.screenProxySecret,
+    authenticate: async (request) => {
+      const session = await requestSession(request);
+      return session ? { userId: session.actor.userId, sessionId: session.sessionId } : null;
+    },
+  });
   mountDesktopWhatsApp(app, {
     enabled: env.whatsappDeviceEnabled === true,
     prisma,
@@ -1448,6 +1467,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     backgroundFailures: inMemoryJobs ? () => inMemoryJobs.failureCounts() : undefined,
     stop: async () => {
       stopDesktopRelay();
+      stopBrowserTabsRelay();
       // Abort in-flight continueRun boot waits before draining jobs so stop() cannot sit
       // on waitForComputerReady for the full boot-wait window during shared Postgres journeys.
       auth.disposeOidcDiscovery();

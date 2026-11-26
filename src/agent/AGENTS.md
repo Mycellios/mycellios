@@ -1829,6 +1829,15 @@
   Agent account preference. Accept live visual overrides only from the exact
   approved extension origin and the parent window. Keep the existing host
   permissions, signing IDs and normal web/Desktop appearance.
+- Chrome tab sharing follows specs/agent-chrome-tabs; phase 1 only lists tabs
+  (`chrome_tabs`). It is off by default, needs the optional `tabs` permission and
+  an open side panel, and connects one panel per profile through a Web Lock.
+  Bridge routes accept only the exact extension origins plus
+  `x-mycellios-extension: 1`, send no CORS grant and never send code. Offer the
+  tool only to the owner's own turn whose message recorded the same sign-in session
+  (`messages.browserSessionKey`); never to routines, channels, members, groups,
+  tasks, webhooks, background or project work. Delivered work is never replayed.
+  Check browser-tabs-relay tests and the executor chrome_tabs gating tests.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the

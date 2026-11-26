@@ -1241,6 +1241,8 @@ model Message {
   clientNonce      String?
   /// The Space member who wrote a user message in their conversation; null for the owner.
   authorUserId     String?
+  /// sha256 of the sign-in session that sent an owner message; its shared Chrome tabs reach that turn.
+  browserSessionKey String?
   /// Blind-index search tokens for the encrypted blocks; NULL until the row is encrypted.
   searchTokens     Int[]
   sourceRuns            Run[]             @relation("RunSourceMessage")

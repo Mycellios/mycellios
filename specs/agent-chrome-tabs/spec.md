@@ -1,6 +1,11 @@
 # Micos working in the person's Chrome tabs
 
-Status: proposed design. No product code changes with this spec.
+Status: phase 1 (sharing and tab list) implemented. Deviations from this design:
+the registration is keyed by account and sign-in session, not by Space (the panel
+chooses no Space and only the owner's own runs reach it), and the session key is
+recorded on the owner's message (`messages.browserSessionKey`) rather than on the
+run, so queued and follow-up turns carry their own sender. The share choice is
+kept in the extension origin's `localStorage`. Later phases remain proposed.
 
 ## Existing behavior and goal
 

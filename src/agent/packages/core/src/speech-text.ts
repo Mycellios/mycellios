@@ -177,6 +177,7 @@ export function narrateTool(toolName: string): string | null {
     [/^(web_?fetch|fetch)$/, "reading a page"],
     [/^(screenshot|computer_observe)$/, "looking at the screen"],
     [/^(browser_navigate|browser_snapshot|browser_act)$/, "using the page"],
+    [/^chrome_tabs$/, "looking at your tabs"],
     [/^(click|type_text|press_key|scroll|computer_batch|computer_act)$/, "using the computer"],
     [/^open_url$/, "opening a page"],
     [/^list_bots$/, "checking who's around"],

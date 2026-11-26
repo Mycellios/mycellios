@@ -1718,6 +1718,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "computer_act") return "Operating the computer";
   if (toolName === "pc_windows" || toolName === "pc_snapshot") return "Reading apps on your PC";
   if (toolName === "pc_act") return "Using an app on your PC";
+  if (toolName === "chrome_tabs") return "Looking at your Chrome tabs";
   if (toolName === "run_subagent") return `Delegating to helper: ${detail(record.name)}`;
   if (toolName === "create_space") return `Creating space: ${detail(record.name)}`;
   if (toolName === "list_fleet") return "Checking your bots";

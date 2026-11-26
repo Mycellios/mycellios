@@ -7,6 +7,7 @@ import { ComposioConnector, IntegrationProviderSettings } from "@mycellios/adapt
 import { phoneCallSettings } from "@mycellios/core";
 import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { desktopRelayKey, desktopAgentSelection, desktopRelayTransport } from "../../../packages/adapters/src/desktop-relay.js";
+import { browserTabsClient, browserTabsKey } from "../../../packages/adapters/src/browser-tabs-relay.js";
 import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { startWorkerHealth } from "./health.js";
 import { createWorkerSecretStore } from "./secret-store.js";
@@ -284,6 +285,13 @@ async function main() {
   // models.dev describes models newer than the bundled Pi list; warm it in the background.
   void modelsDevCatalog.read(0);
   const executor = createRunExecutor({
+    // Shared Chrome tabs reach the API that holds the side panel's connection.
+    chromeTabs: process.env.MYCELLIOS_BROWSER_TABS_ENABLED !== "false" && process.env.AGENT_RUNTIME !== "scripted"
+      ? browserTabsClient(
+          `${(process.env.DESKTOP_RELAY_API_URL ?? process.env.API_URL ?? "http://127.0.0.1:3100").replace(/\/$/, "")}/api/browser-tabs/internal`,
+          browserTabsKey(resolveScreenProxySecret(process.env)),
+        )
+      : undefined,
     maxUploadSizeBytes: uploadSizeFromEnv(process.env),
     prisma,
     runtime,

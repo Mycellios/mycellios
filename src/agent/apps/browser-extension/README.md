@@ -16,6 +16,16 @@ Open **Appearance** to select **Mycellios**, **White**, **Dark** or **System**. 
 tones down avatars and branding inside the panel. These preferences are stored in Chrome for
 this extension and do not change the appearance of regular Agent tabs.
 
+## Share tabs
+
+Off by default. **Share tabs** in the strip asks Chrome for the optional `tabs` permission.
+While a Mycellios panel is open, Micos in chats you start from this browser can list the titles
+and addresses (origin and path only) of your open tabs with `chrome_tabs`. They cannot read or
+use pages yet. Incognito windows are never shared. **Stop sharing**, closing every panel, signing
+out or removing the permission in `chrome://extensions` ends it. With panels in several windows
+one of them holds the connection (`tabs-bridge.js`, Web Locks) and the others stand by. The
+design and later phases are in `specs/agent-chrome-tabs/spec.md`.
+
 ## How framing is allowed
 
 The hosted app sends `frame-ancestors 'none'` except for the origins in
@@ -33,5 +43,7 @@ panel against the hosted app before publishing.
 ## Permissions
 
 - `sidePanel`: show Agent beside the page.
-- Host access to `https://www.mycellios.com/*`: frame the app with its first-party session and check
-  whether you are signed in. The extension reads no tabs, pages or browsing history.
+- Host access to `https://www.mycellios.com/*`: frame the app with its first-party session, check
+  whether you are signed in and connect tab sharing. The extension reads no pages or browsing
+  history.
+- `tabs` (optional, requested only by **Share tabs**): tab titles and addresses while sharing.

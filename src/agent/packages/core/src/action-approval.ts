@@ -6,6 +6,8 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   // Reading the owner's own windows; acting on them (pc_act) always asks.
   "pc_windows",
   "pc_snapshot",
+  // Titles and addresses of the owner's own shared Chrome tabs; nothing leaves the account.
+  "chrome_tabs",
   "browser_navigate",
   "browser_snapshot",
   "browser_act",

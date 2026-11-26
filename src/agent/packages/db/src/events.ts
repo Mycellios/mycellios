@@ -322,6 +322,8 @@ export interface SendUserMessageInput {
   createRun?: boolean;
   /** When true, start a new run even if the bot is already busy (team-chat delivery). */
   allowParallelRun?: boolean;
+  /** sha256 of the owner's sign-in session that sent a follow-up (specs/agent-chrome-tabs). */
+  browserSessionKey?: string;
   /** Model every routine in an inbound delivery agreed on. */
   modelPin?: {
     modelProvider: string;
@@ -546,6 +548,7 @@ export async function sendUserMessage(
         role: "user",
         blocks,
         clientNonce: delivery ? MICO_SCRIPT_DELIVERY_NONCE + delivery.id : input.clientNonce,
+        ...(input.trigger === "follow_up" && input.browserSessionKey ? { browserSessionKey: input.browserSessionKey } : {}),
       });
       if (
         input.crossSpaceSenderBotId &&
