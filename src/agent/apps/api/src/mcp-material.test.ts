@@ -99,6 +99,39 @@ describe("buildMcpUpdateMaterial", () => {
     expect(JSON.stringify(update)).not.toContain("stored-header");
   });
 
+  it("never carries a stored bearer token over to a new endpoint", () => {
+    const update = buildMcpUpdateMaterial(
+      { secret: "stored-token" },
+      {
+        transport: "streamable_http",
+        slug: "x",
+        name: "x",
+        endpoint: "https://other.example.test",
+        headers: {},
+      },
+      { clearOAuth: true, endpointChanged: true },
+    );
+    expect(JSON.stringify(update)).not.toContain("stored-token");
+    expect(update).toEqual({ action: "store", material: { headers: {} } });
+  });
+
+  it("stores a bearer token resent with a new endpoint", () => {
+    expect(
+      buildMcpUpdateMaterial(
+        { secret: "stored-token" },
+        {
+          transport: "streamable_http",
+          slug: "x",
+          name: "x",
+          endpoint: "https://other.example.test",
+          headers: {},
+          secret: "new-token",
+        },
+        { clearOAuth: true, endpointChanged: true },
+      ),
+    ).toEqual({ action: "store", material: { secret: "new-token", headers: {} } });
+  });
+
   it("clearing removes static credentials but keeps OAuth state", () => {
     const existing = { secret: "token", env: { A: "b" }, oauth: { tokens: { access_token: "t" } } };
     const result = buildMcpUpdateMaterial(existing, {

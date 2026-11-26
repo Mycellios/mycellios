@@ -38,9 +38,9 @@ export type McpMaterialUpdate =
  *
  * env/headers/files use full-replace semantics (the update payload is the
  * complete set), matching the create handler; files are kept when omitted and
- * only exist for stdio servers. OAuth state is preserved unless the
- * endpoint changed, since tokens issued for one endpoint must never be sent to
- * another server. */
+ * only exist for stdio servers. OAuth state and the stored bearer token are
+ * preserved unless the endpoint changed, since tokens issued for one endpoint
+ * must never be sent to another server. */
 export function buildMcpUpdateMaterial(
   existing: McpSecretMaterial,
   config: McpServerConfigInput,
@@ -80,7 +80,10 @@ export function buildMcpUpdateMaterial(
         );
   const env = "env" in config ? keepBlank(config.env, material.env) : undefined;
   const headers = "headers" in config ? keepBlank(config.headers, material.headers) : undefined;
-  const { files: storedFiles, ...withoutFiles } = material;
+  const { files: storedFiles, ...kept } = material;
+  // A stored bearer token was given for the old address; a new one must be resent.
+  const { secret: _storedSecret, ...withoutSecret } = kept;
+  const withoutFiles = options.endpointChanged ? withoutSecret : kept;
   const files =
     config.transport === "stdio"
       ? config.files
