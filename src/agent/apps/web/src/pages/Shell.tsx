@@ -417,6 +417,10 @@ const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
 const CONVERSATION_HISTORY_TIMEOUT_MS = 15_000;
 const FIRST_HISTORY_REUSE_MS = 1_500;
 const NO_AGENT_SKILLS: AgentSkillCatalogEntry[] = [];
+// Space settings the shell reads on every mount. Their editors write the saved value
+// back into the cache, so a chat switch or scoped remount can reuse them for a while
+// instead of reading each one from the API again.
+const SHELL_METADATA_STALE_MS = 5 * 60_000;
 const NO_PROVIDERS: string[] = [];
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
@@ -646,7 +650,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const [routinesBotId, setRoutinesBotId] = useState<string | null>(null);
   const [taughtSkills, setTaughtSkills] = useState<TaughtSkill[]>([]);
   const [taughtSkillsBotId, setTaughtSkillsBotId] = useState<string | null>(null);
-  const agentSkillsQuery = useQuery(queries.agentSkills.list.queryOptions());
+  const agentSkillsQuery = useQuery({ ...queries.agentSkills.list.queryOptions(), staleTime: SHELL_METADATA_STALE_MS });
   const agentSkills = agentSkillsQuery.data ?? NO_AGENT_SKILLS;
   const setAgentSkills = useCallback(
     (skills: AgentSkillCatalogEntry[]) =>
@@ -724,12 +728,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, [navigate, searchParams]);
   const messagingStatus = useQuery({
     ...queries.messaging.status.queryOptions(),
+    staleTime: SHELL_METADATA_STALE_MS,
     enabled: Boolean(session.data?.user),
   }).data;
   // A WhatsApp linked device needs no server chat-app provider, only Desktop.
   const messagingSurfaceEnabled = (messagingStatus?.enabled ?? false) || whatsappBridge() !== undefined;
   const messagingProviders = messagingStatus?.providers ?? NO_PROVIDERS;
-  const memoryConfigQuery = useQuery(queries.memory.providerConfig.queryOptions());
+  const memoryConfigQuery = useQuery({ ...queries.memory.providerConfig.queryOptions(), staleTime: SHELL_METADATA_STALE_MS });
   // Undefined while it first loads; null when the space has none or it could not be read.
   const memoryProviderConfig: SpaceMemoryConfig | null | undefined =
     memoryConfigQuery.data !== undefined
@@ -755,7 +760,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   };
   // Voice readiness belongs to the Space, including when a task chat is open.
   const voiceStatus: VoiceStatus | null =
-    useQuery(spaceQueries(userId ?? null, shellSpaceId).voice.status.queryOptions()).data ?? null;
+    useQuery({ ...spaceQueries(userId ?? null, shellSpaceId).voice.status.queryOptions(), staleTime: SHELL_METADATA_STALE_MS }).data ?? null;
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [dismissedRunErrorIds, setDismissedRunErrorIds] =
     useState<ReadonlySet<string>>(readSeenRunErrorIds);

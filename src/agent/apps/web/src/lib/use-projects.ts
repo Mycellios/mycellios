@@ -19,7 +19,8 @@ export function useProjects(rpc: RpcClient, userId: string | null, spaceId: stri
     ...projectCollectionOptions(rpc, userId, spaceId),
     enabled: Boolean(userId && spaceId),
     refetchOnMount: true,
-    refetchInterval: 15000,
+    // Project folders change rarely; a slower poll spares the shared API.
+    refetchInterval: 30_000,
   });
   return { projects: query.data ?? [], error: query.isError, refresh: () => { void query.refetch(); } };
 }
