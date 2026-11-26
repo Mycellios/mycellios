@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-26
+
+### Added
+
+- A routine with a separate browser uses an isolated server computer while your Mico keeps its usual computer.
+
+### Fixed
+
+- Open more project chats faster by preparing their latest messages across folders before you click.
+
 ## [0.31.3] - 2026-11-26
 
 ### Fixed
