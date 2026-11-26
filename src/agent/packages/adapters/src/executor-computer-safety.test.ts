@@ -45,6 +45,33 @@ describe("computer lifecycle command guard", () => {
     expect(isProtectedComputerLifecycleCommand("printf '%s\\n' *.txt && pwd")).toBe(false);
   });
 
+  it.each(["killall5 -9", "/sbin/killall5 -15", "bash -c 'killall5'"])(
+    "refuses killall5, which ends the graphical session: %s",
+    (command) => {
+      expect(protectedComputerLifecycleRefusal(command)).toBe("protected command killall5");
+    },
+  );
+
+  it.each([
+    "make; echo $?",
+    'test "$?" -eq 0 && echo ok',
+    'echo "${?}"',
+    "echo $#",
+    "echo $$",
+    "sleep 1 & echo $!",
+  ])("allows shell parameters that only hold digits: %s", (command) => {
+    expect(protectedComputerLifecycleRefusal(command)).toBeUndefined();
+  });
+
+  it.each([
+    ["killall$?", "protected command killall"],
+    ["kill$! 12", "protected command kill"],
+    ["rm -f /tmp/.X$$-lock", "X11 path"],
+    ["echo $1", "unresolved variable ${1}"],
+  ])("still refuses digit parameters that complete a protected word: %s", (command, reason) => {
+    expect(protectedComputerLifecycleRefusal(command)).toBe(reason);
+  });
+
   it.each([
     "find . -maxdepth 2 -type d -name .git -print",
     "git -C . status --short",

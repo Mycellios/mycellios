@@ -1631,6 +1631,10 @@ function quotedHeredocWords(body: string): string[] | undefined {
   return words;
 }
 
+/** `killall5` signals every process, ending the graphical session like `killall`. */
+const PROTECTED_KILL_COMMANDS = ["kill", "pkill", "killall", "killall5", "xkill"];
+const PROTECTED_KILL_COMMAND = new RegExp(`^(?:${PROTECTED_KILL_COMMANDS.join("|")})$`);
+
 function wordsHaveLifecycleHazard(words: readonly string[]): boolean {
   let sawService = false;
   let sawServiceAction = false;
@@ -1639,7 +1643,7 @@ function wordsHaveLifecycleHazard(words: readonly string[]): boolean {
     if (/(?:\.browser-profiles|--user-data-dir)/.test(folded)) return true;
     if (/(?:\/tmp\/\.x11-unix|\/tmp\/\.x\d+-lock)/.test(folded)) return true;
     const base = folded.split("/").at(-1) ?? "";
-    if (/^(?:kill|pkill|killall|xkill)$/.test(base)) return true;
+    if (PROTECTED_KILL_COMMAND.test(base)) return true;
     if (base === "systemctl" || base === "service") sawService = true;
     if (/^(?:stop|restart|kill)$/.test(base)) sawServiceAction = true;
   }
@@ -1692,7 +1696,7 @@ function quotedHeredocLifecycleHazard(body: string): boolean {
 
 type SplicePiece = { segments: string[]; holes: string[][] };
 
-const SPLICE_SOLO_COMMANDS = ["kill", "pkill", "killall", "xkill"];
+const SPLICE_SOLO_COMMANDS = PROTECTED_KILL_COMMANDS;
 const SPLICE_SERVICE_COMMANDS = ["systemctl", "service"];
 const SPLICE_PATHS = [".browser-profiles", "--user-data-dir", "/tmp/.x11-unix"];
 
@@ -2099,7 +2103,7 @@ function overflowLifecycle(piece: SplicePiece): {
   const { segments, holes } = foldedSplice(piece);
   const none = { hazard: false, service: false, action: false };
   if (holes.length === 0) return none;
-  for (const name of ["kill", "pkill", "killall", "xkill"]) {
+  for (const name of PROTECTED_KILL_COMMANDS) {
     if (basenamePossible(segments, holes, name))
       return { hazard: true, service: false, action: false };
   }
@@ -2785,9 +2789,18 @@ function shellTokenReason(entry: object): string | undefined {
   return "unsupported shell syntax";
 }
 
+/**
+ * `$?`, `$#` and `$$` hold digits; `$!` holds digits or nothing. Digits can only
+ * complete `killall5` or an X lock path, so checking the command once with these
+ * empty and once with a digit covers every value they can take.
+ */
+const NUMERIC_SHELL_PARAMETERS = new Set(["?", "#", "$", "!"]);
+const NUMERIC_PARAMETER_PROBES = ["", "5"];
+
 function tokenizeProtectedShellCommand(
   command: string,
   literals: Readonly<Record<string, string>>,
+  numericValue: string,
 ): { words: string[] } | { reason: string } {
   try {
     // shell-quote treats newlines as whitespace. Preserve command boundaries for
@@ -2795,7 +2808,10 @@ function tokenizeProtectedShellCommand(
     const separated = preserveShellCommandBoundaries(command);
     const parsed = parseShellCommand<{ expansion: string }>(
       separated,
-      (name) => literals[name] ?? STATIC_SHELL_EXPANSIONS[name] ?? { expansion: name },
+      (name) =>
+        literals[name] ??
+        STATIC_SHELL_EXPANSIONS[name] ??
+        (NUMERIC_SHELL_PARAMETERS.has(name) ? numericValue : { expansion: name }),
       { splitUnquoted: true },
     );
     const words: string[] = [];
@@ -2866,7 +2882,7 @@ function tokenizeProtectedShellCommand(
 function protectedWordRefusal(words: readonly string[]): string | undefined {
   for (const word of words) {
     const base = (word.split("/").at(-1) ?? "").toLowerCase();
-    if (/^(?:kill|pkill|killall|xkill)$/.test(base)) return `protected command ${base}`;
+    if (PROTECTED_KILL_COMMAND.test(base)) return `protected command ${base}`;
   }
   for (let index = 0; index < words.length; index += 1) {
     const word = words[index] ?? "";
@@ -2904,9 +2920,12 @@ function protectedWordRefusal(words: readonly string[]): string | undefined {
 export function protectedComputerLifecycleRefusal(command: string): string | undefined {
   const prepared = prepareDesktopGuardCommand(command);
   if ("reason" in prepared) return prepared.reason;
-  const tokenized = tokenizeProtectedShellCommand(prepared.command, prepared.literals);
-  if ("reason" in tokenized) return tokenized.reason;
-  return protectedWordRefusal(tokenized.words);
+  for (const numericValue of NUMERIC_PARAMETER_PROBES) {
+    const tokenized = tokenizeProtectedShellCommand(prepared.command, prepared.literals, numericValue);
+    const reason = "reason" in tokenized ? tokenized.reason : protectedWordRefusal(tokenized.words);
+    if (reason) return reason;
+  }
+  return undefined;
 }
 
 export function isProtectedComputerLifecycleCommand(command: string): boolean {
