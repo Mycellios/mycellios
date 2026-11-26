@@ -121,7 +121,8 @@ describe("native agent protocol integration", () => {
     expect(await promptFiles()).toHaveLength(1);
     // While idle, the kept bridge answers no tool call, even with its own token.
     const launch = JSON.parse((await readFile(launches, "utf8")).trim().split("\n")[0]!) as { args: string[] };
-    const mcp = JSON.parse(launch.args[launch.args.indexOf("--mcp-config") + 1]!).mcpServers.rakazo;
+    const servers = JSON.parse(launch.args[launch.args.indexOf("--mcp-config") + 1]!).mcpServers as Record<string, unknown>;
+    const mcp = Object.values(servers)[0] as { url: string; headers: { Authorization: string } };
     const idleCall = await fetch(mcp.url, {
       method: "POST",
       headers: { Authorization: mcp.headers.Authorization, "content-type": "application/json" },
