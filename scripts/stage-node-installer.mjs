@@ -10,6 +10,19 @@ export const NODE_APP_COMPONENT_SCHEMA = "mycellios-node-app-component/1";
 const PRODUCTION_DEPENDENCIES = ["ws", "zod"];
 /** Read by app/contracts/model-adapter-registry.js from <root>/python. */
 const NODE_APP_PYTHON_FILES = ["distributed_runtime/model_adapter_registry.json"];
+/**
+ * Windows service host: WinSW 2.12.0 x64 (github.com/winsw/winsw, release
+ * v2.12.0, WinSW-x64.exe). service-registration.ts copies bin/MycelliosNode.exe
+ * next to the service definition; without it sc.exe has nothing to register.
+ */
+export const WINDOWS_SERVICE_WRAPPER = Object.freeze({
+  file: "MycelliosNode.exe",
+  url: "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe",
+  bytes: 18_243_033,
+  sha256: "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da",
+});
+/** Built from sidecars/windows-job-broker; node.json's isolation.brokerExecutable. */
+export const WINDOWS_JOB_BROKER_FILE = "mycellios-job-broker.exe";
 
 export async function stageNodeInstaller(input) {
   const output = resolve(input.output);
@@ -37,12 +50,14 @@ export async function stageNodeInstaller(input) {
   await assertSymlinksStayInside(runtime);
   // node.json points runtime.pythonPath at <installRoot>/python (installation-bootstrap.ts).
   verifyNativePythonProductSource(python);
+  const windowsBinaries = platform === "win32" ? await windowsServiceBinaries(input) : [];
   await rm(output, { recursive: true, force: true });
   await mkdir(join(output, "bin"), { recursive: true });
   const [{ provenanceBytes }] = await Promise.all([
     writeNodeAppTree({ output, dist, modules, python, pythonFiles: "all", sourceRevision: input.sourceRevision, provenance }),
     copyTree(runtime, join(output, "runtime"), { materializeInternalSymlinks: true }),
     cp(nodeExecutable, join(output, "bin", platform === "win32" ? "node.exe" : "node")),
+    ...windowsBinaries.map(({ source, file }) => cp(source, join(output, "bin", file))),
   ]);
   if (input.componentTrust !== undefined) {
     // Signed component-update trust anchor (specs/node-runtime-auto-update).
@@ -226,6 +241,25 @@ async function assertRegularFile(path, error) {
   if (!stats?.isFile() || stats.isSymbolicLink()) throw new Error(error);
 }
 
+/**
+ * A Windows node cannot register its service or contain its executors without
+ * these two files, so a Windows layout is refused rather than staged without them.
+ */
+async function windowsServiceBinaries(input) {
+  if (!input.windowsServiceWrapper) throw new Error("node_installer_windows_service_wrapper_is_missing");
+  if (!input.windowsJobBroker) throw new Error("node_installer_windows_job_broker_is_missing");
+  const wrapper = resolve(input.windowsServiceWrapper);
+  const broker = resolve(input.windowsJobBroker);
+  await assertRegularFile(wrapper, "node_installer_windows_service_wrapper_is_missing");
+  await assertRegularFile(broker, "node_installer_windows_job_broker_is_missing");
+  const expected = input.trustedServiceWrapperSha256 ?? WINDOWS_SERVICE_WRAPPER.sha256;
+  if (sha256(await readFile(wrapper)) !== expected) throw new Error("node_installer_windows_service_wrapper_digest_mismatch");
+  if ((await readFile(broker)).subarray(0, 2).toString("latin1") !== "MZ") {
+    throw new Error("node_installer_windows_job_broker_is_not_executable");
+  }
+  return [{ source: wrapper, file: WINDOWS_SERVICE_WRAPPER.file }, { source: broker, file: WINDOWS_JOB_BROKER_FILE }];
+}
+
 function parseTarget(target) {
   const match = /^(linux|macos|windows|darwin|win32)-(x64|arm64)$/.exec(target);
   if (!match) throw new Error("node_installer_target_is_invalid");
@@ -298,6 +332,8 @@ async function main(argv) {
   await stageNodeInstaller({ output: values.output, dist: values.dist, runtime: values.runtime,
     nodeExecutable: values["node-executable"], nodeModules: values["node-modules"], pythonSource: values["python-source"], target: values.target,
     sourceRevision: values["source-revision"], sourceProvenance: buildNativeSourceProvenance(values["source-root"]),
+    ...(values["windows-service-wrapper"] ? { windowsServiceWrapper: values["windows-service-wrapper"] } : {}),
+    ...(values["windows-job-broker"] ? { windowsJobBroker: values["windows-job-broker"] } : {}),
     ...(values["component-trust"] ? { componentTrust: JSON.parse(await readFile(values["component-trust"], "utf8")) } : {}) });
 }
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { access, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -25,7 +26,7 @@ describe("native node installer layout", () => {
     expect(paths).toContain(process.platform === "win32" ? "install.ps1" : "install");
     expect(paths.some((path) => path.includes("vitest"))).toBe(false);
     expect(JSON.parse(await readFile(join(fixture.output, "layout-manifest.json"), "utf8")).files).toEqual(manifest.files);
-    await expect(verifyNodeInstaller(fixture.output)).resolves.toMatchObject({ target: `${process.platform}-${process.arch}` });
+    await expect(verifyNodeInstaller(fixture.output, fixture)).resolves.toMatchObject({ target: `${process.platform}-${process.arch}` });
   });
 
   it("detects any byte changed after staging", async () => {
@@ -55,19 +56,42 @@ describe("native node installer layout", () => {
     await expect(stageNodeInstaller(escaping)).rejects.toThrow("node_installer_runtime_symlink_escapes_root");
     await expect(access(escaping.output)).rejects.toThrow();
   });
+
+  it("puts the service host and job broker in a Windows layout and refuses one without them", async () => {
+    const fixture = await createFixture("win32-x64");
+    const manifest = await stageNodeInstaller(fixture);
+    expect(manifest.files.map((file) => file.path)).toEqual(expect.arrayContaining(["bin/node.exe", "bin/MycelliosNode.exe", "bin/mycellios-job-broker.exe"]));
+    await expect(verifyNodeInstaller(fixture.output, fixture)).resolves.toMatchObject({ target: "win32-x64" });
+    // Without the test override the stand-in is not the pinned WinSW 2.12.0 build.
+    await expect(verifyNodeInstaller(fixture.output)).rejects.toThrow("node_installer_windows_service_wrapper_digest_mismatch");
+
+    const { windowsServiceWrapper: _wrapper, ...noWrapper } = await createFixture("win32-x64");
+    await expect(stageNodeInstaller(noWrapper)).rejects.toThrow("node_installer_windows_service_wrapper_is_missing");
+    const { windowsJobBroker: _broker, ...noBroker } = await createFixture("win32-x64");
+    await expect(stageNodeInstaller(noBroker)).rejects.toThrow("node_installer_windows_job_broker_is_missing");
+    const { trustedServiceWrapperSha256: _trusted, ...untrusted } = await createFixture("win32-x64");
+    await expect(stageNodeInstaller(untrusted)).rejects.toThrow("node_installer_windows_service_wrapper_digest_mismatch");
+  });
 });
 
-async function createFixture() {
+async function createFixture(target = `${process.platform}-${process.arch}`) {
   const root = await mkdtemp(join(tmpdir(), "mycellios-installer-layout-")); cleanup.push(root);
   const dist = join(root, "dist"), runtime = join(root, "runtime"), nodeModules = join(root, "node_modules"), output = join(root, "output");
   await Promise.all([mkdir(join(dist, "node"), { recursive: true }), mkdir(join(dist, "contracts"), { recursive: true }), mkdir(runtime),
     mkdir(join(nodeModules, "ws"), { recursive: true }), mkdir(join(nodeModules, "zod"), { recursive: true }), mkdir(join(root, "host"))]);
   await Promise.all(["main.js", "install-main.js", "uninstall-main.js"].map((name) => writeFile(join(dist, "node", name), "export {};\n")));
   await writeFile(join(dist, "contracts", "node-control.js"), "export {};\n");
-  await writeFile(join(runtime, "runtime-manifest.json"), JSON.stringify({ platform: process.platform, arch: process.arch }));
+  const [platform, arch] = target.split("-");
+  await writeFile(join(runtime, "runtime-manifest.json"), JSON.stringify({ platform, arch }));
   await writeFile(join(runtime, "python"), "runtime");
   await writeFile(join(nodeModules, "ws", "package.json"), "{}"); await writeFile(join(nodeModules, "zod", "package.json"), "{}");
   const nodeExecutable = join(root, "host", "node"); await writeFile(nodeExecutable, "node");
   const pythonSource = join(root, "python"); prepareNativePythonProductSource(resolve("python"), pythonSource);
-  return { output, dist, runtime, nodeExecutable, nodeModules, pythonSource, target: `${process.platform}-${process.arch}`, sourceRevision: "a".repeat(40), sourceProvenance: buildNativeSourceProvenance(resolve(".")) };
+  // Stand-ins for WinSW and the broker; the real WinSW digest is pinned in the stager.
+  const windowsServiceWrapper = join(root, "host", "WinSW-x64.exe"); await writeFile(windowsServiceWrapper, "MZ fixture service wrapper");
+  const windowsJobBroker = join(root, "host", "mycellios-job-broker.exe"); await writeFile(windowsJobBroker, "MZ fixture job broker");
+  const windows = platform === "win32"
+    ? { windowsServiceWrapper, windowsJobBroker, trustedServiceWrapperSha256: createHash("sha256").update("MZ fixture service wrapper").digest("hex") }
+    : {};
+  return { output, dist, runtime, nodeExecutable, nodeModules, pythonSource, target, sourceRevision: "a".repeat(40), sourceProvenance: buildNativeSourceProvenance(resolve(".")), ...windows };
 }
