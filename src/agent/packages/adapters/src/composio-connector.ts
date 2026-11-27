@@ -873,11 +873,17 @@ export class ConnectorRegistry implements ConnectorProvider {
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
     const discovered: ConnectorTool[] = [];
     const used = new Set<string>();
+    // When each provider answered, to see which one holds a turn's setup.
+    const startedAt = Date.now();
+    const providerMarks: string[] = [];
     const providerTools = await Promise.all(
       [...this.providers].map(async ([connectorId, provider]) => {
         try {
-          return [connectorId, await provider.discoverTools(context)] as const;
+          const tools = await provider.discoverTools(context);
+          providerMarks.push(`${connectorId}:${Date.now() - startedAt}`);
+          return [connectorId, tools] as const;
         } catch (error) {
+          providerMarks.push(`${connectorId}:${Date.now() - startedAt}:failed`);
           getLogger().error("connector discovery failed", sanitizeComposioError(error), {
             "connector.id": connectorId,
           });
@@ -885,6 +891,10 @@ export class ConnectorRegistry implements ConnectorProvider {
         }
       }),
     );
+    getLogger().info("connector.tools_discovered", {
+      "connector.discovery_ms": Date.now() - startedAt,
+      "connector.discovery_providers": providerMarks.join(" "),
+    });
     for (const [connectorId, tools] of providerTools) {
       for (const tool of tools) {
         let name = tool.name;
