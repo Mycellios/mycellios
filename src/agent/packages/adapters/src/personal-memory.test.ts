@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createPersonalMemoryResolver,
   formatPersonalMemory,
+  PERSONAL_MEMORY_AUTO_RECALL_BACKOFF_MS,
   PERSONAL_MEMORY_CONTEXT_MAX_CHARS,
   personalMemoryInstruction,
+  resetPersonalMemoryAutoRecallBackoff,
 } from "./personal-memory.js";
 
 const scope = { spaceId: "space-1", userId: "user-1", botId: "bot-1" };
@@ -127,6 +129,46 @@ describe("createPersonalMemoryResolver", () => {
     }));
     const found = await (await resolver.resolve(scope))!.search("question", { limit: 5 });
     expect(found).toEqual({ hits: [], unavailable: ["Broken"] });
+  });
+
+  it("pauses automatic searches of a memory that failed, until the pause ends or one succeeds", async () => {
+    resetPersonalMemoryAutoRecallBackoff();
+    vi.useFakeTimers();
+    try {
+      let down = true;
+      const { resolver, callServerTool } = setup([grant("slow", "Slow"), grant("ok", "Ok")], async (name) => {
+        if (name === "Slow" && down) throw new Error("timed out");
+        return searchResult([{ id: `${name}-1`, snippet: "fact" }]);
+      });
+      const memory = (await resolver.resolve(scope))!;
+      const first = await memory.search("question", { limit: 5, automatic: true });
+      expect(first.unavailable).toEqual(["Slow"]);
+      expect(callServerTool).toHaveBeenCalledTimes(2);
+
+      // The next automatic search skips it without waiting, and still reports it.
+      const skipped = await memory.search("question", { limit: 5, automatic: true });
+      expect(callServerTool).toHaveBeenCalledTimes(3);
+      expect(skipped.hits.map((hit) => hit.id)).toEqual(["Ok-1"]);
+      expect(skipped.unavailable).toEqual(["Slow"]);
+
+      // A search the Mico asks for still tries it, and its success ends the pause.
+      down = false;
+      const asked = await memory.search("question", { limit: 5 });
+      expect(asked.unavailable).toEqual([]);
+      expect(callServerTool).toHaveBeenCalledTimes(5);
+      await memory.search("question", { limit: 5, automatic: true });
+      expect(callServerTool).toHaveBeenCalledTimes(7);
+
+      // After the pause runs out, a failed memory is tried again.
+      down = true;
+      await memory.search("question", { limit: 5, automatic: true });
+      vi.advanceTimersByTime(PERSONAL_MEMORY_AUTO_RECALL_BACKOFF_MS + 1);
+      await memory.search("question", { limit: 5, automatic: true });
+      expect(callServerTool).toHaveBeenCalledTimes(11);
+    } finally {
+      vi.useRealTimers();
+      resetPersonalMemoryAutoRecallBackoff();
+    }
   });
 });
 
