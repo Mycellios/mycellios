@@ -21,7 +21,7 @@ export type NativeEngineModel = {
   fast: boolean;
 };
 /** Model catalogs of the installed CLIs that can list them without a model call. */
-export type NativeEngineModels = Partial<Record<"codex" | "claude", NativeEngineModel[]>>;
+export type NativeEngineModels = Partial<Record<"codex" | "claude" | "opencode", NativeEngineModel[]>>;
 /** The installed engines, those whose CLI reported nobody signed in, and their catalogs. */
 export type NativeEngineState = {
   engines: NativeCodingEngine[];

@@ -1,11 +1,16 @@
-import { homedir } from "node:os";
+import { execFile } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import type { NativeCommand } from "./native-agent-process.js";
-import { NativeAgentProcess } from "./native-agent-process.js";
+import { NativeAgentProcess, nativeEnvironment } from "./native-agent-process.js";
 import type { NativeCodexModel } from "./native-codex-settings.js";
 import { nativeClaudeModels, nativeCodexModels } from "./native-codex-settings.js";
+import { nativeOpenCodeModels, openCodeEnvironment, prepareOpenCodeCatalogProfile } from "./opencode-profile.js";
 
 /** Engines whose CLI lists its signed-in account's models without a model call. */
-export type CatalogEngine = "codex" | "claude";
+export type CatalogEngine = "codex" | "claude" | "opencode";
 
 const PROBE_MS = 10_000;
 const FRESH_MS = 5 * 60_000;
@@ -45,9 +50,33 @@ async function probeCodex(command: NativeCommand, cwd: string, timeoutMs: number
   } finally { await child.stop().catch(() => {}); }
 }
 
+const execFileAsync = promisify(execFile);
+
+/**
+ * `opencode models` in a throwaway private profile holding the host's provider credentials and
+ * definitions only (no plugins, MCPs or project config): it lists the providers it can reach.
+ */
+export async function probeOpenCodeModels(command: NativeCommand, timeoutMs = PROBE_MS, sourceHome?: string) {
+  const home = await mkdtemp(join(tmpdir(), "mycellios-opencode-models-"));
+  try {
+    const config = await prepareOpenCodeCatalogProfile(home, sourceHome);
+    // The resolved command ends in `acp`, which would start its protocol server instead.
+    const args = [...(command.args ?? []).filter(arg => arg !== "acp"), "models", "--verbose"];
+    const { stdout } = await execFileAsync(command.command, args, {
+      cwd: home, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true, encoding: "utf8",
+      env: { ...nativeEnvironment(), ELECTRON_RUN_AS_NODE: "1", ...openCodeEnvironment(home, config) },
+    });
+    return nativeOpenCodeModels(stdout, config.model);
+  } finally {
+    await rm(home, { recursive: true, force: true, maxRetries: 3 }).catch(() => {});
+  }
+}
+
 /** Reads one installed CLI's model catalog: bounded, read-only and never a model call. */
 export function probeNativeModels(engine: CatalogEngine, command: NativeCommand, cwd = homedir()) {
-  return engine === "claude" ? probeClaude(command, cwd, PROBE_MS) : probeCodex(command, cwd, PROBE_MS);
+  return engine === "claude" ? probeClaude(command, cwd, PROBE_MS)
+    : engine === "opencode" ? probeOpenCodeModels(command)
+    : probeCodex(command, cwd, PROBE_MS);
 }
 
 type Entry = { at: number; value: NativeCodexModel[] | undefined; pending?: Promise<NativeCodexModel[] | undefined> };

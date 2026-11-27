@@ -552,7 +552,12 @@
   that updates a note resumes the session with the new instructions instead of
   starting a new one and resending the history; an open process still restarts.
   The native OpenCode engine is opt-in per Mico and uses the server's installed
-  CLI over ACP. Preserve operator account/Space grants and a private CLI home per
+  CLI over ACP. Its picker lists `opencode models --verbose` from a throwaway private profile
+  holding only the host's provider credentials and definitions (no plugins, MCPs or project
+  config; tool-capable, non-deprecated models, at most 256, the CLI's own model first and
+  marked default). A chosen `provider/model` goes in Bot.nativeConfig.modelId (no effort, Fast or
+  user settings) and the run imports only that provider and binds a new session to it; without
+  one OpenCode keeps its own model. Verify opencode-profile and chat-header-model tests. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
   permissions outside the approved MCP bridge. Keep the explicit MCP object
   schema root even for union schemas and expose the authorized file tools with

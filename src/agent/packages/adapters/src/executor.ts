@@ -4545,7 +4545,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? pinnedModelCredentialError(modelChoice, overrideCredential)
             : undefined;
         const nativeEngine = agentEngine !== "pi";
-        const nativeConfig = agentEngine === "codex" || agentEngine === "claude"
+        const nativeConfig = agentEngine === "codex" || agentEngine === "claude" || agentEngine === "opencode"
           ? turnModel ? turnModel.nativeConfig : leaseTarget.nativeConfig as AgentRunRequest["nativeConfig"]
           : null;
         const selected = turnModel

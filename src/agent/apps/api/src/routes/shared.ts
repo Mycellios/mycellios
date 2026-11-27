@@ -105,11 +105,12 @@ function wellFormed<T>(value: unknown, schema: z.ZodType<T>): T[] {
 /** Keeps only well-formed, bounded catalogs of installed, signed-in engines: a PC reports them. */
 function engineModels(value: unknown, engines: string[]) {
   const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const models: { codex?: NativeEngineModelInfo[]; claude?: NativeEngineModelInfo[] } = {};
-  for (const engine of ["codex", "claude"] as const) {
+  const models: { codex?: NativeEngineModelInfo[]; claude?: NativeEngineModelInfo[]; opencode?: NativeEngineModelInfo[] } = {};
+  for (const engine of ["codex", "claude", "opencode"] as const) {
     const list = source[engine];
     if (!engines.includes(engine) || !Array.isArray(list)) continue;
-    models[engine] = list.slice(0, 128).flatMap(entry => {
+    // OpenCode lists every provider it reaches, so it may report more models.
+    models[engine] = list.slice(0, engine === "opencode" ? 256 : 128).flatMap(entry => {
       const parsed = NativeEngineModelSchema.safeParse(entry);
       return parsed.success ? [parsed.data] : [];
     });

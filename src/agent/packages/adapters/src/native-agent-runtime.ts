@@ -1,7 +1,7 @@
 import { isPausingAskTool, pausingQuestionnaire } from "./ask-user-questionnaire.js";
 import { nativeCodexQuota } from "./native-codex-quota.js";
 import { turnStyleReminder, withConversationStyle } from "./conversation-style.js";
-import { prepareOpenCodeProfile } from "./opencode-profile.js";
+import { openCodeEnvironment, openCodeModelProvider, prepareOpenCodeProfile } from "./opencode-profile.js";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -226,9 +226,13 @@ export async function discoverNativeEngines(dataDir?: string, options: NativeEng
     claudeAsked ? nativeSignInState("claude", claude) : undefined,
   ]);
   // A signed-out CLI has no account catalog to read.
-  const [codexModels, claudeModels] = await Promise.all([
+  // OpenCode reports no sign-in: its catalog lists only the providers it holds credentials for.
+  const openCodeCommand = openCode?.command;
+  const openCodeAsked = openCodeCommand && nativeCommandAvailable(openCodeCommand) && openCode?.ready;
+  const [codexModels, claudeModels, openCodeModels] = await Promise.all([
     codexAsked && codexSignedIn !== false ? nativeModelCatalog("codex", codex) : undefined,
     claudeAsked && claudeSignedIn !== false ? nativeModelCatalog("claude", claude) : undefined,
+    openCodeAsked ? nativeModelCatalog("opencode", openCodeCommand) : undefined,
   ]);
   const managedOpenCode = openCode?.source === "managed";
   // The version of a copy that runs from the store; updates are offered only for those.
@@ -256,6 +260,7 @@ export async function discoverNativeEngines(dataDir?: string, options: NativeEng
       id: "opencode" as const,
       name: "OpenCode",
       available: nativeCommandAvailable(openCode?.command),
+      ...(openCodeModels?.length ? { models: openCodeModels } : {}),
       ...(managedOpenCode ? { managedVersion: openCode.version } : {}),
       canInstall: !managedOpenCode && !configured.opencode &&
         host.allowOpenCodeInstall === true && Boolean(storeRoot && nativeEngineRelease("opencode", options)),
@@ -290,7 +295,7 @@ export function defaultLocalEngine(signedIn: readonly string[] | undefined) {
 export function nativeEngineModels(engines: Awaited<ReturnType<typeof discoverNativeEngines>>): NativeEngineModels {
   const models: NativeEngineModels = {};
   for (const engine of engines)
-    if (engine.available && (engine.id === "codex" || engine.id === "claude") && "models" in engine && engine.models)
+    if (engine.available && (engine.id === "codex" || engine.id === "claude" || engine.id === "opencode") && "models" in engine && engine.models)
       models[engine.id] = engine.models;
   return models;
 }
@@ -659,9 +664,11 @@ export class NativeAgentRuntime implements AgentRuntime {
       ...(openCodeProject ? [openCodeProject] : []), ...openCodeFileToolNames,
       ...(claudeWorkspace ? [claudeWorkspace] : []), ...(claudeUserSettings ? ["claude-user-settings"] : [])];
     const modelConfig = request.nativeConfig;
+    // OpenCode's chosen model is fixed when its process starts, so another model is another session.
+    const openCodeModel = engine === "opencode" ? openCodeModelProvider(modelConfig?.modelId) && modelConfig?.modelId : undefined;
     const binding = hash(engine === "codex" && (modelConfig?.modelId || modelConfig?.thinkingLevel || modelConfig?.fastMode)
       ? [...baseBinding, [modelConfig.modelId ?? null, modelConfig.thinkingLevel ?? null, Boolean(modelConfig.fastMode)]]
-      : baseBinding);
+      : openCodeModel ? [...baseBinding, ["opencode-model", openCodeModel]] : baseBinding);
     let sessionId: string | undefined;
     try {
       const prior = JSON.parse(await readFile(join(cwd, "session.json"), "utf8"));
@@ -1231,7 +1238,7 @@ export class NativeAgentRuntime implements AgentRuntime {
             // OpenCode discovers credentials and plugins through the host's home directory.
             // Keep its fresh profile inside the same account/Space/chat boundary as this run.
             const openCodeHome = engine === "opencode" ? join(cwd, ".opencode-home") : null;
-            const openCodeConfig = openCodeHome ? await prepareOpenCodeProfile(openCodeHome) : null;
+            const openCodeConfig = openCodeHome ? await prepareOpenCodeProfile(openCodeHome, undefined, openCodeModel || undefined) : null;
             const projectCwd = openCodeProject ?? cwd;
             if (openCodeProject && await context.resolveOpenCodeProject?.() !== openCodeProject)
               throw new Error("The selected project changed. Open it again.");
@@ -1263,23 +1270,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                   });
               },
               failure,
-              openCodeHome ? {
-                HOME: openCodeHome,
-                USERPROFILE: openCodeHome,
-                APPDATA: openCodeHome,
-                LOCALAPPDATA: openCodeHome,
-                XDG_CONFIG_HOME: join(openCodeHome, "config"),
-                XDG_DATA_HOME: join(openCodeHome, "data"),
-                XDG_CACHE_HOME: join(openCodeHome, "cache"),
-                XDG_STATE_HOME: join(openCodeHome, "state"),
-                OPENCODE_PURE: "true",
-                OPENCODE_DISABLE_PROJECT_CONFIG: "true",
-                OPENCODE_DISABLE_AUTOUPDATE: "true",
-                OPENCODE_DISABLE_LSP_DOWNLOAD: "true",
-                OPENCODE_DISABLE_EXTERNAL_SKILLS: "true",
-                OPENCODE_DISABLE_CLAUDE_CODE: "true",
-                OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeConfig),
-              } : undefined,
+              openCodeHome ? openCodeEnvironment(openCodeHome, openCodeConfig) : undefined,
             );
             const initialized = await process.request<{ agentCapabilities?: { loadSession?: boolean } }>("initialize", {
               protocolVersion: 1,

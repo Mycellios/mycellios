@@ -215,6 +215,30 @@ it("offers only the selected Desktop's native engines, and saves the engine with
   expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "opencode", nativeConfig: null, modelProvider: null, modelId: null, thinkingLevel: null });
 });
 
+it("lists OpenCode's models and saves the chosen provider/model only for this Mico", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["opencode"], models: { opencode: [
+    { id: "opencode-go/kimi", label: "Kimi · opencode-go", isDefault: true, thinkingLevels: [], fast: false },
+    { id: "google/gemini-3-pro", label: "Gemini 3 Pro · google", isDefault: false, thinkingLevels: [], fast: false },
+  ] } };
+  await render("opencode");
+  expect(container.querySelector('[data-choice="native-opencode::opencode-go/kimi"]')?.getAttribute("data-selected")).toBe("true");
+  // The CLI's own model is listed, so no separate default row.
+  expect(container.querySelector('[data-choice="native-opencode::default"]')).toBeNull();
+  expect(container.querySelector("[data-trigger]")?.textContent).toBe("Kimi · opencode-go");
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::google/gemini-3-pro"]')!.click());
+  expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "opencode", nativeConfig: { modelId: "google/gemini-3-pro" }, modelProvider: null, modelId: null, thinkingLevel: null });
+});
+
+it("keeps OpenCode's own choice available when it has no model set", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["opencode"], models: { opencode: [
+    { id: "google/gemini-3-pro", label: "Gemini 3 Pro · google", isDefault: false, thinkingLevels: [], fast: false },
+  ] } };
+  await render("opencode");
+  expect(container.querySelector('[data-choice="native-opencode::default"]')?.textContent).toBe("OpenCode");
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-choice="native-opencode::default"]')!.click());
+  expect(save).toHaveBeenCalledExactlyOnceWith({ agentEngine: "opencode", nativeConfig: null, modelProvider: null, modelId: null, thinkingLevel: null });
+});
+
 it("disables an engine whose CLI is signed out, but keeps the Mico's current engine selectable", async () => {
   fixtures.engines = { computer: "desktop", engines: ["claude", "opencode"], signedOut: ["claude", "opencode"] };
   await render("opencode");

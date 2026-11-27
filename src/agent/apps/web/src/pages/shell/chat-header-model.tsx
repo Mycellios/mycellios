@@ -91,9 +91,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({
     enabled: open && enginesQuery.data?.computer === "server" && !enginesQuery.data.models && enginesQuery.data.engines.includes("codex"),
   }));
-  const engineModels = (engine: "codex" | "claude") => enginesQuery.data?.models?.[engine] ??
+  const engineModels = (engine: "codex" | "claude" | "opencode") => enginesQuery.data?.models?.[engine] ??
     (engine === "codex" && enginesQuery.data?.computer === "server" ? nativeCatalog.data ?? [] : []);
-  const catalogEngine = bot.agentEngine === "codex" || bot.agentEngine === "claude" ? bot.agentEngine : null;
+  const catalogEngine = bot.agentEngine === "codex" || bot.agentEngine === "claude" || bot.agentEngine === "opencode" ? bot.agentEngine : null;
   const nativeModels = catalogEngine ? engineModels(catalogEngine) : [];
   const nativeModel = nativeModels.find(model => bot.nativeConfig?.modelId ? model.id === bot.nativeConfig.modelId : model.isDefault);
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
@@ -197,10 +197,13 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
       NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider))
     : undefined;
   // An engine whose CLI listed its models offers each one; otherwise its account default.
-  const listed = (engine: NativeProvider) => engine === "codex" || engine === "claude" ? engineModels(engine) : [];
-  const nativeChoices = nativeProviders.filter(engine => !listed(engine).length).map(engine => ({
+  const listed = (engine: NativeProvider) => engine === "acp" ? [] : engineModels(engine);
+  // OpenCode without a model of its own keeps a row for whatever it picks by itself.
+  const nativeChoices = nativeProviders.filter(engine => !listed(engine).length ||
+    engine === "opencode" && !listed(engine).some(model => model.isDefault)).map(engine => ({
     key: modelOptionKey(`native-${engine}`, "default"), provider: `native-${engine}`,
-    providerLabel: NATIVE_PROVIDERS[engine], label: NATIVE_PROVIDERS[engine] as string, title: t`Use this account`,
+    providerLabel: NATIVE_PROVIDERS[engine], label: NATIVE_PROVIDERS[engine] as string,
+    title: engine === "opencode" ? t`Model set in OpenCode` : t`Use this account`,
     ...signInRequired(engine),
   }));
   for (const engine of nativeProviders) nativeChoices.push(...listed(engine).map(model => ({
@@ -275,7 +278,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
         fastMode: false, thinkingLevel: null }
         // Another Claude Code model keeps the owner's configuration switch as it was.
         : engine === "claude" ? { modelId: selected?.modelId === "default" ? null : selected?.modelId, thinkingLevel: null,
-          ...(bot.agentEngine === "claude" && bot.nativeConfig?.userSettings ? { userSettings: true } : {}) } : null,
+          ...(bot.agentEngine === "claude" && bot.nativeConfig?.userSettings ? { userSettings: true } : {}) }
+        // OpenCode runs the chosen provider/model; its own default otherwise.
+        : engine === "opencode" && selected?.modelId && selected.modelId !== "default" ? { modelId: selected.modelId } : null,
       modelProvider: engine ? null : selected?.provider ?? null,
       modelId: engine ? null : selected?.modelId ?? null,
       thinkingLevel: null,
@@ -334,7 +339,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                   .map(entry => modelOptionKey(entry.provider, entry.id)))}
               />}
             </fieldset>}
-          {(["codex", "claude"] as const).some(engine => NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && !engineModels(engine).length)
+          {(["codex", "claude", "opencode"] as const).some(engine => NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && !engineModels(engine).length)
             && enginesQuery.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
           {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isFetching ?<p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
           {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isError && !mycelliosCatalog.data?.length ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}

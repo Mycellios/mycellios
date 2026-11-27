@@ -10122,6 +10122,9 @@ msgstr "Ejecutar en su propia conversación"
 msgid "Choose a model to use this provider"
 msgstr "Elige una opción para usar este proveedor"
 
+msgid "Model set in OpenCode"
+msgstr "Modelo configurado en OpenCode"
+
 msgid "Use this account"
 msgstr "Usar esta cuenta"
 

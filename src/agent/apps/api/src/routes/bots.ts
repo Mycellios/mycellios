@@ -439,8 +439,14 @@ export function botsRoutes(ctx: RouterContext) {
           if (!section) throw new IsolationError();
         }
         const configEngine = input.agentEngine ?? existing.agentEngine;
-        if (input.nativeConfig && configEngine !== "codex" && configEngine !== "claude") {
-          throw new ORPCError("BAD_REQUEST", { message: "Model preferences require Codex or Claude Code." });
+        if (input.nativeConfig && configEngine !== "codex" && configEngine !== "claude" && configEngine !== "opencode") {
+          throw new ORPCError("BAD_REQUEST", { message: "Model preferences require Codex, Claude Code or OpenCode." });
+        }
+        // OpenCode takes only a model, named as its catalog lists it (provider/model).
+        if (input.nativeConfig && configEngine === "opencode" && (input.nativeConfig.thinkingLevel ||
+          input.nativeConfig.fastMode || input.nativeConfig.userSettings ||
+          (input.nativeConfig.modelId && !/^[^/\s]+\/\S+$/.test(input.nativeConfig.modelId)))) {
+          throw new ORPCError("BAD_REQUEST", { message: "OpenCode takes only a model named provider/model." });
         }
         if (input.nativeConfig?.fastMode && configEngine !== "codex") {
           throw new ORPCError("BAD_REQUEST", { message: "Fast mode requires Codex." });
