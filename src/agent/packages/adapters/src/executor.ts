@@ -4049,6 +4049,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const markPrepared = (stage: string) => {
         preparationMarks.push(`${stage}:${Math.round(performance.now() - preparationStartedAt)}`);
       };
+      // When each read awaited by the recall stage settled, on the same clock, to see which
+      // one holds that stage (it waits for the slowest).
+      const recallMarks: string[] = [];
+      const markRecallRead = <T>(read: string, pending: Promise<T>): Promise<T> => {
+        const settled = () => {
+          recallMarks.push(`${read}:${Math.round(performance.now() - preparationStartedAt)}`);
+        };
+        pending.then(settled, settled);
+        return pending;
+      };
       // Resumed attempts keep the first start, so lateness reflects when the run began.
       const executionStartedAt = current.startedAt ?? new Date();
       try {
@@ -4587,25 +4597,25 @@ export function createRunExecutor(deps: ExecutorDeps) {
           recalled,
           personalRecalled,
         ] = await Promise.all([
-          discoveredPromise,
-          loadCurrentTurnImages(deps, turnBlocks, context),
-          restrictedRun
+          markRecallRead("tools", discoveredPromise),
+          markRecallRead("images", loadCurrentTurnImages(deps, turnBlocks, context)),
+          markRecallRead("memory", restrictedRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared", onIncluded:(ids)=>{memoryRecallIds=ids;}, ...(previousUserMessage?{previousQuery:previousUserMessage}:{}), onShadow:(ids)=>{memoryShadow.candidate=ids;}}),
-          restrictedRun
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared", onIncluded:(ids)=>{memoryRecallIds=ids;}, ...(previousUserMessage?{previousQuery:previousUserMessage}:{}), onShadow:(ids)=>{memoryShadow.candidate=ids;}})),
+          markRecallRead("scratchpad", restrictedRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
                 spaceId: run.spaceId,
                 botId: bot.id,
-              }),
-          restrictedRun || !deps.ticketBoardEnabled
+              })),
+          markRecallRead("tickets", restrictedRun || !deps.ticketBoardEnabled
             ? Promise.resolve(undefined)
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
                 text: task.prompt,
-              }),
-          recallPromise,
-          personalRecallPromise,
+              })),
+          markRecallRead("semantic", recallPromise),
+          markRecallRead("personal", personalRecallPromise),
         ]);
         markPrepared("recall");
         for (const hit of personalRecalled?.hits ?? []) personalMemoryIds.add(hit.id);
@@ -9617,6 +9627,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           getLogger().info("run.prepared", {
             "run.prepare_ms": Math.round(performance.now() - preparationStartedAt),
             "run.prepare_stages": preparationMarks.join(" "),
+            "run.prepare_recall_reads": recallMarks.join(" "),
           });
           const runtimeEvents = deps.runtime.run(
             {
