@@ -90,3 +90,22 @@ it("offers result filters and reports the chosen one", async () => {
   expect(onFilter).toHaveBeenCalledWith("messages");
   expect(container.textContent).toContain("No results");
 });
+
+it("groups results by kind with a count, without kind labels or repeated names", async () => {
+  const mico: SearchHit = { kind: "conversation", botId: "bot-1", botName: "Mico", title: "Mico", snippet: "CEO · Coordination" };
+  const plain: SearchHit = { kind: "conversation", botId: "bot-2", botName: "SEO", title: "SEO", snippet: "SEO" };
+  await act(async () =>
+    root.render(
+      <SpaceSearchResults hits={[file("ledger"), mico, plain]} loading={false} onSelect={() => {}} query="co" />,
+    ),
+  );
+  const sections = [...container.querySelectorAll("section")];
+  expect(sections.map((section) => section.getAttribute("data-testid"))).toEqual(["search-section-micos", "search-section-files"]);
+  expect(sections[0]!.querySelector("h3")?.textContent).toBe("Micos2");
+  const rows = [...sections[0]!.querySelectorAll("button")].map((row) => row.textContent);
+  expect(rows).toEqual(["MicoCEO · Coordination", "SEO"]);
+  expect(container.textContent).not.toMatch(/bconversationb|bfileb/);
+  // A file names who has it, not its type and size.
+  expect(sections[1]!.querySelector("button")?.textContent).toBe("ledger.pngScout");
+  expect(sections[0]!.querySelector("mark")?.textContent).toBe("co");
+});
