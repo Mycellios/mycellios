@@ -19,6 +19,8 @@ import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Archive, LayoutGrid } from "lucide-react";
 import { ArtifactsPage } from "./Artifacts";
+import { MemoryWorkspace } from "./MemoryWorkspace";
+import { MemoryRecallGate } from "../components/memory/MemoryRecall";
 import type {
   AgentSkillCatalogEntry,
   AppBootstrap,
@@ -529,8 +531,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const redirectKeepingOverlay = useCallback(
     (pathname: string) => {
       const search = new URLSearchParams(shellOverlaySearch(searchParamsRef.current));
-      if (searchParamsRef.current.get("view") === "library") {
-        for (const key of ["view", "file", "libraryBot"]) {
+      if (searchParamsRef.current.get("view") === "library" || searchParamsRef.current.get("view") === "memory") {
+        for (const key of ["view", "file", "libraryBot", "note", "memory"]) {
           const value = searchParamsRef.current.get(key);
           if (value) search.set(key, value);
         }
@@ -4509,6 +4511,23 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     maintenance={mode === "computer" && active && !computerOpen && computerPanelNeedsMaintenance(computer?.state, booting) ? <ComputerMaintenanceActions botId={active.id} computer={computer} onChanged={async()=>{await refreshThread(active.id);}}/> : undefined} />;
   const marketplaceView = searchParams.get("view") === "marketplace" || overlay?.kind === "integrations";
   const libraryView = searchParams.get("view") === "library";
+  const memoryView = searchParams.get("view") === "memory";
+  const openMemoryNote = (noteId: string) => showMemory(noteId);
+  function showMemory(noteId?: string) {
+    if (activityMode) toggleActivityMode();
+    setVoiceConversation(null);
+    reviewWorkspace?.hide();
+    setPanel(null);
+    setComputerOpen(false);
+    setMobileSidebarOpen(false);
+    const next = withShellOverlay(searchParams, null);
+    next.set("view", "memory");
+    if (noteId) { next.set("note", noteId); next.delete("memory"); }
+    next.delete("task");
+    next.delete("file");
+    next.delete("libraryBot");
+    setSearchParams(next);
+  }
   function showLibrary(botId?: string) {
     if (activityMode) toggleActivityMode();
     setVoiceConversation(null);
@@ -4585,7 +4604,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const routineView = searchParams.get("view") === "routines";
   const exitRoutineView = () => {
     const next = new URLSearchParams(searchParams); next.delete("view"); next.delete("flow"); next.delete("task"); next.delete("usageBot");
-    next.delete("file"); next.delete("libraryBot");
+    next.delete("file"); next.delete("libraryBot"); next.delete("note"); next.delete("memory");
     setSearchParams(next); setPanel(null);
   };
   const showRoutines = () => {
@@ -4883,7 +4902,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     </div> : undefined}
     footer={mobile ? sidebarFooter(() => setMobileNavigationOpen(false)) : undefined}
     onNavigate={mobile ? () => setMobileNavigationOpen(false) : undefined}
-    apps={appsOpen} library={libraryView} onApps={openApps}
+    apps={appsOpen} library={libraryView} memory={memoryView} onMemory={() => showMemory()} onApps={openApps}
     marketplace={marketplaceView && !appsOpen} scope={JSON.stringify([userId, currentSpaceId])}
     activeBotId={inGroup ? undefined : active?.id}
     usage={usageView} schedule={scheduleView} onSchedule={showSchedule}
@@ -4927,7 +4946,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         reviewWorkspace.add({ id: crypto.randomUUID(), url: destination, name: new URL(destination).host, mimeType: "text/uri-list" });
       }}
       onPreviewCollapsedChange={setBotsSidebarCollapsed}
-      computerOpen={floatingChat || computerOpen || libraryView || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
+      computerOpen={floatingChat || computerOpen || libraryView || memoryView || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
       data-floating-chat={floatingChat || undefined}
       data-workspace-chrome="compact"
       data-task-desktop={Boolean(desktopBridge())}
@@ -4988,7 +5007,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       ) : null}
       {!floatingChat && workspaceNavigation()}
       <FrozenWhileCovered covered={overlay?.kind === "settings"}>
-      {!floatingChat && ((!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen) ? <Sidebar
+      {!floatingChat && ((!libraryView && !memoryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen) ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
         side={document.documentElement.dir === "rtl" ? "right" : "left"}
         data-testid="bots-sidebar"
@@ -5050,6 +5069,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               loading={searchLoading}
               filter={searchFilter}
               onFilter={setSearchFilter}
+              query={query}
+              botColor={(botId) => bots.find((bot) => bot.id === botId)?.color}
               onSelect={(hit) => void jumpToSearchHit(hit)}
             />
           ) : (
@@ -5159,7 +5180,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           />
         ) : null}
         <CallReturnBar />
-        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onWhatsAppLink={()=>setOverlay({kind:"messaging"})} onShowBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onShowBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=${NEW_ROUTINE_LINK}`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} onOpenConversation={(item, messageId) => navigate(`/app/${encodeURIComponent(item.botId)}?task=${encodeURIComponent(item.threadId)}${messageId ? `&m=${encodeURIComponent(messageId)}` : ""}`)} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowsAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}><WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /></WorkflowsAvailability> : routineView ? <RoutinesAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}>{active && !inGroup ? <RoutineWorkspace
+        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : memoryView ? <MemoryWorkspace key={JSON.stringify([userId, currentSpaceId])} bots={bots.filter(bot => !currentSpaceId || bot.spaceId === currentSpaceId)} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onWhatsAppLink={()=>setOverlay({kind:"messaging"})} onShowBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onShowBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=${NEW_ROUTINE_LINK}`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} onOpenConversation={(item, messageId) => navigate(`/app/${encodeURIComponent(item.botId)}?task=${encodeURIComponent(item.threadId)}${messageId ? `&m=${encodeURIComponent(messageId)}` : ""}`)} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowsAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}><WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /></WorkflowsAvailability> : routineView ? <RoutinesAvailability onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)}>{active && !inGroup ? <RoutineWorkspace
           key={JSON.stringify([userId, currentSpaceId, active.id])}
           bot={active}
           client={rpc}
@@ -5272,7 +5293,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               </div>
             ) : <PageLoading layout="chat" className="flex-1" />
           ) : (
-            <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><SendToGroupContext.Provider value={sendToGroup}><Transcript
+            <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><SendToGroupContext.Provider value={sendToGroup}><MemoryRecallGate enabled={!inGroup && Boolean(active)} botName={active?.name} onOpenNote={openMemoryNote}><Transcript
               headerTabs={false}
               banner={conversationBanner}
               footer={transcriptFooter}
@@ -5339,7 +5360,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               onOpenComputer={onOpenComputer}
               onOpenImport={openTranscriptImport}
               onOpenImportSetup={openTranscriptImportSetup}
-            /></SendToGroupContext.Provider></MessagePinsContext.Provider></ResponseStyleContext.Provider>
+            /></MemoryRecallGate></SendToGroupContext.Provider></MessagePinsContext.Provider></ResponseStyleContext.Provider>
           )}
           <AlertDialog open={Boolean(deletingMessage)} onOpenChange={open => { if (!open) setMessageDelete(null); }}>
             <AlertDialogContent>
@@ -5467,7 +5488,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       </FrozenWhileCovered>
 
       {Object.entries(sideQuestionTargets).map(([key, target]) => <SideQuestion key={key} {...target} enterToSend={enterToSend}
-        active={key === asideKey && target.visible && !libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
+        active={key === asideKey && target.visible && !libraryView && !memoryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
         onClose={() => closeAside(key)} onBrowser={chatTools.onBrowser} onFiles={chatTools.onFiles} onSettings={chatTools.onSettings} onVoice={chatTools.onVoice}/>) }
       {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.group?.id ?? voiceConversation.id,voiceConversation.group ? null : taskScope?.taskThreadId])} rpc={rpc} accountId={userId} spaceId={currentSpaceId} taskThreadId={voiceConversation.group ? undefined : taskScope?.taskThreadId} bot={voiceConversation} group={voiceConversation.group} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
 

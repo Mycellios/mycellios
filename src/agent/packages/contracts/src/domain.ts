@@ -942,6 +942,24 @@ export function isDeletableMemoryDocument(path: string): boolean {
   return path !== MEMORY_INDEX_PATH;
 }
 
+/**
+ * A safe relative path for a note the person creates: folders and a name, `.md` added, no
+ * traversal, control or reserved characters, and never the task folder, whose notes belong
+ * to their conversation. Null when nothing usable is left.
+ */
+export function memoryNotePath(input: string): string | null {
+  const parts = input
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim().replace(/[\u0000-\u001f\u007f<>:"|?*[\]#^]/g, ""))
+    .filter(Boolean);
+  if (!parts.length || parts.some((part) => part === "." || part === ".." || part.startsWith("."))) return null;
+  if (parts[0]!.toLowerCase() === "tasks") return null;
+  const path = parts.join("/");
+  const withExtension = /\.md$/i.test(path) ? path : `${path}.md`;
+  return withExtension.length > 200 ? null : withExtension;
+}
+
 export const ConnectionIdentitySchema = z.object({
   label: z.string().trim().min(1).max(240),
 });

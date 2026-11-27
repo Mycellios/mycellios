@@ -11,6 +11,7 @@ import {
 import {
   Bell,
   Bot,
+  Brain,
   CalendarClock,
   ChartArea,
   Archive,
@@ -51,6 +52,8 @@ type WorkspaceRailProps = {
   activeBotId?: string;
   activity: boolean;
   library?: boolean;
+  memory?: boolean;
+  onMemory?: () => void;
   usage?: boolean;
   marketplace?: boolean;
   apps?: boolean;
@@ -159,6 +162,9 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       extra: true,
     },
     { id: "files", label: t`Library`, icon: Archive, action: props.onArtifacts, current: props.library, extra: true },
+    ...(props.onMemory
+      ? [{ id: "memory" as const, label: t`Memory`, icon: Brain, action: props.onMemory, current: props.memory, extra: true }]
+      : []),
     ...(props.onBoard
       ? [
           {

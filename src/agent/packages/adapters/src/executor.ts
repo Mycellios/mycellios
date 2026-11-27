@@ -390,7 +390,7 @@ import {
 import { createMediaGenerationProvider } from "./media-generation-factory.js";
 import { generateMediaFromTool } from "./media-generation-tools.js";
 import { selectRunMediaGeneration } from "./native-image-generation.js";
-import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
+import { loadAgentMemoryContext, recordRunMemoryRecall, resolveLocalMemoryScope } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import type { PersonalMemoryResolver } from "./personal-memory.js";
 import {
@@ -4478,6 +4478,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 })
                 .catch(() => null)
             : Promise.resolve(null);
+        let memoryRecallIds: string[] = [];
         const [
           discovered,
           currentTurnImages,
@@ -4491,7 +4492,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           restrictedRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared", onIncluded:(ids)=>{memoryRecallIds=ids;}}),
           restrictedRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
@@ -4508,6 +4509,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           personalRecallPromise,
         ]);
         for (const hit of personalRecalled?.hits ?? []) personalMemoryIds.add(hit.id);
+        recordRunMemoryRecall(deps.prisma, { runId: run.id, spaceId: run.spaceId, userId: run.userId }, memoryRecallIds);
         const personalMemoryContext = personalRecalled
           ? formatPersonalMemory(personalRecalled.hits)
           : "";

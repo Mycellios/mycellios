@@ -1383,6 +1383,8 @@ model Run {
   effects              ExternalEffect[]
   steeringMessages     SteeringMessage[]
   externalMessage      ExternalMessage?
+  /// Which local memory notes this run put in its prompt (ids only).
+  memoryRecall         RunMemoryRecall?
 
   @@unique([spaceId, clientNonce])
   @@index([status, wakeAt])
@@ -2243,6 +2245,21 @@ model MemoryConnection {
 
 /// A Mico's access to one personal memory (specs/mcp-memory, phase 2). Nothing is granted
 /// by default, and only the connection's owner creates or removes a grant.
+/// The local memory notes a run placed in its prompt, so the person can see what a
+/// reply had in context. Ids only: note text stays in the encrypted memory tables.
+model RunMemoryRecall {
+  runId       String   @id
+  run         Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  spaceId     String
+  userId      String
+  documentIds String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([spaceId, userId])
+  @@map("run_memory_recalls")
+}
+
 model MicoMemoryGrant {
   id           String           @id @default(cuid())
   spaceId      String

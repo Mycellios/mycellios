@@ -17,9 +17,10 @@ import {
   PopoverTrigger,
 } from "@mycellios/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
-import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Split, Trash2, Users, X } from "lucide-react";
+import { Brain, Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, Split, Trash2, Users, X } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { MessagePinsContext } from "../../components/PinnedMessages";
+import { useMemoryRecall } from "../../components/memory/MemoryRecall";
 import { SEND_TO_GROUP_MENU_LIMIT, SendToGroupContext } from "../../components/SendToGroup";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
 import { copyableMessageText } from "../../lib/message-text";
@@ -153,6 +154,8 @@ export function MessageHoverActions({
   const pinnable=Boolean(pins && !message.id.includes(":") && (message.role==="user"||message.role==="bot"));
   const pinned=pins?.ids.has(message.id)??false;
   const { compactMessageActions } = useGeneralPreferences();
+  const memoryRecall = useMemoryRecall();
+  const recallable = Boolean(memoryRecall && message.role === "bot" && !message.id.includes(":") && !message.progress);
   const [moreOpen, setMoreOpen] = useState(false);
   const [reactionsOpen, setReactionsOpen] = useState(false);
 
@@ -233,6 +236,10 @@ export function MessageHoverActions({
               onClick={() => { setMoreOpen(false); onBranch(message); }}>
               <Split size={14} strokeWidth={1.7} />
               <Trans>Branch in new conversation</Trans>
+            </DropdownMenuItem> : null}
+            {recallable ? <DropdownMenuItem onClick={() => { setMoreOpen(false); memoryRecall!.show(message.id); }}>
+              <Brain size={14} strokeWidth={1.7} />
+              <Trans>Memory in context</Trans>
             </DropdownMenuItem> : null}
             {onAddRoutine && message.role === "user" && copyableMessageText(message) ? <DropdownMenuItem onClick={() => { setMoreOpen(false); onAddRoutine(copyableMessageText(message).slice(0, 80), copyableMessageText(message)); }}>
               <Repeat2 size={14} /><Trans>Repeat automatically</Trans>

@@ -13013,7 +13013,6 @@ msgstr "El presupuesto diario se restablece a las 00:00 UTC."
 msgid "Pending reviews"
 msgstr "Revisiones pendientes"
 
-
 msgid "Open Mycellios Dev"
 msgstr "Abrir Mycellios Dev"
 
@@ -16173,3 +16172,135 @@ msgstr "Mycellios no responde ahora mismo; suele pasar un minuto mientras se act
 
 msgid "Mycellios models are not available right now. Try again shortly."
 msgstr "Los modelos de Mycellios no están disponibles ahora mismo. Vuelve a intentarlo en un momento."
+
+msgid "Memory view"
+msgstr "Vista de memoria"
+
+msgid "Notes"
+msgstr "Notas"
+
+msgid "Graph"
+msgstr "Grafo"
+
+msgid "Search notes"
+msgstr "Buscar notas"
+
+msgid "New note"
+msgstr "Nueva nota"
+
+msgid "Could not load your memory."
+msgstr "No se ha podido cargar tu memoria."
+
+msgid "Your Micos have not saved anything yet. Notes they keep, and notes you write, appear here."
+msgstr "Tus Micos aún no han guardado nada. Aquí aparecen las notas que guardan y las que escribes tú."
+
+msgid "No notes match your search."
+msgstr "Ninguna nota coincide con tu búsqueda."
+
+msgid "{0} notes · {1} links"
+msgstr "{0} notas · {1} enlaces"
+
+msgid "There are too many notes to draw at once. Hide some groups or open a note to see its own links."
+msgstr "Hay demasiadas notas para dibujarlas a la vez. Oculta algunos grupos o abre una nota para ver sus enlaces."
+
+msgid "Nothing to show. Notes appear here as your Micos remember things."
+msgstr "No hay nada que mostrar. Las notas aparecen aquí a medida que tus Micos recuerdan cosas."
+
+msgid "Notes connect when one mentions another as [[note name]]."
+msgstr "Las notas se conectan cuando una menciona a otra como [[nombre de la nota]]."
+
+msgid "Local graph"
+msgstr "Grafo local"
+
+msgid "Full graph"
+msgstr "Grafo completo"
+
+msgid "This note has no links yet. Mention another note as [[note name]] to connect them."
+msgstr "Esta nota aún no tiene enlaces. Menciona otra nota como [[nombre de la nota]] para conectarlas."
+
+msgid "Choose a name for the note."
+msgstr "Elige un nombre para la nota."
+
+msgid "Discard your changes?"
+msgstr "¿Descartar los cambios?"
+
+msgid "This note has edits you have not saved."
+msgstr "Esta nota tiene cambios que no has guardado."
+
+msgid "Discard"
+msgstr "Descartar"
+
+msgid "A note with this name already exists there."
+msgstr "Ya existe una nota con este nombre ahí."
+
+msgid "Could not create the note."
+msgstr "No se ha podido crear la nota."
+
+msgid "Trips/Japan"
+msgstr "Viajes/Japón"
+
+msgid "Who can use it"
+msgstr "Quién puede usarla"
+
+msgid "General (all non-isolated Micos)"
+msgstr "General (todos los Micos no aislados)"
+
+msgid "Create the note {target}"
+msgstr "Crear la nota {target}"
+
+msgid "Back to notes"
+msgstr "Volver a las notas"
+
+msgid "Edited by you"
+msgstr "Editada por ti"
+
+msgid "This note changed meanwhile. Copy your text, then reopen the note to edit its latest version."
+msgstr "Esta nota ha cambiado mientras tanto. Copia tu texto y vuelve a abrir la nota para editar su última versión."
+
+msgid "This note is empty."
+msgstr "Esta nota está vacía."
+
+msgid "Linked from"
+msgstr "Enlazada desde"
+
+msgid "No notes link here yet."
+msgstr "Ninguna nota enlaza aquí todavía."
+
+msgid "Links to"
+msgstr "Enlaza a"
+
+msgid "Notes to link"
+msgstr "Notas para enlazar"
+
+msgid "Write [[ to link another note."
+msgstr "Escribe [[ para enlazar otra nota."
+
+msgid "Pick a note to read it, or open the graph to see how your notes connect."
+msgstr "Elige una nota para leerla o abre el grafo para ver cómo se conectan tus notas."
+
+msgid "Graph of {0} notes and {1} links"
+msgstr "Grafo de {0} notas y {1} enlaces"
+
+msgid "Fit graph"
+msgstr "Ajustar el grafo"
+
+msgid "Memory in context"
+msgstr "Memoria en contexto"
+
+msgid "Notes {botName} had available when writing this reply. Having a note does not mean the reply relied on it."
+msgstr "Notas que {botName} tenía disponibles al escribir esta respuesta. Tener una nota no significa que la respuesta se haya basado en ella."
+
+msgid "Notes the Mico had available when writing this reply. Having a note does not mean the reply relied on it."
+msgstr "Notas que el Mico tenía disponibles al escribir esta respuesta. Tener una nota no significa que la respuesta se haya basado en ella."
+
+msgid "Could not load the notes for this reply."
+msgstr "No se han podido cargar las notas de esta respuesta."
+
+msgid "No memory notes were recorded for this reply. Replies written before this feature, or without saved notes, show nothing here."
+msgstr "No se registraron notas de memoria para esta respuesta. Las respuestas anteriores a esta función, o sin notas guardadas, no muestran nada aquí."
+
+msgid "This Mico"
+msgstr "Este Mico"
+
+msgid "{0} more notes were deleted since."
+msgstr "{0} notas más se han eliminado desde entonces."
