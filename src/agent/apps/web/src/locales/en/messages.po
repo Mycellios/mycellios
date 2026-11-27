@@ -12167,6 +12167,9 @@ msgstr "Use peerId@model as the exact model ID. A pinned seller keeps routing an
 msgid "Use this PC"
 msgstr "Use this PC"
 
+msgid "Model set in OpenCode"
+msgstr "Model set in OpenCode"
+
 msgid "Use this account"
 msgstr "Use this account"
 

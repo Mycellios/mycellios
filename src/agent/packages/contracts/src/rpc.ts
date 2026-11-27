@@ -599,6 +599,8 @@ export const appContract = {
       models: z.object({
         codex: z.array(NativeEngineModelSchema).optional(),
         claude: z.array(NativeEngineModelSchema).optional(),
+        /** Models of the providers OpenCode holds credentials for, as `provider/model`. */
+        opencode: z.array(NativeEngineModelSchema).optional(),
       }).optional(),
       /** The PC can sign its CLIs in and out from here (engines.account). Older servers omit it. */
       account: z.boolean().optional(),
