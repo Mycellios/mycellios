@@ -135,6 +135,7 @@ import {
 import { MeshService, MeshServiceError, type JobStreamEvent } from "./mesh-service.js";
 import { MobileComputeHub, type MobileWorkerSnapshot } from "./mobile-compute-hub.js";
 import { initializeBrowserCompute } from "./browser-compute-init.js";
+import { initializeGuestChat } from "./guest-chat-routes.js";
 import { queueExistingMobileArtifacts } from "./mobile-artifact-backup.js";
 import {
   verifyGitHubReleaseUploadToken,
@@ -1574,6 +1575,8 @@ export async function createCoordinator(
   const { mobileHub, browserInference } = await initializeBrowserCompute(app, { config, database, wallet: creditWallet,
     api: apiAccess, apiEnabled: apiAccessEnabled, principal: principalFor, workerAdmission, trusted: isTrustedLocalRequest,
     disconnectedRetentionMs: options.mobileDisconnectedRetentionMs, persistence, gateway: managedGateway?.textGateway });
+  await initializeGuestChat(app, config.guestChat, database, managedGateway?.textGateway,
+    (request) => rateLimitClientKey(request.ip, request.headers["x-forwarded-for"], trustedProxies));
   if (persistence && config.mobileExpertArtifactsPath) {
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }

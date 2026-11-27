@@ -15916,3 +15916,84 @@ msgstr "This Mico"
 
 msgid "{0} more notes were deleted since."
 msgstr "{0} more notes were deleted since."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest mode"
+msgstr "Guest mode"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest mode. Answers come from a free model served by third-party providers and the Mycellios network. Do not share sensitive information. This chat is kept only in this tab."
+msgstr "Guest mode. Answers come from a free model served by third-party providers and the Mycellios network. Do not share sensitive information. This chat is kept only in this tab."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Hi, I'm Mico. What can I help you with?"
+msgstr "Hi, I'm Mico. What can I help you with?"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Ask anything, no sign-up needed."
+msgstr "Ask anything, no sign-up needed."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Create a free account"
+msgstr "Create a free account"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "The answer could not be confirmed yet. Try again in a moment; it will not be sent twice."
+msgstr "The answer could not be confirmed yet. Try again in a moment; it will not be sent twice."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "You have used the free guest messages. Create a free account to keep chatting."
+msgstr "You have used the free guest messages. Create a free account to keep chatting."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest chat has reached today's limit for your network. Create a free account to keep chatting."
+msgstr "Guest chat has reached today's limit for your network. Create a free account to keep chatting."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Too many guest chats started from your network. Create a free account or try again later."
+msgstr "Too many guest chats started from your network. Create a free account or try again later."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest chat is very busy today. Create a free account or try again tomorrow."
+msgstr "Guest chat is very busy today. Create a free account or try again tomorrow."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "The free model is busy right now. Try again in a minute."
+msgstr "The free model is busy right now. Try again in a minute."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Mico is still answering your previous message."
+msgstr "Mico is still answering your previous message."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "This message cannot be sent in guest mode. Try a shorter text message."
+msgstr "This message cannot be sent in guest mode. Try a shorter text message."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Files, tools, saved chats and your own Micos need a free account."
+msgstr "Files, tools, saved chats and your own Micos need a free account."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest chat is unavailable right now. Try again later or sign in."
+msgstr "Guest chat is unavailable right now. Try again later or sign in."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Starting a guest session…"
+msgstr "Starting a guest session…"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Attach a file"
+msgstr "Attach a file"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Create a free account to keep chatting"
+msgstr "Create a free account to keep chatting"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "1 free guest message left"
+msgstr "1 free guest message left"
+
+#. placeholder {remaining}: remaining
+#: src/pages/guest/GuestChat.tsx
+msgid "{remaining} free guest messages left"
+msgstr "{remaining} free guest messages left"

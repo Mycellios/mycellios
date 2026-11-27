@@ -6,7 +6,7 @@ import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest
 import { readManagedTextStream } from "./managed-text-stream.js";
 import { FREE_PROBE_REQUEST, FreeOfferCooldown, FreeOfferProbes, compareFreeRoutes, freeAllowanceRefusal, freeOfferLimits,
   freeOfferSignals, freeOfferStakersOnly, freeProbePassed, freeRequestFits, freeTextLimits, freeRouteModel, freeRoutePool,
-  marketReferencePrices, pickFreeRoute, FREE_REFUSAL_RETRIES, FREE_RESERVE_SELLERS, FREE_ROUTE_ID,
+  marketReferencePrices, pickFreeRoute, freeRefusalRetries, FREE_RESERVE_SELLERS, FREE_ROUTE_ID,
   type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
 
 const TTL = 60_000;
@@ -260,9 +260,9 @@ export class ManagedAntseedText {
         ...(request.stream ? { stream_options: { include_usage: true } } : {}) } };
   }
   async execute(quote: AntseedTextQuote, chunk?: (value: Record<string, unknown>) => void,
-    submitted?: (job: unknown) => Promise<void>): Promise<ManagedTextResult> {
+    submitted?: (job: unknown) => Promise<void>, options?: unknown): Promise<ManagedTextResult> {
     if (!submitted || quote.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
-    const signal = AbortSignal.timeout(120_000);
+    const signal = AbortSignal.timeout(120_000), retries = freeRefusalRetries(options);
     let q = quote, job!: AntseedTextJob, response!: Response;
     for (let attempt = 0; ; attempt++) {
       const baseline = await this.feed(0, signal);
@@ -274,7 +274,7 @@ export class ManagedAntseedText {
         response = await this.request("/v1/chat/completions", signal, q.body, this.routeHeaders(q.offer, job.requestId, job.tag));
         break;
       } catch (error) {
-        const next = this.afterFreeRefusal(q, error, attempt);
+        const next = this.afterFreeRefusal(q, error, attempt, retries);
         if (!next) throw error;
         q = next;
       }
@@ -297,11 +297,11 @@ export class ManagedAntseedText {
    * same model, or for the stable free model on another pool route. Only another exact-zero route
    * qualifies; any other failure, and any priced route, is never retried.
    */
-  private afterFreeRefusal(q: AntseedTextQuote, error: unknown, attempt: number): AntseedTextQuote | undefined {
+  private afterFreeRefusal(q: AntseedTextQuote, error: unknown, attempt: number, retries: number): AntseedTextQuote | undefined {
     const refusal = (error as { refusal?: FreeRefusal }).refusal;
     if (!q.offer.free || !refusal) return undefined;
     this.retire(q.offer, refusal);
-    if (attempt >= FREE_REFUSAL_RETRIES) return undefined;
+    if (attempt >= retries) return undefined;
     try {
       const next = this.quote(q.request);
       return next.offer.free && next.maximumMicrounits === 0 ? next : undefined;

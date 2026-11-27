@@ -132,6 +132,9 @@ export function planChecks(files, availableAgentTests) {
     if (files.some(f => /^(src\/economy\/(managed-|promotional-credits|referrals|wallet-topups|contribution-credit-wallet)|src\/coordinator\/(managed-|referral-routes|wallet-topup-routes)|src\/core\/managed-provider-config|tests\/(managed-|referrals\.)|scripts\/test-referrals-postgres)/.test(f))) {
       add('.', 'node', ['scripts/test-referrals-postgres.mjs', 'tests/managed-purchases.postgres.test.ts', 'tests/referrals.postgres.test.ts'], 'isolated managed wallet and referral PostgreSQL');
     }
+    if (files.some(f => /^(src\/economy\/(guest-chat|managed-purchases)|src\/coordinator\/(guest-chat|managed-gateway|managed-free-offers|managed-antseed-)|src\/core\/guest-chat-config|tests\/(guest-chat|fixtures\/guest-chat))/.test(f))) {
+      add('.', 'node', ['scripts/test-referrals-postgres.mjs', 'tests/guest-chat.postgres.test.ts'], 'isolated guest chat PostgreSQL limits');
+    }
     if (files.some(f => /^(src\/economy\/(browser-inference|contribution-credit-wallet)|src\/coordinator\/browser-inference|tests\/browser-inference)/.test(f))) {
       add('.', 'node', ['scripts/test-referrals-postgres.mjs', 'tests/browser-inference.postgres.test.ts'], 'isolated browser inference PostgreSQL settlement');
     }

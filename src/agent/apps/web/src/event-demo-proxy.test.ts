@@ -8,3 +8,11 @@ it("forwards only the narrowly scoped demo cookie to the browser coordinator", (
   expect(eventDemoProxyCookie("/mobile/v1/demo/test-only-event/session", "mycellios-demo-local=guest.proof; private=hidden")).toBe("mycellios-demo-local=guest.proof");
   expect(eventDemoProxyCookie("/mobile/v1/demo/test-only-event/session", "__Secure-mycellios-demo=bad proof")).toBeUndefined();
 });
+it("forwards only the guest chat cookie on guest chat paths, and never across features", () => {
+  const header = "better-auth.session_token=private; __Secure-mycellios-guest=session.proof; __Secure-mycellios-demo=guest.proof";
+  expect(eventDemoProxyCookie("/mobile/v1/guest/chat", header)).toBe("__Secure-mycellios-guest=session.proof");
+  expect(eventDemoProxyCookie("/mobile/v1/guest/config?x=1", "mycellios-guest-local=a.b; other=1")).toBe("mycellios-guest-local=a.b");
+  expect(eventDemoProxyCookie("/mobile/v1/demo/test-only-event/session", header)).toBe("__Secure-mycellios-demo=guest.proof");
+  for (const path of ["/mobile/v1/guestbook", "/mobile/v1/register", "/v1/chat/completions"])
+    expect(eventDemoProxyCookie(path, header)).toBeUndefined();
+});
