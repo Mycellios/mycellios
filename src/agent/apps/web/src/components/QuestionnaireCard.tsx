@@ -4,6 +4,7 @@ import type { AgentQuestion } from "@mycellios/contracts";
 import { Button, Input } from "@mycellios/ui-web";
 import { MessageCircleQuestion, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { AnsweredQuestion } from "./AnsweredQuestion";
 import type { AskBlock } from "./AskCard";
 import { QuestionOption } from "./QuestionOption";
 import { errorText } from "../lib/user-error";
@@ -79,12 +80,8 @@ export function QuestionnaireCard({ block, canAnswer, onAnswer }: {
   if (answered) {
     const answer = block.status === "answered" ? block.answer : accepted;
     const selected = block.actions?.find(action => action.id === answer)?.label;
-    return <div data-testid="answered-question-card" className="w-full min-w-0 max-w-md rounded-2xl bg-card px-4 py-3">
-      <p className="whitespace-pre-wrap break-words text-sm leading-5">{answer === SKIPPED ? t`Skipped` : selected ?? answer ?? t`Answered`}</p>
-      <details className="mt-2 text-xs text-muted-foreground"><summary className="w-fit cursor-pointer"><Trans>View question</Trans></summary>
-        {questions.map(question => <div key={question.id} className="mt-2"><ChatMarkdown>{question.question}</ChatMarkdown></div>)}
-      </details>
-    </div>;
+    return <AnsweredQuestion answer={answer === SKIPPED ? t`Skipped` : selected ?? answer ?? t`Answered`}
+      question={questions.map((question, index) => <div key={question.id} className={index ? "mt-2" : undefined}><ChatMarkdown>{question.question}</ChatMarkdown></div>)} />;
   }
   return <div className="w-full min-w-0 max-w-md">
     <form data-testid="question-ask-card" aria-busy={pending} className="relative rounded-2xl bg-card px-4 py-3"

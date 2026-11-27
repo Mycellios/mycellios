@@ -99,22 +99,11 @@ jobs:
           $runtime=Join-Path $env:RUNNER_TEMP desktop-runtime
           New-Item -ItemType Directory -Force $runtime | Out-Null
           $msi=Join-Path $runtime mycellios-runtime.msi
-          $status=& curl.exe --silent --show-error --location --retry 2 --write-out '%{http_code}' --output $msi https://github.com/Mycellios/mycellios/releases/download/desktop-runtime-c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc/mycellios-runtime.msi
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          if($status -eq '404'){
-            $previous=Join-Path $runtime previous.exe
-            # Hash-qualified URL: the plain URL's 404 from the Infomaniak migration is cached at the edge.
-            curl.exe --fail --location --retry 2 --output $previous 'https://www.mycellios.com/downloads/desktop/releases/0.3.15/Mycellios-Desktop-0.3.15-windows-x64-pilot.exe?sha256=a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'
-            if($LASTEXITCODE){exit $LASTEXITCODE}
-            if((Get-FileHash $previous).Hash.ToLowerInvariant() -ne 'a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'){throw 'Published runtime source installer changed'}
-            & 'C:/Program Files/7-Zip/7z.exe' e $previous '$PLUGINSDIR\app-64.*' "-o$runtime" -y
-            if($LASTEXITCODE){exit $LASTEXITCODE}
-            $payload=@(Get-ChildItem "$runtime/app-64.*" -File)
-            if($payload.Count -ne 1){throw 'Ambiguous runtime payload'}
-            & 'C:/Program Files/7-Zip/7z.exe' e $payload[0].FullName resources/contribution/mycellios-runtime.msi "-o$runtime" -y
-            if($LASTEXITCODE){exit $LASTEXITCODE}
-          } elseif($status -ne '200'){throw 'Pinned runtime component download failed'}
-          if((Get-FileHash $msi).Hash.ToLowerInvariant() -ne 'c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc'){throw 'Runtime hash differs from the approved native release'}
+          # Built by node-build (publish_windows_runtime) from 44d69b88: it carries the signed
+          # component-update trust anchor and replaces same-version runtimes (specs/node-runtime-auto-update).
+          curl.exe --fail --silent --show-error --location --retry 2 --output $msi https://github.com/Mycellios/mycellios/releases/download/desktop-runtime-b21b7ec91525c1431a0d563067593115a0120ba213d7466c4a6dd4d750248991/mycellios-runtime.msi
+          if($LASTEXITCODE){throw 'Pinned runtime component download failed'}
+          if((Get-FileHash $msi).Hash.ToLowerInvariant() -ne 'b21b7ec91525c1431a0d563067593115a0120ba213d7466c4a6dd4d750248991'){throw 'Runtime hash differs from the approved native release'}
           "DESKTOP_RUNTIME_MSI=$msi" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Qualify unsigned manual update recovery
         working-directory: src/agent
@@ -156,7 +145,7 @@ jobs:
         run: |
           $bundle=@()
           if('${{ github.event_name == 'push' && github.ref_type == 'tag' && vars.MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE == 'true' }}' -eq 'true'){$bundle=@('--bundle-runtime')}
-          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT @bundle
+          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 b21b7ec91525c1431a0d563067593115a0120ba213d7466c4a6dd4d750248991 --out $env:DESKTOP_RELEASE_OUT @bundle
           if($LASTEXITCODE){exit $LASTEXITCODE}
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
           exit $LASTEXITCODE
