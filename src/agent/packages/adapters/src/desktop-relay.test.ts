@@ -357,7 +357,7 @@ it("hands its PCs to a new server version and still answers the runs already ope
   broker.handOff(true);
   expect(broker.handoffState()).toEqual({
     handingOff: true, handoffEndsAt: new Date(now + DESKTOP_RELAY_HANDOFF_MS).toISOString(),
-    openOperations: 1, deliveredOperations: 1, agentRuns: 1, connectedComputers: 1,
+    openOperations: 1, deliveredOperations: 1, agentRuns: 1, agentChannels: 0, connectedComputers: 1,
   });
   const refusal = (request: Parameters<DesktopRelayBroker["dispatch"]>[0]) => {
     try { broker.dispatch(request, context()); } catch (error) { return error; }

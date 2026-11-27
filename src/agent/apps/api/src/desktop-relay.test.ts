@@ -413,8 +413,7 @@ it("routes a Mico to the PC that reports its folder and reports an unchosen one 
   const channel = await call("session-a", "channel", { deviceId: windows.deviceId });
   expect(channel.headers.get("content-type")).toBe("application/x-ndjson");
   const reader = channel.body!.getReader();
-  expect(new TextDecoder().decode((await reader.read()).value)).toBe('{"keepalive":1}
-');
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe(`{"keepalive":1}${"\n"}`);
   await reader.cancel();
   expect((await call("session-b", "channel", { deviceId: windows.deviceId })).status).toBe(409);
   expect((await call("session-b", "account", mac)).status).toBe(200);
