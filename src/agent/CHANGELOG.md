@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-27
+
+### Added
+
+- Desktop shows Codex, Claude Code and OpenCode updates as a notice at the top right: the new version with an Update button, live download progress, a Retry button if it fails, and a short "updated" note when it finishes.
+
+### Fixed
+
+- Switching between Micos no longer reloads the model catalog, account and quota reads each time, so the new chat loads with less waiting.
+- Opening a project chat reuses your Space's skills, chat apps, memory and voice settings instead of
+  reading them again from the server each time.
+
 ## [0.36.0] - 2026-11-27
 
 ### Security
