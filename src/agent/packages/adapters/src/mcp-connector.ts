@@ -423,6 +423,10 @@ export class McpConnector implements ConnectorProvider {
       },
       include: { server: true },
     });
+    const discoveryStartedAt = Date.now();
+    // Per server, how long its tools took and how they came: reused list (cached), a fresh
+    // tools/list (listed), a server in backoff or still installing (skipped), or a failure.
+    const serverMarks: string[] = [];
     const authorizedAssignments = [];
     for (const assignment of assignments) {
       if (assignment.server.networkId) {
@@ -433,20 +437,26 @@ export class McpConnector implements ConnectorProvider {
       }
       authorizedAssignments.push(assignment);
     }
+    const authorizedAt = Date.now();
     const groups = await Promise.all(
       authorizedAssignments.map(async (assignment): Promise<ConnectorTool[]> => {
         const startedAt = Date.now();
+        const mark = (how: string) => {
+          serverMarks.push(`${assignment.server.slug}:${Date.now() - startedAt}:${how}`);
+        };
         const server = assignment.server;
         const key = this.sessionKey(server, context);
         const live = this.sessions.get(key)?.revision === server.revision;
         // A package still installing finishes in the background; this run goes on without it.
-        if (!live && this.installing.has(key))
+        if (!live && this.installing.has(key)) {
+          mark("skipped");
           return [
             unavailableTool(
               server,
               "it is still installing its package; its tools will be available on a later turn",
             ),
           ];
+        }
         // A server that just failed is not retried on every turn; a live session, a new
         // revision (the user changed it), or a later successful check recorded by any
         // process (e.g. Test connection in the API) ends the wait early.
@@ -456,8 +466,10 @@ export class McpConnector implements ConnectorProvider {
           backoff?.revision === server.revision &&
           Date.now() < backoff.until &&
           !recoveredSince(server, backoff.since)
-        )
+        ) {
+          mark("skipped");
           return [unavailableTool(server, backoff.reason)];
+        }
         let entry: SessionEntry | undefined;
         // Past the deadline this run stops waiting for its own tools/list request only;
         // the session and other calls on it carry on.
@@ -487,6 +499,7 @@ export class McpConnector implements ConnectorProvider {
           );
           this.discoveryBackoff.delete(key);
           this.unavailable.delete(key);
+          mark(reused ? "cached" : "listed");
           if (!reused)
             void this.recordHealth(assignment.server.id, {
               status: "ok",
@@ -568,6 +581,7 @@ export class McpConnector implements ConnectorProvider {
               reason,
             });
           }
+          mark("failed");
           await this.recordDiscoveryFailure(
             assignment.server.slug,
             error,
@@ -579,6 +593,12 @@ export class McpConnector implements ConnectorProvider {
         }
       }),
     );
+    if (serverMarks.length > 0)
+      getLogger().info("mcp.tools_discovered", {
+        "mcp.discovery_ms": Date.now() - discoveryStartedAt,
+        "mcp.authorize_ms": authorizedAt - discoveryStartedAt,
+        "mcp.discovery_servers": serverMarks.join(" "),
+      });
     return groups.flat();
   }
 
