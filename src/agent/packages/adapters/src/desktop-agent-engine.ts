@@ -35,7 +35,17 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
   const storeRoot = nativeEngineStoreRoot(profile);
   // Its updates: offers, the blocklist, and holding an engine's new turns while it is updated.
   const updates = new NativeEngineUpdates(storeRoot, store);
-  if (store.checkUpdates) updates.start();
+  if (store.checkUpdates) {
+    updates.start();
+    // Each CLI's sign-in and models take seconds to read: read them once the account is known, so
+    // the first model picker already lists them.
+    const warm = setInterval(() => {
+      if (!accessScope()) return;
+      clearInterval(warm);
+      void engineState().catch(() => undefined);
+    }, 5_000);
+    warm.unref?.();
+  }
   const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) => new NativeAgentRuntime({
     dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots, storeRoot, engineUpdates: updates,
   }));

@@ -33,8 +33,23 @@ describe("nativeSignInState", () => {
     expect(probe).toHaveBeenCalledTimes(1);
     now += 31_000;
     probe.mockResolvedValueOnce(true);
+    // An older answer comes back at once while the CLI is asked again.
+    expect(await nativeSignInState("claude", claude, { probe, now: () => now })).toBe(false);
+    expect(probe).toHaveBeenCalledTimes(2);
+    await new Promise(resolve => setTimeout(resolve, 0));
     expect(await nativeSignInState("claude", claude, { probe, now: () => now })).toBe(true);
     expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not wait for a slow probe when an earlier answer is known", async () => {
+    let now = 1_000;
+    const probe = vi.fn(async () => true);
+    expect(await nativeSignInState("claude", claude, { probe, now: () => now })).toBe(true);
+    now += 61_000;
+    probe.mockImplementationOnce(() => new Promise<boolean>(() => {}));
+    const started = Date.now();
+    expect(await nativeSignInState("claude", claude, { probe, now: () => now, waitMs: 1_000 })).toBe(true);
+    expect(Date.now() - started).toBeLessThan(500);
   });
 
   it("answers unknown for a slow first probe and keeps its result for the next read", async () => {
