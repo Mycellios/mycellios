@@ -4069,6 +4069,8 @@ describe("appendEvent", () => {
       { id: "run-1", at },
     );
     expect(JSON.stringify(analytics.capture.mock.calls)).not.toContain("private@example.test");
+    // Waiting for the thread row must not expire a short event write at Prisma's 5s default.
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { maxWait: 5_000, timeout: 20_000 });
     expect(prisma.run.findUnique).toHaveBeenCalledExactlyOnceWith({
       where: { id: "run-1" },
       select: {
