@@ -81,6 +81,8 @@ type SessionEntry = {
   lastUsedAt: number;
   /** Resolved credential values the child may echo in errors or tool output. */
   launchSecrets?: string[];
+  /** The server's last tool list on this session, reused by later turns for a while. */
+  listed?: { at: number; tools: Awaited<ReturnType<McpSession["listTools"]>>["tools"] };
 };
 type PendingSession = {
   revision: number;
@@ -93,6 +95,8 @@ export const DEFAULT_MCP_STDIO_STARTUP_TIMEOUT_MS = 30_000;
 export const DEFAULT_MCP_STDIO_IDLE_MS = 15 * 60_000;
 /** How long a run waits for one server's tool list before going on without it. */
 export const DEFAULT_MCP_DISCOVERY_TIMEOUT_MS = 20_000;
+/** A live session's tool list is reused this long instead of asking the server every turn. */
+export const DEFAULT_MCP_TOOL_LIST_TTL_MS = 30 * 60_000;
 /** After a failed discovery, runs skip the server for this long, doubling up to the max. */
 const DISCOVERY_BACKOFF_MS = 30_000;
 const DISCOVERY_BACKOFF_MAX_MS = 5 * 60_000;
@@ -201,6 +205,9 @@ export type McpConnectorOptions = {
   credentialTempRoot?: string;
   /** How long a run waits for one server's tool list; 0 waits for the transport's own timeouts. */
   discoveryTimeoutMs?: number;
+  /** How long a live session's tool list is reused; absent or 0 asks the server every turn.
+   * The API and worker set it through {@link mcpStdioOptionsFromEnv}. */
+  toolListTtlMs?: number;
 };
 
 function positiveInteger(value: string | undefined, allowZero = false): number | undefined {
@@ -214,7 +221,12 @@ export function mcpStdioOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): Pick<
   McpConnectorOptions,
-  "packagesDir" | "installTimeoutMs" | "startupTimeoutMs" | "idleMs" | "discoveryTimeoutMs"
+  | "packagesDir"
+  | "installTimeoutMs"
+  | "startupTimeoutMs"
+  | "idleMs"
+  | "discoveryTimeoutMs"
+  | "toolListTtlMs"
 > {
   return {
     packagesDir: defaultMcpPackagesRoot(env),
@@ -225,6 +237,8 @@ export function mcpStdioOptionsFromEnv(
     idleMs: positiveInteger(env.MCP_STDIO_IDLE_MS, true) ?? DEFAULT_MCP_STDIO_IDLE_MS,
     discoveryTimeoutMs:
       positiveInteger(env.MCP_DISCOVERY_TIMEOUT_MS, true) ?? DEFAULT_MCP_DISCOVERY_TIMEOUT_MS,
+    toolListTtlMs:
+      positiveInteger(env.MCP_TOOL_LIST_TTL_MS, true) ?? DEFAULT_MCP_TOOL_LIST_TTL_MS,
   };
 }
 
@@ -449,22 +463,36 @@ export class McpConnector implements ConnectorProvider {
         // the session and other calls on it carry on.
         const listing = new AbortController();
         try {
+          // A live session keeps its tool list for a while, as the reference app does: no
+          // tools/list round trip on every turn. The session is still checked first (revision,
+          // credential record and digest, token expiry), so a replaced or relaunched session
+          // has no list yet and asks the server again.
+          const ttl = this.options.toolListTtlMs ?? 0;
+          let reused = false;
           const listed = await withDeadline(
-            this.withSession(server, context, (session) => {
+            this.withSession(server, context, async (session) => {
               entry = this.sessions.get(key);
-              return session.listTools({
+              const current = entry?.session === session ? entry : undefined;
+              if (current?.listed && ttl > 0 && Date.now() - current.listed.at < ttl) {
+                reused = true;
+                return { tools: current.listed.tools };
+              }
+              const result = await session.listTools({
                 signal: AbortSignal.any([context.signal, listing.signal]),
               });
+              if (current && ttl > 0) current.listed = { at: Date.now(), tools: result.tools };
+              return result;
             }),
             this.options.discoveryTimeoutMs ?? DEFAULT_MCP_DISCOVERY_TIMEOUT_MS,
           );
           this.discoveryBackoff.delete(key);
           this.unavailable.delete(key);
-          void this.recordHealth(assignment.server.id, {
-            status: "ok",
-            message: null,
-            toolCount: listed.tools.length,
-          });
+          if (!reused)
+            void this.recordHealth(assignment.server.id, {
+              status: "ok",
+              message: null,
+              toolCount: listed.tools.length,
+            });
           const visibleSecrets = [
             ...oauthMaterialSecrets(entry?.material ?? {}),
             ...(entry?.launchSecrets ?? []),
