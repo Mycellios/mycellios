@@ -3,11 +3,13 @@ import { BotAvatar } from "@mycellios/ui-web";
 import { ChevronDown, Hand, MessageCircleQuestion, MessagesSquare } from "lucide-react";
 import { useMemo } from "react";
 import { type NeedsYouEntry, needsYouEntries, needsYouPath } from "../../lib/needs-you";
+import { formatRelativeTime } from "../../lib/relative-time";
 import { useSidebarSectionCollapsed } from "../../lib/sidebar-sections";
 
 type RosterRow = {
   kind: "bot" | "group";
-  chat: { id: string; spaceId: string; name: string; color?: string; status?: string; waitingTaskThreadId?: string; conversations?: { waiting: number } | null };
+  chat: { id: string; spaceId: string; name: string; color?: string; status?: string; waitingTaskThreadId?: string;
+    waitingQuestion?: string; waitingSince?: string; conversations?: { waiting: number } | null };
 };
 
 /**
@@ -26,10 +28,13 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
     bots: groups.flatMap(group => group.bots.flatMap(row => row.kind === "bot" ? [{
       id: row.chat.id, spaceId: row.chat.spaceId, name: row.chat.name, color: row.chat.color ?? "",
       status: row.chat.status ?? "idle", waitingTaskThreadId: row.chat.waitingTaskThreadId, conversations: row.chat.conversations,
+      waitingQuestion: row.chat.waitingQuestion, waitingSince: row.chat.waitingSince,
     }] : [])),
   }]), [groups]);
   if (!entries.length) return null;
-  const describe = (entry: NeedsYouEntry) => entry.action === "answer" ? t`Waiting for your answer`
+  // The question itself says what is needed; a card without one keeps the generic line.
+  const describe = (entry: NeedsYouEntry) => entry.question ? entry.question
+    : entry.action === "answer" ? t`Waiting for your answer`
     : entry.action === "takeover" ? t`Waiting for you to take over`
     : entry.count > 1 ? t`${entry.count} conversations wait for you` : t`A conversation waits for you`;
   const actionLabel = (entry: NeedsYouEntry) => entry.action === "answer" ? t`Answer`
@@ -53,8 +58,11 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
         onClick={() => openSpaceChat(entry.spaceId, needsYouPath(entry))}>
         <BotAvatar color={entry.color} identity={entry.botId} size={mobile ? 36 : 28} status={entry.status} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-body2 font-medium text-foreground" dir="auto">{entry.name}</span>
-          <span className="block truncate text-[11.5px] text-muted-foreground">{describe(entry)}</span>
+          <span className="flex items-baseline gap-1.5">
+            <span className="min-w-0 truncate text-body2 font-medium text-foreground" dir="auto">{entry.name}</span>
+            {entry.since ? <time dateTime={entry.since} className="shrink-0 text-[10.5px] text-muted-foreground">{formatRelativeTime(entry.since)}</time> : null}
+          </span>
+          <span className={`block text-[11.5px] text-muted-foreground ${entry.question ? "line-clamp-2 break-words" : "truncate"}`} dir="auto">{describe(entry)}</span>
         </span>
         <span aria-hidden="true" className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#94620f] px-2 py-0.5 text-[10.5px] font-medium leading-4 text-white">
           <ActionIcon size={12} strokeWidth={2.2} />{actionLabel(entry)}

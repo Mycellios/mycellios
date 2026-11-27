@@ -31,6 +31,13 @@ describe("stuck work age", () => {
     );
   });
 
+  it("reminds an ordinary question but never cancels it", () => {
+    const old = STUCK_WORK_EXPIRE_AFTER_MS * 10;
+    expect(stuckWorkAction({ ageMs: old, alreadyNotified: false, expires: false })).toBe("notify");
+    expect(stuckWorkAction({ ageMs: old, alreadyNotified: true, expires: false })).toBe("none");
+    expect(stuckWorkAction({ ageMs: old, alreadyNotified: true, expires: true })).toBe("expire");
+  });
+
   it("treats only queued and human waits as stuck", () => {
     expect(isStuckWorkStatus("queued")).toBe(true);
     expect(isStuckWorkStatus("waiting_takeover")).toBe(true);

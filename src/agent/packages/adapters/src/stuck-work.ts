@@ -12,7 +12,12 @@ import {
   stuckWorkStoppedNotification,
 } from "@mycellios/core";
 import type { Prisma, PrismaClient, ThreadEvents } from "@mycellios/db";
-import { appendEventInTransaction, expireStuckRun, withTransactionRetry } from "@mycellios/db";
+import {
+  appendEventInTransaction,
+  currentMicoScriptQuestion,
+  expireStuckRun,
+  withTransactionRetry,
+} from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
 
 type StuckCursor = { at: Date; id: string };
@@ -38,7 +43,8 @@ type StuckCandidate = {
 export const STUCK_NOTICE_CLAIM_TTL_MS = 2 * 60 * 1000;
 
 /**
- * Remind, then cancel, queued runs and human waits that have been sitting still.
+ * Remind, then cancel, queued runs and human waits that have been sitting still. An
+ * ordinary question is reminded but never cancelled, so a late answer still continues it.
  * Lives on the job reconciler so a second scheduler is not required. The notice
  * stamp is a thread.meta event keyed to this episode's updatedAt, so answering
  * or reclaiming the run (which bumps updatedAt) can remind again later. A pending
@@ -104,11 +110,14 @@ export async function reconcileStuckWork(deps: {
     const alreadyNotified = notices.some(
       (notice) => notice.runId === run.id && noticeIsDelivered(notice.payload, run.updatedAt),
     );
-    const action = stuckWorkAction({
-      ageMs: stuckWorkAgeMs(run.updatedAt, deps.now),
-      alreadyNotified,
-    });
+    const ageMs = stuckWorkAgeMs(run.updatedAt, deps.now);
     try {
+      let action = stuckWorkAction({ ageMs, alreadyNotified });
+      // An ordinary question stays answerable: only approvals, secrets and other cards that
+      // hold an effect expire. It is read only once the run would otherwise be cancelled.
+      if (action === "expire" && run.status === "waiting_input" &&
+          await currentMicoScriptQuestion(deps.prisma, run.threadId, run.id))
+        action = stuckWorkAction({ ageMs, alreadyNotified, expires: false });
       if (action === "notify") await remindStuckRun(deps, run);
       else if (action === "expire") await expireOne(deps, run);
     } catch (error) {

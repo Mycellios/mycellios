@@ -419,6 +419,68 @@ describe("reconcileStuckWork", () => {
     );
   });
 
+  it("keeps a day-old ordinary question answerable instead of cancelling it", async () => {
+    const run = candidate("waiting_input", 30);
+    const client = expireClient(run);
+    client.message.findMany.mockResolvedValueOnce([
+      { id: "message-ask", createdAt: age(30), blocks: [{ kind: "ask", text: "Which photo?" }] },
+    ] as never);
+    // Nothing cancels the run, so it keeps waiting while its reminder is written.
+    client.run.findUnique.mockReset().mockResolvedValue({
+      status: run.status, updatedAt: run.updatedAt, startedAt: null,
+    } as never);
+    const { jobs, enqueue } = publisher();
+    const { provider, send } = notifications();
+
+    await reconcileStuckWork({
+      prisma: client as unknown as PrismaClient,
+      jobs,
+      notifications: provider,
+      now,
+      batchSize: 100,
+    });
+
+    expect(client.run.updateMany).not.toHaveBeenCalled();
+    expect(client.message.create).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+    // Its one reminder is still sent; it says the question waits, never that it stopped.
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Ada still needs an answer" }),
+      expect.anything(),
+    );
+  });
+
+  it("still cancels a day-old approval card", async () => {
+    const run = candidate("waiting_input", 30);
+    const client = expireClient(run);
+    client.message.findMany.mockResolvedValueOnce([
+      {
+        id: "message-ask",
+        createdAt: age(30),
+        blocks: [{
+          kind: "ask",
+          text: "Send the email?",
+          approvalEffectId: "effect-1",
+          actions: [{ id: "allow", label: "Allow" }, { id: "deny", label: "Deny" }],
+        }],
+      },
+    ] as never);
+    const { jobs } = publisher();
+
+    await reconcileStuckWork({
+      prisma: client as unknown as PrismaClient,
+      jobs,
+      now,
+      batchSize: 100,
+    });
+
+    expect(client.message.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        blocks: [{ kind: "meta", text: stuckWorkStatusMessage("waiting_input") }],
+      }),
+    });
+  });
+
   it("does not write a status line when the cancel loses the race", async () => {
     const run = candidate("waiting_takeover", 25);
     const client = expireClient(run, { cancelled: 0 });
@@ -646,7 +708,8 @@ function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?:
     },
     event: {
       findMany: vi.fn(async () => []),
-      create: vi.fn(async () => ({ seq: 8 })),
+      create: vi.fn(async () => ({ id: "event-notice", seq: 8 })),
+      update: vi.fn(async () => ({ id: "event-notice" })),
       deleteMany: vi.fn(async () => ({ count: 0 })),
     },
     computerExecutionLease: { updateMany: vi.fn(async () => ({ count: 1 })) },

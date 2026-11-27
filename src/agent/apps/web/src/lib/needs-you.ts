@@ -14,6 +14,10 @@ export type NeedsYouEntry = Readonly<{
   status: string;
   action: NeedsYouAction;
   waitingTaskThreadId?: string;
+  /** The question itself, for an answer entry whose card is an ordinary question. */
+  question?: string;
+  /** When the question or takeover started waiting. */
+  since?: string;
   /** Waiting conversations, for a review entry. */
   count: number;
 }>;
@@ -25,6 +29,8 @@ type NeedsYouBot = {
   color: string;
   status: string;
   waitingTaskThreadId?: string;
+  waitingQuestion?: string;
+  waitingSince?: string;
   conversations?: { waiting: number } | null;
 };
 
@@ -36,8 +42,10 @@ export function needsYouEntries(spaces: readonly { bots: readonly NeedsYouBot[] 
       if (seen.has(bot.id)) continue;
       seen.add(bot.id);
       const base = { botId: bot.id, spaceId: bot.spaceId, name: bot.name, color: bot.color, status: bot.status };
-      if (bot.status === "waiting_input") entries.push({ ...base, key: `${bot.id}:answer`, action: "answer", count: 0, waitingTaskThreadId: bot.waitingTaskThreadId });
-      else if (bot.status === "waiting_takeover") entries.push({ ...base, key: `${bot.id}:takeover`, action: "takeover", count: 0 });
+      if (bot.status === "waiting_input") entries.push({ ...base, key: `${bot.id}:answer`, action: "answer", count: 0, waitingTaskThreadId: bot.waitingTaskThreadId,
+        ...(bot.waitingQuestion ? { question: bot.waitingQuestion } : {}), ...(bot.waitingSince ? { since: bot.waitingSince } : {}) });
+      else if (bot.status === "waiting_takeover") entries.push({ ...base, key: `${bot.id}:takeover`, action: "takeover", count: 0,
+        ...(bot.waitingSince ? { since: bot.waitingSince } : {}) });
       const waiting = bot.conversations?.waiting ?? 0;
       if (waiting > 0) entries.push({ ...base, key: `${bot.id}:review`, action: "review", count: waiting });
     }

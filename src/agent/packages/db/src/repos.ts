@@ -11,6 +11,7 @@ import {
   displayName,
   isBackgroundRunTrigger,
   phoneCallSettings,
+  plainTextFromMarkdown,
   ringingCall,
   userVisibleMessages,
 } from "@mycellios/core";
@@ -20,6 +21,7 @@ import type { ComputerMode } from "./computers.js";
 import { computerKindForMode, ensureComputerRecord, parseComputerMode } from "./computers.js";
 import { rosterConversationSignals } from "./conversation-surfaces.js";
 import { createThreadMessageInTransaction } from "./messages.js";
+import { currentMicoScriptQuestion } from "./mico-script-deliveries.js";
 import type { SidebarPreviewMessage } from "./preview-messages.js";
 import {
   NOT_QUIET_ROUTINE_RUN,
@@ -66,8 +68,41 @@ function rememberRosterPreview(threadId: string, entry: RosterPreview) {
 
 const rosterRunSelection = {
   ...activeRunSelection,
-  select: { ...activeRunSelection.select, thread: { select: { taskBotId: true } } },
+  select: {
+    ...activeRunSelection.select,
+    id: true,
+    updatedAt: true,
+    thread: { select: { taskBotId: true } },
+  },
 } as const;
+
+/** The longest question text a roster row carries; the sidebar shows one truncated line. */
+const WAITING_QUESTION_MAX_LENGTH = 240;
+
+type WaitingRun = { id: string; status: string; threadId: string; updatedAt: Date };
+
+/**
+ * What a Mico waits on, for "Needs you": the ordinary question it asked and since when.
+ * Approvals, secrets and other cards keep only their time, so their text stays in the chat.
+ */
+async function waitingDetails(
+  prisma: Pick<PrismaClient, "message">,
+  runs: ReadonlyArray<WaitingRun | undefined>,
+): Promise<Map<string, { waitingQuestion?: string; waitingSince: string }>> {
+  const waiting = runs.filter((run): run is WaitingRun =>
+    run?.status === "waiting_input" || run?.status === "waiting_takeover");
+  const details = await Promise.all(waiting.map(async (run) => {
+    const question = run.status === "waiting_input"
+      ? await currentMicoScriptQuestion(prisma, run.threadId, run.id).catch(() => null)
+      : null;
+    const text = question ? plainTextFromMarkdown(question.ask.text).trim() : "";
+    return [run.id, {
+      ...(text ? { waitingQuestion: text.slice(0, WAITING_QUESTION_MAX_LENGTH) } : {}),
+      waitingSince: run.updatedAt.toISOString(),
+    }] as const;
+  }));
+  return new Map(details);
+}
 
 function waitingTaskThreadId(botId: string, run: {
   status: string;
@@ -266,11 +301,13 @@ export function createRepos(
     });
     const signals = await rosterConversationSignals(prisma, actor.userId,
       bots.flatMap((bot) => bot.thread ? [{ botId: bot.id, threadId: bot.thread.id, unread: bot.thread.unread }] : []));
+    const waits = await waitingDetails(prisma, bots.map((bot) => primaryActiveRun(bot.runs)));
     return bots.map((bot) => {
       if (!bot.thread) throw new IsolationError("Bot is missing its thread");
       const activeRun = primaryActiveRun(bot.runs);
       return {
         ...signals.get(bot.id),
+        ...(activeRun ? waits.get(activeRun.id) : undefined),
         id: bot.id,
         spaceId: bot.spaceId,
         name: bot.name,
@@ -404,6 +441,8 @@ export function createRepos(
       // Archived Micos have no sidebar row to show counts on.
       const signals = await rosterConversationSignals(prisma, actor.userId, options.archived ? [] :
         bots.flatMap((bot) => bot.thread ? [{ botId: bot.id, threadId: bot.thread.id, unread: bot.thread.unread }] : []));
+      const waits = options.archived ? new Map() :
+        await waitingDetails(prisma, bots.map((bot) => primaryActiveRun(bot.runs)));
       const listed = await Promise.all(
         bots.map(async (bot) => {
           let messages = bot.thread?.messages ?? [];
@@ -466,7 +505,8 @@ export function createRepos(
             ),
           );
           const threadId = waitingTaskThreadId(bot.id, activeRun);
-          return threadId ? { ...mapped, waitingTaskThreadId: threadId } : mapped;
+          const wait = activeRun ? waits.get(activeRun.id) : undefined;
+          return { ...mapped, ...(threadId ? { waitingTaskThreadId: threadId } : {}), ...wait };
         }),
       );
       return listed.map((bot) => {
