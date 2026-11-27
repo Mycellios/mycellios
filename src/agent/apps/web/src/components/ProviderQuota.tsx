@@ -16,6 +16,9 @@ import {
   usableWindow,
 } from "./quota-view";
 
+/** How long a Mico switch reuses the account quotas instead of reading them again. */
+const PLAN_REUSE_MS = 60_000;
+
 export function ProviderQuota(props: {
   scope: string;
   /** The open Mico: when it runs on This PC, its PC's Codex usage shows instead of the server's. */
@@ -50,21 +53,28 @@ function QuotaContent({
   const alive = useRef(true);
   const loading = useRef(false);
   const controller = useRef<AbortController | null>(null);
+  // Account quotas do not depend on the open Mico; only its PC's Codex reading does.
+  const plan = useRef<{ value: AccountPlanLimits; at: number } | null>(null);
   const load = useCallback(
-    async (refresh = false) => {
+    async (refresh = false, reusePlan = false) => {
       if (loading.current && !controller.current?.signal.aborted) return;
       loading.current = true;
       setBusy(true);
       const abort = new AbortController();
       controller.current = abort;
       try {
+        const saved = plan.current;
         const [value, native] = await Promise.all([
-          rpc.models.planLimits({ refresh }, { signal: abort.signal }),
+          reusePlan && !refresh && saved && Date.now() - saved.at < PLAN_REUSE_MS
+            ? saved.value
+            : rpc.models.planLimits({ refresh }, { signal: abort.signal }).then((next) => {
+                plan.current = { value: next, at: Date.now() };
+                return next;
+              }),
           rpc.engines.codexQuota(botId ? { botId } : undefined, { signal: abort.signal }).catch(() => null),
         ]);
-        if (native) value.accounts = [...value.accounts, native];
         if (alive.current && !abort.signal.aborted) {
-          setData(value);
+          setData(native ? { ...value, accounts: [...value.accounts, native] } : value);
           setError(false);
           setNow(Date.now());
         }
@@ -79,7 +89,8 @@ function QuotaContent({
   );
   useEffect(() => {
     alive.current = true;
-    void load();
+    // Switching Micos only rereads that Mico's PC; the account quotas refresh on their timer.
+    void load(false, true);
     const tick = setInterval(() => setNow(Date.now()), 30_000);
     return () => {
       alive.current = false;

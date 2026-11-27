@@ -44,6 +44,9 @@ function connectionName(connection: ModelCredential) {
   }
 }
 
+/** How long the header, which remounts for every Mico, reuses account and catalog reads. */
+export const HEADER_MODEL_REUSE_MS = 5 * 60_000;
+
 export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, recovery = false, inMenu = false }: {
   bot: Bot;
   me: Me | null | undefined;
@@ -64,10 +67,13 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const queries = useSpaceQueries();
   const queryClient = useQueryClient();
   const rpc = useSpaceRpc();
-  const meQuery = useQuery({ ...queries.me.queryOptions(), refetchOnMount: true, enabled: Boolean(initialMe) });
+  // The header remounts for every Mico, so it reuses recent account reads; opening the picker
+  // refreshes the connections and catalog it lists.
+  const reuse = { refetchOnMount: true, staleTime: HEADER_MODEL_REUSE_MS } as const;
+  const meQuery = useQuery({ ...queries.me.queryOptions(), ...reuse, enabled: Boolean(initialMe) });
   const me = meQuery.data ?? initialMe;
-  const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), refetchOnMount: true, enabled: Boolean(me) });
-  const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), refetchOnMount: true, enabled: Boolean(me) });
+  const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), ...reuse, enabled: Boolean(me) });
+  const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), ...reuse, enabled: Boolean(me) });
   const enginesQuery = useQuery(queries.engines.forBot.queryOptions({ input: { botId: bot.id }, enabled: open }));
   const refetchEngines = enginesQuery.refetch;
   const refreshEngines = useCallback(() => void refetchEngines(), [refetchEngines]);
@@ -266,7 +272,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   }
   return (
     <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 shrink-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
-      <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setExploring(null); setLastProvider(null); setError(null); } }}>
+      <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setExploring(null); setLastProvider(null); setError(null); if (next && me) { void credentialsQuery.refetch(); void catalogQuery.refetch(); } } }}>
         <PopoverTrigger type="button" title={label} data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
           ? "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-foreground"
           : "app-no-drag flex h-8 min-w-0 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-normal text-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring @max-[32rem]:size-8 @max-[32rem]:justify-center @max-[32rem]:gap-0 @max-[32rem]:px-0"}>
