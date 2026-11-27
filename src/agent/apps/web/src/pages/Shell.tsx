@@ -13,6 +13,8 @@ import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
 import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
 import { GitHubStarPrompt } from "../components/GitHubStarPrompt";
+import { ConversationContextMeter } from "../components/ConversationContextMeter";
+import { contextRefreshKey } from "../lib/conversation-context";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Archive, LayoutGrid } from "lucide-react";
@@ -4695,6 +4697,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       {active && !inGroup && !activeProject ? <span className="contents @max-[36rem]:hidden"><MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
         onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /></span> : null}
       {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
+      {!inGroup && active && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ConversationContextMeter key={`context:${activeSnapshot.threadId}`} rpc={rpc}
+        scope={JSON.stringify([userId, shellSpaceId])} botId={active.id} taskThreadId={taskScope?.taskThreadId}
+        refreshKey={contextRefreshKey(activeSnapshot.run)} /></span> : null}
       {pinTarget && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ChatSearchButton key={`search:${activeSnapshot.threadId}`} rpc={rpc}
         scope={JSON.stringify([userId, shellSpaceId, pinTarget])} target={pinTarget} threadId={activeSnapshot.threadId} onJump={jumpToReplyMessage} /></span> : null}
       {(active || activeGroup) && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage}

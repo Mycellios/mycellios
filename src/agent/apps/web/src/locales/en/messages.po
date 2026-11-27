@@ -15733,6 +15733,14 @@ msgstr "A star on GitHub helps more people find Mycellios."
 msgid "Star on GitHub"
 msgstr "Star on GitHub"
 
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "Context {percent}% full: {used} of {total} tokens."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Copy diagnostic report"

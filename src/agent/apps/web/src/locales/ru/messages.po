@@ -7509,6 +7509,14 @@ msgstr "Звезда на GitHub помогает большему числу л
 msgid "Star on GitHub"
 msgstr "Поставить звезду на GitHub"
 
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "Контекст заполнен на {percent}%: {used} из {total} токенов."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "Контекст заполнен на {percent}%: {used} из {total} токенов. Когда он заполнится, старые сообщения будут автоматически сжаты в сводку."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Скопировать диагностический отчёт"

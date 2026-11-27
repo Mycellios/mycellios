@@ -7509,6 +7509,14 @@ msgstr "Une étoile sur GitHub aide plus de personnes à découvrir Mycellios."
 msgid "Star on GitHub"
 msgstr "Mettre une étoile sur GitHub"
 
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "Contexte rempli à {percent} % : {used} sur {total} jetons."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "Contexte rempli à {percent} % : {used} sur {total} jetons. Une fois plein, les anciens messages sont résumés automatiquement."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Copier le rapport de diagnostic"

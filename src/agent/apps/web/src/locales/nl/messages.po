@@ -7509,6 +7509,14 @@ msgstr "Een ster op GitHub helpt meer mensen Mycellios te vinden."
 msgid "Star on GitHub"
 msgstr "Ster geven op GitHub"
 
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "Context voor {percent}% vol: {used} van {total} tokens."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "Context voor {percent}% vol: {used} van {total} tokens. Als hij vol raakt, worden oudere berichten automatisch samengevat."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Diagnoserapport kopiëren"

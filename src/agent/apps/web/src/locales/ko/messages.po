@@ -7508,6 +7508,14 @@ msgstr "GitHub 별 하나가 더 많은 사람이 Mycellios를 찾도록 도와�
 msgid "Star on GitHub"
 msgstr "GitHub에서 별 주기"
 
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "컨텍스트 {percent}% 사용: {total} 토큰 중 {used}."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "컨텍스트 {percent}% 사용: {total} 토큰 중 {used}. 가득 차면 오래된 메시지가 자동으로 요약됩니다."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "진단 보고서 복사"
