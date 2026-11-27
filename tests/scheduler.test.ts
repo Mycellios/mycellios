@@ -106,7 +106,7 @@ describe("multi-objective scheduler", () => {
       internalPipeline: { stageCount: 2, boundaries: [0, 14, 28] },
     }));
     const models = (await scheduler.listAvailableModels({ connectedWorkerIds: new Set([cell.id]) }));
-    expect(models).toEqual([{ id: "distributed-small", replicas: 0, pipelines: 1 }]);
+    expect(models).toEqual([{ id: "distributed-small", replicas: 0, pipelines: 1, contextLimit: 8192 }]);
     expect((await scheduler.selectRoute(request, "cell-route"))?.routeClass).toBe("replica");
   });
 
@@ -153,6 +153,7 @@ describe("multi-objective scheduler", () => {
       id: "distributed-small",
       replicas: 0,
       pipelines: 1,
+      contextLimit: 8192,
     });
     expect((await scheduler.listAvailableModels({
       connectedWorkerIds: new Set([cell.id]),

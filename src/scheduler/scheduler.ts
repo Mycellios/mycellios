@@ -98,6 +98,8 @@ export interface AvailableModel {
   id: string;
   replicas: number;
   pipelines: number;
+  /** Smallest context window among the eligible deployments: a request that fits it fits any route. */
+  contextLimit?: number;
 }
 
 export class Scheduler {
@@ -276,7 +278,7 @@ export class Scheduler {
       .filter((worker) => !options.connectedWorkerIds || options.connectedWorkerIds.has(worker.id));
     const models = new Map<
       string,
-      { replicas: number; internalPipelines: number; stages: Set<string> }
+      { replicas: number; internalPipelines: number; stages: Set<string>; contextLimit?: number }
     >();
     for (const worker of workers) {
       for (const deployment of worker.capabilities.deployments) {
@@ -294,6 +296,8 @@ export class Scheduler {
         if (deployment.mode === "pipeline" && deployment.stage) {
           entry.stages.add(`${deployment.model}:${deployment.stage.total}:${deployment.stage.index}`);
         }
+        if (Number.isSafeInteger(deployment.contextLimit) && deployment.contextLimit > 0)
+          entry.contextLimit = Math.min(entry.contextLimit ?? deployment.contextLimit, deployment.contextLimit);
         models.set(deployment.model, entry);
       }
     }
@@ -301,6 +305,7 @@ export class Scheduler {
       id,
       replicas: value.replicas,
       pipelines: value.internalPipelines + this.countCompletePipelines(value.stages),
+      ...(value.contextLimit ? { contextLimit: value.contextLimit } : {}),
     }));
   }
 

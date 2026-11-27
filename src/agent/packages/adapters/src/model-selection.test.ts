@@ -22,7 +22,14 @@ import {
   validateConnectedModelChoice,
   validateModelAuthAvailability,
 } from "./model-selection.js";
+import { mycelliosCatalogServes } from "./mycellios-model-limits.js";
 import { listAvailablePiCatalog } from "./pi-catalog-availability.js";
+
+vi.mock("./mycellios-model-limits.js", async (original) => ({
+  ...(await original<typeof import("./mycellios-model-limits.js")>()),
+  // Unknown by default: tests that do not opt in never infer a stale Mycellios id.
+  mycelliosCatalogServes: vi.fn(async () => undefined),
+}));
 import type { CodexLiveCatalog } from "./pi-codex-catalog.js";
 import { providerCatalogCache } from "./pi-live-catalog.js";
 import { listPiCatalog } from "./pi-models.js";
@@ -969,6 +976,53 @@ describe("connected model credential selection", () => {
     expect(prisma.userModelPreference.upsert).not.toHaveBeenCalled();
     expect(preferences).toHaveLength(1);
     expect(preferences[0]).toMatchObject({ modelId: "X" });
+  });
+
+  it("skips a Mycellios connection whose live catalog no longer serves an enabled id", async () => {
+    const mycellios = { ...credential("openai-compatible", "native"), id: "mycellios", secretId: "mycellios" };
+    const gateway = { ...credential("openai-compatible", "auto"), id: "gateway", secretId: "gateway" };
+    const secrets: Record<string, string> = {
+      mycellios: JSON.stringify({
+        kind: "openai_compatible", baseUrl: "https://www.mycellios.com/v1", apiKey: "owned",
+        enabledModelIds: ["native", "groq/openai/gpt-oss-20b"],
+      }),
+      gateway: JSON.stringify({
+        kind: "openai_compatible", baseUrl: "https://gateway.example/v1", apiKey: "other",
+        enabledModelIds: ["auto", "groq/openai/gpt-oss-20b"],
+      }),
+    };
+    const prisma = {
+      userModelPreference: {
+        findMany: vi.fn(async () => [
+          { id: "p", credential: mycellios, modelId: "native", thinkingLevel: null, updatedAt: new Date(0) },
+        ]),
+        findFirst: vi.fn(async () => null),
+      },
+      userModelCredential: { findMany: vi.fn(async () => [mycellios, gateway]) },
+      secret: {
+        findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, ciphertext: secrets[where.id] })),
+      },
+    } as unknown as PrismaClient;
+    const load = async (plaintext: string) => plaintext;
+    const actor = { userId: "user-1", spaceId: "space-1" };
+    const served = vi.mocked(mycelliosCatalogServes);
+
+    served.mockImplementation(async (_base, _key, id) => id === "native");
+    await expect(
+      findConnectedModelCredential(prisma, { load }, actor, "openai-compatible", "groq/openai/gpt-oss-20b"),
+    ).resolves.toMatchObject({ id: "gateway" });
+    // Still served by Mycellios, or the catalog cannot be read: the preferred connection keeps it.
+    served.mockImplementation(async () => true);
+    await expect(
+      findConnectedModelCredential(prisma, { load }, actor, "openai-compatible", "groq/openai/gpt-oss-20b"),
+    ).resolves.toMatchObject({ id: "mycellios" });
+    served.mockImplementation(async () => undefined);
+    await expect(
+      findConnectedModelCredential(prisma, { load }, actor, "openai-compatible", "groq/openai/gpt-oss-20b"),
+    ).resolves.toMatchObject({ id: "mycellios" });
+    expect(served).not.toHaveBeenCalledWith("https://gateway.example/v1", expect.anything(), expect.anything());
+    served.mockReset();
+    served.mockImplementation(async () => undefined);
   });
 });
 

@@ -41,6 +41,7 @@ export function ChatModelPicker({
   onProviderChange,
   modelOrigins,
   freeModels,
+  recommendedModels,
   providerContent,
   mycelliosCatalogReady = true,
   catalogProviders,
@@ -62,6 +63,8 @@ export function ChatModelPicker({
   modelOrigins?: Readonly<Record<string, "network" | "antseed">>;
   /** AntSeed models with an exact-zero price; they lead the AntSeed group. */
   freeModels?: ReadonlySet<string>;
+  /** Models the account catalog recommends; they lead their group. */
+  recommendedModels?: ReadonlySet<string>;
   providerContent?: (provider: string) => ReactNode;
   mycelliosCatalogReady?: boolean;
   catalogProviders?: readonly string[];
@@ -95,7 +98,9 @@ export function ChatModelPicker({
     ? [
       { key: "mycellios-network", heading: networkHeading, data: grouped.flatMap(section => section.data.filter(choice => modelOrigins[choice.key] === "network")) },
       // Free AntSeed models get their own heading, so people find them without reading prices.
-      { key: "mycellios-antseed-free", heading: `${antseedHeading} · ${t`Free`}`, data: antseedChoices.filter(choice => freeModels?.has(choice.key)) },
+      // The recommended free route leads, so it is not lost among dozens of free sellers.
+      { key: "mycellios-antseed-free", heading: `${antseedHeading} · ${t`Free`}`, data: antseedChoices.filter(choice => freeModels?.has(choice.key))
+        .sort((a, b) => Number(Boolean(recommendedModels?.has(b.key))) - Number(Boolean(recommendedModels?.has(a.key)))) },
       { key: "mycellios-antseed", heading: antseedHeading, data: antseedChoices.filter(choice => !freeModels?.has(choice.key)) },
       ...grouped.map(section => ({ ...section, data: section.data.filter(choice => !modelOrigins[choice.key]) })),
     ].filter(section => section.data.length || keepNetworkSection && section.key === "mycellios-network")

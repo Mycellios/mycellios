@@ -15,6 +15,35 @@ export class OAuthConsentError extends Error {
   get sessionRejected() {
     return this.status === 401 || this.status === 403;
   }
+  /** The authorization itself is gone: expired, already used or unknown. */
+  get authorizationGone() {
+    return this.status === 400 || this.status === 404 || this.status === 410;
+  }
+}
+
+const RESTART_KEY = "mycellios.consent.restartedAt";
+const RESTART_WINDOW_MS = 2 * 60_000;
+
+/**
+ * Starts a fresh sign-in from Agent instead of showing an expired authorization
+ * (a reloaded tab, the back button or an old tab). At most once per two minutes,
+ * so an authority that keeps refusing new authorizations shows the error instead
+ * of looping. Returns false when it did not navigate.
+ */
+export function restartExpiredAuthorization(
+  go: (url: string) => void = (url) => location.replace(url),
+  now = Date.now(),
+): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(RESTART_KEY));
+    if (Number.isFinite(last) && now - last >= 0 && now - last < RESTART_WINDOW_MS) return false;
+    sessionStorage.setItem(RESTART_KEY, String(now));
+  } catch {
+    // Without storage the loop guard cannot hold: keep the explicit button.
+    return false;
+  }
+  go("/agent/sign-in");
+  return true;
 }
 
 export function authorizationId(search: string): string {

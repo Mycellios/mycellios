@@ -3,6 +3,8 @@ import type { ModelCatalogEntry } from "@mycellios/contracts";
 import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@mycellios/contracts";
 import { readBoundedJsonResponse } from "@mycellios/core";
 
+const MIN_MICO_CONTEXT_TOKENS = 8_192;
+
 function managedPrice(row: Record<string, unknown>) {
   if (!["external", "network"].includes(String(row.processing)) || !row.pricing || typeof row.pricing !== "object") return null;
   const value = row.pricing as Record<string, unknown>;
@@ -75,6 +77,9 @@ export async function readMycelliosChatModels(
     const row = item as Record<string, unknown>;
     // Tiny browser demos without tool calls cannot execute a Mico's agent turn.
     if (row.supports_tools === false) continue;
+    // A Mico's instructions and tools alone exceed a tiny window, so every turn would fail
+    // with "context window is too small"; such services are not conversational capacity.
+    if (typeof row.context_length === "number" && row.context_length < MIN_MICO_CONTEXT_TOKENS) continue;
     const externalText=row.processing==="external"&&row.modality==="text"&&typeof row.id==="string"&&row.id.startsWith("mycellios/managed/");
     if(row.processing==="external"&&row.modality!==undefined&&row.modality!=="text")continue;
     if (

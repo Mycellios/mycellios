@@ -54,4 +54,18 @@ describe("Mycellios model limits", () => {
       maxTokens: 8_192,
     });
   });
+
+  it("keeps the last good window when a later refresh fails instead of shrinking to the default", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(ok());
+    expect(await readMycelliosModelLimits(BASE, "key", "mycellios/managed/deepseek", { fetch, now: 0 })).toMatchObject({ contextWindow: 41_454 });
+    // After the cache lifetime, the refresh fails: the previous read still answers.
+    expect(await readMycelliosModelLimits(BASE, "key", "mycellios/managed/deepseek", { fetch, now: 6 * 60_000 })).toMatchObject({ contextWindow: 41_454 });
+    // The failed refresh is not cached; the next run asks again.
+    await readMycelliosModelLimits(BASE, "key", "mycellios/managed/deepseek", { fetch, now: 6 * 60_000 + 1 });
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
 });

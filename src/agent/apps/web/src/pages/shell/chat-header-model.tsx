@@ -337,6 +337,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 freeModels={new Set((mycelliosCatalog.data ?? []).filter(entry => entry.mycelliosProcessing === "external" && entry.mycelliosPricing
                   && [entry.mycelliosPricing.input, entry.mycelliosPricing.output, entry.mycelliosPricing.request ?? "0"].every(price => Number(price) === 0))
                   .map(entry => modelOptionKey(entry.provider, entry.id)))}
+                recommendedModels={new Set((mycelliosCatalog.data ?? []).filter(entry => entry.recommended).map(entry => modelOptionKey(entry.provider, entry.id)))}
               />}
             </fieldset>}
           {(["codex", "claude", "opencode"] as const).some(engine => NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && !engineModels(engine).length)
