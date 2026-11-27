@@ -7507,3 +7507,11 @@ msgstr "在 GitHub 上点个星，能帮助更多人发现 Mycellios。"
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "在 GitHub 上加星"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "上下文已用 {percent}%：{total} 个令牌中的 {used}。"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "上下文已用 {percent}%：{total} 个令牌中的 {used}。填满后，较早的消息会自动汇总。"

@@ -7507,3 +7507,11 @@ msgstr "Uma estrela no GitHub ajuda mais pessoas a encontrarem o Mycellios."
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "Dar uma estrela no GitHub"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "Contexto {percent}% cheio: {used} de {total} tokens."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "Contexto {percent}% cheio: {used} de {total} tokens. Quando encher, as mensagens mais antigas são resumidas automaticamente."

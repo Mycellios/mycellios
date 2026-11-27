@@ -2,6 +2,7 @@ import { sporeRewards, usageDashboard } from "../usage-dashboard.js";
 import { getAppCover, setAppCover } from "../app-covers.js";
 import { agentUsage } from "../agent-usage.js";
 import { agentCost } from "../agent-cost.js";
+import { threadContext } from "../thread-context.js";
 import { taskCosts } from "../task-cost.js";
 import { ORPCError } from "@orpc/server";
 import type { UsageOperationKind } from "@mycellios/adapter-kit";
@@ -137,6 +138,9 @@ export function contentRoutes(ctx: RouterContext) {
       agents: authed.usage.agents.handler(({ context }) => agentUsage(deps, context.actor)),
       agent: authed.usage.agent.handler(({ context, input }) =>
         agentCost(deps, context.actor, input.botId),
+      ),
+      threadContext: authed.usage.threadContext.handler(({ context, input }) =>
+        threadContext(deps, context.actor, input),
       ),
       tasks: authed.usage.tasks.handler(({ context, input }) =>
         taskCosts(deps, context.actor, input.runIds),

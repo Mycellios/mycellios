@@ -105,6 +105,24 @@ export function modelAcceptsImageInput(
   return Boolean(model?.input.includes("image"));
 }
 
+/**
+ * The context window the Pi catalog declares for a recorded model, or null when the
+ * catalog does not know it (custom endpoints, native CLIs). Used only to show how full a
+ * conversation is; it never decides what a run may send.
+ */
+export function catalogContextWindow(provider: string, modelId: string): number | null {
+  const resolved = resolveModelRefForVisionCheck(provider, modelId);
+  if (!resolved.provider || !resolved.id) return null;
+  const models = catalogModels();
+  let model = models.getModel(resolved.provider, resolved.id);
+  if (!model && resolved.provider !== "openrouter" && !isOpenAiCompatibleProvider(resolved.provider)) {
+    model = models.getModel("openrouter", resolved.id);
+  }
+  model ??= liveModelSibling(models, resolved.provider, resolved.id);
+  const window = model?.contextWindow;
+  return typeof window === "number" && Number.isFinite(window) && window > 0 ? window : null;
+}
+
 export function filterImageReturningComputerTools<T extends { name: string }>(
   tools: T[],
   acceptsImages: boolean,
