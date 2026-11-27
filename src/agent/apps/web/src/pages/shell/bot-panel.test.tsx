@@ -191,7 +191,7 @@ it("keeps server isolation selectable without granting this PC access", async ()
     <ComputerModeNote mode="isolated" desktopAvailable={false} />
   </>));
   const buttons = [...container.querySelectorAll("button")];
-  expect(buttons.map(button => button.textContent)).toEqual(["Server, just this Mico", "Server, shared", "This PC"]);
+  expect(buttons.map(button => button.textContent)).toEqual(["In the cloud", "In the cloud, shared", "Your PC"]);
   expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
   expect(buttons[0]?.disabled).toBe(false);
   expect(buttons[2]?.disabled).toBe(true);
@@ -291,11 +291,8 @@ it("opens settings subpages and returns focus to the overview row", async () => 
 
   await openSettingsPage("computer");
   expect(container.textContent).toContain("Notes it reads");
-  expect(
-    [...container.querySelectorAll<HTMLOptionElement>('[id$="-computer"] option')].find(
-      (option) => option.value === "dedicated",
-    )?.disabled,
-  ).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>('[data-computer-mode="dedicated"]')?.disabled).toBe(true);
+  expect(container.textContent).toContain("Choose it from Mycellios Desktop on that PC.");
   await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
   await openSettingsPage("permissions");
   expect(container.querySelector('[id$="-fleet-management"]')).not.toBeNull();
@@ -311,7 +308,7 @@ it("binds and repairs This PC from the computer page", async () => {
   await render("Billing", { computerMode: "dedicated" }, false, 0, onUseThisComputer);
   await openSettingsPage("computer");
   const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
-    (candidate) => candidate.textContent === "Move here",
+    (candidate) => candidate.textContent === "Move to this PC",
   );
   expect(button).toBeDefined();
   await act(async () => button!.click());
@@ -322,10 +319,7 @@ it("saves the computer and notes choices as soon as they change, without a Save 
   await render("Billing", {}, false);
   await openSettingsPage("computer");
   const select = (suffix: string) => container.querySelector<HTMLSelectElement>(`[id$="-${suffix}"]`)!;
-  await act(async () => {
-    select("computer").value = "isolated";
-    select("computer").dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-computer-mode="isolated"]')!.click());
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(onSave).toHaveBeenLastCalledWith({ computerMode: "isolated" });
   await act(async () => {

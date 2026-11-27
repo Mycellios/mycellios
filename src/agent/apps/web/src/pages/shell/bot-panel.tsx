@@ -107,11 +107,56 @@ export function ComputerModePicker({
   );
 }
 
-/** Where a Mico works, named by place: the person's PC or the Mycellios server. */
+/** Where a Mico works, named by place: the person's PC or the cloud. */
 export function computerModeLabel(mode: ComputerMode): string {
-  if (mode === "dedicated") return t`This PC`;
-  if (mode === "isolated") return t`Server, just this Mico`;
-  return t`Server, shared`;
+  if (mode === "dedicated") return t`Your PC`;
+  if (mode === "isolated") return t`In the cloud`;
+  return t`In the cloud, shared`;
+}
+
+/** The places in the order a person thinks of them: their own PC first. */
+const COMPUTER_CHOICES: readonly ComputerMode[] = ["dedicated", "isolated", "team"];
+
+/** One line per place: what it reaches and what happens while the PC is off. */
+function computerChoiceDescription(mode: ComputerMode): string {
+  if (mode === "dedicated")
+    return t`With your files and programs. It needs Mycellios Desktop open; while the PC is off, the cloud answers without your files.`;
+  if (mode === "isolated") return t`Keeps working with your PC off. It has its own computer and cannot see your PC.`;
+  return t`Like the cloud, but it shares one computer with your other Micos in this space.`;
+}
+
+/**
+ * Where the Mico works, as three cards to pick from (a radio group): the place, one line on
+ * what it means, and the choice saved at once.
+ */
+function ComputerChoices({ value, busy, desktopAvailable, savedOnPc, onChoose }: {
+  value: ComputerMode;
+  busy: boolean;
+  desktopAvailable: boolean;
+  savedOnPc: boolean;
+  onChoose: (mode: ComputerMode) => void;
+}) {
+  return <div role="radiogroup" aria-label={t`Works on`} data-testid="computer-choices" className="flex flex-col gap-2">
+    {COMPUTER_CHOICES.map((mode) => {
+      const selected = value === mode;
+      const unavailable = mode === "dedicated" && !desktopAvailable && !savedOnPc;
+      return <button key={mode} type="button" role="radio" aria-checked={selected} data-computer-mode={mode}
+        disabled={busy || unavailable}
+        onClick={() => { if (!selected) onChoose(mode); }}
+        className={`flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${selected ? "border-foreground/40 bg-background" : "border-border hover:bg-accent"}`}>
+        <span aria-hidden="true" className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border ${selected ? "border-foreground" : "border-muted-foreground/50"}`}>
+          {selected ? <span className="size-2 rounded-full bg-foreground" /> : null}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-foreground">{computerModeLabel(mode)}</span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+            {computerChoiceDescription(mode)}
+            {unavailable ? <> {t`Choose it from Mycellios Desktop on that PC.`}</> : null}
+          </span>
+        </span>
+      </button>;
+    })}
+  </div>;
 }
 
 /** One plain note for the chosen place: what it can reach and what happens when the PC is off. */
@@ -820,41 +865,17 @@ export function BotSettings({
       {page === "computer" ? (
         <div className="space-y-5">
           <SettingsGroup label={t`Computer`}>
-            {/* One row and one note, saved on change, like the other settings rows. */}
-            <label
-              htmlFor={`${ids}-computer`}
-              className="flex min-h-11 items-center justify-between gap-3 text-sm text-foreground"
-            >
-              <Trans>Works on</Trans>
-              <NativeSelect
-                id={`${ids}-computer`}
-                className="max-w-2/3"
-                value={computerMode}
-                disabled={computerBusy}
-                onChange={(event) => chooseComputer(event.target.value as ComputerMode)}
-              >
-                {BOT_COMPUTER_MODES.map((mode) => (
-                  <NativeSelectOption
-                    key={mode}
-                    value={mode}
-                    disabled={mode === "dedicated" && !onUseThisComputer && bot.computerMode !== "dedicated"}
-                  >
-                    {computerModeLabel(mode)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </label>
-            <p className="text-xs leading-relaxed text-muted-foreground" data-testid="computer-mode-note">
-              <ComputerModeNote mode={computerMode} desktopAvailable={Boolean(onUseThisComputer)} />
-            </p>
+            {/* Three places to pick from, saved on choice, like the other settings rows. */}
+            <ComputerChoices
+              value={computerMode}
+              busy={computerBusy}
+              desktopAvailable={Boolean(onUseThisComputer)}
+              savedOnPc={bot.computerMode === "dedicated"}
+              onChoose={chooseComputer}
+            />
             {onUseThisComputer && bot.computerMode === "dedicated" && computerMode === "dedicated" ? (
               <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
-                <div>
-                  <p className={rowLabelClass}><Trans>Use this PC</Trans></p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    <Trans>If it works on another of your PCs, move it here.</Trans>
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground"><Trans>Does it work on another of your PCs?</Trans></p>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -862,7 +883,7 @@ export function BotSettings({
                   aria-busy={computerBusy}
                   onClick={() => void switchToThisComputer()}
                 >
-                  {computerBusy ? t`Connecting…` : t`Move here`}
+                  {computerBusy ? t`Connecting…` : t`Move to this PC`}
                 </Button>
               </div>
             ) : null}

@@ -140,8 +140,9 @@ import { lazyOverlay } from "../components/ErrorBoundary";
 import { IconTooltip } from "../components/IconTooltip";
 import { MycelliosCredits } from "../components/MycelliosCredits";
 import { SidebarContribution } from "../components/SidebarContribution";
+import { ChromeExtensionCard } from "../components/ChromeExtensionCard";
+import { ShellLoading, TranscriptLoading } from "../components/ShellLoading";
 import { DialogLoading, SettingsLoading } from "../components/LoadingSkeleton";
-import { PageLoading } from "../components/PageLoading";
 import { PasskeyOffer } from "../components/PasskeyOffer";
 import { setLiveThreadConnection } from "../lib/live-thread-connection";
 import { notificationPreferences } from "../lib/notification-preferences";
@@ -4867,11 +4868,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       logOutError={logOutError}
     />
   );
+  const chromeCardMico = active ?? bots[0];
   const sidebarCredits = (
+    <>
+    <ChromeExtensionCard mico={chromeCardMico ? { id: chromeCardMico.id, color: chromeCardMico.color } : undefined} />
     <div className="mx-3 mt-1 flex shrink-0 flex-col gap-1 border-t border-border py-2">
       <div className="w-full px-2"><MycelliosCredits key={userId} ownerId={userId ?? ""} onConnect={() => openSettings("models")} /></div>
       <SidebarContribution />
     </div>
+    </>
   );
   const mobileRosterMenu = (
     <MobileChatActions label={t`More`} onDismiss={() => setMenuOpen(false)}>
@@ -5291,7 +5296,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                   <Trans>Try again</Trans>
                 </Button>
               </div>
-            ) : <PageLoading layout="chat" className="flex-1" />
+            ) : <TranscriptLoading />
           ) : (
             <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><SendToGroupContext.Provider value={sendToGroup}><MemoryRecallGate enabled={!inGroup && Boolean(active)} botName={active?.name} onOpenNote={openMemoryNote}><Transcript
               headerTabs={false}
@@ -6091,7 +6096,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   );
 
   // Empty chrome until the first bot list lands would flash "Select a bot" before the chat.
-  return initialBotsLoaded || initialLoadFailed ? shell : <PageLoading layout="chat" />;
+  return initialBotsLoaded || initialLoadFailed ? shell : <ShellLoading />;
 }
 
 /** A browser handoff showing only the waiting conversation's tab instead of the desktop. */

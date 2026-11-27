@@ -258,9 +258,16 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   50% { clip-path: inset(0 35% 0 35%); }
   100% { clip-path: inset(0 0 0 100%); }
 }
+/* Each new thinking phrase rises into place. */
+.rk-activity-label[data-swap] { animation: rk-activity-swap 280ms ease-out both; }
+@keyframes rk-activity-swap {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
 .rk-thinking-avatar { position: relative; display: inline-flex; flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   .rk-activity-label::after { display: none; }
+  .rk-activity-label[data-swap] { animation: none; }
 }
 
 /* Shared web/Desktop workspace: page rail, chat list and compact title row. */

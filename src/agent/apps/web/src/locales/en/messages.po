@@ -12137,6 +12137,33 @@ msgstr "These instructions will be saved when you create the Mico. You can edit 
 msgid "Thinking it through…"
 msgstr "Thinking it through…"
 
+msgid "On it…"
+msgstr "On it…"
+
+msgid "Looking at it closely…"
+msgstr "Looking at it closely…"
+
+msgid "Weighing the options…"
+msgstr "Weighing the options…"
+
+msgid "Going over the details…"
+msgstr "Going over the details…"
+
+msgid "Piecing it together…"
+msgstr "Piecing it together…"
+
+msgid "Getting the answer ready…"
+msgstr "Getting the answer ready…"
+
+msgid "The spores are busy…"
+msgstr "The spores are busy…"
+
+msgid "Growing an idea…"
+msgstr "Growing an idea…"
+
+msgid "Asking the mycelium…"
+msgstr "Asking the mycelium…"
+
 msgid "Thinking…"
 msgstr "Thinking…"
 
@@ -16096,3 +16123,85 @@ msgstr "Realtime calls"
 #: src/pages/settings/DeviceVoiceSettings.tsx
 msgid "Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice."
 msgstr "Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice."
+
+msgid "Your Micos, in Chrome"
+msgstr "Your Micos, in Chrome"
+
+msgid "Add to Chrome"
+msgstr "Add to Chrome"
+
+msgid "Close the Chrome extension notice"
+msgstr "Close the Chrome extension notice"
+
+msgid "This PC is offline, so the server answers this message with the Mico's saved model instead of {engine}, without this PC's files."
+msgstr "This PC is offline, so the server answers this message with the Mico's saved model instead of {engine}, without this PC's files."
+
+msgid "This PC is offline, so the server answers this message, without this PC's files."
+msgstr "This PC is offline, so the server answers this message, without this PC's files."
+
+msgid "Open Mycellios Desktop on that PC to work there again."
+msgstr "Open Mycellios Desktop on that PC to work there again."
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "Prompt cache"
+msgstr "Prompt cache"
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "5 minutes"
+msgstr "5 minutes"
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "1 hour"
+msgstr "1 hour"
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "1 hour makes replies after a pause faster, but saving the cache costs more."
+msgstr "1 hour makes replies after a pause faster, but saving the cache costs more."
+
+msgid "Your PC"
+msgstr "Your PC"
+
+msgid "In the cloud"
+msgstr "In the cloud"
+
+msgid "In the cloud, shared"
+msgstr "In the cloud, shared"
+
+msgid "With your files and programs. It needs Mycellios Desktop open; while the PC is off, the cloud answers without your files."
+msgstr "With your files and programs. It needs Mycellios Desktop open; while the PC is off, the cloud answers without your files."
+
+msgid "Keeps working with your PC off. It has its own computer and cannot see your PC."
+msgstr "Keeps working with your PC off. It has its own computer and cannot see your PC."
+
+msgid "Like the cloud, but it shares one computer with your other Micos in this space."
+msgstr "Like the cloud, but it shares one computer with your other Micos in this space."
+
+msgid "Does it work on another of your PCs?"
+msgstr "Does it work on another of your PCs?"
+
+msgid "Move to this PC"
+msgstr "Move to this PC"
+
+msgid "As set for this space"
+msgstr "As set for this space"
+
+msgid "Choose it from Mycellios Desktop on that PC."
+msgstr "Choose it from Mycellios Desktop on that PC."
+
+msgid "Its own and the space's"
+msgstr "Its own and the space's"
+
+msgid "Links"
+msgstr "Links"
+
+msgid "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
+msgstr "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
+
+msgid "Mycellios models are not available right now. Try again shortly."
+msgstr "Mycellios models are not available right now. Try again shortly."
+
+msgid "Only its own"
+msgstr "Only its own"
+
+msgid "Works on"
+msgstr "Works on"

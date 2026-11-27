@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { BotAvatar } from "@mycellios/ui-web";
-import { ChevronDown, Hand, MessageCircleQuestion, MessagesSquare } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useMemo } from "react";
 import { type NeedsYouEntry, needsYouEntries, needsYouPath } from "../../lib/needs-you";
 import { formatRelativeTime } from "../../lib/relative-time";
@@ -39,19 +39,17 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
     : entry.count > 1 ? t`${entry.count} conversations wait for you` : t`A conversation waits for you`;
   const actionLabel = (entry: NeedsYouEntry) => entry.action === "answer" ? t`Answer`
     : entry.action === "takeover" ? t`Take over` : t`Review`;
-  const Icon = (entry: NeedsYouEntry) => entry.action === "answer" ? MessageCircleQuestion : entry.action === "takeover" ? Hand : MessagesSquare;
   return <section data-testid="sidebar-needs-you" aria-label={t`Needs you`} className="flex flex-col gap-0.5 pb-1">
     <h2 className="px-1 pt-2">
       {/* Folding hides the rows; the count keeps waiting work visible while folded. */}
       <button type="button" aria-expanded={!collapsed} data-testid="sidebar-needs-you-toggle" onClick={toggle}
         className={`group/section flex min-h-7 w-full items-center gap-1 rounded-md px-1.5 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "text-[13px] font-semibold text-muted-foreground" : "text-xs font-medium text-foreground"}`}>
         <span>{t`Needs you`}</span>
-        {collapsed ? <span className="rounded-full bg-[#94620f] px-1.5 text-[10.5px] font-medium leading-4 text-white">{entries.length}</span> : null}
+        {collapsed ? <span className="rounded-full bg-muted px-1.5 text-[10.5px] font-medium leading-4 text-foreground tabular-nums">{entries.length}</span> : null}
         <ChevronDown aria-hidden="true" size={13} className={`shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${collapsed ? "-rotate-90" : "opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100"}`} />
       </button>
     </h2>
     {collapsed ? null : entries.map(entry => {
-      const ActionIcon = Icon(entry);
       return <button key={entry.key} type="button" data-needs-you={entry.action} data-needs-you-bot={entry.botId}
         aria-label={`${actionLabel(entry)}: ${entry.name}. ${describe(entry)}`}
         className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "min-h-12 py-1.5" : "min-h-10 py-1"}`}
@@ -64,8 +62,8 @@ export function NeedsYouGroup({ groups, mobile = false, openSpaceChat }: {
           </span>
           <span className={`block text-[11.5px] text-muted-foreground ${entry.question ? "line-clamp-2 break-words" : "truncate"}`} dir="auto">{describe(entry)}</span>
         </span>
-        <span aria-hidden="true" className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#94620f] px-2 py-0.5 text-[10.5px] font-medium leading-4 text-white">
-          <ActionIcon size={12} strokeWidth={2.2} />{actionLabel(entry)}
+        <span aria-hidden="true" className="shrink-0 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] font-medium leading-4 text-foreground">
+          {actionLabel(entry)}
         </span>
       </button>;
     })}

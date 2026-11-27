@@ -1369,6 +1369,139 @@ it("shows the masked key form directly beside subscription sign-in in settings",
   }
 });
 
+const anthropicKeyEntry = {
+  provider: "anthropic",
+  providerName: "Anthropic",
+  id: "claude-fixture",
+  label: "Claude fixture",
+  billing: "API key",
+  auth: "api-key" as const,
+  authHint: "API key",
+};
+const anthropicKeyCredential = {
+  id: "cred-anthropic",
+  label: "Anthropic",
+  provider: "anthropic",
+  modelId: "claude-fixture",
+  hasKey: true,
+  isDefault: true,
+  authKind: "api_key" as const,
+};
+
+function promptCacheOption(container: HTMLElement, label: "5 minutes" | "1 hour") {
+  const option = [...container.querySelectorAll('[data-testid="prompt-cache"] button')].find(
+    (entry) => entry.textContent === label,
+  );
+  if (!(option instanceof HTMLButtonElement)) throw new Error(`Missing prompt cache option ${label}`);
+  return option;
+}
+
+it("saves a one-hour prompt cache for an Anthropic API-key connection, keeping its other fields", async () => {
+  vi.mocked(rpc.me).mockResolvedValue(account("anthropic", "claude-fixture"));
+  models.list.mockResolvedValue([anthropicKeyEntry]);
+  models.credentials.mockResolvedValue([
+    {
+      ...anthropicKeyCredential,
+      maxTokens: 2048,
+      cacheCapabilities: { scope: "connection", minimumTokens: 1024 },
+    },
+  ]);
+  const view = await renderSettings();
+  try {
+    await manage();
+    expect(view.container.textContent).toContain("Prompt cache");
+    // No saved mode is the five-minute default, and nothing is dirty yet.
+    expect(promptCacheOption(view.container, "5 minutes").getAttribute("aria-pressed")).toBe("true");
+    expect(promptCacheOption(view.container, "1 hour").getAttribute("aria-pressed")).toBe("false");
+    expect(
+      [...view.container.querySelectorAll("button")].some((entry) => entry.textContent === "Save"),
+    ).toBe(false);
+
+    await click(promptCacheOption(view.container, "1 hour"));
+    expect(promptCacheOption(view.container, "1 hour").getAttribute("aria-pressed")).toBe("true");
+    await click(buttons(view.container, "Save").find((entry) => entry.textContent === "Save"));
+    expect(models.connect).toHaveBeenCalledTimes(1);
+    const input = models.connect.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      provider: "anthropic",
+      credentialId: "cred-anthropic",
+      maxTokens: 2048,
+      cacheCapabilities: {
+        scope: "connection",
+        retentionMode: "long",
+        retentionMs: 3_600_000,
+        minimumTokens: 1024,
+      },
+    });
+    expect(input).not.toHaveProperty("apiKey");
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("shows a saved one-hour prompt cache and saves the change back to five minutes", async () => {
+  vi.mocked(rpc.me).mockResolvedValue(account("anthropic", "claude-fixture"));
+  models.list.mockResolvedValue([anthropicKeyEntry]);
+  models.credentials.mockResolvedValue([
+    {
+      ...anthropicKeyCredential,
+      cacheCapabilities: { scope: "connection", retentionMode: "long", retentionMs: 3_600_000 },
+    },
+  ]);
+  const view = await renderSettings();
+  try {
+    await manage();
+    expect(promptCacheOption(view.container, "1 hour").getAttribute("aria-pressed")).toBe("true");
+    await click(promptCacheOption(view.container, "5 minutes"));
+    await click(buttons(view.container, "Save").find((entry) => entry.textContent === "Save"));
+    expect(models.connect.mock.calls[0]?.[0]).toMatchObject({
+      cacheCapabilities: { scope: "connection", retentionMode: "short", retentionMs: 300_000 },
+    });
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("does not send a prompt cache choice when only the output limit changes", async () => {
+  vi.mocked(rpc.me).mockResolvedValue(account("anthropic", "claude-fixture"));
+  models.list.mockResolvedValue([anthropicKeyEntry]);
+  models.credentials.mockResolvedValue([anthropicKeyCredential]);
+  const view = await renderSettings();
+  try {
+    await manage();
+    const limit = view.container.querySelector<HTMLInputElement>(
+      'input[aria-label="Maximum output tokens"]',
+    );
+    if (!limit) throw new Error("Missing output limit field");
+    await typeInto(limit, "4096");
+    await click(buttons(view.container, "Save").find((entry) => entry.textContent === "Save"));
+    const input = models.connect.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({ provider: "anthropic", maxTokens: 4096 });
+    expect(input).not.toHaveProperty("cacheCapabilities");
+  } finally {
+    await view.unmount();
+  }
+});
+
+it.each([
+  ["a Claude subscription", "anthropic", { ...anthropicKeyCredential, hasKey: false, authKind: "oauth" as const }],
+  ["another provider's API key", "deepseek", { ...deepseekCredential, authKind: "api_key" as const }],
+])("hides the prompt cache choice for %s", async (_name, provider, credential) => {
+  vi.mocked(rpc.me).mockResolvedValue(
+    account(provider, provider === "anthropic" ? "claude-fixture" : "deepseek-chat"),
+  );
+  models.list.mockResolvedValue([provider === "anthropic" ? anthropicKeyEntry : deepseekEntry]);
+  models.credentials.mockResolvedValue([credential]);
+  const view = await renderSettings();
+  try {
+    await manage();
+    expect(view.container.querySelector('input[aria-label="Maximum output tokens"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-testid="prompt-cache"]')).toBeNull();
+  } finally {
+    await view.unmount();
+  }
+});
+
 function providersSection() {
   const found = document.querySelector('[data-testid="model-providers"]');
   if (!found) throw new Error("Missing Providers section");

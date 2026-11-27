@@ -627,6 +627,25 @@ describe("cache request metadata", () => {
     time = 300000;
     expect(tracker.predict(request)).toBe("likely-cold");
   });
+  it("keeps a one-hour connection warm after a pause that a five-minute one does not survive", () => {
+    let time = 0;
+    const tracker = new ContextCacheTracker(() => time);
+    const hour = {
+      ...request,
+      capabilities: { scope: "connection" as const, retentionMode: "long" as const, retentionMs: 3_600_000 },
+    };
+    const fiveMinutes = {
+      ...request,
+      capabilities: { scope: "connection" as const, retentionMode: "short" as const, retentionMs: 300_000 },
+    };
+    tracker.record(tracker.stamp(hour), 1000);
+    tracker.record(tracker.stamp(fiveMinutes), 1000);
+    time = 30 * 60 * 1000;
+    expect(tracker.predict(hour)).toBe("likely-warm");
+    expect(tracker.predict(fiveMinutes)).toBe("likely-cold");
+    time = 60 * 60 * 1000 + 1;
+    expect(tracker.predict(hour)).toBe("likely-cold");
+  });
   it("uses request-start time even when completion arrives after retention expires", () => {
     let time = 0;
     const tracker = new ContextCacheTracker(() => time);

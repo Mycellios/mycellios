@@ -11,7 +11,7 @@ import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-acti
 import { liveThreadDisconnected, subscribeLiveThreadConnection } from "../lib/live-thread-connection";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { RunExecutionDetails } from "./RunExecutionDetails";
-import { ActivityShine, ThinkingAvatar } from "./ThinkingActivity";
+import { ActivityShine, ThinkingAvatar, useThinkingLabel } from "./ThinkingActivity";
 import { useCommandActivity } from "../lib/use-command-activity";
 
 type ActivityStep = {
@@ -100,15 +100,16 @@ export function PendingRunActivity({ messages, bots, onRefresh }: {
   }, []);
   const live = messages.findLast(message => message.id.startsWith("progress:"));
   const steps = summarizeSteps(live?.blocks.flatMap(block => block.kind === "steps" ? block.steps : []) ?? [], presentActivityLabel);
+  const thinking = useThinkingLabel(live?.runId ?? live?.id ?? "pending");
   return <div className="flex min-w-0 items-start gap-2.5 px-1 py-2">
     <ThinkingAvatar members={bots} size={24} />
     <div className="min-w-0 max-w-prose text-xs text-muted-foreground">
       {steps.length ? <details>
-        <summary className="w-fit cursor-pointer rounded-sm py-1"><ActivityShine text={t`Thinking it through…`} /></summary>
+        <summary className="w-fit cursor-pointer rounded-sm py-1"><ActivityShine text={thinking.text} spoken={thinking.spoken} /></summary>
         <ol aria-label={t`Task activity`} className="space-y-1 py-1 text-xs">
           {steps.map((step, index) => <li key={index}>{step.label}{step.count > 1 ? ` ×${step.count}` : ""}</li>)}
         </ol>
-      </details> : <span role="status" className="inline-block py-1"><ActivityShine text={t`Thinking it through…`} /></span>}
+      </details> : <span role="status" className="inline-block py-1"><ActivityShine text={thinking.text} spoken={thinking.spoken} /></span>}
     </div>
   </div>;
 }
@@ -277,9 +278,13 @@ export function RunActivityStatus({
     : labels[health.state];
   // While the Mico works, its line moves as in the reference app; waits and problems stay still.
   const animated = !liveUpdatesStopped && (startingGrace || working);
+  // Plain thinking (no reported step) moves through short phrases while the turn thinks.
+  const plainThinking = animated && primaryLabel === t`Thinking it through…`;
+  const thinkingLabel = useThinkingLabel(run.id, plainThinking);
+  const shownLabel = plainThinking ? thinkingLabel.text : primaryLabel;
   const status = liveUpdatesStopped
     ? <span role="alert" className="break-words text-destructive">{primaryLabel}</span>
-    : <span role="status" className="break-words text-muted-foreground">{animated ? <ActivityShine text={primaryLabel} /> : primaryLabel}</span>;
+    : <span role="status" className="break-words text-muted-foreground">{animated ? <ActivityShine text={shownLabel} spoken={primaryLabel} /> : primaryLabel}</span>;
   const backgroundElapsed = backgroundWait && Number.isFinite(backgroundSince) ? Math.max(0, serverNow - backgroundSince) : null;
   const elapsed = backgroundElapsed !== null
     ? <span aria-live="off" className="shrink-0 text-xs tabular-nums" data-testid="background-wait-elapsed">{duration(backgroundElapsed)}</span>
@@ -325,7 +330,7 @@ export function RunActivityStatus({
             <SheetTitle>{t`Task activity`}</SheetTitle>
             <SheetClose render={<Button variant="ghost" size="icon" className="size-12" aria-label={t`Close`} />}><X /></SheetClose>
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-2 text-sm">{primaryLabel}{elapsed}</div>
+          <div className="flex flex-wrap items-baseline gap-x-2 text-sm">{shownLabel}{elapsed}</div>
           {details}
         </SheetContent>
       </Sheet> : <div className="flex min-h-12 items-center gap-2 px-1 text-sm"><ThinkingAvatar members={bots} size={28} active={animated} />{status}</div>}

@@ -198,6 +198,18 @@ describe("runtime context policy", () => {
     expect(continued.messages.slice(0, initial.messages.length)).toEqual(initial.messages);
     expect(continued.messages).toHaveLength(initial.messages.length + 1);
   });
+  it.each([
+    ["one hour", { scope: "connection" as const, retentionMode: "long" as const, retentionMs: 3_600_000 }, "cache-aware"],
+    ["five minutes", { scope: "connection" as const, retentionMode: "short" as const, retentionMs: 300_000 }, "cache-aware"],
+    ["no choice", undefined, "retrieval"],
+  ] as const)("uses the cache-aware context for a saved %s prompt cache choice", (_name, capabilities, strategy) => {
+    const { request, context } = fixture();
+    enableHistoryRetrieval(request);
+    request.model.cacheCapabilities = capabilities;
+    const policy = createRuntimeContextPolicy(request);
+    policy.prepareContext(context, model);
+    expect(policy.getDecision()!.strategy).toBe(strategy);
+  });
   it("honors an explicit retrieval override even with a declared cache window", () => {
     const { request, context } = fixture(30);
     enableHistoryRetrieval(request);

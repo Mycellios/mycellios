@@ -44,6 +44,7 @@ import { isMycelliosProviderConnected, MycelliosProvider } from "./model-setting
 import { OpenCodeProvider } from "./model-settings/open-code-provider";
 import type { ProviderIntegration } from "./model-settings/provider-detail";
 import { ProviderDiscovery, ProviderRuntimeDetails, useProviderRuntimes } from "./model-settings/provider-runtime";
+import { PromptCacheField } from "./model-settings/prompt-cache";
 import { ConnectionNameField, ProvidersSection } from "./model-settings/providers-section";
 import type { ConnectableProvider } from "./model-settings/role-model-picker";
 import { SpaceBotsModelNotice } from "./model-settings/space-bots-model";
@@ -291,7 +292,18 @@ export function ModelSettingsOverlay({
             setNotice(null);
           }}
           maxTokensLabel={t`Maximum output tokens`}
-        />
+        >
+          {model.promptCacheEditable ? (
+            <PromptCacheField
+              value={model.promptCache}
+              disabled={busy}
+              onChange={(value) => {
+                model.setPromptCache(value);
+                setNotice(null);
+              }}
+            />
+          ) : null}
+        </ModelThinkingOptions>
         {settingsDirty ? (
           <Button
             type="button"
