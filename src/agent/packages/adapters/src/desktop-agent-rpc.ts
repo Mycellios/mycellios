@@ -95,7 +95,7 @@ export class DesktopAgentRpc {
       if (++count > 100_000 || depth > 48) throw Error("Desktop runtime value exceeds its bound");
       if (v === null || typeof v === "string" || typeof v === "boolean" || typeof v === "number" && Number.isFinite(v)) return v;
       if (!v || typeof v !== "object" || Array.isArray(v)) throw Error("Invalid Desktop runtime value");
-      const item = v as { kind?: string; value?: unknown };
+      const item = v as { kind?: string; value?: unknown; mode?: unknown };
       switch (item.kind) {
         case "undefined": return undefined;
         case "bytes":
