@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-11-27
+
+### Fixed
+
+- Center the messages on the sign-in loading screen. "This is taking a while." no longer
+  sits to the left under the logo.
+- Windows updates no longer fail on PCs where Windows PowerShell inherits the module list of PowerShell 7.
+
 ## [0.40.0] - 2026-11-27
 
 ### Added
