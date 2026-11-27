@@ -1105,6 +1105,12 @@
   resource filter unconditionally skips a root directory with that name.
   Fast installation journals a same-volume installation snapshot, retains the old
   uninstaller, registration and shortcut recovery, and never moves userData.
+  A first installation (no app in the fixed folder) skips the helper entirely.
+  fast-install.ps1 must also run in ConstrainedLanguage, which WDAC/AppLocker
+  impose on managed PCs: cmdlets, string methods and Windows executables only,
+  no .NET method calls. Its test runs every case in both language modes. The
+  in-app manual-update helper needs Add-Type and cannot run there; it fails
+  with its retry and download link, and the installer remains the update path.
   Qualify compact-resources, fast-install, the real local server and timed NSIS
   legacy upgrades; report hosted timing separately from physical-PC acceptance.
   Compact Windows payloads use ZIP32/Deflate; afterPack bounds the actual file

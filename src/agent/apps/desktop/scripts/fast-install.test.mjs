@@ -5,20 +5,38 @@ import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 const source=process.env.MYCELLIOS_TEST_INSTALLED_EXE;
 const windows=process.platform==='win32'&&!!source;
 const helper=fileURLToPath(new URL('./fast-install.ps1',import.meta.url));
 const ps=path.join(process.env.SystemRoot??'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe');
 
-test('Windows snapshot/rollback preserves installation registration, drafts and task fixtures',{skip:!windows,timeout:60000},async()=>{
+// WDAC and AppLocker run unsigned scripts in ConstrainedLanguage, as on managed work PCs.
+// Every case runs in both modes; this wrapper switches the session before calling the helper.
+const LANGUAGE_MODES=['FullLanguage','ConstrainedLanguage'];
+const wrapperDir=mkdtempSync(path.join(tmpdir(),'mycellios-fast-install-clm-'));
+const constrained=path.join(wrapperDir,'constrained.ps1');
+writeFileSync(constrained,[
+  '$helper=$args[0];$named=@{}',
+  'for($i=1;$i -lt $args.Count;$i+=2){$named[$args[$i].TrimStart([char]45)]=$args[$i+1]}',
+  "$ExecutionContext.SessionState.LanguageMode='ConstrainedLanguage'",
+  '& $helper @named',
+  'exit $LASTEXITCODE',
+].join('\r\n'));
+process.on('exit',()=>rmSync(wrapperDir,{recursive:true,force:true}));
+const runHelper=mode=>mode==='FullLanguage'?['-File',helper]:['-File',constrained,helper];
+
+for(const mode of LANGUAGE_MODES){
+
+test(`Windows snapshot/rollback preserves installation registration, drafts and task fixtures (${mode})`,{skip:!windows,timeout:60000},async()=>{
   const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-'));
   assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir())+path.sep+'mycellios-fast-install-'));
   const installation=path.join(root,'mycellios-desktop'),profile=path.join(root,'user-profile');
   const journal=path.join(root,'journal.json'),guid=randomUUID();
   const keys=['Software\\'+guid,'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\'+guid];
   const reg=(...args)=>execFileSync('reg.exe',args,{windowsHide:true,stdio:'pipe'}).toString();
-  const invoke=(operation,extra=[],receipt=journal)=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation',operation,'-Installation',installation,'-Journal',receipt,...extra],{windowsHide:true,stdio:'pipe'});
+  const invoke=(operation,extra=[],receipt=journal)=>execFileSync(ps,['-NoProfile','-NonInteractive',...runHelper(mode),'-Operation',operation,'-Installation',installation,'-Journal',receipt,...extra],{windowsHide:true,stdio:'pipe'});
   try {
     for(const key of keys){assert.throws(()=>reg('query','HKCU\\'+key));reg('add','HKCU\\'+key,'/v','InstallLocation','/t','REG_SZ','/d',installation,'/f');}
     reg('add','HKCU\\'+keys[1],'/v','DisplayVersion','/t','REG_SZ','/d','0.3.18','/f');
@@ -80,11 +98,11 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
   }
 });
 
-test('refuses paths outside the named installation without moving data',{skip:!windows},async()=>{
+test(`refuses paths outside the named installation without moving data (${mode})`,{skip:!windows},async()=>{
   const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-scope-'));
   try{
     const target=path.join(root,'other-product');await mkdir(target);await writeFile(path.join(target,'keep'),'preserved');
-    assert.throws(()=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation','prepare','-Installation',target,'-Journal',path.join(root,'journal.json'),'-TargetVersion','99.0.0'],{windowsHide:true,stdio:'pipe'}));
+    assert.throws(()=>execFileSync(ps,['-NoProfile','-NonInteractive',...runHelper(mode),'-Operation','prepare','-Installation',target,'-Journal',path.join(root,'journal.json'),'-TargetVersion','99.0.0'],{windowsHide:true,stdio:'pipe'}));
     assert.equal(await readFile(path.join(target,'keep'),'utf8'),'preserved');
   }finally{
     assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir())+path.sep+'mycellios-fast-install-scope-'));
@@ -92,7 +110,7 @@ test('refuses paths outside the named installation without moving data',{skip:!w
   }
 });
 
-test('prepare reports an open app with its own exit code and moves nothing',{skip:process.platform!=='win32',timeout:60000},async()=>{
+test(`prepare reports an open app with its own exit code and moves nothing (${mode})`,{skip:process.platform!=='win32',timeout:60000},async()=>{
   const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-open-'));
   const installation=path.join(root,'mycellios-desktop'),journal=path.join(root,'journal.json');
   // Any long-running executable under the product name stands in for the open app.
@@ -104,7 +122,7 @@ test('prepare reports an open app with its own exit code and moves nothing',{ski
     child=spawn(running,['-n','60','127.0.0.1'],{windowsHide:true,stdio:'ignore'});
     await new Promise(resolve=>child.once('spawn',resolve));
     let status;
-    try{execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation','prepare','-Installation',installation,'-Journal',journal,'-Uninstaller','Uninstall Mycellios Desktop.exe','-TargetVersion','99.0.0'],{windowsHide:true,stdio:'pipe'});status=0}
+    try{execFileSync(ps,['-NoProfile','-NonInteractive',...runHelper(mode),'-Operation','prepare','-Installation',installation,'-Journal',journal,'-Uninstaller','Uninstall Mycellios Desktop.exe','-TargetVersion','99.0.0'],{windowsHide:true,stdio:'pipe'});status=0}
     catch(error){status=error.status}
     assert.equal(status,3);
     await access(running);await assert.rejects(access(journal));
@@ -116,13 +134,13 @@ test('prepare reports an open app with its own exit code and moves nothing',{ski
   }
 });
 
-test('Windows commit keeps the two newest settled recovery copies and every unsettled one',{skip:!windows,timeout:60000},async()=>{
+test(`Windows commit keeps the two newest settled recovery copies and every unsettled one (${mode})`,{skip:!windows,timeout:60000},async()=>{
   const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-retention-'));
   const installation=path.join(root,'mycellios-desktop'),journal=path.join(root,'journal.json'),guid=randomUUID();
   const backups=path.join(root,'mycellios-desktop-upgrade-backups');
   const keys=['Software\\'+guid,'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\'+guid];
   const reg=(...args)=>execFileSync('reg.exe',args,{windowsHide:true,stdio:'pipe'}).toString();
-  const invoke=(operation,extra=[])=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation',operation,'-Installation',installation,'-Journal',journal,...extra],{windowsHide:true,stdio:'pipe'});
+  const invoke=(operation,extra=[])=>execFileSync(ps,['-NoProfile','-NonInteractive',...runHelper(mode),'-Operation',operation,'-Installation',installation,'-Journal',journal,...extra],{windowsHide:true,stdio:'pipe'});
   const version=execFileSync(ps,['-NoProfile','-NonInteractive','-Command',"(Get-Item -LiteralPath '"+source.replaceAll("'","''")+"').VersionInfo.ProductVersion"]).toString().trim().split('.').slice(0,3).join('.');
   const writeApp=async()=>{
     const target=path.join(installation,'Mycellios Desktop.exe');await link(source,target).catch(()=>copyFile(source,target));
@@ -164,3 +182,4 @@ test('Windows commit keeps the two newest settled recovery copies and every unse
     await rm(root,{recursive:true,force:true});
   }
 });
+}
