@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS guest_chat_sessions (
   state TEXT NOT NULL DEFAULT 'active' CHECK(state IN ('active','closed'))
 );
 CREATE INDEX IF NOT EXISTS guest_chat_sessions_prefix ON guest_chat_sessions(prefix_digest, created_at);
+CREATE INDEX IF NOT EXISTS guest_chat_sessions_expiry ON guest_chat_sessions(expires_at);
 CREATE TABLE IF NOT EXISTS guest_chat_usage (
   bucket BIGINT NOT NULL,
   scope TEXT NOT NULL,
@@ -36,5 +37,5 @@ export function guestChatAccessSql(role: string): string {
     END;$access$;
     DROP POLICY IF EXISTS guest_chat_native_access ON ${table};
     CREATE POLICY guest_chat_native_access ON ${table} TO "${role}" USING (true) WITH CHECK (true);
-    GRANT SELECT,INSERT,UPDATE ON ${table} TO "${role}";`).join("\n");
+    GRANT SELECT,INSERT,UPDATE,DELETE ON ${table} TO "${role}";`).join("\n");
 }

@@ -282,13 +282,28 @@ schema change.
   mobile (Spanish) sizes: three turns, scoped cookie, reload in the same tab, limit
   reached with the account offer, deep link and installed web app keep sign-in.
 
+## Client address and retention
+
+- In production the coordinator sits behind Cloudflare, `mycellios-cloudflared` and the
+  `mycellios-ingress` nginx, so its direct peer is the ingress for every visitor. The
+  optional `clientAddress` setting (`{ "header": "cf-connecting-ip", "trustedProxies":
+  ["<private proxy network CIDR>"] }`) reads the edge's address header only when the
+  direct peer is inside a trusted proxy network; otherwise the default derivation applies.
+  Without it, every visitor would share one network prefix and its limits.
+- Ended sessions and old counters are deleted 7 days after they end (`GUEST_RETENTION_MS`,
+  hourly, at session creation); the runtime role therefore also has DELETE on both tables.
+  `/privacy` states this in "Guest chat without an account".
+
 ## Enabling
 
 1. The migration owner applies `guestChatSchemaSql` and `guestChatAccessSql(<runtime
    role>)` to the coordinator database.
-2. Publish the guest-mode paragraph in `/privacy`.
-3. Set `MYCELLIOS_GUEST_CHAT_CONFIG_JSON` with `publicOrigin` (the exact first-party
-   origin, for example `https://www.mycellios.com`), a fresh 43+ character `secret`
-   and a low `messagesPerDay` for the canary (for example 200), then
-   `MYCELLIOS_GUEST_CHAT_ENABLED=true`. Unset it to switch guest chat off.
+2. Publish the guest-mode paragraph in `/privacy` (done in the release that adds
+   `clientAddress`).
+3. Once a release with `clientAddress` support is live, set
+   `MYCELLIOS_GUEST_CHAT_CONFIG_JSON` with `publicOrigin` (the exact first-party origin,
+   for example `https://www.mycellios.com`), a fresh 43+ character `secret`, a low
+   `messagesPerDay` for the canary (for example 200) and `clientAddress`, then
+   `MYCELLIOS_GUEST_CHAT_ENABLED=true`. Unset it to switch guest chat off. The config is
+   strict: an older release refuses unknown keys at startup.
 4. Confirm `GET /mobile/v1/guest/config` reports `enabled: true` and run a short canary.

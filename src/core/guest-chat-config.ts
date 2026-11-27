@@ -21,6 +21,14 @@ export const guestChatConfigSchema = z.object({
   concurrentTurns: z.number().int().min(1).max(256).default(16),
   /** Leading zero bits of the admission proof of work (16 ≈ 65k SHA-256 digests on average). */
   powDifficulty: z.number().int().min(8).max(26).default(16),
+  /**
+   * Behind Cloudflare, the visitor's address is the edge's `cf-connecting-ip` header. It is read
+   * only when the direct peer is inside one of these private proxy networks (IPv4 CIDR).
+   */
+  clientAddress: z.object({
+    header: z.literal("cf-connecting-ip"),
+    trustedProxies: z.array(z.string().regex(/^(?:\d{1,3}\.){3}\d{1,3}\/(?:[89]|[12]\d|3[0-2])$/)).min(1).max(8),
+  }).strict().optional(),
 }).strict().superRefine((value, ctx) => {
   const url = new URL(value.publicOrigin);
   if (url.origin !== value.publicOrigin || (url.protocol !== "https:" &&
