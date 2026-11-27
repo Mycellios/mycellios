@@ -36,10 +36,10 @@ try{
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
     page.on('console',m=>{if(/Content Security Policy/i.test(m.text()))errors.push(m.text());});
     await page.goto(origin,{waitUntil:'networkidle'});
-    await page.getByRole('heading',{name:'Meet Mycellios',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'AI agents that plan, research, write and grow with you.',exact:true}).waitFor();
     await page.locator('#mycellios-loader').waitFor({state:'detached'});
-    assert.equal(await page.locator('.distributed-earn-node').count(),49);
-    await page.getByRole('button',{name:'Choose a download platform',exact:true}).click();
+    assert.equal(await page.locator('.home-mesh-node').count(),17);
+    await page.getByRole('button',{name:'Choose a download platform',exact:true}).first().click();
     const menu=page.locator('#agent-download-platforms');await menu.waitFor();
     for(const [name,id] of [['macOS · Apple silicon','macos-arm64'],['macOS · Intel','macos-x64'],['Windows','windows-x64'],['Linux · DEB','linux-x64'],['Linux · RPM','fedora-x64']]){
       const link=menu.getByRole('menuitem',{name:new RegExp('^'+name)});

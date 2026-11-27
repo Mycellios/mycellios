@@ -121,7 +121,7 @@
 :root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.panel-stat > div, .global-capacity-metric > i, .panel-disclosure-icon, .overview-announcement-icon, .announcement-icon, .model-icon, .inference-unavailable-icon) { border: 0 !important; background: transparent !important; color: var(--agent-muted) !important; }
 :root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) { background: var(--agent-input-surface) !important; border: 1px solid var(--agent-input-line) !important; }
 :root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) .ui-input { border: 0 !important; background: transparent !important; }
-:root[data-mycellios-design="agent"] #mycellios-loader { background: var(--dark-canvas) !important; }
+:root[data-mycellios-design="agent"] #mycellios-loader:not([data-mode="forest"]) { background: #fff !important; color: #203b2b; }
 
 /* Badges and measured status are the only components with semantic colors. */
 :root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert) { background: var(--agent-card) !important; color: var(--agent-muted) !important; }

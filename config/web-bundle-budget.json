@@ -42,6 +42,14 @@
           "match": "AssemblageLanding-",
           "maximumBytes": 35000
         },
+        "home-landing-route": {
+          "match": "HomeLanding-",
+          "maximumBytes": 45000
+        },
+        "home-scroll-motion": {
+          "match": "home-motion-",
+          "maximumBytes": 55000
+        },
         "reference-landing-route": {
           "match": "ReferenceLanding-",
           "maximumBytes": 35000
@@ -73,6 +81,11 @@
       },
       "criticalPaths": {
         "home": {
+          "entry": "src/rebrand/HomeLanding.tsx",
+          "highPriorityMatches": [],
+          "maximumBytes": 350000
+        },
+        "reference-home": {
           "entry": "src/rebrand/ReferenceLanding.tsx",
           "highPriorityMatches": [],
           "maximumBytes": 350000
