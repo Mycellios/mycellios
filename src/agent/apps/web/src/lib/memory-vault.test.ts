@@ -1,3 +1,4 @@
+import { markdownMentionHref, markdownMentionId } from "@mycellios/chat-ui/web";
 import { memoryNotePath } from "@mycellios/contracts";
 import { describe, expect, it } from "vitest";
 import {
@@ -154,8 +155,9 @@ describe("vault helpers", () => {
     ];
     const output = wikiLinksAsMentions(notes[0]!, createLinkResolver(notes));
     expect(output).toBe(
-      "Go to [B note](rakazo-mention:memory-note%3Ab), see [nope](rakazo-mention:memory-new%3Anope) and `[[code]]`",
+      `Go to [B note](${markdownMentionHref("memory-note:b")}), see [nope](${markdownMentionHref("memory-new:nope")}) and \`[[code]]\``,
     );
+    expect(markdownMentionId(markdownMentionHref("memory-note:b"))).toBe("memory-note:b");
   });
 });
 

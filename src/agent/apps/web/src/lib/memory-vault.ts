@@ -1,3 +1,4 @@
+import { markdownMentionHref } from "@mycellios/chat-ui/web";
 import type { MemoryDocument } from "@mycellios/contracts";
 
 /**
@@ -335,7 +336,7 @@ export function wikiLinksAsMentions(note: VaultNote, resolve: LinkResolver): str
     const id = link.noteId
       ? `${MEMORY_NOTE_MENTION}${link.noteId}`
       : `${MEMORY_NEW_NOTE_MENTION}${link.target}`;
-    output += `[${label}](rakazo-mention:${encodeURIComponent(id)})`;
+    output += `[${label}](${markdownMentionHref(id)})`;
     cursor = link.end;
   }
   return output + note.content.slice(cursor);

@@ -15,6 +15,11 @@ export type ChatMarkdownProps = {
 const MENTION_URL_PREFIX = "rakazo-mention:";
 
 /** The id of a mention link, if this href is one. */
+/** The link target that makes ChatMarkdown draw a mention with this id. */
+export function markdownMentionHref(id: string): string {
+  return `${MENTION_URL_PREFIX}${encodeURIComponent(id)}`;
+}
+
 export function markdownMentionId(href: string | undefined): string | undefined {
   if (!href?.startsWith(MENTION_URL_PREFIX)) return undefined;
   try {
