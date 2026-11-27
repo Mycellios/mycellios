@@ -28,11 +28,14 @@ const result = retained?.result ?? await bootstrapNodeInstallation({ manifest, e
 const config = (await new NodeConfigurationStore(result.configPath).load()).config;
 const previousPid = retained ? await readFile(join(dirname(result.configPath), "state", "health.json"), "utf8")
   .then((text) => (JSON.parse(text) as { pid?: number }).pid).catch(() => undefined) : undefined;
-if (retained) {
-  await resumeNodeInstallationService({ manifest, config, beforeStart: async () => {
+const registration = retained
+  ? await resumeNodeInstallationService({ manifest, config, beforeStart: async () => {
     if (enrollmentPath) await renewNodeInstallationEnrollment(retained, enrollmentPath);
-  } });
-} else await registerNativeNodeService({ manifest, config });
+  } })
+  : await registerNativeNodeService({ manifest, config });
+if (registration?.inboundFirewall === "unavailable") {
+  process.stdout.write(`${JSON.stringify({ phase: "firewall", message: "Windows Firewall refused the inbound rule for direct peer connections. The node still works through relays." })}\n`);
+}
 if (enrollmentPath && resolve(enrollmentPath) !== resolve(result.enrollmentPath)) await rm(resolve(enrollmentPath), { force: true });
 const firstPid = await waitForReady(result.configPath, result.enrollmentPath, previousPid);
 const accelerator = await prepareInstalledNodeAccelerator({

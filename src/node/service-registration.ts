@@ -4,16 +4,22 @@ import { dirname, join } from "node:path";
 import type { NodeConfiguration } from "../contracts/node-configuration.js";
 import type { NodeInstallationManifest } from "../contracts/node-uninstall.js";
 import { linuxSystemdServiceDefinition, macOsLaunchdServiceDefinition } from "./service-definition.js";
+import { addNodeFirewallRuleArguments, deleteNodeFirewallRuleArguments } from "./windows-firewall-rule.js";
 
 export interface ServiceCommandResult { code: number; stdout: string }
 export type ServiceCommandRunner = (executable: string, arguments_: readonly string[]) => Promise<ServiceCommandResult>;
+/**
+ * `unavailable`: Windows refused the inbound rule (for example a disabled or
+ * third-party firewall). The node still works through relays; direct peers may not reach it.
+ */
+export interface NodeServiceRegistration { inboundFirewall: "allowed" | "unavailable" | "not-managed" }
 
 export async function registerNativeNodeService(input: {
   manifest: NodeInstallationManifest;
   config: NodeConfiguration;
   run?: ServiceCommandRunner;
   replaceRetainedServiceFiles?: boolean;
-}): Promise<void> {
+}): Promise<NodeServiceRegistration> {
   const run = input.run ?? runServiceCommand;
   const { manifest, config } = input;
   const serviceEntrypoint = join(dirname(manifest.helperEntrypoint), "main.js");
@@ -26,7 +32,7 @@ export async function registerNativeNodeService(input: {
     await requireSuccess(run, "/bin/chown", ["-R", "mycellios:mycellios", dirname(manifest.configPath), dirname(manifest.identityPath), manifest.cachePath, manifest.logsPath, manifest.statePath], "node_service_permissions_failed");
     await requireSuccess(run, "/bin/systemctl", ["daemon-reload"], "node_service_manager_reload_failed");
     await requireSuccess(run, "/bin/systemctl", ["enable", "--now", manifest.serviceName], "node_service_start_failed");
-    return;
+    return { inboundFirewall: "not-managed" };
   }
   if (manifest.platform === "darwin") {
     const definition = macOsLaunchdServiceDefinition({ config, configPath: manifest.configPath,
@@ -36,7 +42,7 @@ export async function registerNativeNodeService(input: {
     await requireSuccess(run, "/bin/launchctl", ["bootstrap", "system", manifest.serviceDefinitionPath], "node_service_registration_failed");
     await requireSuccess(run, "/bin/launchctl", ["enable", `system/${manifest.serviceName}`], "node_service_enable_failed");
     await requireSuccess(run, "/bin/launchctl", ["kickstart", "-k", `system/${manifest.serviceName}`], "node_service_start_failed");
-    return;
+    return { inboundFirewall: "not-managed" };
   }
   if (manifest.platform === "win32") {
     if (input.replaceRetainedServiceFiles) {
@@ -74,8 +80,9 @@ export async function registerNativeNodeService(input: {
     else await writeNewServiceDefinition(manifest.serviceDefinitionPath, definition);
     await requireSuccess(run, "sc.exe", ["create", manifest.serviceName, "binPath=", `"${wrapperTarget}"`, "start=", "auto", "obj=", "NT AUTHORITY\\LocalService"], "node_service_registration_failed");
     await requireSuccess(run, "sc.exe", ["failure", manifest.serviceName, "reset=", "86400", "actions=", "restart/5000/restart/15000/none/0"], "node_service_recovery_policy_failed");
+    const inboundFirewall = await allowNodeInbound(run, manifest.nodeExecutable);
     await requireSuccess(run, "sc.exe", ["start", manifest.serviceName], "node_service_start_failed");
-    return;
+    return { inboundFirewall };
   }
   const exhaustive: never = manifest.platform;
   throw new Error(`node_service_platform_is_unsupported:${exhaustive}`);
@@ -106,6 +113,16 @@ async function writeNewServiceDefinition(path: string, value: string): Promise<v
 async function requireSuccess(run: ServiceCommandRunner, executable: string, arguments_: readonly string[], error: string): Promise<void> {
   const result = await run(executable, arguments_);
   if (result.code !== 0) throw new Error(error);
+}
+
+/** Replaces any earlier copy, so a reinstall to another path never leaves a stale rule. */
+export async function allowNodeInbound(run: ServiceCommandRunner, nodeExecutable: string): Promise<"allowed" | "unavailable"> {
+  try {
+    await run("netsh.exe", deleteNodeFirewallRuleArguments());
+    return (await run("netsh.exe", addNodeFirewallRuleArguments(nodeExecutable))).code === 0 ? "allowed" : "unavailable";
+  } catch {
+    return "unavailable";
+  }
 }
 
 export async function runServiceCommand(executable: string, arguments_: readonly string[]): Promise<ServiceCommandResult> {
