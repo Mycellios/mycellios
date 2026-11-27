@@ -15,7 +15,7 @@ export async function copyBeforeComputerSwitch<T>(kind: string, copy: () => Prom
   } catch (error) {
     if (kind !== "desktop" || error instanceof ORPCError) throw error;
     // The person sees what to do; the log keeps why, without file contents.
-    getLogger().warn("computer switch PC copy failed", error);
+    getLogger().warn("computer switch PC copy failed", { error });
     throw new ORPCError("BAD_REQUEST", { message: PC_COPY_FAILED, cause: error });
   }
 }
