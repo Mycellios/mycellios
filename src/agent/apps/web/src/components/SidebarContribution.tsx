@@ -30,6 +30,9 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const [needsIdentity, setNeedsIdentity] = useState(false);
   const [incomplete, setIncomplete] = useState(false);
   const [accountUnavailable, setAccountUnavailable] = useState(false);
+  const [upgradeAvailable, setUpgradeAvailable] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeFailed, setUpgradeFailed] = useState(false);
   const [supported, setSupported] = useState(Boolean(runtime));
   const mounted = useRef(true);
   const reading = useRef(false);
@@ -63,6 +66,7 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
         setSupported(local.supported);
         setNeedsIdentity(local.installed && local.enrolled && !local.nodeId);
         setIncomplete(missingRuntime);
+        setUpgradeAvailable(Boolean(local.upgradeAvailable && runtime.upgrade));
       }
       const value = !missingRuntime && local.nodeId ? await rpc.models.contributionStatus({ nodeId: local.nodeId }) : null;
       if (mounted.current && epoch === revision.current) { setNode(value); setError(false); }
@@ -114,6 +118,17 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     } catch { if (mounted.current) setError(true); }
     finally { operating.current = false; if (mounted.current) setBusy(false); }
   }
+  /** One-time, explicit lift of an older runtime to signed automatic updates. */
+  async function upgradeRuntime() {
+    if (!runtime?.upgrade || upgrading || operating.current) return;
+    revision.current++; operating.current = true;
+    setUpgrading(true); setUpgradeFailed(false);
+    try {
+      const local = await runtime.upgrade();
+      if (mounted.current) setUpgradeAvailable(Boolean(local.upgradeAvailable));
+    } catch { if (mounted.current) setUpgradeFailed(true); }
+    finally { operating.current = false; if (mounted.current) setUpgrading(false); }
+  }
   const waiting = Boolean(node?.pending);
   const active = node?.enabled === true;
   const hasError = !incomplete && (error || Boolean(node?.rejected));
@@ -152,6 +167,17 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     </Button>
     </div>
     {!mini && unavailable && <p className="px-2 text-[11px] text-muted-foreground">{t`Available on Desktop`}</p>}
+    {!mini && !unavailable && upgradeAvailable && (
+      <div className="px-2 pb-1">
+        <Button variant="outline" size="sm" className="h-auto min-h-8 w-full justify-start gap-1.5 px-2 py-1 text-start text-xs" onClick={() => { void upgradeRuntime(); }} disabled={upgrading || busy}>
+          {upgrading ? <LoaderCircle size={16} className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw size={16} className="size-4" aria-hidden />}
+          <span className="min-w-0 flex-1">{upgrading ? t`Updating this computer…` : t`Update this computer`}</span>
+        </Button>
+        <p role={upgradeFailed ? "alert" : undefined} className={`pt-1 text-[11px] ${upgradeFailed ? "text-destructive" : "text-muted-foreground"}`}>
+          {upgradeFailed ? t`The update did not finish. This computer keeps its current version.` : t`A one-time update. Afterwards this computer updates itself.`}
+        </p>
+      </div>
+    )}
     {!mini && !unavailable && (hasError || (requested && (busy || needsIdentity)) || (expanded && active) || waiting) && (
       <div className="px-2 pb-1 text-[11px]">
         <p role={hasError ? "alert" : "status"} className={hasError ? "text-destructive" : "text-muted-foreground"}>{detail}</p>

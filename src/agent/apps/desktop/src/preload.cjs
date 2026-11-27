@@ -71,6 +71,7 @@ const desktopBridge = {
   runtime: {
     status: () => ipcRenderer.invoke("desktop.runtime.status"),
     identify: () => ipcRenderer.invoke("desktop.runtime.identify"),
+    upgrade: () => ipcRenderer.invoke("desktop.runtime.upgrade"),
     enroll: (bundle) => ipcRenderer.invoke("desktop.runtime.enroll", bundle),
   },
   badge: {
