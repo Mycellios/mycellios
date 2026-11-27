@@ -926,6 +926,8 @@ export const MemoryDocumentSchema = z.object({
   inclusion: z.enum(["essential", "searchable"]).optional(),
   userControlled: z.boolean().optional(),
   taskThreadId: Id.nullable().optional(),
+  /** The task conversation's title, sent with task notes when the memory page asks for them. */
+  taskThreadTitle: z.string().nullable().optional(),
   id: Id,
   scope: MemoryScope,
   botId: Id.nullable(),

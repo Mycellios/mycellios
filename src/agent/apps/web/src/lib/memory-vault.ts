@@ -19,7 +19,7 @@ export type VaultNote = Pick<
   | "inclusion"
   | "userControlled"
   | "taskThreadId"
->;
+> & { taskThreadTitle?: string | null };
 
 export type WikiLink = {
   /** The target as written, without alias or heading. */
@@ -147,7 +147,10 @@ export function createLinkResolver(notes: readonly VaultNote[]): LinkResolver {
     if (list) list.push(note);
     else map.set(key, [note]);
   };
+  // A task conversation's notes can link out, but a link never lands on them: they are
+  // scratch notes for one conversation and would make ordinary names ambiguous.
   for (const note of notes) {
+    if (note.taskThreadId) continue;
     add(byPath, linkKey(note.path), note);
     add(byTitle, linkKey(noteTitle(note.path)), note);
   }
@@ -272,6 +275,22 @@ export type VaultFolder = {
   folders: VaultFolder[];
   notes: VaultNote[];
 };
+
+/**
+ * Where a note sits in the tree. Task notes live under tasks/<conversation id>/, which means
+ * nothing to a person, so they show under "conversationsLabel / <conversation title>".
+ */
+export function vaultDisplayPath(
+  note: Pick<VaultNote, "path" | "taskThreadId" | "taskThreadTitle">,
+  conversationsLabel: string,
+  untitled: string,
+): string {
+  if (!note.taskThreadId) return note.path;
+  const prefix = `tasks/${note.taskThreadId}/`;
+  const rest = note.path.startsWith(prefix) ? note.path.slice(prefix.length) : noteTitle(note.path);
+  const title = (note.taskThreadTitle?.trim() || untitled).replace(/\//g, "∕");
+  return `${conversationsLabel}/${title}/${rest}`;
+}
 
 /** Notes of one group as nested folders, folders first, both in name order. */
 export function folderTree(notes: readonly VaultNote[]): VaultFolder {

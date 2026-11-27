@@ -23,19 +23,27 @@ export function memoryRoutes(ctx: RouterContext) {
         return {reservedMicrounits:totals._sum.maximumMicrounits??0,chargedMicrounits:totals._sum.chargedMicrounits??0,pending};
       }),
       list: authed.memory.list.handler(async ({ context, input }) => {
+        const withTasks = Boolean(input.includeTasks) && !input.taskThreadId;
         const docs = await deps.prisma.memoryDocument.findMany({
           where: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
             ...(input.botId ? { botId: input.botId } : {}),
             ...(input.scope ? { scope: input.scope } : {}),
-            taskThreadId:input.taskThreadId??null,
+            // Task notes leave with their conversation, so one being deleted is not listed.
+            ...(withTasks
+              ? { OR: [{ taskThreadId: null }, { taskThread: { deleteAfter: null } }] }
+              : { taskThreadId: input.taskThreadId ?? null }),
           },
+          ...(withTasks ? { include: { taskThread: { select: { title: true } } } } : {}),
         });
         return docs.map((doc) => ({
           id: doc.id,
           scope: doc.scope as "bot" | "user",
           inclusion:doc.inclusion as "essential"|"searchable",userControlled:doc.userControlled,taskThreadId:doc.taskThreadId,
+          ...(withTasks && doc.taskThreadId
+            ? { taskThreadTitle: (doc as { taskThread?: { title: string | null } | null }).taskThread?.title ?? null }
+            : {}),
           botId: doc.botId,
           path: doc.path,
           content: doc.content,
@@ -188,6 +196,73 @@ export function memoryRoutes(ctx: RouterContext) {
           recorded: true,
           notes: docs.map((doc) => ({ id: doc.id, path: doc.path, scope: doc.scope as "bot" | "user", botId: doc.botId })),
           removed: receipt.documentIds.length - docs.length,
+        };
+      }),
+      recallCounts: authed.memory.recallCounts.handler(async ({ context, input }) => {
+        const owner = { spaceId: context.actor.spaceId, userId: context.actor.userId };
+        const asked = await deps.prisma.message.findMany({
+          where: { id: { in: input.messageIds }, role: "bot", runId: { not: null }, thread: { ...owner, memberUserId: null } },
+          select: { threadId: true, runId: true },
+        });
+        const runIds = [...new Set(asked.flatMap((message) => (message.runId ? [message.runId] : [])))];
+        if (!runIds.length) return { counts: {} };
+        const [receipts, latest] = await Promise.all([
+          deps.prisma.runMemoryRecall
+            .findMany({ where: { runId: { in: runIds }, ...owner }, select: { runId: true, documentIds: true } })
+            .catch(() => []),
+          // A turn can post several messages; the count belongs on its last one.
+          deps.prisma.message.findMany({
+            where: { threadId: { in: [...new Set(asked.map((message) => message.threadId))] }, runId: { in: runIds }, role: "bot" },
+            orderBy: { seq: "desc" },
+            distinct: ["runId"],
+            select: { id: true, runId: true },
+          }),
+        ]);
+        const byRun = new Map(receipts.map((receipt) => [receipt.runId, receipt.documentIds.length]));
+        const wanted = new Set(input.messageIds);
+        const counts: Record<string, number> = {};
+        for (const message of latest) {
+          const count = message.runId ? byRun.get(message.runId) : undefined;
+          if (count !== undefined && wanted.has(message.id)) counts[message.id] = count;
+        }
+        return { counts };
+      }),
+      sources: authed.memory.sources.handler(async ({ context, input }) => {
+        const owner = { spaceId: context.actor.spaceId, userId: context.actor.userId };
+        const doc = await deps.prisma.memoryDocument.findFirst({ where: { id: input.documentId, ...owner }, select: { id: true } });
+        if (!doc) throw new IsolationError();
+        const revisions = await deps.prisma.memoryRevision.findMany({
+          where: { documentId: doc.id, sourceThreadId: { not: null } },
+          orderBy: { revision: "desc" },
+          take: 200,
+          select: { sourceThreadId: true, createdAt: true },
+        });
+        const newest = new Map<string, Date>();
+        for (const revision of revisions)
+          if (revision.sourceThreadId && !newest.has(revision.sourceThreadId)) newest.set(revision.sourceThreadId, revision.createdAt);
+        const threadIds = [...newest.keys()].slice(0, 20);
+        if (!threadIds.length) return { sources: [] };
+        // Only the person's own conversations that still exist; others are not theirs to open.
+        const threads = await deps.prisma.thread.findMany({
+          where: { id: { in: threadIds }, ...owner, memberUserId: null, deleteAfter: null },
+          select: { id: true, title: true, botId: true, taskBotId: true, groupId: true, archivedAt: true },
+        });
+        const byId = new Map(threads.map((thread) => [thread.id, thread]));
+        return {
+          sources: threadIds.flatMap((id) => {
+            const thread = byId.get(id);
+            if (!thread) return [];
+            const kind = thread.groupId ? ("group" as const) : thread.botId ? ("main" as const) : ("conversation" as const);
+            return [{
+              threadId: thread.id,
+              kind,
+              title: thread.title ?? null,
+              botId: thread.botId ?? thread.taskBotId ?? null,
+              groupId: thread.groupId ?? null,
+              archived: Boolean(thread.archivedAt),
+              at: newest.get(id)!.toISOString(),
+            }];
+          }),
         };
       }),
       exportMarkdown: authed.memory.exportMarkdown.handler(async ({ context, input }) => {

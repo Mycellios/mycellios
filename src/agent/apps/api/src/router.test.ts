@@ -8613,6 +8613,96 @@ describe("memory note creation", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  function readClient(prisma: Record<string, unknown>) {
+    const deps = { prisma, memory: {}, env: { webOrigin: "https://example.test" } } as unknown as RouterDeps;
+    return createRouterClient(createRouter(deps), { context: { actor } as never });
+  }
+
+  it("counts the notes in context on the last message of each recorded turn", async () => {
+    const asked = vi.fn(async () => [
+      { threadId: "t1", runId: "run-1" },
+      { threadId: "t1", runId: "run-2" },
+    ]);
+    const latest = vi.fn(async () => [
+      { id: "m2", runId: "run-1" },
+      { id: "m3", runId: "run-2" },
+    ]);
+    const receipts = vi.fn(async () => [{ runId: "run-1", documentIds: ["a", "b", "c"] }]);
+    const client = readClient({
+      message: { findMany: vi.fn().mockImplementationOnce(asked).mockImplementationOnce(latest) },
+      runMemoryRecall: { findMany: receipts },
+    });
+    // m1 is an earlier message of run-1 and run-2 recorded nothing, so only m2 has a count.
+    await expect(client.memory.recallCounts({ messageIds: ["m1", "m2", "m3"] })).resolves.toEqual({ counts: { m2: 3 } });
+    expect(asked).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ role: "bot", thread: { spaceId: "space-1", userId: "user-1", memberUserId: null } }),
+    }));
+    expect(receipts).toHaveBeenCalledWith(expect.objectContaining({
+      where: { runId: { in: ["run-1", "run-2"] }, spaceId: "space-1", userId: "user-1" },
+    }));
+  });
+
+  it("shows no counts when the receipts table cannot be read", async () => {
+    const client = readClient({
+      message: {
+        findMany: vi.fn()
+          .mockResolvedValueOnce([{ threadId: "t1", runId: "run-1" }])
+          .mockResolvedValueOnce([{ id: "m1", runId: "run-1" }]),
+      },
+      runMemoryRecall: { findMany: vi.fn(async () => { throw new Error("relation does not exist"); }) },
+    });
+    await expect(client.memory.recallCounts({ messageIds: ["m1"] })).resolves.toEqual({ counts: {} });
+  });
+
+  it("lists where a note was learned, newest first, only from the person's live conversations", async () => {
+    const threads = vi.fn(async () => [
+      { id: "main", title: null, botId: "bot-1", taskBotId: null, groupId: null, archivedAt: null },
+      { id: "side", title: "Trip plan", botId: null, taskBotId: "bot-1", groupId: null, archivedAt: new Date("2026-11-20T00:00:00Z") },
+    ]);
+    const client = readClient({
+      memoryDocument: { findFirst: vi.fn(async () => ({ id: "doc-1" })) },
+      memoryRevision: {
+        findMany: vi.fn(async () => [
+          { sourceThreadId: "side", createdAt: new Date("2026-11-26T10:00:00Z") },
+          { sourceThreadId: "gone", createdAt: new Date("2026-11-25T10:00:00Z") },
+          { sourceThreadId: "side", createdAt: new Date("2026-11-24T10:00:00Z") },
+          { sourceThreadId: "main", createdAt: new Date("2026-11-23T10:00:00Z") },
+        ]),
+      },
+      thread: { findMany: threads },
+    });
+    await expect(client.memory.sources({ documentId: "doc-1" })).resolves.toEqual({
+      sources: [
+        { threadId: "side", kind: "conversation", title: "Trip plan", botId: "bot-1", groupId: null, archived: true, at: "2026-11-26T10:00:00.000Z" },
+        { threadId: "main", kind: "main", title: null, botId: "bot-1", groupId: null, archived: false, at: "2026-11-23T10:00:00.000Z" },
+      ],
+    });
+    expect(threads).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: ["side", "gone", "main"] }, spaceId: "space-1", userId: "user-1", memberUserId: null, deleteAfter: null },
+    }));
+  });
+
+  it("refuses sources for a note that is not the person's", async () => {
+    const client = readClient({ memoryDocument: { findFirst: vi.fn(async () => null) } });
+    await expect(client.memory.sources({ documentId: "doc-x" })).rejects.toThrow();
+  });
+
+  it("lists task notes with their conversation title only when asked", async () => {
+    const findMany = vi.fn(async () => [
+      { id: "n1", scope: "bot", inclusion: "searchable", userControlled: false, taskThreadId: "t1", taskThread: { title: "Trip plan" }, botId: "bot-1", path: "tasks/t1/notes.md", content: "", revision: 1, updatedAt: new Date("2026-11-27T00:00:00Z") },
+    ]);
+    const client = readClient({ memoryDocument: { findMany } });
+    await expect(client.memory.list({ includeTasks: true })).resolves.toEqual([
+      expect.objectContaining({ id: "n1", taskThreadId: "t1", taskThreadTitle: "Trip plan" }),
+    ]);
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ OR: [{ taskThreadId: null }, { taskThread: { deleteAfter: null } }] }),
+      include: { taskThread: { select: { title: true } } },
+    }));
+    await client.memory.list({});
+    expect(findMany).toHaveBeenLastCalledWith({ where: expect.objectContaining({ taskThreadId: null }) });
+  });
+
   it("lists the notes a reply had in context, owner-scoped and in recorded order", async () => {
     const findMessage = vi.fn(async () => ({ runId: "run-1" }));
     const findReceipt = vi.fn(async () => ({ documentIds: ["b", "gone", "a"] }));
