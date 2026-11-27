@@ -20,12 +20,15 @@ import {
   BookOpen,
   ChevronDown,
   CircleHelp,
+  ClipboardCopy,
   Code2,
   Mail,
   MessagesSquare,
   Sparkles,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
+import { collectDiagnosticReport } from "../lib/diagnostic-report";
 import { LATEST_RELEASE } from "../lib/release-notes";
 
 /** Shared by the desktop rail and mobile sidebar; no second release feed. */
@@ -39,6 +42,15 @@ export function HelpMenu({
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [guides, setGuides] = useState(false);
+  async function copyDiagnosticReport() {
+    const pending = toast.loading(t`Preparing the diagnostic report…`);
+    try {
+      await navigator.clipboard.writeText(await collectDiagnosticReport());
+      toast.success(t`Diagnostic report copied. Paste it into your message to support.`, { id: pending });
+    } catch {
+      toast.error(t`Could not copy the diagnostic report.`, { id: pending });
+    }
+  }
   const topics = [
     {
       title: t`Start a conversation`,
@@ -173,6 +185,13 @@ export function HelpMenu({
                 <span className={detail}>{t`Opens your email app`} · hello@mycellios.com</span>
               </span>
               <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            </DropdownMenuItem>
+            <DropdownMenuItem className={row} onClick={() => void copyDiagnosticReport()}>
+              <ClipboardCopy className="mt-0.5 size-4 shrink-0" />
+              <span className={copy}>
+                {t`Copy diagnostic report`}
+                <span className={detail}>{t`Versions and connection, without personal data`}</span>
+              </span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className={row}

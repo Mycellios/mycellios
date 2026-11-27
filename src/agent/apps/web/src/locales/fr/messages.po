@@ -7532,3 +7532,23 @@ msgstr "Une mise à jour unique. Ensuite, cet ordinateur se met à jour tout seu
 #: src/components/SidebarContribution.tsx
 msgid "The update did not finish. This computer keeps its current version."
 msgstr "La mise à jour n’a pas abouti. Cet ordinateur conserve sa version actuelle."
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "Copier le rapport de diagnostic"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "Versions et connexion, sans données personnelles"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "Préparation du rapport de diagnostic…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "Rapport de diagnostic copié. Collez-le dans votre message au support."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "Impossible de copier le rapport de diagnostic."

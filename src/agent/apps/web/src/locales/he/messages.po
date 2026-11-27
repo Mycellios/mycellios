@@ -7531,3 +7531,23 @@ msgstr "עדכון חד־פעמי. לאחר מכן המחשב הזה יתעדכ�
 #: src/components/SidebarContribution.tsx
 msgid "The update did not finish. This computer keeps its current version."
 msgstr "העדכון לא הסתיים. המחשב הזה שומר על הגרסה הנוכחית שלו."
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "העתקת דוח אבחון"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "גרסאות וחיבור, ללא מידע אישי"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "מכינים את דוח האבחון…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "דוח האבחון הועתק. הדביקו אותו בהודעה לתמיכה."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "לא ניתן היה להעתיק את דוח האבחון."

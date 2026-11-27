@@ -16142,3 +16142,23 @@ msgstr "Una actualización única. Después este equipo se actualiza solo."
 #: src/components/SidebarContribution.tsx
 msgid "The update did not finish. This computer keeps its current version."
 msgstr "La actualización no ha terminado. Este equipo mantiene su versión actual."
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "Copiar informe de diagnóstico"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "Versiones y conexión, sin datos personales"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "Preparando el informe de diagnóstico…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "Informe de diagnóstico copiado. Pégalo en tu mensaje a soporte."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "No se pudo copiar el informe de diagnóstico."

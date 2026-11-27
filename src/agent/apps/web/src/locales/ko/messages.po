@@ -7531,3 +7531,23 @@ msgstr "한 번만 하는 업데이트입니다. 이후에는 이 컴퓨터가 �
 #: src/components/SidebarContribution.tsx
 msgid "The update did not finish. This computer keeps its current version."
 msgstr "업데이트가 완료되지 않았습니다. 이 컴퓨터는 현재 버전을 유지합니다."
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "진단 보고서 복사"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "버전 및 연결 정보, 개인 데이터 제외"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "진단 보고서를 준비하는 중…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "진단 보고서를 복사했습니다. 지원팀에 보낼 메시지에 붙여 넣으세요."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "진단 보고서를 복사하지 못했습니다."

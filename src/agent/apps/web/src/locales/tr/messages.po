@@ -7531,3 +7531,23 @@ msgstr "Tek seferlik bir güncelleme. Sonrasında bu bilgisayar kendini güncell
 #: src/components/SidebarContribution.tsx
 msgid "The update did not finish. This computer keeps its current version."
 msgstr "Güncelleme tamamlanmadı. Bu bilgisayar mevcut sürümünü korur."
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "Tanılama raporunu kopyala"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "Sürümler ve bağlantı, kişisel veri olmadan"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "Tanılama raporu hazırlanıyor…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "Tanılama raporu kopyalandı. Destek ekibine göndereceğin mesaja yapıştır."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "Tanılama raporu kopyalanamadı."
