@@ -322,6 +322,21 @@ projector present).
   in 15 s; Qwen3.5 2B measured 26 tokens/s generation and 407 tokens/s prefill. A real Pi
   turn called `read_file` and answered (first event 8.8 s including the model load); the next
   turn's first token arrived in 0.2 s.
+- **End to end in the app** (`npm run dev:desktop`, real API, worker, Desktop relay and
+  `llama-server`): "On your PC" installed the model from the picker and the Mico answered
+  without any connection or Credits. Light mode sent a ~5.3k-token prompt. The first turn
+  took 34 s including the model load and gave a weak, meta answer; the second answered fully
+  in 6.9 s from Enter.
+- **Findings fixed while qualifying:** the send gate required a connection
+  (`threadNeedsModel`); the panel showed a guessed recommendation before the PC was checked;
+  the key file stayed on disk after an abrupt exit (now deleted once the server has read it);
+  one measurement taken while the GPU was busy downgraded the recommendation (the best
+  measurement per model is kept).
+- **Open:** a Mico shows "On your PC" only when its computer is the PC (`engines.forBot`
+  reports `desktop`); in the isolated dev stack that report stayed `server`, so the test set
+  the model through the API first. Qualify the picker entry on an installed Desktop. The
+  first turn on a cold model is slow and small models echo the date context; warming the
+  model when a chat opens and a shorter light-mode prompt are next.
 
 ## Verification
 

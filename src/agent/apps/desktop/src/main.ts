@@ -1609,7 +1609,7 @@ app.whenReady().then(async () => {
   // check their vendor channel and the blocklist from main at startup and daily (no account data).
   // Models that run on this PC (specs/local-models/spec.md); nothing loads until asked.
   const localModels = new LocalModels(path.join(userDataDir, "local-models"));
-  app.once("before-quit", () => { void localModels.unload(); });
+  app.once("will-quit", () => { void localModels.unload(); });
   const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope(), undefined,
     { openExternal: (url) => shell.openExternal(url) }, undefined,
     { checkUpdates: true, deviceModels: (modelId) => localModels.endpoint(modelId) });

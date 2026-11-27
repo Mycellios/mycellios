@@ -4,7 +4,7 @@
 // still meets the floor, never the largest that fits.
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { totalmem } from "node:os";
 import { join } from "node:path";
@@ -167,7 +167,14 @@ export class LocalModels {
 
   private async saveSpeed(modelId: string, speed: { prefill: number; generation: number }) {
     const store = await this.readStore();
-    store.speeds[modelId] = { ...speed, at: new Date().toISOString() };
+    // Keep the best measurement: one taken while other work shares the GPU (a game, a build,
+    // another model) would otherwise make a model that runs well here look slow.
+    const previous = store.speeds[modelId];
+    store.speeds[modelId] = {
+      prefill: Math.max(speed.prefill, previous?.prefill ?? 0),
+      generation: Math.max(speed.generation, previous?.generation ?? 0),
+      at: new Date().toISOString(),
+    };
     await mkdir(this.directory, { recursive: true });
     const temporary = join(this.directory, `state.json.${process.pid}.tmp`);
     await writeFile(temporary, JSON.stringify(store));
@@ -353,6 +360,10 @@ export class LocalModels {
     if (!(await stat(path).then((info) => info.size === model.bytes, () => false))) throw new Error("This local model is not installed");
     const port = await freePort();
     const apiKey = randomBytes(24).toString("base64url");
+    // Keys of earlier starts that ended abruptly are useless; remove them too.
+    for (const name of await readdir(this.directory).catch(() => [] as string[])) {
+      if (/^key-\d+\.txt$/.test(name)) await rm(join(this.directory, name), { force: true });
+    }
     const keyFile = join(this.directory, `key-${process.pid}.txt`);
     await writeFile(keyFile, apiKey, { mode: 0o600 });
     const args = [
@@ -375,7 +386,9 @@ export class LocalModels {
       if (child.exitCode !== null) throw new Error("The local model engine stopped while loading");
       const ready = await this.fetcher(`${baseUrl}/health`, { signal: AbortSignal.timeout(2_000) }).then((response) => response.ok, () => false);
       if (ready) {
-        this.loaded = { modelId: model.id, baseUrl: `${baseUrl}/v1`, apiKey, contextWindow: model.contextWindow, process: child, ...(tree ? { tree } : {}) };
+        // The server read the key at start; do not leave it on disk.
+        await rm(keyFile, { force: true });
+        this.loaded ={ modelId: model.id, baseUrl: `${baseUrl}/v1`, apiKey, contextWindow: model.contextWindow, process: child, ...(tree ? { tree } : {}) };
         return this.loaded;
       }
       await new Promise((resolve) => setTimeout(resolve, 500));

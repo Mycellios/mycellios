@@ -703,6 +703,12 @@ describe("model setup gate", () => {
     await expect(threadNeedsModel(deps, actor, bot)).resolves.toBe(!connected);
   });
 
+  it("lets a Mico send with a model on its PC, which needs no connection", async () => {
+    const { deps, actor } = modelGateDeps({ agentRuntime: "pi", modelCredentialConnected: false });
+    await expect(threadNeedsModel(deps, actor, { modelProvider: "device", modelId: "qwen3.5-2b" })).resolves.toBe(false);
+    await expect(threadNeedsModel(deps, actor, { modelProvider: "device", modelId: "../bad" })).resolves.toBe(true);
+  });
+
   it("does not require a model credential for the scripted test runtime", async () => {
     const { actor, handler } = modelGateDeps({ agentRuntime: "scripted" });
 

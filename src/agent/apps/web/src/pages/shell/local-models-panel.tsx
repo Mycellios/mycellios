@@ -90,8 +90,9 @@ export function LocalModelsPanel({ value, onUse, disabled = false }: {
         <p className="text-sm font-medium">{t`Use a model on your PC`}</p>
         <p className="text-xs text-muted-foreground">{t`Free and private: it runs on this PC without Credits, and your messages never leave it.`}</p>
       </div>
-      {!status.inspected && busy ? <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Spinner className="size-3" />{t`Checking your PC…`}</p> : null}
-      {recommended ? <div className="grid gap-2">
+      {/* Until the engine has read this PC's devices the recommendation is only a guess: show none. */}
+      {!status.inspected ? <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Spinner className="size-3" />{t`Checking your PC…`}</p>
+        : recommended ? <div className="grid gap-2">
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm">{recommended.name}</span>
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatModelSize(recommended.bytes)}</span>
@@ -101,7 +102,7 @@ export function LocalModelsPanel({ value, onUse, disabled = false }: {
           {recommended.installed ? t`Use it` : t`Install and use`}
         </Button>
       </div> : <p className="text-xs text-muted-foreground">{t`This PC is too slow for models that answer quickly. The free models in Mycellios work better here.`}</p>}
-      {smarter ? showSmarter ? <div className="grid gap-2 border-t border-border pt-3">
+      {smarter && status.inspected ? showSmarter ? <div className="grid gap-2 border-t border-border pt-3">
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm">{smarter.name}</span>
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatModelSize(smarter.bytes)}</span>
