@@ -15700,3 +15700,19 @@ msgstr "Show steps"
 #. msgid: Retry step request
 msgid "workflow.step.retry"
 msgstr "Retry step request"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "Updating {name}"
+msgstr "Updating {name}"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} update available"
+msgstr "{name} update available"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} update failed"
+msgstr "{name} update failed"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} updated"
+msgstr "{name} updated"

@@ -7476,3 +7476,19 @@ msgstr ""
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Could not change which Micos can use this memory"
 msgstr ""
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "Updating {name}"
+msgstr "{name} を更新中"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} update available"
+msgstr "{name} のアップデートがあります"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} update failed"
+msgstr "{name} の更新に失敗しました"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} updated"
+msgstr "{name} を更新しました"
