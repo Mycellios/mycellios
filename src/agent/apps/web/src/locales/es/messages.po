@@ -16168,6 +16168,54 @@ msgstr "Informe de diagnóstico copiado. Pégalo en tu mensaje a soporte."
 msgid "Could not copy the diagnostic report."
 msgstr "No se pudo copiar el informe de diagnóstico."
 
+msgid "Works on"
+msgstr "Trabaja en"
+
+msgid "Server, just this Mico"
+msgstr "Servidor, solo este Mico"
+
+msgid "Server, shared"
+msgstr "Servidor, compartido"
+
+msgid "If it works on another of your PCs, move it here."
+msgstr "Si trabaja en otro de tus PCs, pásalo a este."
+
+msgid "Move here"
+msgstr "Traer aquí"
+
+msgid "Notes it reads"
+msgstr "Notas que lee"
+
+msgid "As set for this space"
+msgstr "Según este espacio"
+
+msgid "Only its own"
+msgstr "Solo las suyas"
+
+msgid "Its own and the space's"
+msgstr "Las suyas y las del espacio"
+
+msgid "It reads only its own notes and the current task's."
+msgstr "Lee solo sus notas y las de la tarea actual."
+
+msgid "It also reads the general notes of this space, which every Mico here can use."
+msgstr "Lee también las notas generales de este espacio, que pueden usar todos los Micos de aquí."
+
+msgid "It follows this space's setting for general notes."
+msgstr "Sigue el ajuste de este espacio para las notas generales."
+
+msgid "It works on your PC, with your files, apps and permissions. If that PC is off, a new message is answered on the server without your files."
+msgstr "Trabaja en tu PC, con tus archivos, programas y permisos. Si ese PC está apagado, los mensajes nuevos se responden en el servidor, sin tus archivos."
+
+msgid "Choose it from Mycellios Desktop on that PC."
+msgstr "Elígelo desde Mycellios Desktop en ese PC."
+
+msgid "It works on its own computer on the Mycellios server, with its own browser and files. It cannot see your PC."
+msgstr "Trabaja en un ordenador propio en el servidor de Mycellios, con su navegador y sus archivos. No ve tu PC."
+
+msgid "It works on a Mycellios server computer that it shares with your other Micos in this space. It cannot see your PC."
+msgstr "Trabaja en un ordenador del servidor de Mycellios que comparte con tus otros Micos de este espacio. No ve tu PC."
+
 msgid "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
 msgstr "Mycellios no responde ahora mismo; suele pasar un minuto mientras se actualiza. No se ha cambiado nada. Vuelve a intentarlo en un momento."
 
