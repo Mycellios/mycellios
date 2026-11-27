@@ -249,6 +249,7 @@ function fixture({
     })),
     navigate: vi.fn(async () => ({ navigated: { tab: "t9", title: "Shop", url: "https://shop.example/" } })),
     act: vi.fn(async () => ({ acted: { steps: [{ ok: true }] } })),
+    screenshot: vi.fn(async () => ({ screenshot: { mimeType: "image/jpeg" as const, data: "/9j/AAAA" } })),
     snapshot: vi.fn(async () => ({ page: { title: "Laptop", url: "https://shop.example/laptop", text: "Price 900", truncated: false } })),
     list: vi.fn(async () => ({ tabs: [{ tab: "t7", title: "Laptop", url: "https://shop.example/laptop", active: true, audible: false }], omitted: 0 })),
   };
@@ -2461,6 +2462,28 @@ describe("the owner's shared Chrome tabs", () => {
     const f = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", disabledBuiltinTools: ["chrome_tabs"], chromeTabs: { sessionKey: key, shared: true } });
     await f.run();
     expect(f.offeredTools()).not.toContain("chrome_tabs");
+  });
+
+  it("shows a tab as an image to the person's own model, without an approval card", async () => {
+    pageRoute.value = "own";
+    const f = fixture({ name: "chrome_screenshot", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true, read: true } });
+    f.setCalls([{ name: "chrome_screenshot", args: { tab: "t7" }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.offeredTools()).toContain("chrome_screenshot");
+    expect(f.chromeTabsClient.screenshot).toHaveBeenCalledWith({ userId: expect.any(String), sessionKey: key }, "t7", expect.anything());
+    expect(JSON.stringify(f.results)).toContain("/9j/AAAA");
+    expect(f.results.some(isApprovalPausedResult)).toBe(false);
+  });
+
+  it("never shows pages to unidentified sellers, nor without reading", async () => {
+    pageRoute.value = "third_party";
+    const sellers = fixture({ name: "chrome_screenshot", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true, read: true } });
+    await sellers.run();
+    expect(sellers.offeredTools()).not.toContain("chrome_screenshot");
+    pageRoute.value = "own";
+    const noRead = fixture({ name: "chrome_screenshot", builtin: true, sourceRole: "user", chromeTabs: { sessionKey: key, shared: true } });
+    await noRead.run();
+    expect(noRead.offeredTools()).not.toContain("chrome_screenshot");
   });
 
   describe("acting in pages", () => {

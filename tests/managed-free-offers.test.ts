@@ -19,11 +19,11 @@ const peer = (peerId: string, serviceId: string, extra: Record<string, unknown> 
 });
 const caps = { capabilities: { inputs: ["text"], outputs: ["text"], contextWindow: 131072, maxOutputTokens: 8192, toolUse: true } };
 const priced = (peerId: string, serviceId: string, output: number) => peer(peerId, serviceId, { inputUsdPerMillion: 1, cachedInputUsdPerMillion: 1, outputUsdPerMillion: output, ...caps });
-function network() {
+function network(wideGlm = false) {
   return [
-    // Published signals (newer buyers): reliable, fast, no declared capabilities.
+    // Published signals (newer buyers): reliable, fast, no declared capabilities (or a 131k window).
     { id: "glm-flash", name: "GLM Flash", type: "text", reference_price: { input_usd_per_million: 0.15, output_usd_per_million: 0.5 },
-      peers: [peer(forge, "glm-flash", { health: { status: "healthy" }, freeTier: { base: { maxRequestsPerAddress: 500 } },
+      peers: [peer(forge, "glm-flash", { health: { status: "healthy" }, freeTier: { base: { maxRequestsPerAddress: 500 } }, ...(wideGlm ? caps : {}),
         performance: { requests: 99, successRate: 1, firstTokenMsP50: 1467, tokensPerSecondP50: 164 } })] },
     // Frequent measured failures on the open seller; a staked-only pool on the other.
     { id: "deepseek-flash", name: "DeepSeek Flash", type: "text",
@@ -63,7 +63,7 @@ const free = { model: FREE_ROUTE_ID, messages: [{ role: "user", content: "Hello"
 /** The concrete route the stable free model resolves to, once its probes have run. */
 const freeRoute = (adapter: { quote(r: never): { body: Record<string, unknown> } }) => String(adapter.quote(free as never).body.model);
 
-function sidecar(options: { oldListing?: boolean } = {}) {
+function sidecar(options: { oldListing?: boolean; wideGlm?: boolean } = {}) {
   let exhausted = false; const listings: string[] = [], posts: string[] = [];
   const transport = vi.fn<typeof fetch>(async (url, init) => {
     const u = new URL(String(url));
@@ -71,7 +71,7 @@ function sidecar(options: { oldListing?: boolean } = {}) {
     if (u.pathname === "/v1/models") {
       listings.push(u.search);
       if (options.oldListing && u.searchParams.get("type") === "text") return new Response(null, { status: 400 });
-      return Response.json({ data: network() });
+      return Response.json({ data: network(options.wideGlm) });
     }
     if (u.pathname !== "/v1/chat/completions" || init?.method !== "POST") throw new Error("unexpected fixture route");
     const body = JSON.parse(String(init.body)); posts.push(body.model);
@@ -225,6 +225,8 @@ describe("free AntSeed offers", () => {
     expect(freeOfferSignals(deepseek!.peers[1]!, deepseek!, 131_072, new Map()).eligible).toBe(false); // stakers only
     expect(freeOfferSignals(small!.peers[0]!, small!, 16_000, new Map()).eligible).toBe(false); // too small
     expect(freeTextLimits(32_768, 4_096)).toEqual({ context_length: 31_744, max_input_tokens: 27_648, max_output_tokens: 4_096 });
+    // A declared window is published whole, not cut to the paid 128 KiB byte bound (~36,700 tokens).
+    expect(freeTextLimits(131_072, 8_192)).toEqual({ context_length: 130_048, max_input_tokens: 121_856, max_output_tokens: 8_192 });
   });
 
   it("lists free routes without funding or declared capabilities and routes the free model to the one that calls tools", async () => {
@@ -255,6 +257,16 @@ describe("free AntSeed offers", () => {
     const larger = { ...chat("glm-flash"), messages: [{ role: "user", content: "a".repeat(120_000) }] };
     expect(adapter.quote(fits).maximumUsd).toBe("0");
     expect(() => adapter.quote(larger)).toThrow("managed_request_too_large");
+  });
+
+  it("lets a free seller's declared window carry an agent request above the paid byte bound", async () => {
+    const { adapter } = sidecar({ wideGlm: true }); await adapter.refresh();
+    expect(adapter.catalog().find(m => m.id.endsWith("glm-flash"))).toMatchObject({ max_input_tokens: 121_856 });
+    // About 300 KiB of instructions, tool schemas and history: above 128 KiB, inside the 131k window.
+    const agent = { ...chat("glm-flash"), messages: [{ role: "user", content: "a".repeat(300_000) }] };
+    expect(adapter.quote(agent)).toMatchObject({ maximumUsd: "0", maximumMicrounits: 0 });
+    const beyond = { ...chat("glm-flash"), messages: [{ role: "user", content: "a".repeat(480_000) }] };
+    expect(() => adapter.quote(beyond)).toThrow("managed_request_too_large");
   });
 
   it("rests a seller whose free allowance is exhausted and takes it out of the free model", async () => {

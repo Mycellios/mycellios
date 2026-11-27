@@ -15917,6 +15917,66 @@ msgstr "This Mico"
 msgid "{0} more notes were deleted since."
 msgstr "{0} more notes were deleted since."
 
+msgid "1 note in context"
+msgstr "1 note in context"
+
+msgid "{count} notes in context"
+msgstr "{count} notes in context"
+
+msgid "Learned in"
+msgstr "Learned in"
+
+msgid "{0} (archived)"
+msgstr "{0} (archived)"
+
+msgid "Conversation notes"
+msgstr "Conversation notes"
+
+msgid "Main chat with {botName}"
+msgstr "Main chat with {botName}"
+
+msgid "Group conversation"
+msgstr "Group conversation"
+
+msgid "Could not export your memory."
+msgstr "Could not export your memory."
+
+msgid "Could not read those files."
+msgstr "Could not read those files."
+
+msgid "Export as Markdown"
+msgstr "Export as Markdown"
+
+msgid "Import notes"
+msgstr "Import notes"
+
+msgid "Imported: {0}"
+msgstr "Imported: {0}"
+
+msgid "Already there, left unchanged: {0}"
+msgstr "Already there, left unchanged: {0}"
+
+msgid "Skipped (not Markdown, too large, conversation notes or unusable names): {0}"
+msgstr "Skipped (not Markdown, too large, conversation notes or unusable names): {0}"
+
+msgid "Could not import: {0}"
+msgstr "Could not import: {0}"
+
+msgid "Notes to import: {0}"
+msgstr "Notes to import: {0}"
+
+msgid "Files to skip: {0}"
+msgstr "Files to skip: {0}"
+
+msgid "Put notes without a group folder in"
+msgstr "Put notes without a group folder in"
+
+msgid "Folders named like General or a Mico, as an export writes them, go to that group. Existing notes are never replaced."
+msgstr "Folders named like General or a Mico, as an export writes them, go to that group. Existing notes are never replaced."
+
+msgid "Importing {progress} of {0}…"
+msgstr "Importing {progress} of {0}…"
+
 #: src/pages/guest/GuestChat.tsx
 msgid "Guest mode"
 msgstr "Guest mode"

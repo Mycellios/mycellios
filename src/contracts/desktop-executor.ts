@@ -12,6 +12,8 @@ export interface DesktopExecutorPoll {
   active: string[];
   /** Account responses only: this server accepts `workspaces` in later registrations. */
   ownership?: 1;
+  /** This server carries agent messages on an agent channel (POST /api/desktop-relay/channel). */
+  agentChannel?: 1;
 }
 /** The most Mico folder keys one Desktop reports in a registration. */
 export const DESKTOP_WORKSPACE_REPORT_LIMIT = 256;

@@ -29,6 +29,14 @@ const RESULT_ATTEMPT_MS = 15_000;
  */
 export const RESULT_FRAME_BYTES = 240 * 1024;
 const POLL_RETRY_BASE_MS = 250;
+/** The server writes at least every 15 s; a channel silent this long is gone. */
+const CHANNEL_IDLE_MS = 45_000;
+/** The server writes its first line at once; a channel slower than this is being held back. */
+const CHANNEL_FIRST_LINE_MS = 5_000;
+/** After a held-back channel, this PC keeps to the poll for this long. */
+const CHANNEL_PAUSE_MS = 10 * 60_000;
+/** The most bytes one agent channel line may hold (one PC request and its envelope). */
+const CHANNEL_LINE_BYTES = HOST_COMPUTER_MAX_BYTES + 64 * 1024;
 const POLL_RETRY_MAX_MS = 5_000;
 
 /**
@@ -88,6 +96,14 @@ export class DesktopRelayClient {
   /** The server said it accepts this PC's Mico folder keys; older servers refuse unknown fields. */
   private reportWorkspaces = false;
   private updateNotices = new Map<string, () => Promise<void>>();
+  /** The server offered an agent channel (specs/desktop-agent-channel/spec.md phase 3). */
+  private channelOffered = false;
+  private channelRunning = false;
+  private channelController?: AbortController;
+  /** Operations received on the agent channel: acknowledged by their result, never by a poll. */
+  private channelOps = new Set<string>();
+  /** Until then the poll carries everything: a proxy held the last channel's lines back. */
+  private channelPausedUntil = 0;
   constructor(
     private readonly options: {
       base: string;
@@ -273,6 +289,9 @@ export class DesktopRelayClient {
     this.accountIdentity=undefined;
     this.reportWorkspaces=false;
     this.serverHolds=false;
+    this.channelOffered=false;
+    this.channelController?.abort();
+    this.channelOps.clear();
   }
   private ownedWorkspaces() {
     if (!this.accountGeneration || !this.reportWorkspaces || !this.options.workspaces) return undefined;
@@ -291,7 +310,7 @@ export class DesktopRelayClient {
     const wait = Boolean(this.lastContact) && (Boolean(this.options.agentExecution) || this.serverHolds);
     try {
       const state = (await (
-        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {}),...(workspaces ? {workspaces} : {})} : {}),...(wait ? {wait:true,active:[...previousActive]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
+        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {}),...(workspaces ? {workspaces} : {})} : {}),...(wait ? {wait:true,active:[...previousActive].filter(id => !this.channelOps.has(id))} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
       ).json()) as DesktopExecutorPoll & { identity?: unknown };
       if(this.stopped)return;
       // Report Mico folders only to a server that asked for them, from its next poll on.
@@ -336,7 +355,12 @@ export class DesktopRelayClient {
       if (!this.lastContact || (this.options.now ?? Date.now)() - this.lastContact >= ONLINE_MS) recordDesktopDiagnostic("relay_connected");
       this.lastContact = (this.options.now ?? Date.now)();
       this.pollFailures = 0;
+      // Messages for agent runs travel on the agent channel while the server offers it.
+      this.channelOffered = state.agentChannel === 1 && Boolean(this.options.agentExecution);
+      if (this.channelOffered && (this.options.now ?? Date.now)() >= this.channelPausedUntil) void this.runChannel();
       for (const [id, controller] of this.active) {
+        // The server never lists channel operations in a poll; their result settles them.
+        if (this.channelOps.has(id)) continue;
         const action = missingOperationAction(id, state.active, this.settled);
         if (action === "keep") continue;
         this.active.delete(id);
@@ -365,22 +389,7 @@ export class DesktopRelayClient {
             if (this.stopped) return;
           }
         }
-      for (const operation of state.operations) {
-        if (this.active.has(operation.id)) continue;
-        const input = hostComputerRequest.safeParse(operation.request);
-        if (
-          !input.success ||
-          operation.binding.deviceId !== this.deviceId ||
-          operation.binding.generation !== this.grants.get(input.data.botId)?.generation ||
-          input.data.botId !== operation.binding.botId
-        )
-          continue;
-        const controller = new AbortController();
-        recordDesktopDiagnostic("operation_received", {operationId:operation.id,runId:"runId" in input.data ? input.data.runId : undefined,method:input.data.method});
-        this.active.set(operation.id, controller);
-        const release = this.options.awake?.();
-        void this.execute(operation, controller).finally(() => { release?.(); this.active.delete(operation.id); this.settled.delete(operation.id); });
-      }
+      for (const operation of state.operations) this.startOperation(operation, false);
     } catch (error) {
       // An older API behind the same address refuses the extra field; the next poll
       // goes without it until a server offers the report again.
@@ -405,6 +414,102 @@ export class DesktopRelayClient {
     if (!this.stopped) {
       this.timer = setTimeout(() => void this.poll(), pollRetryDelayMs(this.pollFailures, Boolean(this.options.agentExecution) || this.serverHolds));
       this.timer.unref();
+    }
+  }
+  /** Runs one delivered operation once; a redelivered one already started here is skipped. */
+  private startOperation(operation: DesktopExecutorOperation, channel: boolean) {
+    // A channel message that went back to the poll arrives again: never start it twice.
+    if (this.active.has(operation.id) || this.settled.has(operation.id)) return;
+    const input = hostComputerRequest.safeParse(operation.request);
+    if (
+      !input.success ||
+      operation.binding?.deviceId !== this.deviceId ||
+      operation.binding.generation !== this.grants.get(input.data.botId)?.generation ||
+      input.data.botId !== operation.binding.botId ||
+      (channel && input.data.method !== "agentMessage")
+    )
+      return;
+    const controller = new AbortController();
+    recordDesktopDiagnostic("operation_received", {operationId:operation.id,runId:"runId" in input.data ? input.data.runId : undefined,method:input.data.method,...(channel ? {stage:"channel"} : {})});
+    this.active.set(operation.id, controller);
+    if (channel) this.channelOps.add(operation.id);
+    const release = this.options.awake?.();
+    void this.execute(operation, controller).finally(() => {
+      release?.(); this.active.delete(operation.id); this.settled.delete(operation.id); this.channelOps.delete(operation.id);
+    });
+  }
+  /**
+   * Keeps one agent channel open while the server offers it: each message for an agent run
+   * arrives on it as soon as it is dispatched, instead of through a poll answered and re-armed
+   * per message. A channel that ends or goes quiet is opened again; the server delivers again
+   * what was not acknowledged, and startOperation skips anything already started.
+   */
+  private async runChannel() {
+    if (this.channelRunning) return;
+    this.channelRunning = true;
+    const intent = this.intent;
+    let failures = 0;
+    try {
+      while (!this.stopped && intent === this.intent && this.channelOffered) {
+        const controller = new AbortController();
+        this.channelController = controller;
+        try {
+          const opening = setTimeout(() => controller.abort(), CHANNEL_IDLE_MS);
+          const response = await this.post("channel", { deviceId: this.deviceId }, controller.signal).finally(() => clearTimeout(opening));
+          failures = 0;
+          await this.readChannel(response, controller);
+        } catch (error) {
+          if (error instanceof ChannelHeldBack) {
+            // Something between this PC and the server buffers the stream: keep to the poll.
+            this.channelPausedUntil = (this.options.now ?? Date.now)() + CHANNEL_PAUSE_MS;
+            recordDesktopDiagnostic("relay_poll_failed", {stage:"channel",code:"relay_stream_failure"});
+            break;
+          }
+          if (!this.stopped && intent === this.intent && !controller.signal.aborted) {
+            failures++;
+            recordDesktopDiagnostic("relay_poll_failed", {stage:"channel",...desktopExceptionFields(error)});
+          }
+        } finally { controller.abort(); }
+        if (this.stopped || intent !== this.intent) break;
+        await pause(pollRetryDelayMs(failures, true), new AbortController().signal);
+      }
+    } finally { this.channelRunning = false; }
+  }
+  private async readChannel(response: Response, controller: AbortController) {
+    if (!response.body) throw Error("Agent channel unavailable");
+    const reader = response.body.getReader();
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    const watch = () => { clearTimeout(idle); idle = setTimeout(() => controller.abort(), CHANNEL_IDLE_MS); idle.unref?.(); };
+    controller.signal.addEventListener("abort", () => void reader.cancel().catch(() => undefined), { once: true });
+    let pending: Buffer = Buffer.alloc(0);
+    let heldBack = false;
+    clearTimeout(idle);
+    idle = setTimeout(() => { heldBack = true; controller.abort(); }, CHANNEL_FIRST_LINE_MS);
+    try {
+      for (;;) {
+        const { value, done } = await reader.read().catch((error: unknown) => {
+          if (heldBack) throw new ChannelHeldBack();
+          throw error;
+        });
+        if (heldBack) throw new ChannelHeldBack();
+        if (done) return;
+        watch();
+        this.lastContact = (this.options.now ?? Date.now)();
+        pending = Buffer.concat([pending, value]);
+        for (let end = pending.indexOf(10); end >= 0; end = pending.indexOf(10)) {
+          const line = pending.subarray(0, end).toString("utf8");
+          pending = pending.subarray(end + 1);
+          if (!line.trim()) continue;
+          const message = JSON.parse(line) as { keepalive?: unknown } & Partial<DesktopExecutorOperation>;
+          if (message.keepalive === 1) continue;
+          if (typeof message.id !== "string" || !/^[a-f0-9-]{36}$/.test(message.id)) throw Error("Invalid agent channel message");
+          this.startOperation(message as DesktopExecutorOperation, true);
+        }
+        if (pending.byteLength > CHANNEL_LINE_BYTES) throw Error("Agent channel line exceeds its limit");
+      }
+    } finally {
+      clearTimeout(idle);
+      await reader.cancel().catch(() => undefined);
     }
   }
   private async execute(operation: DesktopExecutorOperation, controller: AbortController) {
@@ -564,6 +669,10 @@ export class DesktopRelayClient {
       }
     } finally { this.updateNotices.delete(operation.id); }
   }
+}
+
+class ChannelHeldBack extends Error {
+  constructor() { super("Agent channel held back"); }
 }
 
 function pause(ms: number, signal: AbortSignal) {

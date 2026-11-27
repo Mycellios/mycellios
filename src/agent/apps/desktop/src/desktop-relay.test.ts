@@ -573,3 +573,64 @@ it("reports this PC's Mico folders only to a server that asks for them and stops
     expect(client.online()).toBe(true);
   } finally { client.stop(); }
 });
+
+it("runs agent messages from the agent channel once, acknowledges them by result and keeps them out of polls", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const mine = "11111111-1111-4111-8111-111111111111";
+  const generation = "44444444-4444-4444-8444-444444444444";
+  const operationId = "55555555-5555-4555-8555-555555555555";
+  const operation = { id: operationId, binding: { deviceId: mine, botId: "bot", generation },
+    request: { method: "agentMessage", botId: "bot", runId: "run", sessionId: "66666666-6666-4666-8666-666666666666", message: { kind: "result" } } };
+  const polls: Array<Record<string, unknown>> = [];
+  const results: Array<{ id: string; done: boolean }> = [];
+  let channels = 0;
+  const local = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response('{"done":true}\n'));
+  const client = new DesktopRelayClient({
+    base: "https://example.test", localUrl: "http://127.0.0.1:1234", localToken: "unused", revoked: vi.fn(),
+    deviceId: mine, agentExecution: 1,
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      if (action === "identity") return Response.json(identity);
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      if (action === "result") { results.push({ id: body.id as string, done: body.done as boolean }); return Response.json({ ok: true }); }
+      if (action === "channel") {
+        channels++;
+        const line = (value: unknown) => new TextEncoder().encode(JSON.stringify(value) + "\n");
+        // The same unacknowledged message arrives twice, as after a reconnect.
+        return new Response(new ReadableStream<Uint8Array>({ start: controller => {
+          controller.enqueue(line({ keepalive: 1 }));
+          controller.enqueue(line(operation));
+          controller.enqueue(line(operation));
+        } }));
+      }
+      polls.push(body);
+      if (body.wait) await new Promise(resolve => setTimeout(resolve, 20));
+      return Response.json({ identity, bindings: [{ deviceId: mine, botId: "bot", generation }], active: [], operations: [], agentChannel: 1 });
+    },
+  });
+  try {
+    await client.registerAccount(identity);
+    await vi.waitFor(() => expect(results).toContainEqual({ id: operationId, done: true }));
+    expect(channels).toBe(1);
+    expect(local.mock.calls.filter(([url]) => String(url).endsWith("/computer"))).toHaveLength(1);
+    expect(polls.some(body => Array.isArray(body.active) && (body.active as string[]).includes(operationId))).toBe(false);
+  } finally { client.stop(); }
+});
+
+it("does not open an agent channel for a server that does not offer one", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const actions: string[] = [];
+  const client = new DesktopRelayClient({
+    base: "https://example.test", localUrl: "http://127.0.0.1:1234", localToken: "unused", revoked: vi.fn(), agentExecution: 1,
+    fetch: async (url) => {
+      const action = url.split("/").at(-1)!;
+      actions.push(action);
+      return Response.json(action === "identity" ? identity : { identity, bindings: [], active: [], operations: [] });
+    },
+  });
+  try {
+    await client.registerAccount(identity);
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(actions).not.toContain("channel");
+  } finally { client.stop(); }
+});

@@ -1,10 +1,11 @@
 # Mico memory graph
 
-Status: draft (opened 2026-11-27). Sections 4 and 5 are implemented in a local
-change, not merged: the Memory rail page (vault tree, note view/editor with
-`[[link]]` completion, backlinks, local and full graph) and "Memory in context"
-recall receipts. Sections 1, 2, 3 (server links), 6 and 7 are not implemented
-and change nothing that a Mico receives.
+Status: draft (opened 2026-11-27). Sections 4 and 5 are implemented: the Memory
+rail page (vault tree, note view/editor with `[[link]]` completion, backlinks,
+local and full graph, task notes, "Learned in"), "Memory in context" recall
+receipts with a count on each reply, and a simple form of section 6 (Markdown
+ZIP export and import). Sections 1, 2, 3 (server links) and 7 are not
+implemented; nothing delivered changes what a Mico receives.
 
 Implementation notes for the delivered part:
 
@@ -17,7 +18,18 @@ Implementation notes for the delivered part:
   cascades with the run, no retention job). The executor records them without
   awaiting; a failure or a missing table never affects the run.
   `memory.recall({ messageId })` reads them for the owner's own Mico messages.
-- Task notes are not shown on the page (they stay in their conversation).
+- Each finished reply shows "N notes in context" from one batched
+  `memory.recallCounts` read (at most 100 messages, owner's own Mico threads);
+  the count sits on the last message of its run.
+- Task notes appear under their Mico in "Conversation notes / <title>"
+  (`memory.list({ includeTasks: true })`, excluding conversations being
+  deleted). They can link out, but links never resolve to them.
+- "Learned in" lists up to 20 conversations from `MemoryRevision.sourceThreadId`
+  (`memory.sources`), only the owner's live threads, and opens each one.
+- Export writes `<group>/<note path>` Markdown files into a ZIP in the browser
+  (no front matter, links unchanged). Import accepts `.md` files or such a ZIP
+  (500 files, 64,000 characters each), sends folders named like a group back to
+  it, skips task notes and never overwrites: it uses `memory.create`.
 
 ## Goal
 
@@ -136,8 +148,7 @@ new running cost for the operator.
   the run. Search tool results are not recorded yet.
 - A Mico message's More menu offers "Memory in context". It lists the notes the
   reply had available (not a claim that it relied on them) and opens each on the
-  memory page. A count on the message itself and "Learned in …" from
-  `MemoryRevision.sourceThreadId` are not implemented.
+  memory page. The reply also shows the count, which opens the same list.
 - Not shown for groups, channels or member turns, which receive no memory.
 
 ### 5. Memory page in the workspace rail (phase 3)

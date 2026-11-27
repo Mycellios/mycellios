@@ -1136,7 +1136,15 @@ export const appContract = {
   memory: {
     reviewStatus: oc.output(z.object({reservedMicrounits:z.number().int(),chargedMicrounits:z.number().int(),pending:z.number().int()})),
     list: oc
-      .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional(), taskThreadId: Id.optional() }))
+      .input(
+        z.object({
+          botId: Id.optional(),
+          scope: z.enum(["bot", "user"]).optional(),
+          taskThreadId: Id.optional(),
+          /** Also the notes kept for task conversations, each with its conversation title. */
+          includeTasks: z.boolean().optional(),
+        }),
+      )
       .output(z.array(MemoryDocumentSchema)),
     update: oc
       .input(
@@ -1173,6 +1181,28 @@ export const appContract = {
           notes: z.array(z.object({ id: Id, path: z.string(), scope: z.enum(["bot", "user"]), botId: Id.nullable() })),
           /** Notes that were in context but have been deleted since. */
           removed: z.number().int().nonnegative(),
+        }),
+      ),
+    /** How many notes each reply had in context, for replies whose run recorded it. */
+    recallCounts: oc
+      .input(z.object({ messageIds: z.array(Id).min(1).max(100) }))
+      .output(z.object({ counts: z.record(z.string(), z.number().int().nonnegative()) })),
+    /** The conversations a note's saved versions came from, newest first. */
+    sources: oc
+      .input(z.object({ documentId: Id }))
+      .output(
+        z.object({
+          sources: z.array(
+            z.object({
+              threadId: Id,
+              kind: z.enum(["main", "conversation", "group"]),
+              title: z.string().nullable(),
+              botId: Id.nullable(),
+              groupId: Id.nullable(),
+              archived: z.boolean(),
+              at: z.string(),
+            }),
+          ),
         }),
       ),
     exportMarkdown: oc.input(z.object({ botId: Id.optional() })).output(z.string()),

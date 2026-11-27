@@ -22,10 +22,15 @@ type Result = {
   };
   navigated?: { tab: string; url: string };
 };
-const { actTab, navigateTab, releaseWorking } = bridge as {
+const { actTab, navigateTab, releaseWorking, screenshotTab, pressKey } = bridge as {
   actTab(request: unknown, ui: Ui): Promise<Result>;
   navigateTab(request: unknown, ui: Ui): Promise<Result>;
   releaseWorking(): Promise<void>;
+  screenshotTab(
+    tab: string,
+    ask: Ui["ask"],
+  ): Promise<{ error?: string; screenshot?: { mimeType: string; data: string } }>;
+  pressKey(tabId: number, combo: string): Promise<void>;
 };
 
 const mico = { name: "Ada", color: "green" };
@@ -674,5 +679,211 @@ describe("opening pages in the person's Chrome", () => {
       ),
     ).toEqual({ error: "refused_site" });
     expect(api.tabs.remove).toHaveBeenCalledWith(30);
+  });
+});
+
+describe("real input and screenshots through Chrome's debugger", () => {
+  let commands: { method: string; params: Record<string, unknown> }[];
+  let granted: boolean;
+  let api: ReturnType<typeof makeApi>;
+
+  function makeApi() {
+    const tab = {
+      id: 5,
+      windowId: 1,
+      url: location.href,
+      title: "Shop",
+      status: "complete",
+      incognito: false,
+      active: true,
+    };
+    return {
+      tabs: {
+        get: vi.fn(async () => tab),
+        group: vi.fn(async () => 7),
+        ungroup: vi.fn(async () => {}),
+      },
+      tabGroups: { update: vi.fn(async () => ({})) },
+      windows: { getLastFocused: vi.fn(async () => ({ id: 1 })) },
+      permissions: {
+        contains: vi.fn(async (query: { permissions?: string[] }) =>
+          query.permissions?.includes("debugger") ? granted : true,
+        ),
+        remove: vi.fn(async () => true),
+      },
+      scripting: {
+        executeScript: vi.fn(
+          async ({ func, args = [] }: { func: (...a: unknown[]) => unknown; args?: unknown[] }) => [
+            { result: await func(...args) },
+          ],
+        ),
+      },
+      debugger: {
+        attach: vi.fn(async () => {}),
+        detach: vi.fn(async () => {}),
+        onDetach: { addListener: vi.fn() },
+        sendCommand: vi.fn(
+          async (_target: unknown, method: string, params: Record<string, unknown>) => {
+            commands.push({ method, params });
+            return method === "Page.captureScreenshot" ? { data: "/9j/AAAA" } : {};
+          },
+        ),
+      },
+      captureVisibleTab: undefined,
+    };
+  }
+
+  beforeEach(() => {
+    commands = [];
+    granted = true;
+    api = makeApi();
+    vi.stubGlobal("chrome", api);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 20,
+      height: 10,
+      left: 40,
+      top: 30,
+    } as DOMRect);
+    (globalThis as { __mycelliosPersonAt?: number }).__mycelliosPersonAt = undefined;
+  });
+  afterEach(async () => {
+    await releaseWorking();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  const ui: Ui = {
+    ask: async () => "always",
+    confirm: async () => "allow",
+    actAllowed: async () => true,
+  };
+  const page = (html: string) => {
+    document.body.innerHTML = html;
+    const snap = snapshotPage(48_000) as { text: string };
+    return Array.from(snap.text.matchAll(/\[(e\d+)\]/g), (match) => match[1]!);
+  };
+  const input = (method: string) => commands.filter((command) => command.method === method);
+
+  it("clicks with real mouse events at the element's centre", async () => {
+    const [button] = page("<button>Buy</button>");
+    await actTab({ op: "act", tab: "t5", actions: [{ kind: "click", ref: button }], mico }, ui);
+    expect(api.debugger.attach).toHaveBeenCalledWith({ tabId: 5 }, "1.3");
+    expect(
+      input("Input.dispatchMouseEvent").map((command) => [
+        command.params.type,
+        command.params.x,
+        command.params.y,
+      ]),
+    ).toEqual([
+      ["mouseMoved", 50, 35],
+      ["mousePressed", 50, 35],
+      ["mouseReleased", 50, 35],
+    ]);
+  });
+
+  it("fills by replacing the selected text, and types character by character", async () => {
+    const [field] = page('<input id="q" value="old">');
+    await actTab(
+      { op: "act", tab: "t5", actions: [{ kind: "fill", ref: field, text: "new" }], mico },
+      ui,
+    );
+    expect(input("Input.insertText").map((command) => command.params.text)).toEqual(["new"]);
+    commands = [];
+    await actTab(
+      { op: "act", tab: "t5", actions: [{ kind: "type", ref: field, text: "ab" }], mico },
+      ui,
+    );
+    expect(input("Input.insertText").map((command) => command.params.text)).toEqual(["a", "b"]);
+    // The field's old text is removed first.
+    expect(input("Input.dispatchKeyEvent")[0]?.params.key).toBe("Delete");
+  });
+
+  it("does not take its own real input for the person's", async () => {
+    const [button, field] = page('<button>Go</button><input id="q">');
+    await actTab({ op: "act", tab: "t5", actions: [{ kind: "click", ref: button }], mico }, ui);
+    // Its own trusted events arrive while __mycelliosActing is set, which the guard ignores; the
+    // flag is cleared again when the action ends, so the person's later input still counts.
+    expect((globalThis as { __mycelliosActing?: boolean }).__mycelliosActing).toBe(false);
+    expect((globalThis as { __mycelliosPersonAt?: number }).__mycelliosPersonAt).toBeUndefined();
+    const next = await actTab(
+      { op: "act", tab: "t5", actions: [{ kind: "fill", ref: field, text: "x" }], mico },
+      ui,
+    );
+    expect(next.error).toBeUndefined();
+  });
+
+  it("falls back to synthetic events when the debugger permission is not granted", async () => {
+    granted = false;
+    const [field] = page('<input id="q">');
+    const result = await actTab(
+      { op: "act", tab: "t5", actions: [{ kind: "fill", ref: field, text: "hello" }], mico },
+      ui,
+    );
+    expect(api.debugger.attach).not.toHaveBeenCalled();
+    expect(commands).toEqual([]);
+    expect(result.acted?.steps).toEqual([{ ok: true }]);
+    expect((document.getElementById("q") as HTMLInputElement).value).toBe("hello");
+  });
+
+  it("detaches from every tab when the work ends", async () => {
+    const [button] = page("<button>Go</button>");
+    await actTab({ op: "act", tab: "t5", actions: [{ kind: "click", ref: button }], mico }, ui);
+    await releaseWorking();
+    expect(api.debugger.detach).toHaveBeenCalledWith({ tabId: 5 });
+  });
+
+  it("maps keys and modifiers to Chrome's key events", async () => {
+    granted = true;
+    await pressKey(5, "Enter");
+    await pressKey(5, "Shift+Tab");
+    await pressKey(5, "Control+A");
+    await pressKey(5, ".");
+    const downs = input("Input.dispatchKeyEvent").filter(
+      (command) => command.params.type !== "keyUp",
+    );
+    expect(
+      downs.map((command) => [
+        command.params.type,
+        command.params.key,
+        command.params.text,
+        command.params.modifiers,
+      ]),
+    ).toEqual([
+      ["keyDown", "Enter", "\r", 0],
+      ["rawKeyDown", "Tab", undefined, 8],
+      ["rawKeyDown", "A", undefined, 2],
+      ["keyDown", ".", ".", 0],
+    ]);
+  });
+
+  it("takes a screenshot without the overlay and shows it again", async () => {
+    page("<p>Chart</p>");
+    await actTab(
+      { op: "act", tab: "t5", actions: [{ kind: "scroll", direction: "down" }], mico },
+      ui,
+    );
+    const seen: boolean[] = [];
+    api.debugger.sendCommand.mockImplementation(async (_target: unknown, method: string) => {
+      if (method === "Page.captureScreenshot") {
+        const host = document.documentElement.lastElementChild as HTMLElement;
+        seen.push(host.style.display === "none");
+        return { data: "/9j/AAAA" };
+      }
+      return {};
+    });
+    const shot = await screenshotTab("t5", ui.ask);
+    expect(shot).toEqual({ screenshot: { mimeType: "image/jpeg", data: "/9j/AAAA" } });
+    expect(seen).toEqual([true]);
+    expect((document.documentElement.lastElementChild as HTMLElement).style.display).toBe("");
+  });
+
+  it("cannot capture a background tab without the debugger, and never Mycellios", async () => {
+    granted = false;
+    page("<p>x</p>");
+    (await api.tabs.get()).active = false;
+    expect(await screenshotTab("t5", ui.ask)).toEqual({ error: "not_capturable" });
+    (await api.tabs.get()).url = "https://www.mycellios.com/agent/app";
+    expect(await screenshotTab("t5", ui.ask)).toEqual({ error: "refused_site" });
   });
 });

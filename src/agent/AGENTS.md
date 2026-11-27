@@ -988,7 +988,11 @@
   to open() gets every later batch sent to it, numbered from 1 and one at a time, and
   answers no reads; it orders and bounds them (pushedBatches), and older peers keep
   reading. A broken pushed stream is released and ends with `{ failed: true }`.
-  Verify desktop-model-push too. The Desktop relay sends every
+  Verify desktop-model-push too. An API that answers `agentChannel: 1` delivers a PC's
+  agentMessage operations on its open agent channel (POST /api/desktop-relay/channel), never
+  through a poll; the result POST still acknowledges them, a channel that ends returns the
+  unacknowledged ones to the poll and the PC runs each operation id once. The channel is authenticated
+  when it opens and every 60 s. The Desktop relay sends every
   complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
   with the stream end joined to the last lines, and the API rechecks all of a PC's
   bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,
@@ -1914,9 +1918,15 @@
   joins its named tab group and shows the overlay, which is cosmetic. It yields to the
   person's own input, stops at the first declined, stale or unconfirmed step and reports
   unconfirmed effects as such. Keep operations out of the poll loop so a question
-  waiting for the person never lets the lease lapse. Verify chrome-act, chrome-mico,
-  browser-tabs-relay and executor-readonly-approval tests; a jsdom fixture does not
-  qualify a real Chrome session.
+  waiting for the person never lets the lease lapse. The same switch requests the optional
+  `debugger` permission: real input (trusted clicks, insertText, key events) and
+  `chrome_screenshot` (JPEG without the overlay, read rules, only results may exceed
+  64 KiB); the guard ignores the Mico's own input while acting, tabs are detached when
+  the work ends, and without the permission the synthetic path stays. Stop sharing and
+  turning acting off answer open questions with "deny". Verify chrome-act, chrome-mico,
+  browser-tabs-relay and executor-readonly-approval tests and
+  `node scripts/verify-browser-extension-real.mjs` (real Chromium, local fixtures); neither
+  qualifies a real Mico in a person's signed-in Chrome.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the

@@ -23,6 +23,8 @@ REVISION
 mycellios-native-build-provenance.json
 native-helpers/**/bin/
 native-helpers/**/obj/
+sidecars/**/bin/
+sidecars/**/obj/
 .vite/
 docs-site/.docusaurus/
 docs-site/build/

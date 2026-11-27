@@ -94,6 +94,27 @@ jobs:
         run: choco install wixtoolset --version=3.14.1 --allow-downgrade --no-progress -y
       - if: needs.native_scope.outputs.required == 'true'
         run: npx vitest run tests/node-*.test.ts tests/headless-worker.test.ts tests/worker-hardening.test.ts
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        if: needs.native_scope.outputs.required == 'true' && matrix.target == 'windows-x64'
+        with:
+          global-json-file: global.json
+      - name: Build and contain the Windows Job Object broker
+        if: needs.native_scope.outputs.required == 'true' && matrix.target == 'windows-x64'
+        # CI requires the Native AOT build; the physical tests check argv, exit
+        # codes and that no target or descendant outlives the broker or its parent.
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-windows-job-broker.mjs
+          npx vitest run tests/windows-job-broker-physical.test.ts
+      - name: Fetch the pinned Windows service host
+        if: needs.native_scope.outputs.required == 'true' && matrix.target == 'windows-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r url bytes sha256 < <(node --input-type=module -e "import { WINDOWS_SERVICE_WRAPPER as w } from './scripts/stage-node-installer.mjs'; console.log(w.url, w.bytes, w.sha256)")
+          curl --fail --location --silent --show-error --max-time 120 --max-filesize "$bytes" --output "$RUNNER_TEMP/WinSW-x64.exe" "$url"
+          echo "$sha256  $RUNNER_TEMP/WinSW-x64.exe" | sha256sum --check --strict
       - name: Compile production node payload
         if: needs.native_scope.outputs.required == 'true'
         run: npm run clean --silent && npx tsc -p tsconfig.build.json
@@ -114,6 +135,12 @@ jobs:
             printf '%s' "$MYCELLIOS_NODE_COMPONENT_TRUST" > "$RUNNER_TEMP/node-component-trust.json"
             trust_args=(--component-trust="$RUNNER_TEMP/node-component-trust.json")
           fi
+          windows_args=()
+          if [ "${{ matrix.target }}" = "windows-x64" ]; then
+            # Required on Windows: the stager refuses a layout without them.
+            windows_args=(--windows-service-wrapper="$RUNNER_TEMP/WinSW-x64.exe"
+              --windows-job-broker=build/windows-job-broker/mycellios-job-broker.exe)
+          fi
           node scripts/stage-node-installer.mjs \
             --dist=dist \
             --runtime=build/distribution-runtime \
@@ -124,7 +151,7 @@ jobs:
             --target="${{ matrix.target }}" \
             --source-revision="$GITHUB_SHA" \
             --output="build/node-package/${{ matrix.target }}" \
-            "${trust_args[@]}"
+            ${trust_args[@]+"${trust_args[@]}"} ${windows_args[@]+"${windows_args[@]}"}
           node scripts/verify-node-installer.mjs --root="build/node-package/${{ matrix.target }}"
       - name: Build and verify native Debian installer
         if: needs.native_scope.outputs.required == 'true' && matrix.target == 'linux-x64'

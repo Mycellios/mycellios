@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ManagedCatalogDiscovery, ManagedModel } from "../contracts/managed-provider.js";
-import { MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
+import { MANAGED_FREE_TEXT_MAX_REQUEST_BYTES, MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
 import { managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest, type ManagedTextResult } from "./managed-openrouter.js";
 import { readManagedTextStream } from "./managed-text-stream.js";
@@ -250,7 +250,7 @@ export class ManagedAntseedText {
     }))) throw new Error("managed_server_tools_not_allowed");
     const bytes = Buffer.byteLength(JSON.stringify(request)), output = request.max_tokens ?? Math.min(256, offer.maxOutput);
     const fits = offer.free ? freeRequestFits(bytes, output, offer.context) : bytes + 4096 + output <= offer.context;
-    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || !Number.isSafeInteger(output) || output < 1 || output > offer.maxOutput || !fits)
+    if (bytes > (offer.free ? MANAGED_FREE_TEXT_MAX_REQUEST_BYTES : MANAGED_TEXT_MAX_REQUEST_BYTES) || !Number.isSafeInteger(output) || output < 1 || output > offer.maxOutput || !fits)
       throw new Error("managed_request_too_large");
     const maximumUsd = tokenCost(offer.input, offer.output, bytes + 4096, output), fundingCostBasisPoints = this.funding ?? 0;
     return { offer, request, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, fundingCostBasisPoints).totalMicrounits,

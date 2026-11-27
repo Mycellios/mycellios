@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net8.0": {
+      "Microsoft.DotNet.ILCompiler": {
+        "type": "Direct",
+        "requested": "[8.0.34, )",
+        "resolved": "8.0.34",
+        "contentHash": "Thsuj6oGDaFJSmPLXtMSDdrYLaaXTGFVMRppVHjw7ZVfq7SHS7FIjL3CmfaAEv5upO1geAZgTqPMTA4GSG2/YQ=="
+      },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[8.0.34, )",
+        "resolved": "8.0.34",
+        "contentHash": "AoMGwI/388svzARQ2NYC25vFOQGcf13FgQWv61TwPAdPUMOejXpQxBQHrQpXfqM7vqxxj1E3SAkX/OkE2cuChw=="
+      }
+    },
+    "net8.0/win-x64": {
+      "Microsoft.DotNet.ILCompiler": {
+        "type": "Direct",
+        "requested": "[8.0.34, )",
+        "resolved": "8.0.34",
+        "contentHash": "Thsuj6oGDaFJSmPLXtMSDdrYLaaXTGFVMRppVHjw7ZVfq7SHS7FIjL3CmfaAEv5upO1geAZgTqPMTA4GSG2/YQ==",
+        "dependencies": {
+          "runtime.win-x64.Microsoft.DotNet.ILCompiler": "8.0.34"
+        }
+      },
+      "runtime.win-x64.Microsoft.DotNet.ILCompiler": {
+        "type": "Transitive",
+        "resolved": "8.0.34",
+        "contentHash": "dWVSjjnX9ZA3gX1dUL9Evp5VO4m35RL6zqtx3BXBg6WD6Ta/0o+4f8LZCxFQuCNX9NUJXhj7qNlYzINLK3RIUA=="
+      }
+    }
+  }
+}
