@@ -175,7 +175,7 @@ describe("desktop preload bridge", () => {
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.speak", { text: "Hola", language: "es", speed: 1 });
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.stop");
 
-    expect(Object.keys(bridge.localModels!).sort()).toEqual(["cancel", "inspect", "install", "remove", "status", "unload"]);
+    expect(Object.keys(bridge.localModels!).sort()).toEqual(["cancel", "inspect", "install", "remove", "status", "unload", "warm"]);
     await bridge.localModels!.install("qwen3.5-2b");
     await bridge.localModels!.remove("qwen3.5-2b");
     expect(invoke).toHaveBeenCalledWith("desktop.localModels.install", "qwen3.5-2b");

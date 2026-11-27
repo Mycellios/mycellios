@@ -27,7 +27,7 @@ it("never moves a local-model turn to the server, offline or on a server workspa
   const fallback = { describe, abort: vi.fn(), run: vi.fn() };
   const offline = new DesktopAgentRuntime({ fallback, transport: vi.fn(), select: async () => ({ available: false, preferred: false }) });
   await expect(collect(offline.run(deviceRequest(), context))).rejects.toThrow(DEVICE_MODEL_OFFLINE_ERROR);
-  await expect(collect(offline.run(deviceRequest(), { ...context, cloudWorkspace: true } as AdapterContext))).rejects.toThrow(DEVICE_MODEL_OFFLINE_ERROR);
+  await expect(collect(offline.run(deviceRequest(), { ...context, cloudWorkspace: true } as unknown as AdapterContext))).rejects.toThrow(DEVICE_MODEL_OFFLINE_ERROR);
   expect(fallback.run).not.toHaveBeenCalled();
 });
 
@@ -85,10 +85,16 @@ it("answers a real Pi turn from an OpenAI-compatible server on loopback, keyed p
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   cleanups.push(() => new Promise((resolve) => server.close(resolve)));
   const port = (server.address() as { port: number }).port;
-  const runtime = new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: 12 }),
+  const runtime = new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: 12, light: true }),
     async () => ({ baseUrl: `http://127.0.0.1:${port}/v1`, apiKey: "per-start-key", contextWindow: 16384 }));
   const events = await collect(runtime.run(deviceRequest(), context));
   expect(events.filter((event) => event.type === "text").map((event) => (event as { text: string }).text).join("")).toContain("Hola");
   expect(events.at(-1)?.type).toBe("done");
   expect(bodies[0]).toMatchObject({ authorization: "Bearer per-start-key", body: { model: "qwen3.5-2b" } });
+  // Light mode: a short style, no "say what you will do first" reminder, no work-plan tool.
+  const sent = JSON.stringify(bodies[0]!.body);
+  expect(sent).toContain("Answer the question itself");
+  expect(sent).not.toContain("Mycellios conversation style");
+  expect(sent).not.toContain("mycellios_turn_style");
+  expect(sent).not.toContain("update_work_plan");
 });

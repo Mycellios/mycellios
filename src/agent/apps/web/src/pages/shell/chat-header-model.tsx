@@ -5,7 +5,7 @@ import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptio
 import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Cpu } from "lucide-react";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { useSpaceQueries, writeSaved } from "../../lib/query";
 import { useSpaceRpc } from "../../lib/space-rpc";
@@ -125,8 +125,15 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   // Models on this PC (specs/local-models/spec.md): offered in Desktop for a Mico that runs here.
   const deviceSelected = isDeviceModelChoice(bot.modelProvider) && Boolean(bot.modelId);
   const onYourPc = t`On your PC`;
-  const deviceOffered = Boolean(localModelsBridge()) && (deviceSelected || enginesQuery.data?.computer === "desktop");
+  // The Mico's own choice ("Your PC") decides; the engines report only knows a bound computer.
+  const deviceOffered = Boolean(localModelsBridge()) &&
+    (deviceSelected || bot.computerMode === "dedicated" || enginesQuery.data?.computer === "desktop");
   const local = useLocalModels(deviceOffered && (open || deviceSelected));
+  // Opening the chat loads the model and its saved prompt, so the first answer starts at once.
+  const warmModelId = deviceSelected && !(bot.agentEngine && bot.agentEngine !== "pi") ? bot.modelId : null;
+  useEffect(() => {
+    if (warmModelId) void localModelsBridge()?.warm?.(warmModelId).catch(() => undefined);
+  }, [warmModelId]);
   const deviceName = (modelId: string) => local.status?.models.find(model => model.id === modelId)?.name ?? modelId;
   const nativeEngine = bot.agentEngine && bot.agentEngine !== "pi" ? bot.agentEngine : null;
   const nativeName = nativeEngine ? NATIVE_PROVIDERS[nativeEngine] : undefined;

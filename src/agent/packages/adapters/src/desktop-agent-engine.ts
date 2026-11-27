@@ -53,7 +53,7 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
   }
   const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) => new NativeAgentRuntime({
     dataDir,
-    fallback: new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: DEVICE_MODEL_EAGER_TOOL_SCHEMAS }), store.deviceModels),
+    fallback: new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: DEVICE_MODEL_EAGER_TOOL_SCHEMAS, light: true }), store.deviceModels),
     hostAccess: authorized, processSlots: slots, storeRoot, engineUpdates: updates,
   }));
   let current: { scope: string; runtime: AgentRuntime } | undefined;

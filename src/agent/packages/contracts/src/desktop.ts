@@ -71,6 +71,8 @@ export interface LocalModelsBridge {
   remove: (modelId: string) => Promise<void>;
   /** Free the memory the loaded model holds; it loads again on the next turn. */
   unload: () => Promise<void>;
+  /** Load an installed model ahead of use, so the first answer of an opened chat starts at once. */
+  warm?: (modelId: string) => Promise<void>;
 }
 
 /**

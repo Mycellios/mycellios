@@ -971,7 +971,10 @@
   shared-member turns fail as unpayable. Desktop's DeviceModelRuntime maps the id to
   LocalModels' loopback `llama-server` (pinned b12613 build and GGUF files, size and SHA-256
   checked, per-start key file, random loopback port, idle unload) and runs Pi with a small
-  eager tool budget and no fallbacks. The default model is the fastest that meets the speed
+  eager tool budget, Pi `light` mode (short style, no turn-style reminder, no work-plan loop)
+  and no fallbacks; the executor's `lightRun` drops the long instruction sections and uses
+  formatCurrentTimeNote. Opening such a chat warms the model; loads restore the slot saved
+  on unload and after turns (slot files live in the profile, deleted with the model). The default model is the fastest that meets the speed
   floor measured on that PC (after a warm-up request), never the largest that fits. Verify
   local-models, device-model-runtime, local-models-panel and preload tests, plus
   `apps/desktop/scripts/verify-local-models.ts` and `verify-local-model-turn.ts` on real hardware.

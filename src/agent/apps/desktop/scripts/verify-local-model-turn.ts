@@ -9,7 +9,7 @@ import { LocalModels } from "../src/local-models.ts";
 const [directory, modelId = "qwen3.5-2b"] = process.argv.slice(2);
 if (!directory) throw new Error("Usage: verify-local-model-turn.ts <dir> [modelId]");
 const models = new LocalModels(directory);
-const runtime = new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: 12 }), (id) => models.endpoint(id));
+const runtime = new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: 12, light: true }), (id) => models.endpoint(id));
 const tool = (name: string, description: string, properties: Record<string, unknown>, required: string[]) =>
   ({ name, description, inputSchema: { type: "object", properties, required } });
 const calls: string[] = [];

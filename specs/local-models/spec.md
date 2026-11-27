@@ -332,11 +332,21 @@ projector present).
   the key file stayed on disk after an abrupt exit (now deleted once the server has read it);
   one measurement taken while the GPU was busy downgraded the recommendation (the best
   measurement per model is kept).
-- **Open:** a Mico shows "On your PC" only when its computer is the PC (`engines.forBot`
-  reports `desktop`); in the isolated dev stack that report stayed `server`, so the test set
-  the model through the API first. Qualify the picker entry on an installed Desktop. The
-  first turn on a cold model is slow and small models echo the date context; warming the
-  model when a chat opens and a shorter light-mode prompt are next.
+- **Optimizations after the first run:**
+  - The picker offers "On your PC" for any Mico whose computer choice is "Your PC"
+    (`computerMode: dedicated`); `engines.forBot` reported `server` even while turns ran on
+    the PC.
+  - Opening a chat whose Mico uses a local model loads it (`localModels.warm`). Every load
+    sends one tiny request to compile the GPU kernels and restores the prompt the model had
+    already read, saved with llama-server's slot save (`--slot-save-path`) on unload and 45 s
+    after each turn. Measured: after a reload, a 4.7k-token prompt was reused and the answer
+    started in 0.4 s instead of 12 s. Slot files stay in Desktop's profile and are deleted
+    with their model.
+  - Light prompt: Pi's `light` option drops the long conversation style, the "say what you
+    will do first" reminder (small models answered with that line instead of the answer) and
+    the work-plan loop; the server leaves out project workflow, teammates, skills, plugins,
+    reply guidance and the approval paragraph, and sends the date as one short line. The
+    captured prompt before this change was ~3.5k system tokens plus 11 tools (~2.3k).
 
 ## Verification
 

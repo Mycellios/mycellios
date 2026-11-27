@@ -28,6 +28,8 @@ export const SPEED_FLOOR = 20;
 const SLOW_FLOOR = 10;
 const IDLE_UNLOAD_MS = 10 * 60_000;
 const START_TIMEOUT_MS = 180_000;
+/** Save the model's read prompt this long after a turn started (and again while it works). */
+const SAVE_AFTER_USE_MS = 45_000;
 
 export function engineTarget(platform = process.platform, arch = process.arch): EngineTarget | undefined {
   return (manifest.engine.targets as Record<string, EngineTarget>)[`${platform}-${arch}`];
@@ -105,6 +107,8 @@ async function verifiedFile(path: string, file: { bytes: number; sha256: string 
   } catch { return false; }
 }
 
+const slotFile = (modelId: string) => `${modelId}.bin`;
+
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
@@ -138,7 +142,7 @@ function minimalEnv() {
 }
 
 export type LocalModelEndpoint = { modelId: string; baseUrl: string; apiKey: string; contextWindow: number };
-type Loaded = LocalModelEndpoint & { process: ChildProcess; tree?: NativeProcessTree };
+type Loaded = LocalModelEndpoint & { process: ChildProcess; tree?: NativeProcessTree; server: string };
 type Store = { speeds: Record<string, { prefill: number; generation: number; at: string }> };
 
 export class LocalModels {
@@ -147,6 +151,7 @@ export class LocalModels {
   private loaded?: Loaded;
   private loading?: Promise<LocalModelEndpoint>;
   private idleTimer?: ReturnType<typeof setTimeout>;
+  private saveTimer?: ReturnType<typeof setTimeout>;
   private hardware?: Promise<Hardware>;
   private inspecting?: Promise<void>;
   private store?: Store;
@@ -154,6 +159,7 @@ export class LocalModels {
   constructor(private readonly directory: string, private readonly fetcher: typeof fetch = fetch) {}
 
   private get engineDirectory() { return join(this.directory, "engine", manifest.engine.version); }
+  private get slotDirectory() { return join(this.directory, "slots"); }
   private modelPath(model: LocalModelSpec) { return join(this.directory, "models", `${model.id}-${model.sha256.slice(0, 12)}.gguf`); }
 
   private async readStore(): Promise<Store> {
@@ -274,6 +280,7 @@ export class LocalModels {
     if (this.job?.modelId === model.id && this.working) throw new Error("Wait for the installation to finish");
     if (this.loaded?.modelId === model.id) await this.unload();
     await rm(this.modelPath(model), { force: true });
+    await rm(join(this.slotDirectory, slotFile(model.id)), { force: true });
     const store = await this.readStore();
     if (store.speeds[model.id]) {
       delete store.speeds[model.id];
@@ -366,11 +373,13 @@ export class LocalModels {
     }
     const keyFile = join(this.directory, `key-${process.pid}.txt`);
     await writeFile(keyFile, apiKey, { mode: 0o600 });
+    await mkdir(this.slotDirectory, { recursive: true });
     const args = [
       "-m", path, "--host", "127.0.0.1", "--port", String(port), "--api-key-file", keyFile,
       "-ngl", "99", "-fa", "on", "-c", String(model.contextWindow), "-np", "1", "--jinja",
       "--reasoning", "off", "--no-webui", "--offline", "--cache-ram", "2048",
-    ];
+      // The prompt a model has already read survives an unload (saveSlot / prime).
+      "--slot-save-path", this.slotDirectory,    ];
     const child = spawn(this.engineBinary()!, args, { cwd: this.engineDirectory, windowsHide: true, stdio: ["ignore", "ignore", "ignore"], env: minimalEnv() });
     let tree: NativeProcessTree | undefined;
     if (process.platform === "win32" && child.pid) tree = windowsProcessTree(child.pid);
@@ -388,13 +397,50 @@ export class LocalModels {
       if (ready) {
         // The server read the key at start; do not leave it on disk.
         await rm(keyFile, { force: true });
-        this.loaded ={ modelId: model.id, baseUrl: `${baseUrl}/v1`, apiKey, contextWindow: model.contextWindow, process: child, ...(tree ? { tree } : {}) };
-        return this.loaded;
+        const loaded: Loaded = { modelId: model.id, baseUrl: `${baseUrl}/v1`, server: baseUrl, apiKey, contextWindow: model.contextWindow, process: child, ...(tree ? { tree } : {}) };
+        await this.prime(loaded);
+        this.loaded = loaded;
+        return loaded;
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     child.kill();
     throw new Error("The local model took too long to load");
+  }
+
+  /**
+   * Make the first real turn fast: one tiny request compiles the GPU kernels (the first
+   * request after a load ran at a fifth of the speed), then the prompt this model had
+   * already read before its last unload comes back from disk instead of being read again.
+   */
+  private async prime(loaded: Loaded) {
+    const headers = { "content-type": "application/json", authorization: `Bearer ${loaded.apiKey}` };
+    await this.fetcher(`${loaded.baseUrl}/chat/completions`, {
+      method: "POST", headers, signal: AbortSignal.timeout(120_000),
+      body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }], max_tokens: 1, temperature: 0, cache_prompt: false }),
+    }).then((response) => response.arrayBuffer(), () => undefined);
+    const file = slotFile(loaded.modelId);
+    if (await stat(join(this.slotDirectory, file)).then((info) => info.isFile(), () => false)) {
+      await this.fetcher(`${loaded.server}/slots/0?action=restore`, {
+        method: "POST", headers, body: JSON.stringify({ filename: file }), signal: AbortSignal.timeout(60_000),
+      }).then((response) => response.arrayBuffer(), () => undefined);
+    }
+  }
+
+  /** Keep the prompt the model has read, so the next load does not read it again. */
+  private async saveSlot(loaded: Loaded) {
+    await this.fetcher(`${loaded.server}/slots/0?action=save`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${loaded.apiKey}` },
+      body: JSON.stringify({ filename: slotFile(loaded.modelId) }), signal: AbortSignal.timeout(10_000),
+    }).then((response) => response.arrayBuffer(), () => undefined);
+  }
+
+  /** Load an installed model ahead of use (a chat with it opened), so its first answer starts at once. */
+  async warm(modelId: unknown) {
+    const model = localModelSpec(modelId);
+    if (this.working) return;
+    if (!(await stat(this.modelPath(model)).then((info) => info.size === model.bytes, () => false))) return;
+    await this.endpoint(model.id);
   }
 
   /** Measure this PC's real speed with a short agent-like request and remember it. */
@@ -411,9 +457,7 @@ export class LocalModels {
       if (!response.ok) throw new Error("The local model did not answer");
       return (await response.json() as { timings?: { prompt_per_second?: number; predicted_per_second?: number } }).timings;
     };
-    // The first request after loading also compiles GPU kernels; measuring it would
-    // report a fraction of the real speed, so warm up first.
-    await ask("Warm up.", 4);
+    // endpoint() already warmed the kernels (prime), so this measures the real speed.
     const timings = await ask(filler.repeat(24), 96);
     if (!timings?.predicted_per_second) return;
     await this.saveSpeed(modelId, { prefill: Math.round(timings.prompt_per_second ?? 0), generation: Math.round(timings.predicted_per_second * 10) / 10 });
@@ -423,13 +467,35 @@ export class LocalModels {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => { void this.unload(); }, IDLE_UNLOAD_MS);
     this.idleTimer.unref?.();
+    this.scheduleSave(SAVE_AFTER_USE_MS);
+  }
+
+  /**
+   * Save what the model has read shortly after a turn, not only on a clean unload: a crash,
+   * a forced quit or a power cut would otherwise lose it and the next first answer would
+   * read the whole prompt again. Waits while the model is still working.
+   */
+  private scheduleSave(delay: number) {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(async () => {
+      const loaded = this.loaded;
+      if (!loaded || loaded.process.exitCode !== null) return;
+      const busy = await this.fetcher(`${loaded.server}/slots`, {
+        headers: { authorization: `Bearer ${loaded.apiKey}` }, signal: AbortSignal.timeout(5_000),
+      }).then(async (response) => ((await response.json()) as { is_processing?: boolean }[]).some((slot) => slot.is_processing), () => false);
+      if (busy) this.scheduleSave(SAVE_AFTER_USE_MS);
+      else if (this.loaded === loaded) await this.saveSlot(loaded);
+    }, delay);
+    this.saveTimer.unref?.();
   }
 
   async unload() {
     clearTimeout(this.idleTimer);
+    clearTimeout(this.saveTimer);
     const loaded = this.loaded;
     this.loaded = undefined;
     if (!loaded || loaded.process.exitCode !== null) return;
+    await this.saveSlot(loaded);
     const exited = new Promise((resolve) => loaded.process.once("exit", resolve));
     if (loaded.tree) loaded.tree.kill(); else loaded.process.kill();
     await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 5_000))]);

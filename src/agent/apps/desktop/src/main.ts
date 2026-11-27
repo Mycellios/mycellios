@@ -1935,6 +1935,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("desktop.localModels.cancel", event => { localModelsCaller(event); return localModels.cancel(); });
   ipcMain.handle("desktop.localModels.remove", (event, modelId: unknown) => { localModelsCaller(event); return localModels.remove(modelId); });
   ipcMain.handle("desktop.localModels.unload", event => { localModelsCaller(event); return localModels.unload(); });
+  ipcMain.handle("desktop.localModels.warm", (event, modelId: unknown) => { localModelsCaller(event); return localModels.warm(modelId); });
   const getCloudComputer = () => {
     if (!hostComputer || !mainWindow) throw new Error("Local computer unavailable");
     const base = projectServer();

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrentTimeInstruction } from "./current-time.js";
+import { formatCurrentTimeInstruction, formatCurrentTimeNote } from "./current-time.js";
+
+describe("formatCurrentTimeNote", () => {
+  it("gives small local models one short line they need not repeat", () => {
+    const now = new Date("2026-11-27T21:24:16Z");
+    expect(formatCurrentTimeNote(now, "Europe/Madrid")).toMatch(/^\(Now: Friday, 2026-11-27 22:24 .*Europe\/Madrid\. Mention it only if asked\.\)$/);
+    expect(formatCurrentTimeNote(now, null)).toBe("(Now: Friday, 2026-11-27 21:24 UTC. Mention it only if asked.)");
+  });
+});
 
 describe("formatCurrentTimeInstruction", () => {
   it("anchors the present moment in UTC with the weekday and no sub-second noise", () => {
