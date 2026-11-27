@@ -38,11 +38,11 @@ try {
   });
   const base = origin + "/__isolated_computer";
   await page.goto(base);
-  const isolated = page.getByRole("button", { name: "Server, just this Mico", exact: true });
+  const isolated = page.getByRole("button", { name: "In the cloud", exact: true });
   await expect(isolated).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "This PC", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Your PC", exact: true })).toBeDisabled();
   assert.deepEqual(await page.evaluate(() => window.__isolatedFixture.calls), []);
-  await page.getByRole("button", { name: "Server, shared", exact: true }).click();
+  await page.getByRole("button", { name: "In the cloud, shared", exact: true }).click();
   await expect(page.getByText("It works on a Mycellios server computer that it shares with your other Micos in this space. It cannot see your PC.", { exact: true })).toBeVisible();
   await isolated.click();
   await page.screenshot({ path: path.join(output, "computer-isolation-desktop.png"), animations: "disabled" });
