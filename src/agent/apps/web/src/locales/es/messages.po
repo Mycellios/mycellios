@@ -12472,6 +12472,33 @@ msgstr "La tarea ha fallado"
 msgid "Thinking it through…"
 msgstr "Pensando…"
 
+msgid "On it…"
+msgstr "Manos a la obra…"
+
+msgid "Looking at it closely…"
+msgstr "Mirándolo con calma…"
+
+msgid "Weighing the options…"
+msgstr "Sopesando opciones…"
+
+msgid "Going over the details…"
+msgstr "Repasando los detalles…"
+
+msgid "Piecing it together…"
+msgstr "Atando cabos…"
+
+msgid "Getting the answer ready…"
+msgstr "Preparando la respuesta…"
+
+msgid "The spores are busy…"
+msgstr "Las esporas están en ello…"
+
+msgid "Growing an idea…"
+msgstr "Brotando una idea…"
+
+msgid "Asking the mycelium…"
+msgstr "Consultando al micelio…"
+
 msgid "Thinking…"
 msgstr "Pensando…"
 
@@ -16535,3 +16562,61 @@ msgstr "Llamadas en tiempo real"
 #: src/pages/settings/DeviceVoiceSettings.tsx
 msgid "Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice."
 msgstr "Las llamadas responden mientras hablas y puedes interrumpir. Usa tu clave de voz de OpenAI, que cobra OpenAI, cuando este servidor lo ofrece; si no, las llamadas siguen con la voz estándar."
+
+msgid "Your Micos, in Chrome"
+msgstr "Tus Micos, en Chrome"
+
+msgid "Add to Chrome"
+msgstr "Añadir a Chrome"
+
+msgid "Close the Chrome extension notice"
+msgstr "Cerrar el aviso de la extensión de Chrome"
+
+msgid "This PC is offline, so the server answers this message with the Mico's saved model instead of {engine}, without this PC's files."
+msgstr "Tu PC está desconectado: este mensaje lo responde el servidor con el modelo guardado del Mico en lugar de {engine}, sin los archivos de tu PC."
+
+msgid "This PC is offline, so the server answers this message, without this PC's files."
+msgstr "Tu PC está desconectado: este mensaje lo responde el servidor, sin los archivos de tu PC."
+
+msgid "Open Mycellios Desktop on that PC to work there again."
+msgstr "Abre Mycellios Desktop en ese PC para volver a trabajar en él."
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "Prompt cache"
+msgstr "Caché del prompt"
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "5 minutes"
+msgstr "5 minutos"
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "1 hour"
+msgstr "1 hora"
+
+#: src/pages/model-settings/prompt-cache.tsx
+msgid "1 hour makes replies after a pause faster, but saving the cache costs more."
+msgstr "Con 1 hora, las respuestas tras una pausa son más rápidas, pero guardar la caché cuesta más."
+
+msgid "Your PC"
+msgstr "Tu PC"
+
+msgid "In the cloud"
+msgstr "En la nube"
+
+msgid "In the cloud, shared"
+msgstr "En la nube, compartido"
+
+msgid "With your files and programs. It needs Mycellios Desktop open; while the PC is off, the cloud answers without your files."
+msgstr "Con tus archivos y programas. Necesita Mycellios Desktop abierto; con el PC apagado, responde la nube sin tus archivos."
+
+msgid "Keeps working with your PC off. It has its own computer and cannot see your PC."
+msgstr "Sigue trabajando con el PC apagado. Tiene su propio ordenador y no ve tu PC."
+
+msgid "Like the cloud, but it shares one computer with your other Micos in this space."
+msgstr "Igual que en la nube, pero comparte ordenador con tus otros Micos de este espacio."
+
+msgid "Does it work on another of your PCs?"
+msgstr "¿Trabaja en otro PC tuyo?"
+
+msgid "Move to this PC"
+msgstr "Pasar a este PC"

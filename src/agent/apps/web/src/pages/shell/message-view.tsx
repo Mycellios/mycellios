@@ -17,6 +17,7 @@ import {
 import { SubagentCard } from "../../components/SubagentCard";
 import { TaskReportCard } from "../../components/TaskReportCard";
 import { RoutineRunMarker } from "../../components/RoutineRunMarker";
+import { SystemNoticeLine } from "../../components/SystemNoticeLine";
 import { RoutineWebhookCard } from "../../components/RoutineWebhookCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
@@ -486,15 +487,7 @@ export const MessageView = memo(function MessageView({
             );
           }
           if (block.kind === "meta") {
-            return (
-              <div
-                key={i}
-                className="flex items-center justify-center gap-2 py-1 text-[13.5px] text-muted-foreground"
-              >
-                <span className="text-warning">◷</span>
-                <span>{block.text}</span>
-              </div>
-            );
+            return <SystemNoticeLine key={i} text={block.text} />;
           }
           if (block.kind === "progress") {
             return (
