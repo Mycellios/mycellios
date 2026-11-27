@@ -86,7 +86,8 @@ async function main() {
 
   const vite = spawn(process.execPath, [resolve("src/agent/node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(webPort), "--strictPort"], {
     cwd: resolve("src/agent/apps/web"), stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, RAKAZO_PROJECT_LOCAL: "1", MYCELLIOS_BROWSER_COORDINATOR: coordinator, API_PROXY_TARGET: coordinator },
+    // Explicit loopback targets take precedence over any local Agent .env value.
+    env: { ...process.env, MYCELLIOS_BROWSER_COORDINATOR: coordinator, API_PROXY_TARGET: coordinator },
   });
   children.push(vite);
   for (let i = 0; ; i++) {

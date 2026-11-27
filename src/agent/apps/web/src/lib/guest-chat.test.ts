@@ -20,7 +20,6 @@ describe("guest chat eligibility", () => {
   it("is limited to an ordinary browser tab on the bare entry", () => {
     expect(guestChatEligible(host())).toBe(true);
     expect(guestChatEligible(host({ mycelliosDesktop: {} }))).toBe(false);
-    expect(guestChatEligible(host({ rakazoDesktop: {} }))).toBe(false);
     expect(guestChatEligible(host({ ReactNativeWebView: { postMessage() {} } }))).toBe(false);
     expect(guestChatEligible(host({}, true))).toBe(false);
     expect(guestChatEligible(host({ navigator: { standalone: true } }))).toBe(false);
