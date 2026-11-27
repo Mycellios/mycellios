@@ -7499,6 +7499,11 @@ msgstr "This request stopped after producing results or actions. Send a new mess
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
+msgid "Mycellios restarted for an update while this turn was running. Review what it already did before continuing."
+msgstr "Mycellios restarted for an update while this turn was running. Review what it already did before continuing."
+
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "Desktop could not confirm the result. Review what it already did before continuing."
 msgstr "Desktop could not confirm the result. Review what it already did before continuing."
 

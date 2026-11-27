@@ -26,8 +26,10 @@ it.each(DESKTOP_FAILURE_CODES)(
     expect(isUncertainDesktopRun(message)).toBe(true);
     expect(normalizeRunError(message)).toMatchObject({
       kind: "interrupted",
-      summary:
-        "Desktop could not confirm the result. Review what it already did before continuing.",
+      // A deploy restarting the relay names the update instead of the person's PC.
+      summary: code === "relay_restarted"
+        ? "Mycellios restarted for an update while this turn was running. Review what it already did before continuing."
+        : "Desktop could not confirm the result. Review what it already did before continuing.",
     });
     expect(
       JSON.parse(desktopRunDiagnosticText(message, "cm00000000000000000000001")!),

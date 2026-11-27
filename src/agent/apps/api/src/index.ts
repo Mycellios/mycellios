@@ -14,7 +14,7 @@ const logger = createRootLogger(SERVICE_NAMES.api);
 
 try {
   const env = loadEnv();
-  const { app, stop } = await createApp({ ...env, logger });
+  const { app, stop, closeRelays } = await createApp({ ...env, logger });
   const server = serve({ fetch: app.fetch, port: env.port, hostname: env.apiHost }, () => {
     logger.info("api listening", { "http.host": env.apiHost, "http.port": env.port });
   });
@@ -35,6 +35,10 @@ try {
     if (stopping) return;
     stopping = true;
     stopEventLoopReport();
+    // Tell every open PC stream that the relay is restarting while its socket is still
+    // up. Destroying the sockets first left workers with a bare transport error, so a
+    // turn interrupted by a deploy read as a problem on the person's PC.
+    closeRelays();
     const closed = new Promise<void>((resolve) => server.close(() => resolve()));
     const grace = setTimeout(() => {
       for (const socket of sockets) socket.destroy();

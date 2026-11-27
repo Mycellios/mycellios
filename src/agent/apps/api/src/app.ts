@@ -226,6 +226,12 @@ export interface AppHandles {
   runtime: AgentRuntime;
   awaitIdle?: () => Promise<void>;
   backgroundFailures?: () => Array<{ name: string; count: number }>;
+  /**
+   * Ends the PC and browser relays: each open stream gets its "relay restarted" frame.
+   * Call it before closing the HTTP server, whose sockets are destroyed after a short
+   * grace period. stop() calls it again, which is harmless.
+   */
+  closeRelays: () => void;
   stop: () => Promise<void>;
 }
 
@@ -1465,6 +1471,10 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     runtime,
     awaitIdle: inMemoryJobs ? () => inMemoryJobs.awaitIdle() : undefined,
     backgroundFailures: inMemoryJobs ? () => inMemoryJobs.failureCounts() : undefined,
+    closeRelays: () => {
+      stopDesktopRelay();
+      stopBrowserTabsRelay();
+    },
     stop: async () => {
       stopDesktopRelay();
       stopBrowserTabsRelay();
