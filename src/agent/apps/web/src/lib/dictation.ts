@@ -206,6 +206,13 @@ export class Dictation {
   private finishingSpeech = false;
   private reportBufferedTranscript = false;
   private recordingLimit?: ReturnType<typeof setTimeout>;
+  /**
+   * Whether the level meter of the current endpoint recording has heard speech; null when no
+   * meter runs. A recording that never heard any is discarded, never sent to transcription:
+   * speech models invent text from room noise.
+   */
+  private recordingHeardSpeech: boolean | null = null;
+  private discardRecording = false;
 
   subscribe(fn: (s: DictationSnapshot) => void): () => void {
     this.watchers.add(fn);
@@ -232,6 +239,8 @@ export class Dictation {
     this.nativeCapture?.cancel();
     this.nativeCapture = null;
     clearTimeout(this.recordingLimit);
+    this.recordingHeardSpeech = null;
+    this.discardRecording = false;
     this.token += 1;
     this.transcribeAbort?.abort();
     this.transcribeAbort = null;
@@ -550,6 +559,7 @@ export class Dictation {
       return;
     }
     const keptSpeech = this.snapshot.transcript.trim().length > 0;
+    this.recordingHeardSpeech = null;
     if (mode === "endpoint" && !this.armSilence(stream, mine, endpointMs, keptSpeech)) {
       for (const track of stream.getTracks()) track.stop();
       this.failListening(mine, ENDPOINT_UNSUPPORTED);
@@ -572,7 +582,18 @@ export class Dictation {
         if (this.token !== mine) return;
         clearTimeout(this.recordingLimit);
         this.stopVad();
-        void this.transcribeChunks(mine, spaceId);
+        if (this.discardRecording) {
+          // Nothing but room noise reached the limit: drop it and keep listening.
+          this.discardRecording = false;
+          this.chunks = [];
+          void this.listenRecorder(mine, mode, endpointMs, spaceId);
+          return;
+        }
+        void this.transcribeChunks(
+          mine,
+          spaceId,
+          mode === "endpoint" ? () => void this.listenRecorder(mine, mode, endpointMs, spaceId) : undefined,
+        );
       };
       media.onerror = () => {
         for (const track of stream.getTracks()) track.stop();
@@ -583,7 +604,13 @@ export class Dictation {
       media.start(mode === "endpoint" ? 250 : undefined);
       if (mode === "hold" && (this.onRecording || this.onSpeechStart)) this.armSilence(stream, mine, null);
       if (!this.skipRecordingTranscription) this.checkReadiness(stream, mine, spaceId);
-      this.recordingLimit = setTimeout(() => { if (this.token === mine && media && media.state !== "inactive") media.stop(); }, this.networkTarget ? 29_000 : 60_000);
+      this.recordingLimit = setTimeout(() => {
+        if (this.token !== mine || !media || media.state === "inactive") return;
+        if (mode === "endpoint" && this.recordingHeardSpeech === false && !this.snapshot.transcript.trim()) {
+          this.discardRecording = true;
+        }
+        media.stop();
+      }, this.networkTarget ? 29_000 : 60_000);
     } catch (error) {
       if (media) {
         media.ondataavailable = null;
@@ -642,6 +669,7 @@ export class Dictation {
       if (ctx.state === "suspended") void ctx.resume();
       const data = new Uint8Array(analyser.fftSize);
       let heardSpeech = alreadyHeard;
+      if (endpointMs !== null) this.recordingHeardSpeech = alreadyHeard;
       let silentFor = 0;
       let speechTicks = 0;
       this.vadTimer = setInterval(() => {
@@ -659,6 +687,7 @@ export class Dictation {
         if (rms > SILENCE_RMS) {
           if (++speechTicks === 4) this.onSpeechStart?.();
           heardSpeech = true;
+          if (endpointMs !== null) this.recordingHeardSpeech = true;
           silentFor = 0;
           return;
         }
@@ -711,7 +740,12 @@ export class Dictation {
     if (ctx) void ctx.close().catch(() => undefined);
   }
 
-  private async transcribeChunks(mine: number, spaceId: string | null) {
+  /**
+   * `relisten` (endpoint recordings): a transcript that came back empty — silence, or words the
+   * server dropped as an echo of its own hints — keeps the microphone listening instead of
+   * ending the session with nothing to deliver.
+   */
+  private async transcribeChunks(mine: number, spaceId: string | null, relisten?: () => void) {
     if (this.token !== mine) return;
     const blob = new Blob(this.chunks, { type: this.chunks[0]?.type || "audio/webm" });
     this.chunks = [];
@@ -792,6 +826,11 @@ export class Dictation {
       // The recorder captures fresh audio, so matching words are intentional repetitions.
       const prefix = normalizedTranscript(this.snapshot.transcript);
       const text = body.text ?? "";
+      if (relisten && !prefix && !text.trim()) {
+        this.set({ status: "listening", transcript: "" });
+        relisten();
+        return;
+      }
       this.finish(
         prefix ? [prefix, normalizedTranscript(text)].filter(Boolean).join(" ") : text,
         mine,

@@ -7,8 +7,16 @@ import {
 } from "@mycellios/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pickUp } from "./call-pickup.js";
-import { ECHO_GUARD_MS, endCall, getSnapshot, startCall, toggleMute } from "./call-session";
+import {
+  CALL_NOTICE_POLL_MS,
+  ECHO_GUARD_MS,
+  endCall,
+  getSnapshot,
+  startCall,
+  toggleMute,
+} from "./call-session";
 import { dictation } from "./dictation.js";
+import { connectRealtimeCall } from "./realtime-call.js";
 import { rpc } from "./rpc.js";
 import { reduceThreadSnapshot } from "./thread-events.js";
 import { speaker } from "./tts.js";
@@ -23,6 +31,10 @@ vi.mock("@mycellios/core", async (importOriginal) => ({
   runThreadSubscription: vi.fn(async () => undefined),
 }));
 
+const preferences = vi.hoisted(() => ({ realtimeCalls: false }));
+vi.mock("./general-preferences", () => ({ getGeneralPreferences: () => preferences }));
+vi.mock("./realtime-call.js", () => ({ connectRealtimeCall: vi.fn() }));
+
 vi.mock("./call-pickup.js", () => ({
   pickUp: vi.fn(async () => undefined),
 }));
@@ -33,6 +45,7 @@ vi.mock("./dictation.js", () => ({
     stop: vi.fn(),
     subscribe: vi.fn(() => () => undefined),
   },
+  transcriptionLanguage: () => "es",
 }));
 
 vi.mock("./tts.js", () => ({
@@ -45,6 +58,7 @@ vi.mock("./tts.js", () => ({
 }));
 
 vi.mock("./rpc.js", () => ({
+  selectedSpaceId: () => "space-1",
   rpc: {
     threads: {
       answer: vi.fn(),
@@ -55,6 +69,7 @@ vi.mock("./rpc.js", () => ({
       send: vi.fn(),
       subscribe: vi.fn(),
     },
+    runs: { list: vi.fn() },
   },
 }));
 
@@ -66,6 +81,8 @@ const answer = vi.mocked(rpc.threads.answer);
 const followUp = vi.mocked(rpc.threads.followUp);
 const getThread = vi.mocked(rpc.threads.get);
 const endCallRpc = vi.mocked(rpc.threads.endCall);
+const listRuns = vi.mocked(rpc.runs.list);
+const connectRealtime = vi.mocked(connectRealtimeCall);
 
 describe("call session", () => {
   beforeEach(() => {
@@ -75,6 +92,8 @@ describe("call session", () => {
     isSpeaking.mockReturnValue(false);
     listen.mockResolvedValue(undefined);
     answer.mockResolvedValue({ ok: true } as never);
+    listRuns.mockResolvedValue({ runs: [] } as never);
+    preferences.realtimeCalls = false;
     getThread.mockResolvedValue(snapshot([]) as never);
     send.mockResolvedValue({ runId: "run-1", taskId: "task-1" } as never);
     endCallRpc.mockResolvedValue({ ok: true } as never);
@@ -152,6 +171,182 @@ describe("call session", () => {
       }),
     );
     expect(callIdFromClientNonce(String(answer.mock.calls[0]?.[0]?.clientNonce))).toBeDefined();
+  });
+
+  describe("a pending approval", () => {
+    async function waitingApproval() {
+      const ask = {
+        ...botMessage("ask-1", ""),
+        blocks: [
+          {
+            kind: "ask" as const,
+            text: "Send the email to Ana?",
+            status: "pending" as const,
+            approvalEffectId: "effect-1",
+            actions: [
+              { id: "allow", label: "Allow once" },
+              { id: "always", label: "Always allow" },
+              { id: "deny", label: "Deny" },
+            ],
+          },
+        ],
+      } as ThreadMessage;
+      const waitingRun = { ...runningRun, status: "waiting_input" } as ThreadSnapshot["run"];
+      getThread.mockResolvedValue(snapshot([ask], waitingRun) as never);
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      const feed = vi.mocked(runThreadSubscription).mock.calls.at(-1)?.[0];
+      await feed?.refresh();
+    }
+
+    it.each([["Sí, hazlo."], ["yes please"], ["Vale"]])(
+      "allows it once on a clear yes (%s)",
+      async (said) => {
+        await waitingApproval();
+        await heard(said);
+        expect(answer).toHaveBeenCalledWith(
+          expect.objectContaining({ messageId: "ask-1", answer: "allow" }),
+        );
+      },
+    );
+
+    it("denies it on a clear no", async () => {
+      await waitingApproval();
+      await heard("No, mejor no.");
+      expect(answer).toHaveBeenCalledWith(expect.objectContaining({ answer: "deny" }));
+    });
+
+    it.each([["Always allow"], ["sí, pero antes dime a quién"], ["Gracias por ver el vídeo"]])(
+      "never answers with anything but a clear yes or no (%s)",
+      async (said) => {
+        await waitingApproval();
+        await heard(said);
+        expect(answer).not.toHaveBeenCalled();
+        expect(send).not.toHaveBeenCalled();
+        expect(followUp).not.toHaveBeenCalled();
+        expect(speak).toHaveBeenLastCalledWith(
+          expect.stringContaining("say yes to allow it once"),
+          expect.objectContaining({ botId: "call-bot" }),
+        );
+      },
+    );
+  });
+
+  describe("realtime voice", () => {
+    function controller() {
+      return { setMuted: vi.fn(), notify: vi.fn(), close: vi.fn() };
+    }
+
+    it("stays on the standard voice unless the person turned realtime on", async () => {
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      expect(connectRealtime).not.toHaveBeenCalled();
+      expect(listen).toHaveBeenCalled();
+    });
+
+    it("connects the realtime voice and keeps the turn-based pipeline quiet", async () => {
+      preferences.realtimeCalls = true;
+      const realtime = controller();
+      connectRealtime.mockResolvedValue(realtime);
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      await flushMicrotasks();
+
+      expect(connectRealtime).toHaveBeenCalledWith(
+        expect.objectContaining({ botId: "call-bot", micoName: "Ada", callId: expect.any(String) }),
+      );
+      expect(listen).not.toHaveBeenCalled();
+      const hooks = connectRealtime.mock.calls[0]?.[0].hooks;
+      hooks?.user("Hola");
+      hooks?.bot("¿Qué tal?");
+      hooks?.phase("speaking");
+      expect(getSnapshot()).toMatchObject({
+        phase: "speaking",
+        exchanges: [
+          { role: "user", text: "Hola" },
+          { role: "bot", text: "¿Qué tal?" },
+        ],
+      });
+
+      toggleMute();
+      expect(realtime.setMuted).toHaveBeenCalledWith(true);
+      expect(listen).not.toHaveBeenCalled();
+      endCall();
+      expect(realtime.close).toHaveBeenCalledOnce();
+    });
+
+    it("falls back to the standard voice and says why", async () => {
+      preferences.realtimeCalls = true;
+      connectRealtime.mockRejectedValue(
+        new Error("Realtime calls are not enabled on this server."),
+      );
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      await flushMicrotasks();
+
+      expect(listen).toHaveBeenCalled();
+      expect(getSnapshot()?.caption).toContain("not enabled");
+      expect(getSnapshot()?.caption).toContain("Continuing with standard voice.");
+    });
+
+    it("hangs up when the realtime line ends", async () => {
+      preferences.realtimeCalls = true;
+      connectRealtime.mockResolvedValue(controller());
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      await flushMicrotasks();
+      connectRealtime.mock.calls[0]?.[0].hooks.ended("hang_up");
+      expect(getSnapshot()).toBeNull();
+    });
+  });
+
+  describe("notices about other work", () => {
+    function finishedElsewhere(at: number) {
+      return {
+        runId: "other-run",
+        botId: "bot-2",
+        botName: "Bruno",
+        groupId: null,
+        groupName: null,
+        threadId: "other-thread",
+        status: "completed",
+        trigger: "user",
+        notificationsEnabled: true,
+        updatedAt: new Date(at).toISOString(),
+      };
+    }
+
+    it("mentions work that finished elsewhere once, in a quiet moment", async () => {
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      listRuns.mockImplementation(
+        async ({ filter }) =>
+          ({ runs: filter === "recent" ? [finishedElsewhere(Date.now() + 1)] : [] }) as never,
+      );
+      await vi.advanceTimersByTimeAsync(CALL_NOTICE_POLL_MS + 10);
+
+      expect(speak).toHaveBeenCalledWith(
+        "Bruno finished.",
+        expect.objectContaining({ botId: "call-bot" }),
+      );
+      speak.mockClear();
+      await vi.advanceTimersByTimeAsync(CALL_NOTICE_POLL_MS);
+      expect(speak).not.toHaveBeenCalled();
+    });
+
+    it("waits while the caller is mid-turn", async () => {
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      send.mockReturnValue(new Promise(() => undefined) as never);
+      await heard("book the flight");
+      listRuns.mockImplementation(
+        async ({ filter }) =>
+          ({ runs: filter === "recent" ? [finishedElsewhere(Date.now() + 1)] : [] }) as never,
+      );
+      await vi.advanceTimersByTimeAsync(CALL_NOTICE_POLL_MS + 10);
+      expect(speak).not.toHaveBeenCalledWith("Bruno finished.", expect.anything());
+    });
+
+    it("stops looking when the call ends", async () => {
+      await answeredCall({ botId: "call-bot", botName: "Ada", transcribe: false });
+      endCall();
+      listRuns.mockClear();
+      await vi.advanceTimersByTimeAsync(CALL_NOTICE_POLL_MS * 3);
+      expect(listRuns).not.toHaveBeenCalled();
+    });
   });
 
   it("drops a send that finishes after the same bot is called again", async () => {

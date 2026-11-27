@@ -16,6 +16,7 @@ import {
   voiceHttpError,
   persistVoiceCredential,
   synthesizeVoice,
+  transcribeVoice,
   toVoiceCredential,
   toVoiceStatus,
   updateVoiceSpeechModel,
@@ -460,6 +461,81 @@ describe("updateVoiceSpeechModel", () => {
       updateVoiceSpeechModel(deps, actor, { provider: "elevenlabs", speechModel: "s1" }),
     ).rejects.toThrow("Speech model applies to Fish Audio.");
     expect(account.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("transcribeVoice", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setup(text: string) {
+    const transcribe = vi.fn().mockResolvedValue({ text });
+    vi.spyOn(adapters, "createVoiceProvider").mockReturnValue({ transcribe } as never);
+    const findMany = vi.fn().mockResolvedValue([
+      { id: "bot-2", name: "Bruno" },
+      { id: "bot-1", name: "Ada" },
+    ]);
+    const prisma = {
+      bot: { findMany },
+      spaceSettingOverride: { findUnique: vi.fn().mockResolvedValue(null) },
+      userVoicePreference: {
+        findFirst: vi.fn().mockResolvedValue({
+          isDefault: true,
+          voiceId: "voice-1",
+          credential: {
+            id: "cred-1",
+            userId: actor.userId,
+            provider: "openai",
+            secretId: "secret-1",
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+          },
+        }),
+      },
+      secret: { findFirst: vi.fn().mockResolvedValue({ id: "secret-1", ciphertext: "cipher" }) },
+    };
+    const deps = {
+      prisma,
+      secrets: { load: vi.fn().mockReturnValue("openai-key"), put: vi.fn() },
+    } as unknown as VoiceDeps;
+    return { deps, transcribe, findMany };
+  }
+
+  it("hints the caller's own Mico names, the dictated Mico first", async () => {
+    const { deps, transcribe, findMany } = setup("Ask Bruno to help Ada");
+    const result = await transcribeVoice(deps, actor, {
+      audio: new Uint8Array([1]),
+      mimeType: "audio/webm",
+      botId: "bot-1",
+    });
+
+    expect(result).toEqual({ text: "Ask Bruno to help Ada" });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+      }),
+    );
+    expect(transcribe).toHaveBeenCalledWith(
+      expect.objectContaining({ vocabulary: ["Ada", "Bruno", "Mycellios", "Mico"] }),
+      expect.anything(),
+    );
+  });
+
+  it("returns nothing when the model only recites its hints", async () => {
+    const { deps } = setup("Ada, Bruno, Mycellios.");
+    await expect(
+      transcribeVoice(deps, actor, { audio: new Uint8Array([1]), mimeType: "audio/webm" }),
+    ).resolves.toEqual({ text: "" });
+  });
+
+  it("still transcribes when the names cannot be read", async () => {
+    const { deps, transcribe, findMany } = setup("hello");
+    findMany.mockRejectedValue(new Error("db down"));
+    await expect(
+      transcribeVoice(deps, actor, { audio: new Uint8Array([1]), mimeType: "audio/webm" }),
+    ).resolves.toEqual({ text: "hello" });
+    expect(transcribe.mock.calls[0]?.[0]).not.toHaveProperty("vocabulary");
   });
 });
 

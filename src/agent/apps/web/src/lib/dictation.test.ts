@@ -688,6 +688,101 @@ describe("Dictation recorder fallback", () => {
     vi.useRealTimers();
   });
 
+  it("drops an endpoint recording that never heard speech and keeps listening", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
+    class FakeAnalyser {
+      fftSize = 2048;
+      getByteTimeDomainData(data: Uint8Array) {
+        data.fill(128); // room tone below the speech threshold
+      }
+    }
+    class FakeContext {
+      state = "running";
+      createMediaStreamSource() { return { connect() {} }; }
+      createAnalyser() { return new FakeAnalyser(); }
+      close() { return Promise.resolve(); }
+      resume() { return Promise.resolve(); }
+    }
+    vi.stubGlobal("AudioContext", FakeContext);
+    const getUserMedia = vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] }));
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia }, language: "en-US" });
+    const fetchMock = vi.fn(async () => Response.json({ text: "Thanks for watching!" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const started = vi.fn();
+    vi.stubGlobal("MediaRecorder", class {
+      state = "inactive";
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() { started(); this.state = "recording"; }
+      stop() {
+        this.state = "inactive";
+        this.ondataavailable?.({ data: new Blob(["noise"], { type: "audio/webm" }) });
+        this.onstop?.();
+      }
+    });
+
+    const onFinal = vi.fn();
+    const dictation = new Dictation();
+    await dictation.listen({ mode: "endpoint", transcribe: true, onFinal });
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onFinal).not.toHaveBeenCalled();
+    expect(dictation.state.status).toBe("listening");
+    dictation.stop("cancel");
+    vi.useRealTimers();
+  });
+
+  it("keeps listening when an endpoint recording transcribes to nothing", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const level = { current: 0.6 };
+    class FakeAnalyser {
+      fftSize = 2048;
+      getByteTimeDomainData(data: Uint8Array) { data.fill(Math.round(128 + level.current * 127)); }
+    }
+    class FakeContext {
+      state = "running";
+      createMediaStreamSource() { return { connect() {} }; }
+      createAnalyser() { return new FakeAnalyser(); }
+      close() { return Promise.resolve(); }
+      resume() { return Promise.resolve(); }
+    }
+    vi.stubGlobal("AudioContext", FakeContext);
+    vi.stubGlobal("navigator", {
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
+      language: "en-US",
+    });
+    const fetchMock = vi.fn(async () => Response.json({ text: "" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const started = vi.fn();
+    vi.stubGlobal("MediaRecorder", class {
+      state = "inactive";
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() { started(); this.state = "recording"; }
+      stop() {
+        this.state = "inactive";
+        this.ondataavailable?.({ data: new Blob(["audio"], { type: "audio/webm" }) });
+        this.onstop?.();
+      }
+    });
+
+    const onFinal = vi.fn();
+    const dictation = new Dictation();
+    await dictation.listen({ mode: "endpoint", transcribe: true, endpointMs: 240, onFinal });
+    await vi.advanceTimersByTimeAsync(80);
+    level.current = 0;
+    await vi.advanceTimersByTimeAsync(400);
+    await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(onFinal).not.toHaveBeenCalled();
+    expect(dictation.state.status).toBe("listening");
+    dictation.stop("cancel");
+    vi.useRealTimers();
+  });
+
   it("does not let a replaced recorder tear down the new silence detector", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const level = { current: 0.6 };

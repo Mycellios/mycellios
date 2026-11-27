@@ -86,6 +86,7 @@ export class OpenAIVoiceProvider implements VoiceProvider {
   ): Promise<{ text: string }> {
     const form = new FormData();
     form.set("model", STT_MODEL);
+    if (request.vocabulary?.length) form.set("prompt", request.vocabulary.join(", "));
     form.set(
       "file",
       new Blob([new Uint8Array(request.audio)], { type: request.mimeType || "audio/webm" }),

@@ -172,6 +172,9 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
       {separateModels && modelRow("tts", "Supertonic 3", t`Reads replies aloud on this computer.`)}
       <SettingsRow label={<Label htmlFor={id}>{t`Read new replies aloud`}</Label>} description={t`Read new replies in the open chat on this device. Existing Mico voice preferences still apply.`}
         control={<Switch id={id} checked={value.readReplies} onCheckedChange={readReplies => save({ readReplies })} />} />
+      <SettingsRow label={<Label htmlFor={`${id}-realtime`}>{t`Realtime calls`}</Label>}
+        description={t`Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice.`}
+        control={<Switch id={`${id}-realtime`} checked={value.realtimeCalls} onCheckedChange={realtimeCalls => save({ realtimeCalls })} />} />
       <SettingsRow label={t`Voice`} control={<div className="flex min-w-0 items-center gap-2">
         <Button variant="ghost" size="sm" disabled={!canPreview} onClick={() => { if (previewRunning.current) stopPreview(); else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>
         {conversationOutput === "device" ? <OptionSelect aria-label={t`Device voice`} value={value.deviceVoice} className="w-36 max-w-full"
