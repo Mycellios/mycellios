@@ -7,8 +7,15 @@ import { DELEGATED_RESULT_FORMAT } from "./bot-messages.js";
  * own turns receive. Everything here is written for this product; nothing is copied.
  */
 
-/** Unfinished (working or queued) conversations a Mico may have opened itself at once. */
+/**
+ * Unfinished (working, queued or waiting on an approval or takeover) conversations a Mico may
+ * have opened itself at once. A conversation that only waits for the person to answer an
+ * ordinary question holds no slot: that question never expires, so it would otherwise block
+ * new work until the person answered.
+ */
 export const AGENT_TASK_UNFINISHED_LIMIT = 8;
+/** All open conversations a Mico opened itself, including those waiting on an ordinary question. */
+export const AGENT_TASK_OPEN_LIMIT = 32;
 export const AGENT_TASK_TITLE_MAX_CHARACTERS = 120;
 export const AGENT_TASK_TEXT_MAX_CHARACTERS = 100_000;
 export const TASK_REPORT_TEXT_MAX_CHARACTERS = 6_000;
@@ -24,6 +31,7 @@ export const AGENT_TASK_MESSAGE_INPUT_ERROR = "Write a message of 1 to 100,000 c
 export const AGENT_TASK_SURFACE_ERROR =
   "Tasks can be started, messaged or closed only from your own main chat or one of your routine conversations. Do this work here instead.";
 export const AGENT_TASK_LIMIT_ERROR = `You already have ${AGENT_TASK_UNFINISHED_LIMIT} tasks that have not finished. Start another when one of them ends, or do this work in this turn.`;
+export const AGENT_TASK_OPEN_LIMIT_ERROR = `You already have ${AGENT_TASK_OPEN_LIMIT} tasks open, several waiting for the person to answer a question. Start another when one of them ends, or do this work in this turn.`;
 export const AGENT_TASK_QUEUE_ERROR = "The task could not be started. Do the work in this turn instead.";
 export const AGENT_TASK_NOT_AVAILABLE_ERROR = "This task is not available.";
 export const AGENT_TASK_STILL_RUNNING_ERROR =

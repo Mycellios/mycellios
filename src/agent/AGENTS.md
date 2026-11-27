@@ -840,7 +840,9 @@
   Offer and accept them only in its own main chat and owned routine threads, refuse them
   elsewhere with an explanation, and refuse await_event in agent-started threads. At most 8
   unfinished agent-started conversations per Mico, counted under a per-Mico advisory lock:
-  no queueing, no automatic archive. The tool effect key names the thread, so retries replay.
+  no queueing, no automatic archive. One waiting only on an ordinary question
+  (currentMicoScriptQuestion) holds no slot, since that question never expires; at most 32
+  open in all, including those. The tool effect key names the thread, so retries replay.
   Turns run as agent_task through claimMicoRun (concurrency unchanged); message_task queues an
   agent_task steering row that is never claimed mid-turn. close_task stops through the
   work-stop outbox, archives within 15 s and sends no report. finalizeRun, stopThreadRuns and
