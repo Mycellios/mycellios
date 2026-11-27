@@ -30,6 +30,20 @@ describe("API access accounting", () => {
 
   afterEach(async () => (await database.close()));
 
+  it("reads an existing account without the serialized write transaction", async () => {
+    const transaction = database.transaction.bind(database);
+    let transactions = 0;
+    database.transaction = (async (operation: () => unknown) => {
+      transactions++;
+      return transaction(operation);
+    }) as typeof database.transaction;
+    const created = await access.getOrCreateAccount("user-1");
+    expect(transactions).toBe(1);
+    await expect(access.getOrCreateAccount("user-1")).resolves.toEqual(created);
+    await expect(access.getOrCreateAccount("user-1")).resolves.toEqual(created);
+    expect(transactions).toBe(1);
+  });
+
   it("creates hashed, revocable keys and only returns the full secret once", async () => {
     const created = (await access.createKey("user-1", "Production"));
     expect(created.secret).toMatch(/^myc_live_[A-Za-z0-9_-]{10}_[A-Za-z0-9_-]{43}$/);

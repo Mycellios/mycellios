@@ -186,6 +186,10 @@ export class ApiAccessManager {
   }
 
   async getOrCreateAccount(userId: string): Promise<ApiAccount> {
+    // Every authenticated request lands here. An existing account is a plain read:
+    // taking the serialized write transaction for it queued reads behind all writers.
+    const known = await this.accountRow(userId);
+    if (known) return accountFromRow(known);
     return (await this.database.transaction(async () => {
       const existing = (await this.accountRow(userId));
       if (existing) return accountFromRow(existing);
