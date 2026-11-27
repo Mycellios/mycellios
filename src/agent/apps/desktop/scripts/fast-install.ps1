@@ -16,6 +16,7 @@ $installationPath=[IO.Path]::GetFullPath($Installation).TrimEnd('\')
 $parent=[IO.Path]::GetDirectoryName($installationPath)
 $backupRoot=Join-Path $parent 'mycellios-desktop-upgrade-backups'
 $exeName='Mycellios Desktop.exe'
+$appRunning='Close Mycellios normally before updating'
 # Settled recovery copies (a committed update, or one already rolled back) only serve a manual
 # rollback. Keep the newest ones so each successful update does not leave another full copy of
 # the application (about 1.5-2 GB) behind.
@@ -39,7 +40,7 @@ function Assert-Installation {
 function Assert-Idle {
  $paths=@((Join-Path $installationPath $exeName))
  if($script:state -and $script:state.backup){$paths+=Join-Path $script:state.backup $exeName}
- if(@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -in $paths}).Count){throw 'Close Mycellios normally before updating'}
+ if(@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -in $paths}).Count){throw $appRunning}
 }
 function Save-State {
  $temporary=$Journal+'.tmp'
@@ -244,5 +245,7 @@ try {
   try{Restore-Previous}catch{}
  }
  Write-Error ('Desktop update was not applied: '+$failure) -ErrorAction Continue
+ # The installer asks the person to close Mycellios for this one instead of reporting a failed update.
+ if($failure -eq $appRunning){exit 3}
  exit 1
 }
