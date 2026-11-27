@@ -3,7 +3,10 @@
 // and the strip shows it. One panel per profile holds the connection through a Web Lock; the others
 // stand by. The server sends JSON operations only; this file never runs code it receives.
 import {
+  beginAction,
   describeAction,
+  endAction,
+  overlayVisible,
   performAction,
   preparePage,
   releasePage,
@@ -166,6 +169,136 @@ const cleanName = (name) =>
     .trim()
     .slice(0, 32) || "Mico";
 
+// Real input. With the optional `debugger` permission, clicks and typing go through Chrome's own
+// input pipeline (trusted events, like a person's), so sites that ignore synthetic events still
+// respond. Chrome shows its "started debugging this browser" bar while a tab is attached; tabs
+// are detached when the Mico's work ends. Without the permission, the synthetic path is used.
+const attached = new Set();
+
+let detachWatched = false;
+
+async function realInput(tabId) {
+  if (!chrome.debugger) return false;
+  if (!detachWatched) {
+    // The person can end debugging from Chrome's bar, or the tab can close.
+    chrome.debugger.onDetach?.addListener((source) => attached.delete(source.tabId));
+    detachWatched = true;
+  }
+  if (attached.has(tabId)) return true;
+  if (!(await chrome.permissions.contains({ permissions: ["debugger"] }).catch(() => false)))
+    return false;
+  try {
+    await chrome.debugger.attach({ tabId }, "1.3");
+    attached.add(tabId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function detach(tabId) {
+  if (!attached.delete(tabId)) return;
+  await chrome.debugger.detach({ tabId }).catch(() => {});
+}
+
+const cdp = (tabId, method, params = {}) => chrome.debugger.sendCommand({ tabId }, method, params);
+
+/** Named keys and their Windows key codes; one printable character is typed as itself. */
+const KEYS = {
+  Enter: [13, "\r"],
+  Tab: [9],
+  Escape: [27],
+  Backspace: [8],
+  Delete: [46],
+  ArrowUp: [38],
+  ArrowDown: [40],
+  ArrowLeft: [37],
+  ArrowRight: [39],
+  Home: [36],
+  End: [35],
+  PageUp: [33],
+  PageDown: [34],
+  Space: [32, " "],
+};
+
+/** One key press with optional modifiers ("Shift+Tab", "Control+A", "Enter", "."). */
+export async function pressKey(tabId, combo) {
+  const parts = String(combo).split("+");
+  // "+" itself, and combinations ending in it, keep the plus as the key.
+  const key = combo.endsWith("+") ? "+" : parts.pop() || "";
+  const mods = new Set(parts.map((part) => part.toLowerCase()));
+  const modifiers =
+    (mods.has("alt") ? 1 : 0) |
+    (mods.has("control") || mods.has("ctrl") ? 2 : 0) |
+    (mods.has("meta") ? 4 : 0) |
+    (mods.has("shift") ? 8 : 0);
+  const named = KEYS[key];
+  const printable = !named && key.length === 1;
+  const keyCode = named?.[0] ?? (printable ? key.toUpperCase().charCodeAt(0) : 0);
+  // With Control, Alt or Meta a character is a shortcut, not text.
+  const text = modifiers & 7 ? undefined : (named?.[1] ?? (printable ? key : undefined));
+  const base = {
+    key: key === "Space" ? " " : key,
+    code: named ? key : undefined,
+    windowsVirtualKeyCode: keyCode,
+    modifiers,
+  };
+  await cdp(tabId, "Input.dispatchKeyEvent", {
+    ...base,
+    type: text ? "keyDown" : "rawKeyDown",
+    ...(text ? { text } : {}),
+  });
+  await cdp(tabId, "Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+}
+
+/** Performs one prepared action with real input, then checks its effect in the page. */
+async function performReal(tabId, action) {
+  const [{ result: begun } = {}] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: beginAction,
+    args: [action],
+  });
+  if (!begun?.ok) return begun ?? { ok: false, note: "the page did not answer" };
+  try {
+    if (action.kind === "click") {
+      const at = { x: begun.x, y: begun.y };
+      await cdp(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", ...at });
+      await cdp(tabId, "Input.dispatchMouseEvent", {
+        type: "mousePressed",
+        ...at,
+        button: "left",
+        clickCount: 1,
+      });
+      await cdp(tabId, "Input.dispatchMouseEvent", {
+        type: "mouseReleased",
+        ...at,
+        button: "left",
+        clickCount: 1,
+      });
+    } else if (action.kind === "fill") {
+      // The field's text is selected, so this replaces it.
+      if (action.text) await cdp(tabId, "Input.insertText", { text: action.text });
+      else await pressKey(tabId, "Delete");
+    } else if (action.kind === "type") {
+      await pressKey(tabId, "Delete");
+      for (const char of String(action.text ?? "")) {
+        if (char === "\n") await pressKey(tabId, "Enter");
+        else await cdp(tabId, "Input.insertText", { text: char });
+      }
+    } else if (action.kind === "key") {
+      await pressKey(tabId, action.key);
+    }
+  } catch {
+    return { ok: false, note: "Chrome did not accept the input" };
+  }
+  const [{ result: ended } = {}] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: endAction,
+    args: [action, begun.before],
+  });
+  return ended ?? { ok: false, note: "the page did not answer" };
+}
+
 /** Ends the Mico's work in every tab: overlays go, the person's own tabs leave the group. */
 export async function releaseWorking() {
   clearTimeout(idleTimer);
@@ -178,9 +311,11 @@ export async function releaseWorking() {
       await chrome.scripting
         .executeScript({ target: { tabId: id }, func: releasePage })
         .catch(() => {});
+      await detach(id);
       if (!info.opened) await chrome.tabs.ungroup(id).catch(() => {});
     }),
   );
+  for (const id of [...attached]) await detach(id);
 }
 
 const keepWorking = () => {
@@ -438,11 +573,22 @@ export async function actTab(request, ui) {
       }
       let step;
       try {
-        [{ result: step } = {}] = await chrome.scripting.executeScript({
-          target: { tabId: id },
-          func: performAction,
-          args: [action],
-        });
+        // Clicks, typing and keys use real input when Chrome allows it; select and scroll do not need it.
+        const real =
+          (action.kind === "click" ||
+            action.kind === "fill" ||
+            action.kind === "type" ||
+            action.kind === "key") &&
+          (await realInput(id));
+        if (real) {
+          step = await performReal(id, action);
+        } else {
+          [{ result: step } = {}] = await chrome.scripting.executeScript({
+            target: { tabId: id },
+            func: performAction,
+            args: [action],
+          });
+        }
         step ??= { ok: false, note: "the page did not answer" };
       } catch {
         // A click or Enter that opens another page replaces this one, so it cannot answer: that
@@ -503,9 +649,81 @@ export async function actTab(request, ui) {
   }
 }
 
+/** A screenshot may carry at most this many base64 characters (about 1.8 MB of JPEG). */
+const SCREENSHOT_MAX = 2_400_000;
+
+/**
+ * A picture of one tab, for models that see images, taken without the Mico's overlay. Reading a
+ * site's pixels is reading the site, so it asks like a snapshot. With the debugger permission any
+ * tab can be captured, scaled to at most 1280 CSS pixels wide; without it only the visible tab of
+ * its window.
+ */
+export async function screenshotTab(handle, ask) {
+  const id = tabIdOf(handle);
+  const tab = Number.isSafeInteger(id) ? await chrome.tabs.get(id).catch(() => null) : null;
+  if (!tab || tab.incognito || !tab.url) return { error: "tab_gone" };
+  const access = await siteAccess(tab, ask);
+  if (access.error) return { error: access.error };
+  const { origin, origins, once } = access;
+  let hidden = false;
+  try {
+    let viewport;
+    try {
+      [{ result: viewport } = {}] = await chrome.scripting.executeScript({
+        target: { tabId: id },
+        func: overlayVisible,
+        args: [false],
+      });
+      hidden = true;
+    } catch {
+      return { error: "not_scriptable" };
+    }
+    const current = await chrome.tabs.get(id).catch(() => null);
+    if (!current?.url || refusedPage(current.url) || new URL(current.url).origin !== origin)
+      return { error: "tab_changed" };
+    let data;
+    const shoot = async (quality) => {
+      if (await realInput(id)) {
+        const width = Math.max(1, viewport?.width ?? 1280);
+        const height = Math.max(1, viewport?.height ?? 800);
+        const scale = Math.min(1, 1280 / width);
+        const shot = await cdp(id, "Page.captureScreenshot", {
+          format: "jpeg",
+          quality,
+          clip: { x: 0, y: 0, width, height, scale },
+        });
+        return shot?.data;
+      }
+      if (!current.active) return undefined;
+      const url = await chrome.tabs.captureVisibleTab(current.windowId, {
+        format: "jpeg",
+        quality,
+      });
+      return typeof url === "string" ? url.slice(url.indexOf(",") + 1) : undefined;
+    };
+    try {
+      data = await shoot(70);
+      if (data && data.length > SCREENSHOT_MAX) data = await shoot(40);
+    } catch {
+      data = undefined;
+    }
+    if (!data || data.length > SCREENSHOT_MAX) return { error: "not_capturable" };
+    return { screenshot: { mimeType: "image/jpeg", data } };
+  } finally {
+    if (hidden)
+      await chrome.scripting
+        .executeScript({ target: { tabId: id }, func: overlayVisible, args: [true] })
+        .catch(() => {});
+    if (once) await chrome.permissions.remove({ origins }).catch(() => {});
+    // Detaches the debugger again once the Mico stops working.
+    keepWorking();
+  }
+}
+
 async function run(request, ui) {
   if (request?.op === "list") return listTabs();
   if (request?.op === "snapshot") return snapshotTab(request.tab, ui.ask);
+  if (request?.op === "screenshot") return screenshotTab(request.tab, ui.ask);
   // Acting needs the person's separate switch, checked again now in case it was just turned off.
   if (
     (request?.op === "navigate" || request?.op === "act") &&

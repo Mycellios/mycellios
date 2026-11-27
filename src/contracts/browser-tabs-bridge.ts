@@ -44,6 +44,7 @@ export const BROWSER_MICO_NAME_MAX = 32;
 export type BrowserTabsRequest =
   | { op: "list" }
   | { op: "snapshot"; tab: string }
+  | { op: "screenshot"; tab: string }
   | { op: "navigate"; url: string; tab?: string; newTab?: true; mico: BrowserMico }
   | { op: "act"; tab: string; actions: BrowserAction[]; mico: BrowserMico };
 export interface BrowserTabsOperation { id: string; request: BrowserTabsRequest }
@@ -66,9 +67,16 @@ export interface BrowserActed {
   /** What the person decided for downloads that started while the actions ran. */
   downloads?: ("kept" | "cancelled")[];
 }
+/** A picture of a tab, taken without the Mico's overlay: JPEG, base64. */
+export interface BrowserScreenshot { mimeType: "image/jpeg"; data: string }
+/** The base64 characters a screenshot may carry (about 1.8 MB of JPEG). */
+export const BROWSER_TABS_SCREENSHOT_MAX = 2_400_000;
+/** The only body that may be larger than BROWSER_TABS_MAX_BYTES: a panel's result with a screenshot. */
+export const BROWSER_TABS_RESULT_MAX_BYTES = BROWSER_TABS_SCREENSHOT_MAX + 64 * 1_024;
 export type BrowserTabsResult =
   | { tabs: BrowserTab[]; omitted: number }
   | { page: BrowserPage }
+  | { screenshot: BrowserScreenshot }
   | { acted: BrowserActed }
   | { navigated: { tab: string; title: string; url: string } }
   | { error: BrowserTabsFailure };
@@ -83,6 +91,9 @@ export const BROWSER_TABS_FAILURES = [
   // payment or sign-in, an old ref, an unconfirmed effect) is reported per step, with the steps
   // that did run, never as an error that would hide them.
   "person_active", "tab_not_working",
+  // Screenshots: the tab could not be captured (without the debugger permission only the visible
+  // tab of a window can be, and only on sites the person allowed).
+  "not_capturable",
 ] as const;
 export type BrowserTabsFailure = (typeof BROWSER_TABS_FAILURES)[number];
 /** The page text a snapshot may carry, in characters. */
@@ -214,8 +225,18 @@ function parseTab(value: unknown): BrowserTab {
 export function parseBrowserTabsResult(value: unknown): { generation: string; id: string; result: BrowserTabsResult } {
   const input = object(value, ["generation", "id", "result"]);
   if (!uuid(input.generation) || !uuid(input.id)) throw new Error("Invalid browser tabs result");
-  const result = object(input.result, ["tabs", "omitted", "error", "page", "acted", "navigated"], "Invalid browser tabs result");
+  const result = object(input.result, ["tabs", "omitted", "error", "page", "acted", "navigated", "screenshot"], "Invalid browser tabs result");
   const ids = { generation: input.generation.toLowerCase(), id: input.id.toLowerCase() };
+  if (result.screenshot !== undefined) {
+    if (Object.keys(result).length !== 1) throw new Error("Invalid browser tabs result");
+    const shot = object(result.screenshot, ["mimeType", "data"], "Invalid browser screenshot");
+    if (shot.mimeType !== "image/jpeg" || typeof shot.data !== "string" || shot.data.length === 0 ||
+        shot.data.length > BROWSER_TABS_SCREENSHOT_MAX || !/^[A-Za-z0-9+/]+={0,2}$/.test(shot.data))
+      throw new Error("Invalid browser screenshot");
+    // The data must really be a JPEG: base64 of FF D8 FF.
+    if (!shot.data.startsWith("/9j/")) throw new Error("Invalid browser screenshot");
+    return { ...ids, result: { screenshot: { mimeType: "image/jpeg", data: shot.data } } };
+  }
   if (result.acted !== undefined) {
     if (Object.keys(result).length !== 1) throw new Error("Invalid browser tabs result");
     return { ...ids, result: { acted: parseActed(result.acted) } };
@@ -281,6 +302,7 @@ export function parseBrowserTabsRequest(value: unknown): BrowserTabsRequest {
   const input = object(value, ["op", "tab", "url", "newTab", "actions", "mico"], "Invalid browser tabs request");
   if (input.op === "list" && Object.keys(input).length === 1) return { op: "list" };
   if (input.op === "snapshot" && tabHandle(input.tab) && Object.keys(input).length === 2) return { op: "snapshot", tab: input.tab };
+  if (input.op === "screenshot" && tabHandle(input.tab) && Object.keys(input).length === 2) return { op: "screenshot", tab: input.tab };
   if (input.op === "navigate") {
     // An existing tab or a new one, never both and never neither.
     if (typeof input.url !== "string" || input.url.length > BROWSER_TABS_URL_MAX || input.actions !== undefined ||

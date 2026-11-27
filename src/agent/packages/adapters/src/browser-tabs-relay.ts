@@ -4,6 +4,7 @@ import type {
   BrowserAction,
   BrowserActed,
   BrowserMico,
+  BrowserScreenshot,
   BrowserTabsCapabilities,
   BrowserTabsOperation,
   BrowserTabsOwner,
@@ -29,7 +30,9 @@ const NAVIGATE_TIMEOUT_MS = 45_000;
 /** Acting may wait for several answers (a password, a payment, a download), each up to 75 s. */
 const ACT_TIMEOUT_MS = 240_000;
 const timeoutFor = (request: BrowserTabsRequest) =>
-  request.op === "act" ? ACT_TIMEOUT_MS : request.op === "navigate" ? NAVIGATE_TIMEOUT_MS : request.op === "snapshot" ? SNAPSHOT_TIMEOUT_MS : OPERATION_TIMEOUT_MS;
+  request.op === "act" ? ACT_TIMEOUT_MS : request.op === "navigate" ? NAVIGATE_TIMEOUT_MS : request.op === "snapshot" || request.op === "screenshot" ? SNAPSHOT_TIMEOUT_MS : OPERATION_TIMEOUT_MS;
+/** Reading a page's text or its pixels: both need the reading capability and the site question. */
+const reads = (request: BrowserTabsRequest) => request.op === "snapshot" || request.op === "screenshot";
 /** The tab an operation works on; a new tab and the list belong to none. */
 const tabOf = (request: BrowserTabsRequest) => (request.op === "list" ? undefined : request.tab);
 
@@ -184,7 +187,7 @@ export class BrowserTabsBroker {
 
   dispatch(owner: BrowserTabsOwner, request: BrowserTabsRequest, signal: AbortSignal, timeoutMs = timeoutFor(request)): Promise<BrowserTabsResult> {
     const registration = this.live(owner);
-    if (!registration || registration.capabilities.tabs !== 1 || (request.op === "snapshot" && registration.capabilities.read !== 1))
+    if (!registration || registration.capabilities.tabs !== 1 || (reads(request) && registration.capabilities.read !== 1))
       return Promise.reject(new BrowserTabsError("chrome_not_shared", NOT_SHARED));
     // Acting needs the person's separate switch in that browser.
     if ((request.op === "act" || request.op === "navigate") && registration.capabilities.act !== 1)
@@ -244,10 +247,12 @@ export type ChromeSnapshotResult =
   | { page: { title: string; url: string; text: string; truncated: boolean } }
   | { error: string; code: string };
 export type ChromeActResult = { acted: BrowserActed } | { error: string; code: string };
+export type ChromeScreenshotResult = { screenshot: BrowserScreenshot } | { error: string; code: string };
 export type ChromeNavigateResult = { navigated: { tab: string; title: string; url: string } } | { error: string; code: string };
 const FAILURE_TEXT: Record<string, string> = {
   tabs_permission_missing: "Chrome has not granted the tabs permission. Ask the person to turn Share tabs on again in the Mycellios side panel.",
-  declined: "The person declined reading this site. Do not ask to read it again in this turn unless they say so.",
+  declined: "The person declined. Do not ask for this site or page again in this turn unless they say so.",
+  not_capturable: "Chrome could not take a picture of this tab. Use chrome_snapshot to read it instead.",
   consent_timeout: "The person did not answer the question about reading this site in the Mycellios side panel. Ask them in the chat before trying again.",
   refused_site: "This site is never read in the person's Chrome (Mycellios itself, the Chrome Web Store or a password manager).",
   not_web_page: "Only http(s) pages can be read.",
@@ -321,6 +326,12 @@ export function browserTabsClient(url: string, key: string) {
     async snapshot(scope: BrowserTabsOwner, tab: string, signal: AbortSignal): Promise<ChromeSnapshotResult> {
       const result = await operation(scope, { op: "snapshot", tab }, signal, SNAPSHOT_TIMEOUT_MS);
       if ("page" in result) return { page: result.page };
+      if ("error" in result) return result;
+      return { error: "Unexpected answer from Chrome.", code: "unsupported" };
+    },
+    async screenshot(scope: BrowserTabsOwner, tab: string, signal: AbortSignal): Promise<ChromeScreenshotResult> {
+      const result = await operation(scope, { op: "screenshot", tab }, signal, SNAPSHOT_TIMEOUT_MS);
+      if ("screenshot" in result) return { screenshot: result.screenshot };
       if ("error" in result) return result;
       return { error: "Unexpected answer from Chrome.", code: "unsupported" };
     },

@@ -261,6 +261,7 @@ async function syncSharing() {
   } else if (!wanted && stopSharing) {
     const stop = stopSharing;
     stopSharing = null;
+    cancelQuestions();
     await stop();
   }
   if (!wanted) showShareState("off");
@@ -278,11 +279,22 @@ const consentButtons = ["once", "always", "deny"].map((choice) => [
 const CONSENT_ARM_MS = 500;
 const CONSENT_TIMEOUT_MS = 75_000;
 let consentQueue = Promise.resolve();
+// Stop sharing (or turning acting off) answers the open question and every queued one with "deny",
+// so nothing a Mico asked for keeps waiting once the person has stopped.
+let questionEpoch = 0;
+let closeQuestion = null;
+
+function cancelQuestions() {
+  questionEpoch += 1;
+  closeQuestion?.("deny");
+}
 
 function askSite({ site, origins }) {
+  const epoch = questionEpoch;
   const asked = consentQueue.then(
     () =>
       new Promise((resolve) => {
+        if (epoch !== questionEpoch) return resolve("deny");
         consentText.textContent = t("consentQuestion").replace("{site}", site);
         consent.hidden = false;
         for (const [, button] of consentButtons) button.disabled = true;
@@ -294,8 +306,10 @@ function askSite({ site, origins }) {
           clearTimeout(expire);
           consent.hidden = true;
           for (const [, button] of consentButtons) button.onclick = null;
+          if (closeQuestion === finish) closeQuestion = null;
           resolve(answer);
         };
+        closeQuestion = finish;
         const expire = setTimeout(() => finish("timeout"), CONSENT_TIMEOUT_MS);
         for (const [choice, button] of consentButtons) {
           button.onclick = () => {
@@ -332,9 +346,11 @@ const CONFIRM_QUESTION = {
 function confirmAction({ kind, site, label }) {
   const key = CONFIRM_QUESTION[kind];
   if (!key) return Promise.resolve("deny");
+  const epoch = questionEpoch;
   const asked = consentQueue.then(
     () =>
       new Promise((resolve) => {
+        if (epoch !== questionEpoch) return resolve("deny");
         confirmText.textContent = t(key).replace("{site}", site || "?");
         confirmLabel.textContent = label ? t("confirmPageText").replace("{text}", label) : "";
         confirmLabel.hidden = !label;
@@ -353,8 +369,10 @@ function confirmAction({ kind, site, label }) {
           confirmBox.hidden = true;
           confirmAllow.onclick = null;
           confirmDeny.onclick = null;
+          if (closeQuestion === finish) closeQuestion = null;
           resolve(answer);
         };
+        closeQuestion = finish;
         const expire = setTimeout(() => finish("timeout"), CONSENT_TIMEOUT_MS);
         confirmAllow.onclick = () => finish("allow");
         confirmDeny.onclick = () => finish("deny");
@@ -368,12 +386,15 @@ actToggle.addEventListener("click", async () => {
   if (actChosen()) {
     chooseAct(false);
     showActState(false);
+    cancelQuestions();
     await syncSharing();
     return;
   }
-  // Chrome's own prompt explains the downloads permission; it needs this click's user gesture.
+  // Chrome's own prompt explains both permissions and needs this click's user gesture: downloads
+  // (to hold one until the person decides) and debugger (real clicks and typing that sites accept,
+  // and screenshots of any shared tab). Chrome shows a bar while a Mico is attached to a tab.
   const granted = await chrome.permissions
-    .request({ permissions: ["downloads"] })
+    .request({ permissions: ["downloads", "debugger"] })
     .catch(() => false);
   if (!granted) return;
   chooseAct(true);
@@ -387,6 +408,7 @@ shareToggle.addEventListener("click", async () => {
     const stop = stopSharing;
     stopSharing = null;
     showShareState("off");
+    cancelQuestions();
     await stop?.({ revoke: true });
     return;
   }

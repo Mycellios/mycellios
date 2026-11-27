@@ -1892,9 +1892,15 @@
   joins its named tab group and shows the overlay, which is cosmetic. It yields to the
   person's own input, stops at the first declined, stale or unconfirmed step and reports
   unconfirmed effects as such. Keep operations out of the poll loop so a question
-  waiting for the person never lets the lease lapse. Verify chrome-act, chrome-mico,
-  browser-tabs-relay and executor-readonly-approval tests; a jsdom fixture does not
-  qualify a real Chrome session.
+  waiting for the person never lets the lease lapse. The same switch requests the optional
+  `debugger` permission: real input (trusted clicks, insertText, key events) and
+  `chrome_screenshot` (JPEG without the overlay, read rules, only results may exceed
+  64 KiB); the guard ignores the Mico's own input while acting, tabs are detached when
+  the work ends, and without the permission the synthetic path stays. Stop sharing and
+  turning acting off answer open questions with "deny". Verify chrome-act, chrome-mico,
+  browser-tabs-relay and executor-readonly-approval tests and
+  `node scripts/verify-browser-extension-real.mjs` (real Chromium, local fixtures); neither
+  qualifies a real Mico in a person's signed-in Chrome.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the

@@ -417,3 +417,36 @@ describe("acting in pages", () => {
       expect(sensitive.refusedPage(url)).toBe(browserTabsRefusedAddress(url));
   });
 });
+
+describe("screenshots", () => {
+  let broker: BrowserTabsBroker;
+  afterEach(() => broker?.close());
+  const id = "33333333-3333-4333-8333-333333333333";
+  const scope = { userId: "u", sessionKey: "a".repeat(64) };
+
+  it("needs the reading capability and shares the tab's single slot", async () => {
+    broker = new BrowserTabsBroker();
+    broker.register(owner, generation, { tabs: 1 });
+    await expect(broker.dispatch(owner, { op: "screenshot", tab: "t1" }, never)).rejects.toMatchObject({ code: "chrome_not_shared" });
+    broker.register(owner, generation, { tabs: 1, read: 1 });
+    const shot = broker.dispatch(owner, { op: "screenshot", tab: "t1" }, never);
+    await expect(broker.dispatch(owner, { op: "snapshot", tab: "t1" }, never)).rejects.toMatchObject({ code: "chrome_busy" });
+    const { operations } = await broker.waitPoll(owner, generation, never);
+    broker.result(owner, generation, operations[0]!.id, { screenshot: { mimeType: "image/jpeg", data: "/9j/AAAA" } });
+    await expect(shot).resolves.toEqual({ screenshot: { mimeType: "image/jpeg", data: "/9j/AAAA" } });
+  });
+
+  it("accepts only bounded JPEG data", () => {
+    expect(parseBrowserTabsDispatch({ scope, nonce: id, request: { op: "screenshot", tab: "t3" } }).request).toEqual({ op: "screenshot", tab: "t3" });
+    expect(parseBrowserTabsResult({ generation, id, result: { screenshot: { mimeType: "image/jpeg", data: "/9j/AAAA" } } }).result)
+      .toEqual({ screenshot: { mimeType: "image/jpeg", data: "/9j/AAAA" } });
+    for (const screenshot of [
+      { mimeType: "image/png", data: "iVBORw0KGgo=" },
+      { mimeType: "image/jpeg", data: "iVBORw0KGgo=" },
+      { mimeType: "image/jpeg", data: "/9j/<script>" },
+      { mimeType: "image/jpeg", data: `/9j/${"A".repeat(2_400_000)}` },
+      { mimeType: "image/jpeg", data: "/9j/AAAA", width: 10 },
+    ]) expect(() => parseBrowserTabsResult({ generation, id, result: { screenshot } })).toThrow();
+    expect(parseBrowserTabsResult({ generation, id, result: { error: "not_capturable" } }).result).toEqual({ error: "not_capturable" });
+  });
+});

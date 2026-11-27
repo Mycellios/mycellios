@@ -26,6 +26,7 @@ export const BUILTIN_TOOL_NAMES = [
   "pc_act",
   "chrome_tabs",
   "chrome_snapshot",
+  "chrome_screenshot",
   "chrome_navigate",
   "chrome_act",
   "browser_navigate",
