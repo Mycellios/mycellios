@@ -16,7 +16,13 @@
 
 !macro customHeader
   Var MycelliosPowerShell
+  ; "1" when the fixed installation folder has no app yet: a first install has
+  ; nothing to snapshot or restore, so it never depends on the PowerShell helper.
+  Var MycelliosFirstInstall
   Function MycelliosRollback
+    ${If} $MycelliosFirstInstall == "1"
+      Return
+    ${EndIf}
     SetOutPath $TEMP
     nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation rollback -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json"'
     Pop $0
@@ -29,40 +35,60 @@
 !macroend
 
 !macro customCheckAppRunning
-  !insertmacro MycelliosInitHelper
-  nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation check -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json"'
-  Pop $0
-  ${If} $0 != 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Cierra Mycellios desde su menú antes de actualizar. Se conservarán tus borradores y tareas." /SD IDOK
-    SetErrorLevel 2
-    Abort
+  ${If} $MycelliosFirstInstall != "1"
+    !insertmacro MycelliosInitHelper
+    nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation check -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json"'
+    Pop $0
+    ${If} $0 != 0
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Cierra Mycellios desde su menú antes de actualizar. Se conservarán tus borradores y tareas." /SD IDOK
+      SetErrorLevel 2
+      Abort
+    ${EndIf}
   ${EndIf}
 !macroend
 
 !macro customInit
-  !insertmacro MycelliosInitHelper
-  SetOutPath $TEMP
-  nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation prepare -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json" -Uninstaller "${UNINSTALL_FILENAME}" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -TargetVersion "${VERSION}"'
-  Pop $0
-  ${If} $0 != 0
-    Call MycelliosRollback
-    MessageBox MB_OK|MB_ICONEXCLAMATION "No se ha podido preparar una actualización recuperable. La instalación anterior se conserva." /SD IDOK
-    SetErrorLevel 2
-    Abort
+  StrCpy $MycelliosFirstInstall "0"
+  IfFileExists "$INSTDIR\Mycellios Desktop.exe" +2 0
+    StrCpy $MycelliosFirstInstall "1"
+  ${If} $MycelliosFirstInstall != "1"
+    !insertmacro MycelliosInitHelper
+    SetOutPath $TEMP
+    nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation prepare -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json" -Uninstaller "${UNINSTALL_FILENAME}" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -TargetVersion "${VERSION}"'
+    Pop $0
+    ; prepare runs before customCheckAppRunning, so an open app is reported here (exit code 3).
+    ${If} $0 == 3
+      Call MycelliosRollback
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Cierra Mycellios desde su menú antes de actualizar. Se conservarán tus borradores y tareas." /SD IDOK
+      SetErrorLevel 2
+      Abort
+    ${ElseIf} $0 != 0
+      Call MycelliosRollback
+      MessageBox MB_OK|MB_ICONEXCLAMATION "No se ha podido preparar una actualización recuperable. La instalación anterior se conserva." /SD IDOK
+      SetErrorLevel 2
+      Abort
+    ${EndIf}
   ${EndIf}
 !macroend
 
 !macro customInstall
-  nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation commit -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json"'
-  Pop $0
-  ${If} $0 != 0
-    Call MycelliosRollback
-    SetErrorLevel 2
-    Abort
+  ${If} $MycelliosFirstInstall != "1"
+    nsExec::ExecToLog '"$MycelliosPowerShell" -NoProfile -NonInteractive -File "$PLUGINSDIR\mycellios-fast-install.ps1" -Operation commit -Installation "$INSTDIR" -Journal "$PLUGINSDIR\mycellios-fast-install.json"'
+    Pop $0
+    ${If} $0 != 0
+      Call MycelliosRollback
+      SetErrorLevel 2
+      Abort
+    ${EndIf}
   ${EndIf}
   ; Shortcuts are now named "Mycellios"; remove the ones older versions created.
   Delete "$DESKTOP\Mycellios Desktop.lnk"
   Delete "$SMPROGRAMS\Mycellios Desktop.lnk"
+!macroend
+
+; The uninstaller always works on an existing installation.
+!macro customUnInit
+  StrCpy $MycelliosFirstInstall "0"
 !macroend
 
 !macro MycelliosCheckUninstall
