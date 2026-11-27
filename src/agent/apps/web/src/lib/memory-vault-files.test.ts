@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { safeFolderName, vaultExportFiles, vaultImportPlan } from "./memory-vault-files";
+import {
+  safeFolderName,
+  vaultExportFiles,
+  vaultImportPlan,
+  withoutVaultProperties,
+  withVaultProperties,
+} from "./memory-vault-files";
 
 const groups = [
   { key: "general", label: "General" },
@@ -67,5 +73,48 @@ describe("vault import", () => {
       "invalid_name",
       "invalid_name",
     ]);
+  });
+});
+
+describe("Obsidian properties", () => {
+  const properties = {
+    owner: 'Viajera "test"',
+    alwaysIncluded: true,
+    updated: "2026-11-27T10:00:00.000Z",
+    conversation: "Plan del viaje",
+  };
+
+  it("adds them on export and removes them on import", () => {
+    const exported = withVaultProperties("Kyoto in May. See [[profile]].", properties);
+    expect(exported).toBe(
+      [
+        "---",
+        "mycellios: memory",
+        'owner: "Viajera \\"test\\""',
+        "always_included: true",
+        "updated: 2026-11-27",
+        'conversation: "Plan del viaje"',
+        "---",
+        "Kyoto in May. See [[profile]].",
+      ].join("\n"),
+    );
+    expect(withoutVaultProperties(exported)).toBe("Kyoto in May. See [[profile]].");
+    const plan = vaultImportPlan(
+      [{ path: "Viajera/japan.md", content: exported }],
+      groups,
+      "general",
+      "C",
+    );
+    expect(plan.items[0]).toEqual({
+      group: "bot-a",
+      path: "japan.md",
+      content: "Kyoto in May. See [[profile]].",
+    });
+  });
+
+  it("keeps a note's own properties and never strips foreign ones", () => {
+    const own = "---\ntags: [trip]\n---\nText";
+    expect(withVaultProperties(own, properties)).toBe(own);
+    expect(withoutVaultProperties(own)).toBe(own);
   });
 });

@@ -38,6 +38,45 @@ export function vaultExportFiles(
   return files;
 }
 
+/** What an export writes as Obsidian properties at the top of each note. */
+export type VaultNoteProperties = {
+  owner: string;
+  alwaysIncluded: boolean;
+  updated: string;
+  conversation?: string | null;
+};
+
+const PROPERTIES_MARKER = "mycellios: memory";
+const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+
+/**
+ * The note as Obsidian reads it: properties for its group, inclusion, date and conversation,
+ * then the text unchanged. A note that already starts with its own properties keeps them
+ * alone, since Obsidian reads only the first block.
+ */
+export function withVaultProperties(content: string, properties: VaultNoteProperties): string {
+  if (FRONT_MATTER.test(content)) return content;
+  const lines = [
+    "---",
+    PROPERTIES_MARKER,
+    `owner: ${JSON.stringify(properties.owner)}`,
+    `always_included: ${properties.alwaysIncluded}`,
+    `updated: ${properties.updated.slice(0, 10)}`,
+    ...(properties.conversation ? [`conversation: ${JSON.stringify(properties.conversation)}`] : []),
+    "---",
+    "",
+  ];
+  return lines.join("\n") + content;
+}
+
+/** Removes the properties an export added, so a re-import keeps only the note's own text. */
+export function withoutVaultProperties(content: string): string {
+  const match = FRONT_MATTER.exec(content);
+  const marked = match?.[1]!.split(/\r?\n/).some((line) => line.trim() === PROPERTIES_MARKER);
+  if (!match || !marked) return content;
+  return content.slice(match[0].length);
+}
+
 export type ImportItem = { group: string; path: string; content: string };
 export type ImportSkip = {
   path: string;
@@ -80,7 +119,8 @@ export function vaultImportPlan(
       skipped.push({ path: file.path, reason: "conversation_note" });
       continue;
     }
-    if (file.content.length > IMPORT_MAX_CHARS) {
+    const content = withoutVaultProperties(file.content);
+    if (content.length > IMPORT_MAX_CHARS) {
       skipped.push({ path: file.path, reason: "too_large" });
       continue;
     }
@@ -91,7 +131,7 @@ export function vaultImportPlan(
       continue;
     }
     seen.add(key);
-    items.push({ group, path, content: file.content });
+    items.push({ group, path, content });
   }
   return { items, skipped };
 }
