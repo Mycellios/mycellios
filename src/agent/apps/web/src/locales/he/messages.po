@@ -7507,3 +7507,11 @@ msgstr "כוכב ב-GitHub עוזר ליותר אנשים למצוא את Mycell
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "לתת כוכב ב-GitHub"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "ההקשר מלא ב-{percent}%‏: {used} מתוך {total} טוקנים."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "ההקשר מלא ב-{percent}%‏: {used} מתוך {total} טוקנים. כשהוא מתמלא, הודעות ישנות מסוכמות אוטומטית."

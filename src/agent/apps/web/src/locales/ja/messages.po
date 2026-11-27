@@ -7508,3 +7508,11 @@ msgstr "GitHub でスターを付けると、より多くの人が Mycellios を
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "GitHub でスターを付ける"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "コンテキスト使用率 {percent}%：{total} トークン中 {used}。"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "コンテキスト使用率 {percent}%：{total} トークン中 {used}。いっぱいになると、古いメッセージは自動で要約されます。"

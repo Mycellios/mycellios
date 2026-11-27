@@ -7507,3 +7507,11 @@ msgstr "GitHub'daki bir yıldız daha fazla kişinin Mycellios'u bulmasına yard
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "GitHub'da yıldız ver"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "Bağlam %{percent} dolu: {total} tokenin {used} kadarı."
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "Bağlam %{percent} dolu: {total} tokenin {used} kadarı. Dolduğunda eski mesajlar otomatik olarak özetlenir."

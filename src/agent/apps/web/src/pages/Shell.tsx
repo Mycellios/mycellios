@@ -13,6 +13,8 @@ import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
 import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
 import { GitHubStarPrompt } from "../components/GitHubStarPrompt";
+import { ConversationContextMeter } from "../components/ConversationContextMeter";
+import { contextRefreshKey } from "../lib/conversation-context";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Archive, LayoutGrid } from "lucide-react";
@@ -4719,6 +4721,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         back to the main window. */}
     {!inGroup && active && desktopBridge()?.chatWindow ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
       {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
+      {!inGroup && active && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ConversationContextMeter key={`context:${activeSnapshot.threadId}`} rpc={rpc}
+        scope={JSON.stringify([userId, shellSpaceId])} botId={active.id} taskThreadId={taskScope?.taskThreadId}
+        refreshKey={contextRefreshKey(activeSnapshot.run)} /></span> : null}
       {pinTarget && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ChatSearchButton keyboardOnly key={`search:${activeSnapshot.threadId}`} rpc={rpc}
         scope={JSON.stringify([userId, shellSpaceId, pinTarget])} target={pinTarget} threadId={activeSnapshot.threadId} onJump={jumpToReplyMessage} /></span> : null}
       {(active || activeGroup) && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage}
