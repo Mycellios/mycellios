@@ -5,7 +5,8 @@ rail page (vault tree, note view/editor with `[[link]]` completion, backlinks,
 local and full graph, task notes, "Learned in"), "Memory in context" recall
 receipts with a count on each reply, and a simple form of section 6 (Markdown
 ZIP export and import). Sections 1, 2, 3 (server links) and 7 are not
-implemented; nothing delivered changes what a Mico receives.
+implemented. The only change to what a Mico receives is the linking guidance in
+the memory tool descriptions.
 
 Implementation notes for the delivered part:
 
@@ -27,9 +28,16 @@ Implementation notes for the delivered part:
 - "Learned in" lists up to 20 conversations from `MemoryRevision.sourceThreadId`
   (`memory.sources`), only the owner's live threads, and opens each one.
 - Export writes `<group>/<note path>` Markdown files into a ZIP in the browser
-  (no front matter, links unchanged). Import accepts `.md` files or such a ZIP
+  (links unchanged). Import accepts `.md` files or such a ZIP
   (500 files, 64,000 characters each), sends folders named like a group back to
   it, skips task notes and never overwrites: it uses `memory.create`.
+- Exported notes start with Obsidian properties (`mycellios: memory`, owner,
+  `always_included`, `updated`, `conversation`) unless the note has its own;
+  import removes only blocks carrying that marker.
+- The `remember` and `save_shared_memory` tool descriptions ask Micos to link
+  related notes as `[[note name]]` and to keep distinct topics in their own
+  note. This is the only delivered change to what a Mico receives: two sentences
+  in tool descriptions, no new calls.
 
 ## Goal
 

@@ -864,13 +864,16 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "remember",
     description:
-      "Append a stable fact to Mico memory, or use scope task for temporary decisions/status of this conversation. Existing memories remain. Use general memory only for facts explicitly intended for all Micos.",
+      "Append a stable fact to Mico memory, or use scope task for temporary decisions/status of this conversation. Existing memories remain. Use general memory only for facts explicitly intended for all Micos. When the fact relates to another saved note, link it as [[note name]].",
     inputSchema: {
       type: "object",
       properties: {
         scope: {type:"string",enum:["mico","task"],description:"Default mico; task stays in this conversation only."},
         content: { type: "string" },
-        path: { type: "string" },
+        path: {
+          type: "string",
+          description: "Note name, default MEMORY.md. Keep a distinct topic in its own note, for example people/ana.md.",
+        },
       },
       required: ["content"],
     },
@@ -878,7 +881,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "save_shared_memory",
     description:
-      "Save a Space shared memory document every bot reads. Replaces the full content, so include everything it should keep.",
+      "Save a Space shared memory document every bot reads. Replaces the full content, so include everything it should keep. Link related notes as [[note name]].",
     inputSchema: {
       type: "object",
       properties: {

@@ -72,6 +72,7 @@ import {
   vaultExportFiles,
   vaultImportPlan,
   vaultZip,
+  withVaultProperties,
 } from "../lib/memory-vault-files";
 import { fetchFresh, useSpaceQueries, writeSaved } from "../lib/query";
 import { useSpaceRpc } from "../lib/space-rpc";
@@ -375,7 +376,17 @@ export function MemoryWorkspace({
       const files = vaultExportFiles(
         [...byGroup.entries()].map(([key, groupNotes]) => ({
           label: groupLabel(key),
-          notes: groupNotes.map((note) => ({ path: displayPath(note), content: note.content })),
+          notes: groupNotes.map((note) => ({
+            path: displayPath(note),
+            content: withVaultProperties(note.content, {
+              owner: groupLabel(key),
+              alwaysIncluded: note.inclusion === "essential",
+              updated: note.updatedAt,
+              conversation: note.taskThreadId
+                ? note.taskThreadTitle?.trim() || untitledConversation
+                : null,
+            }),
+          })),
         })),
       );
       const date = new Date().toISOString().slice(0, 10);
