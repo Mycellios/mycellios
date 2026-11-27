@@ -964,7 +964,11 @@
   (desktop-model-batch.ts, bounded by bytes, never by a small event count); open()
   returns the first batch when the PC asks with firstBatch, and both sides keep
   working with peers that do not. Checkpoints go without awaiting the reply; the
-  tool call follows on the same ordered stream. The Desktop relay sends every
+  tool call follows on the same ordered stream. Worker callbacks marked with
+  DesktopAgentRpc.notify (onCheckpoint, onToolCompleted) travel one-way, with no reply
+  operation, when the PC understands `mode: "notify"`; a failed checkpoint still fails
+  the run, and older peers keep their replies. A model stream that reached done is not
+  cancelled (specs/desktop-agent-channel/spec.md). The Desktop relay sends every
   complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
   with the stream end joined to the last lines, and the API rechecks all of a PC's
   bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,

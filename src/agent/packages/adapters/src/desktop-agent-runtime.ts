@@ -226,7 +226,13 @@ export class DesktopAgentRuntime implements AgentRuntime {
       model: nativeEngine ? request.model : desktopModelAccess(request.model, signal, cleanup, accounting),
       ...(request.resolveModel ? { resolveModel: async (provider: string, id: string) => nativeEngine ? request.resolveModel!(provider, id) : desktopModelAccess(await request.resolveModel!(provider, id), signal, cleanup, accounting) } : {}),
       ...(request.resolveFallbackModel ? { resolveFallbackModel: async (provider: string, id: string, connection?: string) => nativeEngine ? request.resolveFallbackModel!(provider, id, connection) : desktopModelAccess(await request.resolveFallbackModel!(provider, id, connection), signal, cleanup, accounting) } : {}),
-      ...(capture ? { onCheckpoint: (blob: string, id: string) => capture(() => blob, id) } : {}),
+      // Both are fire-and-forget on the PC, so a Desktop that understands notifications sends
+      // them one-way: no reply operation crosses the relay for them. A checkpoint that fails to
+      // save still fails this run through accept(); a tool-completion audit stays best effort.
+      ...(capture ? { onCheckpoint: rpc.notify((blob: string, id: string) => capture(() => blob, id)) } : {}),
+      ...(input.onToolCompleted ? { onToolCompleted: rpc.notify(async (completion: Parameters<NonNullable<AgentRunRequest["onToolCompleted"]>>[0]) => {
+        await Promise.resolve(input.onToolCompleted?.(completion)).catch(() => undefined);
+      }) } : {}),
       // Given steeringPending, the engine hands every tool call an AbortSignal, which the
       // bridge cannot carry: each tool failed. The server watches for steering instead.
       steeringPending: undefined,

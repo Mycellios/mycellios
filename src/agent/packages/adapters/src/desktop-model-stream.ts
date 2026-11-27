@@ -40,7 +40,10 @@ export function desktopModelCatalog(base: Models, config: AgentRunModel): Models
     if (key === "streamSimple") return (_model: Model<Api>, context: Context, options?: ModelsSimpleStreamOptions) => {
       const output = new AssistantMessageEventStream();
       let remote: Awaited<ReturnType<typeof transport.open>> | undefined;
-      const abort = () => { void remote?.cancel().catch(() => undefined); };
+      // The cloud releases a stream that reached its end by itself; cancelling it
+      // afterwards only cost one more relay round trip per model call.
+      let completed = false;
+      const abort = () => { if (!completed) void remote?.cancel().catch(() => undefined); };
       options?.signal?.addEventListener("abort", abort, { once: true });
       void (async () => {
         try {
@@ -58,12 +61,15 @@ export function desktopModelCatalog(base: Models, config: AgentRunModel): Models
             const batch = first ?? await remote.read(); options?.signal?.throwIfAborted();
             first = undefined;
             for (const event of batch.events) output.push(event as Parameters<typeof output.push>[0]);
-            if (batch.done) { output.end(batch.result as AssistantMessage); break; }
+            if (batch.done) { completed = true; output.end(batch.result as AssistantMessage); break; }
           }
         } catch {
           const failure: AssistantMessage = { role: "assistant", api: model.api, provider: model.provider, model: model.id, content: [], timestamp: Date.now(), stopReason: options?.signal?.aborted ? "aborted" : "error", errorMessage: "The account model stream was interrupted. Check existing results before retrying.", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
           output.push({ type: "error", reason: failure.stopReason as "error" | "aborted", error: failure }); output.end(failure);
-        } finally { options?.signal?.removeEventListener("abort", abort); await remote?.cancel().catch(() => undefined); }
+        } finally {
+          options?.signal?.removeEventListener("abort", abort);
+          if (!completed) await remote?.cancel().catch(() => undefined);
+        }
       })();
       return output;
     };
