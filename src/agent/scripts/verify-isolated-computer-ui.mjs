@@ -64,14 +64,14 @@ try {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + "?lang=es");
-  await expect(page.getByRole("button", { name: "Servidor, solo este Mico", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "En la nube", exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   const lightBackground = await page.locator("main").evaluate(element => getComputedStyle(element).backgroundColor);
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-es.png"), animations: "disabled" });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });
   await expect(page.locator("main")).not.toHaveCSS("background-color", lightBackground);
   const darkForeground = await page.locator("main").evaluate(element => getComputedStyle(element).color);
-  await expect(page.getByRole("button", { name: "Servidor, solo este Mico", exact: true })).toHaveCSS("color", darkForeground);
+  await expect(page.getByRole("button", { name: "En la nube", exact: true })).toHaveCSS("color", darkForeground);
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-dark.png"), animations: "disabled" });
   await page.goto(base);
   await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
