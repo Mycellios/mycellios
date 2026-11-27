@@ -8,7 +8,12 @@ type Options = { id: string; position?: string; duration?: number; action?: { la
 const mocks = vi.hoisted(() => ({
   data: undefined as unknown,
   queryOptions: [] as Array<Record<string, unknown>>,
-  toast: Object.assign(vi.fn(), { dismiss: vi.fn(), error: vi.fn() }),
+  // Like sonner, a programmatic dismiss also reports onDismiss for a toast on screen.
+  open: new Map<string, { onDismiss?: () => void }>(),
+  toast: Object.assign(vi.fn((_title: string, options: { id: string; onDismiss?: () => void }) => { mocks.open.set(options.id, options); }), {
+    dismiss: vi.fn((id: string) => { const options = mocks.open.get(id); mocks.open.delete(id); options?.onDismiss?.(); }),
+    error: vi.fn(),
+  }),
   install: vi.fn(),
   refetch: vi.fn(),
 }));
@@ -32,7 +37,7 @@ const lastCall = () => mocks.toast.mock.calls.at(-1) as [string, Options];
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  mocks.toast.mockClear(); mocks.toast.dismiss.mockClear(); mocks.install.mockReset().mockResolvedValue({ status: "installing" });
+  mocks.toast.mockClear(); mocks.toast.dismiss.mockClear(); mocks.open.clear(); mocks.install.mockReset().mockResolvedValue({ status: "installing" });
   mocks.queryOptions.length = 0; mocks.data = { computer: "desktop", engines: ["claude"], updates: [release], installing: [] };
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
@@ -65,7 +70,7 @@ it("updates the same notice with progress, then says it finished and closes by i
 
 it("does not offer again a version the person closed", () => {
   render(bot());
-  act(() => lastCall()[1].onDismiss!());
+  act(() => { mocks.open.delete("engine-update-claude"); lastCall()[1].onDismiss!(); });
   mocks.toast.mockClear();
   mocks.data = { ...(mocks.data as object) };
   render(bot());
