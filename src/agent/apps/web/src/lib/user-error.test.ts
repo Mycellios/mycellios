@@ -56,3 +56,9 @@ describe("authErrorText", () => {
     );
   });
 });
+
+it("explains a coordinator restart in the person's words instead of the raw credits message", () => {
+  expect(errorText(new Error("Mycellios credits are temporarily unavailable. Your balance has not been changed."))).toBe(
+    "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly.",
+  );
+});

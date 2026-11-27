@@ -114,4 +114,20 @@ describe("Mycellios models cache", () => {
     await expect(read(other, empty)).resolves.toEqual([]);
     await expect(read(other, empty)).resolves.toEqual(["ready"]);
   });
+
+  it("keeps the owner's last good catalog while the coordinator is restarting, and only for that owner", async () => {
+    let time = 0;
+    const read = createMycelliosModelsCache<string[]>({ now: () => time, staleMs: 1_000_000 });
+    await expect(read(owner, async () => ["a"])).resolves.toEqual(["a"]);
+    time += 60_001;
+    const down = vi.fn().mockRejectedValue(new Error("HTTP 502"));
+    await expect(read(owner, down)).resolves.toEqual(["a"]);
+    // Another owner never receives it.
+    await expect(read({ ...owner, userId: "user-b" }, down)).rejects.toThrow("HTTP 502");
+    // A recovered read replaces it, and a copy older than the window is not served.
+    time += 60_001;
+    await expect(read(owner, async () => ["b"])).resolves.toEqual(["b"]);
+    time += 1_000_001;
+    await expect(read(owner, down)).rejects.toThrow("HTTP 502");
+  });
 });

@@ -16162,3 +16162,9 @@ msgstr "Informe de diagnóstico copiado. Pégalo en tu mensaje a soporte."
 #: src/components/HelpMenu.tsx
 msgid "Could not copy the diagnostic report."
 msgstr "No se pudo copiar el informe de diagnóstico."
+
+msgid "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
+msgstr "Mycellios no responde ahora mismo; suele pasar un minuto mientras se actualiza. No se ha cambiado nada. Vuelve a intentarlo en un momento."
+
+msgid "Mycellios models are not available right now. Try again shortly."
+msgstr "Los modelos de Mycellios no están disponibles ahora mismo. Vuelve a intentarlo en un momento."
