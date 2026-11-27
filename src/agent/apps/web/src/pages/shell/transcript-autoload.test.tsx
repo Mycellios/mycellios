@@ -46,7 +46,11 @@ function renderTranscript(props: Partial<ComponentProps<typeof Transcript>>) {
   const scroller = host.querySelector<HTMLDivElement>('[data-testid="transcript"]')!;
   Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 2_000 });
   Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 600 });
-  return { host, scroller };
+  const rerender = async (next: Partial<ComponentProps<typeof Transcript>>) => {
+    Object.assign(all, next);
+    await act(async () => root!.render(<Transcript {...all} />));
+  };
+  return { host, scroller, rerender };
 }
 
 function scrollTo(scroller: HTMLDivElement, top: number) {
@@ -77,6 +81,26 @@ describe("conversation transcript", () => {
     expect(onLoadOlder).toHaveBeenCalledOnce();
     await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Load earlier messages"]')!.click());
     expect(onLoadOlder).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps reading older pages while a short transcript cannot scroll, four at most", async () => {
+    const onLoadOlder = vi.fn(async () => undefined);
+    const { scroller, rerender } = renderTranscript({ onLoadOlder });
+    expect(onLoadOlder).not.toHaveBeenCalled();
+    // Folded routine runs fill less than the window: nothing can scroll.
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 400 });
+    for (let cursor = 4; cursor >= -2; cursor--) await rerender({ olderCursor: cursor });
+    expect(onLoadOlder).toHaveBeenCalledTimes(4);
+  });
+
+  it("stops filling once the transcript can scroll", async () => {
+    const onLoadOlder = vi.fn(async () => undefined);
+    const { scroller, rerender } = renderTranscript({ onLoadOlder });
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 400 });
+    await rerender({ olderCursor: 4 });
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 3_000 });
+    await rerender({ olderCursor: 3 });
+    expect(onLoadOlder).toHaveBeenCalledOnce();
   });
 
   it("never loads when nothing older exists", () => {

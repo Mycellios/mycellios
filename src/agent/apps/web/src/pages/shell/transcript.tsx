@@ -63,6 +63,8 @@ import type { PendingThreadSend } from "../../lib/pending-thread-sends";
 const NO_PENDING_SENDS: readonly PendingThreadSend[] = [];
 /** How close to the top a scroll starts loading older messages. */
 const TRANSCRIPT_AUTOLOAD_TOP_PX = 240;
+/** Older pages read by themselves while a short transcript cannot scroll yet. */
+const TRANSCRIPT_FILL_PAGES = 4;
 
 /** A message the person sent that the server has not shown back yet. */
 function PendingSendRow({ message }: { message: Pick<PendingThreadSend, "text" | "attachments" | "messageId"> }) {
@@ -560,6 +562,32 @@ export const Transcript = memo(function Transcript({
       throw error;
     });
   }, [onLoadOlder, scrollRef]);
+
+  // A page made mostly of folded rows (routine runs, Mico exchanges) can be shorter than the
+  // window. Nothing scrolls then, so the scroll trigger above never fires and the person had
+  // to press "Load earlier messages" page after page. Keep reading older pages until the
+  // transcript overflows, a few pages at most per conversation visit.
+  const fillPages = useRef(0);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element || olderCursor == null || loadingOlder || !autoLoadOlder.current || jumpScrolling.current) return;
+    if (fillPages.current >= TRANSCRIPT_FILL_PAGES) return;
+    // A hidden or not yet laid out view has no height to fill.
+    if (element.clientHeight <= 0 || element.scrollHeight > element.clientHeight + TRANSCRIPT_AUTOLOAD_TOP_PX) return;
+    fillPages.current += 1;
+    // These pages are read for the person, not by their scrolling: a transcript that was
+    // following new replies keeps following them once the older page is in place.
+    const wasFollowing = following.current;
+    const pending = loadOlder();
+    if (!pending) return;
+    pending.then(() => window.requestAnimationFrame(() => {
+      const current = scrollRef.current;
+      if (wasFollowing && current && transcriptIsNearEnd(current)) {
+        following.current = true;
+        setAtEnd(true);
+      }
+    }), () => { autoLoadOlder.current = false; });
+  }, [olderCursor, loadingOlder, loadOlder, scrollRef, shownMessages.length]);
 
   useEffect(
     () => () => {
