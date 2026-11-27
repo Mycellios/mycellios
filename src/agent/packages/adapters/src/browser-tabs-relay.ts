@@ -1,6 +1,9 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { getLogger } from "@mycellios/logging";
 import type {
+  BrowserAction,
+  BrowserActed,
+  BrowserMico,
   BrowserTabsCapabilities,
   BrowserTabsOperation,
   BrowserTabsOwner,
@@ -22,8 +25,15 @@ const MAX_OPERATIONS = 4;
 const OPERATION_TIMEOUT_MS = 20_000;
 /** Reading a page may wait for the person to answer the site question in the panel. */
 const SNAPSHOT_TIMEOUT_MS = 90_000;
+const NAVIGATE_TIMEOUT_MS = 45_000;
+/** Acting may wait for several answers (a password, a payment, a download), each up to 75 s. */
+const ACT_TIMEOUT_MS = 240_000;
+const timeoutFor = (request: BrowserTabsRequest) =>
+  request.op === "act" ? ACT_TIMEOUT_MS : request.op === "navigate" ? NAVIGATE_TIMEOUT_MS : request.op === "snapshot" ? SNAPSHOT_TIMEOUT_MS : OPERATION_TIMEOUT_MS;
+/** The tab an operation works on; a new tab and the list belong to none. */
+const tabOf = (request: BrowserTabsRequest) => (request.op === "list" ? undefined : request.tab);
 
-export type BrowserTabsErrorCode = "chrome_not_shared" | "chrome_busy" | "chrome_uncertain";
+export type BrowserTabsErrorCode = "chrome_not_shared" | "chrome_busy" | "chrome_uncertain" | "chrome_act_off";
 export class BrowserTabsError extends Error {
   constructor(readonly code: BrowserTabsErrorCode, message: string, readonly status: 409 | 429 = 409) {
     super(message);
@@ -32,6 +42,7 @@ export class BrowserTabsError extends Error {
 }
 const NOT_SHARED = "Chrome is not sharing tabs with this conversation. Ask the person to open the Mycellios side panel in Chrome and turn on Share tabs.";
 const UNCERTAIN = "The Chrome connection changed while this request was in progress. Check before retrying.";
+const ACT_OFF = "The person has not allowed Micos to click and type in this Chrome. Ask them to turn on \"Let Micos click and type\" in the Mycellios side panel, or to do this step themselves.";
 
 type Operation = {
   id: string;
@@ -171,13 +182,17 @@ export class BrowserTabsBroker {
     if (registration) this.drop(registration, "revoked");
   }
 
-  dispatch(owner: BrowserTabsOwner, request: BrowserTabsRequest, signal: AbortSignal, timeoutMs = request.op === "snapshot" ? SNAPSHOT_TIMEOUT_MS : OPERATION_TIMEOUT_MS): Promise<BrowserTabsResult> {
+  dispatch(owner: BrowserTabsOwner, request: BrowserTabsRequest, signal: AbortSignal, timeoutMs = timeoutFor(request)): Promise<BrowserTabsResult> {
     const registration = this.live(owner);
     if (!registration || registration.capabilities.tabs !== 1 || (request.op === "snapshot" && registration.capabilities.read !== 1))
       return Promise.reject(new BrowserTabsError("chrome_not_shared", NOT_SHARED));
-    // One operation per tab: a second read of the same tab waits for the person's first answer.
-    if (request.op === "snapshot" && [...registration.operations.values()].some(item => item.request.op === "snapshot" && item.request.tab === request.tab))
-      return Promise.reject(new BrowserTabsError("chrome_busy", "This tab is already being read. Wait for that result.", 429));
+    // Acting needs the person's separate switch in that browser.
+    if ((request.op === "act" || request.op === "navigate") && registration.capabilities.act !== 1)
+      return Promise.reject(new BrowserTabsError("chrome_act_off", ACT_OFF));
+    // One operation per tab: a second one on the same tab waits for the first (and for the person's answer).
+    const tab = tabOf(request);
+    if (tab !== undefined && [...registration.operations.values()].some(item => tabOf(item.request) === tab))
+      return Promise.reject(new BrowserTabsError("chrome_busy", "This tab is already busy. Wait for that result.", 429));
     if (registration.operations.size >= MAX_OPERATIONS)
       return Promise.reject(new BrowserTabsError("chrome_busy", "Chrome is busy with other requests. Try again in a moment.", 429));
     return new Promise<BrowserTabsResult>((resolve, reject) => {
@@ -228,6 +243,8 @@ export type ChromeTabsListResult =
 export type ChromeSnapshotResult =
   | { page: { title: string; url: string; text: string; truncated: boolean } }
   | { error: string; code: string };
+export type ChromeActResult = { acted: BrowserActed } | { error: string; code: string };
+export type ChromeNavigateResult = { navigated: { tab: string; title: string; url: string } } | { error: string; code: string };
 const FAILURE_TEXT: Record<string, string> = {
   tabs_permission_missing: "Chrome has not granted the tabs permission. Ask the person to turn Share tabs on again in the Mycellios side panel.",
   declined: "The person declined reading this site. Do not ask to read it again in this turn unless they say so.",
@@ -237,6 +254,8 @@ const FAILURE_TEXT: Record<string, string> = {
   tab_gone: "That tab is closed or not shared. Call chrome_tabs again.",
   tab_changed: "The tab moved to another site while the person answered. Call chrome_tabs again.",
   not_scriptable: "Chrome did not let the extension read this page.",
+  person_active: "The person is using this tab right now. Wait a moment, or ask them in the chat, before acting again.",
+  tab_not_working: "chrome_navigate with tab works only in a tab you already work in (opened with new_tab, or used with chrome_act). Open the page with new_tab true instead.",
   unsupported: "The Mycellios extension in that Chrome cannot do this yet. Ask the person to update it.",
 };
 
@@ -269,19 +288,35 @@ export function browserTabsClient(url: string, key: string) {
     return result;
   };
   return {
-    /** Whether that browser shares tabs now, and can read pages. No answer counts as not sharing. */
-    async available(scope: BrowserTabsOwner, signal: AbortSignal): Promise<{ tabs: boolean; read: boolean }> {
+    /** Whether that browser shares tabs now, can read pages and may act. No answer counts as not sharing. */
+    async available(scope: BrowserTabsOwner, signal: AbortSignal): Promise<{ tabs: boolean; read: boolean; act: boolean }> {
       try {
         const response = await post({ scope, probe: "tabs" }, AbortSignal.any([signal, AbortSignal.timeout(1_500)]));
         if (!response.ok) {
           await response.body?.cancel();
-          return { tabs: false, read: false };
+          return { tabs: false, read: false, act: false };
         }
-        const value = (await response.json()) as { available?: unknown; read?: unknown };
-        return { tabs: value.available === true, read: value.available === true && value.read === true };
+        const value = (await response.json()) as { available?: unknown; read?: unknown; act?: unknown };
+        const tabs = value.available === true;
+        const read = tabs && value.read === true;
+        return { tabs, read, act: read && value.act === true };
       } catch {
-        return { tabs: false, read: false };
+        return { tabs: false, read: false, act: false };
       }
+    },
+    async navigate(scope: BrowserTabsOwner, args: { url: string; tab?: string; newTab?: true; mico: BrowserMico }, signal: AbortSignal): Promise<ChromeNavigateResult> {
+      const request: BrowserTabsRequest = { op: "navigate", ...args };
+      const result = await operation(scope, request, signal, timeoutFor(request));
+      if ("navigated" in result) return { navigated: result.navigated };
+      if ("error" in result) return result;
+      return { error: "Unexpected answer from Chrome.", code: "unsupported" };
+    },
+    async act(scope: BrowserTabsOwner, args: { tab: string; actions: BrowserAction[]; mico: BrowserMico }, signal: AbortSignal): Promise<ChromeActResult> {
+      const request: BrowserTabsRequest = { op: "act", ...args };
+      const result = await operation(scope, request, signal, timeoutFor(request));
+      if ("acted" in result) return { acted: result.acted };
+      if ("error" in result) return result;
+      return { error: "Unexpected answer from Chrome.", code: "unsupported" };
     },
     async snapshot(scope: BrowserTabsOwner, tab: string, signal: AbortSignal): Promise<ChromeSnapshotResult> {
       const result = await operation(scope, { op: "snapshot", tab }, signal, SNAPSHOT_TIMEOUT_MS);

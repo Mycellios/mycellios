@@ -55,10 +55,14 @@ describe("browser tabs routes", () => {
     const relay = setup();
     stop = relay.stop;
     const scope = { userId: "user-1", sessionKey: browserSessionKey("session-1") };
-    expect(await (await relay.worker({ scope, probe: "tabs" })).json()).toEqual({ available: false, read: false });
+    expect(await (await relay.worker({ scope, probe: "tabs" })).json()).toEqual({ available: false, read: false, act: false });
     await relay.panel("register", { generation, capabilities: { tabs: 1 } });
-    expect(await (await relay.worker({ scope, probe: "tabs" })).json()).toEqual({ available: true, read: false });
-    expect(await (await relay.worker({ scope: { ...scope, sessionKey: browserSessionKey("phone") }, probe: "tabs" })).json()).toEqual({ available: false, read: false });
+    expect(await (await relay.worker({ scope, probe: "tabs" })).json()).toEqual({ available: true, read: false, act: false });
+    expect(await (await relay.worker({ scope: { ...scope, sessionKey: browserSessionKey("phone") }, probe: "tabs" })).json()).toEqual({ available: false, read: false, act: false });
+    // Acting is advertised only by a panel whose person turned on their own switch.
+    await relay.panel("register", { generation, capabilities: { tabs: 1, read: 1, act: 1 } });
+    expect(await (await relay.worker({ scope, probe: "tabs" })).json()).toEqual({ available: true, read: true, act: true });
+    await relay.panel("register", { generation, capabilities: { tabs: 1 } });
 
     const listing = relay.worker({ scope, request: { op: "list" } });
     const poll = await (await relay.panel("poll", { generation, wait: true })).json() as { operations: { id: string }[] };

@@ -24,9 +24,35 @@
   "shareTabsStandby": { "message": "Sharing from another window" },
   "shareTabsSignedOut": { "message": "Sign in to share tabs" },
   "shareTabsOffline": { "message": "Reconnecting…" },
-  "shareTabsDetail": { "message": "Micos in chats you start from this browser can see the titles and addresses of your open tabs, and ask here before reading a site. They cannot click or type in your pages. Incognito windows are never shared." },
+  "shareTabsDetail": {
+    "message": "Micos in chats you start from this browser can see the titles and addresses of your open tabs, and ask here before reading a site. They cannot click or type in your pages unless you also allow it. Incognito windows are never shared."
+  },
   "consentQuestion": { "message": "Your Mico wants to read {site} in this browser." },
   "consentOnce": { "message": "Allow once" },
   "consentAlways": { "message": "Always allow" },
-  "consentDeny": { "message": "Deny" }
+  "consentDeny": { "message": "Deny" },
+  "actStatusOff": { "message": "Micos cannot click or type" },
+  "actStatusOn": { "message": "Micos can click and type" },
+  "actEnable": { "message": "Let Micos click and type" },
+  "actDisable": { "message": "Turn off" },
+  "actDetail": {
+    "message": "Micos could click and type in your pages, in tabs that show their name and color. You are always asked before a password, payment details, a sign-in or a download, and they stop when you use the tab. Chrome will ask to manage downloads so one can be held until you decide."
+  },
+  "confirmPassword": {
+    "message": "Your Mico wants to type into a password or code field on {site}."
+  },
+  "confirmPayment": { "message": "Your Mico wants to enter payment details on {site}." },
+  "confirmSignIn": { "message": "Your Mico wants to sign in or authorize on {site}." },
+  "confirmDownload": { "message": "A download started on {site}. Keep it?" },
+  "confirmPageText": { "message": "Page text: {text}" },
+  "confirmAllow": { "message": "Allow once" },
+  "confirmKeep": { "message": "Keep" },
+  "confirmCancel": { "message": "Cancel" },
+  "micLabel": { "message": "Dictation microphone" },
+  "micAllow": { "message": "Allow" },
+  "micTitle": { "message": "Allow the microphone for dictation" },
+  "micDone": { "message": "Microphone allowed. You can close this tab." },
+  "micDenied": {
+    "message": "The microphone is blocked. Allow it for this extension in Chrome's site settings."
+  }
 }

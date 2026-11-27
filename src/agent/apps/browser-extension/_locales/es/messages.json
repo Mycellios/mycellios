@@ -24,9 +24,35 @@
   "shareTabsStandby": { "message": "Compartiendo desde otra ventana" },
   "shareTabsSignedOut": { "message": "Inicia sesión para compartir pestañas" },
   "shareTabsOffline": { "message": "Reconectando…" },
-  "shareTabsDetail": { "message": "Los Micos de los chats que empieces desde este navegador pueden ver los títulos y las direcciones de tus pestañas abiertas, y te preguntan aquí antes de leer un sitio. No pueden hacer clic ni escribir en tus páginas. Las ventanas de incógnito nunca se comparten." },
+  "shareTabsDetail": {
+    "message": "Los Micos de los chats que empieces desde este navegador pueden ver los títulos y las direcciones de tus pestañas abiertas, y te preguntan aquí antes de leer un sitio. No pueden hacer clic ni escribir en tus páginas salvo que lo permitas también. Las ventanas de incógnito nunca se comparten."
+  },
   "consentQuestion": { "message": "Tu Mico quiere leer {site} en este navegador." },
   "consentOnce": { "message": "Permitir una vez" },
   "consentAlways": { "message": "Permitir siempre" },
-  "consentDeny": { "message": "Denegar" }
+  "consentDeny": { "message": "Denegar" },
+  "actStatusOff": { "message": "Los Micos no pueden hacer clic ni escribir" },
+  "actStatusOn": { "message": "Los Micos pueden hacer clic y escribir" },
+  "actEnable": { "message": "Dejar que los Micos hagan clic y escriban" },
+  "actDisable": { "message": "Desactivar" },
+  "actDetail": {
+    "message": "Los Micos podrían hacer clic y escribir en tus páginas, en pestañas que muestran su nombre y color. Siempre te preguntan antes de una contraseña, datos de pago, un inicio de sesión o una descarga, y paran cuando usas la pestaña. Chrome pedirá gestionar descargas para poder retener una hasta que decidas."
+  },
+  "confirmPassword": {
+    "message": "Tu Mico quiere escribir en un campo de contraseña o de código en {site}."
+  },
+  "confirmPayment": { "message": "Tu Mico quiere introducir datos de pago en {site}." },
+  "confirmSignIn": { "message": "Tu Mico quiere iniciar sesión o autorizar en {site}." },
+  "confirmDownload": { "message": "Ha empezado una descarga en {site}. ¿La conservas?" },
+  "confirmPageText": { "message": "Texto de la página: {text}" },
+  "confirmAllow": { "message": "Permitir una vez" },
+  "confirmKeep": { "message": "Conservar" },
+  "confirmCancel": { "message": "Cancelar" },
+  "micLabel": { "message": "Micrófono para dictar" },
+  "micAllow": { "message": "Permitir" },
+  "micTitle": { "message": "Permite el micrófono para dictar" },
+  "micDone": { "message": "Micrófono permitido. Puedes cerrar esta pestaña." },
+  "micDenied": {
+    "message": "El micrófono está bloqueado. Permítelo para esta extensión en la configuración de sitios de Chrome."
+  }
 }

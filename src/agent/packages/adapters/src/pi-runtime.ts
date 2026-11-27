@@ -1720,6 +1720,8 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "pc_act") return "Using an app on your PC";
   if (toolName === "chrome_tabs") return "Looking at your Chrome tabs";
   if (toolName === "chrome_snapshot") return "Reading a page in your Chrome";
+  if (toolName === "chrome_navigate") return "Opening a page in your Chrome";
+  if (toolName === "chrome_act") return "Using a page in your Chrome";
   if (toolName === "run_subagent") return `Delegating to helper: ${detail(record.name)}`;
   if (toolName === "create_space") return `Creating space: ${detail(record.name)}`;
   if (toolName === "list_fleet") return "Checking your bots";

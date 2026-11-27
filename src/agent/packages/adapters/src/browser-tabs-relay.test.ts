@@ -206,3 +206,214 @@ describe("reading pages", () => {
     });
   });
 });
+
+describe("acting in pages", () => {
+  let broker: BrowserTabsBroker;
+  afterEach(() => broker?.close());
+  const mico = { name: "Ada", color: "green" } as const;
+  const click = { kind: "click", ref: "e3" } as const;
+  const id = "33333333-3333-4333-8333-333333333333";
+  const scope = { userId: "u", sessionKey: "a".repeat(64) };
+
+  it("needs the person's separate switch, and says so instead of claiming nothing is shared", async () => {
+    broker = new BrowserTabsBroker();
+    broker.register(owner, generation, { tabs: 1, read: 1 });
+    await expect(
+      broker.dispatch(owner, { op: "act", tab: "t1", actions: [click], mico }, never),
+    ).rejects.toMatchObject({ code: "chrome_act_off" });
+    await expect(
+      broker.dispatch(
+        owner,
+        { op: "navigate", url: "https://shop.example/", newTab: true, mico },
+        never,
+      ),
+    ).rejects.toMatchObject({ code: "chrome_act_off" });
+    expect(broker.available(owner, "act")).toBe(false);
+    broker.register(owner, generation, { tabs: 1, read: 1, act: 1 });
+    expect(broker.available(owner, "act")).toBe(true);
+  });
+
+  it("delivers an action and keeps one operation per tab, whichever kind it is", async () => {
+    broker = new BrowserTabsBroker();
+    broker.register(owner, generation, { tabs: 1, read: 1, act: 1 });
+    const first = broker.dispatch(owner, { op: "act", tab: "t1", actions: [click], mico }, never);
+    await expect(
+      broker.dispatch(owner, { op: "snapshot", tab: "t1" }, never),
+    ).rejects.toMatchObject({ code: "chrome_busy" });
+    await expect(
+      broker.dispatch(
+        owner,
+        { op: "navigate", url: "https://shop.example/", tab: "t1", mico },
+        never,
+      ),
+    ).rejects.toMatchObject({ code: "chrome_busy" });
+    // Another tab and a new tab are independent.
+    const other = broker.dispatch(owner, { op: "act", tab: "t2", actions: [click], mico }, never);
+    const opened = broker.dispatch(
+      owner,
+      { op: "navigate", url: "https://shop.example/", newTab: true, mico },
+      never,
+    );
+    const { operations } = await broker.waitPoll(owner, generation, never);
+    expect(operations).toHaveLength(3);
+    broker.result(owner, generation, operations[0]!.id, { acted: { steps: [{ ok: true }] } });
+    await expect(first).resolves.toEqual({ acted: { steps: [{ ok: true }] } });
+    broker.revoke(owner);
+    await expect(other).rejects.toMatchObject({ code: "chrome_uncertain" });
+    await expect(opened).rejects.toMatchObject({ code: "chrome_uncertain" });
+  });
+
+  it("does not replay an action that was delivered when the connection ended", async () => {
+    broker = new BrowserTabsBroker();
+    broker.register(owner, generation, { tabs: 1, read: 1, act: 1 });
+    const delivered = broker.dispatch(
+      owner,
+      { op: "act", tab: "t1", actions: [click], mico },
+      never,
+    );
+    await broker.waitPoll(owner, generation, never);
+    broker.register(owner, "22222222-2222-4222-8222-222222222222", { tabs: 1, read: 1, act: 1 });
+    await expect(delivered).rejects.toMatchObject({ code: "chrome_uncertain" });
+  });
+
+  it("registers acting only together with reading", () => {
+    expect(
+      parseBrowserTabsRegister({ generation, capabilities: { tabs: 1, read: 1, act: 1 } })
+        .capabilities,
+    ).toEqual({ tabs: 1, read: 1, act: 1 });
+    expect(() =>
+      parseBrowserTabsRegister({ generation, capabilities: { tabs: 1, act: 1 } }),
+    ).toThrow();
+    expect(parseBrowserTabsDispatch({ scope, nonce: id, probe: "act" }).probe).toBe("act");
+  });
+
+  it("parses action and navigate requests strictly", () => {
+    const act = {
+      op: "act",
+      tab: "t12",
+      actions: [
+        { kind: "fill", ref: "e1", text: "ada@example.com" },
+        { kind: "key", key: "Enter" },
+        { kind: "scroll", direction: "down" },
+      ],
+      mico,
+    };
+    expect(parseBrowserTabsDispatch({ scope, nonce: id, request: act }).request).toEqual(act);
+    // Each kind needs its own inputs; unknown kinds and fields, empty and oversized lists are refused.
+    for (const actions of [
+      [{ kind: "click" }],
+      [{ kind: "fill", ref: "e1" }],
+      [{ kind: "key" }],
+      [{ kind: "scroll" }],
+      [{ kind: "hover", ref: "e1" }],
+      [{ kind: "click", ref: "button" }],
+      [{ kind: "click", ref: "e1", extra: 1 }],
+      [],
+      Array.from({ length: 25 }, () => click),
+      [{ kind: "type", text: "x".repeat(4_001) }],
+      [{ kind: "scroll", direction: "sideways" }],
+    ])
+      expect(() =>
+        parseBrowserTabsDispatch({
+          scope,
+          nonce: id,
+          request: { op: "act", tab: "t1", actions, mico },
+        }),
+      ).toThrow();
+    expect(() =>
+      parseBrowserTabsDispatch({
+        scope,
+        nonce: id,
+        request: { ...act, mico: { name: "x".repeat(33), color: "green" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseBrowserTabsDispatch({
+        scope,
+        nonce: id,
+        request: { ...act, mico: { name: "Ada", color: "magenta" } },
+      }),
+    ).toThrow();
+    const open = { op: "navigate", url: "https://shop.example/cart?x=1", newTab: true, mico };
+    expect(parseBrowserTabsDispatch({ scope, nonce: id, request: open }).request).toEqual(open);
+    expect(
+      parseBrowserTabsDispatch({
+        scope,
+        nonce: id,
+        request: { op: "navigate", url: "https://shop.example/", tab: "t4", mico },
+      }).request,
+    ).toMatchObject({ op: "navigate", tab: "t4" });
+    for (const request of [
+      { op: "navigate", url: "https://shop.example/", mico },
+      { ...open, tab: "t4" },
+      { ...open, url: "javascript:alert(1)" },
+      { ...open, url: "https://user:pw@shop.example/" },
+      { ...open, url: "https://www.mycellios.com/agent/app" },
+      { ...open, url: "https://vault.bitwarden.com/" },
+      { ...open, url: "chrome://settings" },
+    ])
+      expect(() => parseBrowserTabsDispatch({ scope, nonce: id, request })).toThrow();
+  });
+
+  it("parses action results and navigation results, and drops query strings from addresses", () => {
+    const acted = {
+      steps: [{ ok: true }, { ok: false, note: "not confirmed" }],
+      downloads: ["cancelled"],
+      page: {
+        title: "Cart",
+        url: "https://shop.example/cart?token=1",
+        text: "1 item",
+        truncated: false,
+      },
+    };
+    expect(parseBrowserTabsResult({ generation, id, result: { acted } }).result).toEqual({
+      acted: { ...acted, page: { ...acted.page, url: "https://shop.example/cart" } },
+    });
+    expect(
+      parseBrowserTabsResult({
+        generation,
+        id,
+        result: { navigated: { tab: "t9", title: "Shop", url: "https://shop.example/?a=1" } },
+      }).result,
+    ).toEqual({ navigated: { tab: "t9", title: "Shop", url: "https://shop.example/" } });
+    for (const result of [
+      { acted: { steps: [{ ok: "yes" }] } },
+      { acted: { steps: Array.from({ length: 25 }, () => ({ ok: true })) } },
+      { acted: { steps: [], downloads: ["kept", "stolen"] } },
+      { acted: { steps: [] }, error: "declined" },
+      { navigated: { tab: "9", title: "x", url: "https://a.example/" } },
+      { navigated: { tab: "t9", title: "x", url: "file:///etc/passwd" } },
+    ])
+      expect(() => parseBrowserTabsResult({ generation, id, result })).toThrow();
+    for (const error of ["person_active", "tab_not_working"])
+      expect(parseBrowserTabsResult({ generation, id, result: { error } }).result).toEqual({
+        error,
+      });
+    // Mid-run stops are steps, not errors.
+    expect(() =>
+      parseBrowserTabsResult({ generation, id, result: { error: "declined_password" } }),
+    ).toThrow();
+  });
+
+  it("keeps the extension's refusal list equal to the contract's", async () => {
+    // @ts-expect-error The extension is plain JavaScript without declarations.
+    const sensitive = (await import("../../../apps/browser-extension/sensitive.js")) as {
+      REFUSED_HOSTS: string[];
+      refusedPage(url: string): string | null;
+    };
+    const { BROWSER_TABS_REFUSED_HOSTS, browserTabsRefusedAddress } = await import(
+      "../../../../contracts/browser-tabs-bridge.js"
+    );
+    expect([...sensitive.REFUSED_HOSTS].sort()).toEqual([...BROWSER_TABS_REFUSED_HOSTS].sort());
+    for (const url of [
+      "https://shop.example/",
+      "https://a.mycellios.com/x",
+      "https://chrome.google.com/webstore/x",
+      "ftp://x.example/",
+      "https://u:p@a.example/",
+      "not a url",
+      "https://bitwarden.com./",
+    ])
+      expect(sensitive.refusedPage(url)).toBe(browserTabsRefusedAddress(url));
+  });
+});

@@ -25,10 +25,41 @@ and addresses (origin and path only) of your open tabs with `chrome_tabs`, and r
 once**, **Always allow** (Chrome keeps the site access; remove it in `chrome://extensions`) or
 **Deny**. Mycellios, the Chrome Web Store and password managers are never read, and the values of
 password, payment and hidden fields are left out. Pages are read only when the Mico's model is
-your own provider or a contracted Mycellios-managed one. Micos cannot click or type in your pages. Incognito windows are never shared. **Stop sharing**, closing every panel, signing
-out or removing the permission in `chrome://extensions` ends it. With panels in several windows
-one of them holds the connection (`tabs-bridge.js`, Web Locks) and the others stand by. The
-design and later phases are in `specs/agent-chrome-tabs/spec.md`.
+your own provider or a contracted Mycellios-managed one. Incognito windows are never shared.
+**Stop sharing**, closing every panel, signing out or removing the permission in
+`chrome://extensions` ends it. With panels in several windows one of them holds the connection
+(`tabs-bridge.js`, Web Locks) and the others stand by. The design and later phases are in
+`specs/agent-chrome-tabs/spec.md`.
+
+## Let Micos click and type
+
+A second switch, also off by default and also per browser profile. It asks Chrome for the optional
+`downloads` permission and, while it is on, Micos can open pages with `chrome_navigate` and use them
+with `chrome_act` (click, fill, type, select, scroll, key), on the same model rule as reading. They
+open pages only in new tabs or in tabs they already work in, never in one of your own tabs.
+
+- **Visible work.** A tab a Mico uses joins a Chrome tab group with its name and color, glows in that
+  color with its name and shows a cursor that moves to each click. The glow is cosmetic (a page can
+  hide it); the tab group and the panel are what a page cannot forge. The Mico stops when you use
+  the tab, and its tabs leave the group after 90 s without work, or at **Stop sharing**.
+- **Always asked.** The panel asks, in every approval mode and whatever the server says, before a Mico
+  types into a password or one-time code field, enters card details, submits a sign-in or opens an
+  identity provider's authorization page, and keeps a download. The rules are in `sensitive.js`
+  and run here, not on the server. A download that starts while a Mico acts is held (paused) until
+  you keep or cancel it; downloads you start yourself are never touched.
+- **Honest results.** Events come from the extension and some sites ignore them: a step whose effect
+  cannot be seen is reported as not confirmed, and the run stops at the first step that was
+  declined, stale or not confirmed.
+
+Refused everywhere: Mycellios, the Chrome Web Store, password managers, `chrome://` pages and
+addresses with embedded credentials.
+
+## Dictation
+
+The composer's dictation uses the microphone permission of this extension, and Chrome cannot show its
+permission prompt inside a side panel. Until the microphone is allowed, **Appearance** shows a
+**Dictation microphone** row whose button opens `microphone.html` in a tab, where one click asks
+Chrome. Nothing is recorded there. This is not yet qualified in a real Chrome side panel.
 
 ## How framing is allowed
 
@@ -51,6 +82,10 @@ panel against the hosted app before publishing.
   whether you are signed in and connect tab sharing. The extension reads no pages or browsing
   history.
 - `tabs` (optional, requested only by **Share tabs**): tab titles and addresses while sharing.
-- `scripting`: run the bundled page reader (`page-agent.js`) in a tab. The server never sends code.
+- `scripting`: run the bundled page reader and actions (`page-agent.js`) in a tab. The server never
+  sends code.
+- `tabGroups`: show the tabs a Mico works in as a named, colored group.
+- `downloads` (optional, requested only by **Let Micos click and type**): hold a download that
+  starts while a Mico acts until you keep or cancel it.
 - Optional site access (`https://*/*`, `http://*/*`): requested one site at a time when you allow
   a Mico to read it.

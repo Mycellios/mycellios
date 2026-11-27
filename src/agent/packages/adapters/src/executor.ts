@@ -586,6 +586,8 @@ import { createWebProvider } from "./web-provider-factory.js";
 import { webFetchFromTool, webSearchFromTool } from "./web-tools.js";
 import type { BrowserTabsClient } from "./browser-tabs-relay.js";
 import { chromePageRoute } from "./chrome-page-route.js";
+import { chromeMico } from "./chrome-mico.js";
+import { browserTabsRefusedAddress, parseBrowserTabsRequest } from "../../../../contracts/browser-tabs-bridge.js";
 import { APP_CONTROL_TOOL_NAMES, appControlRequest } from "./app-control.js";
 import { readVideoFromTool, sharedVideoReader } from "./video-reader.js";
 import type { VideoReader } from "./video-reader.js";
@@ -4930,7 +4932,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : undefined;
         const chromeShared = chromeTabsScope !== undefined
           ? await deps.chromeTabs!.available(chromeTabsScope, context.signal)
-          : { tabs: false, read: false };
+          : { tabs: false, read: false, act: false };
         if (!chromeShared.tabs) disabledBuiltinTools.add("chrome_tabs");
         // Page text from the person's signed-in browser goes only to their own provider or a
         // contracted managed one, never to unidentified sellers or the contributor network.
@@ -4939,8 +4941,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ownCredential: resolved.ownCredential === true, baseUrl: resolved.baseUrl,
           deploymentProvider: runDeployment?.provider,
         });
-        const chromeReadAllowed = chromeShared.read && chromePageRouteClass !== "third_party" && !disabledBuiltinTools.has("chrome_snapshot");
+        const chromeRouteAllowed = chromeShared.read && chromePageRouteClass !== "third_party";
+        const chromeReadAllowed = chromeRouteAllowed && !disabledBuiltinTools.has("chrome_snapshot");
         if (!chromeReadAllowed) disabledBuiltinTools.add("chrome_snapshot");
+        // Opening and using pages needs the person's separate "Let Micos click and type" switch in
+        // that browser, on top of the same route rule as reading.
+        const chromeNavigateAllowed = chromeRouteAllowed && chromeShared.act && !disabledBuiltinTools.has("chrome_navigate");
+        const chromeActAllowed = chromeRouteAllowed && chromeShared.act && !disabledBuiltinTools.has("chrome_act");
+        if (!chromeNavigateAllowed) disabledBuiltinTools.add("chrome_navigate");
+        if (!chromeActAllowed) disabledBuiltinTools.add("chrome_act");
+        const chromeMicoShown = chromeMico(bot.id, bot.name);
         // The normal user takeover panel controls the assigned computer, not the
         // separate server workspace. Keep that control off this run.
         if (cloudComputer) disabledBuiltinTools.add("request_takeover");
@@ -6668,6 +6678,44 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const tab = typeof args.tab === "string" && /^t\d{1,12}$/.test(args.tab) ? args.tab : undefined;
             if (!tab) return { error: "chrome_snapshot needs tab, as chrome_tabs lists it (for example t123)." };
             return deps.chromeTabs.snapshot(chromeTabsScope, tab, context.signal);
+          }
+          if (name === "chrome_navigate" || name === "chrome_act") {
+            const allowed = name === "chrome_navigate" ? chromeNavigateAllowed : chromeActAllowed;
+            if (!chromeTabsScope || !deps.chromeTabs || !allowed) return { error: "Using pages in Chrome is not available in this conversation." };
+            // A backup model can take over mid-turn; it never inherits the right to use pages.
+            const current = await deps.prisma.run.findUnique({ where: { id: run.id }, select: { modelProvider: true, modelId: true } });
+            if (current?.modelProvider && runModelProvider && (current.modelProvider !== runModelProvider || current.modelId !== runModelId))
+              return { error: "This turn moved to a backup model, which may not use the person's pages. Ask them to do this step or try again later." };
+            if (name === "chrome_navigate") {
+              const url = typeof args.url === "string" ? args.url.trim() : "";
+              const refused = url ? browserTabsRefusedAddress(url) : "not_web_page";
+              if (refused === "not_web_page") return { error: "chrome_navigate needs an http(s) address." };
+              if (refused) return { error: "This site is never opened by Micos in the person's Chrome (Mycellios itself, the Chrome Web Store or a password manager)." };
+              let request;
+              try {
+                request = parseBrowserTabsRequest({
+                  op: "navigate", url, mico: chromeMicoShown,
+                  ...(typeof args.tab === "string" ? { tab: args.tab } : {}),
+                  ...(args.new_tab === true ? { newTab: true } : {}),
+                });
+              } catch {
+                return { error: "chrome_navigate needs either new_tab true or tab, as chrome_tabs lists it (for example t123), and an address without credentials." };
+              }
+              if (request.op !== "navigate") return { error: "chrome_navigate needs an address." };
+              return deps.chromeTabs.navigate(chromeTabsScope, {
+                url: request.url, mico: request.mico,
+                ...(request.tab ? { tab: request.tab } : {}),
+                ...(request.newTab ? { newTab: true as const } : {}),
+              }, context.signal);
+            }
+            let request;
+            try {
+              request = parseBrowserTabsRequest({ op: "act", tab: args.tab, actions: args.actions, mico: chromeMicoShown });
+            } catch {
+              return { error: "chrome_act needs tab, as chrome_tabs lists it, and 1 to 24 actions with the fields each kind needs (refs like e12 from chrome_snapshot)." };
+            }
+            if (request.op !== "act") return { error: "chrome_act needs tab and actions." };
+            return deps.chromeTabs.act(chromeTabsScope, { tab: request.tab, actions: request.actions, mico: request.mico }, context.signal);
           }
           if (name === "chrome_tabs") {
             if (!chromeTabsScope || !deps.chromeTabs) return { error: "Chrome tabs are not shared with this conversation." };
