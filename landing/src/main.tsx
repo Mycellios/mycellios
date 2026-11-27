@@ -17,6 +17,7 @@ const ModernLanding = lazy(() => import("./rebrand/ModernLanding").then((module)
 const RootedLanding = lazy(() => import("./rebrand/RootedLanding").then((module) => ({ default: module.RootedLanding })));
 const AssemblageLanding = lazy(() => import("./rebrand/AssemblageLanding").then((module) => ({ default: module.AssemblageLanding })));
 const ReferenceLanding = lazy(() => import("./rebrand/ReferenceLanding").then((module) => ({ default: module.ReferenceLanding })));
+const HomeLanding = lazy(() => import("./rebrand/HomeLanding").then((module) => ({ default: module.HomeLanding })));
 const StatsDashboard = lazy(() => import("./StatsDashboard").then((module) => ({ default: module.StatsDashboard })));
 const PricingPage = lazy(() => import("./rebrand/PricingPage").then((module) => ({ default: module.PricingPage })));
 const ComparePage = lazy(() => import("./rebrand/ComparePage").then((module) => ({ default: module.ComparePage })));
@@ -104,6 +105,9 @@ const previousLanding = new URLSearchParams(window.location.search).get("landing
 const savedLanding = new URLSearchParams(window.location.search).get("landing") === "saved";
 const rootedLanding = new URLSearchParams(window.location.search).get("landing") === "rooted";
 const assemblageLanding = new URLSearchParams(window.location.search).get("landing") === "assemblage";
+// The previous Agent-first page and the forest opening keep the reference landing.
+const referenceLanding = new URLSearchParams(window.location.search).get("landing") === "reference"
+  || new URLSearchParams(window.location.search).get("intro") === "forest";
 
 const page = surface === "stats" ? <StatsDashboard />
   : surface === "guide" ? <GuidePage />
@@ -116,7 +120,7 @@ const page = surface === "stats" ? <StatsDashboard />
   : isSpore ? <SporeStudio />
   : isNetwork ? <NetworkPage />
   : isPanel ? <Panel accountEntry={path === "/account"} mobileEntry={path === "/browser" || path === "/mobile"} />
-  : previousLanding ? <RebrandLanding /> : savedLanding ? <ModernLanding /> : rootedLanding ? <RootedLanding /> : assemblageLanding ? <AssemblageLanding /> : <ReferenceLanding />;
+  : previousLanding ? <RebrandLanding /> : savedLanding ? <ModernLanding /> : rootedLanding ? <RootedLanding /> : assemblageLanding ? <AssemblageLanding /> : referenceLanding ? <ReferenceLanding /> : <HomeLanding />;
 
 /*
  * Start the hero renderer's download here rather than letting the component ask

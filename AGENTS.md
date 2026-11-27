@@ -186,17 +186,17 @@ These rules apply to the complete repository.
 - The panel has no built-in chat. Mycellios Agent owns the conversation UI; keep
   legacy `view=chat` and `view=inference` links mapped to Overview, without removing
   the coordinator API used by Agent and other clients.
-- The contribution chapter after the landing opening uses DistributedEarnScene,
-  ContributionEntry and
-  the shared UI kit. Browser points to the account-bound Agent Earn credits control;
+- The home page's contribution chapter uses ContributionEntry, the
+  `HomeNetworkMesh` peer mesh and the shared UI kit; the reference page keeps
+  DistributedEarnScene. Browser points to the account-bound Agent Earn credits control;
   Desktop points to `/downloads/desktop`. Keep the Earn page consistent, explain
   verified-work Credits separately from Spore, and never auto-start compute or
   display simulated earnings. Preserve the remaining landing composition.
   Terminal downloads use stable published native-node routes, with explicit platform
   selection and copy-only commands; installing still requires account pairing.
   Do not offer unavailable installers or execute downloaded scripts from the page.
-  The distributed scene is deterministic conceptual artwork, not telemetry or a
-  wallet. Its money symbols represent AI Credits, not cash payouts. Pause motion
+  The distributed scene and the mesh are deterministic conceptual artwork, not
+  telemetry or a wallet. Its money symbols represent AI Credits, not cash payouts. Pause motion
   offscreen, in hidden tabs, for reduced motion and with page/scene controls.
 - The landing startup mark mirrors Agent's `public/mycellios/loader.svg` in
   `landing/public/brand/agent-loader.svg`; keep the assets identical and retain
@@ -210,13 +210,25 @@ These rules apply to the complete repository.
   It falls back to the downloads page. Never
   guess Mac CPU architecture or advertise unsupported installers. Keep the platform
   picker dismissible with Escape/outside click and separate browser entry available.
-- The Agent opening uses GoldenMycelium: original WebGL2 gold hyphae on deep moss,
+- `HomeLanding` (`landing/src/rebrand`) is the default marketing page: hero with
+  the download split button and browser entry, `HomeArtwork` (bounded WebGL2
+  ordered-dither print with a pointer color lens and an image fallback), the Agent
+  demo, live statistics from `/public/v1/snapshot` (hidden when unavailable, never
+  invented), a feature bento, stacked steps, the network chapter, API quick start,
+  FAQ and closing call to action, under the shared `MarketingHeader`/footer. Its
+  optional GSAP scroll and pointer effects load after first paint; every section
+  stays visible without them and reduced motion disables them. Styles stay within
+  `home-landing.css` under `.home`. `scripts/verify-built-landing.mjs` checks its
+  heading, mesh and download picker. Artwork, mesh and demo are concepts, never
+  telemetry, earnings or real tool execution.
+- The reference page's Agent opening uses GoldenMycelium: original WebGL2 gold hyphae on deep moss,
   measured around the real download action and paper workspace. Keep its geometry
   and pixel ratio bounded, content exclusion masks, lazy graphics loading, static
   reduced-motion/unsupported fallback, and shared playback/visibility pause.
   Check golden-mycelium tests for clock pause, GPU cleanup and failure paths.
   This is conceptual brand artwork, never evidence of network work or earnings.
-- `ReferenceLanding` is the default network-first marketing page: a centered
+- `ReferenceLanding` (`?landing=reference` or `?intro=forest`) is the previous
+  network-first marketing page: a centered
   introduction, a large computing-fabric illustration and API/device entry points
   in the network chapter. `NetworkPrint` applies a bounded WebGL print treatment
   with a plain image fallback and reduced-motion support. It follows the supplied
