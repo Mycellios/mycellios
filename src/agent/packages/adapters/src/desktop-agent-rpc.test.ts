@@ -32,3 +32,49 @@ it("names the unsupported type and key path, never the value", () => {
   expect(() => bridge.encode(new URL("https://example.com/private"))).toThrow("Unsupported Desktop runtime value (URL at root)");
   expect(failure?.message).not.toContain(secret);
 });
+
+it("sends notifications one-way only when both sides understand them", async () => {
+  const toWorker: unknown[] = [];
+  const toPc: unknown[] = [];
+  const worker = new DesktopAgentRpc(message => { toPc.push(message); });
+  const pc = new DesktopAgentRpc(message => { toWorker.push(message); });
+  const saved: string[] = [];
+  const wire = worker.encode({ onCheckpoint: worker.notify(async (blob: string) => { saved.push(blob); }) });
+  expect(JSON.stringify(wire)).toContain('"mode":"notify"');
+  const { onCheckpoint } = pc.decode(JSON.parse(JSON.stringify(wire))) as { onCheckpoint: (blob: string) => Promise<void> };
+  // The PC does not wait for the worker: the call resolves as soon as it is sent.
+  await onCheckpoint("transcript");
+  expect(toWorker).toEqual([expect.objectContaining({ kind: "call", notify: true })]);
+  await worker.accept(toWorker[0]);
+  expect(saved).toEqual(["transcript"]);
+  // No reply operation crosses back.
+  expect(toPc).toEqual([]);
+});
+
+it("still replies to a caller that ignores the notification mode", async () => {
+  const toPc: unknown[] = [];
+  const worker = new DesktopAgentRpc(message => { toPc.push(message); });
+  const wire = worker.encode({ done: worker.notify(() => undefined) }) as { kind: string; value: [string, { value: string }][] };
+  const target = wire.value[0]![1].value;
+  // An older Desktop sends an ordinary call and keeps waiting for its reply.
+  await worker.accept({ kind: "call", id: "11111111-1111-4111-8111-111111111111", target, args: { kind: "array", value: [] } });
+  expect(toPc).toEqual([expect.objectContaining({ kind: "result", failed: false })]);
+});
+
+it("refuses one-way calls to ordinary functions and reports a failed notification locally", async () => {
+  const toPc: unknown[] = [];
+  const worker = new DesktopAgentRpc(message => { toPc.push(message); });
+  const wire = worker.encode({
+    plain: () => "answer",
+    broken: worker.notify(() => { throw Error("checkpoint not saved"); }),
+  }) as { value: [string, { value: string }][] };
+  const [plain, broken] = wire.value.map(([, handle]) => handle.value);
+  const args = { kind: "array", value: [] };
+  await expect(worker.accept({ kind: "call", id: "22222222-2222-4222-8222-222222222222", target: plain, args, notify: true }))
+    .rejects.toThrow("Invalid Desktop runtime notification");
+  await expect(worker.accept({ kind: "call", id: "33333333-3333-4333-8333-333333333333", target: broken, args, notify: true }))
+    .rejects.toThrow("checkpoint not saved");
+  expect(toPc).toEqual([]);
+  expect(() => rpc().decode({ kind: "promise", value: plain, mode: "notify" })).toThrow("Invalid Desktop runtime value");
+  expect(() => rpc().decode({ kind: "function", value: plain, mode: "other" })).toThrow("Invalid Desktop runtime value");
+});

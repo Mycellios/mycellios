@@ -6,9 +6,11 @@ import { ModelAccountError, ModelOutputError, TransientModelError } from "@mycel
 export type AgentWire = null | boolean | number | string | {
   kind: "undefined" | "bytes" | "date" | "error" | "function" | "promise" | "array" | "object";
   value?: unknown;
+  /** On a function: the side that owns it sends no reply when the caller marks the call one-way. */
+  mode?: "notify";
 };
 export type AgentRpcMessage =
-  | { kind: "call"; id: string; target: string; args: AgentWire }
+  | { kind: "call"; id: string; target: string; args: AgentWire; notify?: true }
   | { kind: "result"; id: string; value: AgentWire; failed: boolean };
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9-]{36}$/.test(value);
 const LIMIT = 4096;
@@ -30,8 +32,28 @@ export class DesktopAgentRpc {
   private pending = new Map<string, { resolve(value: unknown): void; reject(error: unknown): void }>();
   private received = new Map<string, { fingerprint: string; result: Promise<AgentRpcMessage> }>();
   private outgoing = new Set<Promise<unknown>>();
+  /** Functions this side offers as notifications, and the ids it gave them. */
+  private notifications = new WeakSet<object>();
+  private notifyTargets = new Set<string>();
   private closed = false;
   constructor(private readonly send: (message: AgentRpcMessage) => Promise<void> | void) {}
+
+  /**
+   * Offers `fn` as a notification: a caller that understands it sends the call one-way and
+   * gets no reply, which saves a relay round trip. Older callers still get their reply. A
+   * failure is not reported back; it rejects this side's accept() instead.
+   */
+  notify<T extends (...args: never[]) => unknown>(fn: T): T {
+    this.notifications.add(fn);
+    return fn;
+  }
+
+  /** Binds an object method to its object, keeping a notification a notification. */
+  private bound(fn: (...args: unknown[]) => unknown, self: object) {
+    const bound = fn.bind(self);
+    if (this.notifications.has(fn)) this.notifications.add(bound);
+    return bound;
+  }
 
   encode(value: unknown): AgentWire {
     let count = 0;
@@ -46,6 +68,10 @@ export class DesktopAgentRpc {
         this.targets.set(id, typeof v === "function" ? v as (...args: unknown[]) => unknown : () => v);
         // Prevent an asynchronously rejected shell completion from becoming unhandled before use.
         if (v instanceof Promise) void v.catch(() => undefined);
+        if (typeof v === "function" && this.notifications.has(v)) {
+          this.notifyTargets.add(id);
+          return { kind: "function", value: id, mode: "notify" };
+        }
         return { kind: typeof v === "function" ? "function" : "promise", value: id };
       }
       if (v instanceof Uint8Array) return { kind: "bytes", value: Buffer.from(v).toString("base64") };
@@ -57,7 +83,7 @@ export class DesktopAgentRpc {
       if (v instanceof Error) return { kind: "error", value: [v.name, v.message] };
       if (Array.isArray(v)) return { kind: "array", value: v.map((x, i) => visit(x, depth + 1, `${path}[${i}]`)) };
       if (typeof v === "object" && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null))
-        return { kind: "object", value: Object.entries(v).map(([k, x]) => [k, visit(typeof x === "function" ? x.bind(v) : x, depth + 1, keyPath(path, k))]) };
+        return { kind: "object", value: Object.entries(v).map(([k, x]) => [k, visit(typeof x === "function" ? this.bound(x as (...args: unknown[]) => unknown, v) : x, depth + 1, keyPath(path, k))]) };
       throw unsupportedValue(v, path);
     };
     return visit(value, 0, "");
@@ -69,7 +95,7 @@ export class DesktopAgentRpc {
       if (++count > 100_000 || depth > 48) throw Error("Desktop runtime value exceeds its bound");
       if (v === null || typeof v === "string" || typeof v === "boolean" || typeof v === "number" && Number.isFinite(v)) return v;
       if (!v || typeof v !== "object" || Array.isArray(v)) throw Error("Invalid Desktop runtime value");
-      const item = v as { kind?: string; value?: unknown };
+      const item = v as { kind?: string; value?: unknown; mode?: unknown };
       switch (item.kind) {
         case "undefined": return undefined;
         case "bytes":
@@ -90,6 +116,8 @@ export class DesktopAgentRpc {
         case "function": case "promise": {
           if (!uuid(item.value)) break;
           const target = item.value;
+          if (item.mode !== undefined && (item.mode !== "notify" || item.kind !== "function")) break;
+          if (item.mode === "notify") return (...args: unknown[]) => this.notifyCall(target, args);
           const call = (...args: unknown[]) => this.call(target, args);
           return item.kind === "promise" ? call() : call;
         }
@@ -127,6 +155,12 @@ export class DesktopAgentRpc {
     return promise;
   }
 
+  /** A one-way call: resolves once it is handed to the transport, and expects no reply. */
+  private async notifyCall(target: string, args: unknown[]): Promise<void> {
+    if (this.closed) throw Error("Desktop runtime disconnected");
+    await this.send({ kind: "call", id: randomUUID(), target, args: this.encode(args), notify: true });
+  }
+
   /** Call handling is deliberately concurrent: tool observers can call back during a tool call. */
   async accept(input: unknown): Promise<void> {
     if (this.closed || !input || typeof input !== "object") throw Error("Desktop runtime disconnected");
@@ -142,6 +176,9 @@ export class DesktopAgentRpc {
       return;
     }
     if (message.kind !== "call" || !uuid(message.target)) throw Error("Invalid Desktop runtime callback");
+    if (message.notify !== undefined && (message.notify !== true || !this.notifyTargets.has(message.target))) {
+      throw Error("Invalid Desktop runtime notification");
+    }
     const target = this.targets.get(message.target);
     if (!target || this.received.size >= LIMIT) throw Error("Unknown Desktop runtime callback");
     const fingerprint = JSON.stringify(message);
@@ -158,6 +195,11 @@ export class DesktopAgentRpc {
       prior = { fingerprint, result }; this.received.set(message.id, prior);
     }
     const result = await prior.result;
+    if (message.notify) {
+      // No reply travels back; a failed notification fails this side instead.
+      if (result.kind === "result" && result.failed) throw this.decode(result.value);
+      return;
+    }
     if (!this.closed) await this.send(result);
   }
 
@@ -170,6 +212,6 @@ export class DesktopAgentRpc {
   close() {
     this.closed = true;
     for (const pending of this.pending.values()) pending.reject(Error("Desktop runtime disconnected; check existing results before retrying"));
-    this.pending.clear(); this.targets.clear(); this.received.clear();
+    this.pending.clear(); this.targets.clear(); this.received.clear(); this.notifyTargets.clear();
   }
 }

@@ -81,4 +81,18 @@ describe("desktopModelCatalog", () => {
     expect(events).toEqual([delta]);
     expect(result).toEqual(final);
   });
+
+  it("does not cancel a stream that reached its end, saving one round trip per call", async () => {
+    const cancel = vi.fn(async () => undefined);
+    await stream(async () => ({ read: vi.fn(), cancel, first: { events: [delta], done: true, result: final } }));
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("still cancels a stream that broke off before its end", async () => {
+    const cancel = vi.fn(async () => undefined);
+    const read = vi.fn().mockRejectedValueOnce(Error("relay lost"));
+    const { result } = await stream(async () => ({ read, cancel, first: { events: [delta], done: false } }));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect((result as { stopReason?: string }).stopReason).toBe("error");
+  });
 });
