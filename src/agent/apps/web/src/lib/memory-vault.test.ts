@@ -12,6 +12,7 @@ import {
   parseWikiLinks,
   subgraph,
   type VaultNote,
+  vaultDisplayPath,
   wikiLinksAsMentions,
 } from "./memory-vault";
 
@@ -177,5 +178,30 @@ describe("memoryNotePath", () => {
 
   it("drops characters that break links", () => {
     expect(memoryNotePath("plan [v2] #1|x")).toBe("plan v2 1x.md");
+  });
+});
+
+describe("task conversation notes", () => {
+  const task = {
+    ...note("t", "tasks/thread-1/trip ideas.md", "See [[profile]]", mico("bot-a")),
+    taskThreadId: "thread-1",
+    taskThreadTitle: "Plan / Japan",
+  };
+
+  it("show under the conversation title instead of the stored folder", () => {
+    expect(vaultDisplayPath(task, "Conversation notes", "Untitled")).toBe(
+      "Conversation notes/Plan ∕ Japan/trip ideas.md",
+    );
+    expect(vaultDisplayPath({ ...task, taskThreadTitle: null }, "C", "Untitled")).toBe(
+      "C/Untitled/trip ideas.md",
+    );
+    expect(vaultDisplayPath(note("n", "a/b.md"), "C", "U")).toBe("a/b.md");
+  });
+
+  it("link out but are never the target of a link", () => {
+    const notes = [task, note("p", "profile.md")];
+    const resolve = createLinkResolver(notes);
+    expect(resolve({ scope: "bot", botId: "bot-a" }, "trip ideas")).toBeNull();
+    expect(buildVaultGraph(notes).edges).toEqual([{ source: "t", target: "p" }]);
   });
 });

@@ -50,6 +50,7 @@ import {
   McpApprovalCard,
 } from "./message-cards";
 import { MessageHoverActions } from "./message-hover-actions";
+import { MemoryRecallChip } from "../../components/memory/MemoryRecall";
 
 export const MessageView = memo(function MessageView({
   artifactTarget,
@@ -228,6 +229,11 @@ export const MessageView = memo(function MessageView({
       branchDisabled={branchDisabled}
     />
   );
+  // How many notes the finished reply had in context; it renders nothing without a count.
+  const recallChip =
+    message.role === "bot" && !isLive && !message.progress && !message.id.includes(":") ? (
+      <MemoryRecallChip messageId={message.id} />
+    ) : null;
   if (isNarration && naturalStyle) {
     // Natural style: the short notes the agent wrote between steps, one steps summary, then the
     // complete answer. The notes and the summary carry no actions; the answer keeps them.
@@ -276,6 +282,7 @@ export const MessageView = memo(function MessageView({
                 ))}
               </div>
             </div>
+            {recallChip}
             {hoverActions}
           </div>
         ) : null}
@@ -338,6 +345,7 @@ export const MessageView = memo(function MessageView({
 
             </div>
           </div>
+          {recallChip}
           {hoverActions}
         </div>
       </>

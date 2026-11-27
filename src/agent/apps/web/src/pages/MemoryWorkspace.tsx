@@ -27,12 +27,26 @@ import {
 } from "@mycellios/ui-web";
 import { ORPCError } from "@orpc/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, FilePlus2, FileText, Folder, Menu, Network, Search } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import {
+  ChevronRight,
+  Download,
+  FilePlus2,
+  FileText,
+  Folder,
+  Menu,
+  Network,
+  Search,
+  Upload,
+} from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { IconTooltip } from "../components/IconTooltip";
 import { MemoryGraph } from "../components/memory/MemoryGraph";
-import { EmptyMemoryNote, MemoryNote } from "../components/memory/MemoryNote";
+import {
+  EmptyMemoryNote,
+  MemoryNote,
+  type MemoryNoteSource,
+} from "../components/memory/MemoryNote";
 import { downloadArtifactBytes } from "../lib/artifact-open";
 import { desktopDragClass } from "../lib/desktop";
 import {
@@ -41,13 +55,24 @@ import {
   folderTree,
   matchesVaultQuery,
   neighbourhood,
+  noteFolder,
   noteTitle,
   subgraph,
   type VaultFolder,
   type VaultGraphNode,
   type VaultNote,
+  vaultDisplayPath,
   vaultGroupKey,
 } from "../lib/memory-vault";
+import {
+  type ImportItem,
+  readVaultFiles,
+  type VaultFile,
+  type VaultGroupChoice,
+  vaultExportFiles,
+  vaultImportPlan,
+  vaultZip,
+} from "../lib/memory-vault-files";
 import { fetchFresh, useSpaceQueries, writeSaved } from "../lib/query";
 import { useSpaceRpc } from "../lib/space-rpc";
 
@@ -62,19 +87,28 @@ type Mode = "notes" | "graph";
  * same owner-scoped memory routes as Settings, so nothing here changes what a Mico receives
  * except the person's own edits.
  */
+export type MemoryConversationSource = {
+  threadId: string;
+  kind: "main" | "conversation" | "group";
+  botId: string | null;
+  groupId: string | null;
+};
+
 export function MemoryWorkspace({
   bots,
   onOpenNavigation,
+  onOpenConversation,
 }: {
   bots: readonly Bot[];
   onOpenNavigation?: () => void;
+  onOpenConversation?: (source: MemoryConversationSource) => void;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
   const queries = useSpaceQueries();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const list = queries.memory.list.queryOptions({ input: {} });
+  const list = queries.memory.list.queryOptions({ input: { includeTasks: true } });
   // Micos write memory as they work, so every visit reads it again behind the cached list.
   const listQuery = useQuery({ ...list, refetchOnMount: "always" });
   const notes = listQuery.data ?? NO_NOTES;
@@ -91,6 +125,9 @@ export function MemoryWorkspace({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<{ id: string | null; mode?: Mode } | null>(null);
   const [creating, setCreating] = useState<{ name: string; group: string } | null>(null);
+  const [importing, setImporting] = useState<VaultFile[] | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const importInput = useRef<HTMLInputElement>(null);
 
   const botById = useMemo(() => new Map(bots.map((bot) => [bot.id, bot])), [bots]);
   const groupLabel = useCallback(
@@ -119,6 +156,12 @@ export function MemoryWorkspace({
     [generalColor, groupColors],
   );
 
+  const conversationsLabel = t`Conversation notes`;
+  const untitledConversation = t`Untitled conversation`;
+  const displayPath = useCallback(
+    (note: VaultNote) => vaultDisplayPath(note, conversationsLabel, untitledConversation),
+    [conversationsLabel, untitledConversation],
+  );
   const resolve = useMemo(() => createLinkResolver(notes), [notes]);
   const graph = useMemo(() => buildVaultGraph(notes), [notes]);
   const byId = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes]);
@@ -286,8 +329,70 @@ export function MemoryWorkspace({
   }, [graph, hiddenGroups]);
   const tooLarge = fullGraph.nodes.length > FULL_GRAPH_LIMIT;
 
+  const sourcesQuery = useQuery({
+    ...queries.memory.sources.queryOptions({ input: { documentId: selected?.id ?? "" } }),
+    enabled: Boolean(selected),
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const sources = useMemo<MemoryNoteSource[] | undefined>(
+    () =>
+      sourcesQuery.data?.sources.map((source) => {
+        const botName = source.botId ? botById.get(source.botId)?.name : undefined;
+        const label =
+          source.kind === "main"
+            ? botName
+              ? t`Main chat with ${botName}`
+              : t`Main chat`
+            : source.title?.trim() ||
+              (source.kind === "group" ? t`Group conversation` : untitledConversation);
+        return {
+          key: source.threadId,
+          label,
+          archived: source.archived,
+          onOpen: () => onOpenConversation?.(source),
+        };
+      }),
+    [sourcesQuery.data, botById, onOpenConversation, t, untitledConversation],
+  );
+
   const newNote = (name = "", group = selected ? vaultGroupKey(selected) : "general") =>
     setCreating({ name, group });
+  const groupChoices: VaultGroupChoice[] = [
+    { key: "general", label: t`General` },
+    ...bots.map((bot) => ({ key: bot.id, label: bot.name })),
+  ];
+
+  async function exportVault() {
+    setTransferError(null);
+    try {
+      const latest = await fetchFresh(queryClient, list);
+      const byGroup = new Map<string, VaultNote[]>();
+      for (const note of latest) {
+        const key = vaultGroupKey(note);
+        (byGroup.get(key) ?? byGroup.set(key, []).get(key)!).push(note);
+      }
+      const files = vaultExportFiles(
+        [...byGroup.entries()].map(([key, groupNotes]) => ({
+          label: groupLabel(key),
+          notes: groupNotes.map((note) => ({ path: displayPath(note), content: note.content })),
+        })),
+      );
+      const date = new Date().toISOString().slice(0, 10);
+      downloadArtifactBytes(`memory-${date}.zip`, "application/zip", await vaultZip(files));
+    } catch {
+      setTransferError(t`Could not export your memory.`);
+    }
+  }
+  async function pickImport(picked: FileList | null) {
+    setTransferError(null);
+    if (!picked?.length) return;
+    try {
+      setImporting(await readVaultFiles([...picked]));
+    } catch {
+      setTransferError(t`Could not read those files.`);
+    }
+  }
 
   return (
     <div
@@ -359,12 +464,50 @@ export function MemoryWorkspace({
                 className="ps-8"
               />
             </div>
+            <IconTooltip label={t`Export as Markdown`}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t`Export as Markdown`}
+                disabled={notes.length === 0}
+                onClick={() => void exportVault()}
+              >
+                <Download aria-hidden />
+              </Button>
+            </IconTooltip>
+            <IconTooltip label={t`Import notes`}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t`Import notes`}
+                onClick={() => importInput.current?.click()}
+              >
+                <Upload aria-hidden />
+              </Button>
+            </IconTooltip>
+            <input
+              ref={importInput}
+              type="file"
+              accept=".md,.zip,text/markdown,application/zip"
+              multiple
+              hidden
+              data-testid="memory-import-input"
+              onChange={(event) => {
+                void pickImport(event.target.files);
+                event.target.value = "";
+              }}
+            />
             <Button size="sm" onClick={() => newNote()}>
               <FilePlus2 aria-hidden />
               <Trans>New note</Trans>
             </Button>
           </div>
         </div>
+        {transferError ? (
+          <p className="mt-2 text-[13px] text-destructive" role="alert">
+            {transferError}
+          </p>
+        ) : null}
       </header>
 
       {listQuery.isPending ? (
@@ -404,7 +547,13 @@ export function MemoryWorkspace({
                     ? generalColor
                     : (groupColors.get(group.key) ?? generalColor)
                 }
-                tree={folderTree(group.notes.filter((note) => !matches || matches.has(note.id)))}
+                tree={folderTree(
+                  group.notes
+                    .filter((note) => !matches || matches.has(note.id))
+                    .map((note) =>
+                      note.taskThreadId ? { ...note, path: displayPath(note) } : note,
+                    ),
+                )}
                 selectedId={selectedId}
                 onOpen={(id) => go(id, "notes")}
               />
@@ -498,6 +647,10 @@ export function MemoryWorkspace({
                     key={selected.id}
                     note={selected}
                     locationLabel={groupLabel(vaultGroupKey(selected))}
+                    displayFolder={
+                      selected.taskThreadId ? noteFolder(displayPath(selected)) : undefined
+                    }
+                    sources={sources}
                     notes={notes}
                     resolve={resolve}
                     backlinks={backlinks}
@@ -569,14 +722,36 @@ export function MemoryWorkspace({
         </div>
       )}
 
+      {importing ? (
+        <ImportDialog
+          files={importing}
+          groups={groupChoices}
+          conversationsLabel={conversationsLabel}
+          onClose={() => {
+            setImporting(null);
+            void fetchFresh(queryClient, list).catch(() => undefined);
+          }}
+          onCreate={async (item) => {
+            try {
+              await rpc.memory.create(
+                item.group === "general"
+                  ? { scope: "user", path: item.path, content: item.content }
+                  : { scope: "bot", botId: item.group, path: item.path, content: item.content },
+              );
+              return "created";
+            } catch (err) {
+              if (err instanceof ORPCError && err.code === "CONFLICT") return "exists";
+              throw err;
+            }
+          }}
+        />
+      ) : null}
+
       {creating ? (
         <NewNoteDialog
           initialName={creating.name}
           initialGroup={creating.group}
-          groups={[
-            { key: "general", label: t`General` },
-            ...bots.map((bot) => ({ key: bot.id, label: bot.name })),
-          ]}
+          groups={groupChoices}
           onClose={() => setCreating(null)}
           onCreate={async (name, group) => {
             const path = memoryNotePath(name);
@@ -856,6 +1031,149 @@ function NewNoteDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type ImportResult = { created: number; existing: number; skipped: number; failed: number };
+
+/**
+ * Brings Markdown notes in from files or an exported .zip. Every note is created new: a note
+ * that already exists is left as it is and counted, never overwritten.
+ */
+function ImportDialog({
+  files,
+  groups,
+  conversationsLabel,
+  onClose,
+  onCreate,
+}: {
+  files: readonly VaultFile[];
+  groups: readonly VaultGroupChoice[];
+  conversationsLabel: string;
+  onClose: () => void;
+  onCreate: (item: ImportItem) => Promise<"created" | "exists">;
+}) {
+  const { t } = useLingui();
+  const formId = useId();
+  const [destination, setDestination] = useState("general");
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const plan = useMemo(
+    () => vaultImportPlan(files, groups, destination, conversationsLabel),
+    [files, groups, destination, conversationsLabel],
+  );
+  async function run() {
+    if (busy) return;
+    setBusy(true);
+    const totals: ImportResult = {
+      created: 0,
+      existing: 0,
+      skipped: plan.skipped.length,
+      failed: 0,
+    };
+    for (const [index, item] of plan.items.entries()) {
+      try {
+        if ((await onCreate(item)) === "created") totals.created += 1;
+        else totals.existing += 1;
+      } catch {
+        totals.failed += 1;
+      }
+      setProgress(index + 1);
+    }
+    setResult(totals);
+    setBusy(false);
+  }
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
+      <DialogContent data-testid="memory-import-dialog">
+        <DialogHeader>
+          <DialogTitle>
+            <Trans>Import notes</Trans>
+          </DialogTitle>
+        </DialogHeader>
+        {result ? (
+          <div className="space-y-2 text-sm">
+            <p>{t`Imported: ${result.created}`}</p>
+            {result.existing ? (
+              <p className="text-muted-foreground">
+                {t`Already there, left unchanged: ${result.existing}`}
+              </p>
+            ) : null}
+            {result.skipped ? (
+              <p className="text-muted-foreground">
+                {t`Skipped (not Markdown, too large, conversation notes or unusable names): ${result.skipped}`}
+              </p>
+            ) : null}
+            {result.failed ? (
+              <p className="text-destructive" role="alert">
+                {t`Could not import: ${result.failed}`}
+              </p>
+            ) : null}
+            <DialogFooter>
+              <Button onClick={onClose}>
+                <Trans>Done</Trans>
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run();
+            }}
+          >
+            <p className="text-sm">
+              {t`Notes to import: ${plan.items.length}`}
+              {plan.skipped.length ? ` · ${t`Files to skip: ${plan.skipped.length}`}` : ""}
+            </p>
+            <label htmlFor={`${formId}-group`} className="block space-y-1 text-sm">
+              <span>
+                <Trans>Put notes without a group folder in</Trans>
+              </span>
+              <NativeSelect
+                id={`${formId}-group`}
+                value={destination}
+                disabled={busy}
+                onChange={(event) => setDestination(event.target.value)}
+                className="w-full"
+              >
+                {groups.map((entry) => (
+                  <NativeSelectOption key={entry.key} value={entry.key}>
+                    {entry.key === "general" ? t`General (all non-isolated Micos)` : entry.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </label>
+            <p className="text-xs text-muted-foreground">
+              <Trans>
+                Folders named like General or a Mico, as an export writes them, go to that group.
+                Existing notes are never replaced.
+              </Trans>
+            </p>
+            {busy ? (
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                {t`Importing ${progress} of ${plan.items.length}…`}
+              </p>
+            ) : null}
+            <DialogFooter>
+              <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+                <Trans>Cancel</Trans>
+              </Button>
+              <Button type="submit" disabled={busy || plan.items.length === 0}>
+                <Trans>Import</Trans>
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

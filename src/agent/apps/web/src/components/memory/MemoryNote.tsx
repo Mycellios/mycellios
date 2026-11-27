@@ -2,7 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@mycellios/chat-ui/web";
 import { isDeletableMemoryDocument } from "@mycellios/contracts";
 import { Badge, Button, Textarea } from "@mycellios/ui-web";
-import { ArrowLeft, Download, FilePlus2, Pencil, Pin, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FilePlus2, MessagesSquare, Pencil, Pin, Trash2 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
 import {
   type LinkResolver,
@@ -23,9 +23,21 @@ function openLinkQuery(text: string, caret: number): { start: number; query: str
   return match ? { start: caret - match[1]!.length, query: match[1]! } : null;
 }
 
+/** A conversation a note's saved versions came from, ready to show. */
+export type MemoryNoteSource = {
+  key: string;
+  label: string;
+  archived: boolean;
+  onOpen: () => void;
+};
+
 export type MemoryNoteProps = {
   note: VaultNote;
   locationLabel: string;
+  /** The folder to show, when the stored one means nothing to a person (task notes). */
+  displayFolder?: string;
+  /** Where the note was learned; undefined while loading or when unavailable. */
+  sources?: readonly MemoryNoteSource[];
   notes: readonly VaultNote[];
   resolve: LinkResolver;
   backlinks: readonly VaultNote[];
@@ -53,7 +65,7 @@ export function MemoryNote(props: MemoryNoteProps) {
   const { t, i18n } = useLingui();
   const { note, notes, resolve } = props;
   const rendered = useMemo(() => wikiLinksAsMentions(note, resolve), [note, resolve]);
-  const folder = noteFolder(note.path);
+  const folder = props.displayFolder ?? noteFolder(note.path);
   const renderMention = (id: string, name: string): ReactNode => {
     if (id.startsWith(MEMORY_NOTE_MENTION)) {
       const target = id.slice(MEMORY_NOTE_MENTION.length);
@@ -100,7 +112,7 @@ export function MemoryNote(props: MemoryNoteProps) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs text-muted-foreground" dir="auto">
             {props.locationLabel}
-            {folder ? ` / ${folder}` : ""}
+            {folder ? ` / ${folder.split("/").join(" / ")}` : ""}
           </p>
           <h2 className="truncate text-lg font-semibold" dir="auto">
             {noteTitle(note.path)}
@@ -198,8 +210,44 @@ export function MemoryNote(props: MemoryNoteProps) {
         {!props.editing && props.outgoing.length ? (
           <NoteLinks title={t`Links to`} notes={props.outgoing} onOpen={props.onOpenNote} />
         ) : null}
+        {!props.editing && props.sources?.length ? <NoteSources sources={props.sources} /> : null}
       </div>
     </article>
+  );
+}
+
+/** "Learned in": the conversations whose turns wrote this note, newest first. */
+function NoteSources({ sources }: { sources: readonly MemoryNoteSource[] }) {
+  const { t } = useLingui();
+  return (
+    <section className="mt-8 border-t border-border pt-4" data-testid="memory-note-sources">
+      <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+        <Trans>Learned in</Trans>
+      </h3>
+      <ul className="flex flex-wrap gap-1.5">
+        {sources.map((source) => (
+          <li key={source.key}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-w-72"
+              title={source.archived ? t`${source.label} (archived)` : source.label}
+              onClick={source.onOpen}
+            >
+              <MessagesSquare aria-hidden />
+              <span className="truncate" dir="auto">
+                {source.label}
+              </span>
+              {source.archived ? (
+                <span className="text-muted-foreground">
+                  <Trans>archived</Trans>
+                </span>
+              ) : null}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
