@@ -355,9 +355,16 @@ it("hands its PCs to a new server version and still answers the runs already ope
   const run = broker.dispatch({ method: "agentRun", botId: "bot", runId: "open-run", sessionId: crypto.randomUUID(), request: {} }, context());
   const runOp = broker.poll(owner, "device").operations[0]!.id;
   broker.handOff(true);
+  const since = new Date(now).toISOString();
   expect(broker.handoffState()).toEqual({
-    handingOff: true, handoffEndsAt: new Date(now + DESKTOP_RELAY_HANDOFF_MS).toISOString(),
-    openOperations: 1, deliveredOperations: 1, agentRuns: 1, agentChannels: 0, connectedComputers: 1,
+    handingOff: true, handoffSince: since, handoffEndsAt: new Date(now + DESKTOP_RELAY_HANDOFF_MS).toISOString(),
+    openOperations: 1, openStreams: 1, deliveredOperations: 1, agentRuns: 1, agentChannels: 0, connectedComputers: 1,
+  });
+  // Renewing extends it but keeps when it started.
+  now += 1_000;
+  broker.handOff(true);
+  expect(broker.handoffState()).toMatchObject({
+    handoffSince: since, handoffEndsAt: new Date(now + DESKTOP_RELAY_HANDOFF_MS).toISOString(),
   });
   const refusal = (request: Parameters<DesktopRelayBroker["dispatch"]>[0]) => {
     try { broker.dispatch(request, context()); } catch (error) { return error; }
@@ -375,12 +382,20 @@ it("hands its PCs to a new server version and still answers the runs already ope
   const done = Buffer.from('{"done":true}\n').toString("base64");
   broker.result(owner, "device", callbackOp, 0, done, true);
   broker.result(owner, "device", runOp, 0, done, true);
+  // Closed operations count as open streams until their answers have been read.
+  expect(broker.handoffState()).toMatchObject({ openOperations: 0, openStreams: 2 });
   await Promise.all([run.text(), callback.text()]);
-  expect(broker.handoffState()).toMatchObject({ handingOff: true, openOperations: 0, agentRuns: 0 });
+  expect(broker.handoffState()).toMatchObject({ handingOff: true, openOperations: 0, openStreams: 0, agentRuns: 0 });
   // A rollback ends it at once; a handoff nobody renews ends by itself.
   broker.handOff(false);
   expect(broker.handoffState()).not.toHaveProperty("handoffEndsAt");
+  expect(broker.handoffState()).not.toHaveProperty("handoffSince");
   await broker.dispatch({ method: "environment", botId: "bot" }, { ...context(), signal: AbortSignal.abort() }).text();
+  // A dropped answer stops counting too.
+  const dropped = broker.dispatch({ method: "environment", botId: "bot" }, context());
+  expect(broker.handoffState()).toMatchObject({ openStreams: 1 });
+  await dropped.body?.cancel();
+  expect(broker.handoffState()).toMatchObject({ openOperations: 0, openStreams: 0 });
   broker.handOff(true);
   now += DESKTOP_RELAY_HANDOFF_MS - 1;
   expect(broker.handingOff()).toBe(true);

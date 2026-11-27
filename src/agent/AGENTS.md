@@ -2434,6 +2434,12 @@
   setup limit, PC work pauses and continues) and are never read as offline; callbacks of
   agent runs open on that instance still pass. Every answer carries the instance, revision
   and open/delivered/agent-run operations a handoff waits for; `cancel` is the rollback.
+  Nucleus drives the same state through `/internal/desktop-relay/drain` (POST starts or renews,
+  GET reads) and `/internal/desktop-relay/undrain`, signed alike: schemaVersion 1, instanceId
+  (HOSTNAME), a per-process bootId, the 40-hex releaseSha, openOperations, openStreams (answers
+  the worker has not finished reading) and drained only when both are 0. Refusals add
+  Retry-After and reason `desktop_relay_draining` but keep code/header `desktop_updating`;
+  a drain still expires 15 minutes after its latest POST, never cancels or replays work.
   If an active Desktop turn loses the relay without a handoff, only a correlated
   run transport interruption with a captured tool checkpoint starts a recovery
   segment. Mark pending calls uncertain and reuse the command-receipt checks.

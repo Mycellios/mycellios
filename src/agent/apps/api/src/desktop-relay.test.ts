@@ -607,6 +607,95 @@ it("hands the relay to a new server version only on a signed request from inside
   expect((await signed("/api/desktop-relay/internal", { probe: "test-bot", scope, nonce: randomUUID() })).status).toBe(200);
 });
 
+it("drains for a deployment: refuses new operations, finishes open ones and binds the evidence to this process", async () => {
+  const app = new Hono();
+  const revision = "a".repeat(40);
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    revision,
+    authenticate: async () => ({ actor: owner, sessionId: "test-session" }),
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const key = desktopRelayKey("test-purpose-secret");
+  const signed = (method: "GET" | "POST", url: string, body = "", headers: Record<string, string> = {}) => {
+    const time = String(Date.now());
+    return app.request(url, {
+      method,
+      headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(key, time, body), ...headers },
+      ...(method === "POST" ? { body } : {}),
+    });
+  };
+  const drain = async (method: "GET" | "POST" = "GET", url = "/internal/desktop-relay/drain") => {
+    const response = await signed(method, url);
+    expect(response.status).toBe(200);
+    return response.json() as Promise<Record<string, unknown>>;
+  };
+  const scope = { userId: owner.userId, spaceId: owner.spaceId };
+  const dispatch = (request: unknown) => {
+    const body = JSON.stringify({ scope, request, nonce: randomUUID() });
+    return signed("POST", "/api/desktop-relay/internal", body);
+  };
+  const native = { "x-mycellios-desktop": "1" };
+  const call = (action: string, input: unknown) =>
+    app.request(`/api/desktop-relay/${action}`, { method: "POST", headers: native, body: JSON.stringify(input) });
+
+  // Only a signed request from inside the deployment reads or changes it.
+  expect((await app.request("/internal/desktop-relay/drain")).status).toBe(401);
+  expect((await app.request("/internal/desktop-relay/drain", { method: "POST", body: "" })).status).toBe(401);
+  expect((await signed("POST", "/internal/desktop-relay/drain", "", { "x-forwarded-for": "203.0.113.7" })).status).toBe(404);
+
+  const idle = await drain();
+  expect(idle).toMatchObject({
+    schemaVersion: 1, releaseSha: revision, draining: false, openOperations: 0, openStreams: 0,
+    drainingSince: null, drained: false,
+  });
+  expect(idle.bootId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(typeof idle.instanceId).toBe("string");
+  expect(JSON.stringify(idle)).not.toContain(owner.userId);
+
+  // One operation is already open on this instance when the drain starts.
+  const identity = await (await call("identity", {})).json();
+  const deviceId = randomUUID(), generation = randomUUID();
+  expect((await call("account", { deviceId, generation, identity })).status).toBe(200);
+  expect((await call("bind", { deviceId, generation, botId: "test-bot" })).status).toBe(200);
+  const open = await dispatch({ method: "environment", botId: "test-bot" });
+  expect(open.status).toBe(200);
+
+  const draining = await drain("POST");
+  expect(draining).toMatchObject({ bootId: idle.bootId, draining: true, openOperations: 1, openStreams: 1, drained: false });
+  expect(typeof draining.drainingSince).toBe("string");
+  // Idempotent: asking again renews it but keeps when it started.
+  const renewed = await drain("POST");
+  expect(renewed).toMatchObject({ bootId: idle.bootId, draining: true, drainingSince: draining.drainingSince });
+
+  // New work is refused with a retry hint and the code turns already wait on.
+  const refused = await dispatch({ method: "environment", botId: "test-bot" });
+  expect(refused.status).toBe(503);
+  expect(refused.headers.get("x-mycellios-desktop-error")).toBe("desktop_updating");
+  expect(refused.headers.get("retry-after")).toBe("5");
+  expect(await refused.json()).toMatchObject({ code: "desktop_updating", reason: "desktop_relay_draining" });
+
+  // The open operation is still delivered and its result accepted.
+  const polled = await (await call("poll", { deviceId })).json();
+  expect(polled.operations).toHaveLength(1);
+  const id = polled.operations[0].id as string;
+  expect((await call("result", { deviceId, id, seq: 0, data: Buffer.from('{"ok":true}\n').toString("base64"), done: true })).status).toBe(200);
+  // Closed, but its answer has not been read yet: not drained.
+  expect(await drain()).toMatchObject({ openOperations: 0, openStreams: 1, drained: false });
+  expect(await open.text()).toBe('{"ok":true}\n');
+  expect(await drain()).toMatchObject({ bootId: idle.bootId, draining: true, openOperations: 0, openStreams: 0, drained: true });
+
+  // Undrain is the rollback: work is admitted again.
+  expect(await drain("POST", "/internal/desktop-relay/undrain")).toMatchObject({
+    bootId: idle.bootId, draining: false, drainingSince: null, drained: false,
+  });
+  const admitted = await dispatch({ method: "environment", botId: "test-bot" });
+  expect(admitted.status).toBe(200);
+  await admitted.body?.cancel();
+  expect(await drain()).toMatchObject({ bootId: idle.bootId, openStreams: 0 });
+});
+
 it("finishes an active conversation exactly once before replacing its relay, then accepts a follow-up", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "mc-relay-"));
   const project = path.join(root, "project");
