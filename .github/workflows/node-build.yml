@@ -151,7 +151,7 @@ jobs:
             --target="${{ matrix.target }}" \
             --source-revision="$GITHUB_SHA" \
             --output="build/node-package/${{ matrix.target }}" \
-            "${trust_args[@]}" "${windows_args[@]}"
+            ${trust_args[@]+"${trust_args[@]}"} ${windows_args[@]+"${windows_args[@]}"}
           node scripts/verify-node-installer.mjs --root="build/node-package/${{ matrix.target }}"
       - name: Build and verify native Debian installer
         if: needs.native_scope.outputs.required == 'true' && matrix.target == 'linux-x64'
