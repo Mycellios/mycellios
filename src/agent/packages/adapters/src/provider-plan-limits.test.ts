@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CLAUDE_PLAN_LIMITS_URL,
   CODEX_PLAN_LIMITS_URL,
+  OPENCODE_GO_PLAN_LIMITS_URL,
   parseClaudePlanLimits,
   parseCodexPlanLimits,
   readProviderPlanLimits,
@@ -151,5 +152,29 @@ describe("passive subscription quota", () => {
         })
       ).status,
     ).toBe("unsupported");
+  });
+});
+
+describe("OpenCode Go usage", () => {
+  it("reads the rolling, weekly and monthly windows of a Go key from OpenCode's fixed endpoint", async () => {
+    const fetch = vi.fn(async () => Response.json({ usage: {
+      rolling: { percent: 0, resetsAt: "2026-11-27T12:00:00Z" },
+      weekly: { percent: 32, resetsAt: "2026-11-30T00:00:00Z" },
+      monthly: { percent: 72, resetsAt: null },
+    } }));
+    const result = await readProviderPlanLimits({ provider: "opencode-go", accessToken: "synthetic-go-key", fetch: fetch as never });
+    expect(fetch).toHaveBeenCalledWith(OPENCODE_GO_PLAN_LIMITS_URL, expect.objectContaining({ redirect: "error" }));
+    const headers = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+    expect(headers).toEqual({ authorization: "Bearer synthetic-go-key", accept: "application/json" });
+    expect(result.status).toBe("available");
+    expect(result.windows.map(({ id, durationMinutes, usedPercent }) => [id, durationMinutes, usedPercent]))
+      .toEqual([["rolling", 300, 0], ["weekly", 10080, 32], ["monthly", 43200, 72]]);
+    expect(result.windows[2]!.resetsAt).toBeNull();
+  });
+
+  it("shows nothing for a key without a Go subscription", async () => {
+    const fetch = vi.fn(async () => new Response("", { status: 401 }));
+    const result = await readProviderPlanLimits({ provider: "opencode", accessToken: "synthetic-zen-key", fetch: fetch as never });
+    expect(result).toMatchObject({ status: "unsupported", reason: "not_reported", windows: [] });
   });
 });

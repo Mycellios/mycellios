@@ -20,6 +20,18 @@ export const LastModelCallSchema = z.object({
 });
 export type LastModelCall = z.infer<typeof LastModelCallSchema>;
 
+/**
+ * A conversation's size at its latest answer: the tokens that model call read and wrote,
+ * and the model's context window when the catalog knows it (null otherwise).
+ */
+export const ConversationContextSchema = z.object({
+  model: z.string(),
+  at: z.string(),
+  usedTokens: z.number().int().nonnegative(),
+  contextWindow: z.number().int().positive().nullable(),
+});
+export type ConversationContext = z.infer<typeof ConversationContextSchema>;
+
 export const AgentUsageTotalsSchema = TaskCostSchema.omit({ runId: true }).extend({
   inputTokens: z.number().int().nonnegative().nullable(),
   outputTokens: z.number().int().nonnegative().nullable(),

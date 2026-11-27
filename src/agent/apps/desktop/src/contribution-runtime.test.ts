@@ -155,3 +155,40 @@ it("does not invoke the installer if pairing expires during the component downlo
   const manager=new ContributionRuntime({...f.options,run:f.run,now:()=>now,fetch:vi.fn(async()=>{now=Date.parse("2031-01-01T00:00:00Z");return new Response(bytes);})});
   await expect(manager.enroll(bundle())).rejects.toThrow(/expired/);expect(f.run).not.toHaveBeenCalled();
 });
+
+it("offers the one-time runtime upgrade only to an enrolled runtime without the update trust anchor", async () => {
+  const f = await fixture(); await f.provision();
+  const trust = path.join(f.options.programFiles, "Mycellios", "app", "component-update-trust.json");
+  const run = vi.fn(async (_exe: string, args: string[]) => {
+    expect(args).toContain(path.join(f.resource, "upgrade-runtime.ps1"));
+    expect(args).not.toContain("-Enrollment");
+    expect(await readFile(args[args.indexOf("-Msi") + 1]!)).toEqual(Buffer.from("disposable test payload, not a real MSI"));
+    await mkdir(path.dirname(trust), { recursive: true }); await writeFile(trust, "{}"); return 0;
+  });
+  const manager = new ContributionRuntime({ ...f.options, run });
+  expect(await manager.status()).toMatchObject({ enrolled: true, nodeId: "existing-node", upgradeAvailable: true });
+  expect(await manager.upgrade()).toMatchObject({ enrolled: true, nodeId: "existing-node", upgradeAvailable: false, installing: false });
+  expect(run).toHaveBeenCalledOnce();
+  expect(await manager.upgrade()).toMatchObject({ upgradeAvailable: false });
+  expect(run).toHaveBeenCalledOnce();
+});
+it("never offers the legacy pinned runtime or an unenrolled computer as an upgrade", async () => {
+  const f = await fixture(); const run = vi.fn(async () => 0);
+  const manager = new ContributionRuntime({ ...f.options, run });
+  expect((await manager.status()).upgradeAvailable).toBe(false);
+  await f.provision();
+  await writeFile(path.join(f.resource, "runtime.json"), JSON.stringify({ schema: "mycellios-desktop-runtime/1", file: "mycellios-runtime.msi", sha256: "c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc" }));
+  expect((await manager.status()).upgradeAvailable).toBe(false);
+  expect(await manager.upgrade()).toMatchObject({ upgradeAvailable: false });
+  expect(run).not.toHaveBeenCalled();
+});
+it("keeps the previous runtime when the upgrade is cancelled or fails", async () => {
+  const f = await fixture(); await f.provision();
+  for (const [code, message] of [[1223, "cancelled"], [25, "previous runtime was kept"]] as const) {
+    const manager = new ContributionRuntime({ ...f.options, run: async () => code });
+    await expect(manager.upgrade()).rejects.toThrow(message);
+    expect(await manager.status()).toMatchObject({ enrolled: true, upgradeAvailable: true, installing: false });
+  }
+  const unconfirmed = new ContributionRuntime({ ...f.options, run: async () => 0 });
+  await expect(unconfirmed.upgrade()).rejects.toThrow("not been confirmed");
+});

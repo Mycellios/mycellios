@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish_windows_runtime:
+        description: Publish the Windows MSI as a pinnable desktop-runtime component (main only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -199,3 +204,31 @@ jobs:
             build/evidence/${{ matrix.target }}
           if-no-files-found: error
           retention-days: 14
+
+  publish_windows_runtime:
+    name: Publish Windows runtime component
+    needs: node
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_windows_runtime && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: desktop-runtime-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: mycellios-node-windows-x64
+          path: ${{ runner.temp }}/windows-node
+      - name: Publish the immutable desktop-runtime release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t msi < <(find "$RUNNER_TEMP/windows-node" -maxdepth 2 -name 'mycellios-node-*-windows-x64.msi')
+          test "${#msi[@]}" -eq 1
+          node scripts/publish-windows-runtime.mjs --msi="${msi[0]}" --revision="$GITHUB_SHA" | tee "$RUNNER_TEMP/component.json"
+          echo "### Windows runtime component" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat "$RUNNER_TEMP/component.json" >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"

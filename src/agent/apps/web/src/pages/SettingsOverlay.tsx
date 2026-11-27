@@ -384,13 +384,13 @@ export function SettingsOverlay({
         aria-current={active ? "page" : undefined}
         disabled={panelBusy}
         onClick={() => leaveSettings(() => changeSection(item.id))}
-        className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13.5px] transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+        className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13.5px] transition-colors md:gap-2 md:rounded-md md:px-2 md:py-[5px] md:text-[13px] md:leading-tight disabled:pointer-events-none disabled:opacity-50 ${
           active
             ? "bg-accent text-accent-foreground"
             : "text-muted-foreground hover:bg-accent hover:text-foreground"
         }`}
       >
-        <Icon className="size-4 shrink-0" strokeWidth={1.75} />
+        <Icon className="size-4 shrink-0 md:size-[15px]" strokeWidth={1.75} />
         <span className="whitespace-nowrap md:whitespace-normal">{item.label}</span>
       </button>
     );
@@ -465,8 +465,8 @@ export function SettingsOverlay({
         className="inset-0 top-0 left-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none bg-background p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] ring-0 sm:max-w-none data-open:animate-none data-closed:animate-none"
       >
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div className="flex min-h-0 shrink-0 flex-col border-b border-border md:w-[232px] md:border-b-0 md:border-e">
-            <div className="space-y-3 px-4 pt-4 pb-2">
+          <div className="flex min-h-0 shrink-0 flex-col border-b border-border md:w-[220px] md:border-b-0 md:border-e">
+            <div className="space-y-3 px-4 pt-4 pb-2 md:space-y-2 md:px-3 md:pt-3 md:pb-1">
               <p className={macWindowButtons ? "rk-settings-title app-drag text-sm font-semibold" : "text-sm font-semibold"}>{settingsTitle}</p>
               <div className="relative">
                 <Search className="pointer-events-none absolute start-2.5 top-2.5 size-3.5 text-muted-foreground" />
@@ -516,13 +516,13 @@ export function SettingsOverlay({
                 ref={setNavElement}
                 data-testid="settings-nav"
                 aria-label={settingsTitle}
-                className="flex min-h-0 min-w-0 flex-1 flex-row gap-1 overflow-x-auto py-2 md:h-full md:w-full md:flex-col md:overflow-y-auto md:px-3"
+                className="flex min-h-0 min-w-0 flex-1 flex-row gap-1 overflow-x-auto py-2 md:h-full md:w-full md:flex-col md:gap-px md:overflow-y-auto md:px-2 md:py-1"
               >
                 {navGroups.map(({ id, label }) => {
                   const items = visibleItems.filter(item => item.group === id);
                   if (!items.length) return null;
                   return <Fragment key={id ?? "main"}>
-                    {label ? <p className="hidden px-2.5 pt-4 pb-1 text-xs font-medium text-muted-foreground md:block">{label}</p> : null}
+                    {label ? <p className="hidden px-2 pt-3 pb-0.5 text-[11px] font-medium text-muted-foreground md:block">{label}</p> : null}
                     {items.filter(item => !extraSections.has(item.id)).map(renderNavItem)}
                     {items.filter(item => extraSections.has(item.id)).map(renderNavItem)}
                   </Fragment>;

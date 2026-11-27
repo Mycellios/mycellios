@@ -249,7 +249,7 @@ import {
   SpaceMemberRoleSchema,
   SpaceMembersSchema,
 } from "./space-members.js";
-import { AgentUsageReportSchema, LastModelCallSchema, TaskCostSchema } from "./task-cost.js";
+import { AgentUsageReportSchema, ConversationContextSchema, LastModelCallSchema, TaskCostSchema } from "./task-cost.js";
 
 const botId = z.object({ botId: Id });
 const groupId = z.object({ groupId: Id });
@@ -1708,6 +1708,8 @@ export const appContract = {
     dashboard: oc.input(UsageDashboardInputSchema).output(UsageDashboardSchema),
     agents: oc.output(AgentUsageReportSchema),
     agent: oc.input(botId).output(TaskCostSchema.omit({ runId: true }).extend({ botId: Id, lastCall: LastModelCallSchema.nullable() })),
+    /** How full the conversation was at its latest answer, from that model call's usage. */
+    threadContext: oc.input(z.object({ botId: Id, taskThreadId: Id.optional() })).output(ConversationContextSchema.nullable()),
     tasks: oc.input(z.object({ runIds: z.array(Id).max(100) })).output(z.array(TaskCostSchema)),
     list: oc.output(z.array(UsageRecordSchema)),
     summary: oc.output(UsageSummarySchema),

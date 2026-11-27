@@ -12,6 +12,9 @@ import { getGeneralPreferences } from "../lib/general-preferences";
 import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
 import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
+import { GitHubStarPrompt } from "../components/GitHubStarPrompt";
+import { ConversationContextMeter } from "../components/ConversationContextMeter";
+import { contextRefreshKey } from "../lib/conversation-context";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Archive, LayoutGrid } from "lucide-react";
@@ -271,7 +274,6 @@ import { sendFirstMessage } from "../lib/new-conversation";
 import { MessagePinsContext, PinnedMessagesButton, useMessagePins } from "../components/PinnedMessages";
 import { ChatSearchButton } from "../components/ChatSearch";
 import { LocalProject } from "../components/LocalProject";
-import { MicoWorkMenu } from "../components/MicoWorkMenu";
 import { WorkflowWorkspace } from "./workflows/WorkflowWorkspace";
 import { WorkflowsAvailability } from "./workflows/WorkflowsAvailability";
 import { RoutineWorkspace } from "./routines/RoutineWorkspace";
@@ -288,6 +290,7 @@ import { WorkspaceRail } from "./shell/workspace-rail";
 import { FrozenWhileCovered } from "./shell/frozen-while-covered";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
+import { EngineUpdateToasts } from "./shell/engine-update-toasts";
 import { ChatHeaderTools, ChatToolsPanel, MobileChatActions } from "./shell/chat-tools-panel";
 import {OpenMycelliosDev} from "../components/OpenMycelliosDev";
 import { DeveloperContextLink } from "../components/DeveloperContextLink";
@@ -362,7 +365,8 @@ import { SidebarHeader, useCreateMenu } from "./shell/sidebar-header";
 import { BotsSidebarLayout } from "./shell/sidebar-layout";
 import { SidebarRoster } from "./shell/sidebar-roster";
 import { commitSpaceRename, countUnreadChats, sidebarGroupsForSpaces } from "./shell/space-sidebar";
-import { Transcript } from "./shell/transcript";
+import { PendingConversation, Transcript } from "./shell/transcript";
+import { carryPendingSend } from "../lib/pending-thread-sends";
 import { useRoutineEditor } from "./shell/use-routine-editor";
 import { useSidebarExpansion } from "./shell/use-sidebar-expansion";
 import type { SettingsSection, ShellOverlay } from "./shell-overlay";
@@ -419,8 +423,9 @@ const FIRST_HISTORY_REUSE_MS = 1_500;
 const NO_AGENT_SKILLS: AgentSkillCatalogEntry[] = [];
 // Space settings the shell reads on every mount. Their editors write the saved value
 // back into the cache, so a chat switch or scoped remount can reuse them for a while
-// instead of reading each one from the API again.
-const SHELL_METADATA_STALE_MS = 5 * 60_000;
+// instead of reading each one from the API again. The client default refetches on every
+// mount, which would ignore that freshness window.
+const SHELL_METADATA_FRESHNESS = { staleTime: 5 * 60_000, refetchOnMount: true } as const;
 const NO_PROVIDERS: string[] = [];
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
@@ -539,6 +544,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     [navigate],
   );
   const queries = spaceQueries(userId ?? null, shellSpaceId, taskScope);
+  // Space settings are shared by the main chat and every task chat of the Space, so they use
+  // the Space-level keys: a project chat's scoped remount then reuses them instead of reading.
+  const spaceLevelQueries = spaceQueries(userId ?? null, shellSpaceId);
   const [groups, setGroups] = useState<Group[]>(seed?.groups ?? []);
   const [bots, setBots] = useState<Bot[]>(seed?.bots ?? []);
   const botsRef = useRef(bots);
@@ -650,12 +658,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const [routinesBotId, setRoutinesBotId] = useState<string | null>(null);
   const [taughtSkills, setTaughtSkills] = useState<TaughtSkill[]>([]);
   const [taughtSkillsBotId, setTaughtSkillsBotId] = useState<string | null>(null);
-  const agentSkillsQuery = useQuery({ ...queries.agentSkills.list.queryOptions(), staleTime: SHELL_METADATA_STALE_MS });
+  const agentSkillsQuery = useQuery({ ...spaceLevelQueries.agentSkills.list.queryOptions(), ...SHELL_METADATA_FRESHNESS });
   const agentSkills = agentSkillsQuery.data ?? NO_AGENT_SKILLS;
   const setAgentSkills = useCallback(
-    (skills: AgentSkillCatalogEntry[]) =>
-      void writeSaved(queryClient, queries.agentSkills.list.queryKey(), () => skills),
-    [queries],
+    (skills: AgentSkillCatalogEntry[]) => {
+      void writeSaved(queryClient, spaceLevelQueries.agentSkills.list.queryKey(), () => skills);
+      if (queries !== spaceLevelQueries)
+        void writeSaved(queryClient, queries.agentSkills.list.queryKey(), () => skills);
+    },
+    [queries, spaceLevelQueries],
   );
   const [teachBusy, setTeachBusy] = useState(false);
   const [computer, setComputer] = useState<ComputerStatus | null>(null);
@@ -727,14 +738,14 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     navigate({ search: searchString(withShellOverlay(searchParams, next)) }, { replace: true });
   }, [navigate, searchParams]);
   const messagingStatus = useQuery({
-    ...queries.messaging.status.queryOptions(),
-    staleTime: SHELL_METADATA_STALE_MS,
+    ...spaceLevelQueries.messaging.status.queryOptions(),
+    ...SHELL_METADATA_FRESHNESS,
     enabled: Boolean(session.data?.user),
   }).data;
   // A WhatsApp linked device needs no server chat-app provider, only Desktop.
   const messagingSurfaceEnabled = (messagingStatus?.enabled ?? false) || whatsappBridge() !== undefined;
   const messagingProviders = messagingStatus?.providers ?? NO_PROVIDERS;
-  const memoryConfigQuery = useQuery({ ...queries.memory.providerConfig.queryOptions(), staleTime: SHELL_METADATA_STALE_MS });
+  const memoryConfigQuery = useQuery({ ...spaceLevelQueries.memory.providerConfig.queryOptions(), ...SHELL_METADATA_FRESHNESS });
   // Undefined while it first loads; null when the space has none or it could not be read.
   const memoryProviderConfig: SpaceMemoryConfig | null | undefined =
     memoryConfigQuery.data !== undefined
@@ -760,7 +771,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   };
   // Voice readiness belongs to the Space, including when a task chat is open.
   const voiceStatus: VoiceStatus | null =
-    useQuery({ ...spaceQueries(userId ?? null, shellSpaceId).voice.status.queryOptions(), staleTime: SHELL_METADATA_STALE_MS }).data ?? null;
+    useQuery({ ...spaceLevelQueries.voice.status.queryOptions(), ...SHELL_METADATA_FRESHNESS }).data ?? null;
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [dismissedRunErrorIds, setDismissedRunErrorIds] =
     useState<ReadonlySet<string>>(readSeenRunErrorIds);
@@ -1906,8 +1917,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, []);
 
   const refreshAgentSkills = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: queries.agentSkills.list.queryKey() });
-  }, [queries]);
+    void queryClient.invalidateQueries({ queryKey: spaceLevelQueries.agentSkills.list.queryKey() });
+    // Skill screens opened from a task chat read the same list under that chat's scope.
+    if (queries !== spaceLevelQueries)
+      void queryClient.invalidateQueries({ queryKey: queries.agentSkills.list.queryKey() });
+  }, [queries, spaceLevelQueries]);
 
   useEffect(() => {
     const unsubSpeech = speaker.subscribe((state) => {
@@ -2742,9 +2756,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, [readingFirstHistory, active?.id, groupId, taskScope?.taskThreadId]);
   const pendingSendScope = JSON.stringify([userId, currentSpaceId]);
   const {
-    visible: pendingMessages, begin: beginPendingSend, accept: acceptPendingSend,
+    visible: pendingMessages, all: allPendingSends, begin: beginPendingSend, accept: acceptPendingSend,
     observe: observePendingSend, remove: removePendingSend,
   } = usePendingThreadSends(pendingSendScope, activeSnapshot);
+  // A new conversation's first message, shown while the conversation is created.
+  const [draftSend, setDraftSend] = useState<{ scope: string; botId: string; nonce: string; text: string; attachments: string[] } | null>(null);
+  // ...and once it exists, while its history loads.
+  const loadingTaskSends = useMemo(() => taskScope
+    ? allPendingSends.filter(send => send.scope === pendingSendScope && send.threadId === taskScope.taskThreadId)
+    : [], [allPendingSends, pendingSendScope, taskScope]);
   // Keep the armed reply even when its parent leaves the loaded page: the
   // server resolves a paged-out target and degrades a deleted one to a plain
   // reply instead of failing the send.
@@ -2798,6 +2818,17 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   );
   const workingRuns = currentRuns.filter((run) => isRunWorking(run.status));
   const transcriptRunning = workingRuns.length > 0;
+  // "Working in another conversation" explains a wait here only: once this conversation has its
+  // answer, the Mico's other work (a routine, another conversation) is shown by the sidebar.
+  const awaitingReply = useMemo(() => {
+    const messages = activeSnapshot?.messages ?? [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const role = messages[index]!.role;
+      if (role === "user") return true;
+      if (role === "bot") return false;
+    }
+    return pendingMessages.length > 0;
+  }, [activeSnapshot?.messages, pendingMessages.length]);
   const composerRunning = currentRuns.some((run) => isActive(run.status));
   const runError = threadRunError(activeSnapshot, dismissedRunErrorIds);
   const displayedRunError = !sendError ? runError : null;
@@ -3520,6 +3551,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       sendingRef.current = true;
       setSending(true);
       setSendError(null);
+      const shownSend = { scope: pendingSendScope, nonce: clientNonce, text: plan.trimmed,
+        attachments: attachments.map(attachment => attachment.file.name) };
+      setDraftSend({ ...shownSend, botId: botTarget });
       try {
         const artifactIds: string[] = [];
         for (const pending of attachments) {
@@ -3553,6 +3587,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           writeComposerDraft(`${floatingChat ? "floating:" : ""}bot:${botTarget}:task:${result.threadId}`, text);
           toast.error(t`Could not confirm the first message. Check the new conversation and send it again if it is missing.`);
         }
+        if (result.status === "sent") {
+          const accepted = { ...shownSend, threadId: result.threadId, messageId: result.messageId };
+          carryPendingSend(accepted);
+          beginPendingSend(accepted);
+        }
         updateConversationTabs(conversationScope, state => adoptNewConversation(state, result.threadId));
         void refreshBots().catch(() => undefined);
         if (activeBotId.current === botTarget) selectConversationRef.current(result.threadId);
@@ -3561,11 +3600,12 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         if (activeBotId.current === botTarget) setSendError(errorText(error, t`Failed to send message`));
         return false;
       } finally {
+        setDraftSend(current => current?.nonce === clientNonce ? null : current);
         sendingRef.current = false;
         setSending(false);
       }
     },
-    [newConversation, conversationScope, pendingAttachments, rpc, shellSpaceId, floatingChat, t],
+    [newConversation, conversationScope, pendingAttachments, rpc, shellSpaceId, floatingChat, t, pendingSendScope, beginPendingSend],
   );
   const stopRun = useCallback(async () => {
     if (sending) return;
@@ -4675,15 +4715,16 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
         };
   const renderHeaderActions = (close?: () => void) => (
     <>
-    {/* A narrow header (a side panel open, a small window) drops secondary actions before they
-        overlap the tabs: first Tasks (also in the rail), then search and pins. The model and Chat
-        tools always stay. Opening the floating window lives in Chat tools; inside that window the
-        header keeps its way back to the main window. */}
+    {/* As in the reference app the header keeps the model and pins (Tasks lives in the rail and
+        search opens with Ctrl/Cmd+F). A narrow header drops the pins before they overlap the tabs;
+        the model and Chat tools always stay. Inside the floating window the header keeps its way
+        back to the main window. */}
     {!inGroup && active && desktopBridge()?.chatWindow ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
-      {active && !inGroup && !activeProject ? <span className="contents @max-[36rem]:hidden"><MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
-        onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /></span> : null}
       {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-      {pinTarget && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ChatSearchButton key={`search:${activeSnapshot.threadId}`} rpc={rpc}
+      {!inGroup && active && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ConversationContextMeter key={`context:${activeSnapshot.threadId}`} rpc={rpc}
+        scope={JSON.stringify([userId, shellSpaceId])} botId={active.id} taskThreadId={taskScope?.taskThreadId}
+        refreshKey={contextRefreshKey(activeSnapshot.run)} /></span> : null}
+      {pinTarget && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><ChatSearchButton keyboardOnly key={`search:${activeSnapshot.threadId}`} rpc={rpc}
         scope={JSON.stringify([userId, shellSpaceId, pinTarget])} target={pinTarget} threadId={activeSnapshot.threadId} onJump={jumpToReplyMessage} /></span> : null}
       {(active || activeGroup) && activeSnapshot && !newConversation ? <span className="contents @max-[28rem]:hidden"><PinnedMessagesButton key={`pins:${activeSnapshot.threadId}`} state={messagePins} onJump={jumpToReplyMessage}
         mico={!inGroup && active ? { rpc, scope: JSON.stringify([userId, shellSpaceId]), botId: active.id, name: active.name,
@@ -4859,11 +4900,13 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const shell = (
     <>
     <ServerConnectionDialogs ownerId={userId ?? null} />
+    <EngineUpdateToasts bot={inGroup ? null : active} />
     <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} onOpen={openSpaceChat} />
     {userId && currentSpaceId ? <MicoEdgeDock key={JSON.stringify([userId, currentSpaceId])}
       bots={bots} spaceId={currentSpaceId} scope={JSON.stringify([userId, currentSpaceId])} activeId={active?.id}
       onOpen={id => openSpaceChat(currentSpaceId, `/app/${encodeURIComponent(id)}`)} onCreate={() => setCreateBotOpen(true)} /> : null}
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
+    {userId && shellReady && !floatingChat && !isMobileSidebar ? <GitHubStarPrompt /> : null}
     {isMobileSidebar && !floatingChat ? <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
       <SheetContent side={document.documentElement.dir === "rtl" ? "right" : "left"}
         showCloseButton={false} className="rk-mobile-navigation" aria-describedby={undefined}>
@@ -5148,14 +5191,20 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             {firstMicoSetup ? <span className="text-sm font-medium"><Trans>New bot</Trans></span> : <Button
               variant={active && !inGroup && !activeProject ? "ghost" : "floating"}
               data-testid="bot-settings-trigger"
-              aria-label={isMobileSidebar && (taskScope || newConversation) && !activeProject && !inGroup ? t`Main chat` : undefined}
+              // As in the reference app, the Mico's name is the main chat's tab: from another
+              // conversation it opens the main chat, and in the main chat it opens the Mico's settings.
+              data-main-chat-tab={active && !inGroup && !activeProject && !isMobileSidebar ? "" : undefined}
+              aria-current={active && !inGroup && !activeProject && !isMobileSidebar && !taskScope && !newConversation ? "page" : undefined}
+              aria-label={(taskScope || newConversation) && !activeProject && !inGroup ? t`Main chat` : undefined}
+              title={active && !inGroup && !activeProject && !isMobileSidebar
+                ? (taskScope || newConversation ? t`Main chat` : t`Settings`) : undefined}
               onClick={() => {
-                if (isMobileSidebar && (taskScope || newConversation) && active && !activeProject && !inGroup) {
+                if ((taskScope || newConversation) && active && !activeProject && !inGroup) {
                   selectConversation();
                 } else setPanel(inGroup ? "group-settings" : "settings");
               }}
               className={active && !inGroup && !activeProject
-                ? "app-no-drag h-7 min-w-0 max-w-[32%] shrink-0 gap-1.5 rounded-md px-2 max-md:h-12 max-md:max-w-[calc(100%-112px)] max-md:rounded-full max-md:px-3"
+                ? "app-no-drag h-7 min-w-0 max-w-[32%] shrink-0 gap-1.5 rounded-md px-2 aria-[current=page]:bg-muted max-md:h-12 max-md:max-w-[calc(100%-112px)] max-md:rounded-full max-md:px-3 max-md:aria-[current=page]:bg-transparent"
                 : "app-no-drag h-8 min-w-0 max-w-[40%] gap-2 rounded-md px-1.5 max-md:h-12 max-md:max-w-[calc(100%-112px)] max-md:rounded-full max-md:px-3"}
             >
               {inGroup ? (
@@ -5210,9 +5259,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               </Button>
             </div>
           ) : newConversation && active && !inGroup ? (
-            <NewConversationIntro bot={active} />
+            draftSend && draftSend.botId === active.id && draftSend.scope === pendingSendScope
+              ? <PendingConversation messages={[draftSend]} />
+              : <NewConversationIntro bot={active} />
           ) : !activeSnapshot && active ? (
-            failedThreadBotId === active.id ? (
+            loadingTaskSends.length && failedThreadBotId !== active.id ? <PendingConversation messages={loadingTaskSends} /> : failedThreadBotId === active.id ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3">
                 <p role="status"><Trans>Could not load this chat.</Trans></p>
                 <Button variant="ghost" onClick={() => setThreadLoadAttempt(attempt => attempt + 1)}>
@@ -5249,7 +5300,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               answerableAskIds={answerableAskIds}
               dismissableAskIds={dismissableAskIds}
               running={transcriptRunning}
-              workingElsewhere={!inGroup && !transcriptRunning && Boolean(active && isRunWorking(active.status))}
+              workingElsewhere={!inGroup && !transcriptRunning && awaitingReply && Boolean(active && isRunWorking(active.status))}
               workingBots={workingBots}
               lastRun={activeSnapshot?.run}
               activeRun={workingRuns.find((run) => Boolean(run.startedAt)) ?? workingRuns[0]}
@@ -5957,7 +6008,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             }}
             memoryConfig={memoryProviderConfig}
             onMemoryConfigChange={(config) => {
-              void writeSaved(queryClient, queries.memory.providerConfig.queryKey(), () => config);
+              void writeSaved(queryClient, spaceLevelQueries.memory.providerConfig.queryKey(), () => config);
             }}
             onClose={() => setOverlay(null)}
           />

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { AccountPlanLimit } from "@mycellios/contracts";
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   freshQuota,
   quotaColor,
@@ -9,6 +9,7 @@ import {
   readQuotaPreferences,
   remainingQuota,
   ringWindows,
+  sameQuotaAccount,
 } from "./quota-view";
 
 const now = Date.now();
@@ -71,4 +72,18 @@ it("isolates account choice and automatic refresh per scope, including broken or
   expect(readQuotaPreferences("bob/one")).toEqual({ accountId: "", autoRefresh: true });
   localStorage.setItem(quotaPreferencesKey("alice/one"), "{");
   expect(readQuotaPreferences("alice/one").autoRefresh).toBe(true);
+});
+
+describe("the PC's own Codex beside a saved ChatGPT account", () => {
+  const account = (credentialId: string, usedPercent: number, resetsAt: string) => ({
+    credentialId, provider: "openai-codex", label: "ChatGPT", authKind: "oauth", status: "available",
+    windows: [{ id: "secondary_window", label: "Weekly", durationMinutes: 10080, usedPercent, resetsAt, model: null }],
+    plan: null, checkedAt: new Date().toISOString(), measuredAt: new Date().toISOString(), retryAt: null, reason: null,
+  }) as AccountPlanLimit;
+  it("is the same account when its use and reset match, and another one when they differ", () => {
+    const saved = account("saved", 100, "2026-11-29T13:00:00.000Z");
+    expect(sameQuotaAccount(saved, account("native", 100, "2026-11-29T13:00:40.000Z"))).toBe(true);
+    expect(sameQuotaAccount(saved, account("native", 40, "2026-11-29T13:00:00.000Z"))).toBe(false);
+    expect(sameQuotaAccount(saved, account("native", 100, "2026-12-01T13:00:00.000Z"))).toBe(false);
+  });
 });

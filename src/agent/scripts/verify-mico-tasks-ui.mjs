@@ -97,13 +97,13 @@ async function verifyConversationNavigation(browser, url) {
     const routineTab = page.locator('[data-thread-tab="task-routine"]');
     const routineRow = picker.getByRole("button", { name: /Daily digest/ });
     await switcher.waitFor();
-    assert.equal(await switcher.textContent(), "Todas las conversaciones");
-    assert.equal(await switcher.locator("span.truncate").evaluate(label => label.scrollWidth > label.clientWidth), false);
+    // As in the reference app, the list of all conversations is a chevron after New conversation.
+    assert.equal((await switcher.textContent()).trim(), "");
     const shortTab = await page.locator('[data-thread-tab="task-one"]').boundingBox();
     const longTab = await page.locator('[data-thread-tab="task-two"]').boundingBox();
     assert.ok(shortTab && longTab && longTab.width > shortTab.width, "tabs give more width to longer titles");
-    assert.equal(await mainTab.textContent(), "Chat principal");
-    assert.equal(await mainTab.getAttribute("aria-current"), "page");
+    // The main chat's tab is the Mico's name in the shell header, outside this component.
+    assert.equal(await mainTab.count(), 0);
     assert.equal(await routineTab.count(), 0);
     await switcher.click();
     await picker.getByRole("button", { name: /Review API/ }).getByText("Pestaña abierta").waitFor();
@@ -118,7 +118,8 @@ async function verifyConversationNavigation(browser, url) {
     await routineTab.hover();
     await routineTab.locator("button[aria-label]").click();
     await routineTab.waitFor({ state: "detached" });
-    await mainTab.click();
+    await switcher.click();
+    await picker.getByRole("button", { name: "Chat principal", exact: true }).click();
     await switcher.click();
     await routineRow.waitFor();
     assert.equal(await routineRow.locator("[data-open-tab]").count(), 0);
@@ -188,7 +189,9 @@ async function verifyConversationSurfaces(browser, url) {
   await openPicker();
   const rows = await picker().locator("button:not([aria-label])").allTextContents();
   assert.deepEqual(rows.slice(0, 2), ["New conversation", "Main chat"]);
-  assert.ok(rows.some(row => row.startsWith("Daily digestRoutine")) && rows.some(row => row.startsWith("Check supplier pricesDelegated")), rows.join(" | "));
+  // Routine runs sit under their own Routines heading instead of carrying a label on each row.
+  assert.ok(rows.some(row => row.startsWith("Daily digest")) && rows.some(row => row.startsWith("Check supplier pricesDelegated")), rows.join(" | "));
+  assert.equal(await picker().locator("legend").filter({ hasText: "Routines" }).count(), 1);
   assert.ok(rows.at(-1).startsWith("Old budget"), rows.join(" | "));
   const marks = await picker().locator("[data-thread-status]").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-thread-status")));
   for (const mark of ["working", "unread", "waiting", "failed", "queued"]) assert.ok(marks.includes(mark), `${mark} in ${marks}`);

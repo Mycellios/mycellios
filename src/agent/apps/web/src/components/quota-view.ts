@@ -36,6 +36,21 @@ export function ringWindows(account: AccountPlanLimit | undefined, now: number) 
 export function quotaColor(remaining: number) {
   return remaining < 10 ? "var(--destructive)" : remaining < 30 ? "var(--warning)" : "var(--success)";
 }
+/**
+ * The PC's own Codex reports no account identity. When its account-wide windows match a saved
+ * account of the same provider (same use and reset), it is that account: show it once.
+ */
+export function sameQuotaAccount(saved: AccountPlanLimit, native: AccountPlanLimit, now = Date.now()) {
+  // A stale saved reading keeps the PC's fresher one visible.
+  if (saved.provider !== native.provider || !freshQuota(saved, now) || native.status !== "available") return false;
+  const general = native.windows.filter(window => !window.model);
+  return general.length > 0 && general.every(window => saved.windows.some(other =>
+    !other.model && other.durationMinutes === window.durationMinutes &&
+    Math.abs(other.usedPercent - window.usedPercent) < 1 &&
+    (other.resetsAt === window.resetsAt ||
+      Math.abs(Date.parse(other.resetsAt ?? "") - Date.parse(window.resetsAt ?? "")) <= 120_000)));
+}
 export function providerName(provider: string) {
-  return provider === "openai-codex" ? "ChatGPT" : provider === "anthropic" ? "Claude" : provider;
+  return provider === "openai-codex" ? "ChatGPT" : provider === "anthropic" ? "Claude"
+    : provider === "opencode-go" || provider === "opencode" ? "OpenCode" : provider;
 }

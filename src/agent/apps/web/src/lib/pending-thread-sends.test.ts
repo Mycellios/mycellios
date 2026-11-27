@@ -65,3 +65,14 @@ describe("pending message identity", () => {
     ).toHaveLength(1);
   });
 });
+
+describe("carried pending sends", () => {
+  it("hands a new conversation's first message to the view that mounts next, briefly and per scope", async () => {
+    const { carryPendingSend, carriedPendingSends } = await import("./pending-thread-sends");
+    const send = { scope: "s1", threadId: "t1", nonce: "n-carry", text: "test", attachments: [], messageId: "m1" };
+    carryPendingSend(send, 1_000);
+    expect(carriedPendingSends("s1", 2_000)).toEqual([send]);
+    expect(carriedPendingSends("s2", 2_000)).toEqual([]);
+    expect(carriedPendingSends("s1", 1_000 + 30_000)).toEqual([]);
+  });
+});

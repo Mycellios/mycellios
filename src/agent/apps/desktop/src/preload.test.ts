@@ -157,7 +157,7 @@ describe("desktop preload bridge", () => {
       "toggleMaximize",
     ]);
     expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "cancelRestart", "check", "download", "forceInstall", "install", "onPrepare", "preferences", "restartWhenIdle", "savePreferences", "state"]);
-    expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status"]);
+    expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status", "upgrade"]);
 
     expect(Object.keys(bridge.localVoice!).sort()).toEqual(["prepare", "prepareModel", "removeModel", "speak", "status", "stop", "transcribe"]);
     await bridge.localVoice!.status();

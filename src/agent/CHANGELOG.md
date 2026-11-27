@@ -6,6 +6,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-27
+
+### Added
+
+- Desktop shows Codex, Claude Code and OpenCode updates as a notice at the top right: the new version with an Update button, live download progress, a Retry button if it fails, and a short "updated" note when it finishes.
+
+### Fixed
+
+- Switching between Micos no longer reloads the model catalog, account and quota reads each time, so the new chat loads with less waiting.
+- Opening a project chat reuses your Space's skills, chat apps, memory and voice settings instead of
+  reading them again from the server each time.
+
+## [0.36.0] - 2026-11-27
+
+### Security
+
+- The desktop-protection guard now refuses `killall5`, which ends the whole graphical session
+  the same way `killall` does.
+
+### Added
+
+- Your Micos can read a page in your shared Chrome tabs. The side panel asks before each new site:
+  allow once, always allow or deny. Pages are read only when the Mico uses your own model provider
+  or a Mycellios-managed one with a contract, never the free route or the contributor network.
+  Mycellios, the Chrome Web Store and password managers are never read, and password and card
+  values are hidden.
+
+### Changed
+
+- Codex, Claude Code and OpenCode Micos now work on several conversations at once, up to the
+  Mico's conversation limit, and the main chat never waits behind side conversations. Before,
+  each of these Micos answered one conversation at a time. Self-hosters can set
+  `MYCELLIOS_NATIVE_CONCURRENCY=0` on the API and worker to keep the old behavior.
+- Claude Code and Codex stay ready for 5 minutes after a reply instead of 30 seconds, so the
+  next message in the same conversation starts faster.
+- Fold the "Needs you" and "Projects" sidebar sections from their titles. Folded "Needs you"
+  keeps a count of what waits, and each device remembers the choice.
+- Simplify the conversations menu: one line per conversation, aligned status marks, and routine
+  runs under their own "Routines" heading instead of a badge on each row.
+- List free AntSeed models under their own "AntSeed · Free" heading in the model picker, and
+  set the agent programs installed on this PC (Claude Code, Codex, OpenCode) apart from the API
+  connections that share their logos.
+- Show the Mycellios model list at once from the last catalog this device read, while the live
+  one loads, and keep the catalog on the server for a minute so the picker opens quickly.
+- Move "Open floating chat" to Chat tools. A narrow chat header now hides secondary actions
+  instead of letting them overlap the conversation tabs.
+- Show created, archived and deleted Mico notes as small status lines, like routine runs.
+- Show only a quiet arrow for the steps of a turn that is still running.
+
+### Fixed
+
+- Mycellios asks the server for less in the background, so chats open and refresh faster when
+  several windows or devices are signed in. The task menu checks idle work less often, the Mico list
+  and project folders refresh at a calmer pace, and switching between chats reuses your Space
+  settings instead of reading them again.
+- Offer browser contribution instead of a permanent "Could not confirm contribution" error when
+  Mycellios Desktop shows a server other than the official Mycellios app, such as a self-hosted
+  server. Desktop only runs this computer's contribution for the official app, so retrying never
+  helped.
+- A Mico that controls a desktop computer can now run ordinary shell commands that read `$?`,
+  `$#`, `$$` or `$!`. Before, the desktop-protection guard refused them as unresolved variables
+  even though they only ever hold digits.
+- Opening a project chat in Mycellios Desktop no longer reads again the history of every Mico that is
+  waiting for your answer, and the Mico list formats its times without rebuilding the formatter for
+  every row.
+- Stop dictation as soon as it starts when the microphone sends no sound or transcription is
+  unavailable, with the reason, instead of failing after you have spoken.
+- Make the Settings close button respond to every click on macOS, and keep the window buttons
+  clear of the Settings title and of the first controls in narrow windows.
+- Keep the sidebar resize handle on the sidebar's edge on macOS.
+
 ## [0.35.0] - 2026-11-26
 
 ### Security

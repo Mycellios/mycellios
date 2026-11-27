@@ -8,6 +8,7 @@ import { useSpaceRpc } from "../lib/space-rpc";
 import {
   freshQuota,
   providerName,
+  sameQuotaAccount,
   quotaColor,
   quotaPreferencesKey,
   readQuotaPreferences,
@@ -15,6 +16,9 @@ import {
   ringWindows,
   usableWindow,
 } from "./quota-view";
+
+/** How long a Mico switch reuses the account quotas instead of reading them again. */
+const PLAN_REUSE_MS = 60_000;
 
 export function ProviderQuota(props: {
   scope: string;
@@ -26,6 +30,12 @@ export function ProviderQuota(props: {
 }) {
   return <QuotaContent key={props.scope} {...props} />;
 }
+/**
+ * The last reading of each account/Space scope, in memory for this window only: the rail and the
+ * panel paint it at once (for instance after switching Micos) while a fresh one loads.
+ */
+const recentQuota = new Map<string, AccountPlanLimits>();
+
 function QuotaContent({
   scope,
   botId,
@@ -42,7 +52,7 @@ function QuotaContent({
   const { t, i18n } = useLingui();
   const rpc = useSpaceRpc();
   const [preferences, setPreferences] = useState(() => readQuotaPreferences(scope));
-  const [data, setData] = useState<AccountPlanLimits | null>(null);
+  const [data, setData] = useState<AccountPlanLimits | null>(() => recentQuota.get(scope) ?? null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -50,24 +60,37 @@ function QuotaContent({
   const alive = useRef(true);
   const loading = useRef(false);
   const controller = useRef<AbortController | null>(null);
+  // Account quotas do not depend on the open Mico; only its PC's Codex reading does.
+  const plan = useRef<{ value: AccountPlanLimits; at: number } | null>(null);
   const load = useCallback(
-    async (refresh = false) => {
+    async (refresh = false, reusePlan = false) => {
       if (loading.current && !controller.current?.signal.aborted) return;
       loading.current = true;
       setBusy(true);
       const abort = new AbortController();
       controller.current = abort;
       try {
-        const [value, native] = await Promise.all([
-          rpc.models.planLimits({ refresh }, { signal: abort.signal }),
-          rpc.engines.codexQuota(botId ? { botId } : undefined, { signal: abort.signal }).catch(() => null),
-        ]);
-        if (native) value.accounts = [...value.accounts, native];
-        if (alive.current && !abort.signal.aborted) {
-          setData(value);
+        // The PC's own Codex answers through the Desktop relay and can take seconds: show the
+        // saved accounts as soon as they arrive and add the PC's reading when it comes.
+        const nativeReading = rpc.engines.codexQuota(botId ? { botId } : undefined, { signal: abort.signal }).catch(() => null);
+        const saved = plan.current;
+        const value = reusePlan && !refresh && saved && Date.now() - saved.at < PLAN_REUSE_MS
+          ? saved.value
+          : await rpc.models.planLimits({ refresh }, { signal: abort.signal }).then((next) => {
+              plan.current = { value: next, at: Date.now() };
+              return next;
+            });
+        const show = (next: AccountPlanLimits) => {
+          if (!alive.current || abort.signal.aborted) return;
+          recentQuota.set(scope, next);
+          setData(next);
           setError(false);
           setNow(Date.now());
-        }
+        };
+        const previousNative = recentQuota.get(scope)?.accounts.filter(row => !value.accounts.some(saved => saved.credentialId === row.credentialId)) ?? [];
+        show({ ...value, accounts: [...value.accounts, ...previousNative.filter(row => !value.accounts.some(saved => sameQuotaAccount(saved, row)))] });
+        const native = await nativeReading;
+        show({ ...value, accounts: native && !value.accounts.some((saved) => sameQuotaAccount(saved, native)) ? [...value.accounts, native] : value.accounts });
       } catch {
         if (alive.current && !abort.signal.aborted) setError(true);
       } finally {
@@ -75,11 +98,12 @@ function QuotaContent({
         if (alive.current && !abort.signal.aborted) setBusy(false);
       }
     },
-    [rpc, botId],
+    [rpc, botId, scope],
   );
   useEffect(() => {
     alive.current = true;
-    void load();
+    // Switching Micos only rereads that Mico's PC; the account quotas refresh on their timer.
+    void load(false, true);
     const tick = setInterval(() => setNow(Date.now()), 30_000);
     return () => {
       alive.current = false;
@@ -142,6 +166,7 @@ function QuotaContent({
       <PopoverTrigger
         data-testid="provider-quota-trigger"
         openOnHover={compact}
+        delay={80}
         onClick={compact ? () => action(onUsage) : undefined}
         onKeyDown={compact ? (event) => {
           if (event.key !== "ArrowDown") return;
@@ -225,6 +250,7 @@ function QuotaContent({
                         const value = remainingQuota(window);
                         const label = window.durationMinutes === 300 ? t`5 hours`
                           : window.durationMinutes === 10080 ? t`Weekly`
+                            : window.durationMinutes === 43200 ? t`Monthly`
                             : window.label === "Session" ? t`Session` : window.label;
                         const windowName = window.model ? `${window.model} · ${label}` : label;
                         const date = window.resetsAt ? new Date(window.resetsAt) : null;

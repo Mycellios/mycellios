@@ -39,7 +39,8 @@ export function generateWixSource(input) {
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
 <Product Id="${guid(`product:${input.version}:${input.sourceRevision}`)}" Name="Mycellios Node" Language="1033" Version="${input.version}" Manufacturer="Mycellios" UpgradeCode="${guid("upgrade:io.mycellios.node")}">
 <Package Id="${guid(`package:${input.version}:${input.sourceRevision}`)}" InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" Description="Native Mycellios contribution node" />
-<MajorUpgrade DowngradeErrorMessage="A newer Mycellios Node is already installed." />
+<!-- package.json versions are not bumped per revision: a same-version build must still replace the installed product. -->
+<MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer Mycellios Node is already installed." />
 <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 <Property Id="MYCELLIOSSOURCEREVISION" Value="${input.sourceRevision}" />
 <Directory Id="TARGETDIR" Name="SourceDir"><Directory Id="ProgramFiles64Folder">${renderDirectory(root)}</Directory></Directory>

@@ -7476,3 +7476,59 @@ msgstr ""
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Could not change which Micos can use this memory"
 msgstr ""
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "Updating {name}"
+msgstr "{name} अपडेट हो रहा है"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} update available"
+msgstr "{name} का अपडेट उपलब्ध है"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} update failed"
+msgstr "{name} का अपडेट विफल रहा"
+
+#: src/pages/shell/engine-update-toasts.tsx
+msgid "{name} updated"
+msgstr "{name} अपडेट हो गया"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star Mycellios on GitHub"
+msgstr "GitHub पर Mycellios को स्टार दें"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Enjoying Mycellios so far?"
+msgstr "अब तक Mycellios पसंद आ रहा है?"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "A star on GitHub helps more people find Mycellios."
+msgstr "GitHub पर एक स्टार ज़्यादा लोगों को Mycellios ढूँढने में मदद करता है।"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star on GitHub"
+msgstr "GitHub पर स्टार दें"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens."
+msgstr "संदर्भ {percent}% भरा: {total} में से {used} टोकन।"
+
+#: src/components/ConversationContextMeter.tsx
+msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
+msgstr "संदर्भ {percent}% भरा: {total} में से {used} टोकन। भर जाने पर पुराने संदेश अपने आप संक्षेप में बदल जाते हैं।"
+
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "इस कंप्यूटर को अपडेट करें"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "इस कंप्यूटर को अपडेट किया जा रहा है…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "एक बार का अपडेट। इसके बाद यह कंप्यूटर अपने आप अपडेट होगा।"
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "अपडेट पूरा नहीं हुआ। यह कंप्यूटर अपना मौजूदा संस्करण बनाए रखता है।"

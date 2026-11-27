@@ -172,7 +172,7 @@ const basePages = {
         "Account-bound, approved work can earn AI Credits after independent verification. Connection time and benchmarks do not earn Credits; demand and earnings are not guaranteed. Spore token rewards and cash payouts remain separate, planned features.",
       ],
       links: [
-        { href: "https://www.mycellios.com/agent", label: "Open Agent and activate Generate AI" },
+        { href: "https://www.mycellios.com/agent", label: "Open Agent and turn on Earn credits" },
         { href: "/guides/contribute-compute", label: "How verified-work Credits work" },
         { href: "/downloads", label: "Check native package availability" },
       ],
@@ -191,7 +191,7 @@ const basePages = {
         "If a package is unavailable, review the public releases or try the browser worker on a compatible device without installing a native client.",
       ],
       links: [
-        { href: "https://www.mycellios.com/agent", label: "Open Agent and activate Generate AI" },
+        { href: "https://www.mycellios.com/agent", label: "Open Agent and turn on Earn credits" },
         { href: "/guides/contribute-compute", label: "How verified-work Credits work" },
         { href: "https://github.com/Mycellios/mycellios/releases", label: "View published releases" },
       ],
@@ -212,7 +212,7 @@ const basePages = {
       heading: "Connect a browser to Mycellios",
       paragraphs: [
         "An opt-in worker lets compatible desktop, tablet, or phone browsers contribute measurable compute to the Mycellios test network. You can pause it at any time.",
-        "Available tasks depend on browser capabilities and network state. This standalone worker does not attribute earnings to your account. For verified-work Credits, use the account-bound Generate AI control in Mycellios Agent.",
+        "Available tasks depend on browser capabilities and network state. This standalone worker does not attribute earnings to your account. For verified-work Credits, use the account-bound Earn credits control in Mycellios Agent.",
       ],
       links: [
         { href: "/earn", label: "Learn about contributing compute" },

@@ -38,6 +38,17 @@ function ProviderMark({ provider }: { provider: string }) {
   return <Icon size={16} strokeWidth={1.6} aria-hidden="true" />;
 }
 
+/**
+ * The last report of each account/Space scope and filter, in memory for this window only: opening
+ * Usage again shows it at once while a fresh one loads. Never stored on disk.
+ */
+const recentReports = new Map<string, UsageDashboard>();
+function rememberReport(key: string, report: UsageDashboard) {
+  recentReports.delete(key);
+  recentReports.set(key, report);
+  while (recentReports.size > 24) recentReports.delete(recentReports.keys().next().value!);
+}
+
 export function UsageWorkspace({
   client,
   scope,
@@ -103,8 +114,11 @@ export function UsageWorkspace({
   useEffect(() => {
     let live = true,
       timer: ReturnType<typeof setTimeout>;
-    setReport(null);
-    setLoading(true);
+    const reportKey = JSON.stringify([scope, zone, filter.bot, filter.period]);
+    const recent = recentReports.get(reportKey) ?? null;
+    setReport(recent);
+    if (recent) setAgents(recent.agents);
+    setLoading(!recent);
     setError("");
     async function load() {
       const today = dateInZone(new Date(), zone);
@@ -118,6 +132,7 @@ export function UsageWorkspace({
             : { botId: filter.bot === "unassigned" ? null : filter.bot }),
         });
         if (!live) return;
+        rememberReport(reportKey, result);
         setReport(result);
         setAgents(result.agents);
         setLoading(false);
@@ -135,7 +150,7 @@ export function UsageWorkspace({
       live = false;
       clearTimeout(timer);
     };
-  }, [client, zone, filter.bot, filter.period, revision]);
+  }, [client, scope, zone, filter.bot, filter.period, revision]);
   const compact = (value: number | null) =>
     value === null
       ? "—"
