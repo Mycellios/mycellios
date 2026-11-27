@@ -15784,3 +15784,135 @@ msgstr "Diagnostic report copied. Paste it into your message to support."
 #: src/components/HelpMenu.tsx
 msgid "Could not copy the diagnostic report."
 msgstr "Could not copy the diagnostic report."
+
+msgid "Memory view"
+msgstr "Memory view"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Graph"
+msgstr "Graph"
+
+msgid "Search notes"
+msgstr "Search notes"
+
+msgid "New note"
+msgstr "New note"
+
+msgid "Could not load your memory."
+msgstr "Could not load your memory."
+
+msgid "Your Micos have not saved anything yet. Notes they keep, and notes you write, appear here."
+msgstr "Your Micos have not saved anything yet. Notes they keep, and notes you write, appear here."
+
+msgid "No notes match your search."
+msgstr "No notes match your search."
+
+msgid "{0} notes · {1} links"
+msgstr "{0} notes · {1} links"
+
+msgid "There are too many notes to draw at once. Hide some groups or open a note to see its own links."
+msgstr "There are too many notes to draw at once. Hide some groups or open a note to see its own links."
+
+msgid "Nothing to show. Notes appear here as your Micos remember things."
+msgstr "Nothing to show. Notes appear here as your Micos remember things."
+
+msgid "Notes connect when one mentions another as [[note name]]."
+msgstr "Notes connect when one mentions another as [[note name]]."
+
+msgid "Local graph"
+msgstr "Local graph"
+
+msgid "Full graph"
+msgstr "Full graph"
+
+msgid "This note has no links yet. Mention another note as [[note name]] to connect them."
+msgstr "This note has no links yet. Mention another note as [[note name]] to connect them."
+
+msgid "Choose a name for the note."
+msgstr "Choose a name for the note."
+
+msgid "Discard your changes?"
+msgstr "Discard your changes?"
+
+msgid "This note has edits you have not saved."
+msgstr "This note has edits you have not saved."
+
+msgid "Discard"
+msgstr "Discard"
+
+msgid "A note with this name already exists there."
+msgstr "A note with this name already exists there."
+
+msgid "Could not create the note."
+msgstr "Could not create the note."
+
+msgid "Trips/Japan"
+msgstr "Trips/Japan"
+
+msgid "Who can use it"
+msgstr "Who can use it"
+
+msgid "General (all non-isolated Micos)"
+msgstr "General (all non-isolated Micos)"
+
+msgid "Create the note {target}"
+msgstr "Create the note {target}"
+
+msgid "Back to notes"
+msgstr "Back to notes"
+
+msgid "Edited by you"
+msgstr "Edited by you"
+
+msgid "This note changed meanwhile. Copy your text, then reopen the note to edit its latest version."
+msgstr "This note changed meanwhile. Copy your text, then reopen the note to edit its latest version."
+
+msgid "This note is empty."
+msgstr "This note is empty."
+
+msgid "Linked from"
+msgstr "Linked from"
+
+msgid "No notes link here yet."
+msgstr "No notes link here yet."
+
+msgid "Links to"
+msgstr "Links to"
+
+msgid "Notes to link"
+msgstr "Notes to link"
+
+msgid "Write [[ to link another note."
+msgstr "Write [[ to link another note."
+
+msgid "Pick a note to read it, or open the graph to see how your notes connect."
+msgstr "Pick a note to read it, or open the graph to see how your notes connect."
+
+msgid "Graph of {0} notes and {1} links"
+msgstr "Graph of {0} notes and {1} links"
+
+msgid "Fit graph"
+msgstr "Fit graph"
+
+msgid "Memory in context"
+msgstr "Memory in context"
+
+msgid "Notes {botName} had available when writing this reply. Having a note does not mean the reply relied on it."
+msgstr "Notes {botName} had available when writing this reply. Having a note does not mean the reply relied on it."
+
+msgid "Notes the Mico had available when writing this reply. Having a note does not mean the reply relied on it."
+msgstr "Notes the Mico had available when writing this reply. Having a note does not mean the reply relied on it."
+
+msgid "Could not load the notes for this reply."
+msgstr "Could not load the notes for this reply."
+
+msgid "No memory notes were recorded for this reply. Replies written before this feature, or without saved notes, show nothing here."
+msgstr "No memory notes were recorded for this reply. Replies written before this feature, or without saved notes, show nothing here."
+
+msgid "This Mico"
+msgstr "This Mico"
+
+msgid "{0} more notes were deleted since."
+msgstr "{0} more notes were deleted since."

@@ -1149,6 +1149,32 @@ export const appContract = {
       )
       .output(MemoryDocumentSchema),
     remove: oc.input(z.object({ documentId: Id })).output(z.object({ ok: z.literal(true) })),
+    /** A new note the person writes on the memory page; never replaces an existing one. */
+    create: oc
+      .input(
+        z
+          .object({
+            scope: z.enum(["bot", "user"]),
+            botId: Id.optional(),
+            path: z.string().min(1).max(200),
+            content: z.string().max(64_000),
+          })
+          .refine((value) => (value.scope === "bot") === Boolean(value.botId), {
+            message: "A Mico note needs its Mico; a general note has none.",
+          }),
+      )
+      .output(MemoryDocumentSchema),
+    /** The notes a Mico reply had in its prompt: ids recorded by the run, names read now. */
+    recall: oc
+      .input(z.object({ messageId: Id }))
+      .output(
+        z.object({
+          recorded: z.boolean(),
+          notes: z.array(z.object({ id: Id, path: z.string(), scope: z.enum(["bot", "user"]), botId: Id.nullable() })),
+          /** Notes that were in context but have been deleted since. */
+          removed: z.number().int().nonnegative(),
+        }),
+      ),
     exportMarkdown: oc.input(z.object({ botId: Id.optional() })).output(z.string()),
     providerConfig: oc.output(SpaceMemoryConfigSchema.nullable()),
     connectProvider: oc

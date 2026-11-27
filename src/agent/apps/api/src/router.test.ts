@@ -4,7 +4,7 @@ import path from "node:path";
 import { createRouterClient } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import type { ManagedConnectorProvider } from "@mycellios/adapter-kit";
-import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
+import { MEMORY_REVISION_CONFLICT_ERROR, SecretStoreUnavailableError } from "@mycellios/adapter-kit";
 import type { McpOAuthSummary } from "@mycellios/adapters";
 import * as adapters from "@mycellios/adapters";
 import {
@@ -8566,6 +8566,109 @@ describe("memory documents", () => {
     const foreign = memoryClient(null);
     await expect(foreign.client.memory.remove({ documentId: "doc-2" })).rejects.toBeTruthy();
     expect(foreign.memory.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("memory note creation", () => {
+  const actor = { userId: "user-1", spaceId: "space-1", email: "user@mycellios.test" };
+
+  function createClient(commit = vi.fn(async (request: { path: string; content: string }) => ({ id: "doc-9", path: request.path, revision: 1, content: request.content })), session: typeof actor | null = actor) {
+    const deps = {
+      prisma: {},
+      memory: { commit },
+      env: { webOrigin: "https://example.test" },
+    } as unknown as RouterDeps;
+    const client = createRouterClient(createRouter(deps), { context: { actor: session } as never });
+    return { client, commit };
+  }
+
+  it("creates a general note only when it does not exist yet, as the person's own choice", async () => {
+    const { client, commit } = createClient();
+    await expect(client.memory.create({ scope: "user", path: "Trips/Japan", content: "Kyoto in May" })).resolves.toMatchObject({
+      id: "doc-9",
+      scope: "user",
+      botId: null,
+      path: "Trips/Japan.md",
+      inclusion: "searchable",
+      userControlled: true,
+    });
+    expect(commit).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "user", path: "Trips/Japan.md", expectedRevision: 0, selectionByUser: true, inclusion: "searchable" }),
+      expect.objectContaining({ spaceId: "space-1", userId: "user-1" }),
+    );
+  });
+
+  it("reports an existing note as a conflict instead of replacing it", async () => {
+    const { client } = createClient(vi.fn(async () => {
+      throw new Error(MEMORY_REVISION_CONFLICT_ERROR);
+    }));
+    await expect(client.memory.create({ scope: "user", path: "profile", content: "" })).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("refuses unsafe names, task folders and a Mico note without its Mico", async () => {
+    const { client, commit } = createClient();
+    await expect(client.memory.create({ scope: "user", path: "../outside", content: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(client.memory.create({ scope: "user", path: "tasks/t1/x", content: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(client.memory.create({ scope: "bot", path: "x", content: "" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("lists the notes a reply had in context, owner-scoped and in recorded order", async () => {
+    const findMessage = vi.fn(async () => ({ runId: "run-1" }));
+    const findReceipt = vi.fn(async () => ({ documentIds: ["b", "gone", "a"] }));
+    const findDocs = vi.fn(async () => [
+      { id: "a", path: "profile.md", scope: "user", botId: null },
+      { id: "b", path: "reviews/tea.md", scope: "bot", botId: "bot-1" },
+    ]);
+    const deps = {
+      prisma: { message: { findFirst: findMessage }, runMemoryRecall: { findFirst: findReceipt }, memoryDocument: { findMany: findDocs } },
+      memory: {},
+      env: { webOrigin: "https://example.test" },
+    } as unknown as RouterDeps;
+    const client = createRouterClient(createRouter(deps), { context: { actor } as never });
+    await expect(client.memory.recall({ messageId: "msg-1" })).resolves.toEqual({
+      recorded: true,
+      notes: [
+        { id: "b", path: "reviews/tea.md", scope: "bot", botId: "bot-1" },
+        { id: "a", path: "profile.md", scope: "user", botId: null },
+      ],
+      removed: 1,
+    });
+    expect(findMessage).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "msg-1", role: "bot", thread: { spaceId: "space-1", userId: "user-1", memberUserId: null } },
+    }));
+    expect(findReceipt).toHaveBeenCalledWith(expect.objectContaining({ where: { runId: "run-1", spaceId: "space-1", userId: "user-1" } }));
+    expect(findDocs).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ["b", "gone", "a"] }, spaceId: "space-1", userId: "user-1" } }));
+  });
+
+  it("says nothing was recorded when the receipt is missing or unreadable", async () => {
+    const deps = {
+      prisma: {
+        message: { findFirst: vi.fn(async () => ({ runId: "run-1" })) },
+        runMemoryRecall: { findFirst: vi.fn(async () => { throw new Error("relation does not exist"); }) },
+        memoryDocument: { findMany: vi.fn() },
+      },
+      memory: {},
+      env: { webOrigin: "https://example.test" },
+    } as unknown as RouterDeps;
+    const client = createRouterClient(createRouter(deps), { context: { actor } as never });
+    await expect(client.memory.recall({ messageId: "msg-1" })).resolves.toEqual({ recorded: false, notes: [], removed: 0 });
+  });
+
+  it("does not reveal another person's message", async () => {
+    const deps = {
+      prisma: { message: { findFirst: vi.fn(async () => null) } },
+      memory: {},
+      env: { webOrigin: "https://example.test" },
+    } as unknown as RouterDeps;
+    const client = createRouterClient(createRouter(deps), { context: { actor } as never });
+    await expect(client.memory.recall({ messageId: "msg-x" })).rejects.toBeTruthy();
+  });
+
+  it("requires a session", async () => {
+    const { client, commit } = createClient(undefined, null);
+    await expect(client.memory.create({ scope: "user", path: "x", content: "" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(commit).not.toHaveBeenCalled();
   });
 });
 

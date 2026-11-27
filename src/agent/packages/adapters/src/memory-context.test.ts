@@ -1,6 +1,6 @@
 import type { AdapterContext, MemorySnapshot, MemoryStore } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
-import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
+import { loadAgentMemoryContext, recordRunMemoryRecall, resolveLocalMemoryScope } from "./memory-context.js";
 
 const context: AdapterContext = {
   operationId: "run-1",
@@ -131,4 +131,34 @@ it("keeps inherited isolation when the external provider is unavailable",async()
  expect(await resolveLocalMemoryScope(db,"space",null)).toBe("isolated");
  expect(await resolveLocalMemoryScope(db,"space","shared")).toBe("shared");
  expect(findUnique).toHaveBeenCalledWith({where:{spaceId:"space"},select:{defaultMemoryScope:true}});
+});
+
+it("reports which non-empty notes entered the block without changing it", async () => {
+  const read = vi.fn(async ({ scope }: { scope: string }) => ({
+    documents: scope === "user"
+      ? [{ id: "seed", path: "MEMORY.md", content: "  ", revision: 1 }]
+      : [{ id: "essential", path: "prefs.md", content: "Answer briefly", revision: 1, inclusion: "essential" as const }],
+  }));
+  const onIncluded = vi.fn();
+  const plain = await loadAgentMemoryContext({ read } as never, "bot-1", context);
+  const reported = await loadAgentMemoryContext({ read } as never, "bot-1", context, undefined, { onIncluded });
+  expect(reported).toBe(plain);
+  expect(onIncluded).toHaveBeenCalledWith(["essential"]);
+});
+
+it("records recalled notes best effort and never throws", async () => {
+  const upsert = vi.fn(async () => ({}));
+  recordRunMemoryRecall({ runMemoryRecall: { upsert } }, { runId: "run-1", spaceId: "s", userId: "u" }, ["a", "a", "b"]);
+  expect(upsert).toHaveBeenCalledWith({
+    where: { runId: "run-1" },
+    create: { runId: "run-1", spaceId: "s", userId: "u", documentIds: ["a", "b"] },
+    update: { documentIds: ["a", "b"] },
+  });
+  const failing = vi.fn(async () => {
+    throw new Error("relation does not exist");
+  });
+  expect(() => recordRunMemoryRecall({ runMemoryRecall: { upsert: failing } }, { runId: "r", spaceId: "s", userId: "u" }, ["a"])).not.toThrow();
+  expect(() => recordRunMemoryRecall({}, { runId: "r", spaceId: "s", userId: "u" }, ["a"])).not.toThrow();
+  recordRunMemoryRecall({ runMemoryRecall: { upsert } }, { runId: "r2", spaceId: "s", userId: "u" }, []);
+  expect(upsert).toHaveBeenCalledTimes(1);
 });

@@ -490,3 +490,17 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
 
 .rk-unread-divider .text-unread { color: light-dark(var(--unread), color-mix(in srgb, var(--unread) 60%, white)); }
 .rk-unread-divider .bg-unread { background-color: light-dark(var(--unread), color-mix(in srgb, var(--unread) 60%, white)); }
+
+/* Memory page: [[links]] between notes read as links; a missing note reads as one to create. */
+.rk-memory-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.rk-memory-link:hover { text-decoration-thickness: 2px; }
+.rk-memory-link-missing {
+  color: var(--muted-foreground);
+  text-decoration-style: dashed;
+}

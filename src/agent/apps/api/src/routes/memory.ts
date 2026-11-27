@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { MEMORY_REVISION_CONFLICT_ERROR } from "@mycellios/adapter-kit";
 import { isScratchpadStatus, listScratchpadItems, mapScratchpadItem } from "@mycellios/adapters";
-import { isDeletableMemoryDocument } from "@mycellios/contracts";
+import { isDeletableMemoryDocument, memoryNotePath } from "@mycellios/contracts";
 import { findSpaceMemoryConfig, IsolationError } from "@mycellios/db";
 import {
   disconnectMemoryProvider,
@@ -121,6 +121,74 @@ export function memoryRoutes(ctx: RouterContext) {
           },
         );
         return { ok: true as const };
+      }),
+      create: authed.memory.create.handler(async ({ context, input }) => {
+        const path = memoryNotePath(input.path);
+        if (!path) throw new ORPCError("BAD_REQUEST", { message: "Choose a note name without special folders." });
+        if (input.botId) await repos.getBot(context.actor, input.botId);
+        const created = await deps.memory
+          .commit(
+            {
+              scope: input.scope,
+              botId: input.botId,
+              path,
+              content: input.content,
+              // Revision 0 only matches a note that does not exist yet.
+              expectedRevision: 0,
+              selectionByUser: true,
+              inclusion: "searchable",
+            },
+            {
+              operationId: "mem",
+              traceId: "mem",
+              spaceId: context.actor.spaceId,
+              userId: context.actor.userId,
+              signal: new AbortController().signal,
+            },
+          )
+          .catch((error: unknown) => {
+            if (error instanceof Error && error.message === MEMORY_REVISION_CONFLICT_ERROR) {
+              throw new ORPCError("CONFLICT", { message: "A note with this name already exists." });
+            }
+            throw error;
+          });
+        return {
+          id: created.id,
+          inclusion: "searchable" as const,
+          userControlled: true,
+          taskThreadId: null,
+          scope: input.scope,
+          botId: input.botId ?? null,
+          path: created.path,
+          content: created.content,
+          revision: created.revision,
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+      recall: authed.memory.recall.handler(async ({ context, input }) => {
+        const owner = { spaceId: context.actor.spaceId, userId: context.actor.userId };
+        const message = await deps.prisma.message.findFirst({
+          where: { id: input.messageId, role: "bot", thread: { ...owner, memberUserId: null } },
+          select: { runId: true },
+        });
+        if (!message) throw new IsolationError();
+        const receipt = message.runId
+          ? await deps.prisma.runMemoryRecall
+              .findFirst({ where: { runId: message.runId, ...owner }, select: { documentIds: true } })
+              .catch(() => null)
+          : null;
+        if (!receipt) return { recorded: false, notes: [], removed: 0 };
+        const docs = await deps.prisma.memoryDocument.findMany({
+          where: { id: { in: receipt.documentIds }, ...owner },
+          select: { id: true, path: true, scope: true, botId: true },
+        });
+        const order = new Map(receipt.documentIds.map((id, index) => [id, index]));
+        docs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+        return {
+          recorded: true,
+          notes: docs.map((doc) => ({ id: doc.id, path: doc.path, scope: doc.scope as "bot" | "user", botId: doc.botId })),
+          removed: receipt.documentIds.length - docs.length,
+        };
       }),
       exportMarkdown: authed.memory.exportMarkdown.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({
