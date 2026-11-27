@@ -1,8 +1,31 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { isIP, isIPv4 } from "node:net";
 import { z } from "zod";
 import type { GuestChatConfig } from "../core/guest-chat-config.js";
 import type { MeshDatabase } from "../storage/database.js";
 import { GuestChat, GuestChatError, type GuestChatGateway } from "./guest-chat.js";
+
+const ipv4Number = (address: string) => address.split(".").reduce((value, part) => value * 256 + Number(part), 0);
+/** True when an IPv4 (or IPv4-mapped IPv6) peer lies inside the CIDR. */
+export function inIpv4Cidr(address: string, cidr: string): boolean {
+  const peer = address.replace(/^::ffff:/i, ""), [network = "", size = "32"] = cidr.split("/");
+  if (!isIPv4(peer) || !isIPv4(network)) return false;
+  const bits = Number(size), block = 2 ** (32 - bits);
+  return Math.floor(ipv4Number(peer) / block) === Math.floor(ipv4Number(network) / block);
+}
+/** The visitor's address: the edge header only from a trusted proxy network, else the default derivation. */
+export function guestClientAddress(config: GuestChatConfig | undefined, fallback: (request: FastifyRequest) => string) {
+  const trust = config?.clientAddress;
+  return (request: FastifyRequest) => {
+    if (trust) {
+      const peer = request.socket.remoteAddress ?? "";
+      const header = request.headers[trust.header];
+      const value = typeof header === "string" ? header.trim() : "";
+      if (trust.trustedProxies.some(cidr => inIpv4Cidr(peer, cidr)) && isIP(value)) return value;
+    }
+    return fallback(request);
+  };
+}
 
 /** Always answers `GET config`; without configuration, owner tables or a free route it reports disabled. */
 export async function initializeGuestChat(app: FastifyInstance, config: GuestChatConfig | undefined, database: MeshDatabase,
@@ -10,7 +33,7 @@ export async function initializeGuestChat(app: FastifyInstance, config: GuestCha
   const service = config ? new GuestChat(config, database, gateway) : undefined;
   if (service && !(await service.initialize()))
     app.log.warn({ event: "guest_chat_unavailable" }, "Guest chat is configured but its owner tables or free route are missing");
-  mountGuestChat(app, service, clientAddress);
+  mountGuestChat(app, service, guestClientAddress(config, clientAddress));
   return service;
 }
 

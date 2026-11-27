@@ -13,6 +13,8 @@ export interface GuestChatResult { status: "completed" | "pending"; content?: st
 export class GuestChatError extends Error {}
 
 const HOUR = 3_600_000, DAY = 86_400_000, CHALLENGE_TTL = 5 * 60_000;
+/** Ended sessions and old counters are deleted after this; the privacy policy states it. */
+export const GUEST_RETENTION_MS = 7 * DAY;
 const base64url = /^[A-Za-z0-9_-]+$/;
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 const equal = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -123,6 +125,8 @@ export class GuestChat {
     this.verifyChallenge(input.challenge, input.solution);
     const nonceHash = sha256("guest-nonce:" + input.nonce), challengeHash = sha256(input.challenge);
     const prefixDigest = this.prefixDigest(address), now = this.now();
+    // Sessions and counters are kept at most GUEST_RETENTION_MS after they end.
+    await this.prune(now);
     const session = await this.db.transaction(async () => {
       const previous = await this.db.raw.prepare("SELECT * FROM guest_chat_sessions WHERE nonce_hash=?").get(nonceHash);
       if (previous && previous.state === "active" && Number(previous.expires_at) > now) return sessionFrom(previous);
@@ -138,6 +142,16 @@ export class GuestChat {
       return { id, prefixDigest, createdAt: now, expiresAt, messages: 0 };
     });
     return { session, token: this.token(session.id) };
+  }
+  private lastPrune = 0;
+  private async prune(now: number) {
+    if (now - this.lastPrune < HOUR) return;
+    this.lastPrune = now;
+    // Cleanup never blocks admission; it is retried an hour later.
+    try {
+      await this.db.raw.prepare("DELETE FROM guest_chat_sessions WHERE expires_at < ?").run(now - GUEST_RETENTION_MS);
+      await this.db.raw.prepare("DELETE FROM guest_chat_usage WHERE bucket < ?").run(now - GUEST_RETENTION_MS - DAY);
+    } catch { this.lastPrune = now - HOUR + 60_000; }
   }
   async authenticate(token: string | undefined): Promise<GuestSession> {
     this.requireReady();

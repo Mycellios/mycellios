@@ -9,7 +9,7 @@ import { ManagedPurchases } from "../src/economy/managed-purchases.js";
 import { createGuestChatSchema } from "./fixtures/guest-chat-postgres.js";
 import { ApiAccessManager } from "../src/coordinator/api-access.js";
 import { ManagedGateway } from "../src/coordinator/managed-gateway.js";
-import { GuestChat, leadingZeroBits, GUEST_SYSTEM_PROMPT, type GuestChatGateway } from "../src/coordinator/guest-chat.js";
+import { GuestChat, leadingZeroBits, GUEST_RETENTION_MS, GUEST_SYSTEM_PROMPT, type GuestChatGateway } from "../src/coordinator/guest-chat.js";
 import { mountGuestChat } from "../src/coordinator/guest-chat-routes.js";
 import { guestChatConfigSchema, type GuestChatConfig } from "../src/core/guest-chat-config.js";
 
@@ -241,6 +241,20 @@ describe.skipIf(!url)("registration-free guest chat on isolated PostgreSQL, fict
     expect((await turn(cookie)).json()).toEqual({ error: { code: "guest_busy" } });
     expect(provider.execute).toHaveBeenCalledTimes(1);
     expect((await app.inject({ method: "GET", url: base + "/session", headers: { cookie } })).json()).toMatchObject({ remaining: 12 });
+  });
+
+  it("deletes sessions and counters 7 days after they end, as the privacy policy states", async () => {
+    const cookie = cookieOf(await enter());
+    expect((await turn(cookie)).statusCode).toBe(200);
+    const count = async (table: string) => Number((await db.raw.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get())!.n);
+    expect(await count("guest_chat_sessions")).toBe(1);
+    expect(await count("guest_chat_usage")).toBe(3);
+    // A new visitor 7 days after the first session ended triggers the cleanup.
+    now += 24 * 3_600_000 + GUEST_RETENTION_MS + 86_400_000 + 1;
+    expect((await enter()).statusCode).toBe(200);
+    expect(await count("guest_chat_sessions")).toBe(1);
+    expect(await db.raw.prepare("SELECT scope FROM guest_chat_usage").all())
+      .toEqual([{ scope: expect.stringMatching(/^sessions:/) }]);
   });
 
   it("reports itself unavailable without the owner tables instead of failing", async () => {

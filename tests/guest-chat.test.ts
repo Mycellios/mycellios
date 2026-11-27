@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import Fastify from "fastify";
 import { guestChatConfigSchema, readGuestChatConfig } from "../src/core/guest-chat-config.js";
 import { GuestChat, guestChatInputSchema, leadingZeroBits, networkPrefix } from "../src/coordinator/guest-chat.js";
-import { initializeGuestChat, guestCookieName } from "../src/coordinator/guest-chat-routes.js";
+import { initializeGuestChat, guestCookieName, guestClientAddress, inIpv4Cidr } from "../src/coordinator/guest-chat-routes.js";
 import type { MeshDatabase } from "../src/storage/database.js";
 
 const secret = "s".repeat(43);
@@ -97,6 +97,34 @@ describe("guest chat helpers", () => {
     expect(service.prefixDigest("203.0.113.7")).not.toContain("203");
     expect(service.prefixDigest("203.0.114.7")).not.toBe(service.prefixDigest("203.0.113.7"));
     expect(service.token(uuid)).toMatch(new RegExp("^" + uuid + "\\.[A-Za-z0-9_-]{43}$"));
+  });
+});
+
+describe("guest client address", () => {
+  const trusted = config({ clientAddress: { header: "cf-connecting-ip", trustedProxies: ["10.253.118.0/24"] } });
+  const request = (peer: string, header?: string) => ({ socket: { remoteAddress: peer },
+    headers: header === undefined ? {} : { "cf-connecting-ip": header } }) as never;
+  const fallback = () => "fallback";
+  it("reads the edge header only from a trusted proxy network and only when it is an address", () => {
+    const address = guestClientAddress(trusted, fallback);
+    expect(address(request("10.253.118.37", "203.0.113.9"))).toBe("203.0.113.9");
+    expect(address(request("::ffff:10.253.118.37", "2001:db8::7"))).toBe("2001:db8::7");
+    expect(address(request("198.51.100.1", "203.0.113.9"))).toBe("fallback");
+    expect(address(request("10.253.119.5", "203.0.113.9"))).toBe("fallback");
+    expect(address(request("10.253.118.37", "not-an-ip"))).toBe("fallback");
+    expect(address(request("10.253.118.37"))).toBe("fallback");
+    expect(guestClientAddress(config(), fallback)(request("10.253.118.37", "203.0.113.9"))).toBe("fallback");
+    expect(guestClientAddress(undefined, fallback)(request("10.253.118.37", "203.0.113.9"))).toBe("fallback");
+  });
+  it("matches IPv4 networks and rejects malformed trust settings", () => {
+    expect(inIpv4Cidr("10.0.0.255", "10.0.0.0/24")).toBe(true);
+    expect(inIpv4Cidr("10.0.1.0", "10.0.0.0/24")).toBe(false);
+    expect(inIpv4Cidr("172.16.5.4", "172.16.0.0/12")).toBe(true);
+    expect(inIpv4Cidr("172.32.0.1", "172.16.0.0/12")).toBe(false);
+    expect(inIpv4Cidr("2001:db8::1", "10.0.0.0/8")).toBe(false);
+    for (const bad of [{ header: "x-forwarded-for", trustedProxies: ["10.0.0.0/24"] }, { header: "cf-connecting-ip", trustedProxies: [] },
+      { header: "cf-connecting-ip", trustedProxies: ["0.0.0.0/0"] }, { header: "cf-connecting-ip", trustedProxies: ["10.0.0.1"] }])
+      expect(() => config({ clientAddress: bad })).toThrow();
   });
 });
 
