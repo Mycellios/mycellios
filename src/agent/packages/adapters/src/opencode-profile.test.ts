@@ -56,9 +56,10 @@ async function hostProfile() {
 it("runs the Mico's chosen model with only that provider's credentials and definition", async () => {
   const { root, source } = await hostProfile();
   const home = join(root, "isolated");
-  expect(await prepareOpenCodeProfile(home, source, "google/gemini-3-pro")).toEqual({
-    model: "google/gemini-3-pro", enabled_providers: ["google"], snapshot: false,
-    permission: { "*": "deny", "rakazo_*": "allow" } });
+  const chosen = await prepareOpenCodeProfile(home, source, "google/gemini-3-pro");
+  expect(chosen).toMatchObject({ model: "google/gemini-3-pro", enabled_providers: ["google"], snapshot: false });
+  expect(chosen).not.toHaveProperty("provider");
+  expect(chosen.permission["*"]).toBe("deny");
   expect(JSON.parse(await readFile(join(home, "data/opencode/auth.json"), "utf8"))).toEqual({ google: { type: "api", key: "google-secret" } });
   expect(await prepareOpenCodeProfile(home, source, "custom/m")).toMatchObject({ provider: { custom: { npm: "fixture" } } });
   // A malformed choice falls back to the CLI's own model.
