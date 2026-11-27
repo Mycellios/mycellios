@@ -1,8 +1,9 @@
 import { startContributionGrowth, stopContributionGrowth } from "../lib/contribution-growth";
 import "./contribution.css";
+import { ContributionSpinner } from "./ContributionSpinner";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@mycellios/ui-web";
-import { LoaderCircle, Pause, Play, RefreshCw } from "lucide-react";
+import { LoaderCircle, Pause, Play, RefreshCw, Sprout } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
 import { desktopBridge } from "../lib/desktop";
@@ -30,6 +31,9 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const [needsIdentity, setNeedsIdentity] = useState(false);
   const [incomplete, setIncomplete] = useState(false);
   const [accountUnavailable, setAccountUnavailable] = useState(false);
+  const [upgradeAvailable, setUpgradeAvailable] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeFailed, setUpgradeFailed] = useState(false);
   const [supported, setSupported] = useState(Boolean(runtime));
   const mounted = useRef(true);
   const reading = useRef(false);
@@ -63,6 +67,7 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
         setSupported(local.supported);
         setNeedsIdentity(local.installed && local.enrolled && !local.nodeId);
         setIncomplete(missingRuntime);
+        setUpgradeAvailable(Boolean(local.upgradeAvailable && runtime.upgrade));
       }
       const value = !missingRuntime && local.nodeId ? await rpc.models.contributionStatus({ nodeId: local.nodeId }) : null;
       if (mounted.current && epoch === revision.current) { setNode(value); setError(false); }
@@ -114,6 +119,17 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     } catch { if (mounted.current) setError(true); }
     finally { operating.current = false; if (mounted.current) setBusy(false); }
   }
+  /** One-time, explicit lift of an older runtime to signed automatic updates. */
+  async function upgradeRuntime() {
+    if (!runtime?.upgrade || upgrading || operating.current) return;
+    revision.current++; operating.current = true;
+    setUpgrading(true); setUpgradeFailed(false);
+    try {
+      const local = await runtime.upgrade();
+      if (mounted.current) setUpgradeAvailable(Boolean(local.upgradeAvailable));
+    } catch { if (mounted.current) setUpgradeFailed(true); }
+    finally { operating.current = false; if (mounted.current) setUpgrading(false); }
+  }
   const waiting = Boolean(node?.pending);
   const active = node?.enabled === true;
   const hasError = !incomplete && (error || Boolean(node?.rejected));
@@ -127,7 +143,7 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     setContributionActivity(key, !expanded && confirmedActive);
     return () => { setContributionActivity(key, false); };
   }, [confirmedActive, expanded]);
-  const idleLabel = activationLabel ?? t`Generate AI`;
+  const idleLabel = activationLabel ?? t`Earn credits`;
   const shortLabel = t`Earn with your computer`;
   const unavailable = !runtime || !supported || incomplete || accountUnavailable;
   const label = busy ? needsIdentity ? t`Verifying this computer…` : t`Setting up contribution…`
@@ -147,11 +163,23 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     <div className="flex min-w-0 items-center">
     <Button variant="ghost" className={actionClass}
       onClick={event => { if (active) stopContributionGrowth(); else if (!hasError && !needsIdentity) startContributionGrowth(event.currentTarget); if (hasError && !needsIdentity && !retryPause) void refresh(); else void toggle(); }} disabled={unavailable || busy || (waiting && !hasError)} aria-label={label} title={unavailable ? t`Available on Desktop` : mini ? `${label}. ${detail}` : detail}>
-      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : t`Generate AI`}</span><span className="block text-[11px] text-muted-foreground">{hasError && !retryPause ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Share computing power with the network`}</span></span>}
-      <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>{spinning ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : (hasError && !retryPause) || needsIdentity ? <RefreshCw size={22} className="size-5" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}</span>
+      {!mini && <Sprout aria-hidden className={`size-4 shrink-0 text-emerald-600 dark:text-emerald-400 ${confirmedActive ? "rk-contribution-sprout" : ""}`} />}
+      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : t`Earn credits`}</span><span className="block text-[11px] text-muted-foreground">{hasError && !retryPause ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Share computing power with the network`}</span></span>}
+      <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>{spinning ? <ContributionSpinner /> : (hasError && !retryPause) || needsIdentity ? <RefreshCw size={22} className="size-5" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}</span>
     </Button>
     </div>
     {!mini && unavailable && <p className="px-2 text-[11px] text-muted-foreground">{t`Available on Desktop`}</p>}
+    {!mini && !unavailable && upgradeAvailable && (
+      <div className="px-2 pb-1">
+        <Button variant="outline" size="sm" className="h-auto min-h-8 w-full justify-start gap-1.5 px-2 py-1 text-start text-xs" onClick={() => { void upgradeRuntime(); }} disabled={upgrading || busy}>
+          {upgrading ? <LoaderCircle size={16} className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw size={16} className="size-4" aria-hidden />}
+          <span className="min-w-0 flex-1">{upgrading ? t`Updating this computer…` : t`Update this computer`}</span>
+        </Button>
+        <p role={upgradeFailed ? "alert" : undefined} className={`pt-1 text-[11px] ${upgradeFailed ? "text-destructive" : "text-muted-foreground"}`}>
+          {upgradeFailed ? t`The update did not finish. This computer keeps its current version.` : t`A one-time update. Afterwards this computer updates itself.`}
+        </p>
+      </div>
+    )}
     {!mini && !unavailable && (hasError || (requested && (busy || needsIdentity)) || (expanded && active) || waiting) && (
       <div className="px-2 pb-1 text-[11px]">
         <p role={hasError ? "alert" : "status"} className={hasError ? "text-destructive" : "text-muted-foreground"}>{detail}</p>

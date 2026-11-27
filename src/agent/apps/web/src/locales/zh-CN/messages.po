@@ -7516,6 +7516,22 @@ msgstr "上下文已用 {percent}%：{total} 个令牌中的 {used}。"
 msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
 msgstr "上下文已用 {percent}%：{total} 个令牌中的 {used}。填满后，较早的消息会自动汇总。"
 
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "更新此电脑"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "正在更新此电脑…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "一次性更新。之后此电脑会自动更新。"
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "更新未完成。此电脑保留当前版本。"
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "复制诊断报告"

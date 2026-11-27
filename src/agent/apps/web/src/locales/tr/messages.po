@@ -7516,6 +7516,22 @@ msgstr "Bağlam %{percent} dolu: {total} tokenin {used} kadarı."
 msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
 msgstr "Bağlam %{percent} dolu: {total} tokenin {used} kadarı. Dolduğunda eski mesajlar otomatik olarak özetlenir."
 
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "Bu bilgisayarı güncelle"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "Bu bilgisayar güncelleniyor…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "Tek seferlik bir güncelleme. Sonrasında bu bilgisayar kendini günceller."
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "Güncelleme tamamlanmadı. Bu bilgisayar mevcut sürümünü korur."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Tanılama raporunu kopyala"

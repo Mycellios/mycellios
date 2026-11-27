@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { CREDIT_MICROUNITS } from "@mycellios/contracts";
 import type { MycelliosAccount } from "@mycellios/contracts";
-import { RefreshCw } from "lucide-react";
+import { Coins, Gift, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { rpc } from "../lib/rpc";
 
@@ -131,6 +131,20 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
   const hasPromotion = (account?.promotionalGrantedMicrounits ?? 0) > 0;
   const statusLabel = loading ? "…" : balance == null ? t`Balance unavailable`
     : new Intl.NumberFormat(i18n.locale, { maximumFractionDigits: 6 }).format(balance / CREDIT_MICROUNITS);
+  // The exact balance stays (contribution earns millionths), but only its first two decimals stand
+  // out: "1,13" reads at a glance and the rest follows smaller.
+  const amount = balance == null || loading ? null : (() => {
+    const parts = new Intl.NumberFormat(i18n.locale, { maximumFractionDigits: 6 }).formatToParts(balance / CREDIT_MICROUNITS);
+    let lead = "", tail = "", seenDecimal = false, fraction = 0;
+    for (const part of parts) {
+      if (part.type === "decimal") { seenDecimal = true; lead += part.value; continue; }
+      if (seenDecimal && part.type === "fraction") {
+        lead += part.value.slice(0, 2); tail += part.value.slice(2); fraction += part.value.length; continue;
+      }
+      if (tail) tail += part.value; else lead += part.value;
+    }
+    return { lead, tail, fraction };
+  })();
   return (
     <div
       data-testid="mycellios-micos"
@@ -141,11 +155,20 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
       title={accessDenied ? t`Sign in again to see your credits.` : unavailable ? (account ? t`Last verified balance. Retrying automatically.` : t`Balance temporarily unavailable. Retrying automatically.`) : (!loading && !account) ? t`Credits are not enabled in this installation.` : t`Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token.`}
     >
       <div className="flex min-h-7 min-w-0 flex-1 items-center justify-between gap-3">
-        <span>{account?.environment === "sandbox" ? t`Test credits` : t`Credits`}</span>
-        {!loading && !unavailable && !account ? <button type="button" className="text-xs text-foreground hover:underline" onClick={onConnect} disabled={!onConnect} title={t`Credits are not enabled in this installation.`}>{t`Not enabled`}</button> : <span className={`min-w-0 truncate tabular-nums ${balance == null ? "text-muted-foreground" : "font-medium text-foreground"}`}>{statusLabel}</span>}
+        <span className="flex min-w-0 items-center gap-2">
+          <Coins aria-hidden className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span className="truncate">{account?.environment === "sandbox" ? t`Test credits` : t`Credits`}</span>
+        </span>
+        {!loading && !unavailable && !account ? <button type="button" className="text-xs text-foreground hover:underline" onClick={onConnect} disabled={!onConnect} title={t`Credits are not enabled in this installation.`}>{t`Not enabled`}</button>
+          : amount ? <span className="min-w-0 truncate tabular-nums text-foreground" title={statusLabel}>
+            <span className="text-sm font-semibold">{amount.lead}</span>{amount.tail ? <span className="text-[10px] text-muted-foreground">{amount.tail}</span> : null}
+          </span>
+          : <span className="min-w-0 truncate tabular-nums text-muted-foreground">{statusLabel}</span>}
       </div>
       {gain?.ownerId === ownerId && !unavailable && <span role="status" className="rk-credit-gain">+{new Intl.NumberFormat(i18n.locale,{maximumFractionDigits:6}).format(gain.amount/CREDIT_MICROUNITS)} {t`Earned`}</span>}
-      {hasPromotion ? <span className="text-[10px] text-muted-foreground" title={t`Promotional grant, separate from earned credits`}>{t`Promo`}</span> : null}
+      {hasPromotion ? <span className="grid size-5 shrink-0 place-items-center text-muted-foreground" title={t`Promotional grant, separate from earned credits`}>
+        <Gift aria-hidden className="size-3.5" /><span className="sr-only">{t`Promo`}</span>
+      </span> : null}
       {unavailable && !accessDenied ? <button type="button" aria-label={t`Retry`} title={t`Retry`}
         className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         onClick={() => refreshBalance.current()}><RefreshCw className="size-3.5" aria-hidden /></button> : null}

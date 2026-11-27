@@ -8,13 +8,13 @@ const paths = {
   browser: {
     title: "One tab. You're in.",
     description: "Your browser can be part of the network. No installation or provider keys.",
-    steps: ["Open Mycellios in your browser.", "Sign in so work can reach your wallet.", "Press Play next to Generate AI."],
+    steps: ["Open Mycellios in your browser.", "Sign in so work can reach your wallet.", "Press Play next to Earn credits."],
     href: AGENT_URL, action: "Connect in browser",
   },
   desktop: {
     title: "Put your computer to work.",
     description: "Contribute from the Mycellios app. You choose when to start and when to pause.",
-    steps: ["Download the app for your computer.", "Sign in with your Mycellios account.", "Press Play next to Generate AI."],
+    steps: ["Download the app for your computer.", "Sign in with your Mycellios account.", "Press Play next to Earn credits."],
     href: "/downloads/desktop", action: "Get the desktop app",
   },
 } as const;

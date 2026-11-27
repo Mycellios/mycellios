@@ -188,7 +188,7 @@ These rules apply to the complete repository.
   the coordinator API used by Agent and other clients.
 - The contribution chapter after the landing opening uses DistributedEarnScene,
   ContributionEntry and
-  the shared UI kit. Browser points to the account-bound Agent Generate AI control;
+  the shared UI kit. Browser points to the account-bound Agent Earn credits control;
   Desktop points to `/downloads/desktop`. Keep the Earn page consistent, explain
   verified-work Credits separately from Spore, and never auto-start compute or
   display simulated earnings. Preserve the remaining landing composition.

@@ -605,10 +605,10 @@ export function MicoTaskTabs({
         ? <Button size="sm" variant="ghost" aria-label={`${currentTitle} · ${pickerLabel}`} title={currentTitle} className="relative h-7 min-w-0 flex-1 justify-between gap-1 px-2 font-normal" />
         : minimal || inMenu
           ? <Button size="icon-sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative" data-mobile-chat-action={inMenu || undefined} />
-          : <Button size="sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative h-7 max-w-52 shrink-0 gap-1 px-2 font-normal" />}>
+          : <Button size="icon-sm" variant="ghost" aria-label={pickerLabel} title={pickerLabel} className="relative size-7 shrink-0 text-muted-foreground hover:text-foreground" />}>
         {inMenu ? <><MessageCircle aria-hidden /><Trans>Conversations</Trans></>
           : compact && !minimal ? <><span className="min-w-0 truncate" dir="auto">{currentTitle}</span><ChevronDown size={15} aria-hidden="true" className="shrink-0" /></>
-          : <>{!minimal ? <span className="min-w-0 truncate">{allConversationsLabel}</span> : null}<ChevronDown size={15} aria-hidden="true" className="shrink-0" /></>}
+          : <ChevronDown size={15} aria-hidden="true" className="shrink-0" />}
         {replyDot}
       </PopoverTrigger>
       <PopoverContent align="end" className="max-h-[60dvh] w-80 max-w-[calc(100vw-2rem)] gap-0 overflow-y-auto p-1 [&_button]:font-normal">
@@ -653,20 +653,15 @@ export function MicoTaskTabs({
     onClick={openDraft}><Plus size={16} aria-hidden="true" /></Button> : null;
 
   return <nav ref={nav} aria-label={t`Conversations`} data-tabs-layout={inMenu ? "menu" : minimal ? "minimal" : compact ? "compact" : "tabs"}
-    className={inMenu ? "min-w-0" : "flex min-w-0 flex-1 items-center gap-1 md:ms-1 md:border-s md:border-border md:ps-3"}>
+    className={inMenu ? "min-w-0" : "flex min-w-0 flex-1 items-center gap-1"}>
+    {/* As in the reference app: the Mico's name in the header is the main chat's tab, then the
+        conversation tabs, New conversation and the list of all conversations. */}
     {!inMenu && !compact ? <>
-      <MainTabMenu enabled label={t`Main chat`} onCloseAll={closeOthers}>
-        <Button size="sm" variant="ghost" data-main-chat-tab aria-current={!current ? "page" : undefined}
-          className="h-7 max-w-28 shrink-0 px-2 font-normal aria-[current=page]:bg-muted"
-          onClick={() => select()}>
-          <span className="min-w-0 truncate"><Trans>Main chat</Trans></span>
-        </Button>
-      </MainTabMenu>
       {displayedTabs.length ? <div className="flex min-w-0 items-center gap-1 overflow-hidden">
         {displayedTabs.map(tabItem)}
       </div> : null}
-    </> : null}
-    {pickerElement}{addElement}
+      {addElement}{pickerElement}
+    </> : <>{pickerElement}{addElement}</>}
     {error && !threadPickerOpen ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
     {renameError ? <p role="alert" className="max-w-52 text-xs text-destructive">{renameError}</p> : null}
     <DeleteConversationDialog open={Boolean(deleteTarget)} title={deleteTarget ? titleOf(deleteTarget) : ""}

@@ -7516,6 +7516,22 @@ msgstr "Contexto {percent}% cheio: {used} de {total} tokens."
 msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
 msgstr "Contexto {percent}% cheio: {used} de {total} tokens. Quando encher, as mensagens mais antigas são resumidas automaticamente."
 
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "Atualizar este computador"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "Atualizando este computador…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "Uma atualização única. Depois disso, este computador se atualiza sozinho."
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "A atualização não terminou. Este computador mantém a versão atual."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Copiar relatório de diagnóstico"

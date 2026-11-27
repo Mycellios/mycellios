@@ -97,7 +97,14 @@ export class ContributionRuntime {
       const value = JSON.parse(raw ?? "null");
       if (typeof value?.version === "string" && /^\d+\.\d+\.\d+$/.test(value.version)) version = value.version;
     } catch {}
-    return { supported: this.supported(), installed, enrolled, nodeId, version, installing: this.installing };
+    let upgradeAvailable = false;
+    if (this.options.platform === "win32" && installed && enrolled) {
+      let trusted = true;
+      try { await lstat(path.join(root, "app", RUNTIME_COMPONENT_TRUST_FILE)); }
+      catch (error) { trusted = (error as NodeJS.ErrnoException).code !== "ENOENT"; }
+      upgradeAvailable = !trusted && await this.pinnedRuntimeUpgrades();
+    }
+    return { supported: this.supported(), installed, enrolled, nodeId, version, installing: this.installing, upgradeAvailable };
   }
 
   async identify(): Promise<DesktopRuntimeStatus> {
@@ -129,30 +136,16 @@ export class ContributionRuntime {
     try {
       if ((await this.status()).enrolled) throw new Error("This computer already has a runtime identity. Manage the existing node instead.");
       const root = path.join(this.options.resources, "contribution");
-      const linux = this.options.platform === "linux";
       const mac = this.options.platform === "darwin";
-      const expectedFile = mac ? "mycellios-runtime.pkg" : linux ? "mycellios-runtime.deb" : "mycellios-runtime.msi";
-      const manifest = JSON.parse(await readFile(path.join(root, "runtime.json"), "utf8"));
-      if (!["mycellios-desktop-runtime/1", "mycellios-desktop-runtime/2"].includes(manifest.schema) ||
-        manifest.file !== expectedFile || !/^[a-f0-9]{64}$/.test(manifest.sha256))
-        throw new Error("The bundled runtime could not be verified.");
-      const msi = manifest.schema === "mycellios-desktop-runtime/2"
-        ? await contributionComponent(manifest, expectedFile, path.join(this.options.userData, "runtime-components"), this.options.fetch)
-        : path.join(root, manifest.file);
-      const info = await lstat(msi);
-      if (!info.isFile() || info.isSymbolicLink()) throw new Error("The bundled runtime could not be verified.");
-      const hash = createHash("sha256");
-      for await (const chunk of createReadStream(msi)) hash.update(chunk);
-      const digest = hash.digest("hex");
-      if (digest !== manifest.sha256) throw new Error("The bundled runtime could not be verified.");
+      const { file: msi, sha256 } = await this.bundledRuntime();
       if (Date.parse(bundle.expiresAt) <= (this.options.now?.() ?? Date.now())) throw new Error("This pairing request expired. Request a new pairing before installation.");
       const grants = path.join(this.options.userData, "runtime-pairing");
       await mkdir(grants, { recursive: true, mode: 0o700 });
       grantPath = path.join(grants, `${bundle.enrollmentId}.json`);
       await writePrivateFile(grantPath, JSON.stringify(bundle));
-      const code = await this.privileged(path.join(root, mac ? "install-runtime-macos.sh" : "install-runtime.sh"), [msi, manifest.sha256, grantPath], [
+      const code = await this.privileged(path.join(root, mac ? "install-runtime-macos.sh" : "install-runtime.sh"), [msi, sha256, grantPath], [
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(root, "install-runtime.ps1"),
-        "-Msi", msi, "-ExpectedSha256", manifest.sha256, "-Enrollment", grantPath,
+        "-Msi", msi, "-ExpectedSha256", sha256, "-Enrollment", grantPath,
       ]);
       if (code !== 0) throw new Error(code === 1223 ? "Installation was cancelled." : "Contribution setup did not complete. Your existing data was retained.");
       const result = await this.status();
@@ -163,7 +156,76 @@ export class ContributionRuntime {
       this.installing = false;
     }
   }
+
+  /**
+   * One-time lift of an enrolled Windows runtime that predates signed component
+   * updates. The MSI MajorUpgrade replaces product files only; the identity,
+   * configuration and service stay as they are.
+   */
+  async upgrade(): Promise<DesktopRuntimeStatus> {
+    if (this.options.platform !== "win32") throw new Error("Runtime upgrade is not available on this platform.");
+    if (this.installing) throw new Error("Contribution setup is already running.");
+    const before = await this.status();
+    if (!before.upgradeAvailable) return before;
+    this.installing = true;
+    try {
+      const { file: msi, sha256 } = await this.bundledRuntime();
+      const root = path.join(this.options.resources, "contribution");
+      const code = await this.privileged(path.join(root, "upgrade-runtime.ps1"), [], [
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(root, "upgrade-runtime.ps1"),
+        "-Msi", msi, "-ExpectedSha256", sha256,
+      ]);
+      if (code !== 0) throw new Error(code === 1223 ? "The update was cancelled." : "The runtime update did not complete. The previous runtime was kept.");
+      const result = await this.status();
+      if (!result.installed || !result.enrolled || result.upgradeAvailable) throw new Error("The runtime update has not been confirmed.");
+      return { ...result, installing: false };
+    } finally {
+      this.installing = false;
+    }
+  }
+
+  private async pinnedManifest() {
+    const linux = this.options.platform === "linux";
+    const mac = this.options.platform === "darwin";
+    const expectedFile = mac ? "mycellios-runtime.pkg" : linux ? "mycellios-runtime.deb" : "mycellios-runtime.msi";
+    const manifest = JSON.parse(await readFile(path.join(this.options.resources, "contribution", "runtime.json"), "utf8"));
+    if (!["mycellios-desktop-runtime/1", "mycellios-desktop-runtime/2"].includes(manifest?.schema) ||
+      manifest.file !== expectedFile || typeof manifest.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(manifest.sha256))
+      throw new Error("The bundled runtime could not be verified.");
+    return { manifest, expectedFile, sha256: manifest.sha256 as string };
+  }
+
+  /** The pinned runtime package, downloaded if needed and verified against its hash. */
+  private async bundledRuntime() {
+    const { manifest, expectedFile, sha256 } = await this.pinnedManifest();
+    const file = manifest.schema === "mycellios-desktop-runtime/2"
+      ? await contributionComponent(manifest, expectedFile, path.join(this.options.userData, "runtime-components"), this.options.fetch)
+      : path.join(this.options.resources, "contribution", manifest.file);
+    const info = await lstat(file);
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error("The bundled runtime could not be verified.");
+    const hash = createHash("sha256");
+    for await (const chunk of createReadStream(file)) hash.update(chunk);
+    if (hash.digest("hex") !== sha256) throw new Error("The bundled runtime could not be verified.");
+    return { file, sha256 };
+  }
+
+  /** True when the pinned package can perform the one-time hop to signed component updates. */
+  private async pinnedRuntimeUpgrades() {
+    try { return !LEGACY_RUNTIME_SHA256.has((await this.pinnedManifest()).sha256); }
+    catch { return false; }
+  }
 }
+
+/**
+ * Pinned runtime packages built before signed component updates. Desktop never
+ * offers them as an upgrade: installing one would not add the updater.
+ */
+export const LEGACY_RUNTIME_SHA256: ReadonlySet<string> = new Set([
+  "c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc",
+]);
+
+/** Written by the node installer since signed component updates (scripts/stage-node-installer.mjs). */
+export const RUNTIME_COMPONENT_TRUST_FILE = "component-update-trust.json";
 
 function shellQuote(value: string) {
   if (/[\r\n\0]/.test(value)) throw new Error("Invalid installer path.");

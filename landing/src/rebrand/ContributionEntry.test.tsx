@@ -8,7 +8,7 @@ describe("the public contribution entry", () => {
     const html = renderToStaticMarkup(<ContributionEntry />);
     expect(html).toContain('href="https://www.mycellios.com/agent"');
     expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain("Press Play next to Generate AI.");
+    expect(html).toContain("Press Play next to Earn credits.");
     expect(html).toContain("completed, verified inference");
     expect(html).not.toContain("autostart=1");
     expect(html).not.toContain("<iframe");

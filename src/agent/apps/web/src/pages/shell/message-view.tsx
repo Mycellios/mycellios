@@ -7,7 +7,7 @@ import { BotAvatar, Button, cn, resolvePersonaColorDef } from "@mycellios/ui-web
 import { UserRound } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
-import { AskCard } from "../../components/AskCard";
+import { AskCard, isPersonAnsweredAsk } from "../../components/AskCard";
 import { CollaborationMarker } from "../../components/ai/CollaborationMarker";
 import { CloudAgentCard } from "../../components/CloudAgentCard";
 import {
@@ -696,7 +696,8 @@ export const MessageView = memo(function MessageView({
             return (
               <div
                 key={i}
-                className="relative w-full min-w-0 max-w-xl"
+                // The person's answer sits on their side of the transcript.
+                className={cn("relative w-full min-w-0 max-w-xl", isPersonAnsweredAsk(block) && "self-end")}
               >
                 <AskCard
                   block={block}

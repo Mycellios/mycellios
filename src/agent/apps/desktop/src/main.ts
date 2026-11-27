@@ -1769,6 +1769,10 @@ app.whenReady().then(async () => {
       if (!contributionRequest(event)) throw new Error("Contribution requires the Mycellios application.");
       return contributionRuntime.identify();
     });
+    ipcMain.handle("desktop.runtime.upgrade", (event) => {
+      if (!contributionRequest(event)) throw new Error("Contribution requires the Mycellios application.");
+      return contributionRuntime.upgrade();
+    });
   const cancelBrowserAuth = () => {
     for (const attempt of browserAuthAttempts.values()) attempt.abort();
     browserAuthAttempts.clear();

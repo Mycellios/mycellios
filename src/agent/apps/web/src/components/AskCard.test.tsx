@@ -19,7 +19,7 @@ vi.mock("../lib/rpc", () => ({ rpc: {} }));
 
 import { ChoiceCard } from "../pages/shell/message-cards";
 import type { AskBlock } from "./AskCard";
-import { AskCard } from "./AskCard";
+import { AskCard, isPersonAnsweredAsk } from "./AskCard";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -333,6 +333,18 @@ it("collapses answered questions into a neutral reply without rewriting their te
   expect(card.querySelector("details")?.textContent).toContain("What does the user want to do?");
   expect(card.querySelector(".text-success")).toBeNull();
   expect(card.querySelector("input, textarea, button")).toBeNull();
+  // The answer reads as the person's own reply, never as something the Mico said.
+  expect(card.querySelector("p")?.className).toContain("bg-chat-user");
+  expect(card.className).toContain("items-end");
+});
+
+it("places only answered ordinary questions on the person's side", () => {
+  const base = { kind: "ask", text: "Which one?" } as AskBlock;
+  expect(isPersonAnsweredAsk({ ...base, status: "answered", answer: "try again" })).toBe(true);
+  expect(isPersonAnsweredAsk({ ...base, status: "pending" })).toBe(false);
+  expect(isPersonAnsweredAsk({ ...base, status: "answered", answer: "allow", approvalEffectId: "effect-1",
+    actions: [{ id: "allow", label: "Allow" }, { id: "deny", label: "Deny" }] } as AskBlock)).toBe(false);
+  expect(isPersonAnsweredAsk({ ...base, status: "answered", answer: "", input: "secret" } as AskBlock)).toBe(false);
 });
 
 it("offers import on the unanswered first-run focus card only", async () => {

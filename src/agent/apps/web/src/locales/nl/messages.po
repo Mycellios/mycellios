@@ -7517,6 +7517,22 @@ msgstr "Context voor {percent}% vol: {used} van {total} tokens."
 msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
 msgstr "Context voor {percent}% vol: {used} van {total} tokens. Als hij vol raakt, worden oudere berichten automatisch samengevat."
 
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "Deze computer bijwerken"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "Deze computer wordt bijgewerkt…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "Een eenmalige update. Daarna werkt deze computer zichzelf bij."
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "De update is niet voltooid. Deze computer behoudt zijn huidige versie."
+
 #: src/components/HelpMenu.tsx
 msgid "Copy diagnostic report"
 msgstr "Diagnoserapport kopiëren"

@@ -280,14 +280,15 @@ describe("Mico task navigation", () => {
     expect(list).toHaveBeenCalledWith({ botId: "mico" });
     const task = host.querySelector<HTMLButtonElement>('button[aria-current="page"]')!;
     expect(task.textContent).toBe("Independent work");
-    expect(host.querySelector("[data-main-chat-tab]")?.textContent).toBe("Main chat");
+    // The main chat's tab is the Mico's name in the shell header, as in the reference app.
+    expect(host.querySelector("[data-main-chat-tab]")).toBeNull();
     await act(() => task.click());
     expect(host.querySelector('input[aria-label="Conversation title"]')).not.toBeNull();
     expect(select).not.toHaveBeenCalled();
     await act(() => button("Close tab", host).click());
     expect(select).toHaveBeenLastCalledWith(undefined);
     await act(() => render());
-    expect(host.querySelector("[data-main-chat-tab]")?.getAttribute("aria-current")).toBe("page");
+    expect(host.querySelector('button[aria-current="page"]')).toBeNull();
     expect(host.querySelector('button[title="Independent work"]')).toBeNull();
     await act(() => button("All conversations", host).click());
     const reopen = Array.from(document.querySelectorAll("button")).find(item => item.textContent === "Independent work")!;

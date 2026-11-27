@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  OPENCODE_PLAN_PROVIDERS,
   oauthCredentialAccountId,
   parseModelSecret,
   readProviderPlanLimits,
@@ -91,7 +92,18 @@ export function createModelPlanLimits(
           await renewCredential(scope, row.secretId, row.provider).catch(() => undefined);
           secret = (await reloadSecret(userId, row.secretId)) ?? secret;
         }
-        if (secret.kind !== "oauth" || !["openai-codex", "anthropic"].includes(base.provider))
+        // An OpenCode key reads its Go usage from OpenCode's fixed endpoint only.
+        const openCodeKey = secret.kind === "api_key" && OPENCODE_PLAN_PROVIDERS.includes(base.provider)
+          ? secret.key.trim() : "";
+        if (openCodeKey) {
+          const quota = await readProviderPlanLimits({
+            provider: base.provider,
+            accessToken: openCodeKey,
+            fetch: deps.modelConnectionFetch,
+            now: stamp,
+          });
+          result = { ...result, ...quota, measuredAt: quota.status === "available" ? new Date(now()).toISOString() : null };
+        } else if (secret.kind !== "oauth" || !["openai-codex", "anthropic"].includes(base.provider))
           result = { ...result, status: "unsupported", reason: "not_reported" };
         else if (expired(secret.credential))
           result = { ...result, status: "reconnect", reason: "expired" };

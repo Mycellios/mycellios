@@ -4377,7 +4377,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           type: "run.started",
           runId,
-          payload: { trigger: run.trigger, routineId: run.routineId },
+          // The lease lets an open chat confirm the worker at once instead of waiting for
+          // its next snapshot read.
+          payload: { trigger: run.trigger, routineId: run.routineId, leaseExpiresAt: current.leaseExpiresAt?.toISOString() ?? null },
         });
 
         // A member's turn reaches none of the owner's connected accounts or tool servers.
@@ -11296,6 +11298,14 @@ export function persistentComputerInstruction(options: {
   return `You have a persistent sandbox${capabilities}. This backend does not provide model-visible graphical control.${toolSentence}`;
 }
 
+/**
+ * A Docker computer runs on a Mycellios server, so a request to work in the person's
+ * own PC or browser gets the routes that actually exist instead of a request for
+ * their address and sign-in to repeat the work in this computer's browser.
+ */
+export const PERSON_DEVICE_BOUNDARY_INSTRUCTION =
+  "This computer runs on a Mycellios server, not on the person's device: you cannot see their screen, files, own browser tabs or sign-ins, nor reach their private or company network. When they ask you to work on their own PC or in their own browser, say so in one short sentence and offer the routes that exist: Mycellios Desktop on that PC with this Mico set to This PC, which works there with their approval; or sharing their Chrome tabs from the Mycellios extension's side panel, which lets you read pages but not act in them. Offer this computer's browser only for sites reachable from the internet, and never ask for a password in chat.";
+
 export function dockerComputerToolInstruction(
   computerKind: string,
   disabled?: ReadonlySet<string>,
@@ -11305,6 +11315,7 @@ export function dockerComputerToolInstruction(
   const act = builtinOffered(disabled, "browser_act");
   const takeover = builtinOffered(disabled, "request_takeover");
   const parts = [
+    PERSON_DEVICE_BOUNDARY_INSTRUCTION,
     "For Python CLI tools, use `uv tool install <package>`; it installs without sudo and keeps tools under this computer's persistent home. GitHub's `gh` CLI is installed. `pdftotext`, `pandoc`, and `openpyxl` are available to extract text from PDFs, documents, and spreadsheets.",
   ];
   if (builtinOffered(disabled, "shell")) {
