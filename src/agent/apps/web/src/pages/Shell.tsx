@@ -419,8 +419,9 @@ const FIRST_HISTORY_REUSE_MS = 1_500;
 const NO_AGENT_SKILLS: AgentSkillCatalogEntry[] = [];
 // Space settings the shell reads on every mount. Their editors write the saved value
 // back into the cache, so a chat switch or scoped remount can reuse them for a while
-// instead of reading each one from the API again.
-const SHELL_METADATA_STALE_MS = 5 * 60_000;
+// instead of reading each one from the API again. The client default refetches on every
+// mount, which would ignore that freshness window.
+const SHELL_METADATA_FRESHNESS = { staleTime: 5 * 60_000, refetchOnMount: true } as const;
 const NO_PROVIDERS: string[] = [];
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32;
 const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
@@ -539,6 +540,9 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     [navigate],
   );
   const queries = spaceQueries(userId ?? null, shellSpaceId, taskScope);
+  // Space settings are shared by the main chat and every task chat of the Space, so they use
+  // the Space-level keys: a project chat's scoped remount then reuses them instead of reading.
+  const spaceLevelQueries = spaceQueries(userId ?? null, shellSpaceId);
   const [groups, setGroups] = useState<Group[]>(seed?.groups ?? []);
   const [bots, setBots] = useState<Bot[]>(seed?.bots ?? []);
   const botsRef = useRef(bots);
@@ -650,12 +654,15 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const [routinesBotId, setRoutinesBotId] = useState<string | null>(null);
   const [taughtSkills, setTaughtSkills] = useState<TaughtSkill[]>([]);
   const [taughtSkillsBotId, setTaughtSkillsBotId] = useState<string | null>(null);
-  const agentSkillsQuery = useQuery({ ...queries.agentSkills.list.queryOptions(), staleTime: SHELL_METADATA_STALE_MS });
+  const agentSkillsQuery = useQuery({ ...spaceLevelQueries.agentSkills.list.queryOptions(), ...SHELL_METADATA_FRESHNESS });
   const agentSkills = agentSkillsQuery.data ?? NO_AGENT_SKILLS;
   const setAgentSkills = useCallback(
-    (skills: AgentSkillCatalogEntry[]) =>
-      void writeSaved(queryClient, queries.agentSkills.list.queryKey(), () => skills),
-    [queries],
+    (skills: AgentSkillCatalogEntry[]) => {
+      void writeSaved(queryClient, spaceLevelQueries.agentSkills.list.queryKey(), () => skills);
+      if (queries !== spaceLevelQueries)
+        void writeSaved(queryClient, queries.agentSkills.list.queryKey(), () => skills);
+    },
+    [queries, spaceLevelQueries],
   );
   const [teachBusy, setTeachBusy] = useState(false);
   const [computer, setComputer] = useState<ComputerStatus | null>(null);
@@ -727,14 +734,14 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
     navigate({ search: searchString(withShellOverlay(searchParams, next)) }, { replace: true });
   }, [navigate, searchParams]);
   const messagingStatus = useQuery({
-    ...queries.messaging.status.queryOptions(),
-    staleTime: SHELL_METADATA_STALE_MS,
+    ...spaceLevelQueries.messaging.status.queryOptions(),
+    ...SHELL_METADATA_FRESHNESS,
     enabled: Boolean(session.data?.user),
   }).data;
   // A WhatsApp linked device needs no server chat-app provider, only Desktop.
   const messagingSurfaceEnabled = (messagingStatus?.enabled ?? false) || whatsappBridge() !== undefined;
   const messagingProviders = messagingStatus?.providers ?? NO_PROVIDERS;
-  const memoryConfigQuery = useQuery({ ...queries.memory.providerConfig.queryOptions(), staleTime: SHELL_METADATA_STALE_MS });
+  const memoryConfigQuery = useQuery({ ...spaceLevelQueries.memory.providerConfig.queryOptions(), ...SHELL_METADATA_FRESHNESS });
   // Undefined while it first loads; null when the space has none or it could not be read.
   const memoryProviderConfig: SpaceMemoryConfig | null | undefined =
     memoryConfigQuery.data !== undefined
@@ -760,7 +767,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   };
   // Voice readiness belongs to the Space, including when a task chat is open.
   const voiceStatus: VoiceStatus | null =
-    useQuery({ ...spaceQueries(userId ?? null, shellSpaceId).voice.status.queryOptions(), staleTime: SHELL_METADATA_STALE_MS }).data ?? null;
+    useQuery({ ...spaceLevelQueries.voice.status.queryOptions(), ...SHELL_METADATA_FRESHNESS }).data ?? null;
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [dismissedRunErrorIds, setDismissedRunErrorIds] =
     useState<ReadonlySet<string>>(readSeenRunErrorIds);
@@ -1906,8 +1913,11 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   }, []);
 
   const refreshAgentSkills = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: queries.agentSkills.list.queryKey() });
-  }, [queries]);
+    void queryClient.invalidateQueries({ queryKey: spaceLevelQueries.agentSkills.list.queryKey() });
+    // Skill screens opened from a task chat read the same list under that chat's scope.
+    if (queries !== spaceLevelQueries)
+      void queryClient.invalidateQueries({ queryKey: queries.agentSkills.list.queryKey() });
+  }, [queries, spaceLevelQueries]);
 
   useEffect(() => {
     const unsubSpeech = speaker.subscribe((state) => {
@@ -5957,7 +5967,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             }}
             memoryConfig={memoryProviderConfig}
             onMemoryConfigChange={(config) => {
-              void writeSaved(queryClient, queries.memory.providerConfig.queryKey(), () => config);
+              void writeSaved(queryClient, spaceLevelQueries.memory.providerConfig.queryKey(), () => config);
             }}
             onClose={() => setOverlay(null)}
           />
