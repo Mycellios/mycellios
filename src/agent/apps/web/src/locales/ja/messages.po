@@ -7492,3 +7492,19 @@ msgstr "{name} の更新に失敗しました"
 #: src/pages/shell/engine-update-toasts.tsx
 msgid "{name} updated"
 msgstr "{name} を更新しました"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star Mycellios on GitHub"
+msgstr "GitHub で Mycellios にスターを付ける"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Enjoying Mycellios so far?"
+msgstr "Mycellios を気に入っていただけていますか？"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "A star on GitHub helps more people find Mycellios."
+msgstr "GitHub でスターを付けると、より多くの人が Mycellios を見つけられます。"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star on GitHub"
+msgstr "GitHub でスターを付ける"

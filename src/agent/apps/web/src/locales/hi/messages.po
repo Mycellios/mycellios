@@ -7492,3 +7492,19 @@ msgstr "{name} का अपडेट विफल रहा"
 #: src/pages/shell/engine-update-toasts.tsx
 msgid "{name} updated"
 msgstr "{name} अपडेट हो गया"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star Mycellios on GitHub"
+msgstr "GitHub पर Mycellios को स्टार दें"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Enjoying Mycellios so far?"
+msgstr "अब तक Mycellios पसंद आ रहा है?"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "A star on GitHub helps more people find Mycellios."
+msgstr "GitHub पर एक स्टार ज़्यादा लोगों को Mycellios ढूँढने में मदद करता है।"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star on GitHub"
+msgstr "GitHub पर स्टार दें"

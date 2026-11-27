@@ -16099,3 +16099,19 @@ msgstr "Falló la actualización de {name}"
 #: src/pages/shell/engine-update-toasts.tsx
 msgid "{name} updated"
 msgstr "{name} actualizado"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star Mycellios on GitHub"
+msgstr "Dar una estrella a Mycellios en GitHub"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Enjoying Mycellios so far?"
+msgstr "¿Te gusta Mycellios hasta ahora?"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "A star on GitHub helps more people find Mycellios."
+msgstr "Una estrella en GitHub ayuda a que más personas encuentren Mycellios."
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star on GitHub"
+msgstr "Dar una estrella en GitHub"
