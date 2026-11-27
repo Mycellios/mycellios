@@ -6,7 +6,9 @@ export const STUCK_WORK_NOTIFY_AFTER_MS = 4 * 60 * 60 * 1000;
 
 /** Cancel once that same work has been sitting this long.
  *  Matches how long a takeover holds the screen, and leaves the hours after
- *  the reminder for someone to answer before the thread is freed. */
+ *  the reminder for someone to answer before the thread is freed. An ordinary
+ *  question is the exception: it holds no queue, screen or effect, so it stays
+ *  answerable and a late answer still continues its run. */
 export const STUCK_WORK_EXPIRE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /** Marker on a thread.meta event so a reminder is sent once per waiting episode. */
@@ -27,12 +29,16 @@ export function stuckWorkAgeMs(updatedAt: Date | string, now: Date): number {
   return now.getTime() - at;
 }
 
-/** `alreadyNotified` is for this episode (the run's current updatedAt), not an older one. */
+/**
+ * `alreadyNotified` is for this episode (the run's current updatedAt), not an older one.
+ * `expires: false` is work that only waits for an answer: it is reminded, never cancelled.
+ */
 export function stuckWorkAction(input: {
   ageMs: number;
   alreadyNotified: boolean;
+  expires?: boolean;
 }): StuckWorkAction {
-  if (input.ageMs >= STUCK_WORK_EXPIRE_AFTER_MS) return "expire";
+  if (input.expires !== false && input.ageMs >= STUCK_WORK_EXPIRE_AFTER_MS) return "expire";
   if (input.ageMs >= STUCK_WORK_NOTIFY_AFTER_MS && !input.alreadyNotified) return "notify";
   return "none";
 }

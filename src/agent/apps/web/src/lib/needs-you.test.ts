@@ -20,3 +20,14 @@ it("leads an answer to the question and the rest to the Mico's main chat", () =>
   expect(needsYouPath({ botId: "mico", action: "review" })).toBe("/app/mico");
   expect(needsYouPath({ botId: "mico", action: "takeover" })).toBe("/app/mico");
 });
+
+it("carries the question and when it started waiting", () => {
+  const [answer, takeover] = needsYouEntries([{ bots: [
+    { ...bot("asks", "waiting_input"), waitingQuestion: "Which photo?", waitingSince: "2026-11-27T08:00:00.000Z" },
+    { ...bot("screen", "waiting_takeover"), waitingQuestion: "ignored", waitingSince: "2026-11-27T09:00:00.000Z" },
+  ] }]);
+  expect(answer).toMatchObject({ action: "answer", question: "Which photo?", since: "2026-11-27T08:00:00.000Z" });
+  expect(takeover).toMatchObject({ action: "takeover", since: "2026-11-27T09:00:00.000Z" });
+  expect(takeover).not.toHaveProperty("question");
+  expect(needsYouEntries([{ bots: [bot("old", "waiting_input")] }])[0]).not.toHaveProperty("question");
+});

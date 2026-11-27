@@ -204,6 +204,10 @@ export const BotSchema = z.object({
   preview: z.string(),
   status: z.string(),
   waitingTaskThreadId: Id.optional(),
+  /** The ordinary question the Mico waits on, as plain text; older servers and other cards omit it. */
+  waitingQuestion: z.string().max(240).optional(),
+  /** When the current question or takeover started waiting; older servers omit it. */
+  waitingSince: z.string().optional(),
   runErrorId: Id.nullable().default(null),
   /** Replies in the main chat the person has not read yet, at most 100. Older servers omit it. */
   unreadCount: z.number().int().nonnegative().optional(),
@@ -417,6 +421,8 @@ export const SpaceBotSchema = BotSchema.pick({
   preview: true,
   status: true,
   waitingTaskThreadId: true,
+  waitingQuestion: true,
+  waitingSince: true,
   runErrorId: true,
   unreadCount: true,
   conversations: true,

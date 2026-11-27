@@ -822,7 +822,11 @@
   as Read uses threads.markAllRead({botId}) (main chat and open conversations, never archived or
   deleting); Mark as Unread makes the newest reply unread; the view menu's Mark all as read calls
   markAllRead per Space. "Needs you" sits above the roster only while something waits and leaves
-  rows in their folders; the device filter (Micos, groups, unread, working, folders) and Recent
+  rows in their folders. Its rows show the roster's waitingSince and, for an ordinary question
+  only (currentMicoScriptQuestion), waitingQuestion; other cards keep their text in the chat.
+  Stuck-work reconciliation reminds an ordinary question once and never cancels it, so a late
+  answer continues the run; approvals, secrets, other cards, takeovers and queued runs still
+  expire after 24 h. The device filter (Micos, groups, unread, working, folders) and Recent
   activity sort are opt-in: never change the default order or grouping. The transcript shows
   "N new messages" with Jump and Mark as read while the New divider is out of sight. Verify
   ConversationsPane, SideConversationView, MirroredRequests, SidebarMicoConversations,
