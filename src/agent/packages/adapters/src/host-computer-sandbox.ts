@@ -230,8 +230,9 @@ export class HostComputerSandbox implements SandboxProvider {
     return parsed.data;
   }
   environment(computer: ComputerRef, context: AdapterContext) {
+    // Callers read the shell, paths and consents; CLI engines come from nativeEngineState.
     return this.one<HostComputerEnvironment>(
-      { method: "environment", botId: computer.botId },
+      { method: "environment", botId: computer.botId, engines: false },
       context,
     );
   }
