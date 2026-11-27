@@ -5069,6 +5069,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
               loading={searchLoading}
               filter={searchFilter}
               onFilter={setSearchFilter}
+              query={query}
+              botColor={(botId) => bots.find((bot) => bot.id === botId)?.color}
               onSelect={(hit) => void jumpToSearchHit(hit)}
             />
           ) : (

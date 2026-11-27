@@ -6122,7 +6122,7 @@ msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Groups"
-msgstr ""
+msgstr "Grupos"
 
 #: src/components/ModelCredits.tsx
 msgid "Hosted credits (USD)"
@@ -16166,6 +16166,9 @@ msgstr "Informe de diagnóstico copiado. Pégalo en tu mensaje a soporte."
 #: src/components/HelpMenu.tsx
 msgid "Could not copy the diagnostic report."
 msgstr "No se pudo copiar el informe de diagnóstico."
+
+msgid "Links"
+msgstr "Enlaces"
 
 msgid "Works on"
 msgstr "Trabaja en"
