@@ -1672,7 +1672,10 @@ export async function appendEvent(
 ): Promise<ProductEvent> {
   // Concurrent writers in one thread (group members, bot messages) can deadlock on the thread row.
   const event = await withTransactionRetry(() =>
-    prisma.$transaction((tx: Prisma.TransactionClient) => appendEventInTransaction(tx, input)),
+    prisma.$transaction(
+      (tx: Prisma.TransactionClient) => appendEventInTransaction(tx, input),
+      THREAD_WRITE_TRANSACTION_OPTIONS,
+    ),
   );
   if (
     input.runId &&
@@ -1743,9 +1746,13 @@ export function completedRunBlocks(
   );
 }
 
-// The thread lock is shared with snapshot reads that may hold it for up to 15s. Prisma's 5s
-// default counts that wait, and expiring would fail a run whose work already finished.
-const FINALIZE_TRANSACTION_OPTIONS = { maxWait: 5_000, timeout: 20_000 };
+/**
+ * Transactions that take the thread row: its lock is shared with sends, finalizers and
+ * reconcilers, and Prisma's 5s default counts the wait for it, so a short database stall would
+ * expire an event write and fail the run that made it (P2028 on event.create).
+ */
+export const THREAD_WRITE_TRANSACTION_OPTIONS = { maxWait: 5_000, timeout: 20_000 } as const;
+const FINALIZE_TRANSACTION_OPTIONS = THREAD_WRITE_TRANSACTION_OPTIONS;
 
 async function finalizeRunOnce(
   prisma: PrismaClient,

@@ -16,6 +16,7 @@ import {
   appendEventInTransaction,
   currentMicoScriptQuestion,
   expireStuckRun,
+  THREAD_WRITE_TRANSACTION_OPTIONS,
   withTransactionRetry,
 } from "@mycellios/db";
 import { getLogger } from "@mycellios/logging";
@@ -210,7 +211,10 @@ async function remindStuckRun(
   if (!deps.notifications || !noticesEnabled(run)) return;
   if (!(await pushCanDeliver(deps.notifications, run.userId))) return;
   const claimId = await withTransactionRetry(() =>
-    deps.prisma.$transaction((tx) => claimStuckReminder(tx, run, deps.now)),
+    deps.prisma.$transaction(
+      (tx) => claimStuckReminder(tx, run, deps.now),
+      THREAD_WRITE_TRANSACTION_OPTIONS,
+    ),
   );
   if (!claimId) return;
   const reminder = stuckWorkReminder(run.status, run.bot.name);
