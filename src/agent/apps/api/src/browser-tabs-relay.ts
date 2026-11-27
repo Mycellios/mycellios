@@ -4,6 +4,7 @@ import { BROWSER_EXTENSION_ORIGINS } from "@mycellios/contracts/content-security
 import type { Hono } from "hono";
 import {
   BROWSER_TABS_MAX_BYTES,
+  BROWSER_TABS_RESULT_MAX_BYTES,
   parseBrowserTabsDispatch,
   parseBrowserTabsPoll,
   parseBrowserTabsRegister,
@@ -74,9 +75,10 @@ export function mountBrowserTabsRelay(
     const session = await deps.authenticate(c.req.raw);
     if (!session) return c.json({ error: "Sign in again" }, 401);
     const owner = { userId: session.userId, sessionKey: browserSessionKey(session.sessionId) };
-    const body = await readBoundedBody(c.req.raw, BROWSER_TABS_MAX_BYTES);
-    if (body === null) return c.json({ error: "Too large" }, 413);
     const action = c.req.param("action");
+    // Only a result may carry a screenshot; every other body stays small.
+    const body = await readBoundedBody(c.req.raw, action === "result" ? BROWSER_TABS_RESULT_MAX_BYTES : BROWSER_TABS_MAX_BYTES);
+    if (body === null) return c.json({ error: "Too large" }, 413);
     try {
       const input: unknown = JSON.parse(body);
       switch (action) {

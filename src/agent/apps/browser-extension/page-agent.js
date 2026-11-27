@@ -150,8 +150,11 @@ export function preparePage(mico) {
     typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (!globalThis.__mycelliosGuard) {
+    // Real input the extension sends through Chrome's debugger is trusted too, so it is ignored
+    // while a Mico's own action is in progress (beginAction to endAction).
     const stamp = (event) => {
-      if (event.isTrusted) globalThis.__mycelliosPersonAt = Date.now();
+      if (event.isTrusted && !globalThis.__mycelliosActing)
+        globalThis.__mycelliosPersonAt = Date.now();
     };
     for (const type of ["pointerdown", "keydown", "wheel", "touchstart"])
       addEventListener(type, stamp, { capture: true, passive: true });
@@ -230,6 +233,10 @@ export function preparePage(mico) {
       cursor.style.transform = to;
       at = to;
     },
+    /** Screenshots for the Mico are taken without the overlay. */
+    visible(shown) {
+      host.style.display = shown ? "" : "none";
+    },
     remove() {
       host.remove();
       globalThis.__mycelliosOverlay = undefined;
@@ -241,6 +248,120 @@ export function preparePage(mico) {
 /** Removes the overlay when the Mico is done with the tab, or sharing stops. */
 export function releasePage() {
   globalThis.__mycelliosOverlay?.remove();
+  globalThis.__mycelliosActing = false;
+}
+
+/** Hides or shows the overlay around a screenshot; returns the viewport size in CSS pixels. */
+export function overlayVisible(shown) {
+  globalThis.__mycelliosOverlay?.visible(shown);
+  return { width: innerWidth, height: innerHeight };
+}
+
+/**
+ * First half of an action done with real input through Chrome's debugger: checks the element,
+ * brings it into view, moves the cursor there, focuses and selects a field's text so typed text
+ * replaces it, and returns the point to click in viewport CSS pixels and a fingerprint of the page.
+ * Select and scroll do not need real input and are not prepared here.
+ */
+export function beginAction(action) {
+  const refs = globalThis.__mycelliosRefs;
+  const el = action.ref ? refs?.get(action.ref)?.deref() : undefined;
+  if (action.ref && !el?.isConnected) return { ok: false, note: "stale ref: take a new snapshot" };
+  const content = (node) => (node ? (node.innerText ?? node.textContent ?? "") : "");
+  const fingerprint = (node) =>
+    [
+      location.href,
+      content(document.body).length,
+      document.querySelectorAll("*").length,
+      node && "checked" in node ? node.checked : "",
+      node && "value" in node ? node.value : "",
+    ].join("|");
+  const textField = (node) => {
+    if (node instanceof HTMLTextAreaElement) return true;
+    if (node instanceof HTMLInputElement)
+      return ![
+        "checkbox",
+        "radio",
+        "button",
+        "submit",
+        "file",
+        "hidden",
+        "reset",
+        "image",
+        "range",
+        "color",
+      ].includes(node.type);
+    return Boolean(node?.isContentEditable);
+  };
+  if (action.kind === "click" && !el) return { ok: false, note: "click needs an element ref" };
+  if ((action.kind === "fill" || action.kind === "type") && (!el || !textField(el)))
+    return { ok: false, note: "not a text field" };
+  if (el && (el.disabled || el.getAttribute?.("aria-disabled") === "true"))
+    return { ok: false, note: "the element is disabled" };
+  if ((action.kind === "fill" || action.kind === "type") && el.readOnly)
+    return { ok: false, note: "the field is not editable" };
+  if (typeof el?.scrollIntoView === "function")
+    el.scrollIntoView({ block: "center", inline: "center" });
+  let x = 0;
+  let y = 0;
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    x = rect.left + rect.width / 2;
+    y = rect.top + rect.height / 2;
+    globalThis.__mycelliosOverlay?.move(x, y);
+  }
+  if (action.kind === "click") {
+    const hit = document.elementFromPoint?.(x, y);
+    if (hit && hit !== el && !el.contains(hit) && !hit.contains(el))
+      return { ok: false, note: "another element covers it" };
+  }
+  if (action.kind === "fill" || action.kind === "type" || (action.kind === "key" && el)) {
+    el.focus?.();
+    if (action.kind !== "key") {
+      if (typeof el.select === "function") el.select();
+      else if (el.isContentEditable) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const selection = getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    }
+  }
+  globalThis.__mycelliosActing = true;
+  globalThis.__mycelliosBeforeActive = document.activeElement;
+  return { ok: true, x, y, before: fingerprint(el ?? document.activeElement) };
+}
+
+/** Second half: waits a moment, then reports whether the action's effect can be seen. */
+export async function endAction(action, before) {
+  const refs = globalThis.__mycelliosRefs;
+  const el = action.ref ? refs?.get(action.ref)?.deref() : undefined;
+  const content = (node) => (node ? (node.innerText ?? node.textContent ?? "") : "");
+  const fingerprint = (node) =>
+    [
+      location.href,
+      content(document.body).length,
+      document.querySelectorAll("*").length,
+      node && "checked" in node ? node.checked : "",
+      node && "value" in node ? node.value : "",
+    ].join("|");
+  await new Promise((resolve) => setTimeout(resolve, action.kind === "click" ? 400 : 250));
+  globalThis.__mycelliosActing = false;
+  if (action.kind === "fill" || action.kind === "type") {
+    const value = el && "value" in el ? el.value : el?.textContent;
+    return value === String(action.text ?? "")
+      ? { ok: true }
+      : { ok: false, note: "not confirmed: the field shows different text" };
+  }
+  const target = el ?? document.activeElement;
+  // Moving the focus is the visible effect of a key such as Tab, but not of a click (a clicked
+  // button takes the focus whether or not anything happened).
+  const changed =
+    fingerprint(target) !== before ||
+    (action.kind === "key" && document.activeElement !== globalThis.__mycelliosBeforeActive);
+  globalThis.__mycelliosBeforeActive = undefined;
+  return changed ? { ok: true } : { ok: false, note: "not confirmed: nothing visibly changed" };
 }
 
 /**

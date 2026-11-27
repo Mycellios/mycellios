@@ -47,9 +47,22 @@ open pages only in new tabs or in tabs they already work in, never in one of you
   identity provider's authorization page, and keeps a download. The rules are in `sensitive.js`
   and run here, not on the server. A download that starts while a Mico acts is held (paused) until
   you keep or cancel it; downloads you start yourself are never touched.
-- **Honest results.** Events come from the extension and some sites ignore them: a step whose effect
-  cannot be seen is reported as not confirmed, and the run stops at the first step that was
-  declined, stale or not confirmed.
+- **Real input.** The switch also asks for Chrome's `debugger` permission. With it, clicks, typing and
+  keys go through Chrome's own input pipeline, so they count as a person's (`isTrusted`) and sites
+  that ignore synthetic events respond. Chrome shows its "started debugging this browser" bar while
+  a Mico works in a tab; the extension detaches when the work ends. Without it, the extension falls
+  back to synthetic events.
+- **Screenshots.** `chrome_screenshot` shows a Mico the tab as an image, without its overlay, for
+  models that see images. It is reading the site, so it asks like reading does.
+- **Honest results.** A step whose effect cannot be seen is reported as not confirmed, and the run
+  stops at the first step that was declined, stale or not confirmed.
+- **Stop means stop.** Stop sharing, or turning acting off, answers every open question with "deny".
+
+`node scripts/verify-browser-extension-real.mjs` (from `src/agent`) loads this extension into
+Playwright's Chromium and checks the real Chrome APIs against local pages: listing, reading, real
+clicks on a button that ignores synthetic ones, typing, screenshots, the tab group and overlay, the
+person-first guard, the password, sign-in and payment questions, held downloads, opening pages,
+refused sites and the clean-up. It signs in to nothing and runs no model.
 
 Refused everywhere: Mycellios, the Chrome Web Store, password managers, `chrome://` pages and
 addresses with embedded credentials.
@@ -87,5 +100,7 @@ panel against the hosted app before publishing.
 - `tabGroups`: show the tabs a Mico works in as a named, colored group.
 - `downloads` (optional, requested only by **Let Micos click and type**): hold a download that
   starts while a Mico acts until you keep or cancel it.
+- `debugger` (optional, requested with `downloads`): real clicks and typing, and screenshots, in
+  the tabs a Mico works in. Chrome shows a bar while it is in use.
 - Optional site access (`https://*/*`, `http://*/*`): requested one site at a time when you allow
   a Mico to read it.

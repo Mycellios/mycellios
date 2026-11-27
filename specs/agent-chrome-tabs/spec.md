@@ -19,7 +19,20 @@ window and Mico, and tabs leave them after 90 s without work or on Stop sharing;
 page actions stop at the first step that is declined, stale or not confirmed; approval
 cards are the generic ones (no element label yet); `site` deny rules and the takeover
 card's Open for Chrome tabs are not wired; the person-first guard watches trusted
-input in the tab for 3 s from the moment the Mico first prepares it. Deviations from this design:
+input in the tab for 3 s from the moment the Mico first prepares it. Owner decision for
+open question 5 (2026-11-27, parity with the reference): the acting switch also requests
+the optional `debugger` permission. With it, clicks, typing and keys go through
+`chrome.debugger` (`Input.dispatchMouseEvent`, `Input.insertText`, `Input.dispatchKeyEvent`)
+so sites that ignore synthetic events respond, and the guard ignores the Mico's own trusted
+input while an action runs; without it the synthetic path remains. Chrome shows its
+debugging bar while a tab is attached, and the extension detaches when the work ends.
+Open question 8 is answered too: `chrome_screenshot` returns a JPEG of a tab without the
+overlay (`Page.captureScreenshot`, at most 1280 CSS pixels wide; without the debugger
+only the visible tab through `captureVisibleTab`), under the same route rule and site
+question as reading; only a panel's `result` body may exceed 64 KiB, up to the screenshot
+bound. Stop sharing and turning acting off answer every open and queued question with
+"deny". `scripts/verify-browser-extension-real.mjs` checks all of this in Playwright's
+Chromium with the real extension against local fixture pages. Deviations from this design:
 the registration is keyed by account and sign-in session, not by Space (the panel
 chooses no Space and only the owner's own runs reach it), and the session key is
 recorded on the owner's message (`messages.browserSessionKey`) rather than on the

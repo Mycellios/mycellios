@@ -36,7 +36,7 @@
   "actEnable": { "message": "Dejar que los Micos hagan clic y escriban" },
   "actDisable": { "message": "Desactivar" },
   "actDetail": {
-    "message": "Los Micos podrían hacer clic y escribir en tus páginas, en pestañas que muestran su nombre y color. Siempre te preguntan antes de una contraseña, datos de pago, un inicio de sesión o una descarga, y paran cuando usas la pestaña. Chrome pedirá gestionar descargas para poder retener una hasta que decidas."
+    "message": "Los Micos podrían hacer clic y escribir en tus páginas, en pestañas que muestran su nombre y color. Siempre te preguntan antes de una contraseña, datos de pago, un inicio de sesión o una descarga, y paran cuando usas la pestaña. Chrome pedirá gestionar descargas, para poder retener una hasta que decidas, y usar su depurador, para que los clics y lo que escriban funcionen como los tuyos y puedan ver la página; Chrome muestra una barra mientras un Mico trabaja en una pestaña."
   },
   "confirmPassword": {
     "message": "Tu Mico quiere escribir en un campo de contraseña o de código en {site}."

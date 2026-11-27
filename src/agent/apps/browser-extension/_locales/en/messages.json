@@ -36,7 +36,7 @@
   "actEnable": { "message": "Let Micos click and type" },
   "actDisable": { "message": "Turn off" },
   "actDetail": {
-    "message": "Micos could click and type in your pages, in tabs that show their name and color. You are always asked before a password, payment details, a sign-in or a download, and they stop when you use the tab. Chrome will ask to manage downloads so one can be held until you decide."
+    "message": "Micos could click and type in your pages, in tabs that show their name and color. You are always asked before a password, payment details, a sign-in or a download, and they stop when you use the tab. Chrome will ask to manage downloads, so one can be held until you decide, and to use its debugger, so clicks and typing work like yours and Micos can see the page; Chrome shows a bar while a Mico works in a tab."
   },
   "confirmPassword": {
     "message": "Your Mico wants to type into a password or code field on {site}."
