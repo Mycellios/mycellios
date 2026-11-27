@@ -1759,9 +1759,13 @@
 - Protect multiline secret fragments during streaming as well as whole-output redaction;
   monitoring must scrub Windows profile paths with either slash direction and spaces.
 
-- Answered ordinary questions collapse into a neutral reply with the original
+- Answered ordinary questions collapse into the person's own reply bubble, on their
+  side of the transcript (AnsweredQuestion, isPersonAnsweredAsk), with the original
   question available in a disclosure. Keep approval outcomes and saved credentials
   on their existing explicit status path, never expose secret answers.
+- Docker computers state that they run on a server, not the person's device, and
+  offer Desktop (This PC) or Chrome tab sharing for work on the person's own PC or
+  browser (PERSON_DEVICE_BOUNDARY_INSTRUCTION); never ask for a password in chat.
 
 - This development fork presents Mycellios Agent. Shared product names, API origins and asset
   paths live in `packages/contracts/src/product-brand.ts`; semantic forest/paper
