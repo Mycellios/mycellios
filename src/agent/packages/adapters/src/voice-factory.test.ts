@@ -130,6 +130,21 @@ describe("ElevenLabsVoiceProvider", () => {
     expect(form instanceof FormData && form.get("model_id")).toBe("scribe_v2");
   });
 
+  it("gives OpenAI the expected names as its transcription prompt", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response(JSON.stringify({ text: "Ask Ada" })));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAIVoiceProvider();
+    const request = { audio: new Uint8Array([1]), mimeType: "audio/webm", apiKey: "sk" };
+    await provider.transcribe!({ ...request, vocabulary: ["Ada", "Mycellios"] }, ctx);
+    await provider.transcribe!(request, ctx);
+    const hinted = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    const plain = fetchMock.mock.calls[1]?.[1]?.body as FormData;
+    expect(hinted.get("prompt")).toBe("Ada, Mycellios");
+    expect(plain.has("prompt")).toBe(false);
+  });
+
   const quota =
     "This request exceeds your quota of 10000. You have 12 credits remaining, while 50 credits are required for this request.";
   const permission =

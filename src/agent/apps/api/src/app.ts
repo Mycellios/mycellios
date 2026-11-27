@@ -190,6 +190,7 @@ import {
   TeamChatStartupRetries,
 } from "./team-chat-startup.js";
 import { mountVoiceHttpRoutes, voiceAccountErrorStatus } from "./voice.js";
+import { mountRealtimeCallRoutes } from "./voice-realtime.js";
 import { mountWebhookHttpRoutes } from "./webhook.js";
 import { mountMicoScriptsHttp } from "./mico-scripts-http.js";
 import { mountWorkflowWebhooks } from "./workflow-webhooks.js";
@@ -1049,6 +1050,11 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     await next();
   });
   mountVoiceHttpRoutes(app, { prisma, secrets, env }, async (c) => {
+    const actor = await sessionActor(c.req.raw);
+    if (actor) enrichLogContext({ "user.id": actor.userId, "space.id": actor.spaceId });
+    return actor;
+  });
+  mountRealtimeCallRoutes(app, { prisma, secrets, env }, async (c) => {
     const actor = await sessionActor(c.req.raw);
     if (actor) enrichLogContext({ "user.id": actor.userId, "space.id": actor.spaceId });
     return actor;

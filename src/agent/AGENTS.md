@@ -1185,6 +1185,17 @@
   stays unknown. Workflow condition branches retain the existing worker semantics.
   Verify scripts/verify-workspace-sync-db.ts and verify-workspace-sync-ui.mjs;
   the browser fixture uses synthetic RPCs and does not qualify real agent execution.
+- Realtime Mico calls follow specs/realtime-mico-calls/spec.md: off unless
+  MYCELLIOS_REALTIME_CALLS=true and the person's device switch. The server only relays
+  the WebRTC offer with the person's own OpenAI voice key (never another payer, never
+  the key in the browser); the speech model gets four tools (ask_mico, read_conversation,
+  answer_request, end_call) that RealtimeCallTools runs in the person's client through the
+  ordinary thread RPCs and the call's client nonce. A send needs new transcribed words
+  since the previous send, runs once per provider call id and is never retried when
+  uncertain; answer_request is only allow/deny and must match spokenApprovalAction on the
+  person's own last words. A failed realtime start continues on the turn-based call.
+  Verify voice-realtime, realtime-call(-tools), call-session and voice-scenarios tests;
+  fixtures do not qualify a real provider session, microphone or latency.
 - Continuous voice keeps its immutable Space/task client and stops its owned audio
   resources on close. Track the accepted turn by run and task ID so an older
   chat failure cannot stop the microphone or speak an unrelated reply.

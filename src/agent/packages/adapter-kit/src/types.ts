@@ -824,6 +824,11 @@ export interface VoiceTranscribeRequest {
    * one language into lookalike words of another.
    */
   language?: string;
+  /**
+   * Names the recording is likely to contain (the Mico, its teammates, the product). Providers
+   * that accept a prompt use it to spell them right; others ignore it.
+   */
+  vocabulary?: readonly string[];
   signal?: AbortSignal;
 }
 

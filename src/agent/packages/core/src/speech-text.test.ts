@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  isVocabularyEcho,
   narrateTool,
   speakable,
   speechFromBlocks,
+  spokenApprovalAction,
   spokenDecision,
   toUtterances,
+  transcriptionVocabulary,
 } from "./speech-text.js";
 
 describe("speakable", () => {
@@ -166,5 +169,53 @@ describe("spokenDecision", () => {
     expect(spokenDecision("No thanks")).toBe("no");
     expect(spokenDecision("I'm sure that's fine, go look at the logs")).toBeNull();
     expect(spokenDecision("")).toBeNull();
+  });
+
+  it("understands Spanish and politeness around a clear answer", () => {
+    expect(spokenDecision("Sí.")).toBe("yes");
+    expect(spokenDecision("Sí, hazlo, por favor")).toBe("yes");
+    expect(spokenDecision("vale gracias")).toBe("yes");
+    expect(spokenDecision("No, mejor no.")).toBe("no");
+    expect(spokenDecision("No lo hagas")).toBe("no");
+  });
+
+  it("refuses sentences that only start like an answer", () => {
+    expect(spokenDecision("si me dices qué es")).toBeNull();
+    expect(spokenDecision("sí, pero antes dime a quién")).toBeNull();
+    expect(spokenDecision("yes no")).toBeNull();
+    expect(spokenDecision("Gracias por ver el vídeo")).toBeNull();
+    expect(spokenDecision("ok, ok, ok, ok, ok")).toBeNull();
+  });
+});
+
+describe("spokenApprovalAction", () => {
+  const actions = [{ id: "allow" }, { id: "always" }, { id: "deny" }];
+  it("allows once or denies, never always", () => {
+    expect(spokenApprovalAction("sí", actions)).toBe("allow");
+    expect(spokenApprovalAction("no", actions)).toBe("deny");
+    expect(spokenApprovalAction("always allow", actions)).toBeNull();
+    expect(spokenApprovalAction("siempre", actions)).toBeNull();
+  });
+});
+
+describe("transcription vocabulary", () => {
+  it("deduplicates and bounds the hinted names", () => {
+    expect(transcriptionVocabulary(["Ada", "ada", " Mycellios ", "", "x".repeat(80)])).toEqual([
+      "Ada",
+      "Mycellios",
+    ]);
+    expect(transcriptionVocabulary(Array.from({ length: 50 }, (_, i) => `Mico ${i}`))).toHaveLength(
+      24,
+    );
+  });
+
+  it("drops a transcript that only recites the hints", () => {
+    const vocabulary = ["Ada", "Mycellios", "Bruno Díaz"];
+    expect(isVocabularyEcho("Ada, Mycellios, Bruno Diaz.", vocabulary)).toBe(true);
+    expect(isVocabularyEcho("Mycellios Ada", vocabulary)).toBe(true);
+    // One name alone can be the person calling their Mico.
+    expect(isVocabularyEcho("Ada", vocabulary)).toBe(false);
+    expect(isVocabularyEcho("Ada, ask Bruno Díaz about Mycellios", vocabulary)).toBe(false);
+    expect(isVocabularyEcho("", vocabulary)).toBe(false);
   });
 });

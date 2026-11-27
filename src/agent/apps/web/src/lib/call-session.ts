@@ -3,23 +3,28 @@ import type { ThreadMessage, ThreadSnapshot } from "@mycellios/contracts";
 import {
   callClientNonce,
   INTERIM_BARGE_IN_MS,
+  isApprovalAskBlock,
   isCallBargeIn,
   isFarewell,
   isInterimCallBargeIn,
   isSecretAskBlock,
   runThreadSubscription,
   speechFromBlocks,
+  spokenApprovalAction,
   spokenDecision,
   spokenMemory,
 } from "@mycellios/core";
 import { useSyncExternalStore } from "react";
+import { type CallNotice, callNoticeSpeech, callNotices } from "./call-notices.js";
 import { pickUp } from "./call-pickup.js";
-import { dictation } from "./dictation.js";
+import { closeContinuousVoice } from "./continuous-voice-owner.js";
+import { dictation, transcriptionLanguage } from "./dictation.js";
+import { getGeneralPreferences } from "./general-preferences";
 import { reportClientError } from "./monitoring";
-import { rpc } from "./rpc.js";
+import { connectRealtimeCall, type RealtimeCallController } from "./realtime-call.js";
+import { rpc, selectedSpaceId } from "./rpc.js";
 import { isThreadSnapshotEvent, reduceThreadSnapshot } from "./thread-events.js";
 import { speaker } from "./tts.js";
-import { closeContinuousVoice } from "./continuous-voice-owner.js";
 import { errorText } from "./user-error";
 
 /** `ringing` until the call picks up; the rest describe the conversation. */
@@ -82,6 +87,16 @@ let awaitingReply = false;
 /** Counting down an interim phrase heard over the reply, before it counts as cutting in. */
 let interimTimer: ReturnType<typeof setTimeout> | null = null;
 const watchers = new Set<() => void>();
+/** How often a connected call looks at the person's other work. */
+export const CALL_NOTICE_POLL_MS = 10_000;
+let noticeTimer: ReturnType<typeof setInterval> | null = null;
+let noticesSince = 0;
+let noticesBusy = false;
+let pendingNotices: CallNotice[] = [];
+const announcedNotices = new Set<string>();
+/** A realtime call owns the microphone and speaker; the turn-based pipeline stays idle. */
+let realtimeMode = false;
+let realtime: RealtimeCallController | null = null;
 
 export function subscribe(watcher: () => void): () => void {
   watchers.add(watcher);
@@ -172,6 +187,11 @@ export function startCall(call: {
   void pickUp(ringing.signal, { ring: !call.answered }).then(() => {
     if (ringing.signal.aborted || !state || callId !== ringingCallId) return;
     pickup = null;
+    watchNotices();
+    if (!opening && getGeneralPreferences().realtimeCalls) {
+      void startRealtime(call.botId, call.botName, ringingCallId);
+      return;
+    }
     if (!opening) {
       set({ phase: "listening", connectedAt: Date.now() });
       void listen();
@@ -220,6 +240,15 @@ export function endCall(): void {
   openingPending = false;
   feed?.abort();
   feed = null;
+  const closingRealtime = realtime;
+  realtime = null;
+  realtimeMode = false;
+  closingRealtime?.close();
+  if (noticeTimer) clearInterval(noticeTimer);
+  noticeTimer = null;
+  noticesBusy = false;
+  pendingNotices = [];
+  announcedNotices.clear();
   hangUpAfterReply = false;
   botEndedCall = false;
   if (hangUpTimer) clearTimeout(hangUpTimer);
@@ -248,6 +277,10 @@ export function toggleMute(): void {
   if (!state) return;
   const muted = !state.muted;
   set({ muted });
+  if (realtimeMode) {
+    realtime?.setMuted(muted);
+    return;
+  }
   if (muted) {
     dictation.stop("cancel");
     micOpen = false;
@@ -408,6 +441,19 @@ async function handleTranscript(text: string) {
   const { botId, exchanges } = state;
   const askId = latestAskId(thread);
   const askMessage = thread?.messages.find((message) => message.id === askId);
+  const approvalBlock = askMessage?.blocks.find(
+    (block) => block.kind === "ask" && block.status !== "answered" && isApprovalAskBlock(block),
+  );
+  // An approval takes only a clear spoken yes (allow once) or no (deny). Anything else is
+  // never sent as the answer: the caller hears what the card is waiting for instead.
+  const approvalAction =
+    approvalBlock && approvalBlock.kind === "ask"
+      ? spokenApprovalAction(text, approvalBlock.actions)
+      : null;
+  if (approvalBlock && !approvalAction) {
+    repromptApproval(text);
+    return;
+  }
   // Captured now: a call started while this is in flight must not re-attach the new feed
   // or commit this turn onto it. The same bot can be called again, so the bot id is not enough.
   const callFeed = feed;
@@ -430,7 +476,7 @@ async function handleTranscript(text: string) {
           botId,
           runId: askMessage.runId ?? "",
           messageId: askMessage.id,
-          answer: spokenDecision(text) ?? text,
+          answer: approvalAction ?? spokenDecision(text) ?? text,
           clientNonce,
         })
       : runActive(thread)
@@ -493,6 +539,8 @@ function clearInterim() {
 function reactToThread() {
   // Nothing is spoken before the call picks up, or over the bot's opening.
   if (!state || state.phase === "ringing" || openingPending) return;
+  // A realtime call speaks for itself; its tools read the thread.
+  if (realtimeMode) return;
   // The bot already said goodbye: neither its marker nor the work it files after it is spoken.
   if (botEndedCall) return;
   if (pendingSecretAsk(thread)) {
@@ -542,6 +590,135 @@ function replyFinished(message: ThreadMessage) {
   if (!run) return true;
   if (message.runId && message.runId !== run.id) return true;
   return !RUN_ACTIVE.includes(run.status);
+}
+
+/**
+ * A pending approval heard something other than a clear yes or no: say what it waits for and
+ * listen again. "Always allow" is only offered on screen.
+ */
+function repromptApproval(heard: string) {
+  if (!state) return;
+  const reprompt = t`To answer the request, say yes to allow it once or no to deny it. You can also answer on screen.`;
+  set({
+    heard: "",
+    phase: "thinking",
+    caption: reprompt,
+    exchanges: [...state.exchanges, { role: "user", text: heard }, { role: "bot", text: reprompt }],
+  });
+  spokenMemory.remember(reprompt);
+  const turnCallId = callId;
+  void speaker.speak(reprompt, { botId: state.botId }).catch(() => {
+    if (callId === turnCallId) void listen();
+  });
+}
+
+/**
+ * While connected, the call checks the person's other work (other Micos, side conversations,
+ * groups) and mentions what finished, failed or waits for them in the next quiet moment.
+ */
+function watchNotices() {
+  if (noticeTimer) clearInterval(noticeTimer);
+  noticesSince = Date.now();
+  pendingNotices = [];
+  announcedNotices.clear();
+  const watchingCallId = callId;
+  noticeTimer = setInterval(() => void pollNotices(watchingCallId), CALL_NOTICE_POLL_MS);
+}
+
+async function pollNotices(watchingCallId: string) {
+  if (!state || callId !== watchingCallId || noticesBusy) return;
+  noticesBusy = true;
+  try {
+    const [active, recent] = await Promise.all([
+      rpc.runs.list({ filter: "active" }),
+      rpc.runs.list({ filter: "recent" }),
+    ]);
+    if (!state || callId !== watchingCallId) return;
+    const queued = new Set(pendingNotices.map((notice) => notice.key));
+    const fresh = callNotices([...active.runs, ...recent.runs], {
+      since: noticesSince,
+      callThreadId: thread?.threadId ?? null,
+      seen: new Set([...announcedNotices, ...queued]),
+    });
+    pendingNotices = [...pendingNotices, ...fresh];
+  } catch {
+    // A failed read keeps what is queued; the next poll tries again.
+  } finally {
+    noticesBusy = false;
+  }
+  announceNotices();
+}
+
+/** Speaks queued notices only when nobody is talking and no reply is on its way. */
+function announceNotices() {
+  if (!state || pendingNotices.length === 0) return;
+  if (realtimeMode) {
+    if (!realtime) return;
+    const text = callNoticeSpeech(pendingNotices);
+    for (const notice of pendingNotices) announcedNotices.add(notice.key);
+    pendingNotices = [];
+    if (text) realtime.notify(text);
+    return;
+  }
+  if (state.phase !== "listening" || state.heard || awaitingReply || openingPending) return;
+  if (speaker.isSpeaking() || pendingSecretAsk(thread)) return;
+  const text = callNoticeSpeech(pendingNotices);
+  for (const notice of pendingNotices) announcedNotices.add(notice.key);
+  pendingNotices = [];
+  if (!text) return;
+  set({ exchanges: [...state.exchanges, { role: "bot", text }] });
+  spokenMemory.remember(text);
+  void speaker.speak(text, { botId: state.botId }).catch(() => undefined);
+}
+
+/**
+ * Opens the realtime transport (specs/realtime-mico-calls). If the server, key or network
+ * cannot provide it, the call continues on the turn-based pipeline and says why.
+ */
+async function startRealtime(botId: string, botName: string, ringingCallId: string) {
+  realtimeMode = true;
+  set({ phase: "thinking", connectedAt: Date.now(), caption: t`Connecting…` });
+  try {
+    const controller = await connectRealtimeCall({
+      botId,
+      micoName: botName,
+      callId: ringingCallId,
+      language: transcriptionLanguage(),
+      spaceId: selectedSpaceId(),
+      rpc,
+      hooks: {
+        phase: (phase) => {
+          if (callId === ringingCallId) set({ phase });
+        },
+        user: (text) => {
+          if (state && callId === ringingCallId)
+            set({ heard: "", exchanges: [...state.exchanges, { role: "user", text }] });
+        },
+        bot: (text) => {
+          if (state && callId === ringingCallId)
+            set({ exchanges: [...state.exchanges, { role: "bot", text }] });
+        },
+        ended: () => {
+          if (callId === ringingCallId) endCall();
+        },
+      },
+    });
+    if (!state || callId !== ringingCallId) {
+      controller.close();
+      return;
+    }
+    realtime = controller;
+    if (state.muted) controller.setMuted(true);
+    set({ caption: "" });
+  } catch (error) {
+    if (!state || callId !== ringingCallId) return;
+    realtimeMode = false;
+    set({
+      phase: "listening",
+      caption: `${errorText(error, t`Realtime voice is unavailable`)} ${t`Continuing with standard voice.`}`,
+    });
+    void listen();
+  }
 }
 
 function runActive(snapshot: ThreadSnapshot | null) {

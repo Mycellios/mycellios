@@ -16496,3 +16496,39 @@ msgstr "Te queda 1 mensaje gratuito de invitado"
 #: src/pages/guest/GuestChat.tsx
 msgid "{remaining} free guest messages left"
 msgstr "Te quedan {remaining} mensajes gratuitos de invitado"
+
+#: src/lib/call-session.ts
+msgid "To answer the request, say yes to allow it once or no to deny it. You can also answer on screen."
+msgstr "Para responder a la solicitud, di sí para permitirlo una vez o no para denegarlo. También puedes responder en la pantalla."
+
+#: src/lib/call-notices.ts
+msgid "{first} and others"
+msgstr "{first} y otros"
+
+#: src/lib/call-notices.ts
+msgid "Heads up: {names} is waiting for you."
+msgstr "Atención: tienes algo pendiente con {names}."
+
+#: src/lib/call-notices.ts
+msgid "Work by {names} failed."
+msgstr "Ha fallado un trabajo de {names}."
+
+#: src/lib/call-notices.ts
+msgid "{names} finished."
+msgstr "Ha terminado: {names}."
+
+#: src/lib/call-session.ts
+msgid "Realtime voice is unavailable"
+msgstr "La voz en tiempo real no está disponible"
+
+#: src/lib/call-session.ts
+msgid "Continuing with standard voice."
+msgstr "Sigues con la voz estándar."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Realtime calls"
+msgstr "Llamadas en tiempo real"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice."
+msgstr "Las llamadas responden mientras hablas y puedes interrumpir. Usa tu clave de voz de OpenAI, que cobra OpenAI, cuando este servidor lo ofrece; si no, las llamadas siguen con la voz estándar."

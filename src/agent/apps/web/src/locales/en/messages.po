@@ -16057,3 +16057,39 @@ msgstr "1 free guest message left"
 #: src/pages/guest/GuestChat.tsx
 msgid "{remaining} free guest messages left"
 msgstr "{remaining} free guest messages left"
+
+#: src/lib/call-session.ts
+msgid "To answer the request, say yes to allow it once or no to deny it. You can also answer on screen."
+msgstr "To answer the request, say yes to allow it once or no to deny it. You can also answer on screen."
+
+#: src/lib/call-notices.ts
+msgid "{first} and others"
+msgstr "{first} and others"
+
+#: src/lib/call-notices.ts
+msgid "Heads up: {names} is waiting for you."
+msgstr "Heads up: {names} is waiting for you."
+
+#: src/lib/call-notices.ts
+msgid "Work by {names} failed."
+msgstr "Work by {names} failed."
+
+#: src/lib/call-notices.ts
+msgid "{names} finished."
+msgstr "{names} finished."
+
+#: src/lib/call-session.ts
+msgid "Realtime voice is unavailable"
+msgstr "Realtime voice is unavailable"
+
+#: src/lib/call-session.ts
+msgid "Continuing with standard voice."
+msgstr "Continuing with standard voice."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Realtime calls"
+msgstr "Realtime calls"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice."
+msgstr "Calls answer as you speak and you can interrupt. Uses your OpenAI voice key, which is charged by OpenAI, when this server offers it; otherwise calls keep the standard voice."

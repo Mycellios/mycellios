@@ -22,8 +22,8 @@ import type {
   VoiceCredential,
   VoiceStatus,
 } from "@mycellios/contracts";
-import { isNetworkVoiceErrorCode, SettingsScopeSchema } from "@mycellios/contracts";
-import { toUtterances } from "@mycellios/core";
+import { isNetworkVoiceErrorCode, productBrand, SettingsScopeSchema } from "@mycellios/contracts";
+import { isVocabularyEcho, toUtterances, transcriptionVocabulary } from "@mycellios/core";
 import {
   deleteUnreferencedCredentialSecret,
   findDefaultVoiceCredential,
@@ -51,7 +51,12 @@ export interface VoiceDeps {
   prisma: PrismaClient;
   secrets: SecretStore;
   /** The instance flag (`MCP_ALLOW_PRIVATE_ENDPOINT`). */
-  env?: { mcpAllowPrivateEndpoint?: boolean; mycelliosNetworkSpeechIdentityIds?: string[]; mycelliosNetworkTranscriptionIdentityIds?: string[] };
+  env?: {
+    mcpAllowPrivateEndpoint?: boolean;
+    mycelliosNetworkSpeechIdentityIds?: string[];
+    mycelliosNetworkTranscriptionIdentityIds?: string[];
+    realtimeCalls?: { model: string; voice: string; transcriptionModel: string };
+  };
 }
 
 /** A self-hosted speech server on a private address is limited like model endpoints. */
@@ -591,16 +596,41 @@ export async function transcribeVoice(
   if (input.audio.byteLength === 0 || input.audio.byteLength > MAX_TRANSCRIBE_BYTES) {
     throw new ORPCError("BAD_REQUEST", { message: "That recording is empty or too large." });
   }
-  return provider.transcribe(
+  const vocabulary = await transcriptionHints(deps, actor, input.botId);
+  const result = await provider.transcribe(
     {
       audio: input.audio,
       mimeType: input.mimeType || "audio/webm",
       language: input.language,
       apiKey: loaded.apiKey,
+      ...(vocabulary.length ? { vocabulary } : {}),
       signal: input.signal,
     },
     voiceContext(actor, input.signal),
   );
+  // A model that heard nothing clear can hand back its own hints: that is not the person.
+  return isVocabularyEcho(result.text, vocabulary) ? { text: "" } : result;
+}
+
+/**
+ * Names the person is likely to say: the Mico being dictated to first, then their other Micos
+ * in this Space and the product name. Only the caller's own Micos; a failed read hints nothing.
+ */
+async function transcriptionHints(deps: VoiceDeps, actor: Actor, botId?: string): Promise<string[]> {
+  try {
+    const bots = await deps.prisma.bot.findMany({
+      where: { userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+      select: { id: true, name: true },
+      orderBy: { updatedAt: "desc" },
+      take: 40,
+    });
+    const first = bots.filter((bot) => bot.id === botId);
+    const rest = bots.filter((bot) => bot.id !== botId);
+    const names = [...first, ...rest].map((bot) => bot.name);
+    return transcriptionVocabulary([...names, productBrand.shortName, productBrand.companionName]);
+  } catch {
+    return [];
+  }
 }
 
 export function mountVoiceHttpRoutes(

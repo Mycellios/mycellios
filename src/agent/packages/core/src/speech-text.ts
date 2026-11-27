@@ -232,14 +232,182 @@ export function speechFromBlocks(blocks: MessageBlock[]): string {
     .join("\n");
 }
 
-const YES = /^(yes|yeah|yep|yup|ok|okay|sure|do it|go ahead|approve|confirmed|affirmative)\b/i;
-const NO = /^(no|nope|nah|cancel|stop|don't|do not|reject|deny|negative)\b/i;
+// Whole-utterance phrases only: "si me dices qué es" or "sure, but first…" must never count.
+const YES_PHRASES = [
+  "yes",
+  "yeah",
+  "yep",
+  "yup",
+  "ok",
+  "okay",
+  "sure",
+  "do it",
+  "go ahead",
+  "approve",
+  "approved",
+  "allow it",
+  "confirmed",
+  "affirmative",
+  "go for it",
+  "si",
+  "vale",
+  "claro",
+  "de acuerdo",
+  "adelante",
+  "hazlo",
+  "dale",
+  "venga",
+  "correcto",
+  "confirmo",
+  "confirmado",
+  "apruebalo",
+  "permitelo",
+  "perfecto",
+  "por supuesto",
+];
+const NO_PHRASES = [
+  "no",
+  "nope",
+  "nah",
+  "cancel",
+  "cancel it",
+  "stop",
+  "don't",
+  "dont",
+  "do not",
+  "don't do it",
+  "reject",
+  "deny",
+  "deny it",
+  "negative",
+  "not now",
+  "no lo hagas",
+  "cancela",
+  "cancelalo",
+  "para",
+  "deniega",
+  "denegado",
+  "rechaza",
+  "rechazalo",
+  "mejor no",
+  "ahora no",
+  "de ninguna manera",
+];
+const FILLER = new Set(["thanks", "thank you", "please", "gracias", "por favor"]);
 
-/** Consent must never be inferred from a sentence that merely contained "sure". */
-export function spokenDecision(transcript: string): "yes" | "no" | null {
-  const text = transcript.trim();
+function decisionUnits(transcript: string): string[] | null {
+  const text = transcript
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/[^\p{L}\p{N}' ]+/gu, ",")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!text) return null;
-  if (YES.test(text) && text.split(/\s+/).length <= 6) return "yes";
-  if (NO.test(text) && text.split(/\s+/).length <= 6) return "no";
+  const units = text
+    .split(",")
+    .map((unit) => unit.trim())
+    .filter(Boolean);
+  return units.length > 0 && units.length <= 4 ? units : null;
+}
+
+/**
+ * A clear spoken yes or no, in English or Spanish. Every comma-separated part of the utterance
+ * must itself be a yes (or a no) phrase, or politeness: consent is never inferred from a
+ * sentence that merely contains "sure" or starts with "si".
+ */
+export function spokenDecision(transcript: string): "yes" | "no" | null {
+  const units = decisionUnits(transcript);
+  if (!units) return null;
+  const classify = (unit: string): "yes" | "no" | "filler" | null => {
+    if (FILLER.has(unit)) return "filler";
+    if (YES_PHRASES.includes(unit)) return "yes";
+    if (NO_PHRASES.includes(unit)) return "no";
+    // "si hazlo", "no thanks", "yes please": a phrase followed by more of the same kind.
+    const words = unit.split(" ");
+    for (let cut = words.length - 1; cut >= 1; cut -= 1) {
+      const head = classify(words.slice(0, cut).join(" "));
+      const tail = classify(words.slice(cut).join(" "));
+      if (head && head !== "filler" && (tail === head || tail === "filler")) return head;
+    }
+    return null;
+  };
+  const kinds = new Set(units.map(classify));
+  kinds.delete("filler");
+  if (kinds.size !== 1 || kinds.has(null)) return null;
+  return kinds.has("yes") ? "yes" : "no";
+}
+
+/**
+ * The approval action a spoken answer selects: a clear yes allows once, a clear no denies.
+ * "Always allow" is never chosen by voice; it stays a deliberate tap on screen.
+ */
+export function spokenApprovalAction(
+  transcript: string,
+  actions: readonly { id: string }[] | undefined,
+): "allow" | "deny" | null {
+  const ids = new Set(actions?.map((action) => action.id));
+  const decision = spokenDecision(transcript);
+  if (decision === "yes" && ids.has("allow")) return "allow";
+  if (decision === "no" && ids.has("deny")) return "deny";
   return null;
+}
+
+const VOCABULARY_MAX_NAMES = 24;
+const VOCABULARY_MAX_CHARS = 400;
+
+function spokenWords(text: string): string[] {
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+/**
+ * Names a speech model should expect (the Mico, its teammates, the product), deduplicated and
+ * bounded, ready to pass as a transcription prompt. Empty when there is nothing to hint.
+ */
+export function transcriptionVocabulary(names: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  let chars = 0;
+  for (const raw of names) {
+    const name = raw.replace(/\s+/g, " ").trim();
+    const key = spokenWords(name).join(" ");
+    if (!key || name.length > 60 || seen.has(key)) continue;
+    if (out.length >= VOCABULARY_MAX_NAMES || chars + name.length + 2 > VOCABULARY_MAX_CHARS) break;
+    seen.add(key);
+    out.push(name);
+    chars += name.length + 2;
+  }
+  return out;
+}
+
+/**
+ * True when a transcript only recites the hinted names (at least two of them, and no other
+ * word): speech models return their prompt for short or unclear sounds, and that is not
+ * something the person said.
+ */
+export function isVocabularyEcho(transcript: string, vocabulary: readonly string[]): boolean {
+  const words = spokenWords(transcript);
+  if (words.length === 0) return false;
+  const names = vocabulary.map((name) => spokenWords(name)).filter((name) => name.length > 0);
+  const matched = new Set<number>();
+  let index = 0;
+  while (index < words.length) {
+    let advanced = 0;
+    names.forEach((name, nameIndex) => {
+      if (advanced >= name.length) return;
+      if (name.every((word, offset) => words[index + offset] === word)) {
+        advanced = name.length;
+        matched.add(nameIndex);
+      }
+    });
+    if (!advanced) return false;
+    index += advanced;
+  }
+  return matched.size >= 2;
 }

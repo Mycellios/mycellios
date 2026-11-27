@@ -49,6 +49,8 @@ export interface AppEnv {
   /** Operator-approved speech replicas with current physical contribution evidence. */
   mycelliosNetworkSpeechIdentityIds?: string[];
   mycelliosNetworkTranscriptionIdentityIds?: string[];
+  /** Realtime Mico calls on the person's own OpenAI voice key (specs/realtime-mico-calls); off by default. */
+  realtimeCalls?: { model: string; voice: string; transcriptionModel: string };
   defaultModelMaxTokens?: number;
   defaultModelContextWindow?: number;
   nodeEnv: string;
@@ -363,6 +365,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     mcpAllowPrivateEndpoint: source.MCP_ALLOW_PRIVATE_ENDPOINT === "true",
     mycelliosNetworkSpeechIdentityIds: networkSpeechIdentityIds(source.MYCELLIOS_NETWORK_SPEECH_IDENTITIES),
     mycelliosNetworkTranscriptionIdentityIds: networkSpeechIdentityIds(source.MYCELLIOS_NETWORK_TRANSCRIPTION_IDENTITIES),
+    realtimeCalls: realtimeCallsFromEnv(source),
     port: Number(source.API_PORT ?? 3100),
     gitSha: optional(source.GIT_SHA) ?? optional(readEnv("GIT_SHA", source)),
     minimumClientBuilds: parseMinimumClientBuilds(readEnv("MIN_CLIENT_BUILD", source)),
@@ -430,4 +433,22 @@ function androidCertFingerprints(value: string | undefined): string[] {
     }
     return hex.toUpperCase().match(/../g)!.join(":");
   });
+}
+
+const REALTIME_IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
+
+/** MYCELLIOS_REALTIME_CALLS=true turns realtime calls on; the model ids are operator choices. */
+export function realtimeCallsFromEnv(source: Record<string, string | undefined>) {
+  if (source.MYCELLIOS_REALTIME_CALLS !== "true") return undefined;
+  const pick = (name: string, fallback: string) => {
+    const value = source[name]?.trim();
+    if (!value) return fallback;
+    if (!REALTIME_IDENTIFIER.test(value)) throw new Error(`${name} must be a model or voice id`);
+    return value;
+  };
+  return {
+    model: pick("MYCELLIOS_REALTIME_MODEL", "gpt-realtime"),
+    voice: pick("MYCELLIOS_REALTIME_VOICE", "marin"),
+    transcriptionModel: pick("MYCELLIOS_REALTIME_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe"),
+  };
 }

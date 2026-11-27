@@ -14,6 +14,8 @@ export const DEFAULT_GENERAL_PREFERENCES = {
   dictationEngine: "auto" as "auto" | "local" | "provider" | "device",
   networkSpeechAccount: "", networkTranscriptionAccount: "",
   dictationLanguage: "auto", speechSpeed: 1, deviceVoice: "default", readReplies: false,
+  /** Calls use the realtime voice on the person's OpenAI key when the server offers it. */
+  realtimeCalls: false,
   taskSound: "classic", actionSound: "off",
   productAnalytics: false,
   analyticsAccountId: "",
@@ -46,6 +48,7 @@ export function parseGeneralPreferences(raw: string | null): GeneralPreferences 
       networkTranscriptionAccount: typeof value.networkTranscriptionAccount === "string" && value.networkTranscriptionAccount.length <= 128 ? value.networkTranscriptionAccount : "",
       deviceVoice: typeof value.deviceVoice === "string" && value.deviceVoice.length <= 200 ? value.deviceVoice : "default",
       readReplies: value.readReplies === true,
+      realtimeCalls: value.realtimeCalls === true,
       taskSound: ["off", "classic", "default", "mech", "bubble", "press"].includes(value.taskSound) ? value.taskSound : "classic",
       actionSound: ["off", "default", "mech", "bubble", "press"].includes(value.actionSound) ? value.actionSound : "off",
       productAnalytics: value.productAnalytics === true,
