@@ -53,6 +53,8 @@ describe("privileged node uninstall lifecycle", () => {
     } else {
       expect(run).toHaveBeenNthCalledWith(1, "sc.exe", ["stop", "mycellios-node.service"], true);
       expect(run).toHaveBeenNthCalledWith(2, "sc.exe", ["delete", "mycellios-node.service"], true);
+      expect(run).toHaveBeenNthCalledWith(3, "netsh.exe",
+        ["advfirewall", "firewall", "delete", "rule", "name=Mycellios node direct transport"], true);
     }
     const removed = remove.mock.calls.map(([path]) => path);
     expect(removed).toEqual(expect.arrayContaining([manifest.logsPath, manifest.statePath, manifest.serviceDefinitionPath, manifest.installRoot]));

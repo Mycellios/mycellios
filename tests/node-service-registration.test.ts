@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { registerNativeNodeService, type ServiceCommandRunner } from "../src/node/service-registration.js";
+import { resumeNodeInstallationService } from "../src/node/installation-service-resume.js";
+import { NODE_FIREWALL_RULE_NAME } from "../src/node/windows-firewall-rule.js";
 import type { NodeConfiguration } from "../src/contracts/node-configuration.js";
 import type { NodeInstallationManifest } from "../src/contracts/node-uninstall.js";
 
@@ -40,6 +42,55 @@ describe("native service registration", () => {
     }
   });
 
+  it("allows inbound TCP for the node executable before starting the Windows service", async () => {
+    const root = await temporaryDirectory(); const calls: string[][] = [];
+    const manifest = await windowsInstallation(root);
+    const registration = await registerNativeNodeService({ manifest, config: windowsConfiguration(root, manifest), run: runner(calls) });
+    expect(registration).toEqual({ inboundFirewall: "allowed" });
+    const netsh = calls.filter((call) => call[0] === "netsh.exe");
+    // A stale rule from an earlier install path is replaced, never accumulated.
+    expect(netsh[0]).toEqual(["netsh.exe", "advfirewall", "firewall", "delete", "rule", `name=${NODE_FIREWALL_RULE_NAME}`]);
+    expect(netsh[1]).toEqual(expect.arrayContaining(["add", "dir=in", "action=allow", `program=${manifest.nodeExecutable}`,
+      "protocol=TCP", "profile=private,public"]));
+    expect(netsh[1]).not.toEqual(expect.arrayContaining([expect.stringMatching(/^localport=/)]));
+    const start = calls.findIndex((call) => call[0] === "sc.exe" && call[1] === "start");
+    expect(calls.indexOf(netsh[1]!)).toBeLessThan(start);
+  });
+
+  it("still starts the Windows service when the firewall refuses the rule", async () => {
+    const root = await temporaryDirectory(); const calls: string[][] = [];
+    const manifest = await windowsInstallation(root);
+    const run: ServiceCommandRunner = async (executable, arguments_) => {
+      calls.push([executable, ...arguments_]);
+      return { code: executable === "netsh.exe" ? 1 : 0, stdout: "" };
+    };
+    await expect(registerNativeNodeService({ manifest, config: windowsConfiguration(root, manifest), run }))
+      .resolves.toEqual({ inboundFirewall: "unavailable" });
+    expect(calls).toContainEqual(["sc.exe", "start", manifest.serviceName]);
+    const linux = installation(root, "linux");
+    await expect(registerNativeNodeService({ manifest: linux, config: configuration(linux, { mode: "linux-cgroup-v2" }), run: runner([]) }))
+      .resolves.toEqual({ inboundFirewall: "not-managed" });
+  });
+
+  it("adds the rule when resuming an existing Windows service installed before it existed", async () => {
+    const root = await temporaryDirectory(); const calls: string[][] = [];
+    const manifest = await windowsInstallation(root);
+    const wrapper = join(root, "service", "MycelliosNode.exe");
+    const run: ServiceCommandRunner = async (executable, arguments_) => {
+      calls.push([executable, ...arguments_]);
+      if (executable === "sc.exe" && arguments_[0] === "query") return { code: 0, stdout: "STATE              : 1  STOPPED" };
+      if (executable === "powershell.exe") {
+        return { code: 0, stdout: JSON.stringify({ Name: manifest.serviceName, PathName: `"${wrapper}"`, StartName: "NT AUTHORITY\\LocalService" }) };
+      }
+      return { code: 0, stdout: "" };
+    };
+    await expect(resumeNodeInstallationService({ manifest, config: windowsConfiguration(root, manifest), run, beforeStart: async () => undefined }))
+      .resolves.toEqual({ inboundFirewall: "allowed" });
+    const add = calls.findIndex((call) => call[0] === "netsh.exe" && call[3] === "add");
+    expect(add).toBeGreaterThan(-1);
+    expect(add).toBeLessThan(calls.findIndex((call) => call[0] === "sc.exe" && call[1] === "start"));
+  });
+
   it("fails closed when the service manager rejects registration", async () => {
     const root = await temporaryDirectory(); const manifest = installation(root, "linux");
     const run: ServiceCommandRunner = async (executable, arguments_) => ({ code: executable === "/bin/systemctl" && arguments_[0] === "enable" ? 1 : 0, stdout: "" });
@@ -59,5 +110,13 @@ function configuration(manifest: NodeInstallationManifest, isolation: NodeConfig
   return { schema: "mycellios-node-configuration/1", revision: 1, nodeId: "node-a", coordinator: { url: "https://coordinator.example", identityPath: manifest.identityPath }, worker: { configPath: join(manifest.configPath, "..", "worker.json") },
     runtime: { pythonExecutable: join(manifest.installRoot, "runtime", "python"), pythonPath: join(manifest.installRoot, "runtime"), cachePath: manifest.cachePath, stagePort: 9850 },
     limits: { maxConcurrency: 1, maxCpuPercent: 90, maxRamMiB: 8192, maxVramMiB: 0, maxDiskMiB: 32768, maxTemperatureC: 85 }, isolation, updateChannel: "stable", uninstall: { manifestPath: join(manifest.statePath, "installation.json") } };
+}
+async function windowsInstallation(root: string): Promise<NodeInstallationManifest> {
+  await mkdir(join(root, "install", "bin"), { recursive: true });
+  await writeFile(join(root, "install", "bin", "MycelliosNode.exe"), "fixture service wrapper; runner is mocked");
+  return installation(root, "win32");
+}
+function windowsConfiguration(root: string, manifest: NodeInstallationManifest): NodeConfiguration {
+  return configuration(manifest, { mode: "windows-job-object", brokerExecutable: join(root, "install", "bin", "broker.exe") });
 }
 async function temporaryDirectory() { const root = await mkdtemp(join(tmpdir(), "mycellios-service-registration-")); cleanup.push(root); return root; }

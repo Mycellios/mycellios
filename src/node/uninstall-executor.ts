@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { nodeUninstallReceiptSchema, type NodeInstallationManifest, type NodeUninstallReceipt, type NodeUninstallRequest } from "../contracts/node-uninstall.js";
+import { deleteNodeFirewallRuleArguments } from "./windows-firewall-rule.js";
 
 export type PlatformCommandRunner = (executable: string, args: readonly string[], allowFailure?: boolean) => Promise<void>;
 export type PathRemover = (path: string) => Promise<void>;
@@ -59,6 +60,7 @@ async function disableService(manifest: NodeInstallationManifest, run: PlatformC
   }
   await run("sc.exe", ["stop", manifest.serviceName], true);
   await run("sc.exe", ["delete", manifest.serviceName], true);
+  await run("netsh.exe", deleteNodeFirewallRuleArguments(), true);
 }
 
 async function runPlatformCommand(executable: string, args: readonly string[], allowFailure = false): Promise<void> {

@@ -2,13 +2,14 @@ import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { NodeConfiguration } from "../contracts/node-configuration.js";
 import type { NodeInstallationManifest } from "../contracts/node-uninstall.js";
-import { registerNativeNodeService, runServiceCommand, type ServiceCommandRunner } from "./service-registration.js";
+import { allowNodeInbound, registerNativeNodeService, runServiceCommand, type NodeServiceRegistration,
+  type ServiceCommandRunner } from "./service-registration.js";
 
 /** Resume only the service owned by the validated native installation. */
 export async function resumeNodeInstallationService(input: {
   manifest: NodeInstallationManifest; config: NodeConfiguration;
   beforeStart: () => Promise<void>; run?: ServiceCommandRunner; pause?: () => Promise<void>;
-}): Promise<void> {
+}): Promise<NodeServiceRegistration> {
   if (input.manifest.platform !== "win32") throw new Error("node_install_resume_requires_windows");
   const run = input.run ?? runServiceCommand;
   const pause = input.pause ?? (() => delay(1_000));
@@ -16,8 +17,7 @@ export async function resumeNodeInstallationService(input: {
   const status = await query();
   if (status.code === 1060) {
     await input.beforeStart();
-    await registerNativeNodeService({ ...input, run, replaceRetainedServiceFiles: true });
-    return;
+    return await registerNativeNodeService({ ...input, run, replaceRetainedServiceFiles: true });
   }
   if (status.code !== 0) throw new Error("node_install_resume_service_query_failed");
   // SCM display labels are localized. CIM property names remain invariant.
@@ -44,6 +44,9 @@ export async function resumeNodeInstallationService(input: {
     if (!stoppedNow) throw new Error("node_install_resume_service_stop_timed_out");
   }
   await input.beforeStart();
+  // Nodes installed before the rule existed receive it on their next resume.
+  const inboundFirewall = await allowNodeInbound(run, input.manifest.nodeExecutable);
   const started = await run("sc.exe", ["start", input.manifest.serviceName]);
   if (started.code !== 0) throw new Error("node_install_resume_service_start_failed");
+  return { inboundFirewall };
 }
