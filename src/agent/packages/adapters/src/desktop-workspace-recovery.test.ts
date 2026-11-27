@@ -5,6 +5,7 @@ import { expect, it } from "vitest";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { startHostComputerServer } from "./host-computer-server.js";
+import { isMissingPcWorkspaceError, PC_WORKSPACE_MISSING } from "./workspace-transfer.js";
 
 const context = {
   operationId: "test",
@@ -107,5 +108,32 @@ it("recovers through the host transport and executes after transferring an attac
   } finally {
     await server.close();
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  }
+});
+
+it("reports a Mico folder this PC does not have as a missing workspace, not a missing file", async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "desktop-missing-workspace-")));
+  const token = "cd".repeat(32);
+  const server = await startHostComputerServer({ root, token, hostname: "127.0.0.1" });
+  server.setEnabled(true);
+  const client = new HostComputerSandbox(`http://127.0.0.1:${server.port}`, token);
+  // A folder another PC made: its path does not exist here.
+  const ref = {
+    id: "elsewhere",
+    botId: "elsewhere",
+    kind: "desktop" as const,
+    providerRef: path.join(root, "made-on-another-pc", "elsewhere"),
+  };
+  try {
+    const copy = async () => {
+      for await (const _file of client.exportWorkspace(ref, context)) void _file;
+    };
+    const error = await copy().then(() => undefined, (cause: unknown) => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe(PC_WORKSPACE_MISSING);
+    expect(isMissingPcWorkspaceError(error)).toBe(true);
+  } finally {
+    await server.close();
+    await rm(root, { recursive: true, force: true });
   }
 });
