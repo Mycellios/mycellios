@@ -750,6 +750,11 @@
   open chat has history the first four visible Micos of the current Space warm
   one at a time while the window is visible (not on phones). Never cross a Space
   boundary or mark them read. Verify roster-history-preload tests.
+  A Mico switch reuses account-wide reads: the header model picker keeps me,
+  connections and catalog for HEADER_MODEL_REUSE_MS and rereads connections and
+  catalog older than 30 s when it opens; the rail quota rereads only the Mico's PC Codex reading and keeps plan
+  limits for a minute (its timer, popover and Refresh still read them). Verify
+  chat-header-model and ProviderQuota tests.
   Projects warm up to twelve conversations across folders with two concurrent
   background reads per account and Space. On the default route this starts when
   authenticated bootstrap retrieves the Projects list, while the shell mounts.

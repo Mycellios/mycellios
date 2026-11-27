@@ -36,6 +36,16 @@ it("asks for the open Mico's own PC usage, and the server's without a Mico", asy
   await act(async () => root.render(<ProviderQuota scope="user/space" onModels={models} onUsage={usage} />));
   expect(mocks.native).toHaveBeenLastCalledWith(undefined, expect.anything());
 });
+it("switching Micos rereads only the Mico's PC and keeps the account quotas", async () => {
+  const claude = { ...account(), credentialId: "claude-oauth", provider: "anthropic", label: "Claude" };
+  mocks.planLimits.mockResolvedValue({ accounts: [claude] }); mocks.native.mockResolvedValue(account());
+  await act(async () => root.render(<ProviderQuota scope="user/space" botId="a" onModels={models} onUsage={usage} />));
+  await act(async () => root.render(<ProviderQuota scope="user/space" botId="b" onModels={models} onUsage={usage} />));
+  expect(mocks.planLimits).toHaveBeenCalledOnce();
+  expect(mocks.native).toHaveBeenLastCalledWith({ botId: "b" }, expect.anything());
+  const rings = container.querySelectorAll('[data-testid="provider-quota-trigger"] [data-testid="provider-quota-ring"]');
+  expect(rings.length).toBe(2);
+});
 it("keeps saved account quotas when the native host is unavailable", async () => {
   mocks.native.mockRejectedValue(new Error("unsupported host")); mocks.planLimits.mockResolvedValue({ accounts: [account()] }); await render();
   expect(container.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("92");
