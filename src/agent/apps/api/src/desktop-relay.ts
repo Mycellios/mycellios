@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 import type { Actor } from "@mycellios/contracts";
 import { getLogger } from "@mycellios/logging";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import {
   parseDesktopBinding,
   parseDesktopAccount,
@@ -22,6 +23,8 @@ import { readBoundedBody } from "./http-body.js";
 
 /** How often an open agent channel rechecks the PC's session and its Micos. */
 const DESKTOP_CHANNEL_RECHECK_MS = 60_000;
+/** A refused Desktop operation during a drain asks again after this long (an HTTP Retry-After). */
+const DRAIN_RETRY_AFTER_SECONDS = "5";
 
 /** Fixed routes; no remote URL, path, OS token or account identity comes from the browser. */
 export function mountDesktopRelay(
@@ -94,7 +97,8 @@ export function mountDesktopRelay(
       // offline and moving to the server.
       if (input.probe && !input.request && broker.handingOff()) {
         c.header("x-mycellios-desktop-error", "desktop_updating");
-        return c.json({ error: "The server is moving to a new version.", code: "desktop_updating" }, 503);
+        c.header("retry-after", DRAIN_RETRY_AFTER_SECONDS);
+        return c.json({ error: "The server is moving to a new version.", code: "desktop_updating", reason: "desktop_relay_draining" }, 503);
       }
       const request = input.request && !input.probe ? hostComputerRequest.parse(input.request) : undefined;
       const botId=input.probe ?? request?.botId;
@@ -127,6 +131,10 @@ export function mountDesktopRelay(
     } catch (error) {
       if (error instanceof DesktopRelayError) {
         c.header("x-mycellios-desktop-error", error.code);
+        if (error.code === "desktop_updating") {
+          c.header("retry-after", DRAIN_RETRY_AFTER_SECONDS);
+          return c.json({ error: error.message, code: error.code, reason: "desktop_relay_draining" }, error.status);
+        }
         return c.json({ error: error.message, code: error.code }, error.status);
       }
       return c.json(
@@ -166,6 +174,48 @@ export function mountDesktopRelay(
     }
     return c.json({ instance, ...(deps.revision ? { revision: deps.revision } : {}), ...broker.handoffState() });
   });
+  /**
+   * The deployment's drain signal (specs/mycellios-continuous-deploy in Nucleus): the same
+   * state as the handoff above, in the shape the deployment binds to this exact process.
+   * `drain` refuses new Desktop operations here (503 desktop_updating with Retry-After) while
+   * open ones, their results and streams finish; it is idempotent and lasts
+   * DESKTOP_RELAY_HANDOFF_MS from the latest request, so a deployment that stops asking never
+   * leaves PCs refused. `undrain` is the rollback. Signed like /internal; never public.
+   */
+  const drainState = () => {
+    const state = broker.handoffState();
+    return {
+      schemaVersion: 1 as const,
+      instanceId: process.env.HOSTNAME?.trim() || hostname(),
+      bootId: instance,
+      releaseSha: deps.revision && /^[a-f0-9]{40}$/.test(deps.revision) ? deps.revision : null,
+      draining: state.handingOff,
+      openOperations: state.openOperations,
+      openStreams: state.openStreams,
+      drainingSince: state.handoffSince ?? null,
+      drainingUntil: state.handoffEndsAt ?? null,
+      drained: state.handingOff && state.openOperations === 0 && state.openStreams === 0,
+    };
+  };
+  const internalDrain = (handler: () => void) => async (c: Context) => {
+    c.header("cache-control", "no-store");
+    if (c.req.header("x-forwarded-for") || c.req.header("forwarded")) return c.notFound();
+    const body = await readBoundedBody(c.req.raw, 1_024);
+    if (body === null) return c.json({ error: "Too large" }, 413);
+    if (!verifyDesktopRelay(secret, c.req.header("x-desktop-time") ?? "", body, c.req.header("x-desktop-signature") ?? ""))
+      return c.json({ error: "Unauthorized" }, 401);
+    handler();
+    return c.json(drainState());
+  };
+  app.get("/internal/desktop-relay/drain", internalDrain(() => undefined));
+  app.post("/internal/desktop-relay/drain", internalDrain(() => {
+    broker.handOff(true);
+    getLogger().info("desktop.relay.drain", { "desktop.handoff": "start", ...broker.handoffState() });
+  }));
+  app.post("/internal/desktop-relay/undrain", internalDrain(() => {
+    broker.handOff(false);
+    getLogger().info("desktop.relay.drain", { "desktop.handoff": "cancel", ...broker.handoffState() });
+  }));
   app.post("/api/desktop-relay/:action", async (c) => {
     c.header("cache-control", "no-store");
     if (!deps.enabled) return c.json({ error: "Unavailable" }, 404);

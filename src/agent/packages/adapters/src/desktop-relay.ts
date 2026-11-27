@@ -73,6 +73,8 @@ export class DesktopRelayBroker {
   /** Open agent channels, one per signed-in PC session (see attachChannel). */
   private channels = new Map<string, Channel>();
   private handoffUntil = 0;
+  private handoffSince = 0;
+  private openStreams = 0;
   private pollKey(owner: DesktopExecutorOwner, deviceId: string) { return JSON.stringify([owner.userId, owner.spaceId, owner.sessionId, deviceId]); }
   private wake(owner: DesktopExecutorOwner, deviceId: string) { for (const finish of this.waiting.get(this.pollKey(owner, deviceId)) ?? []) finish(); }
   constructor(private readonly now = Date.now) {
@@ -399,6 +401,9 @@ export class DesktopRelayBroker {
    * unless renewed; `false` ends it now (a rollback).
    */
   handOff(start: boolean) {
+    // Renewing keeps the original start: a drain's age is measured from its first request.
+    if (start && !this.handingOff()) this.handoffSince = this.now();
+    if (!start) this.handoffSince = 0;
     this.handoffUntil = start ? this.now() + DESKTOP_RELAY_HANDOFF_MS : 0;
   }
   handingOff() {
@@ -411,8 +416,13 @@ export class DesktopRelayBroker {
     const handingOff = this.handingOff();
     return {
       handingOff,
-      ...(handingOff ? { handoffEndsAt: new Date(this.handoffUntil).toISOString() } : {}),
+      ...(handingOff ? {
+        handoffSince: new Date(this.handoffSince).toISOString(),
+        handoffEndsAt: new Date(this.handoffUntil).toISOString(),
+      } : {}),
       openOperations: open.length,
+      /** Operation answers the worker has not finished reading (a closed operation may still be in flight). */
+      openStreams: this.openStreams,
       deliveredOperations: open.filter(op => op.claimed).length,
       agentRuns: open.filter(op => op.method === "agentRun").length,
       agentChannels: this.channels.size,
@@ -476,7 +486,7 @@ export class DesktopRelayBroker {
     }, { highWaterMark: MAX_STREAM_BUFFER, size: chunk => chunk.byteLength });
     context.signal.addEventListener("abort", abort, { once: true });
     if (context.signal.aborted) abort();
-    return new Response(body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store", "x-mycellios-desktop-operation": id } });
+    return new Response(this.countedStream(body), { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store", "x-mycellios-desktop-operation": id } });
   }
   result(owner: DesktopExecutorOwner, deviceId: string, id: string, seq: number, data: string, done: boolean) {
     const op = this.operations.get(id);
@@ -524,6 +534,29 @@ export class DesktopRelayBroker {
     }
     this.wake(op.binding, op.binding.deviceId);
     try { op.controller.enqueue(new TextEncoder().encode(JSON.stringify({ error: message, code: desktopLegacyFailureCode(message), operationId: op.id, dispatched: op.claimed }) + "\n")); op.controller.close(); } catch { /* consumer already gone */ }
+  }
+  /**
+   * Counts an operation's answer until the worker has read it to the end (or dropped it), so a
+   * drain is not reported complete while a finished result is still on its way. It pulls only
+   * on demand, leaving the operation's own buffer and slow-consumer check unchanged.
+   */
+  private countedStream(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+    const reader = body.getReader();
+    let open = true;
+    this.openStreams++;
+    const settle = () => { if (open) { open = false; this.openStreams--; } };
+    return new ReadableStream<Uint8Array>({
+      pull: async controller => {
+        try {
+          const { done, value } = await reader.read();
+          if (done) { settle(); controller.close(); } else controller.enqueue(value);
+        } catch (error) {
+          settle();
+          controller.error(error);
+        }
+      },
+      cancel: reason => { settle(); return reader.cancel(reason); },
+    }, { highWaterMark: 0 });
   }
   private logFailure(op: Operation, reason: string) {
     getLogger().warn("desktop.relay.operation_failed", {
