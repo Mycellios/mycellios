@@ -16181,3 +16181,27 @@ msgstr "Does it work on another of your PCs?"
 
 msgid "Move to this PC"
 msgstr "Move to this PC"
+
+msgid "As set for this space"
+msgstr "As set for this space"
+
+msgid "Choose it from Mycellios Desktop on that PC."
+msgstr "Choose it from Mycellios Desktop on that PC."
+
+msgid "Its own and the space's"
+msgstr "Its own and the space's"
+
+msgid "Links"
+msgstr "Links"
+
+msgid "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
+msgstr "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
+
+msgid "Mycellios models are not available right now. Try again shortly."
+msgstr "Mycellios models are not available right now. Try again shortly."
+
+msgid "Only its own"
+msgstr "Only its own"
+
+msgid "Works on"
+msgstr "Works on"
