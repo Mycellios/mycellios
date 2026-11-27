@@ -11,7 +11,8 @@ vi.mock("@lingui/react/macro", () => ({
     i18n: { locale: "en" },
   }),
 }));
-vi.mock("../lib/general-preferences", () => ({
+vi.mock("../lib/general-preferences", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/general-preferences")>()),
   useGeneralPreferences: () => ({ compactMessageActions: true }),
 }));
 
