@@ -177,6 +177,16 @@
   in the main process. Verify floating-window, desktop-companions,
   companion-renderer, window-icon and floating-chats tests.
 
+- Guest chat (specs/guest-chat/spec.md at the repository root) replaces the signed-out
+  welcome page only on the bare `/` route of an ordinary browser tab when the coordinator's
+  `/mobile/v1/guest/config` reports it enabled; deep links, Desktop, the Android host,
+  native WebViews and installed PWAs keep sign-in. `GuestEntry`/`GuestChat` never mount
+  Shell, RPC, realtime or push. Text only: no files, tools, model picker or saved
+  history; the transcript stays in sessionStorage and the nonce in localStorage. Render
+  replies without images (`withoutImages`), with remote images and favicon lookups off.
+  The Dev proxy forwards only the guest cookie on guest paths. Verify guest-chat lib,
+  GuestChat and event-demo-proxy tests and `npx tsx scripts/verify-guest-chat-ui.ts`.
+
 - `/demo/<event>` is a bounded public guest surface, outside the normal SessionApp
   gate. Keep its coordinator cookie scoped to `/mobile/v1/demo/<event>`; the Dev
   proxy forwards only this cookie and strips all Agent cookies. It never creates

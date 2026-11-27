@@ -45,6 +45,7 @@ import { IntegrationCallbackPage } from "./pages/IntegrationCallback";
 import { IntegrationSetupPage } from "./pages/IntegrationSetup";
 import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 import { ShellPage } from "./pages/Shell";
+import { GuestEntry } from "./pages/guest/GuestEntry";
 import { eventDemoRoute } from "./lib/event-demo";
 
 const EventDemoPage = lazyComponent(() => import("./pages/demo/EventDemo").then(module => module.EventDemoPage));
@@ -195,7 +196,7 @@ function SessionApp() {
       <div className="h-full" data-rakazo-app-state="ready">
         <Suspense fallback={<PageLoading />}>
           <Routes>
-            <Route path="/" element={user ? <Navigate to="/app" replace /> : <WelcomePage />} />
+            <Route path="/" element={user ? <Navigate to="/app" replace /> : <GuestEntry fallback={<WelcomePage />} />} />
             <Route
               path="/sign-in"
               element={

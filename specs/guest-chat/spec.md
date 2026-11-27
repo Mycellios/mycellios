@@ -1,7 +1,8 @@
 # Registration-free guest chat on the web
 
-Status: proposed, not implemented. Owner decision pending on the open questions
-at the end. Nothing here is enabled until an operator turns it on.
+Status: phases 1 (coordinator) and 2 (Agent web) implemented and disabled by
+default. Phase 3 (conversation import) and phase 4 (production rollout) are not
+started. Nothing here is enabled until an operator turns it on (see "Enabling").
 
 ## Goal
 
@@ -110,8 +111,9 @@ scoped-cookie pattern. It adds no Agent tenant data.
 
 - Session creation requires a proof of work issued by `GET config`: a server-signed,
   short-lived challenge with a difficulty the operator configures. The browser
-  solves it in a Web Worker in about a second on a mid-range phone. This needs no
-  third-party script and no new privacy processor.
+  solves it with batched WebCrypto digests, yielding between batches, in about a
+  second on a mid-range phone. This needs no third-party script and no new privacy
+  processor.
 - An optional Cloudflare Turnstile verifier can replace or add to the proof of work
   later. Adopting it requires a CSP change, a privacy-policy update and an owner
   decision (see open questions).
@@ -158,6 +160,7 @@ scoped-cookie pattern. It adds no Agent tenant data.
 | Global guest messages per UTC day | 2,000 |
 | Concurrent guest turns, global | 16 |
 | Concurrent turns per session | 1 |
+| Proof-of-work difficulty (leading zero bits) | 16 |
 
 The global guest daily budget is separate from, and never consumes, the per-account
 free allowance of registered users (`DEFAULT_FREE_DAILY_REQUESTS`).
@@ -223,13 +226,69 @@ free allowance of registered users (`DEFAULT_FREE_DAILY_REQUESTS`).
 - Before enabling in production: the `/privacy` update is published, the operator
   confirms the limits and a short real canary passes with the low budget.
 
-## Open questions for the owner
+## Decisions for the first release
 
-1. Proof of work only, or Cloudflare Turnstile as well? Turnstile adds a third-party
-   processor and a CSP change.
-2. Are the default limits right, especially 12 messages per guest and 2,000 guest
-   messages per day globally?
-3. Should guests choose between Mycellios network models and AntSeed free models, or
-   always get the stable recommended free model?
-4. Is the conversation import on registration (phase 3) wanted in the first release?
-5. Is a moderation step required before public launch, or after observing traffic?
+The owner asked for the recommended defaults. They can change later without a
+schema change.
+
+1. Proof of work only (SHA-256 leading zero bits, default 16, signed challenge valid
+   5 minutes, one session per challenge). No Turnstile, no new processor or CSP change.
+   The browser solves it with WebCrypto in small batches on the page: about 0.5 s at
+   130,000 digests per second on a desktop, a few seconds on a slow phone.
+2. The default limits in "Limits" above.
+3. Guests always get the stable recommended free model (`mycellios/managed/free`); no
+   model picker.
+4. No conversation import in the first release (phase 3 stays open).
+5. No moderation step in phase 1; the kill switch, server persona and limits apply.
+   Revisit with real traffic in phase 4.
+
+## Implementation
+
+- Coordinator: `src/core/guest-chat-config.ts` (`MYCELLIOS_GUEST_CHAT_ENABLED`,
+  `MYCELLIOS_GUEST_CHAT_CONFIG_JSON`), `src/economy/guest-chat-schema.ts`
+  (`guestChatSchemaSql`, `guestChatAccessSql`), `src/coordinator/guest-chat.ts` and
+  `guest-chat-routes.ts`. `GET /mobile/v1/guest/config` always answers and reports
+  `{ enabled: false }` when guest chat is off, its owner tables are missing or
+  unprotected, or no managed free route exists. Session counters use
+  `guest_chat_usage` rows keyed by bucket and scope (`global`, `prefix:<digest>`,
+  `sessions:<digest>` per hour) with conditional upserts, in the same transaction as
+  the session counter. A turn that did no work (not submitted, or refused by the free
+  seller) gives its message back; an uncertain result keeps its count and is never
+  replayed. `freeRefusalRetries(options)` lets a caller only lower the AntSeed free
+  retry budget; guest turns pass 0.
+- Agent web: `lib/guest-chat.ts`, `pages/guest/GuestEntry.tsx` and `GuestChat.tsx`.
+  The signed-out `/` route shows guest chat only for an ordinary tab with no query
+  string; otherwise the existing welcome page. The Dev proxy forwards only the guest
+  cookie on guest paths (`event-demo-proxy.ts`). The existing one-time language
+  question still comes first on a first visit.
+- Landing copy is unchanged ("Open in browser"); "Try it free, no sign-up" can follow
+  once guest chat is enabled in production.
+
+## Qualification run
+
+- `tests/guest-chat.test.ts` (config, prefixes, proof of work, request shape, disabled
+  routes) and the guest case in `tests/managed-free-offers.test.ts`.
+- `tests/guest-chat.postgres.test.ts` on an isolated cluster
+  (`node scripts/test-referrals-postgres.mjs tests/guest-chat.postgres.test.ts`): cookie
+  flags and scope, exact Origin, no CORS, request bounds, nonce resume, challenge replay
+  and expiry, concurrent session creation per prefix, every limit with rollback, UTC
+  day rollover, session expiry, concurrency, refusal refund, no priced quote,
+  content-free storage and logs, and missing or unprotected tables.
+- Agent web: `lib/guest-chat.test.ts`, `pages/guest/GuestChat.test.tsx` and
+  `event-demo-proxy.test.ts`.
+- Real browser: `npx tsx scripts/verify-guest-chat-ui.ts [--output=<folder>]` runs the
+  Agent web Dev server against a loopback coordinator with the real guest routes,
+  isolated PostgreSQL and a fictional zero-priced seller, at desktop (English) and
+  mobile (Spanish) sizes: three turns, scoped cookie, reload in the same tab, limit
+  reached with the account offer, deep link and installed web app keep sign-in.
+
+## Enabling
+
+1. The migration owner applies `guestChatSchemaSql` and `guestChatAccessSql(<runtime
+   role>)` to the coordinator database.
+2. Publish the guest-mode paragraph in `/privacy`.
+3. Set `MYCELLIOS_GUEST_CHAT_CONFIG_JSON` with `publicOrigin` (the exact first-party
+   origin, for example `https://www.mycellios.com`), a fresh 43+ character `secret`
+   and a low `messagesPerDay` for the canary (for example 200), then
+   `MYCELLIOS_GUEST_CHAT_ENABLED=true`. Unset it to switch guest chat off.
+4. Confirm `GET /mobile/v1/guest/config` reports `enabled: true` and run a short canary.

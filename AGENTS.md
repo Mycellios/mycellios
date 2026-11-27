@@ -24,6 +24,17 @@ These rules apply to the complete repository.
   the separate read-only presenter capability. Apply `eventDemoSchemaSql` with the
   migration owner and verify `tests/event-demo.postgres.test.ts` on isolated PG.
 
+- Registration-free web guest chat (`specs/guest-chat/spec.md`) stays off unless
+  `MYCELLIOS_GUEST_CHAT_ENABLED=true` and `guestChatSchemaSql` exist; without them
+  `GET /mobile/v1/guest/config` reports disabled. Guests get text only on the exact-zero
+  `mycellios/managed/free` route under a `guest:<session>` account: no tools, Credits,
+  grants, API keys or Agent rows, never a priced quote, and `freeRefusalRetries: 0`.
+  Keep the HttpOnly SameSite=Strict cookie scoped to `/mobile/v1/guest`, the exact
+  Origin on writes, no CORS, the signed proof of work per session and the session,
+  prefix (HMAC digest, never the raw address) and global limits in one transaction.
+  Store no content and log codes only. Verify `tests/guest-chat.postgres.test.ts` on
+  isolated PG and `npx tsx scripts/verify-guest-chat-ui.ts`.
+
 - Mycellios is an independent distributed inference runtime.
 - The network vision includes phones, laptops, desktop PCs and servers as
   contributing compute nodes. Illustrations must reflect that role; distinguish

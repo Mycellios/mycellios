@@ -7,7 +7,7 @@ import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest
 import { readManagedTextStream } from "./managed-text-stream.js";
 import { FREE_PROBE_REQUEST, FreeOfferCooldown, FreeOfferProbes, compareFreeRoutes, freeAllowanceRefusal, freeOfferLimits,
   freeOfferSignals, freeOfferStakersOnly, freeProbePassed, freeRequestFits, freeTextLimits, freeRouteModel, freeRoutePool,
-  marketReferencePrices, pickFreeRoute, FREE_REFUSAL_RETRIES, FREE_RESERVE_SELLERS, FREE_ROUTE_ID,
+  marketReferencePrices, pickFreeRoute, freeRefusalRetries, FREE_RESERVE_SELLERS, FREE_ROUTE_ID,
   type FreeOfferSignals, type FreeRefusal } from "./managed-free-offers.js";
 
 const TTL = 60_000;
@@ -281,9 +281,9 @@ export class ManagedAntseedGateway {
       billingContext: {contract: this.contract, seller: offer.seller, provider: offer.provider,
         input: offer.inputCap ?? INPUT_CAP, output: offer.outputCap ?? OUTPUT_CAP, keyId: this.session?.keyId}};
   }
-  async execute(quote: AntseedGatewayQuote, chunk?: (v: Record<string, unknown>) => void, submitted?: (job: unknown) => Promise<void>): Promise<ManagedTextResult> {
+  async execute(quote: AntseedGatewayQuote, chunk?: (v: Record<string, unknown>) => void, submitted?: (job: unknown) => Promise<void>, options?: unknown): Promise<ManagedTextResult> {
     if (!submitted || quote.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
-    const signal = AbortSignal.timeout(120_000), auth = await this.authenticate(signal);
+    const signal = AbortSignal.timeout(120_000), auth = await this.authenticate(signal), retries = freeRefusalRetries(options);
     if ((quote.billingContext as any).keyId !== auth.keyId) throw new Error("antseed_payer_changed");
     let q = quote, job!: Job, r!: Response;
     for (let attempt = 0; ; attempt++) {
@@ -295,7 +295,7 @@ export class ManagedAntseedGateway {
             "x-antseed-provider": q.offer.provider}, body: JSON.stringify(q.body)});
         break;
       } catch (error) {
-        const next = this.afterFreeRefusal(q, error, attempt);
+        const next = this.afterFreeRefusal(q, error, attempt, retries);
         if (!next || (next.billingContext as any).keyId !== auth.keyId) throw error;
         q = next;
       }
@@ -329,11 +329,11 @@ export class ManagedAntseedGateway {
    * same model, or for the stable free model on another pool route. Only another exact-zero route
    * qualifies; any other failure, and any priced route, is never retried.
    */
-  private afterFreeRefusal(q: AntseedGatewayQuote, error: unknown, attempt: number): AntseedGatewayQuote | undefined {
+  private afterFreeRefusal(q: AntseedGatewayQuote, error: unknown, attempt: number, retries: number): AntseedGatewayQuote | undefined {
     const refusal = (error as {refusal?: FreeRefusal}).refusal;
     if (!q.offer.free || !refusal) return undefined;
     this.retire(q.offer, refusal);
-    if (attempt >= FREE_REFUSAL_RETRIES) return undefined;
+    if (attempt >= retries) return undefined;
     try {
       const next = this.quote(q.request);
       return next.offer.free && next.maximumMicrounits === 0 ? next : undefined;

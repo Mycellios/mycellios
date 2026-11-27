@@ -190,6 +190,14 @@ export function compareFreeRoutes(a: { signals?: FreeOfferSignals | null }, b: {
 export const FREE_RESERVE_SELLERS = 2;
 /** Free routes one request may try after sellers refused it before any work (exact zero cost). */
 export const FREE_REFUSAL_RETRIES = 2;
+/**
+ * Execution options travel through the gateway's private payload. A caller may only lower the
+ * retry count (guest chat passes 0 so guests never drain reserves registered accounts rely on).
+ */
+export function freeRefusalRetries(options: unknown): number {
+  const value = options && typeof options === "object" ? (options as { freeRefusalRetries?: unknown }).freeRefusalRetries : undefined;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? Math.min(value, FREE_REFUSAL_RETRIES) : FREE_REFUSAL_RETRIES;
+}
 
 /** Sellers refused before any work leave the catalog for a while; staked-only pools for a day. */
 export class FreeOfferCooldown {

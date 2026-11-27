@@ -16415,3 +16415,84 @@ msgstr "Las carpetas con el nombre de General o de un Mico, como las escribe una
 
 msgid "Importing {progress} of {0}…"
 msgstr "Importando {progress} de {0}…"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest mode"
+msgstr "Modo invitado"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest mode. Answers come from a free model served by third-party providers and the Mycellios network. Do not share sensitive information. This chat is kept only in this tab."
+msgstr "Modo invitado. Las respuestas vienen de un modelo gratuito servido por proveedores externos y la red de Mycellios. No compartas información sensible. Este chat solo se guarda en esta pestaña."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Hi, I'm Mico. What can I help you with?"
+msgstr "Hola, soy Mico. ¿En qué te puedo ayudar?"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Ask anything, no sign-up needed."
+msgstr "Pregunta lo que quieras, sin registrarte."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Create a free account"
+msgstr "Crear una cuenta gratis"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "The answer could not be confirmed yet. Try again in a moment; it will not be sent twice."
+msgstr "Todavía no se ha podido confirmar la respuesta. Vuelve a intentarlo en un momento; no se enviará dos veces."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "You have used the free guest messages. Create a free account to keep chatting."
+msgstr "Has usado los mensajes gratuitos de invitado. Crea una cuenta gratis para seguir conversando."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest chat has reached today's limit for your network. Create a free account to keep chatting."
+msgstr "El chat de invitado ha llegado al límite de hoy para tu red. Crea una cuenta gratis para seguir conversando."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Too many guest chats started from your network. Create a free account or try again later."
+msgstr "Se han iniciado demasiados chats de invitado desde tu red. Crea una cuenta gratis o vuelve a intentarlo más tarde."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest chat is very busy today. Create a free account or try again tomorrow."
+msgstr "El chat de invitado está muy ocupado hoy. Crea una cuenta gratis o vuelve a intentarlo mañana."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "The free model is busy right now. Try again in a minute."
+msgstr "El modelo gratuito está ocupado ahora mismo. Vuelve a intentarlo en un minuto."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Mico is still answering your previous message."
+msgstr "Mico todavía está respondiendo a tu mensaje anterior."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "This message cannot be sent in guest mode. Try a shorter text message."
+msgstr "Este mensaje no se puede enviar en modo invitado. Prueba con un texto más corto."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Files, tools, saved chats and your own Micos need a free account."
+msgstr "Los archivos, las herramientas, los chats guardados y tus propios Micos necesitan una cuenta gratis."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Guest chat is unavailable right now. Try again later or sign in."
+msgstr "El chat de invitado no está disponible ahora mismo. Vuelve a intentarlo más tarde o inicia sesión."
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Starting a guest session…"
+msgstr "Iniciando una sesión de invitado…"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Attach a file"
+msgstr "Adjuntar un archivo"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "Create a free account to keep chatting"
+msgstr "Crea una cuenta gratis para seguir conversando"
+
+#: src/pages/guest/GuestChat.tsx
+msgid "1 free guest message left"
+msgstr "Te queda 1 mensaje gratuito de invitado"
+
+#. placeholder {remaining}: remaining
+#: src/pages/guest/GuestChat.tsx
+msgid "{remaining} free guest messages left"
+msgstr "Te quedan {remaining} mensajes gratuitos de invitado"

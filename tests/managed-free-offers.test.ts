@@ -6,7 +6,7 @@ import { ManagedAntseedGateway } from "../src/coordinator/managed-antseed-gatewa
 import { handleManagedChat } from "../src/coordinator/managed-provider-routes.js";
 import { readManagedProviderConfig } from "../src/core/managed-provider-config.js";
 import { FREE_ROUTE_ID, FreeOfferCooldown, FreeOfferProbes, freeOfferSignals, freeRoutePool, freeScore, freeTextLimits,
-  marketReferencePrices, pickFreeRoute } from "../src/coordinator/managed-free-offers.js";
+  marketReferencePrices, pickFreeRoute, freeRefusalRetries, FREE_REFUSAL_RETRIES } from "../src/coordinator/managed-free-offers.js";
 import type { ManagedModel } from "../src/contracts/managed-provider.js";
 import { operatorSecret } from "./fixtures/managed-antseed.js";
 import { gatewayKey } from "./fixtures/managed-antseed-gateway.js";
@@ -186,6 +186,24 @@ describe("free AntSeed offers", () => {
     refused.add(forge); refused.add(other);
     await expect(adapter.execute(adapter.quote(free as never), undefined, async () => {})).rejects.toThrow();
     expect(chats).toHaveLength(3);
+  });
+
+  it("lets guest requests rest a refusing seller without draining reserve free sellers", async () => {
+    const other = "8".repeat(40), glm = network()[0]!;
+    for (const make of [refusingSidecar, refusingGateway]) {
+      const { adapter, refused, chats } = make([{ ...glm, peers: [...glm.peers, peer(other, "glm-flash", { health: { status: "healthy" } })] }]);
+      await adapter.refresh();
+      refused.add(forge);
+      await expect(adapter.execute(adapter.quote(chat("glm-flash")) as never, undefined, async () => {}, { freeRefusalRetries: 0 }))
+        .rejects.toThrow("managed_free_tier_exhausted");
+      expect(chats).toEqual([forge]);
+      // The refusing seller still rests, so the next (registered) request starts on the reserve.
+      expect(adapter.quote(chat("glm-flash")).body.model).toBe(other + "@glm-flash");
+      // A caller can only lower the retry budget, never raise it.
+      expect(freeRefusalRetries({ freeRefusalRetries: 99 })).toBe(FREE_REFUSAL_RETRIES);
+      expect(freeRefusalRetries({ freeRefusalRetries: -1 })).toBe(FREE_REFUSAL_RETRIES);
+      expect(freeRefusalRetries(undefined)).toBe(FREE_REFUSAL_RETRIES);
+    }
   });
 
   it("derives a market capability price only from several paid sellers", () => {
