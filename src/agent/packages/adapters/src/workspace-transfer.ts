@@ -11,6 +11,20 @@ import { createHash } from "node:crypto";
 /** Bytes of file content carried by one transfer piece (before base64). */
 export const WORKSPACE_TRANSFER_CHUNK_BYTES = 8 * 1024 * 1024;
 
+/** The PC asked for a workspace copy has no folder for that Mico (another PC made it, or it was removed). */
+export const PC_WORKSPACE_MISSING = "computer workspace not found";
+
+/**
+ * A PC that cannot produce the Mico's folder has nothing to save. Older PCs report a
+ * missing folder as the generic missing-file error.
+ */
+export function isMissingPcWorkspaceError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message === PC_WORKSPACE_MISSING || error.message === "computer file not found")
+  );
+}
+
 const ARCHIVE = /\.(?:zip|tar|tgz|gz|7z|rar)$/iu;
 const PRIVATE_KEY = /private.*key/iu;
 

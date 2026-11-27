@@ -23,7 +23,11 @@ import {
   hostComputerRequest,
   hostGroupFolderId,
 } from "./host-computer-protocol.js";
-import { workspaceTransferDigest, workspaceTransferPieces } from "./workspace-transfer.js";
+import {
+  PC_WORKSPACE_MISSING,
+  workspaceTransferDigest,
+  workspaceTransferPieces,
+} from "./workspace-transfer.js";
 
 /** A shared group folder refusal the Mico should read as is. */
 class SharedFolderError extends Error {}
@@ -299,6 +303,7 @@ export async function startHostComputerServer(options: {
       if (
         error instanceof Error &&
         (error.message === "Path escapes the computer workspace" ||
+          error.message === PC_WORKSPACE_MISSING ||
           /^computer file exceeds \d+ bytes$/.test(error.message) ||
           error.message === "Link this agent's project on this computer before continuing." ||
           error.message === "Project link in progress" ||

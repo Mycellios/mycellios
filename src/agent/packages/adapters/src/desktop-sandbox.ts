@@ -55,7 +55,11 @@ import { hostCommandEnvironment } from "./sandbox-command-environment.js";
 import { gitBashPath } from "./native-shell.js";
 import { NativeCommandJournal } from "./native-command-journal.js";
 import { HOST_COMPUTER_MAX_WORKSPACE_FILE_BYTES } from "./host-computer-protocol.js";
-import { isWorkspaceTransferExcluded } from "./workspace-transfer.js";
+import { isWorkspaceTransferExcluded, PC_WORKSPACE_MISSING } from "./workspace-transfer.js";
+
+function isMissingFileError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "ENOENT");
+}
 
 const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 
@@ -970,14 +974,27 @@ async function* walkDesktopWorkspace(
   home: string,
   directory: string,
 ): AsyncIterable<DesktopWorkspaceFile> {
-  const target = await localWorkspaceTarget(home, directory, true);
+  let target: string;
+  try {
+    target = await localWorkspaceTarget(home, directory, true);
+  } catch (error) {
+    // A Mico folder another PC made, or one removed here, has nothing to copy: say so
+    // instead of the generic missing-file error, so the caller keeps its saved copy.
+    if (!directory && isMissingFileError(error)) throw new Error(PC_WORKSPACE_MISSING);
+    throw error;
+  }
   for (const entry of await readdir(target, { withFileTypes: true })) {
     const relative = normalizeWorkspacePath(directory ? `${directory}/${entry.name}` : entry.name);
     // Repository internals, dependency trees, secrets and archives stay on this PC.
     if (isWorkspaceTransferExcluded(relative)) continue;
     const child = await localWorkspaceTarget(home, relative, true).catch(() => null);
     if (!child) continue;
-    const info = await stat(child);
+    // A file removed while the copy walks the folder is simply not part of it.
+    const info = await stat(child).catch((error: unknown) => {
+      if (isMissingFileError(error)) return null;
+      throw error;
+    });
+    if (!info) continue;
     if (info.isDirectory()) yield* walkDesktopWorkspace(home, relative);
     else if (info.isFile()) {
       yield {

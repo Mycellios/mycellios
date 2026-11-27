@@ -15,6 +15,7 @@ import {
   nativeHostAccess,
   forgetBotSecret,
   hasActiveComputerControl,
+  isMissingPcWorkspaceError,
   listBotSecretMetadata,
   normalizeSecretDestination,
   pageUrlOrigin,
@@ -595,7 +596,16 @@ export function botsRoutes(ctx: RouterContext) {
             const ctx = computerContext(context.actor, bot.id, "computer.switch");
             const ref = toComputerRef(bot.computer);
             if (bot.computer.state === "running") {
-              await checkpointAndRecordComputerWorkspace(deps, bot.computer, ref, ctx);
+              try {
+                await checkpointAndRecordComputerWorkspace(deps, bot.computer, ref, ctx);
+              } catch (error) {
+                // The PC that answered has no folder for this Mico (another PC made it, or it
+                // was removed): there is nothing to save, so keep the last saved copy and switch.
+                if (ref.kind !== "desktop" || !isMissingPcWorkspaceError(error)) throw error;
+                getLogger().warn("computer.switch.pc_workspace_missing", {
+                  "computer.id": bot.computer.id,
+                });
+              }
               await deps.sandbox.stop(ref, ctx);
             }
             await deps.prisma.computerExecutionLease.deleteMany({
