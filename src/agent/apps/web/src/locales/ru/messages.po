@@ -7516,3 +7516,19 @@ msgstr "Контекст заполнен на {percent}%: {used} из {total} �
 #: src/components/ConversationContextMeter.tsx
 msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
 msgstr "Контекст заполнен на {percent}%: {used} из {total} токенов. Когда он заполнится, старые сообщения будут автоматически сжаты в сводку."
+
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "Обновить этот компьютер"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "Обновление этого компьютера…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "Разовое обновление. После него этот компьютер будет обновляться сам."
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "Обновление не завершилось. На этом компьютере остаётся текущая версия."

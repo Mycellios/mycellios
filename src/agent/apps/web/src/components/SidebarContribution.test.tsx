@@ -294,3 +294,32 @@ it("clears the activity indicator when a previously active node cannot be verifi
   expect(document.body.dataset.mycelliosContributing).toBe("false");
  });}finally{vi.useRealTimers();}
 });
+
+it("offers the one-time runtime update only when Desktop reports it and never starts compute with it", async () => {
+  const upgrade = vi.fn().mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node", upgradeAvailable: false });
+  f.bridge.mockReturnValue({ runtime: { status: f.native, enroll: f.enroll, identify: f.identify, upgrade } });
+  f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node", upgradeAvailable: true });
+  await rendered(async host => {
+    const button = [...host.querySelectorAll("button")].find(b => b.textContent?.includes("Update this computer"))!;
+    expect(button).toBeDefined();
+    await act(async () => button.click());
+    expect(upgrade).toHaveBeenCalledOnce();
+    expect(f.control).not.toHaveBeenCalled(); expect(f.enroll).not.toHaveBeenCalled();
+    expect(host.textContent).not.toContain("Update this computer");
+  });
+});
+it("keeps the update offer and explains a failed runtime update", async () => {
+  const upgrade = vi.fn().mockRejectedValue(new Error("The runtime update did not complete."));
+  f.bridge.mockReturnValue({ runtime: { status: f.native, enroll: f.enroll, identify: f.identify, upgrade } });
+  f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node", upgradeAvailable: true });
+  await rendered(async host => {
+    const button = [...host.querySelectorAll("button")].find(b => b.textContent?.includes("Update this computer"))!;
+    await act(async () => button.click());
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("keeps its current version");
+    expect(host.textContent).toContain("Update this computer");
+  });
+});
+it("hides the runtime update when an older Desktop has no upgrade bridge", async () => {
+  f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node", upgradeAvailable: true });
+  await rendered(host => { expect(host.textContent).not.toContain("Update this computer"); });
+});

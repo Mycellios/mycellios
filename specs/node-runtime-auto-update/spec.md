@@ -255,6 +255,25 @@ package.
    `node-app`"). It already contains #483. After that hop, later releases
    arrive automatically once the owner opts in.
 
+   Desktop performs this hop on Windows:
+   - **Detection.** `status()` reports `upgradeAvailable` when the computer
+     is enrolled, the runtime is installed, `app/component-update-trust.json`
+     is absent, and the pinned runtime is not a legacy package
+     (`LEGACY_RUNTIME_SHA256`).
+   - **Action.** The sidebar shows "Update this computer". After an explicit
+     click and UAC, `upgrade-runtime.ps1` verifies the pinned MSI hash, stops
+     `MycelliosNode`, runs the MSI and checks that the trust anchor now exists.
+     It then starts the service again, and it also restarts the service after
+     a failed or cancelled MSI.
+   - **Scope.** It never touches the identity, the configuration or the
+     service definition in `ProgramData`.
+   - **Same version.** `package.json` is not bumped per revision, so the MSI
+     sets `AllowSameVersionUpgrades="yes"`.
+   - **Publication.** CI publishes the pinnable package with the `node-build`
+     workflow input `publish_windows_runtime` (main only), as the immutable
+     `desktop-runtime-<sha256>` release. Desktop adopts it only after a
+     reviewed change to the hash pinned in `desktop-windows-release.yml`.
+
 ## Platforms
 
 Only the Windows service runs through the supervisor today. Linux (systemd) and

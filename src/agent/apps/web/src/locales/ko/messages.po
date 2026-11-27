@@ -7515,3 +7515,19 @@ msgstr "컨텍스트 {percent}% 사용: {total} 토큰 중 {used}."
 #: src/components/ConversationContextMeter.tsx
 msgid "Context {percent}% full: {used} of {total} tokens. Older messages are summarized automatically when it fills up."
 msgstr "컨텍스트 {percent}% 사용: {total} 토큰 중 {used}. 가득 차면 오래된 메시지가 자동으로 요약됩니다."
+
+#: src/components/SidebarContribution.tsx
+msgid "Update this computer"
+msgstr "이 컴퓨터 업데이트"
+
+#: src/components/SidebarContribution.tsx
+msgid "Updating this computer…"
+msgstr "이 컴퓨터를 업데이트하는 중…"
+
+#: src/components/SidebarContribution.tsx
+msgid "A one-time update. Afterwards this computer updates itself."
+msgstr "한 번만 하는 업데이트입니다. 이후에는 이 컴퓨터가 스스로 업데이트됩니다."
+
+#: src/components/SidebarContribution.tsx
+msgid "The update did not finish. This computer keeps its current version."
+msgstr "업데이트가 완료되지 않았습니다. 이 컴퓨터는 현재 버전을 유지합니다."

@@ -67,6 +67,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: manifest, to: 'contribution/runtime.json' },
       { from: path.join(desktopRoot, 'scripts/install-runtime.ps1'), to: 'contribution/install-runtime.ps1' },
       { from: path.join(desktopRoot, 'scripts/describe-runtime.ps1'), to: 'contribution/describe-runtime.ps1' },
+      { from: path.join(desktopRoot, 'scripts/upgrade-runtime.ps1'), to: 'contribution/upgrade-runtime.ps1' },
       { from: path.join(desktopRoot, 'scripts/runtime-public-status.cjs'), to: 'contribution/runtime-public-status.cjs' },
       { from: path.join(desktopRoot, '../web/dist'), to: 'web', filter: ['**/*', '!**/*.map'] },
       { from: path.join(desktopRoot, '../../infra/compose/docker-compose.images.yml'), to: 'stack/docker-compose.images.yml' },

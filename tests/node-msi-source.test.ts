@@ -20,6 +20,17 @@ describe("native Windows MSI source", () => {
     expect(source).toContain("layout-manifest.json");
   });
 
+  it("replaces an installed product of the same version from another revision", () => {
+    const build = (sourceRevision: string) => generateWixSource({ stagedRoot: "C:\\staged", version: "0.2.124", sourceRevision, files: [{ path: "install.ps1", bytes: 1, sha256: "d".repeat(64) }] });
+    const older = build("a".repeat(40)), newer = build("b".repeat(40));
+    // package.json is not bumped per revision, so a same-version MajorUpgrade is the only upgrade path.
+    expect(newer).toContain('<MajorUpgrade AllowSameVersionUpgrades="yes"');
+    const upgradeCode = (source: string) => /UpgradeCode="([^"]+)"/.exec(source)?.[1];
+    const productId = (source: string) => /<Product Id="([^"]+)"/.exec(source)?.[1];
+    expect(upgradeCode(newer)).toBe(upgradeCode(older));
+    expect(productId(newer)).not.toBe(productId(older));
+  });
+
   it("is deterministic for identical source identity", () => {
     const input = { stagedRoot: "C:\\staged", version: "0.2.77", sourceRevision: "a".repeat(40), files: [{ path: "install.ps1", bytes: 1, sha256: "d".repeat(64) }] };
     expect(generateWixSource(input)).toBe(generateWixSource(input));
