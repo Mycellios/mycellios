@@ -13,6 +13,7 @@ import {
 } from "@mycellios/contracts";
 import { escapePromptData } from "@mycellios/core";
 import type { McpServer, PrismaClient } from "@mycellios/db";
+import { getLogger } from "@mycellios/logging";
 import { combineSignals, sanitizeConnectorError } from "./connector-safety.js";
 import { sanitizeReviewText } from "./local-memory-review.js";
 
@@ -20,10 +21,24 @@ import { sanitizeReviewText } from "./local-memory-review.js";
 export const PERSONAL_MEMORY_TOOL_TIMEOUT_MS = 10_000;
 /** Time the automatic search before a reply may add to the turn. */
 export const PERSONAL_MEMORY_AUTO_RECALL_TIMEOUT_MS = 2_500;
+/**
+ * After an automatic search of a connection fails or runs out of time, later automatic
+ * searches skip it for this long instead of holding every reply for the full timeout.
+ * Searches the Mico asks for still try it, and any successful search ends the pause.
+ */
+export const PERSONAL_MEMORY_AUTO_RECALL_BACKOFF_MS = 5 * 60_000;
 /** Hits per connection in the automatic search. */
 export const PERSONAL_MEMORY_AUTO_RECALL_LIMIT = 5;
 /** The formatted personal memory block never exceeds this many characters. */
 export const PERSONAL_MEMORY_CONTEXT_MAX_CHARS = 8_192;
+
+/** Per process: connection id → when its automatic search may be tried again. */
+const autoRecallPausedUntil = new Map<string, number>();
+
+/** Forget every automatic-search pause (tests). */
+export function resetPersonalMemoryAutoRecallBackoff(): void {
+  autoRecallPausedUntil.clear();
+}
 
 export interface PersonalMemoryConnection {
   id: string;
@@ -247,11 +262,16 @@ export function createPersonalMemoryResolver(
             (connection) => !options.automatic || connection.autoRecall,
           );
           if (text.length < 2 || targets.length === 0) return { hits: [], unavailable: [] };
+          const now = Date.now();
+          const paused = options.automatic
+            ? targets.filter((connection) => (autoRecallPausedUntil.get(connection.id) ?? 0) > now)
+            : [];
+          const searched = targets.filter((connection) => !paused.includes(connection));
           const timeout = options.automatic
             ? PERSONAL_MEMORY_AUTO_RECALL_TIMEOUT_MS
             : PERSONAL_MEMORY_TOOL_TIMEOUT_MS;
           const settled = await Promise.allSettled(
-            targets.map(async (connection) => {
+            searched.map(async (connection) => {
               const context: AdapterContext = {
                 operationId: `personal-memory-${connection.id}`,
                 traceId: `personal-memory-${connection.id}`,
@@ -277,10 +297,23 @@ export function createPersonalMemoryResolver(
             }),
           );
           const hits: PersonalMemoryHit[] = [];
-          const unavailable: string[] = [];
+          const unavailable: string[] = paused.map((connection) => connection.name);
           settled.forEach((outcome, index) => {
-            if (outcome.status === "fulfilled") hits.push(...outcome.value);
-            else unavailable.push(targets[index]!.name);
+            const connection = searched[index]!;
+            if (outcome.status === "fulfilled") {
+              autoRecallPausedUntil.delete(connection.id);
+              hits.push(...outcome.value);
+              return;
+            }
+            unavailable.push(connection.name);
+            // A caller that stopped the search is not the server's fault.
+            if (!options.automatic || options.signal?.aborted) return;
+            autoRecallPausedUntil.set(connection.id, Date.now() + PERSONAL_MEMORY_AUTO_RECALL_BACKOFF_MS);
+            getLogger().warn("personal_memory.auto_recall_paused", {
+              "memory.connection_id": connection.id,
+              "memory.pause_ms": PERSONAL_MEMORY_AUTO_RECALL_BACKOFF_MS,
+              reason: personalMemoryErrorMessage(outcome.reason),
+            });
           });
           return { hits, unavailable };
         },
