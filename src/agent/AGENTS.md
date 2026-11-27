@@ -570,6 +570,14 @@
   copy is adopted by its pinned hash. Preserve operator command overrides and the no-fallback
   model policy. Verify native-engine-store, native-login-path, desktop-agent-engine,
   host-computer, the engines route tests and chat-header-model.
+  EngineUpdateToasts (as the reference app's provider update notices; behavior only)
+  shows the open This PC Mico's engines.forBot updates/installing as one persistent
+  top-right sonner toast per CLI (id engine-update-<engine>): offer with versions and
+  Update (engines.install with that version), live progress polled every 2 s, the
+  failure with Retry, then "updated" closing after 6 s. Idle PCs are read every 10
+  minutes; a closed offer or failure is not shown again in that window; server and
+  Team computers are never asked. Verify engine-update-presentation and
+  engine-update-toasts tests.
   Signing a PC's Codex or Claude Code in or out (specs/native-engines/spec.md phase 1)
   goes through `engines.account` → the owned Desktop's `engineAccount` method, only
   for a This PC Mico (never server, Team or isolated computers) and under the PC's

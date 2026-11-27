@@ -288,6 +288,7 @@ import { WorkspaceRail } from "./shell/workspace-rail";
 import { FrozenWhileCovered } from "./shell/frozen-while-covered";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
+import { EngineUpdateToasts } from "./shell/engine-update-toasts";
 import { ChatHeaderTools, ChatToolsPanel, MobileChatActions } from "./shell/chat-tools-panel";
 import {OpenMycelliosDev} from "../components/OpenMycelliosDev";
 import { DeveloperContextLink } from "../components/DeveloperContextLink";
@@ -4869,6 +4870,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const shell = (
     <>
     <ServerConnectionDialogs ownerId={userId ?? null} />
+    <EngineUpdateToasts bot={inGroup ? null : active} />
     <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} onOpen={openSpaceChat} />
     {userId && currentSpaceId ? <MicoEdgeDock key={JSON.stringify([userId, currentSpaceId])}
       bots={bots} spaceId={currentSpaceId} scope={JSON.stringify([userId, currentSpaceId])} activeId={active?.id}
