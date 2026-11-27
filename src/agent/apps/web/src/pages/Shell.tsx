@@ -12,6 +12,7 @@ import { getGeneralPreferences } from "../lib/general-preferences";
 import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
 import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
+import { GitHubStarPrompt } from "../components/GitHubStarPrompt";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Archive, LayoutGrid } from "lucide-react";
@@ -4864,6 +4865,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
       bots={bots} spaceId={currentSpaceId} scope={JSON.stringify([userId, currentSpaceId])} activeId={active?.id}
       onOpen={id => openSpaceChat(currentSpaceId, `/app/${encodeURIComponent(id)}`)} onCreate={() => setCreateBotOpen(true)} /> : null}
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
+    {userId && shellReady && !floatingChat && !isMobileSidebar ? <GitHubStarPrompt /> : null}
     {isMobileSidebar && !floatingChat ? <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
       <SheetContent side={document.documentElement.dir === "rtl" ? "right" : "left"}
         showCloseButton={false} className="rk-mobile-navigation" aria-describedby={undefined}>

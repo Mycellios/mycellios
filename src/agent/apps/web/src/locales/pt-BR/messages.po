@@ -7475,3 +7475,19 @@ msgstr ""
 #: src/pages/memory-providers/PersonalMemoryConnections.tsx
 msgid "Could not change which Micos can use this memory"
 msgstr ""
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star Mycellios on GitHub"
+msgstr "Dar uma estrela ao Mycellios no GitHub"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Enjoying Mycellios so far?"
+msgstr "Está gostando do Mycellios até agora?"
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "A star on GitHub helps more people find Mycellios."
+msgstr "Uma estrela no GitHub ajuda mais pessoas a encontrarem o Mycellios."
+
+#: src/components/GitHubStarPrompt.tsx
+msgid "Star on GitHub"
+msgstr "Dar uma estrela no GitHub"
