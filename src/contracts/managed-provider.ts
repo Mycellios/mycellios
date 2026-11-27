@@ -42,6 +42,12 @@ export interface ManagedModel {
 /** Requests above this many JSON bytes are refused before any paid upstream call. */
 export const MANAGED_TEXT_MAX_REQUEST_BYTES = 131_072;
 /**
+ * A zero-priced route charges nobody, so its requests are bounded by the seller's own window
+ * instead of the paid byte cap. This only keeps one request well inside the coordinator's 2 MiB
+ * body limit (about 293,000 tokens at the published ratio).
+ */
+export const MANAGED_FREE_TEXT_MAX_REQUEST_BYTES = 1_048_576;
+/**
  * Clients estimate tokens; quotes bound input by JSON bytes. Publishing a token
  * budget at 0.28 tokens per byte keeps an admitted estimate under both the byte
  * cap and the route context (counted as bytes plus the route overhead), so a

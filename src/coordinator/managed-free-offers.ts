@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ManagedModel } from "../contracts/managed-provider.js";
-import { MANAGED_TEXT_MAX_REQUEST_BYTES } from "../contracts/managed-provider.js";
+import { MANAGED_FREE_TEXT_MAX_REQUEST_BYTES } from "../contracts/managed-provider.js";
 import { markedUpUnitPrice } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX } from "./managed-openrouter.js";
 
@@ -51,9 +51,12 @@ export function freeOfferLimits(peer: Peer): { context: number; maxOutput: numbe
   return { context, maxOutput: Math.min(8_192, output, context - FREE_OVERHEAD_TOKENS - 1) };
 }
 
-/** Token budget a client can plan with; the byte cap still bounds every request. */
+/**
+ * Token budget a client can plan with: the seller's whole window, since an agent needs room for
+ * its instructions, tool schemas and history. Only the free byte bound limits it further.
+ */
 export function freeTextLimits(context: number, maxOutput: number) {
-  const input = Math.max(0, Math.min(Math.floor(MANAGED_TEXT_MAX_REQUEST_BYTES * TOKENS_PER_BYTE), context - maxOutput - FREE_OVERHEAD_TOKENS));
+  const input = Math.max(0, Math.min(Math.floor(MANAGED_FREE_TEXT_MAX_REQUEST_BYTES * TOKENS_PER_BYTE), context - maxOutput - FREE_OVERHEAD_TOKENS));
   return { context_length: input + maxOutput, max_input_tokens: input, max_output_tokens: maxOutput };
 }
 
