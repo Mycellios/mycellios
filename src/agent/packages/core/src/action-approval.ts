@@ -51,6 +51,10 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
 
 const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "pc_act",
+  // Opening and using pages in the person's signed-in Chrome follows the approval mode;
+  // passwords, payment details, sign-ins and downloads always ask in the browser itself.
+  "chrome_navigate",
+  "chrome_act",
   "generate_image",
   "generate_video",
   "delete_bot",

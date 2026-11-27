@@ -1,10 +1,25 @@
 # Micos working in the person's Chrome tabs
 
-Status: phases 1 (sharing and tab list) and 2 (reading pages, `chrome_snapshot`)
-implemented. Phase 2 asks for site consent inside the extension (the operation waits
-up to 75 s for the person) instead of through a run waiting state, and does not yet
-add tab groups or the page overlay. Owner decision for open question 1: pages are
-read only on the person's own providers or contracted managed routes. Deviations from this design:
+Status: phases 1 (sharing and tab list), 2 (reading pages, `chrome_snapshot`), 3
+(acting: `chrome_navigate`, `chrome_act`, working indicators, mandatory confirmations)
+and 4 (held downloads) implemented; the Store listing (phase 5) and the dictation
+side item remain. Phases 2 to 4 ask for consent inside the extension (each question
+waits up to 75 s for the person, an action up to 240 s) instead of through a run
+waiting state, so a declined or unanswered password, payment, sign-in or download
+question is reported as a step of the result, with the steps that did run. Owner
+decision for open question 1: pages are read and used only on the person's own
+providers or contracted managed routes. Acting has its own switch in the panel ("Let
+Micos click and type", off by default, per browser profile); turning it on requests
+the optional `downloads` permission, and the panel advertises `capabilities.act` only
+while both hold. Further deviations of phases 3 and 4: `chrome_act` works in any of
+the person's shared tabs (the first use puts the tab in the Mico's tab group and shows
+the overlay), while `chrome_navigate` with `tab` is limited to tabs the Mico already
+works in, so a Mico never navigates the person's own tab away; tab groups are keyed by
+window and Mico, and tabs leave them after 90 s without work or on Stop sharing;
+page actions stop at the first step that is declined, stale or not confirmed; approval
+cards are the generic ones (no element label yet); `site` deny rules and the takeover
+card's Open for Chrome tabs are not wired; the person-first guard watches trusted
+input in the tab for 3 s from the moment the Mico first prepares it. Deviations from this design:
 the registration is keyed by account and sign-in session, not by Space (the panel
 chooses no Space and only the owner's own runs reach it), and the session key is
 recorded on the owner's message (`messages.browserSessionKey`) rather than on the

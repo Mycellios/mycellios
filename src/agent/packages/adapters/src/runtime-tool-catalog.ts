@@ -30,6 +30,8 @@ const CORE_TOOL_NAMES = new Set([
   // Offered only while the person's own Chrome shares its tabs with this turn.
   "chrome_tabs",
   "chrome_snapshot",
+  "chrome_navigate",
+  "chrome_act",
   "request_takeover",
   "web_search",
   "web_fetch",

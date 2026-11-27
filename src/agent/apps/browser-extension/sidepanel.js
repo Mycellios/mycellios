@@ -48,15 +48,19 @@ function loadAppearance() {
 
 function sendAppearance() {
   if (!app.getAttribute("src")) return;
-  app.contentWindow?.postMessage({
-    type: "mycellios:browser-panel-appearance",
-    theme: root.dataset.theme,
-    discreet: discreet.checked,
-  }, AGENT_ORIGIN);
+  app.contentWindow?.postMessage(
+    {
+      type: "mycellios:browser-panel-appearance",
+      theme: root.dataset.theme,
+      discreet: discreet.checked,
+    },
+    AGENT_ORIGIN,
+  );
 }
 
 function applyAppearance() {
-  root.dataset.theme = design.value === "system" ? (systemDark.matches ? "dark" : "light") : design.value;
+  root.dataset.theme =
+    design.value === "system" ? (systemDark.matches ? "dark" : "light") : design.value;
   root.toggleAttribute("data-discreet", discreet.checked);
   if (title.dataset.message) title.textContent = noticeText(title.dataset.message);
   sendAppearance();
@@ -64,7 +68,10 @@ function applyAppearance() {
 
 function saveAppearance() {
   try {
-    localStorage.setItem(appearanceKey, JSON.stringify({ design: design.value, discreet: discreet.checked }));
+    localStorage.setItem(
+      appearanceKey,
+      JSON.stringify({ design: design.value, discreet: discreet.checked }),
+    );
   } catch {
     // The controls still apply for the open panel if storage is unavailable.
   }
@@ -78,13 +85,38 @@ function noticeText(key) {
 design.addEventListener("change", saveAppearance);
 discreet.addEventListener("change", saveAppearance);
 systemDark.addEventListener("change", applyAppearance);
-window.addEventListener("storage", event => {
+window.addEventListener("storage", (event) => {
   if (event.key === appearanceKey || event.key === null) loadAppearance();
   // Another panel turned sharing on or off for this profile.
-  if ((event.key === "mycellios.panel.shareTabs" || event.key === null) && !shareStrip.hidden) syncSharing();
+  if (
+    (event.key === "mycellios.panel.shareTabs" ||
+      event.key === "mycellios.panel.actTabs" ||
+      event.key === null) &&
+    !shareStrip.hidden
+  )
+    syncSharing();
 });
 app.addEventListener("load", sendAppearance);
 loadAppearance();
+
+// Dictation in the framed app uses the microphone permission of this extension. Chrome cannot ask
+// for it inside a side panel, so until it is granted a button opens a tab that asks once.
+const micRow = document.getElementById("mic-row");
+document.getElementById("mic-open").addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("microphone.html") });
+});
+navigator.permissions
+  ?.query({ name: "microphone" })
+  .then((status) => {
+    const show = () => {
+      micRow.hidden = status.state === "granted";
+    };
+    show();
+    status.addEventListener("change", show);
+  })
+  .catch(() => {
+    micRow.hidden = true;
+  });
 
 let pollTimer = null;
 
@@ -143,6 +175,45 @@ const shareLabels = {
 };
 let stopSharing = null;
 
+// Acting in pages (phases 3-4) has its own switch, also off by default and also per browser
+// profile. Turning it on asks Chrome for the optional downloads permission, which lets this panel
+// hold a download that starts while a Mico acts until the person keeps or cancels it.
+const actKey = "mycellios.panel.actTabs";
+const actBlock = document.getElementById("tabs-act");
+const actStatus = document.getElementById("tabs-act-status");
+const actToggle = document.getElementById("tabs-act-toggle");
+let registeredAct = false;
+
+function actChosen() {
+  try {
+    return localStorage.getItem(actKey) === "on";
+  } catch {
+    return false;
+  }
+}
+
+function chooseAct(on) {
+  try {
+    if (on) localStorage.setItem(actKey, "on");
+    else localStorage.removeItem(actKey);
+  } catch {
+    // Without storage the choice lasts while this panel is open.
+  }
+}
+
+async function actAllowed() {
+  return (
+    actChosen() &&
+    (await chrome.permissions.contains({ permissions: ["downloads"] }).catch(() => false))
+  );
+}
+
+function showActState(on) {
+  actStatus.textContent = t(on ? "actStatusOn" : "actStatusOff");
+  actToggle.textContent = t(on ? "actDisable" : "actEnable");
+  actToggle.classList.toggle("secondary", on);
+}
+
 function shareChosen() {
   try {
     return localStorage.getItem(shareKey) === "on";
@@ -167,14 +238,26 @@ function showShareState(state) {
   shareToggle.textContent = t(on ? "shareTabsStop" : "shareTabsOn");
   shareToggle.classList.toggle("secondary", on);
   shareDetail.hidden = on;
+  actBlock.hidden = !on;
+  if (on) showActState(registeredAct);
   chrome.action.setBadgeText({ text: state === "sharing" ? "•" : "" }).catch(() => {});
   chrome.action.setBadgeBackgroundColor({ color: "#2f7d4f" }).catch(() => {});
 }
 
 async function syncSharing() {
-  const wanted = shareChosen() && await chrome.permissions.contains({ permissions: ["tabs"] }).catch(() => false);
+  const wanted =
+    shareChosen() &&
+    (await chrome.permissions.contains({ permissions: ["tabs"] }).catch(() => false));
   if (wanted && !stopSharing) {
-    stopSharing = startSharing(showShareState, askSite);
+    registeredAct = await actAllowed();
+    stopSharing = startSharing(showShareState, askSite, { confirm: confirmAction, actAllowed });
+  } else if (wanted && stopSharing && registeredAct !== (await actAllowed())) {
+    // The acting switch changed (here or in another panel): register again with the new capability.
+    const stop = stopSharing;
+    stopSharing = null;
+    await stop();
+    registeredAct = await actAllowed();
+    stopSharing = startSharing(showShareState, askSite, { confirm: confirmAction, actAllowed });
   } else if (!wanted && stopSharing) {
     const stop = stopSharing;
     stopSharing = null;
@@ -188,36 +271,115 @@ async function syncSharing() {
 // meant for something else cannot answer, and the question expires before the server gives up.
 const consent = document.getElementById("tabs-consent");
 const consentText = document.getElementById("tabs-consent-text");
-const consentButtons = ["once", "always", "deny"].map((choice) => [choice, document.getElementById(`tabs-consent-${choice}`)]);
+const consentButtons = ["once", "always", "deny"].map((choice) => [
+  choice,
+  document.getElementById(`tabs-consent-${choice}`),
+]);
 const CONSENT_ARM_MS = 500;
 const CONSENT_TIMEOUT_MS = 75_000;
 let consentQueue = Promise.resolve();
 
 function askSite({ site, origins }) {
-  const asked = consentQueue.then(() => new Promise((resolve) => {
-    consentText.textContent = t("consentQuestion").replace("{site}", site);
-    consent.hidden = false;
-    for (const [, button] of consentButtons) button.disabled = true;
-    const arm = setTimeout(() => { for (const [, button] of consentButtons) button.disabled = false; }, CONSENT_ARM_MS);
-    const finish = (answer) => {
-      clearTimeout(arm);
-      clearTimeout(expire);
-      consent.hidden = true;
-      for (const [, button] of consentButtons) button.onclick = null;
-      resolve(answer);
-    };
-    const expire = setTimeout(() => finish("timeout"), CONSENT_TIMEOUT_MS);
-    for (const [choice, button] of consentButtons) {
-      button.onclick = () => {
-        if (choice === "deny") return finish("deny");
-        // Chrome's own site prompt needs this click's user gesture.
-        chrome.permissions.request({ origins }).then((granted) => finish(granted ? choice : "deny"), () => finish("deny"));
-      };
-    }
-  }));
+  const asked = consentQueue.then(
+    () =>
+      new Promise((resolve) => {
+        consentText.textContent = t("consentQuestion").replace("{site}", site);
+        consent.hidden = false;
+        for (const [, button] of consentButtons) button.disabled = true;
+        const arm = setTimeout(() => {
+          for (const [, button] of consentButtons) button.disabled = false;
+        }, CONSENT_ARM_MS);
+        const finish = (answer) => {
+          clearTimeout(arm);
+          clearTimeout(expire);
+          consent.hidden = true;
+          for (const [, button] of consentButtons) button.onclick = null;
+          resolve(answer);
+        };
+        const expire = setTimeout(() => finish("timeout"), CONSENT_TIMEOUT_MS);
+        for (const [choice, button] of consentButtons) {
+          button.onclick = () => {
+            if (choice === "deny") return finish("deny");
+            // Chrome's own site prompt needs this click's user gesture.
+            chrome.permissions.request({ origins }).then(
+              (granted) => finish(granted ? choice : "deny"),
+              () => finish("deny"),
+            );
+          };
+        }
+      }),
+  );
   consentQueue = asked.catch(() => {});
   return asked;
 }
+
+// The questions that always ask, in every approval mode: typing into a password field, entering
+// payment details, a sign-in, and keeping a download a Mico's action started. Like the site
+// question they can be answered only here, arm after 500 ms and expire before the server gives up.
+// The page-provided label is shown as quoted text, never as part of the question.
+const confirmBox = document.getElementById("tabs-confirm");
+const confirmText = document.getElementById("tabs-confirm-text");
+const confirmLabel = document.getElementById("tabs-confirm-label");
+const confirmAllow = document.getElementById("tabs-confirm-allow");
+const confirmDeny = document.getElementById("tabs-confirm-deny");
+const CONFIRM_QUESTION = {
+  password: "confirmPassword",
+  payment: "confirmPayment",
+  sign_in: "confirmSignIn",
+  download: "confirmDownload",
+};
+
+function confirmAction({ kind, site, label }) {
+  const key = CONFIRM_QUESTION[kind];
+  if (!key) return Promise.resolve("deny");
+  const asked = consentQueue.then(
+    () =>
+      new Promise((resolve) => {
+        confirmText.textContent = t(key).replace("{site}", site || "?");
+        confirmLabel.textContent = label ? t("confirmPageText").replace("{text}", label) : "";
+        confirmLabel.hidden = !label;
+        confirmAllow.textContent = t(kind === "download" ? "confirmKeep" : "confirmAllow");
+        confirmDeny.textContent = t(kind === "download" ? "confirmCancel" : "consentDeny");
+        confirmBox.hidden = false;
+        confirmAllow.disabled = true;
+        confirmDeny.disabled = true;
+        const arm = setTimeout(() => {
+          confirmAllow.disabled = false;
+          confirmDeny.disabled = false;
+        }, CONSENT_ARM_MS);
+        const finish = (answer) => {
+          clearTimeout(arm);
+          clearTimeout(expire);
+          confirmBox.hidden = true;
+          confirmAllow.onclick = null;
+          confirmDeny.onclick = null;
+          resolve(answer);
+        };
+        const expire = setTimeout(() => finish("timeout"), CONSENT_TIMEOUT_MS);
+        confirmAllow.onclick = () => finish("allow");
+        confirmDeny.onclick = () => finish("deny");
+      }),
+  );
+  consentQueue = asked.catch(() => {});
+  return asked;
+}
+
+actToggle.addEventListener("click", async () => {
+  if (actChosen()) {
+    chooseAct(false);
+    showActState(false);
+    await syncSharing();
+    return;
+  }
+  // Chrome's own prompt explains the downloads permission; it needs this click's user gesture.
+  const granted = await chrome.permissions
+    .request({ permissions: ["downloads"] })
+    .catch(() => false);
+  if (!granted) return;
+  chooseAct(true);
+  showActState(true);
+  await syncSharing();
+});
 
 shareToggle.addEventListener("click", async () => {
   if (stopSharing || shareChosen()) {
@@ -235,6 +397,11 @@ shareToggle.addEventListener("click", async () => {
   await syncSharing();
 });
 chrome.permissions.onRemoved.addListener(({ permissions = [] }) => {
+  if (permissions.includes("downloads")) {
+    // Without it a download could not be held, so acting stops with it.
+    chooseAct(false);
+    syncSharing();
+  }
   if (!permissions.includes("tabs")) return;
   chooseSharing(false);
   syncSharing();

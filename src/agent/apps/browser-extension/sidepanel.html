@@ -25,6 +25,10 @@
           <span data-i18n="discreet">Discreet mode</span>
           <input id="discreet" type="checkbox" />
         </label>
+        <div class="appearance-row" id="mic-row" hidden>
+          <span data-i18n="micLabel">Dictation microphone</span>
+          <button id="mic-open" type="button" class="secondary" data-i18n="micAllow">Allow</button>
+        </div>
       </div>
     </details>
     <section id="tabs-share" class="tabs-share" hidden>
@@ -33,6 +37,21 @@
         <button id="tabs-share-toggle" type="button" class="secondary"></button>
       </div>
       <p id="tabs-share-detail" class="tabs-share-detail" data-i18n="shareTabsDetail"></p>
+      <div id="tabs-act" class="tabs-act" hidden>
+        <div class="tabs-share-row">
+          <span id="tabs-act-status" class="tabs-share-status" role="status"></span>
+          <button id="tabs-act-toggle" type="button" class="secondary"></button>
+        </div>
+        <p id="tabs-act-detail" class="tabs-share-detail" data-i18n="actDetail"></p>
+      </div>
+      <div id="tabs-confirm" class="tabs-consent" role="alertdialog" aria-labelledby="tabs-confirm-text" hidden>
+        <p id="tabs-confirm-text" class="tabs-consent-text"></p>
+        <p id="tabs-confirm-label" class="tabs-consent-detail" hidden></p>
+        <div class="tabs-consent-actions">
+          <button id="tabs-confirm-allow" type="button"></button>
+          <button id="tabs-confirm-deny" type="button" class="secondary"></button>
+        </div>
+      </div>
       <div id="tabs-consent" class="tabs-consent" role="alertdialog" aria-labelledby="tabs-consent-text" hidden>
         <p id="tabs-consent-text" class="tabs-consent-text"></p>
         <div class="tabs-consent-actions">

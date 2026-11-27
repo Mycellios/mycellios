@@ -28,7 +28,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]), :root[data-theme="original"] {
+  :root:not([data-theme]),
+  :root[data-theme="original"] {
     --canvas: #1c1c1c;
     --ink: #ececec;
     --muted: #a3a3a3;
@@ -241,4 +242,25 @@ button.secondary {
 .tabs-consent button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* The person's separate switch for clicking and typing, under the share row. */
+.tabs-act {
+  margin-top: 6px;
+}
+
+.tabs-act[hidden] {
+  display: none;
+}
+
+/* Page-provided text shown with a question: smaller and muted so it reads as quoted, not as the question. */
+.tabs-consent-detail {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.tabs-consent-detail[hidden] {
+  display: none;
 }

@@ -104,7 +104,7 @@ function fixture({
   chromeTabs,
 }: {
   /** The browser that sent the source message (sessionKey) and whether it shares tabs now. */
-  chromeTabs?: { sessionKey?: string; shared: boolean; read?: boolean };
+  chromeTabs?: { sessionKey?: string; shared: boolean; read?: boolean; act?: boolean };
   /** A connected PC whose environment reports the owner's app control opt-in (or not). */
   pcAppControl?: boolean;
   /** Apps connected through Composio. */
@@ -242,7 +242,13 @@ function fixture({
   let offeredTools: string[] = [];
   const appControl = vi.fn(async () => ({ ok: true, confirmed: true, data: {} }));
   const chromeTabsClient = {
-    available: vi.fn(async () => ({ tabs: chromeTabs?.shared === true, read: chromeTabs?.shared === true && chromeTabs.read === true })),
+    available: vi.fn(async () => ({
+      tabs: chromeTabs?.shared === true,
+      read: chromeTabs?.shared === true && chromeTabs.read === true,
+      act: chromeTabs?.shared === true && chromeTabs.read === true && chromeTabs.act === true,
+    })),
+    navigate: vi.fn(async () => ({ navigated: { tab: "t9", title: "Shop", url: "https://shop.example/" } })),
+    act: vi.fn(async () => ({ acted: { steps: [{ ok: true }] } })),
     snapshot: vi.fn(async () => ({ page: { title: "Laptop", url: "https://shop.example/laptop", text: "Price 900", truncated: false } })),
     list: vi.fn(async () => ({ tabs: [{ tab: "t7", title: "Laptop", url: "https://shop.example/laptop", active: true, audible: false }], omitted: 0 })),
   };
@@ -2455,6 +2461,116 @@ describe("the owner's shared Chrome tabs", () => {
     const f = fixture({ name: "chrome_tabs", builtin: true, sourceRole: "user", disabledBuiltinTools: ["chrome_tabs"], chromeTabs: { sessionKey: key, shared: true } });
     await f.run();
     expect(f.offeredTools()).not.toContain("chrome_tabs");
+  });
+
+  describe("acting in pages", () => {
+    const acting = { sessionKey: key, shared: true, read: true, act: true } as const;
+
+    it("is offered only with the person's own switch on and their own or a managed model", async () => {
+      pageRoute.value = "own";
+      const on = fixture({
+        name: "chrome_act",
+        builtin: true,
+        readOnly: false,
+        sourceRole: "user",
+        chromeTabs: acting,
+      });
+      await on.run();
+      expect(on.offeredTools()).toEqual(expect.arrayContaining(["chrome_navigate", "chrome_act"]));
+      const switchOff = fixture({
+        name: "chrome_act",
+        builtin: true,
+        readOnly: false,
+        sourceRole: "user",
+        chromeTabs: { ...acting, act: false },
+      });
+      await switchOff.run();
+      expect(switchOff.offeredTools()).toContain("chrome_snapshot");
+      expect(switchOff.offeredTools()).not.toContain("chrome_act");
+      expect(switchOff.offeredTools()).not.toContain("chrome_navigate");
+      pageRoute.value = "third_party";
+      const sellers = fixture({
+        name: "chrome_act",
+        builtin: true,
+        readOnly: false,
+        sourceRole: "user",
+        chromeTabs: acting,
+      });
+      await sellers.run();
+      expect(sellers.offeredTools()).not.toContain("chrome_act");
+      expect(sellers.offeredTools()).not.toContain("chrome_navigate");
+    });
+
+    it.each(["routine", "webhook", "messaging", "agent_task"])(
+      "is never offered to a %s run",
+      async (trigger) => {
+        pageRoute.value = "own";
+        const f = fixture({
+          name: "chrome_act",
+          builtin: true,
+          readOnly: false,
+          sourceRole: "user",
+          trigger,
+          chromeTabs: acting,
+        });
+        await f.run();
+        expect(f.offeredTools()).not.toContain("chrome_act");
+        expect(f.offeredTools()).not.toContain("chrome_navigate");
+      },
+    );
+
+    it("is not offered when the Mico disabled it", async () => {
+      pageRoute.value = "own";
+      const f = fixture({
+        name: "chrome_act",
+        builtin: true,
+        readOnly: false,
+        sourceRole: "user",
+        disabledBuiltinTools: ["chrome_act", "chrome_navigate"],
+        chromeTabs: acting,
+      });
+      await f.run();
+      expect(f.offeredTools()).not.toContain("chrome_act");
+      expect(f.offeredTools()).not.toContain("chrome_navigate");
+    });
+
+    it("asks for approval first and does not act in the browser while waiting", async () => {
+      pageRoute.value = "own";
+      const f = fixture({
+        name: "chrome_act",
+        builtin: true,
+        readOnly: false,
+        sourceRole: "user",
+        chromeTabs: acting,
+      });
+      f.setCalls([
+        {
+          name: "chrome_act",
+          args: { tab: "t7", actions: [{ kind: "click", ref: "e3" }] },
+          executionId: "call-1",
+        },
+      ]);
+      await f.run();
+      expect(f.chromeTabsClient.act).not.toHaveBeenCalled();
+      expect(f.results.some(isApprovalPausedResult)).toBe(true);
+      const open = fixture({
+        name: "chrome_navigate",
+        builtin: true,
+        readOnly: false,
+        sourceRole: "user",
+        chromeTabs: acting,
+      });
+      open.setCalls([
+        {
+          name: "chrome_navigate",
+          args: { url: "https://shop.example/", new_tab: true },
+          executionId: "call-1",
+        },
+      ]);
+      await open.run();
+      expect(open.chromeTabsClient.navigate).not.toHaveBeenCalled();
+      expect(open.results.some(isApprovalPausedResult)).toBe(true);
+    });
   });
 });
 

@@ -1878,6 +1878,19 @@
   (`messages.browserSessionKey`); never to routines, channels, members, groups,
   tasks, webhooks, background or project work. Delivered work is never replayed.
   Check browser-tabs-relay tests and the executor chrome_tabs gating tests.
+  Acting (`chrome_navigate`, `chrome_act`) needs the person's separate "Let Micos click
+  and type" switch (the optional `downloads` permission; `capabilities.act`), the same
+  model-route rule as reading and the approval mode (both tools are approval-required).
+  The extension, never the server, asks in every mode before a password or code field,
+  card details, a sign-in or authorization page, and keeping a download (`sensitive.js`;
+  answers cannot be skipped by Never ask or Auto Review). Downloads are paused only while
+  a Mico acts. A Mico navigates only new tabs or tabs it already works in; a tab it uses
+  joins its named tab group and shows the overlay, which is cosmetic. It yields to the
+  person's own input, stops at the first declined, stale or unconfirmed step and reports
+  unconfirmed effects as such. Keep operations out of the poll loop so a question
+  waiting for the person never lets the lease lapse. Verify chrome-act, chrome-mico,
+  browser-tabs-relay and executor-readonly-approval tests; a jsdom fixture does not
+  qualify a real Chrome session.
 - Appearance defaults to light when no valid preference is saved. Keep the pre-paint
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the

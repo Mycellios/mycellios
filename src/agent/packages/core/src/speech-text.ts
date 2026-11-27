@@ -179,6 +179,7 @@ export function narrateTool(toolName: string): string | null {
     [/^(browser_navigate|browser_snapshot|browser_act)$/, "using the page"],
     [/^chrome_tabs$/, "looking at your tabs"],
     [/^chrome_snapshot$/, "reading your page"],
+    [/^(chrome_navigate|chrome_act)$/, "using your browser"],
     [/^(click|type_text|press_key|scroll|computer_batch|computer_act)$/, "using the computer"],
     [/^open_url$/, "opening a page"],
     [/^list_bots$/, "checking who's around"],
