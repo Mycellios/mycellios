@@ -429,6 +429,20 @@ async function toolBridge(
   };
 }
 
+/**
+ * Context blocks that change between turns without changing who the Mico is: memory, open notes and
+ * the teammate list. Claude Code and Codex resume their saved session with the current
+ * instructions, so these blocks never decide whether a session can go on. Otherwise a routine that
+ * updated a note made the next message start a new session and resend the whole history.
+ */
+const VOLATILE_INSTRUCTION_BLOCKS = ["teammate_directory", "durable_memory", "personal_memory", "recalled_memory", "scratchpad_open"];
+export function sessionInstructions(instructions: string): string {
+  let stable = instructions;
+  for (const tag of VOLATILE_INSTRUCTION_BLOCKS)
+    stable = stable.replace(new RegExp(String.raw`<${tag}>[\s\S]*?</${tag}>`, "g"), `<${tag}/>`);
+  return stable;
+}
+
 const CODEX_IDLE_MS = 5 * 60_000;
 const CODEX_RETAINED_TURNS = 32;
 type CodexProcess = {
@@ -637,7 +651,11 @@ export class NativeAgentRuntime implements AgentRuntime {
       ? tools.filter(({ name }) => openCodeFileTools.has(name)).map(({ name }) => `${nativeMcpServerName}_${name}`)
       : [];
     // Claude Code keeps sessions per working folder, so a new folder or configuration starts a fresh one.
-    const baseBinding = [engine, request.model.id, request.instructions, tools,
+    // Codex and Claude Code take the current instructions when they resume, so only their stable part
+    // binds the session; the other engines restart when anything in them changes.
+    const boundInstructions = engine === "codex" || engine === "claude"
+      ? sessionInstructions(request.instructions ?? "") : request.instructions;
+    const baseBinding = [engine, request.model.id, boundInstructions, tools,
       ...(openCodeProject ? [openCodeProject] : []), ...openCodeFileToolNames,
       ...(claudeWorkspace ? [claudeWorkspace] : []), ...(claudeUserSettings ? ["claude-user-settings"] : [])];
     const modelConfig = request.nativeConfig;
@@ -814,7 +832,7 @@ export class NativeAgentRuntime implements AgentRuntime {
             fileIdentity(join(codexHome, "config.toml")),
             fileIdentity(join(cwd, ".codex", "config.toml")),
           ]);
-          if (identity[0]) codexKey = hash([cwd, binding, command, this.options.codexArgs, identity]);
+          if (identity[0]) codexKey = hash([cwd, binding, command, this.options.codexArgs, identity, request.instructions ?? ""]);
         }
         if (engine === "claude" && !request.turnCheckpoint && !request.resetNativeSession) {
           // The CLI, its sign-in and the owner's loaded settings must be the same ones it started with.
@@ -824,7 +842,9 @@ export class NativeAgentRuntime implements AgentRuntime {
             claudeUserSettings ? fileIdentity(join(claudeHome, "settings.json")) : null,
           ]);
           if (identity[0])
-            claudeKey = hash([cwd, binding, command, claudeWorkspace ?? null, request.nativeConfig ?? null, identity]);
+            // An open process keeps the instructions it started with: any change starts a new one,
+            // which still resumes the same session.
+            claudeKey = hash([cwd, binding, command, claudeWorkspace ?? null, request.nativeConfig ?? null, identity, request.instructions ?? ""]);
         }
         signal.throwIfAborted();
         if (!await authorized()) throw new Error("Native agent access changed before execution.");

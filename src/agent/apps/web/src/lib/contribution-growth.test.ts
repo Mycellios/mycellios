@@ -15,7 +15,8 @@ it("removes the entire flourish and its deadline immediately when paused",()=>{
  stopContributionGrowth();
  expect(document.querySelectorAll(".rk-contribution-growth")).toHaveLength(0);
  expect(vi.getTimerCount()).toBe(0);
- expect(playback.cancel).toHaveBeenCalledTimes(5);
+ // Two ripples and nine spores.
+ expect(playback.cancel).toHaveBeenCalledTimes(11);
  vi.runAllTimers();expect(document.querySelector(".rk-contribution-growth")).toBeNull();
 });
 it("never accumulates effects on repeated activation and clears naturally",()=>{

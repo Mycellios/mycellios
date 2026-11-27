@@ -102,7 +102,7 @@ Account-bound, approved work can earn AI Credits after independent verification.
 
 ## Links
 
-- [Open Agent and activate Generate AI](https://www.mycellios.com/agent)
+- [Open Agent and turn on Earn credits](https://www.mycellios.com/agent)
 - [How verified-work Credits work](https://www.mycellios.com/guides/contribute-compute)
 - [Check native package availability](https://www.mycellios.com/downloads)
 
@@ -120,7 +120,7 @@ If a package is unavailable, review the public releases or try the browser worke
 
 ## Links
 
-- [Open Agent and activate Generate AI](https://www.mycellios.com/agent)
+- [Open Agent and turn on Earn credits](https://www.mycellios.com/agent)
 - [How verified-work Credits work](https://www.mycellios.com/guides/contribute-compute)
 - [View published releases](https://github.com/Mycellios/mycellios/releases)
 
@@ -132,7 +132,7 @@ Source: https://www.mycellios.com/downloads
 
 An opt-in worker lets compatible desktop, tablet, or phone browsers contribute measurable compute to the Mycellios test network. You can pause it at any time.
 
-Available tasks depend on browser capabilities and network state. This standalone worker does not attribute earnings to your account. For verified-work Credits, use the account-bound Generate AI control in Mycellios Agent.
+Available tasks depend on browser capabilities and network state. This standalone worker does not attribute earnings to your account. For verified-work Credits, use the account-bound Earn credits control in Mycellios Agent.
 
 
 
@@ -771,7 +771,7 @@ Check the requirements of your connection before you start. Model and tool avail
 
 ## Start from your account
 
-Open Mycellios Agent and sign in with your Mycellios account so accepted work can be attributed to your wallet. Find Generate AI in the main sidebar and press Play to opt in. You can pause from the same control. Do not use the legacy standalone browser worker as a substitute for an account-bound earnings connection.
+Open Mycellios Agent and sign in with your Mycellios account so accepted work can be attributed to your wallet. Find Earn credits in the main sidebar and press Play to opt in. You can pause from the same control. Do not use the legacy standalone browser worker as a substitute for an account-bound earnings connection.
 
 Browser contribution uses compatible resources available to the browser. Desktop and native-node participation have their own runtime and pairing requirements. Device support, model downloads, memory and network conditions determine which tasks a node can accept.
 

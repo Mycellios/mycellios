@@ -2,12 +2,13 @@ import type { ProductEvent, ThreadSnapshot } from "@mycellios/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type PendingThreadSend,
+  carriedPendingSends,
   pendingSendMatchesEvent,
   visiblePendingSends,
 } from "../../lib/pending-thread-sends";
 
 export function usePendingThreadSends(scope: string, snapshot: ThreadSnapshot | null) {
-  const [sends, setSends] = useState<PendingThreadSend[]>([]);
+  const [sends, setSends] = useState<PendingThreadSend[]>(() => carriedPendingSends(scope));
   const begin = useCallback((send: PendingThreadSend) => {
     setSends((current) => [...current.filter((item) => item.nonce !== send.nonce), send].slice(-8));
   }, []);
@@ -77,5 +78,5 @@ export function usePendingThreadSends(scope: string, snapshot: ThreadSnapshot | 
       return next.length === current.length ? current : next;
     });
   }, [scope, snapshot, sends]);
-  return { visible, begin, accept, observe, remove };
+  return { visible, all: sends, begin, accept, observe, remove };
 }

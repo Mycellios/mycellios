@@ -12129,6 +12129,9 @@ msgstr "Theme"
 msgid "These instructions will be saved when you create the Mico. You can edit them later."
 msgstr "These instructions will be saved when you create the Mico. You can edit them later."
 
+msgid "Thinking it through…"
+msgstr "Thinking it through…"
+
 msgid "Thinking…"
 msgstr "Thinking…"
 

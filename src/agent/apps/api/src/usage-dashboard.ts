@@ -163,19 +163,26 @@ export async function usageDashboard(
         unmappedCalls: number;
       }>
     >(Prisma.sql`
-      WITH selected AS (SELECT u."runId" FROM usage_records u WHERE ${where}),
-      cohort AS (
-        SELECT r.id, r."threadId", r."sourceMessageId", r."createdAt", r.status,
-          NOT EXISTS (SELECT 1 FROM usage_records x WHERE x."runId"=r.id AND x."userId"=${actor.userId} AND x."spaceId"=${actor.spaceId}) AS missing
-        FROM runs r WHERE r."userId"=${actor.userId} AND r."spaceId"=${actor.spaceId}
+      -- Each source is read once and joined by hash. A per-run NOT EXISTS over the account's usage
+      -- and an OR inside a per-message EXISTS made this report take tens of seconds.
+      WITH selected AS MATERIALIZED (SELECT u."runId" FROM usage_records u WHERE ${where}),
+      used AS MATERIALIZED (
+        SELECT DISTINCT x."runId" FROM usage_records x
+        WHERE x."userId"=${actor.userId} AND x."spaceId"=${actor.spaceId} AND x."runId" IS NOT NULL
+      ),
+      cohort AS MATERIALIZED (
+        SELECT r.id, r."threadId", r."sourceMessageId", r."createdAt", r.status, used."runId" IS NULL AS missing
+        FROM runs r LEFT JOIN used ON used."runId"=r.id
+        WHERE r."userId"=${actor.userId} AND r."spaceId"=${actor.spaceId}
           AND ((r."createdAt">=${from} AND r."createdAt"<${to} ${runBotFilter}) OR r.id IN (SELECT "runId" FROM selected))
       ), message_counts AS (
-        SELECT COUNT(DISTINCT m.id) FILTER (WHERE m.role='user')::int AS users,
-          COUNT(DISTINCT m.id) FILTER (WHERE m.role='bot')::int AS assistants
+        SELECT COUNT(*) FILTER (WHERE m.role='user')::int AS users,
+          COUNT(*) FILTER (WHERE m.role='bot')::int AS assistants
         FROM messages m INNER JOIN threads t ON t.id=m."threadId"
         WHERE t."userId"=${actor.userId} AND t."spaceId"=${actor.spaceId}
           AND m."createdAt">=${from} AND m."createdAt"<${to}
-          AND EXISTS (SELECT 1 FROM cohort r WHERE m."runId"=r.id OR m.id=r."sourceMessageId")
+          AND (m."runId" IN (SELECT id FROM cohort)
+            OR m.id IN (SELECT "sourceMessageId" FROM cohort WHERE "sourceMessageId" IS NOT NULL))
       )
       SELECT COUNT(DISTINCT "threadId")::int AS sessions,
         COUNT(*) FILTER (WHERE missing)::int AS "missingRuns",

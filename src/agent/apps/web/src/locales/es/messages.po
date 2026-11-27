@@ -12461,6 +12461,9 @@ msgstr "Deteniendo"
 msgid "Task failed"
 msgstr "La tarea ha fallado"
 
+msgid "Thinking it through…"
+msgstr "Pensándolo…"
+
 msgid "Thinking…"
 msgstr "Pensando…"
 

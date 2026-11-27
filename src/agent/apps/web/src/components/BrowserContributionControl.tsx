@@ -4,8 +4,9 @@ import { startContributionGrowth, stopContributionGrowth } from "../lib/contribu
 /// <reference types="@webgpu/types" />
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { ContributionSpinner } from "./ContributionSpinner";
 import { Button } from "@mycellios/ui-web";
-import { LoaderCircle, Pause, Play } from "lucide-react";
+import { Pause, Play, Sprout } from "lucide-react";
 import { authClient } from "../lib/auth";
 import { rpc } from "../lib/rpc";
 import { setContributionActivity } from "../lib/contribution-activity";
@@ -97,7 +98,7 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
     if (previous?.owner === owner && count > previous.count)
       window.dispatchEvent(new Event("mycellios:contribution-verified"));
   }, [session.data?.user.id, connected, state?.verifiedTasks]);
-  const label = active || preparing ? t`Pause contribution` : t`Generate AI`;
+  const label = active || preparing ? t`Pause contribution` : t`Earn credits`;
   useEffect(() => {
     const owner = session.data?.user.id;
     if (!online || !owner) { linkedWorker.current = null; setLinked(false); return; }
@@ -147,9 +148,10 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
   return <div data-testid="browser-contribution-control" data-active={connected ? "true" : "false"} className="rk-contribution-control">
     <Button variant="ghost" className="rk-contribution-button justify-between gap-2 px-2 text-xs" aria-label={label}
       aria-pressed={active || preparing} title={label} onClick={event => { if (active || preparing) { activationSource.current = null; stopContributionGrowth(); setContributionActivity(indicator.current, false); } else { activationSource.current = event.currentTarget; startContributionGrowth(event.currentTarget); } void toggle(); }}>
-      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{preparing ? t`Activating…` : t`Generate AI`}</span><span className="block text-[11px] text-muted-foreground">{t`Share computing power with the network`}</span></span>}
+      {!mini && <Sprout aria-hidden className={`size-4 shrink-0 text-emerald-600 dark:text-emerald-400 ${connected ? "rk-contribution-sprout" : ""}`} />}
+      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{preparing ? t`Activating…` : t`Earn credits`}</span><span className="block text-[11px] text-muted-foreground">{t`Share computing power with the network`}</span></span>}
       <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>
-        {preparing ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}
+        {preparing ? <ContributionSpinner /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}
       </span>
     </Button>
     {!mini && !issue && (failed || (active && !connected)) && <p className="px-2 text-[11px] text-muted-foreground" role={failed ? "alert" : "status"}>

@@ -5,7 +5,6 @@ import {
   createHash,
   randomBytes,
   scrypt,
-  scryptSync,
 } from "node:crypto";
 import type {
   AdapterContext,
@@ -28,10 +27,6 @@ function legacyKeyFrom(secret: string): Buffer {
 }
 
 const SCRYPT_OPTIONS: ScryptOptions = { N: 16_384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
-
-function keyFrom(secret: string, salt: Buffer): Buffer {
-  return scryptSync(secret, salt, 32, SCRYPT_OPTIONS);
-}
 
 function keyFromAsync(secret: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -86,15 +81,19 @@ export class EncryptedSecretStore extends SecretChanges implements SecretStore {
   ): Promise<SecretRecord> {
     context.signal.throwIfAborted();
     const recordId = options.recordId ?? randomBytes(12).toString("hex");
-    const ref = this.seal(plaintext, recordId);
+    const ref = await this.seal(plaintext, recordId);
     this.changed(ref);
     return { id: recordId, ref, ciphertext: ref };
   }
 
-  private seal(plaintext: string, recordId: string): string {
+  /**
+   * Derive the v2 key in the threadpool, as reads do. A synchronous scrypt here stopped the whole
+   * worker for each push notification and MCP token renewal, delaying every running turn by seconds.
+   */
+  private async seal(plaintext: string, recordId: string): Promise<string> {
     const salt = randomBytes(SALT_BYTES);
     const iv = randomBytes(IV_BYTES);
-    const cipher = createCipheriv("aes-256-gcm", keyFrom(this.encryptionKey, salt), iv);
+    const cipher = createCipheriv("aes-256-gcm", await keyFromAsync(this.encryptionKey, salt), iv);
     cipher.setAAD(Buffer.from(recordId));
     const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
     const tag = cipher.getAuthTag();

@@ -192,6 +192,8 @@ export const webLightOverrides = {
 
   primaryHover: "#344438",
   primaryDisabled: "#1E2A2226",
+  // Menus and popovers rise above the warm canvas instead of sharing its exact fill.
+  popover: "#FFFDF9",
 } as const satisfies Partial<WebColorTokens>;
 
 export const webDarkTokens: WebColorTokens = { ...darkTokens, ...webDarkOverrides };
