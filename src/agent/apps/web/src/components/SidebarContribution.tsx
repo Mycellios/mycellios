@@ -3,7 +3,7 @@ import "./contribution.css";
 import { ContributionSpinner } from "./ContributionSpinner";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@mycellios/ui-web";
-import { Pause, Play, RefreshCw, Sprout } from "lucide-react";
+import { LoaderCircle, Pause, Play, RefreshCw, Sprout } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
 import { desktopBridge } from "../lib/desktop";
