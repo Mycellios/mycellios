@@ -3,6 +3,8 @@ import {
   ACTIVE_RUN_STATUSES,
   AGENT_TASK_LIMIT_ERROR,
   AGENT_TASK_NOT_AVAILABLE_ERROR,
+  AGENT_TASK_OPEN_LIMIT,
+  AGENT_TASK_OPEN_LIMIT_ERROR,
   AGENT_TASK_UNFINISHED_LIMIT,
   agentTaskBriefPrompt,
   agentTaskMessageNonce,
@@ -26,6 +28,7 @@ import { Prisma, type PrismaClient } from "./client.js";
 import { appendEventInTransaction } from "./events.js";
 import { INTERRUPTED_TURN_RECOVERY_DELAYS_MS, INTERRUPTED_TURN_RECOVERY_NOTE, WORK_RECOVERY_MARKER } from "./event-waits.js";
 import { createThreadMessageInTransaction } from "./messages.js";
+import { currentMicoScriptQuestion } from "./mico-script-deliveries.js";
 import { recordThreadTurnOutcome, reopenSideThreadForSend } from "./thread-lifecycle.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -84,20 +87,49 @@ async function assertSourceOwnsLease(tx: Tx, source: AgentTaskSource) {
   if (!run) throw new AgentTaskError("source", "This turn no longer owns its work; nothing was changed.");
 }
 
-/** Conversations this Mico opened that are still working, waiting for the person or queued. */
-export async function countUnfinishedAgentTasks(
-  tx: Pick<Tx, "$queryRaw">,
+/**
+ * Conversations this Mico opened that are still working, queued or waiting for the person.
+ * `unfinished` leaves out those that only wait on an ordinary question (see
+ * AGENT_TASK_UNFINISHED_LIMIT); `waitingQuestions` counts those.
+ */
+export async function countAgentTaskSlots(
+  tx: Pick<Tx, "$queryRaw" | "message">,
   scope: Scope & { botId: string },
   exceptThreadId?: string,
-): Promise<number> {
-  const [row] = await tx.$queryRaw<Array<{ count: number }>>`
-    SELECT count(*)::int AS count FROM threads t
+): Promise<{ unfinished: number; waitingQuestions: number }> {
+  const rows = await tx.$queryRaw<Array<{ threadId: string; waitingRunId: string | null }>>`
+    SELECT t.id AS "threadId",
+      CASE WHEN EXISTS (SELECT 1 FROM runs r WHERE r."threadId" = t.id AND r.status IN (${ACTIVE}) AND r.status <> 'waiting_input')
+             OR EXISTS (SELECT 1 FROM tasks k WHERE k."threadId" = t.id AND k."delegationState" IN (${UNFINISHED_WORK}))
+        THEN NULL
+        ELSE (SELECT r.id FROM runs r WHERE r."threadId" = t.id AND r.status = 'waiting_input' ORDER BY r."createdAt" DESC LIMIT 1)
+      END AS "waitingRunId"
+    FROM threads t
     WHERE t."taskBotId" = ${scope.botId} AND t."spaceId" = ${scope.spaceId} AND t."userId" = ${scope.userId}
       AND t."startedBy" = 'agent' AND t."deleteAfter" IS NULL
       ${exceptThreadId ? Prisma.sql`AND t.id <> ${exceptThreadId}` : Prisma.empty}
       AND (EXISTS (SELECT 1 FROM runs r WHERE r."threadId" = t.id AND r.status IN (${ACTIVE}))
         OR EXISTS (SELECT 1 FROM tasks k WHERE k."threadId" = t.id AND k."delegationState" IN (${UNFINISHED_WORK})))`;
-  return row?.count ?? 0;
+  let waitingQuestions = 0;
+  for (const row of rows)
+    if (row.waitingRunId && (await currentMicoScriptQuestion(tx, row.threadId, row.waitingRunId))) waitingQuestions++;
+  return { unfinished: rows.length - waitingQuestions, waitingQuestions };
+}
+
+/** Unfinished conversations that hold a slot under AGENT_TASK_UNFINISHED_LIMIT. */
+export async function countUnfinishedAgentTasks(
+  tx: Pick<Tx, "$queryRaw" | "message">,
+  scope: Scope & { botId: string },
+  exceptThreadId?: string,
+): Promise<number> {
+  return (await countAgentTaskSlots(tx, scope, exceptThreadId)).unfinished;
+}
+
+/** Refuses one more working task when either limit is reached. */
+async function assertAgentTaskSlot(tx: Tx, scope: Scope & { botId: string }, exceptThreadId?: string) {
+  const { unfinished, waitingQuestions } = await countAgentTaskSlots(tx, scope, exceptThreadId);
+  if (unfinished >= AGENT_TASK_UNFINISHED_LIMIT) throw new AgentTaskError("limit", AGENT_TASK_LIMIT_ERROR);
+  if (unfinished + waitingQuestions >= AGENT_TASK_OPEN_LIMIT) throw new AgentTaskError("limit", AGENT_TASK_OPEN_LIMIT_ERROR);
 }
 
 /** The other unfinished tasks a report names, newest first. */
@@ -147,8 +179,7 @@ export async function startAgentTask(
         select: { id: true },
       });
       if (!bot) throw new AgentTaskError("source", "This Mico is no longer available.");
-      if ((await countUnfinishedAgentTasks(tx, source)) >= AGENT_TASK_UNFINISHED_LIMIT)
-        throw new AgentTaskError("limit", AGENT_TASK_LIMIT_ERROR);
+      await assertAgentTaskSlot(tx, source);
       const thread = await tx.thread.create({
         data: {
           spaceId: source.spaceId,
@@ -297,8 +328,7 @@ export async function messageAgentTask(
         where: { threadId: thread.id, status: { in: [...ACTIVE_RUN_STATUSES] } },
         select: { id: true },
       });
-      if (!active && (await countUnfinishedAgentTasks(tx, source, thread.id)) >= AGENT_TASK_UNFINISHED_LIMIT)
-        throw new AgentTaskError("limit", AGENT_TASK_LIMIT_ERROR);
+      if (!active) await assertAgentTaskSlot(tx, source, thread.id);
       await reopenSideThreadForSend(tx, source, thread.id);
       const blocks: MessageBlock[] = [
         { kind: "task_brief", fromBotId: source.botId, fromBotName: input.botName, text: input.text },

@@ -195,6 +195,21 @@ try {
     (error: unknown) => error instanceof AgentTaskError && error.code === "limit");
   checks.push("message_task refuses to wake an idle task while eight are unfinished");
 
+  // 7b. A task that only waits on an ordinary question frees its slot; an approval card does not.
+  const asking = await prisma.run.findFirstOrThrow({ where: { thread: { taskBotId: mico.id, startedBy: "agent" }, status: "queued" }, orderBy: { createdAt: "desc" } });
+  await prisma.run.update({ where: { id: asking.id }, data: { status: "waiting_input" } });
+  const askingThread = await prisma.thread.findUniqueOrThrow({ where: { id: asking.threadId } });
+  const askMessage = await prisma.message.create({ data: { threadId: asking.threadId, runId: asking.id, seq: askingThread.nextMessageSeq, role: "bot",
+    blocks: [{ kind: "ask", text: "Which photo for the cover?" }] } });
+  await prisma.thread.update({ where: { id: asking.threadId }, data: { nextMessageSeq: askingThread.nextMessageSeq + 1 } });
+  assert.equal(await countUnfinishedAgentTasks(prisma, { ...scope, botId: mico.id }), AGENT_TASK_UNFINISHED_LIMIT - 1);
+  await prisma.message.update({ where: { id: askMessage.id }, data: { blocks: [{ kind: "ask", text: "Send the email?", approvalEffectId: "effect-1",
+    actions: [{ id: "allow", label: "Allow" }, { id: "deny", label: "Deny" }] }] } });
+  assert.equal(await countUnfinishedAgentTasks(prisma, { ...scope, botId: mico.id }), AGENT_TASK_UNFINISHED_LIMIT);
+  await prisma.message.delete({ where: { id: askMessage.id } });
+  await prisma.run.update({ where: { id: asking.id }, data: { status: "queued" } });
+  checks.push("a task waiting only on an ordinary question holds no slot; one waiting on an approval still does");
+
   // 8. close_task's stop half: queue dropped, runs cancelled with a durable teardown receipt, no report.
   await messageAgentTask(prisma, source, { key: "msg-h", taskId: taskH, text: "queued", botName: "Mico" });
   const closed = await stopAgentTaskRuns(prisma, { ...scope, botId: mico.id }, taskH);
