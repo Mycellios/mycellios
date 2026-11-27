@@ -571,3 +571,87 @@ it("reads an unresolved Mico as an online PC, and an older API as before", async
     expect(await select(context())).toEqual({ available: false, preferred: true });
   } finally { fetch.mockRestore(); }
 });
+
+describe("agent channel", () => {
+  const lines = async (reader: ReadableStreamDefaultReader<Uint8Array>, count: number) => {
+    const out: Array<Record<string, unknown>> = [];
+    let text = "";
+    while (out.length < count) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += new TextDecoder().decode(value);
+      let end: number;
+      while ((end = text.indexOf("\n")) >= 0) {
+        const line = JSON.parse(text.slice(0, end)) as Record<string, unknown>;
+        text = text.slice(end + 1);
+        if (line.keepalive !== 1) out.push(line);
+      }
+    }
+    return out;
+  };
+  const agentPc = () => {
+    broker = new DesktopRelayBroker();
+    broker.register(owner, { ...binding, agentExecution: 1 });
+    broker.connectAccountBot(owner, "bot");
+    const run = broker.dispatch({ method: "agentRun", botId: "bot", runId: "run", sessionId: crypto.randomUUID(), request: {} }, context());
+    expect(broker.poll(owner, "device").operations).toHaveLength(1);
+    return run;
+  };
+  const message = () => broker.dispatch({ method: "agentMessage", botId: "bot", runId: "run", sessionId: crypto.randomUUID(), message: { kind: "result" } }, context());
+
+  it("delivers agent messages on the channel, never through a poll, and acknowledges them by result", async () => {
+    const run = agentPc();
+    const reader = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
+    const callback = message();
+    const [delivered] = await lines(reader, 1);
+    expect(delivered).toMatchObject({ binding: { deviceId: "device", botId: "bot", generation: "generation" }, request: { method: "agentMessage" } });
+    const polled = broker.poll(owner, "device");
+    expect(polled.operations).toEqual([]);
+    expect(polled.active).not.toContain(delivered!.id);
+    broker.result(owner, "device", delivered!.id as string, 0, Buffer.from('{"ok":true}\n').toString("base64"), true);
+    expect(await callback.text()).toBe('{"ok":true}\n');
+    await reader.cancel(); void run.body?.cancel();
+  });
+
+  it("delivers again on the next channel what the PC did not acknowledge", async () => {
+    const run = agentPc();
+    const first = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
+    const callback = message();
+    const [delivered] = await lines(first, 1);
+    await first.cancel();
+    const second = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
+    const [again] = await lines(second, 1);
+    expect(again!.id).toBe(delivered!.id);
+    broker.result(owner, "device", delivered!.id as string, 0, Buffer.from('{"ok":true}\n').toString("base64"), true);
+    expect(await callback.text()).toBe('{"ok":true}\n');
+    await second.cancel(); void run.body?.cancel();
+  });
+
+  it("does not count channel messages against the shared poll limit", async () => {
+    const run = agentPc();
+    const reader = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
+    const callbacks = [message(), message(), message(), message()];
+    const delivered = await lines(reader, 4);
+    expect(delivered).toHaveLength(4);
+    for (const line of delivered) broker.result(owner, "device", line.id as string, 0, "", true);
+    await Promise.all(callbacks.map(response => response.text()));
+    await reader.cancel(); void run.body?.cancel();
+  });
+
+  it("refuses a channel for a PC that is not connected and closes it on revoke", async () => {
+    broker = new DesktopRelayBroker();
+    expect(() => broker.attachChannel(owner, "device", new AbortController().signal)).toThrow("Desktop device is not connected");
+    broker.register(owner, { ...binding, agentExecution: 1 });
+    const reader = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
+    expect((await reader.read()).value).toBeDefined(); // the opening keepalive
+    broker.revoke(owner, "device");
+    expect((await reader.read()).done).toBe(true);
+  });
+
+  it("leaves messages to the poll when the PC has no channel", async () => {
+    const run = agentPc();
+    const callback = message();
+    expect(broker.poll(owner, "device").operations.map(op => (op.request as { method: string }).method)).toEqual(["agentMessage"]);
+    broker.close(); await callback.text(); void run.body?.cancel();
+  });
+});

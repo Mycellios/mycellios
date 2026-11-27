@@ -1,6 +1,6 @@
 # Desktop agent channel
 
-Status: phase 1 merged; phase 2 in progress. Owner decision: start with the persistent channel (2026-11-27).
+Status: phases 1 and 2 merged; phase 3 in progress.
 
 ## Problem
 
@@ -92,6 +92,31 @@ redelivery on reconnect, by sequence, never re-executing a call. Authentication 
 the stream opens and is rechecked periodically, as `threads.subscribe` does, instead of twice
 per message. The per-message long-poll re-arm disappears for agent traffic. Control operations
 stop counting against the global cap of 8.
+
+As built:
+- **Negotiation.** The API answers `account` and `poll` with `agentChannel: 1`. A Desktop with
+  agent execution then keeps `POST /api/desktop-relay/channel` open. Older Desktops never open
+  it, and a Desktop polling an older API never sees the offer.
+- **Delivery.** The broker writes each `agentMessage` for that PC session to the channel as one
+  NDJSON line, in the same shape as a poll operation, the moment it is dispatched. It never
+  hands that message to a poll, wakes the held poll for it, or lists it in a poll's `active`.
+- **Acknowledgement.** The result POST acknowledges and closes the operation, unchanged
+  (sequence and digest deduplication included), and does not re-arm the poll.
+- **Caps.** Channel messages do not count against the global cap of 8 open control operations.
+  The per-Mico cap of 4 and the shared byte bound still apply.
+- **Redelivery.** A new channel replaces the previous one and first rewrites every channel
+  operation that is still open. The PC skips any it is running or has settled
+  (`startOperation`), so nothing runs twice. An operation nobody acknowledges ends at its
+  deadline, as before.
+- **Liveness.** The channel opens with a keepalive line and sends another every 15 s. It closes
+  itself after 4 minutes, and the PC opens the next one. The PC drops a channel that has been
+  silent for 45 s.
+- **Authorization.** Opening the channel authenticates the session and rechecks its bound
+  Micos. Every 60 s the API checks the session again (a changed session revokes the PC) and
+  rechecks the Micos. Revoke, release and relay restart close the channel.
+
+The acknowledgement still uses one authenticated result POST per message; moving it onto the
+`agentRun` result stream remains for a later change.
 
 ### Phase 4: worker ↔ API stream
 

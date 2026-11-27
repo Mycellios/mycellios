@@ -33,7 +33,15 @@ type Operation = {
   method: HostComputerRequest["method"]; runId?: string;
   controller: ReadableStreamDefaultController<Uint8Array>; timer: ReturnType<typeof setTimeout>;
   seq: number; digest: string; closed: boolean; requestBytes: number; dispose(): void;
+  /** Delivered on the PC's agent channel instead of a poll; redelivered there until acknowledged. */
+  channel?: boolean;
 };
+/** How long one agent channel stays open before the PC opens the next one. */
+export const DESKTOP_CHANNEL_MS = 4 * 60_000;
+/** A line at least this often keeps proxies and the PC's idle watchdog from closing a quiet channel. */
+export const DESKTOP_CHANNEL_KEEPALIVE_MS = 15_000;
+const CHANNEL_BUFFER = 16 * 1024 * 1024;
+type Channel = { owner: DesktopExecutorOwner; deviceId: string; write(line: unknown): boolean; close(): void };
 const sameOwner = (a: DesktopExecutorOwner, b: DesktopExecutorOwner) =>
   a.userId === b.userId && a.spaceId === b.spaceId && a.sessionId === b.sessionId;
 const key = (scope: { userId: string; spaceId: string }, botId: string) => JSON.stringify([scope.userId, scope.spaceId, botId]);
@@ -62,6 +70,8 @@ export class DesktopRelayBroker {
   private sweep: ReturnType<typeof setInterval>;
   private waiting = new Map<string, Set<() => void>>();
   private polling = new Set<string>();
+  /** Open agent channels, one per signed-in PC session (see attachChannel). */
+  private channels = new Map<string, Channel>();
   private handoffUntil = 0;
   private pollKey(owner: DesktopExecutorOwner, deviceId: string) { return JSON.stringify([owner.userId, owner.spaceId, owner.sessionId, deviceId]); }
   private wake(owner: DesktopExecutorOwner, deviceId: string) { for (const finish of this.waiting.get(this.pollKey(owner, deviceId)) ?? []) finish(); }
@@ -195,6 +205,7 @@ export class DesktopRelayBroker {
     const accountKey=this.accountKey(owner, deviceId);
     const account=this.accounts.get(accountKey);
     if(account && sameOwner(account,owner))this.accounts.delete(accountKey);
+    this.closeChannel(owner, deviceId);
     for (const [id, binding] of this.bindings) if (sameOwner(owner, binding) && binding.deviceId === deviceId) {
       this.bindings.delete(id);
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Local computer access was revoked.");
@@ -209,6 +220,7 @@ export class DesktopRelayBroker {
     const accountKey = this.accountKey(owner, deviceId);
     const account = this.accounts.get(accountKey);
     if (account && sameOwner(account, owner)) this.accounts.delete(accountKey);
+    this.closeChannel(owner, deviceId);
     for (const [id, binding] of this.bindings) if (sameOwner(owner, binding) && binding.deviceId === deviceId) {
       this.bindings.delete(id);
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Desktop disconnected. Check results before retrying.");
@@ -229,14 +241,15 @@ export class DesktopRelayBroker {
   private pollState(owner: DesktopExecutorOwner, deviceId: string, claim: boolean, verifiedBots?: ReadonlySet<string>): DesktopExecutorPoll {
     this.expire();
     for (const binding of this.bindings.values()) if (sameOwner(owner, binding) && binding.deviceId === deviceId) binding.seen = this.now();
-    const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed);
+    // Channel operations travel on the agent channel and are acknowledged there, never through a poll.
+    const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed && !op.channel);
     const lane = (op: Operation) => op.request.method === "agentMessage" ? "control" : op.request.method === "agentRun" ? "agent" : "computer";
     const limits = { control: 8, agent: 4, computer: MAX_OPERATIONS };
     // A callback reply stays claimed until the PC acknowledges it, so two per Mico made a
     // third reply wait a whole round trip. Control matches its dispatch bound per Mico.
     const perMico = { control: 4, agent: 2, computer: 2 };
     const claimed = { control: 0, agent: 0, computer: 0 };
-    for (const op of this.operations.values()) if (op.claimed && !op.closed) claimed[lane(op)]++;
+    for (const op of this.operations.values()) if (op.claimed && !op.closed && !op.channel) claimed[lane(op)]++;
     const pending: Operation[] = [];
     const perBinding = new Map<Binding, Record<ReturnType<typeof lane>, number>>();
     for (const op of current) {
@@ -284,6 +297,78 @@ export class DesktopRelayBroker {
     } finally { this.polling.delete(id); }
   }
   /**
+   * Opens this PC's agent channel (specs/desktop-agent-channel/spec.md phase 3): one streamed
+   * response that carries every message for its agent runs as it is dispatched, instead of a
+   * held poll answering, then being re-armed, once per message. The PC acknowledges each one
+   * with its result, as before. A newer channel replaces an older one; operations it delivered
+   * that the PC has not acknowledged are delivered again on the next channel, by operation id,
+   * and the PC never runs one twice. The caller authenticates the PC when it opens the channel
+   * and again while it stays open.
+   */
+  attachChannel(owner: DesktopExecutorOwner, deviceId: string, signal: AbortSignal): ReadableStream<Uint8Array> {
+    this.expire();
+    const account = this.accounts.get(this.accountKey(owner, deviceId));
+    if (!(account && sameOwner(owner, account)) && !this.ownedBindings(owner, deviceId).length) throw Error("Desktop device is not connected");
+    const id = this.pollKey(owner, deviceId);
+    if (!this.channels.has(id) && this.channels.size >= 128) throw Error("Desktop relay is busy");
+    this.channels.get(id)?.close();
+    const encoder = new TextEncoder();
+    let channel!: Channel;
+    let keepalive: ReturnType<typeof setInterval> | undefined;
+    let lifetime: ReturnType<typeof setTimeout> | undefined;
+    const end = () => {
+      clearInterval(keepalive); clearTimeout(lifetime); signal.removeEventListener("abort", channel.close);
+      if (this.channels.get(id) === channel) this.channels.delete(id);
+    };
+    return new ReadableStream<Uint8Array>({
+      start: controller => {
+        let open = true;
+        channel = {
+          owner, deviceId,
+          write: line => {
+            if (!open) return false;
+            const bytes = encoder.encode(JSON.stringify(line) + "\n");
+            // A PC that stops reading loses this channel; its messages wait for the next one.
+            if ((controller.desiredSize ?? 0) < bytes.byteLength) { channel.close(); return false; }
+            controller.enqueue(bytes);
+            return true;
+          },
+          close: () => {
+            if (!open) return;
+            open = false; end();
+            try { controller.close(); } catch { /* the PC already went away */ }
+          },
+        };
+        this.channels.set(id, channel);
+        keepalive = setInterval(() => channel.write({ keepalive: 1 }), DESKTOP_CHANNEL_KEEPALIVE_MS); keepalive.unref();
+        lifetime = setTimeout(() => channel.close(), DESKTOP_CHANNEL_MS); lifetime.unref();
+        signal.addEventListener("abort", channel.close, { once: true });
+        if (signal.aborted) { channel.close(); return; }
+        channel.write({ keepalive: 1 });
+        // Delivered before, never acknowledged: the PC skips any it already started.
+        for (const op of this.operations.values())
+          if (op.channel && !op.closed && sameOwner(owner, op.binding) && op.binding.deviceId === deviceId) channel.write(this.channelLine(op));
+      },
+      cancel: () => channel.close(),
+    }, { highWaterMark: CHANNEL_BUFFER, size: chunk => chunk.byteLength });
+  }
+  private channelLine(op: Operation) {
+    return { id: op.id, binding: { deviceId: op.binding.deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request };
+  }
+  /** Hands a message to the PC's open agent channel; false leaves it for the poll. */
+  private sendOnChannel(op: Operation) {
+    const channel = this.channels.get(this.pollKey(op.binding, op.binding.deviceId));
+    if (!channel || !sameOwner(channel.owner, op.binding)) return false;
+    op.claimed = true; op.channel = true;
+    // A channel that closed meanwhile keeps the message for the next one.
+    channel.write(this.channelLine(op));
+    return true;
+  }
+  /** Ends this PC's agent channel (a signed-out or revoked session). */
+  closeChannel(owner: DesktopExecutorOwner, deviceId: string) {
+    this.channels.get(this.pollKey(owner, deviceId))?.close();
+  }
+  /**
    * A new API version takes over the PC connections (a deploy's handoff, see the API's
    * /internal/desktop-relay/handoff). Until it ends, nothing new reaches a PC through this
    * instance: new work hears "updating", so its turn pauses and continues once the PC has
@@ -308,6 +393,7 @@ export class DesktopRelayBroker {
       openOperations: open.length,
       deliveredOperations: open.filter(op => op.claimed).length,
       agentRuns: open.filter(op => op.method === "agentRun").length,
+      agentChannels: this.channels.size,
       connectedComputers: new Set([...this.accounts.values()].map(account =>
         JSON.stringify([account.userId, account.spaceId, account.deviceId]))).size,
     };
@@ -334,7 +420,10 @@ export class DesktopRelayBroker {
     const open = [...this.operations.values()].filter(op => !op.closed);
     const control = input.method === "agentMessage";
     const peers = open.filter(op => (op.request.method === "agentMessage") === control);
-    if (peers.length >= (control ? 8 : MAX_WAITING_OPERATIONS) || peers.filter(op => op.binding === binding).length >= (control ? 4 : MAX_BOT_OPERATIONS) || peers.reduce((bytes, op) => bytes + op.requestBytes, requestBytes) > (control ? 16 * 1024 * 1024 : MAX_REQUEST_BUFFER))
+    // Messages to a PC with an agent channel go straight to it, so they no longer wait for the
+    // shared poll slots: only that PC's own bound applies to them.
+    const viaChannel = control && this.channels.has(this.pollKey(binding, binding.deviceId));
+    if ((viaChannel ? false : peers.filter(op => !op.channel).length >= (control ? 8 : MAX_WAITING_OPERATIONS)) || peers.filter(op => op.binding === binding).length >= (control ? 4 : MAX_BOT_OPERATIONS) || peers.reduce((bytes, op) => bytes + op.requestBytes, requestBytes) > (control ? 16 * 1024 * 1024 : MAX_REQUEST_BUFFER))
       throw new DesktopRelayError("desktop_busy", "The PC request queue is full. Wait for current work to finish; this operation was not dispatched.", 429);
     if (input.runId) {
       const runKey = key(context, `${input.botId}:${input.runId}`);
@@ -359,7 +448,7 @@ export class DesktopRelayBroker {
         op = { id, binding, request: input, method: input.method, runId: input.runId, requestBytes, claimed: false, controller, timer, seq: -1, digest: "", closed: false,
           dispose: () => { clearTimeout(timer); context.signal.removeEventListener("abort", abort); } };
         this.operations.set(id, op);
-        this.wake(binding, binding.deviceId);
+        if (!(control && this.sendOnChannel(op))) this.wake(binding, binding.deviceId);
       },
       cancel: () => this.fail(op, "Desktop response disconnected. Check results before retrying."),
     }, { highWaterMark: MAX_STREAM_BUFFER, size: chunk => chunk.byteLength });
@@ -389,7 +478,8 @@ export class DesktopRelayBroker {
     op.binding.seen = this.now();
     if (done) {
       op.closed = true; op.dispose(); op.controller.close();
-      this.wake(op.binding, op.binding.deviceId);
+      // A held poll only needs waking for work it delivers; channel work never re-arms it.
+      if (!op.channel) this.wake(op.binding, op.binding.deviceId);
       // Keep only the final acknowledgement briefly; no command or output retention.
       op.request = { method: "isRunning", botId: op.binding.botId };
       const timer = setTimeout(() => this.operations.delete(id), 30_000); timer.unref();
@@ -423,6 +513,7 @@ export class DesktopRelayBroker {
     for (const callbacks of this.waiting.values()) for (const finish of callbacks) finish();
     this.waiting.clear();
     clearInterval(this.sweep);
+    for (const channel of [...this.channels.values()]) channel.close();
     for (const op of this.operations.values()) this.fail(op, "Desktop relay restarted. Check results before retrying.");
     this.operations.clear(); this.bindings.clear(); this.runs.clear(); this.accounts.clear();
   }
