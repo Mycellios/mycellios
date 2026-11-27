@@ -16,3 +16,6 @@
   brown pill.
 - When a This PC Mico's message is answered on the server because the PC is offline, the
   chat says so in the person's language, with a cloud mark and how to get the PC back.
+- Anthropic API-key connections can keep the prompt cache for 1 hour instead of 5 minutes
+  (Settings → Models → the connection → Advanced → Prompt cache). Replies after a pause up to an
+  hour start faster; writing the longer cache costs more, so 5 minutes stays the default.

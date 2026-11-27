@@ -3,7 +3,9 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { describe, expect, it, vi } from "vitest";
+import type { CacheCapabilities } from "@mycellios/contracts";
 import { requestedPiCacheWriteRetention, resolvePiCacheRetention } from "./pi-cache-retention.js";
+import { reliableModelStream } from "./pi-runtime.js";
 import { observedPiStream } from "./pi-usage.js";
 
 const model: Model<Api> = {
@@ -119,6 +121,82 @@ async function outgoing(
   expect((await stream.result()).stopReason).not.toBe("error");
   return payload;
 }
+
+/** The runtime's own seam: a connection's saved mode through reliableModelStream and the usage guard. */
+async function connectionRequest(cacheCapabilities: CacheCapabilities | undefined) {
+  const configured = { ...model, api: "anthropic-messages" as const };
+  const api = anthropicMessagesApi();
+  const models = { streamSimple: api.streamSimple } as unknown as Parameters<
+    typeof observedPiStream
+  >[0];
+  const context = {
+    systemPrompt: "Stable guidance",
+    messages: [{ role: "user", content: "Hello", timestamp: 0 }],
+  } as unknown as Parameters<typeof observedPiStream>[2];
+  let body = "";
+  const stream = reliableModelStream(
+    models,
+    configured,
+    context,
+    {
+      apiKey: "fake-fixture-key",
+      sessionId: "fixture-session",
+      fetch: async (_input, init) => {
+        body = String(init?.body);
+        const events = [
+          {
+            type: "message_start",
+            message: {
+              id: "fixture",
+              type: "message",
+              role: "assistant",
+              model: "fixture",
+              content: [],
+              stop_reason: null,
+              usage: { input_tokens: 1, output_tokens: 0 },
+            },
+          },
+          { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 0 } },
+          { type: "message_stop" },
+        ];
+        return new Response(
+          events.map((event) => `event: ${event.type}
+data: ${JSON.stringify(event)}
+
+`).join(""),
+          { headers: { "content-type": "text/event-stream" } },
+        );
+      },
+    },
+    undefined,
+    undefined,
+    (prepared) => observedPiStream(models, configured, context, prepared, () => {}),
+    cacheCapabilities?.retentionMode,
+  );
+  for await (const _event of stream) {
+  }
+  expect((await stream.result()).stopReason).not.toBe("error");
+  return body;
+}
+
+describe("connection prompt cache choice", () => {
+  it("requests the one-hour Anthropic cache when the connection chose one hour", async () => {
+    const body = await connectionRequest({
+      scope: "connection",
+      retentionMode: "long",
+      retentionMs: 3_600_000,
+    });
+    expect(body).toContain('"cache_control":{"type":"ephemeral","ttl":"1h"}');
+  });
+  it.each([
+    ["chose five minutes", { scope: "connection", retentionMode: "short", retentionMs: 300_000 }],
+    ["never chose", undefined],
+  ] as const)("keeps the five-minute marker when the connection %s", async (_name, capabilities) => {
+    const body = await connectionRequest(capabilities);
+    expect(body).toContain('"cache_control":{"type":"ephemeral"}');
+    expect(body).not.toContain('"ttl":"1h"');
+  });
+});
 
 describe("installed Pi cache protocol controls", () => {
   it.each(["none", "long"] as const)(

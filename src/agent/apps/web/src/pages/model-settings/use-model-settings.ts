@@ -48,6 +48,12 @@ import { fetchFresh, useSpaceQueries } from "../../lib/query";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import { useModelOAuthSignIn } from "../../lib/use-model-oauth-signin";
 import { errorText } from "../../lib/user-error";
+import {
+  type PromptCacheRetention,
+  promptCacheCapabilities,
+  promptCacheConfigurable,
+  savedPromptCacheRetention,
+} from "./prompt-cache";
 
 const NO_CATALOG: ModelCatalogEntry[] = [];
 const NO_CREDENTIALS: never[] = [];
@@ -113,6 +119,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
   const [reasoning, setReasoning] = useState(false);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
   const [maxTokens, setMaxTokens] = useState("");
+  const [promptCache, setPromptCache] = useState<PromptCacheRetention>("short");
   const [contextWindow, setContextWindow] = useState(String(DEFAULT_MODEL_CONTEXT_WINDOW));
   const [supportsImages, setSupportsImages] = useState(false);
   const [maxImagesPerPrompt, setMaxImagesPerPrompt] = useState("");
@@ -252,6 +259,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
         );
       }
       setMaxTokens(connectionMaxTokensField(nextCredential?.maxTokens));
+      setPromptCache(savedPromptCacheRetention(nextCredential));
       setAccountId(nextCredential?.accountId ?? "");
       setGatewayId(nextCredential?.gatewayId ?? "");
     }
@@ -379,11 +387,16 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
     probeModels,
   );
   const defaultModelOptions = [...new Set([...enabledModelIds, modelId])];
-  // Saved-connection settings edited without a new key (output limit, gateway ids).
+  const promptCacheEditable = !isOpenAiCompatible && promptCacheConfigurable(provider, credential);
+  // Only a changed choice is sent, so a connection that never chose keeps no cache window.
+  const promptCacheDirty =
+    promptCacheEditable && promptCache !== savedPromptCacheRetention(credential);
+  // Saved-connection settings edited without a new key (output limit, gateway ids, cache).
   const settingsDirty =
     !isOpenAiCompatible &&
     Boolean(credential) &&
     (maxTokens.trim() !== connectionMaxTokensField(credential?.maxTokens) ||
+      promptCacheDirty ||
       (isCloudflare &&
         (accountId.trim() !== (credential?.accountId ?? "") ||
           gatewayId.trim() !== (credential?.gatewayId ?? ""))));
@@ -465,6 +478,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
       ) as ThinkingLevel | null,
     );
     setMaxTokens(connectionMaxTokensField(nextCredential?.maxTokens));
+    setPromptCache(savedPromptCacheRetention(nextCredential));
     setContextWindow(String(nextCredential?.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW));
     setSupportsImages(nextCredential?.supportsImages ?? false);
     setMaxImagesPerPrompt(String(nextCredential?.maxImagesPerPrompt ?? ""));
@@ -694,6 +708,14 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
                 : {}),
               ...(intent ? { makeDefault: intent.makeDefault, scope } : me?.needsModel ? { makeDefault: true, scope } : {}),
               maxTokens: parsedMaxTokens ?? null,
+              ...(promptCacheDirty
+                ? {
+                    cacheCapabilities: promptCacheCapabilities(
+                      promptCache,
+                      credential?.cacheCapabilities,
+                    ),
+                  }
+                : {}),
               label: selected.providerName ?? selected.provider,
               credentialId: credential?.id ?? null,
             },
@@ -834,6 +856,8 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
     probeModels,
     probeServerModels,
     probing,
+    promptCache,
+    promptCacheEditable,
     provider,
     reasoning,
     selected,
@@ -851,6 +875,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
     setModelId,
     setNotice,
     setPasteCode,
+    setPromptCache,
     setReasoning,
     setSupportsImages,
     setThinkingLevel,

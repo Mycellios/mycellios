@@ -213,6 +213,52 @@ describe("built-in provider output limits", () => {
     ).toBe("oauth");
   });
 
+  it("stores a chosen prompt cache window and keeps it through later saves", () => {
+    const longCache = { scope: "connection" as const, retentionMode: "long" as const, retentionMs: 3_600_000 };
+    // The settings form sends exactly this shape; the route schema must accept it.
+    expect(
+      ModelConnectInputSchema.safeParse({
+        provider: "anthropic",
+        credentialId: null,
+        maxTokens: 8192,
+        cacheCapabilities: longCache,
+      }).success,
+    ).toBe(true);
+    const keyed = connectAsOwner({ provider: "anthropic", apiKey: "sk-test-key", maxTokens: 8192 });
+    const chosen = connectAsOwner({ provider: "anthropic", cacheCapabilities: longCache }, keyed);
+    expect(parseModelSecret(chosen)).toEqual({
+      kind: "api_key",
+      key: "sk-test-key",
+      maxTokens: 8192,
+      cacheCapabilities: longCache,
+    });
+    expect(modelCredentialDto(row, chosen)).toMatchObject({ cacheCapabilities: longCache, maxTokens: 8192 });
+    // A save without the field (output limit, replacement key) inherits the choice.
+    const limitOnly = connectAsOwner({ provider: "anthropic", maxTokens: 4096 }, chosen);
+    expect(parseModelSecret(limitOnly)).toMatchObject({ key: "sk-test-key", maxTokens: 4096, cacheCapabilities: longCache });
+    const rotated = connectAsOwner({ provider: "anthropic", apiKey: "sk-rotated-key" }, limitOnly);
+    expect(parseModelSecret(rotated)).toMatchObject({ key: "sk-rotated-key", cacheCapabilities: longCache });
+    // Choosing five minutes again replaces the stored window.
+    const shortCache = { scope: "connection" as const, retentionMode: "short" as const, retentionMs: 300_000 };
+    expect(
+      parseModelSecret(connectAsOwner({ provider: "anthropic", cacheCapabilities: shortCache }, rotated)),
+    ).toMatchObject({ cacheCapabilities: shortCache });
+  });
+
+  it("never stores a prompt cache window for a subscription sign-in", () => {
+    const credential = { type: "oauth" as const, access: "access", refresh: "refresh", expires: 10 };
+    const previous = serializeModelSecret({ kind: "oauth", credential });
+    const saved = connectAsOwner(
+      {
+        provider: "anthropic",
+        cacheCapabilities: { scope: "connection", retentionMode: "long", retentionMs: 3_600_000 },
+      },
+      previous,
+    );
+    expect(parseModelSecret(saved)).toEqual({ kind: "oauth", credential });
+    expect(modelCredentialDto(row, saved)).not.toHaveProperty("cacheCapabilities");
+  });
+
   it("rejects a limit update when no credential exists", () => {
     expect(() => connectAsOwner({ provider: "anthropic", maxTokens: 8192 })).toThrow(/API key/);
   });
