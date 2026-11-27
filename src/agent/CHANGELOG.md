@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-27
+
+### Added
+
+- The model picker lists OpenCode's models: every model of the providers you signed in to in
+  OpenCode on that computer (for example Gemini with a Google API key), and choosing one
+  changes only that Mico's model, without editing your OpenCode configuration. The model set in
+  OpenCode stays the default.
+
+### Changed
+
+- While a Mico is thinking, its row shows only the text, without the three dots over its avatar, and in Spanish it now reads "Pensando…".
+
+### Fixed
+
+- A Mico on This PC starts answering sooner: each turn no longer waits in line for the PC's details, and the PC no longer checks Codex, Claude Code and OpenCode before every turn.
+- Micos start answering sooner: each turn reads what it needs at the same time instead of one thing after another, and connected tool servers are not asked for their tool list on every turn.
+
 ## [0.39.0] - 2026-11-27
 
 ### Added
