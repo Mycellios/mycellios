@@ -92,7 +92,7 @@ it("verifies the existing installation before offering a separate start action",
     expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.enroll).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
+    expect(host.querySelector('[aria-label="Earn credits"]')?.textContent).toBe("Earn creditsShare computing power with the network");
     f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
@@ -106,7 +106,7 @@ it("keeps verification read-only when another process has already repaired the i
     await act(async () => host.querySelector("button")!.click());
     expect(f.identify).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
+    expect(host.querySelector('[aria-label="Earn credits"]')?.textContent).toBe("Earn creditsShare computing power with the network");
   });
 });
 
@@ -143,7 +143,7 @@ it("refreshes a rejected command instead of replaying its effect", async () => {
     expect(host.querySelector("button")!.textContent).toContain("Retry");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
+    expect(host.querySelector('[aria-label="Earn credits"]')?.textContent).toBe("Earn creditsShare computing power with the network");
   });
 });
 it("still pauses a running contributor after a rejected command", async () => {
@@ -225,7 +225,7 @@ it("never resumes a node when the user requested pause and it is already paused"
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
+    expect(host.querySelector('[aria-label="Earn credits"]')?.textContent).toBe("Earn creditsShare computing power with the network");
   });
 });
 

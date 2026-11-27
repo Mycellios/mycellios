@@ -4377,7 +4377,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           type: "run.started",
           runId,
-          payload: { trigger: run.trigger, routineId: run.routineId },
+          // The lease lets an open chat confirm the worker at once instead of waiting for
+          // its next snapshot read.
+          payload: { trigger: run.trigger, routineId: run.routineId, leaseExpiresAt: current.leaseExpiresAt?.toISOString() ?? null },
         });
 
         // A member's turn reaches none of the owner's connected accounts or tool servers.

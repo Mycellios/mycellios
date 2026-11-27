@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { Run, TaskCost, ThreadMessage, ThreadSnapshot } from "@mycellios/contracts";
 import { lastRunOutput, runHealth } from "@mycellios/core/run-health";
 import { observedTools, type ToolObservation } from "@mycellios/core";
-import { Button, GroupAvatar } from "@mycellios/ui-web";
+import { Button } from "@mycellios/ui-web";
 import type { GroupAvatarMember } from "@mycellios/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@mycellios/ui-web/components/ui/sheet";
 import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
@@ -11,6 +11,7 @@ import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-acti
 import { liveThreadDisconnected, subscribeLiveThreadConnection } from "../lib/live-thread-connection";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { RunExecutionDetails } from "./RunExecutionDetails";
+import { ActivityShine, ThinkingAvatar } from "./ThinkingActivity";
 import { useCommandActivity } from "../lib/use-command-activity";
 
 type ActivityStep = {
@@ -100,17 +101,20 @@ export function PendingRunActivity({ messages, bots, onRefresh }: {
   const live = messages.findLast(message => message.id.startsWith("progress:"));
   const steps = summarizeSteps(live?.blocks.flatMap(block => block.kind === "steps" ? block.steps : []) ?? [], presentActivityLabel);
   return <div className="flex min-w-0 items-start gap-2.5 px-1 py-2">
-    <GroupAvatar members={bots} size={24} />
-    <div className="min-w-0 max-w-prose text-sm text-muted-foreground">
+    <ThinkingAvatar members={bots} size={24} />
+    <div className="min-w-0 max-w-prose text-xs text-muted-foreground">
       {steps.length ? <details>
-        <summary className="w-fit cursor-pointer rounded-sm py-1">{t`Receiving activity · task status not confirmed`}</summary>
+        <summary className="w-fit cursor-pointer rounded-sm py-1"><ActivityShine text={t`Thinking it through…`} /></summary>
         <ol aria-label={t`Task activity`} className="space-y-1 py-1 text-xs">
           {steps.map((step, index) => <li key={index}>{step.label}{step.count > 1 ? ` ×${step.count}` : ""}</li>)}
         </ol>
-      </details> : <span role="status">{t`Receiving activity · task status not confirmed`}</span>}
+      </details> : <span role="status" className="inline-block py-1"><ActivityShine text={t`Thinking it through…`} /></span>}
     </div>
   </div>;
 }
+
+/** How long a new turn may take to start before its queued or waiting state is shown. */
+const START_GRACE_MS = 10_000;
 
 /** This observer only reads state. It never stops, retries or restarts a run. */
 export function RunActivityStatus({
@@ -210,9 +214,11 @@ export function RunActivityStatus({
     blocked: t`Cannot start: virtual computer unavailable`,
     starting: t`Waiting to start`,
     recovering: t`Checking connection…`,
-    running: t`Working…`,
+    running: t`Thinking it through…`,
     quiet: t`Working…`,
-    unknown: t`Status not confirmed`,
+    // As in the reference app, a turn that runs shows its activity; a missing lease is not a problem
+    // to report. A lease that expired (recovering) or stopped live updates still say so.
+    unknown: t`Thinking it through…`,
   };
   const duration = (ms: number) => {
     const minutes = Math.max(0, Math.floor(ms / 60_000));
@@ -256,21 +262,28 @@ export function RunActivityStatus({
     : /read|file|list|inspect/.test(activityKind) ? t`Reading files…`
     : /shell|exec|command|running:/.test(activityKind) ? t`Running a command…`
     : "";
-  const primaryLabel = liveUpdatesStopped
+  // A turn's first seconds are its start, not a queue: like the reference app, say the Mico is
+  // thinking instead of naming each internal step. A start that takes longer shows its real state.
+  const startingGrace = (health.state === "queued" || health.state === "starting") &&
+    !(Date.parse(run.wakeAt ?? "") > serverNow) && health.elapsedMs < START_GRACE_MS;
+  const working = health.state === "running" || health.state === "unknown";
+  const primaryLabel = startingGrace ? t`Thinking it through…` : liveUpdatesStopped
     ? t`Live updates stopped. The task was not cancelled.`
-    : backgroundWait && (health.state === "running" || health.state === "quiet") ? t`Waiting for background work…`
+    : backgroundWait && (working || health.state === "quiet") ? t`Waiting for background work…`
     : health.state === "quiet" ? t`Waiting for an activity update…`
-    : health.state === "running" && thinking ? t`Thinking…`
-    : health.state === "running" && specificNow ? specificNow
-    : health.state === "running" && settledTool?.outcome === "paused" ? t`A tool is waiting for input`
+    : working && thinking ? t`Thinking it through…`
+    : working && specificNow ? specificNow
+    : working && settledTool?.outcome === "paused" ? t`A tool is waiting for input`
     : labels[health.state];
+  // While the Mico works, its line moves as in the reference app; waits and problems stay still.
+  const animated = !liveUpdatesStopped && (startingGrace || working);
   const status = liveUpdatesStopped
     ? <span role="alert" className="break-words text-destructive">{primaryLabel}</span>
-    : <span role="status" className="break-words text-muted-foreground">{primaryLabel}</span>;
+    : <span role="status" className="break-words text-muted-foreground">{animated ? <ActivityShine text={primaryLabel} /> : primaryLabel}</span>;
   const backgroundElapsed = backgroundWait && Number.isFinite(backgroundSince) ? Math.max(0, serverNow - backgroundSince) : null;
   const elapsed = backgroundElapsed !== null
     ? <span aria-live="off" className="shrink-0 text-xs tabular-nums" data-testid="background-wait-elapsed">{duration(backgroundElapsed)}</span>
-    : health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{duration(health.elapsedMs)}</span> : null;
+    : health.elapsedMs >= 5000 && !startingGrace ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{duration(health.elapsedMs)}</span> : null;
   const hasDetails = Boolean(visibleSteps.length || showActivity);
   const hasExecutionDetails = Boolean(run.modelId || run.modelProvider || (cost?.runId === run.id));
   const legacyCommand = showActivity && !toolEvents.length && /^running:/i.test(latestActivity)
@@ -303,7 +316,7 @@ export function RunActivityStatus({
     return <div className="min-w-0 px-1 py-1" data-testid="run-activity-status">
       {hasDetails ? <Sheet key={run.id}>
         <SheetTrigger className="flex min-h-12 w-full min-w-0 items-center gap-2 rounded-md px-1 text-start text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={t`Show task activity`}>
-          <GroupAvatar members={bots} size={28} />
+          <ThinkingAvatar members={bots} size={28} active={animated} />
           <span className="min-w-0 flex-1 line-clamp-2">{status}{backgroundElapsed !== null ? <> {elapsed}</> : null}</span>
           <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-muted-foreground rtl:rotate-180" />
         </SheetTrigger>
@@ -315,13 +328,13 @@ export function RunActivityStatus({
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm">{primaryLabel}{elapsed}</div>
           {details}
         </SheetContent>
-      </Sheet> : <div className="flex min-h-12 items-center gap-2 px-1 text-sm"><GroupAvatar members={bots} size={28} />{status}</div>}
+      </Sheet> : <div className="flex min-h-12 items-center gap-2 px-1 text-sm"><ThinkingAvatar members={bots} size={28} active={animated} />{status}</div>}
       {computerAction}
     </div>;
   }
   return (
     <div className="flex min-w-0 items-start gap-2.5 px-1 py-2" data-testid="run-activity-status">
-      <GroupAvatar members={bots} size={24} />
+      <ThinkingAvatar members={bots} size={24} active={animated} />
       <div className="min-w-0 max-w-full space-y-1 text-xs text-muted-foreground">
         {hasDetails ? <details key={run.id} open={disclosure?.runId === run.id && disclosure.expanded === expanded ? disclosure.open : expanded} className="group/activity" onToggle={(event) => {
           const open = event.currentTarget.open;

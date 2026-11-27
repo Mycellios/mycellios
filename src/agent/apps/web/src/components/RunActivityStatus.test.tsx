@@ -123,18 +123,18 @@ it("keeps a long, silent run active and distinguishes worker contact from output
 });
 it("leaves Working when live updates stay disconnected", async () => {
   mount({ ...run, startedAt: new Date(now - 6000).toISOString() });
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking it through…");
   act(() => setLiveThreadConnection("reconnecting"));
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking it through…");
   await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
   expect(node.querySelector("[role=alert]")?.textContent).toBe("Live updates stopped. The task was not cancelled.");
   expect(node.textContent).not.toContain("Working");
   act(() => setLiveThreadConnection("live"));
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking it through…");
 });
 it("does not offer an empty disclosure before the first recorded step", () => {
   mount({ ...run, startedAt: new Date(now - 6000).toISOString(), modelId: "known-model" });
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking it through…");
   expect(node.querySelector("details")).toBeNull();
   expect(node.textContent).not.toContain("known-model");
 });
@@ -144,7 +144,7 @@ it("shows the active run's thinking status without a details panel", () => {
     role: "bot", botId: "bot", createdAt: at(0),
     blocks: [{ kind: "progress", text: "Thinking…", activity: true }],
   }]);
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking…");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking it through…");
   expect(node.querySelector("details")).toBeNull();
 });
 it.each([
@@ -205,11 +205,9 @@ it("does not overlap refreshes while a snapshot request is pending", async () =>
   });
   expect(refresh).toHaveBeenCalledTimes(2);
 });
-it("old API snapshots never claim confirmed worker health", () => {
+it("shows a turn without lease details as working, like any running turn", () => {
   mount({ ...run, updatedAt: undefined, observedAt: undefined, leaseExpiresAt: undefined });
-  expect(node.querySelector("[role=status]")?.textContent).toBe(
-    "Status not confirmed",
-  );
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Thinking it through…");
 });
 
 it("shows real tool activity without claiming the worker is connected or opening diagnostics", () => {
@@ -218,7 +216,7 @@ it("shows real tool activity without claiming the worker is connected or opening
   } as import("@mycellios/contracts").ThreadMessage;
   mount({ ...run, leaseExpiresAt: undefined, observedAt: undefined }, false, [message]);
   expect(node.querySelector('ol[aria-label="Task activity"]')?.textContent).toContain("List files");
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Status not confirmed");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Reading files…");
   expect(node.querySelector("details")?.open).toBe(false);
   expect(node.querySelector("details")?.contains(node.querySelector('ol[aria-label="Task activity"]'))).toBe(true);
   expect(node.textContent).not.toContain("Technical details");
@@ -344,3 +342,13 @@ it("shows a timed row while the turn waits for its own background work", () => {
   expect(node.querySelector("[role=status]")?.textContent).toBe("Waiting for background work…");
   expect(node.querySelector("[data-testid=background-wait-elapsed]")?.textContent).toMatch(/1/);
 });
+
+it("says a new turn is thinking while it starts, and shows a start that takes longer as queued", () => {
+  const queued = { ...run, status: "queued", startedAt: null, leaseExpiresAt: null, createdAt: new Date(now - 2000).toISOString(), observedAt: new Date(now).toISOString() } as Run;
+  mount(queued);
+  expect(node.textContent).toContain("Thinking it through…");
+  expect(node.textContent).not.toContain("Queued");
+  act(() => { vi.advanceTimersByTime(9_000); });
+  expect(node.textContent).toContain("Queued");
+});
+

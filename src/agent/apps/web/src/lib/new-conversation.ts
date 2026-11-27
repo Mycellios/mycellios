@@ -5,7 +5,7 @@ type SendInput = Parameters<RpcClient["threads"]["send"]>[0];
 
 export type FirstMessageResult =
   /** The conversation exists and holds the message. */
-  | { status: "sent"; threadId: string; runId: string }
+  | { status: "sent"; threadId: string; runId: string; messageId?: string }
   /** The conversation exists, but the message may have arrived: keep the text with it. */
   | { status: "unconfirmed"; threadId: string; error: unknown }
   /**
@@ -49,7 +49,7 @@ export async function sendFirstMessage(input: {
   }
   try {
     const sent = await client.threads.send({ ...input.message, botId: input.botId });
-    return { status: "sent", threadId, runId: sent.runId };
+    return { status: "sent", threadId, runId: sent.runId, messageId: sent.messageId };
   } catch (error) {
     // A refusal wrote nothing; a lost answer may have delivered the message.
     return isRetryableError(error) ? { status: "unconfirmed", threadId, error } : discard(error);

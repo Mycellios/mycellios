@@ -61,6 +61,10 @@ function runFromStartedEvent(event: ProductEvent, previous: Run | undefined): Ru
     startedAt: previous?.startedAt ?? event.createdAt,
     completedAt: null,
     createdAt: previous?.createdAt ?? event.createdAt,
+    // The worker's lease from the start event; without it a later snapshot read supplies it.
+    leaseExpiresAt: typeof event.payload.leaseExpiresAt === "string" && Number.isFinite(Date.parse(event.payload.leaseExpiresAt))
+      ? event.payload.leaseExpiresAt
+      : (previous?.leaseExpiresAt ?? null),
   };
 }
 

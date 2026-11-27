@@ -4,6 +4,10 @@ import type { AccountPlanLimit, PlanLimitWindow } from "@mycellios/contracts";
 // user-supplied compatible endpoint, follow redirects, or spend reset credits.
 export const CODEX_PLAN_LIMITS_URL = "https://chatgpt.com/backend-api/wham/usage";
 export const CLAUDE_PLAN_LIMITS_URL = "https://api.anthropic.com/api/oauth/usage";
+/** OpenCode Go's usage of a key, as the reference app reads it: rolling 5 hours, week and month. */
+export const OPENCODE_GO_PLAN_LIMITS_URL = "https://opencode.ai/zen/go/v1/usage";
+/** OpenCode connections whose saved API key may carry a Go subscription. */
+export const OPENCODE_PLAN_PROVIDERS: readonly string[] = ["opencode-go", "opencode"];
 const MAX_BYTES = 128 * 1024;
 type QuotaValue = Pick<AccountPlanLimit, "status" | "windows" | "plan" | "reason" | "retryAt">;
 function record(value: unknown): Record<string, unknown> | null {
@@ -92,6 +96,21 @@ export function parseClaudePlanLimits(value: unknown): Pick<QuotaValue, "windows
   // No guess about plan type, money, or extra paid usage from utilization alone.
   return { windows, plan: null };
 }
+export function parseOpenCodePlanLimits(value: unknown): Pick<QuotaValue, "windows" | "plan"> {
+  const usage = record(record(value)?.usage);
+  const windows: PlanLimitWindow[] = [];
+  for (const [id, label, minutes] of [
+    ["rolling", "5 hours", 300],
+    ["weekly", "Weekly", 10080],
+    ["monthly", "Monthly", 43200],
+  ] as const) {
+    const raw = record(usage?.[id]);
+    const percent = finite(raw?.percent);
+    if (!raw || percent === null || percent < 0) continue;
+    windows.push({ id, label, durationMinutes: minutes, usedPercent: Math.min(100, percent), resetsAt: iso(raw.resetsAt), model: null });
+  }
+  return { windows, plan: windows.length ? "OpenCode Go" : null };
+}
 async function boundedJson(response: Response) {
   if (Number(response.headers.get("content-length")) > MAX_BYTES) {
     await response.body?.cancel();
@@ -146,7 +165,8 @@ export async function readProviderPlanLimits(input: {
 }): Promise<QuotaValue> {
   const codex = input.provider === "openai-codex";
   const claude = input.provider === "anthropic";
-  if (!codex && !claude) return failed("unsupported", "not_reported");
+  const openCode = OPENCODE_PLAN_PROVIDERS.includes(input.provider);
+  if (!codex && !claude && !openCode) return failed("unsupported", "not_reported");
   if (codex && !input.accountId) return failed("unavailable", "permission");
   const now = input.now ?? Date.now();
   const controller = new AbortController();
@@ -163,7 +183,7 @@ export async function readProviderPlanLimits(input: {
   const read = async (): Promise<QuotaValue> => {
     try {
       const response = await (input.fetch ?? fetch)(
-        codex ? CODEX_PLAN_LIMITS_URL : CLAUDE_PLAN_LIMITS_URL,
+        codex ? CODEX_PLAN_LIMITS_URL : openCode ? OPENCODE_GO_PLAN_LIMITS_URL : CLAUDE_PLAN_LIMITS_URL,
         {
           method: "GET",
           redirect: "error",
@@ -173,7 +193,7 @@ export async function readProviderPlanLimits(input: {
             accept: "application/json",
             ...(codex
               ? { "chatgpt-account-id": input.accountId!, originator: "mycellios" }
-              : { "anthropic-beta": "oauth-2025-04-20" }),
+              : claude ? { "anthropic-beta": "oauth-2025-04-20" } : {}),
           },
         },
       );
@@ -183,6 +203,9 @@ export async function readProviderPlanLimits(input: {
       }
       if (!response.ok) {
         await response.body?.cancel().catch(() => undefined);
+        // A key without a Go subscription (Zen only) has no usage to show.
+        if (openCode && (response.status === 401 || response.status === 403))
+          return failed("unsupported", "not_reported");
         if (response.status === 401) return failed("reconnect", "expired");
         if (response.status === 403) return failed("unavailable", "permission");
         if (response.status === 429) {
@@ -200,7 +223,8 @@ export async function readProviderPlanLimits(input: {
         return failed("unavailable", "unreachable");
       }
       const value = await boundedJson(response);
-      const parsed = codex ? parseCodexPlanLimits(value) : parseClaudePlanLimits(value);
+      const parsed = codex ? parseCodexPlanLimits(value)
+        : openCode ? parseOpenCodePlanLimits(value) : parseClaudePlanLimits(value);
       return {
         ...parsed,
         status: parsed.windows.length ? "available" : "unsupported",

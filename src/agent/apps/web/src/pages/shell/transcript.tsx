@@ -27,6 +27,7 @@ import {
 } from "@mycellios/core";
 import type { GroupAvatarMember } from "@mycellios/ui-web";
 import { Button, cn, Spinner } from "@mycellios/ui-web";
+import { ActivityShine, ThinkingAvatar } from "../../components/ThinkingActivity";
 import { useIsMobile } from "@mycellios/ui-web/hooks/use-mobile";
 import { ArrowDown } from "lucide-react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
@@ -62,6 +63,30 @@ import type { PendingThreadSend } from "../../lib/pending-thread-sends";
 const NO_PENDING_SENDS: readonly PendingThreadSend[] = [];
 /** How close to the top a scroll starts loading older messages. */
 const TRANSCRIPT_AUTOLOAD_TOP_PX = 240;
+
+/** A message the person sent that the server has not shown back yet. */
+function PendingSendRow({ message }: { message: Pick<PendingThreadSend, "text" | "attachments" | "messageId"> }) {
+  const { t } = useLingui();
+  return <div data-testid="pending-message" aria-busy={message.messageId === undefined} className="rk-chat-pending-row flex justify-end">
+    <div className={cn("min-w-0 rounded-[20px] bg-chat-user px-3.5 py-2.5 text-body1 text-chat-user-foreground", bubbleFrameWidth("user"))}>
+      {message.text ? <p className="whitespace-pre-wrap wrap-anywhere">{message.text}</p> : null}
+      {message.attachments.map((name, index) => <p key={`${index}:${name}`} className="break-all text-xs">{name}</p>)}
+      {message.messageId === undefined ? <span role="status" className="sr-only">{t`Sending…`}</span> : null}
+    </div>
+  </div>;
+}
+
+/**
+ * The first message of a new conversation, shown at once while the conversation is created
+ * and its history loads, so sending never waits for the server to show what was written.
+ */
+export function PendingConversation({ messages }: { messages: readonly Pick<PendingThreadSend, "nonce" | "text" | "attachments" | "messageId">[] }) {
+  return <div data-testid="pending-conversation" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="flex min-h-full min-w-0 rk-transcript-stack flex-col justify-end gap-0 px-3 pt-3 pb-8 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pt-5 md:pb-13">
+      {messages.map(message => <PendingSendRow key={message.nonce} message={message} />)}
+    </div>
+  </div>;
+}
 
 export function bubbleFrameWidth(role: ThreadMessage["role"]) {
   return role === "user"
@@ -846,15 +871,14 @@ export const Transcript = memo(function Transcript({
             </Fragment>
           );
         })}
-        {pendingMessages.map(message => (
-          <div key={message.nonce} data-testid="pending-message" aria-busy={message.messageId === undefined} className="rk-chat-pending-row flex justify-end">
-            <div className={cn("min-w-0 rounded-[20px] bg-chat-user px-3.5 py-2.5 text-body1 text-chat-user-foreground", bubbleFrameWidth("user"))}>
-              {message.text ? <p className="whitespace-pre-wrap wrap-anywhere">{message.text}</p> : null}
-              {message.attachments.map((name, index) => <p key={`${index}:${name}`} className="break-all text-xs">{name}</p>)}
-              {message.messageId === undefined ? <span role="status" className="sr-only">{t`Sending…`}</span> : null}
-            </div>
+        {pendingMessages.map(message => <PendingSendRow key={message.nonce} message={message} />)}
+        {/* The Mico's activity row appears with the message, before the server confirms the turn. */}
+        {!running && !workingElsewhere && conversationBot && pendingMessages.length ? (
+          <div data-testid="starting-activity" className="rk-chat-live-row flex min-w-0 items-start gap-2.5 px-1 py-2">
+            <ThinkingAvatar members={[{ botId: conversationBot.id, color: conversationBot.color, status: "running" }]} size={24} />
+            <span role="status" className="py-1 text-xs text-muted-foreground"><ActivityShine text={t`Thinking it through…`} /></span>
           </div>
-        ))}
+        ) : null}
         {running &&
         (activeRun ||
           !messages.some(

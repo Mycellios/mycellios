@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { builtinAgentTools } from "./builtin-tools.js";
 import { approvalPausedToolResult } from "./approval-effect.js";
 import { findNativeCommand, nativeEnvironment } from "./native-agent-process.js";
-import { codexPermissionProfile, codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
+import { codexPermissionProfile, codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent, sessionInstructions } from "./native-agent-runtime.js";
 import { ScriptedAgentRuntime } from "./scripted-runtime.js";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { startHostComputerServer } from "./host-computer-server.js";
@@ -659,4 +659,31 @@ it("starts a fresh native session after a new-chat context change and keeps the 
   const calls = await readFile(log, "utf8");
   expect(calls).toContain("thread/start"); expect(calls).not.toContain("thread/resume");
   expect(await readFile(join(workspace, "kept-note.txt"), "utf8")).toBe("Workspace survives");
+});
+
+describe("the Claude Code session binding", () => {
+  it("resumes the session when only memory or notes changed, and starts a new one for other instructions", async () => {
+    expect(sessionInstructions("Be brief.\n<durable_memory>\nlikes tea\n</durable_memory>\n<scratchpad_open>- a</scratchpad_open>"))
+      .toBe("Be brief.\n<durable_memory/>\n<scratchpad_open/>");
+    const root = await mkdtemp(join(tmpdir(), "mycellios-claude-binding-"));
+    roots.push(root);
+    const launches = join(root, "launches");
+    const test = await setup("claude", ["--claude-launch-log", launches]);
+    const turn = async (runId: string, instructions: string) => {
+      const events: AgentRuntimeEvent[] = [];
+      for await (const event of test.runtime.run({ ...test.request, runId, instructions }, test.context)) events.push(event);
+      expect(events.at(-1)?.type).toBe("done");
+      await test.runtime.releaseIdleNativeProcesses();
+    };
+    const resumed = async () => {
+      const args = JSON.parse((await readFile(launches, "utf8")).trim().split("\n").at(-1)!).args as string[];
+      return args.includes("--resume");
+    };
+    await turn("first", "Use authorized tools\n<durable_memory>\nv1\n</durable_memory>");
+    expect(await resumed()).toBe(false);
+    await turn("memory-changed", "Use authorized tools\n<durable_memory>\nv2\n</durable_memory>");
+    expect(await resumed()).toBe(true);
+    await turn("persona-changed", "Answer only in French\n<durable_memory>\nv2\n</durable_memory>");
+    expect(await resumed()).toBe(false);
+  }, 30_000);
 });

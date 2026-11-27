@@ -537,6 +537,10 @@
   identity. The idle bridge refuses every call; each turn binds its own executor and
   clears earlier call ids. Failed, stopped or paused turns, a waiting slot, an update,
   sign-in/out or install, and host disable never keep it.
+  Only the stable part of the instructions binds a Claude Code or Codex session
+  (sessionInstructions drops memory, open notes and the teammate list), so a routine
+  that updates a note resumes the session with the new instructions instead of
+  starting a new one and resending the history; an open process still restarts.
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
@@ -786,8 +790,11 @@
   `node --import tsx scripts/verify-thread-lifecycle-db.ts` (migration backfill, archive,
   delete/undo/purge, lock races), verify-task-conversations(-route)-db.ts and
   `node scripts/verify-mico-tasks-ui.mjs`.
-  In the wide header, Main chat has a fixed tab, the Mico name opens its
-  settings, and All conversations sits beside the tabs. The picker marks open
+  The wide header follows the reference app: the Mico's name is the main chat's
+  tab (from another conversation it opens the main chat; in the main chat it
+  opens the Mico's settings), then the conversation tabs, New conversation (+)
+  and a chevron for all conversations. On the right only the model, pins and
+  Chat tools; Tasks lives in the rail and chat search opens with Ctrl/Cmd+F. The picker marks open
   tabs independently of routine and unread status. Closing a tab keeps its
   history. Keep Create Mico separate from these actions.
   Reset context is a confirmed secondary action for the main chat only; never
@@ -1764,8 +1771,11 @@
 
 - Keep transcript progress live: in classic style stream the reply as it arrives
   unless the user saved streaming off (natural holds the answer until complete), and show the current step with its specific command, path
-  or query plus live output in an open timeline. Unknown worker health stays
-  visibly unconfirmed; folding details must never cancel, retry or restart a task.
+  or query plus live output in an open timeline. As in the reference app, a started
+  turn without lease details reads as working, and a new turn's first 10 seconds of
+  queue/start read as thinking (the row appears with the sent message); an expired
+  lease, stopped live updates and longer waits keep their own labels. Folding
+  details must never cancel, retry or restart a task.
   Keep the latest projected action visible, scoped to the active run and labelled
   as recorded activity rather than worker liveness. Finished tool cards stay behind
   the tool-activity preference.

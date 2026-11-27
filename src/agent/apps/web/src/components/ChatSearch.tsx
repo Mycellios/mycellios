@@ -18,15 +18,28 @@ export function ChatSearchButton({
   target,
   threadId,
   onJump,
+  keyboardOnly = false,
 }: {
   rpc: RpcClient;
   scope: string;
   target: SearchTarget;
   threadId: string;
   onJump: (messageId: string) => void;
+  /** No visible button: Ctrl/Cmd+F opens the search, anchored at the end of the header. */
+  keyboardOnly?: boolean;
 }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!keyboardOnly) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "f" || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      event.preventDefault();
+      setOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [keyboardOnly]);
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -73,7 +86,10 @@ export function ChatSearchButton({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="shrink-0 text-muted-foreground"
+            className={keyboardOnly ? "pointer-events-none size-0 shrink-0 overflow-hidden p-0 opacity-0" : "shrink-0 text-muted-foreground"}
+            tabIndex={keyboardOnly ? -1 : undefined}
+            aria-hidden={keyboardOnly || undefined}
+            aria-keyshortcuts="Control+F Meta+F"
             aria-label={t`Search messages`}
             title={t`Search messages`}
           />
