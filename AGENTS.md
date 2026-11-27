@@ -624,7 +624,10 @@ These rules apply to the complete repository.
   request again on another exact-zero route (FREE_REFUSAL_RETRIES), never on a
   priced one and never after any other failure. AntSeed is
   the only free route: an OpenRouter upstream never offers its zero-priced models
-  (`free_requires_antseed`). Check tests/managed-free-offers.test.ts,
+  (`free_requires_antseed`). A free route publishes and admits the seller's whole
+  declared window (freeTextLimits, MANAGED_FREE_TEXT_MAX_REQUEST_BYTES = 1 MiB),
+  not the paid 128 KiB byte bound, so a Mico's instructions and tools fit; paid
+  routes keep that bound. Check tests/managed-free-offers.test.ts,
   tests/managed-provider.test.ts and the isolated managed-purchases suite.
   `token-bounded-v2` expands only verified text/tool offers behind an advertised
   gateway reservation contract. Preserve `deepseek-bounded-v1` and recovery of

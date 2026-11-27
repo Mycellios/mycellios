@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as receiptDelay } from "node:timers/promises";
 import type { ManagedCatalogDiscovery, ManagedModel } from "../contracts/managed-provider.js";
-import { MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
+import { MANAGED_FREE_TEXT_MAX_REQUEST_BYTES, MANAGED_TEXT_MAX_REQUEST_BYTES, managedTextLimits } from "../contracts/managed-provider.js";
 import { managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest, type ManagedTextResult } from "./managed-openrouter.js";
 import { readManagedTextStream } from "./managed-text-stream.js";
@@ -271,7 +271,7 @@ export class ManagedAntseedGateway {
       ...(request.stream ? {stream_options: {include_usage: true}} : {})};
     const bytes = Buffer.byteLength(JSON.stringify(body)), inputBound = bytes + 8192 + request.messages.length * 64;
     const fits = offer.free ? freeRequestFits(bytes, output, offer.context) : inputBound + output <= offer.context;
-    if (bytes > MANAGED_TEXT_MAX_REQUEST_BYTES || !fits) throw new Error("managed_request_too_large");
+    if (bytes > (offer.free ? MANAGED_FREE_TEXT_MAX_REQUEST_BYTES : MANAGED_TEXT_MAX_REQUEST_BYTES) || !fits) throw new Error("managed_request_too_large");
     // The gateway rounds its own upper bound to USDC micro-units. Cover that ceil as well.
     const rawUsd = tokenCost(offer.inputCap ?? INPUT_CAP, offer.outputCap ?? OUTPUT_CAP, inputBound, output);
     const micro = managedCharge(rawUsd, 0).upstreamMicrounits;
