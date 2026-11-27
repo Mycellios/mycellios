@@ -96,8 +96,11 @@ export function mountDesktopRelay(
         c.header("x-mycellios-desktop-error", "desktop_updating");
         return c.json({ error: "The server is moving to a new version.", code: "desktop_updating" }, 503);
       }
-      const botId=input.probe ?? (input.request ? hostComputerRequest.parse(input.request).botId : undefined);
-      if (botId) {
+      const request = input.request && !input.probe ? hostComputerRequest.parse(input.request) : undefined;
+      const botId=input.probe ?? request?.botId;
+      // A message of an agent run already admitted here skips the ownership query: that run was
+      // checked when it started, and revoking the Mico ends it. Everything else is checked.
+      if (botId && !(request && broker.admittedMessage(input.scope, request))) {
         if (!await deps.ownsBot(input.scope,botId)) return c.json({available:false,error:"Unavailable agent"},404);
         // Only a remembered choice may settle several online PCs; one PC needs no lookup.
         const chosen = broker.needsChoice(input.scope, botId)
@@ -115,7 +118,7 @@ export function mountDesktopRelay(
         return c.json({ available: broker.available(input.scope, input.probe), ...unresolved });
       }
       if (!input.request || input.probe) return c.json({ error: "Invalid request" }, 400);
-      return broker.dispatch(hostComputerRequest.parse(input.request), {
+      return broker.dispatch(request!, {
         ...input.scope,
         operationId: input.nonce,
         traceId: input.nonce,
