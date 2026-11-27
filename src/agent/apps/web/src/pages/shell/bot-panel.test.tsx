@@ -106,7 +106,7 @@ vi.mock("../KnowledgeSection", () => ({
 import { InstructionSettings } from "../../components/InstructionSettings";
 import { spaceQueries } from "../../lib/query";
 import { rpc } from "../../lib/rpc";
-import { BotSettings, ComputerModePicker, ComputerModeDescription } from "./bot-panel";
+import { BotSettings, ComputerModePicker, ComputerModeNote } from "./bot-panel";
 
 const longInstructions = "I".repeat(4_000);
 
@@ -188,15 +188,15 @@ async function openSettingsPage(page: string) {
 it("keeps server isolation selectable without granting this PC access", async () => {
   await act(async () => root.render(<>
     <ComputerModePicker value="isolated" desktopAvailable={false} onChange={vi.fn()} />
-    <ComputerModeDescription mode="isolated" />
+    <ComputerModeNote mode="isolated" desktopAvailable={false} />
   </>));
   const buttons = [...container.querySelectorAll("button")];
-  expect(buttons.map(button => button.textContent)).toEqual(["Just this Mico", "Shared", "This PC"]);
+  expect(buttons.map(button => button.textContent)).toEqual(["Server, just this Mico", "Server, shared", "This PC"]);
   expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
   expect(buttons[0]?.disabled).toBe(false);
   expect(buttons[2]?.disabled).toBe(true);
-  expect(container.textContent).toContain("Available when an isolated computer provider is configured.");
-  expect(container.textContent).not.toContain("If this PC is offline");
+  expect(container.textContent).toContain("It cannot see your PC.");
+  expect(container.textContent).not.toContain("If that PC is off");
   expect(onSave).not.toHaveBeenCalled();
 });
 
@@ -290,10 +290,10 @@ it("opens settings subpages and returns focus to the overview row", async () => 
   expect(document.activeElement?.getAttribute("data-settings-page")).toBe("instructions");
 
   await openSettingsPage("computer");
-  expect(container.textContent).toContain("Memory scope");
+  expect(container.textContent).toContain("Notes it reads");
   expect(
-    [...container.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.textContent === "This PC",
+    [...container.querySelectorAll<HTMLOptionElement>('[id$="-computer"] option')].find(
+      (option) => option.value === "dedicated",
     )?.disabled,
   ).toBe(true);
   await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
@@ -311,11 +311,30 @@ it("binds and repairs This PC from the computer page", async () => {
   await render("Billing", { computerMode: "dedicated" }, false, 0, onUseThisComputer);
   await openSettingsPage("computer");
   const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
-    (candidate) => candidate.textContent === "Use this PC",
+    (candidate) => candidate.textContent === "Move here",
   );
   expect(button).toBeDefined();
   await act(async () => button!.click());
   expect(onUseThisComputer).toHaveBeenCalledTimes(1);
+});
+
+it("saves the computer and notes choices as soon as they change, without a Save button", async () => {
+  await render("Billing", {}, false);
+  await openSettingsPage("computer");
+  const select = (suffix: string) => container.querySelector<HTMLSelectElement>(`[id$="-${suffix}"]`)!;
+  await act(async () => {
+    select("computer").value = "isolated";
+    select("computer").dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(onSave).toHaveBeenLastCalledWith({ computerMode: "isolated" });
+  await act(async () => {
+    select("memory-scope").value = "shared";
+    select("memory-scope").dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(onSave).toHaveBeenLastCalledWith({ memoryScope: "shared" });
+  expect([...container.querySelectorAll("button")].some((button) => button.textContent === "Save")).toBe(false);
 });
 
 describe("BotSettings model choices", () => {

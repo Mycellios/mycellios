@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { BotBrowserReset } from "../../components/BotBrowserReset";
 import { MicoPcFolder } from "../../components/MicoPcFolder";
@@ -99,24 +100,32 @@ export function ComputerModePicker({
           }}
           className="aria-pressed:border-foreground/40 aria-pressed:text-foreground"
         >
-          {mode === "isolated" ? <Trans>Just this Mico</Trans> : mode === "team" ? <Trans>Shared</Trans> : <Trans>This PC</Trans>}
+          {computerModeLabel(mode)}
         </Toggle>
       ))}
     </div>
   );
 }
 
-export function ComputerModeDescription({ mode }: { mode: ComputerMode }) {
-  return <>
-    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-      {mode === "isolated" ? <Trans>A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured.</Trans>
-        : mode === "team" ? <Trans>Your Micos share a computer in this space.</Trans>
-        : <Trans>Uses your connected PC and its permissions. It is not an isolated server computer.</Trans>}
-    </p>
-    {mode === "dedicated" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-      <Trans>If this PC is offline, a new message runs on the server instead, without this PC's files. Work already running on this PC stops.</Trans>
-    </p> : null}
-  </>;
+/** Where a Mico works, named by place: the person's PC or the Mycellios server. */
+export function computerModeLabel(mode: ComputerMode): string {
+  if (mode === "dedicated") return t`This PC`;
+  if (mode === "isolated") return t`Server, just this Mico`;
+  return t`Server, shared`;
+}
+
+/** One plain note for the chosen place: what it can reach and what happens when the PC is off. */
+export function ComputerModeNote({ mode, desktopAvailable }: { mode: ComputerMode; desktopAvailable: boolean }) {
+  if (mode === "dedicated")
+    return (
+      <>
+        <Trans>It works on your PC, with your files, apps and permissions. If that PC is off, a new message is answered on the server without your files.</Trans>
+        {desktopAvailable ? null : <> <Trans>Choose it from Mycellios Desktop on that PC.</Trans></>}
+      </>
+    );
+  if (mode === "isolated")
+    return <Trans>It works on its own computer on the Mycellios server, with its own browser and files. It cannot see your PC.</Trans>;
+  return <Trans>It works on a Mycellios server computer that it shares with your other Micos in this space. It cannot see your PC.</Trans>;
 }
 
 export function BotSettings({
@@ -505,6 +514,49 @@ export function BotSettings({
   }
   executeSaveRef.current = executeSave;
 
+  /** Saves one field on its own, in the save queue, and undoes the choice on screen if it fails. */
+  function saveChoice(
+    patch: { computerMode: ComputerMode } | { memoryScope: "isolated" | "shared" | null },
+    undo: () => void,
+  ) {
+    setError(null);
+    pendingSavesRef.current += 1;
+    setSaving(true);
+    saveQueueRef.current = saveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await onSave(patch);
+          setSavedAdvanced((saved) => {
+            const values = JSON.parse(saved) as unknown[];
+            if ("computerMode" in patch) values[2] = patch.computerMode;
+            else values[3] = patch.memoryScope;
+            return JSON.stringify(values);
+          });
+        } catch (err) {
+          undo();
+          setError(errorText(err, t`Could not save`));
+        } finally {
+          pendingSavesRef.current -= 1;
+          setSaving(pendingSavesRef.current > 0);
+        }
+      });
+  }
+
+  function chooseComputer(next: ComputerMode) {
+    const previous = computerMode;
+    if (next === previous) return;
+    setComputerMode(next);
+    saveChoice({ computerMode: next }, () => setComputerMode(previous));
+  }
+
+  function chooseMemoryScope(next: "isolated" | "shared" | null) {
+    const previous = memoryScope;
+    if (next === previous) return;
+    setMemoryScope(next);
+    saveChoice({ memoryScope: next }, () => setMemoryScope(previous));
+  }
+
   async function switchToThisComputer() {
     if (!onUseThisComputer || computerBusy) return;
     setComputerBusy(true);
@@ -766,56 +818,87 @@ export function BotSettings({
         </ErrorBoundary>
       ) : null}
       {page === "computer" ? (
-        <SettingsGroup label={t`Computer`}>
-          <ComputerModePicker
-            value={computerMode}
-            onChange={setComputerMode}
-            desktopAvailable={Boolean(onUseThisComputer)}
-          />
-          {onUseThisComputer && computerMode === "dedicated" ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-3 w-full"
-              disabled={computerBusy}
-              aria-busy={computerBusy}
-              onClick={() => void switchToThisComputer()}
+        <div className="space-y-5">
+          <SettingsGroup label={t`Computer`}>
+            {/* One row and one note, saved on change, like the other settings rows. */}
+            <label
+              htmlFor={`${ids}-computer`}
+              className="flex min-h-11 items-center justify-between gap-3 text-sm text-foreground"
             >
-              {computerBusy ? t`Connecting…` : t`Use this PC`}
-            </Button>
-          ) : null}
-          <ComputerModeDescription mode={computerMode} />
-          {bot.computerMode === "dedicated" && computerMode === "dedicated" ? <MicoPcFolder botId={bot.id} /> : null}
-          {bot.computerMode !== "dedicated" ? <BotBrowserReset botId={bot.id} /> : null}
-
-            <div className="mt-4 text-sm text-foreground">
-              <Trans>Memory scope</Trans>
-              <p className="mt-1 text-xs text-muted-foreground"><Trans>Isolated uses only Mico and task notes. Shared also uses general notes from this space.</Trans></p>
-              <div className="mt-2 flex gap-2">
-                {(
-                  [
-                    { value: null, label: t`Inherit default` },
-                    { value: "isolated" as const, label: t`Isolated` },
-                    { value: "shared" as const, label: t`Shared` },
-                  ] satisfies Array<{ value: "isolated" | "shared" | null; label: string }>
-                ).map((option) => (
-                  <Toggle
-                    key={option.label}
-                    variant="outline"
-                    size="sm"
-                    pressed={memoryScope === option.value}
-                    onPressedChange={(pressed) => {
-                      if (pressed) setMemoryScope(option.value);
-                    }}
-                    className="flex-1 aria-pressed:border-foreground/40 aria-pressed:text-foreground"
+              <Trans>Works on</Trans>
+              <NativeSelect
+                id={`${ids}-computer`}
+                className="max-w-2/3"
+                value={computerMode}
+                disabled={computerBusy}
+                onChange={(event) => chooseComputer(event.target.value as ComputerMode)}
+              >
+                {BOT_COMPUTER_MODES.map((mode) => (
+                  <NativeSelectOption
+                    key={mode}
+                    value={mode}
+                    disabled={mode === "dedicated" && !onUseThisComputer && bot.computerMode !== "dedicated"}
                   >
-                    {option.label}
-                  </Toggle>
+                    {computerModeLabel(mode)}
+                  </NativeSelectOption>
                 ))}
+              </NativeSelect>
+            </label>
+            <p className="text-xs leading-relaxed text-muted-foreground" data-testid="computer-mode-note">
+              <ComputerModeNote mode={computerMode} desktopAvailable={Boolean(onUseThisComputer)} />
+            </p>
+            {onUseThisComputer && bot.computerMode === "dedicated" && computerMode === "dedicated" ? (
+              <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                <div>
+                  <p className={rowLabelClass}><Trans>Use this PC</Trans></p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <Trans>If it works on another of your PCs, move it here.</Trans>
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={computerBusy}
+                  aria-busy={computerBusy}
+                  onClick={() => void switchToThisComputer()}
+                >
+                  {computerBusy ? t`Connecting…` : t`Move here`}
+                </Button>
               </div>
-            </div>
-
-            </SettingsGroup>
+            ) : null}
+            {bot.computerMode === "dedicated" && computerMode === "dedicated" ? <MicoPcFolder botId={bot.id} /> : null}
+            {bot.computerMode !== "dedicated" ? <BotBrowserReset botId={bot.id} /> : null}
+          </SettingsGroup>
+          <SettingsGroup label={t`Memory`}>
+            <label
+              htmlFor={`${ids}-memory-scope`}
+              className="flex min-h-11 items-center justify-between gap-3 text-sm text-foreground"
+            >
+              <Trans>Notes it reads</Trans>
+              <NativeSelect
+                id={`${ids}-memory-scope`}
+                className="max-w-2/3"
+                value={memoryScope ?? ""}
+                onChange={(event) =>
+                  chooseMemoryScope((event.target.value || null) as "isolated" | "shared" | null)
+                }
+              >
+                <NativeSelectOption value="">{t`As set for this space`}</NativeSelectOption>
+                <NativeSelectOption value="isolated">{t`Only its own`}</NativeSelectOption>
+                <NativeSelectOption value="shared">{t`Its own and the space's`}</NativeSelectOption>
+              </NativeSelect>
+            </label>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {memoryScope === "isolated" ? (
+                <Trans>It reads only its own notes and the current task's.</Trans>
+              ) : memoryScope === "shared" ? (
+                <Trans>It also reads the general notes of this space, which every Mico here can use.</Trans>
+              ) : (
+                <Trans>It follows this space's setting for general notes.</Trans>
+              )}
+            </p>
+          </SettingsGroup>
+        </div>
       ) : null}
       {page === "permissions" ? (
         <SettingsGroup label={t`Permissions`}>
