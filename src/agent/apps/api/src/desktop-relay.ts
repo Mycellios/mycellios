@@ -246,7 +246,8 @@ export function mountDesktopRelay(
           const stop = () => { clearInterval(recheck); closed.abort(); };
           c.req.raw.signal.addEventListener("abort", stop, { once: true });
           const body = stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ flush: stop }));
-          return new Response(body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" } });
+          // Proxies must pass each line on at once, as for the event streams of threads.subscribe.
+          return new Response(body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" } });
         }
         case "result": {
           const value = parseDesktopResult(input);

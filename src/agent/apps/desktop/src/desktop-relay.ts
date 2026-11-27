@@ -31,6 +31,10 @@ export const RESULT_FRAME_BYTES = 240 * 1024;
 const POLL_RETRY_BASE_MS = 250;
 /** The server writes at least every 15 s; a channel silent this long is gone. */
 const CHANNEL_IDLE_MS = 45_000;
+/** The server writes its first line at once; a channel slower than this is being held back. */
+const CHANNEL_FIRST_LINE_MS = 5_000;
+/** After a held-back channel, this PC keeps to the poll for this long. */
+const CHANNEL_PAUSE_MS = 10 * 60_000;
 /** The most bytes one agent channel line may hold (one PC request and its envelope). */
 const CHANNEL_LINE_BYTES = HOST_COMPUTER_MAX_BYTES + 64 * 1024;
 const POLL_RETRY_MAX_MS = 5_000;
@@ -98,6 +102,8 @@ export class DesktopRelayClient {
   private channelController?: AbortController;
   /** Operations received on the agent channel: acknowledged by their result, never by a poll. */
   private channelOps = new Set<string>();
+  /** Until then the poll carries everything: a proxy held the last channel's lines back. */
+  private channelPausedUntil = 0;
   constructor(
     private readonly options: {
       base: string;
@@ -351,7 +357,7 @@ export class DesktopRelayClient {
       this.pollFailures = 0;
       // Messages for agent runs travel on the agent channel while the server offers it.
       this.channelOffered = state.agentChannel === 1 && Boolean(this.options.agentExecution);
-      if (this.channelOffered) void this.runChannel();
+      if (this.channelOffered && (this.options.now ?? Date.now)() >= this.channelPausedUntil) void this.runChannel();
       for (const [id, controller] of this.active) {
         // The server never lists channel operations in a poll; their result settles them.
         if (this.channelOps.has(id)) continue;
@@ -412,7 +418,8 @@ export class DesktopRelayClient {
   }
   /** Runs one delivered operation once; a redelivered one already started here is skipped. */
   private startOperation(operation: DesktopExecutorOperation, channel: boolean) {
-    if (this.active.has(operation.id) || (channel && this.settled.has(operation.id))) return;
+    // A channel message that went back to the poll arrives again: never start it twice.
+    if (this.active.has(operation.id) || this.settled.has(operation.id)) return;
     const input = hostComputerRequest.safeParse(operation.request);
     if (
       !input.success ||
@@ -447,10 +454,17 @@ export class DesktopRelayClient {
         const controller = new AbortController();
         this.channelController = controller;
         try {
-          const response = await this.post("channel", { deviceId: this.deviceId }, controller.signal);
+          const opening = setTimeout(() => controller.abort(), CHANNEL_IDLE_MS);
+          const response = await this.post("channel", { deviceId: this.deviceId }, controller.signal).finally(() => clearTimeout(opening));
           failures = 0;
           await this.readChannel(response, controller);
         } catch (error) {
+          if (error instanceof ChannelHeldBack) {
+            // Something between this PC and the server buffers the stream: keep to the poll.
+            this.channelPausedUntil = (this.options.now ?? Date.now)() + CHANNEL_PAUSE_MS;
+            recordDesktopDiagnostic("relay_poll_failed", {stage:"channel",code:"relay_stream_failure"});
+            break;
+          }
           if (!this.stopped && intent === this.intent && !controller.signal.aborted) {
             failures++;
             recordDesktopDiagnostic("relay_poll_failed", {stage:"channel",...desktopExceptionFields(error)});
@@ -468,10 +482,16 @@ export class DesktopRelayClient {
     const watch = () => { clearTimeout(idle); idle = setTimeout(() => controller.abort(), CHANNEL_IDLE_MS); idle.unref?.(); };
     controller.signal.addEventListener("abort", () => void reader.cancel().catch(() => undefined), { once: true });
     let pending: Buffer = Buffer.alloc(0);
-    watch();
+    let heldBack = false;
+    clearTimeout(idle);
+    idle = setTimeout(() => { heldBack = true; controller.abort(); }, CHANNEL_FIRST_LINE_MS);
     try {
       for (;;) {
-        const { value, done } = await reader.read();
+        const { value, done } = await reader.read().catch((error: unknown) => {
+          if (heldBack) throw new ChannelHeldBack();
+          throw error;
+        });
+        if (heldBack) throw new ChannelHeldBack();
         if (done) return;
         watch();
         this.lastContact = (this.options.now ?? Date.now)();
@@ -649,6 +669,10 @@ export class DesktopRelayClient {
       }
     } finally { this.updateNotices.delete(operation.id); }
   }
+}
+
+class ChannelHeldBack extends Error {
+  constructor() { super("Agent channel held back"); }
 }
 
 function pause(ms: number, signal: AbortSignal) {

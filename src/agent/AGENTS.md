@@ -978,8 +978,8 @@
   reading. A broken pushed stream is released and ends with `{ failed: true }`.
   Verify desktop-model-push too. An API that answers `agentChannel: 1` delivers a PC's
   agentMessage operations on its open agent channel (POST /api/desktop-relay/channel), never
-  through a poll; the result POST still acknowledges them, a new channel redelivers the
-  unacknowledged ones and the PC runs each operation id once. The channel is authenticated
+  through a poll; the result POST still acknowledges them, a channel that ends returns the
+  unacknowledged ones to the poll and the PC runs each operation id once. The channel is authenticated
   when it opens and every 60 s. The Desktop relay sends every
   complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
   with the stream end joined to the last lines, and the API rechecks all of a PC's

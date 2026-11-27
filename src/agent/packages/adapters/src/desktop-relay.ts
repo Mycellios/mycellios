@@ -300,9 +300,9 @@ export class DesktopRelayBroker {
    * Opens this PC's agent channel (specs/desktop-agent-channel/spec.md phase 3): one streamed
    * response that carries every message for its agent runs as it is dispatched, instead of a
    * held poll answering, then being re-armed, once per message. The PC acknowledges each one
-   * with its result, as before. A newer channel replaces an older one; operations it delivered
-   * that the PC has not acknowledged are delivered again on the next channel, by operation id,
-   * and the PC never runs one twice. The caller authenticates the PC when it opens the channel
+   * with its result, as before. A newer channel replaces an older one. When a channel ends,
+   * operations it delivered that the PC has not acknowledged go back to the poll, which the PC
+   * already holds; the PC skips any operation id it started, so none runs twice. The caller authenticates the PC when it opens the channel
    * and again while it stays open.
    */
   attachChannel(owner: DesktopExecutorOwner, deviceId: string, signal: AbortSignal): ReadableStream<Uint8Array> {
@@ -318,7 +318,16 @@ export class DesktopRelayBroker {
     let lifetime: ReturnType<typeof setTimeout> | undefined;
     const end = () => {
       clearInterval(keepalive); clearTimeout(lifetime); signal.removeEventListener("abort", channel.close);
-      if (this.channels.get(id) === channel) this.channels.delete(id);
+      if (this.channels.get(id) !== channel) return;
+      this.channels.delete(id);
+      // What it carried and the PC has not acknowledged goes back to the poll. The PC skips any
+      // operation it already started, so a message is never run twice.
+      let returned = false;
+      for (const op of this.operations.values())
+        if (op.channel && !op.closed && sameOwner(owner, op.binding) && op.binding.deviceId === deviceId) {
+          op.channel = false; op.claimed = false; returned = true;
+        }
+      if (returned) this.wake(owner, deviceId);
     };
     return new ReadableStream<Uint8Array>({
       start: controller => {
@@ -345,9 +354,6 @@ export class DesktopRelayBroker {
         signal.addEventListener("abort", channel.close, { once: true });
         if (signal.aborted) { channel.close(); return; }
         channel.write({ keepalive: 1 });
-        // Delivered before, never acknowledged: the PC skips any it already started.
-        for (const op of this.operations.values())
-          if (op.channel && !op.closed && sameOwner(owner, op.binding) && op.binding.deviceId === deviceId) channel.write(this.channelLine(op));
       },
       cancel: () => channel.close(),
     }, { highWaterMark: CHANNEL_BUFFER, size: chunk => chunk.byteLength });

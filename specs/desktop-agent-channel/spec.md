@@ -104,10 +104,13 @@ As built:
   (sequence and digest deduplication included), and does not re-arm the poll.
 - **Caps.** Channel messages do not count against the global cap of 8 open control operations.
   The per-Mico cap of 4 and the shared byte bound still apply.
-- **Redelivery.** A new channel replaces the previous one and first rewrites every channel
-  operation that is still open. The PC skips any it is running or has settled
-  (`startOperation`), so nothing runs twice. An operation nobody acknowledges ends at its
-  deadline, as before.
+- **Redelivery.** When a channel ends (rotation, a new channel, or the PC going away), the channel
+  operations it carried that are still open go back to the poll the PC already holds. The PC
+  skips any operation id it is running or has settled (`startOperation`), so nothing runs
+  twice. An operation nobody acknowledges ends at its deadline, as before.
+- **Held-back streams.** The response carries `x-accel-buffering: no` and `no-transform`. A PC
+  that gets no first line within 5 s assumes something buffers the stream and keeps to the poll
+  for 10 minutes; what the closed channel carried returns to the poll.
 - **Liveness.** The channel opens with a keepalive line and sends another every 15 s. It closes
   itself after 4 minutes, and the PC opens the next one. The PC drops a channel that has been
   silent for 45 s.

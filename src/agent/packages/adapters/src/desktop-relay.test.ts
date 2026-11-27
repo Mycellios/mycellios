@@ -613,18 +613,16 @@ describe("agent channel", () => {
     await reader.cancel(); void run.body?.cancel();
   });
 
-  it("delivers again on the next channel what the PC did not acknowledge", async () => {
+  it("returns what the PC did not acknowledge to the poll when the channel ends", async () => {
     const run = agentPc();
-    const first = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
+    const reader = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
     const callback = message();
-    const [delivered] = await lines(first, 1);
-    await first.cancel();
-    const second = broker.attachChannel(owner, "device", new AbortController().signal).getReader();
-    const [again] = await lines(second, 1);
-    expect(again!.id).toBe(delivered!.id);
+    const [delivered] = await lines(reader, 1);
+    await reader.cancel();
+    expect(broker.poll(owner, "device").operations.map(op => op.id)).toEqual([delivered!.id]);
     broker.result(owner, "device", delivered!.id as string, 0, Buffer.from('{"ok":true}\n').toString("base64"), true);
     expect(await callback.text()).toBe('{"ok":true}\n');
-    await second.cancel(); void run.body?.cancel();
+    void run.body?.cancel();
   });
 
   it("does not count channel messages against the shared poll limit", async () => {
