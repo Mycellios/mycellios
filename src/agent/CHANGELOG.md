@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-27
+
+### Added
+
+- While a Mico thinks, its status line moves through short phrases instead of always saying
+  "Thinking it through…". A real step (searching, reading files, running a command) still
+  shows that step.
+- A sidebar card offers the Mycellios Agent extension for Chrome, with a link to its Chrome
+  Web Store page. Closing it keeps it closed on that device.
+- Run a Mico on a model that works on your own PC, free and private. In Mycellios Desktop, open
+  a Mico's model menu and choose **On your PC**: one button checks the PC, installs the fastest
+  model that answers well there and switches the Mico to it. **Smarter, slower** offers a larger
+  model when the PC can run it. Messages never leave the PC and use no Credits.
+- Local models answer fast from the first message: opening the chat loads the model, and it
+  remembers what it already read even after Mycellios Desktop frees its memory.
+- See and delete the models installed on this PC, with the speed measured on it, in
+  **Settings → Models → On your PC**.
+
+### Changed
+
+- The loading screen draws the whole app (rail, sidebar, chat header, messages and composer)
+  on computers and the chat on phones, instead of a few floating bars.
+- A Mico's computer settings show three clear choices: Your PC, In the cloud, and In the
+  cloud, shared, each with one line on what it means.
+- The "Answer" and "Review" labels in the sidebar use a quiet outline instead of a solid
+  brown pill.
+- When a This PC Mico's message is answered on the server because the PC is offline, the
+  chat says so in the person's language, with a cloud mark and how to get the PC back.
+- Anthropic API-key connections can keep the prompt cache for 1 hour instead of 5 minutes
+  (Settings → Models → the connection → Advanced → Prompt cache). Replies after a pause up to an
+  hour start faster; writing the longer cache costs more, so 5 minutes stays the default.
+
+### Fixed
+
+- A Mico's turn no longer fails when saving one of its steps has to wait a few seconds for the
+  conversation (for example while another turn or a reminder is being saved in it).
+- Reply sooner when a personal memory connection is slow or down. Before, every reply waited
+  up to 2.5 seconds for its automatic memory search; now a memory that just failed is skipped
+  for five minutes, while searches the Mico asks for still try it.
+- Micos no longer fail with "This model's context window is too small" when two connections enable the same model: a Mycellios connection whose live catalog stopped serving a model no longer takes precedence over the connection that actually runs it.
+- A slow Mycellios catalog read keeps the last known model window instead of shrinking every Mycellios model to the connection default, which made turns on Mycellios Free fail.
+- The model picker hides Mycellios network models whose window is too small for a Mico, such as the decision model, and shows Mycellios Free first among the free models.
+- An expired or already used sign-in link now starts a fresh sign-in by itself; a connection problem says so instead of claiming the link expired.
+
 ## [0.40.1] - 2026-11-27
 
 ### Fixed
