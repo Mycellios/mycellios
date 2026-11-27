@@ -361,6 +361,22 @@ export class DesktopRelayBroker {
   private channelLine(op: Operation) {
     return { id: op.id, binding: { deviceId: op.binding.deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request };
   }
+  /**
+   * Whether this message belongs to an agent run that is open here, on the binding it started on:
+   * that run was admitted after an ownership check, and revoking the Mico (revokeBot, on every
+   * poll and channel recheck) ends it. Messages of such a run need no ownership query of their
+   * own (specs/desktop-agent-channel/spec.md phase 4).
+   */
+  admittedMessage(scope: { userId: string; spaceId: string }, input: HostComputerRequest) {
+    if (input.method !== "agentMessage") return false;
+    this.expire();
+    const binding = this.bindings.get(key(scope, input.botId));
+    if (!binding) return false;
+    for (const op of this.operations.values())
+      if (!op.closed && op.method === "agentRun" && op.binding === binding && op.runId === input.runId &&
+        op.request.method === "agentRun" && op.request.sessionId === input.sessionId) return true;
+    return false;
+  }
   /** Hands a message to the PC's open agent channel; false leaves it for the poll. */
   private sendOnChannel(op: Operation) {
     const channel = this.channels.get(this.pollKey(op.binding, op.binding.deviceId));

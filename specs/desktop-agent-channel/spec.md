@@ -1,6 +1,6 @@
 # Desktop agent channel
 
-Status: phases 1 and 2 merged; phase 3 in progress.
+Status: phases 1–3 merged; phase 4 in progress.
 
 ## Problem
 
@@ -125,6 +125,25 @@ The acknowledgement still uses one authenticated result POST per message; moving
 
 The worker keeps one signed stream to the owning API instance per agent session instead of
 one internal POST per message.
+
+Measured before building it (production, 2026-11-27, 43 internal requests in 30 minutes): the
+worker reaches the API over the internal Docker network (`DESKTOP_RELAY_API_URL`). The internal
+POST answers in 46 ms at p50 and 114 ms at p90. Most of that is the per-message `ownsBot` query,
+plus the remembered-PC lookup when several PCs are online; connection setup on that network is
+about a millisecond. A persistent signed stream would save only that millisecond and would add
+its own framing, redelivery and handoff rules.
+
+As built:
+- **No ownership query for admitted runs.** An `agentMessage` whose run, session and binding
+  match an `agentRun` still open on this instance (`DesktopRelayBroker.admittedMessage`) skips
+  the `ownsBot` query and the PC choice. That run passed both when it started.
+- **Revocation.** Revoking the Mico (`revokeBot`, run on every poll and on the channel's 60 s
+  recheck) or the PC ends the run, and its later messages are checked in full again. A new
+  binding for the Mico also disqualifies the old run's messages.
+- **Unchanged.** HMAC, freshness, nonce replay protection, the PC's own admission and every
+  dispatch bound still apply.
+- **Future option.** The persistent worker stream stays open as an option if a later
+  measurement shows connection or signing cost on the internal leg.
 
 ## Qualification
 

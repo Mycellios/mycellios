@@ -653,3 +653,24 @@ describe("agent channel", () => {
     broker.close(); await callback.text(); void run.body?.cancel();
   });
 });
+
+describe("admitted agent messages", () => {
+  it("recognises a message of an open agent run on its own binding and session only", () => {
+    broker = new DesktopRelayBroker();
+    broker.register(owner, { ...binding, agentExecution: 1 });
+    broker.connectAccountBot(owner, "bot");
+    const sessionId = crypto.randomUUID();
+    const run = broker.dispatch({ method: "agentRun", botId: "bot", runId: "run", sessionId, request: {} }, context());
+    const message = (overrides: Record<string, unknown> = {}) =>
+      ({ method: "agentMessage", botId: "bot", runId: "run", sessionId, message: {}, ...overrides }) as Parameters<DesktopRelayBroker["dispatch"]>[0];
+    expect(broker.admittedMessage(owner, message())).toBe(true);
+    expect(broker.admittedMessage(owner, message({ sessionId: crypto.randomUUID() }))).toBe(false);
+    expect(broker.admittedMessage(owner, message({ runId: "other" }))).toBe(false);
+    expect(broker.admittedMessage({ ...owner, spaceId: "other" }, message())).toBe(false);
+    expect(broker.admittedMessage(owner, { method: "environment", botId: "bot" })).toBe(false);
+    // Revoking the Mico ends the run, so its messages need the full check again.
+    broker.revokeBot(owner, "bot");
+    expect(broker.admittedMessage(owner, message())).toBe(false);
+    void run.body?.cancel();
+  });
+});
