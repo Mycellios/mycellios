@@ -25,7 +25,8 @@ const connect = vi.hoisted(() => vi.fn());
 const account = vi.hoisted(() => vi.fn());
 const install = vi.hoisted(() => vi.fn());
 const refetch = vi.hoisted(() => vi.fn());
-const queryCalls = vi.hoisted(() => [] as Array<{ queryKey: string[]; staleTime?: number; refetchOnMount?: unknown }>);
+const queryCalls = vi.hoisted(() => [] as Array<{ queryKey: string[]; staleTime?: number; refetchOnMount?: unknown; enabled?: boolean }>);
+const fetching = vi.hoisted(() => ({ value: false }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
   t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((text, part, i) => `${text}${i ? values[i - 1] : ""}${part}`, ""),
 }) }));
@@ -35,7 +36,7 @@ vi.mock("../../lib/query", () => {
 });
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect }, engines: { account, install } }) }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"]; staleTime?: number; refetchOnMount?: unknown }) => (queryCalls.push(options), { data: options.queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[options.queryKey[0]], isPending: false, refetch, dataUpdatedAt: fixtures.dataUpdatedAt }),
+  useQuery: (options: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"]; staleTime?: number; refetchOnMount?: unknown }) => (queryCalls.push(options), { data: options.queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[options.queryKey[0]], isPending: false, isFetching: fetching.value, refetch, dataUpdatedAt: fixtures.dataUpdatedAt }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
@@ -45,7 +46,7 @@ vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onCh
 }));
 vi.mock("@mycellios/ui-web", () => ({
   Popover: ({ children, onOpenChange }: { children: ReactNode; onOpenChange: (open: boolean) => void }) => <div><button data-open onClick={() => onOpenChange(true)}>Open</button>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <button data-trigger>{children}</button>,
+  PopoverTrigger: ({ children, onFocus }: { children: ReactNode; onFocus?: () => void }) => <button data-trigger onFocus={onFocus}>{children}</button>,
   PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Button: ({ children, onClick }: { children: ReactNode; onClick: () => void }) => <button onClick={onClick}>{children}</button>,
   Switch: ({ checked, onCheckedChange, "aria-label": label }: { checked: boolean; onCheckedChange: (value: boolean) => void; "aria-label": string }) =>
@@ -64,6 +65,7 @@ beforeEach(() => {
   fixtures.nativeModels = [];
   fixtures.engines = { computer: "server", engines: ["codex", "opencode"] };
   fixtures.mycelliosCatalog = [];
+  fetching.value = false;
   fixtures.credentials.splice(1);
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
@@ -85,6 +87,23 @@ it("reuses recent account reads across Micos and refreshes older connections whe
   await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
   expect(refetch).toHaveBeenCalledTimes(2);
   fixtures.dataUpdatedAt = Date.now();
+});
+it("asks the PC for its engines once focus or the pointer reaches the button, before the picker opens", async () => {
+  queryCalls.length = 0;
+  act(() => root.render(<ChatHeaderModel bot={{ id: "bot", agentEngine: "claude", modelProvider: null, modelId: null, thinkingLevel: null } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
+  const engines = () => queryCalls.filter(call => call.queryKey[0] === "engines").at(-1);
+  expect(engines()).toMatchObject({ enabled: false, staleTime: 60_000 });
+  act(() => container.querySelector<HTMLButtonElement>("[data-trigger]")!.focus());
+  expect(engines()).toMatchObject({ enabled: true });
+});
+it("says Claude Code's models are loading only while its own list is missing", async () => {
+  fixtures.engines = { computer: "desktop", engines: ["claude"] };
+  fetching.value = true;
+  await render("claude");
+  expect(container.textContent).toContain("Loading models…");
+  fixtures.engines = { computer: "desktop", engines: ["claude"], models: { claude: [{ id: "opus", label: "Opus", isDefault: true, thinkingLevels: [], fast: false }] } };
+  await render("claude");
+  expect(container.textContent).not.toContain("Loading models…");
 });
 it("shows the installed provider instead of the unrelated general model", async () => {
   await render();

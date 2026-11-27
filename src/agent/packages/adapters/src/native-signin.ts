@@ -80,8 +80,9 @@ export function watchNativeSignIn(engine: SignInEngine, command: NativeCommand, 
 }
 
 /**
- * Cached sign-in state, so engine discovery stays fast: a fresh answer is reused for a minute,
- * a first probe is awaited briefly and otherwise keeps running for the next read.
+ * Cached sign-in state, so engine discovery stays fast: a fresh answer is reused for a minute, an
+ * older one is answered at once while the CLI is asked again (a sign-in or sign-out from Mycellios
+ * forgets it), and a first probe is awaited briefly and otherwise keeps running for the next read.
  */
 export async function nativeSignInState(
   engine: SignInEngine,
@@ -102,6 +103,8 @@ export async function nativeSignInState(
     cache.set(key, started);
     void pending.then(value => { if (cache.get(key) === started) cache.set(key, { at: now(), value }); });
   }
+  // A known answer is given at once while the CLI is asked again, except while a sign-in may finish.
+  if (entry?.value !== undefined && watchedUntil <= now()) return entry.value;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<"late">(resolve => { timer = setTimeout(() => resolve("late"), options.waitMs ?? FIRST_WAIT_MS); });
   const result = await Promise.race([pending, late]).finally(() => clearTimeout(timer));

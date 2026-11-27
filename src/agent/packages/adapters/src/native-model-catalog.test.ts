@@ -27,8 +27,34 @@ describe("nativeModelCatalog", () => {
     expect(probe).toHaveBeenCalledTimes(1);
     now += 5 * 60_000;
     probe.mockResolvedValueOnce([]);
+    // An older list comes back at once while the CLI is asked again.
+    expect(await nativeModelCatalog("claude", claude, { probe, now: () => now })).toEqual([model]);
+    expect(probe).toHaveBeenCalledTimes(2);
+    await new Promise(resolve => setTimeout(resolve, 0));
     expect(await nativeModelCatalog("claude", claude, { probe, now: () => now })).toEqual([]);
     expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it("answers the last list at once instead of waiting for a slow refresh", async () => {
+    let now = 0;
+    const probe = vi.fn().mockResolvedValue([model]);
+    await nativeModelCatalog("claude", claude, { probe, now: () => now });
+    now += 6 * 60_000;
+    probe.mockImplementationOnce(() => new Promise(() => {}));
+    const started = Date.now();
+    expect(await nativeModelCatalog("claude", claude, { probe, now: () => now, waitMs: 1_000 })).toEqual([model]);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("keeps the last list when a refresh fails", async () => {
+    let now = 0;
+    const probe = vi.fn().mockResolvedValue([model]);
+    await nativeModelCatalog("claude", claude, { probe, now: () => now });
+    now += 6 * 60_000;
+    probe.mockRejectedValueOnce(new Error("busy"));
+    await nativeModelCatalog("claude", claude, { probe, now: () => now });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await nativeModelCatalog("claude", claude, { probe, now: () => now })).toEqual([model]);
   });
 
   it("answers unknown for a slow first read and keeps its result for the next one", async () => {

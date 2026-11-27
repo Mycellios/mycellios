@@ -54,8 +54,9 @@ type Entry = { at: number; value: NativeCodexModel[] | undefined; pending?: Prom
 const cache = new Map<string, Entry>();
 
 /**
- * Cached catalog, so engine discovery stays fast: a fresh list is reused for five minutes, a first
- * read is awaited briefly and otherwise keeps running for the next one. A failure is `undefined`.
+ * Cached catalog, so engine discovery stays fast: a fresh list is reused for five minutes, an older
+ * one is answered at once while the CLI is asked again, and a first read is awaited briefly and
+ * otherwise keeps running for the next one. A failure is `undefined`.
  */
 export async function nativeModelCatalog(
   engine: CatalogEngine,
@@ -71,8 +72,10 @@ export async function nativeModelCatalog(
     pending = (options.probe ?? probeNativeModels)(engine, command).catch(() => undefined);
     const started: Entry = { at: entry?.at ?? 0, value: entry?.value, pending };
     cache.set(key, started);
-    void pending.then(value => { if (cache.get(key) === started) cache.set(key, { at: now(), value }); });
+    void pending.then(value => { if (cache.get(key) === started) cache.set(key, { at: now(), value: value ?? started.value }); });
   }
+  // Each read starts Claude Code for seconds: the model picker shows the last list meanwhile.
+  if (entry?.value !== undefined) return entry.value;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<"late">(resolve => { timer = setTimeout(() => resolve("late"), options.waitMs ?? FIRST_WAIT_MS); });
   const result = await Promise.race([pending, late]).finally(() => clearTimeout(timer));

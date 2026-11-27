@@ -48,6 +48,7 @@ function connectionName(connection: ModelCredential) {
 export const HEADER_MODEL_REUSE_MS = 5 * 60_000;
 /** Opening the picker rereads connections and catalog older than the usual freshness window. */
 const PICKER_FRESH_MS = 30_000;
+const ENGINES_REUSE_MS = 60_000;
 
 export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, recovery = false, inMenu = false }: {
   bot: Bot;
@@ -79,7 +80,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const refreshPicker = () => {
     for (const query of [credentialsQuery, catalogQuery]) if (Date.now() - query.dataUpdatedAt > PICKER_FRESH_MS) void query.refetch();
   };
-  const enginesQuery = useQuery(queries.engines.forBot.queryOptions({ input: { botId: bot.id }, enabled: open }));
+  // The PC's engines and models are asked for as soon as the pointer or focus reaches the button,
+  // so the list is usually there when the picker opens; a recent answer is reused for a minute.
+  const [wantEngines, setWantEngines] = useState(false);
+  const enginesQuery = useQuery({ ...queries.engines.forBot.queryOptions({ input: { botId: bot.id } }),
+    enabled: open || wantEngines, staleTime: ENGINES_REUSE_MS });
   const refetchEngines = enginesQuery.refetch;
   const refreshEngines = useCallback(() => void refetchEngines(), [refetchEngines]);
   // Servers that predate per-computer catalogs only list Codex models of their own CLI.
@@ -278,7 +283,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   return (
     <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 shrink-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
       <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setExploring(null); setLastProvider(null); setError(null); if (next && me) refreshPicker(); } }}>
-        <PopoverTrigger type="button" title={label} data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
+        <PopoverTrigger type="button" title={label} onPointerEnter={() => setWantEngines(true)} onFocus={() => setWantEngines(true)} data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
           ? "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-foreground"
           : "app-no-drag flex h-8 min-w-0 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-normal text-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring @max-[32rem]:size-8 @max-[32rem]:justify-center @max-[32rem]:gap-0 @max-[32rem]:px-0"}>
           {inMenu ? <><Cpu aria-hidden /><span>{t`Model`}</span><span className="ms-auto min-w-0 truncate text-xs text-muted-foreground">{label}</span></> : (
@@ -327,9 +332,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                   .map(entry => modelOptionKey(entry.provider, entry.id)))}
               />}
             </fieldset>}
-          {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
-          {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isError ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}
-          {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.data?.length === 0 ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`No Mycellios agent models are available right now. Retrying automatically.`}</p> : null}
+          {(["codex", "claude"] as const).some(engine => NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && !engineModels(engine).length)
+            && enginesQuery.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
+          {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isFetching ?<p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
+          {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isError ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}
+          {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.data?.length === 0 ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`No Mycellios agent models are available right now. Retrying automatically.`}</p> : null}
           {!recovery && (!lastProvider || lastProvider === currentProvider) && levels.length ? <label className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-sm">{t`Effort`}
             <OptionSelect
               aria-label={t`Thinking`}
