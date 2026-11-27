@@ -5,7 +5,7 @@ import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import type {RpcClient} from "../lib/rpc";
 vi.mock("@lingui/react/macro",()=>({Trans:({children}:{children:unknown})=>children,useLingui:()=>({t:(strings:TemplateStringsArray,...values:unknown[])=>strings.reduce((text,part,index)=>text+part+(index<values.length?String(values[index]):""),""),i18n:{locale:"en"}})}));
-vi.mock("../lib/general-preferences",()=>({useGeneralPreferences:()=>({compactMessageActions:true})}));
+vi.mock("../lib/general-preferences",async(importOriginal)=>({...await importOriginal<typeof import("../lib/general-preferences")>(),useGeneralPreferences:()=>({compactMessageActions:true})}));
 import {MessagePinsContext,PinnedMessagesButton,useMessagePins} from "./PinnedMessages";
 import {MessageHoverActions} from "../pages/shell/message-hover-actions";
 

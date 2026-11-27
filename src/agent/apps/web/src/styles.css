@@ -259,23 +259,8 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   100% { clip-path: inset(0 0 0 100%); }
 }
 .rk-thinking-avatar { position: relative; display: inline-flex; flex-shrink: 0; }
-.rk-thinking-dots {
-  position: absolute; top: -6px; inset-inline-start: 50%; translate: -50% 0;
-  display: flex; gap: 2px; pointer-events: none;
-}
-.rk-thinking-dots i {
-  width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .35;
-  animation: rk-thinking-dot 1.2s ease-in-out infinite;
-}
-.rk-thinking-dots i:nth-child(2) { animation-delay: .15s; }
-.rk-thinking-dots i:nth-child(3) { animation-delay: .3s; }
-@keyframes rk-thinking-dot {
-  0%, 60%, 100% { transform: translateY(0); opacity: .35; }
-  30% { transform: translateY(-2px); opacity: 1; }
-}
 @media (prefers-reduced-motion: reduce) {
   .rk-activity-label::after { display: none; }
-  .rk-thinking-dots i { animation: none; opacity: .6; }
 }
 
 /* Shared web/Desktop workspace: page rail, chat list and compact title row. */

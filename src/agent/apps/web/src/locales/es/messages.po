@@ -12470,7 +12470,7 @@ msgid "Task failed"
 msgstr "La tarea ha fallado"
 
 msgid "Thinking it through…"
-msgstr "Pensándolo…"
+msgstr "Pensando…"
 
 msgid "Thinking…"
 msgstr "Pensando…"
