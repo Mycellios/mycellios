@@ -408,7 +408,14 @@ it("routes a Mico to the PC that reports its folder and reports an unchosen one 
   const windows = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await call("session-a", "identity", {})).json(), agentExecution: 1 };
   const mac = { deviceId: randomUUID(), generation: randomUUID(), identity: await (await call("session-b", "identity", {})).json(), agentExecution: 1 };
   // The account response tells a new Desktop that this server accepts its folder report.
-  expect(await (await call("session-a", "account", windows)).json()).toMatchObject({ ownership: 1 });
+  // It also offers the agent channel, which opens as a stream for that same PC session.
+  expect(await (await call("session-a", "account", windows)).json()).toMatchObject({ ownership: 1, agentChannel: 1 });
+  const channel = await call("session-a", "channel", { deviceId: windows.deviceId });
+  expect(channel.headers.get("content-type")).toBe("application/x-ndjson");
+  const reader = channel.body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe(`{"keepalive":1}${"\n"}`);
+  await reader.cancel();
+  expect((await call("session-b", "channel", { deviceId: windows.deviceId })).status).toBe(409);
   expect((await call("session-b", "account", mac)).status).toBe(200);
   expect(await probe("test-bot")).toEqual({ agentExecution: 1, available: false, preferred: true, unresolved: true });
   expect(await probe("test-bot", false)).toEqual({ available: false, unresolved: true });

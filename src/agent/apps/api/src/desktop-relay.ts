@@ -20,6 +20,9 @@ import {
 import { HOST_COMPUTER_MAX_BYTES } from "../../../packages/adapters/src/host-computer-protocol.js";
 import { readBoundedBody } from "./http-body.js";
 
+/** How often an open agent channel rechecks the PC's session and its Micos. */
+const DESKTOP_CHANNEL_RECHECK_MS = 60_000;
+
 /** Fixed routes; no remote URL, path, OS token or account identity comes from the browser. */
 export function mountDesktopRelay(
   app: Hono,
@@ -205,7 +208,8 @@ export function mountDesktopRelay(
           broker.register(owner,value);
           await recheckBindings(session.actor, owner, value.deviceId);
           // ownership: this server accepts the PC's Mico folder keys in later registrations.
-          return c.json({...await poll(value),identity,ownership:1});
+          // agentChannel: this server carries agent messages on an agent channel (phase 3).
+          return c.json({...await poll(value),identity,ownership:1,agentChannel:1});
         }
         case "bind": {
           const value = parseDesktopBinding(input);
@@ -222,7 +226,28 @@ export function mountDesktopRelay(
           const value = parseDesktopPoll(input);
           await recheckBindings(session.actor, owner, value.deviceId);
           // Membership/session was freshly checked above on every heartbeat.
-          return c.json({ ...await poll(value), identity });
+          return c.json({ ...await poll(value), identity, agentChannel: 1 });
+        }
+        case "channel": {
+          const value = parseDesktopPoll(input);
+          await recheckBindings(session.actor, owner, value.deviceId);
+          const closed = new AbortController();
+          const stream = broker.attachChannel(owner, value.deviceId, AbortSignal.any([c.req.raw.signal, closed.signal]));
+          // Checked when it opens and every minute while it stays open, instead of twice per message.
+          const recheck = setInterval(() => void (async () => {
+            const current = await deps.authenticate(c.req.raw);
+            if (!current || current.sessionId !== owner.sessionId || current.actor.userId !== owner.userId || current.actor.spaceId !== owner.spaceId) {
+              broker.revoke(owner, value.deviceId);
+              return;
+            }
+            await recheckBindings(current.actor, owner, value.deviceId);
+          })().catch(() => closed.abort()), DESKTOP_CHANNEL_RECHECK_MS);
+          recheck.unref?.();
+          const stop = () => { clearInterval(recheck); closed.abort(); };
+          c.req.raw.signal.addEventListener("abort", stop, { once: true });
+          const body = stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ flush: stop }));
+          // Proxies must pass each line on at once, as for the event streams of threads.subscribe.
+          return new Response(body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" } });
         }
         case "result": {
           const value = parseDesktopResult(input);

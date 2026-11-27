@@ -978,7 +978,11 @@
   to open() gets every later batch sent to it, numbered from 1 and one at a time, and
   answers no reads; it orders and bounds them (pushedBatches), and older peers keep
   reading. A broken pushed stream is released and ends with `{ failed: true }`.
-  Verify desktop-model-push too. The Desktop relay sends every
+  Verify desktop-model-push too. An API that answers `agentChannel: 1` delivers a PC's
+  agentMessage operations on its open agent channel (POST /api/desktop-relay/channel), never
+  through a poll; the result POST still acknowledges them, a channel that ends returns the
+  unacknowledged ones to the poll and the PC runs each operation id once. The channel is authenticated
+  when it opens and every 60 s. The Desktop relay sends every
   complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
   with the stream end joined to the last lines, and the API rechecks all of a PC's
   bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,
