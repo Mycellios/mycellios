@@ -351,4 +351,3 @@ it("says a new turn is thinking while it starts, and shows a start that takes lo
   act(() => { vi.advanceTimersByTime(9_000); });
   expect(node.textContent).toContain("Queued");
 });
-
