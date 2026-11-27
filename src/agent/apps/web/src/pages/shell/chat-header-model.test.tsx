@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ChatHeaderModel, HEADER_MODEL_REUSE_MS } from "./chat-header-model";
 
 const fixtures = vi.hoisted(() => ({
+  dataUpdatedAt: Date.now(),
   me: { userId: "user", spaceId: "space", defaultProvider: "opencode-go", defaultModel: "gpt-6-luna", needsModel: false },
   credentials: [{ id: "go", provider: "opencode-go", label: "OpenCode Go", modelId: "gpt-6-luna", hasKey: true }] as ModelCredential[],
   mycelliosCatalog: [] as ModelCatalogEntry[],
@@ -34,7 +35,7 @@ vi.mock("../../lib/query", () => {
 });
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => ({ models: { credentials: async () => fixtures.credentials, connect }, engines: { account, install } }) }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"]; staleTime?: number; refetchOnMount?: unknown }) => (queryCalls.push(options), { data: options.queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[options.queryKey[0]], isPending: false, refetch }),
+  useQuery: (options: { queryKey: [keyof typeof fixtures | "mycellios-chat-catalog"]; staleTime?: number; refetchOnMount?: unknown }) => (queryCalls.push(options), { data: options.queryKey[0] === "mycellios-chat-catalog" ? fixtures.mycelliosCatalog : fixtures[options.queryKey[0]], isPending: false, refetch, dataUpdatedAt: fixtures.dataUpdatedAt }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
@@ -71,15 +72,19 @@ async function render(engine: Bot["agentEngine"] = "codex") {
   act(() => root.render(<ChatHeaderModel bot={{ id: "bot", agentEngine: engine, modelProvider: null, modelId: null, thinkingLevel: "medium" } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
   await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
 }
-it("reuses recent account reads across Micos and refreshes connections when the picker opens", async () => {
+it("reuses recent account reads across Micos and refreshes older connections when the picker opens", async () => {
   queryCalls.length = 0; refetch.mockClear();
   act(() => root.render(<ChatHeaderModel bot={{ id: "bot", agentEngine: "pi", modelProvider: null, modelId: null, thinkingLevel: "medium" } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
   for (const key of ["me", "credentials", "catalog"]) {
     expect(queryCalls.find(call => call.queryKey[0] === key)).toMatchObject({ refetchOnMount: true, staleTime: HEADER_MODEL_REUSE_MS });
   }
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
   expect(refetch).not.toHaveBeenCalled();
+  fixtures.dataUpdatedAt = Date.now() - 31_000;
+  act(() => root.render(<ChatHeaderModel bot={{ id: "bot", agentEngine: "pi", modelProvider: null, modelId: null, thinkingLevel: "medium" } as Bot} me={fixtures.me as Me} onSave={save} onConnections={() => {}} />));
   await act(async () => container.querySelector<HTMLButtonElement>("[data-open]")!.click());
   expect(refetch).toHaveBeenCalledTimes(2);
+  fixtures.dataUpdatedAt = Date.now();
 });
 it("shows the installed provider instead of the unrelated general model", async () => {
   await render();
