@@ -17,7 +17,7 @@ describe("diagnostic report", () => {
 
   it("probes the server three times and keeps only a revision-shaped value", async () => {
     let clock = 0;
-    const fetcher = vi.fn(async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       clock += 100;
       return new Response(JSON.stringify({ ok: true, revision: "1f198fa57bdfaf8873042910c78f8d24ea94a126" }));
     });
