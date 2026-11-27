@@ -621,7 +621,7 @@ export function BotSettings({
     permissions: t`Permissions`,
     advanced: t`Advanced`,
   };
-  const computerLabel = computerMode === "isolated" ? t`Just this Mico` : computerMode === "team" ? t`Shared` : t`This PC`;
+  const computerLabel = computerModeLabel(computerMode);
 
   return (
     <div data-testid="bot-settings">
