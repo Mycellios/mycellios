@@ -10,6 +10,8 @@ export const translateRunError: RunErrorTranslator = (message, values) => {
       return i18n._({ id: "The native agent is not available on this computer. Check its installation and Mico settings.", message: "The native agent is not available on this computer. Check its installation and Mico settings.", values });
     case "Mycellios encountered an internal error.":
       return i18n._({ id: "Mycellios encountered an internal error.", message: "Mycellios encountered an internal error.", values });
+    case "Mycellios restarted for an update while this turn was running. Review what it already did before continuing.":
+      return i18n._({ id: "Mycellios restarted for an update while this turn was running. Review what it already did before continuing.", message: "Mycellios restarted for an update while this turn was running. Review what it already did before continuing.", values });
     case "Desktop could not confirm the result. Review what it already did before continuing.":
       return i18n._({ id: "Desktop could not confirm the result. Review what it already did before continuing.", message: "Desktop could not confirm the result. Review what it already did before continuing.", values });
     case "{provider} could not complete the request. The cause is unknown.":

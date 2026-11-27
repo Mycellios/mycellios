@@ -9340,6 +9340,11 @@ msgstr "No se ha enviado el mensaje. Tu texto se conserva aquí."
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
+msgid "Mycellios restarted for an update while this turn was running. Review what it already did before continuing."
+msgstr "Mycellios se reinició por una actualización mientras se ejecutaba este turno. Revisa qué se hizo antes de continuar."
+
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "Desktop could not confirm the result. Review what it already did before continuing."
 msgstr "No se pudo confirmar el resultado en tu PC. Revisa qué se hizo antes de continuar."
 
@@ -16210,3 +16215,9 @@ msgstr "Trabaja en un ordenador propio en el servidor de Mycellios, con su naveg
 
 msgid "It works on a Mycellios server computer that it shares with your other Micos in this space. It cannot see your PC."
 msgstr "Trabaja en un ordenador del servidor de Mycellios que comparte con tus otros Micos de este espacio. No ve tu PC."
+
+msgid "Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly."
+msgstr "Mycellios no responde ahora mismo; suele pasar un minuto mientras se actualiza. No se ha cambiado nada. Vuelve a intentarlo en un momento."
+
+msgid "Mycellios models are not available right now. Try again shortly."
+msgstr "Los modelos de Mycellios no están disponibles ahora mismo. Vuelve a intentarlo en un momento."

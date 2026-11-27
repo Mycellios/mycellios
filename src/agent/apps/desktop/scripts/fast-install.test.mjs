@@ -92,6 +92,30 @@ test('refuses paths outside the named installation without moving data',{skip:!w
   }
 });
 
+test('prepare reports an open app with its own exit code and moves nothing',{skip:process.platform!=='win32',timeout:60000},async()=>{
+  const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-open-'));
+  const installation=path.join(root,'mycellios-desktop'),journal=path.join(root,'journal.json');
+  // Any long-running executable under the product name stands in for the open app.
+  const running=path.join(installation,'Mycellios Desktop.exe');
+  let child;
+  try{
+    await mkdir(installation);await copyFile(path.join(process.env.SystemRoot??'C:/Windows','System32/PING.EXE'),running);
+    const {spawn}=await import('node:child_process');
+    child=spawn(running,['-n','60','127.0.0.1'],{windowsHide:true,stdio:'ignore'});
+    await new Promise(resolve=>child.once('spawn',resolve));
+    let status;
+    try{execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation','prepare','-Installation',installation,'-Journal',journal,'-Uninstaller','Uninstall Mycellios Desktop.exe','-TargetVersion','99.0.0'],{windowsHide:true,stdio:'pipe'});status=0}
+    catch(error){status=error.status}
+    assert.equal(status,3);
+    await access(running);await assert.rejects(access(journal));
+    await assert.rejects(access(path.join(root,'mycellios-desktop-upgrade-backups')));
+  }finally{
+    child?.kill();if(child&&child.exitCode===null)await new Promise(resolve=>child.once('exit',resolve));
+    assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir())+path.sep+'mycellios-fast-install-open-'));
+    await rm(root,{recursive:true,force:true});
+  }
+});
+
 test('Windows commit keeps the two newest settled recovery copies and every unsettled one',{skip:!windows,timeout:60000},async()=>{
   const root=await mkdtemp(path.join(tmpdir(),'mycellios-fast-install-retention-'));
   const installation=path.join(root,'mycellios-desktop'),journal=path.join(root,'journal.json'),guid=randomUUID();

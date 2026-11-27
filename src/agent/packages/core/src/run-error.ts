@@ -326,6 +326,15 @@ export function normalizeRunError(
       kind: "maintenance",
     };
   }
+  // A deploy restarted the relay while the PC was working: name the update, not the PC.
+  // The outcome is still uncertain, so the person checks what already happened.
+  if (parseDesktopDiagnostic(trimmed)?.code === "relay_restarted") {
+    return {
+      summary: translate("Mycellios restarted for an update while this turn was running. Review what it already did before continuing."),
+      details,
+      kind: "interrupted",
+    };
+  }
   if (isUncertainDesktopText(trimmed)) {
     return {
       summary: translate("Desktop could not confirm the result. Review what it already did before continuing."),

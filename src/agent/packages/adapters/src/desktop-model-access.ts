@@ -6,6 +6,28 @@ import { maximumModelCallCost, observedPiStream } from "./pi-usage.js";
 import { readModelBatch } from "./desktop-model-batch.js";
 import type { ModelBatchState } from "./desktop-model-batch.js";
 
+type PushedBatch = Awaited<ReturnType<typeof readModelBatch>> | { failed: true };
+
+/**
+ * Sends a stream's batches to the PC in order, one at a time: each send returns once the PC
+ * received it, so batches never overtake one another. A stream that breaks is released and the
+ * PC is told once; a PC that cannot hear it has lost the run's transport as well.
+ */
+export async function pushModelBatches(read: () => Promise<Awaited<ReturnType<typeof readModelBatch>>>,
+  push: (seq: number, batch: PushedBatch) => unknown, stop: () => Promise<void>) {
+  let seq = 0;
+  try {
+    for (;;) {
+      const batch = await read();
+      await push(++seq, batch);
+      if (batch.done) return;
+    }
+  } catch {
+    await stop().catch(() => undefined);
+    await Promise.resolve(push(++seq, { failed: true })).catch(() => undefined);
+  }
+}
+
 /** Cloud retains keys, OAuth refresh and private connection endpoints for every provider. */
 export function desktopModelAccess(config: AgentRunModel, signal: AbortSignal, cleanup: Set<() => void>, accounting: {
   runId: string; userId: string; operationKind: AgentRunRequest["usageOperationKind"];
@@ -59,12 +81,20 @@ export function desktopModelAccess(config: AgentRunModel, signal: AbortSignal, c
       } finally { reading = false; }
     };
     // A Desktop that asks for it gets the first events with the stream, one round trip sooner.
-    if (accept?.firstBatch !== true) return { cancel: stop, read };
-    try {
-      return { cancel: stop, read, first: await read() };
-    } catch (error) {
-      await stop().catch(() => undefined);
-      throw error;
+    let first: Awaited<ReturnType<typeof read>> | undefined;
+    if (accept?.firstBatch === true) {
+      try {
+        first = await read();
+      } catch (error) {
+        await stop().catch(() => undefined);
+        throw error;
+      }
     }
+    // A Desktop that offers a sink gets every later batch sent to it without asking: one one-way
+    // operation per batch, and the next batch gathers while the previous one travels.
+    const push = typeof accept?.push === "function" ? accept.push : undefined;
+    if (!push) return first ? { cancel: stop, read, first } : { cancel: stop, read };
+    if (!first?.done) void pushModelBatches(read, push, stop);
+    return first ? { cancel: stop, read, first, pushed: true as const } : { cancel: stop, read, pushed: true as const };
   } } };
 }

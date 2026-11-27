@@ -1,6 +1,7 @@
 import { responseLanguageInstruction } from "../response-language.js";
 import { initialComputerAssignmentFilter } from "../initial-computer-assignment.js";
 import { adoptLocalEngines } from "../local-engine-adoption.js";
+import { copyBeforeComputerSwitch } from "../computer-switch.js";
 import { randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@mycellios/adapter-kit";
@@ -596,17 +597,20 @@ export function botsRoutes(ctx: RouterContext) {
             const ctx = computerContext(context.actor, bot.id, "computer.switch");
             const ref = toComputerRef(bot.computer);
             if (bot.computer.state === "running") {
-              try {
-                await checkpointAndRecordComputerWorkspace(deps, bot.computer, ref, ctx);
-              } catch (error) {
-                // The PC that answered has no folder for this Mico (another PC made it, or it
-                // was removed): there is nothing to save, so keep the last saved copy and switch.
-                if (ref.kind !== "desktop" || !isMissingPcWorkspaceError(error)) throw error;
-                getLogger().warn("computer.switch.pc_workspace_missing", {
-                  "computer.id": bot.computer.id,
-                });
-              }
-              await deps.sandbox.stop(ref, ctx);
+              const computer = bot.computer;
+              await copyBeforeComputerSwitch(computer.kind, async () => {
+                try {
+                  await checkpointAndRecordComputerWorkspace(deps, computer, ref, ctx);
+                } catch (error) {
+                  // The PC that answered has no folder for this Mico (another PC made it, or it
+                  // was removed): there is nothing to save, so keep the last saved copy and switch.
+                  if (ref.kind !== "desktop" || !isMissingPcWorkspaceError(error)) throw error;
+                  getLogger().warn("computer.switch.pc_workspace_missing", {
+                    "computer.id": computer.id,
+                  });
+                }
+                await deps.sandbox.stop(ref, ctx);
+              });
             }
             await deps.prisma.computerExecutionLease.deleteMany({
               where: { computerId: bot.computer.id, botId: bot.id },
