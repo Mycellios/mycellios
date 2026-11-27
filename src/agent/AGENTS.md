@@ -1001,7 +1001,11 @@
   and session (admittedMessage) skips the per-message ownsBot query; revokeBot ends that run. The Desktop relay sends every
   complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
   with the stream end joined to the last lines, and the API rechecks all of a PC's
-  bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,
+  bound Micos with one ownedBots read. A turn asks its PC's environment as soon as the
+  computer kind is known (groups after their shared folders), in parallel with the rest of
+  its setup, and with `engines: false`: the PC then skips its CLI engine reads, which only
+  nativeEngineState (the picker) needs. `run.prepared` logs `run.prepare_ms`, the setup time
+  before the engine starts. Verify host-computer tests. Verify desktop-model-batch, desktop-model-stream,
   desktop-agent-runtime and the Desktop/API relay tests.
   Phase 4 of specs/local-engine-default/spec.md gives only explicitly requested,
   recoverable owned Desktop shell commands the ephemeral loopback model token.

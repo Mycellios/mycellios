@@ -619,6 +619,32 @@ it("drains a completed result instead of cancelling the relay before the PC ackn
   expect(cancelled).toBe(false);
 });
 
+it("answers a turn's environment without reading the PC's CLI engines, which the picker still gets", async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-host-engines-")));
+  const nativeEngineState = vi.fn(async () => ({ engines: ["codex" as const], signedOut: [] }));
+  const nativeEngines = vi.fn(async () => ["codex" as const]);
+  const agentRuntime = {
+    describe: () => ({ id: "fixture", contractVersion: "1", adapterVersion: "1", capabilities: { streaming: true, tools: true, compaction: true, scripted: true } }),
+    abort: vi.fn(), async *run() {}, nativeEngineState, nativeEngines,
+  };
+  const server = await startHostComputerServer({ root, token, hostname: "127.0.0.1", agentRuntime });
+  const client = new HostComputerSandbox(`http://127.0.0.1:${server.port}`, token);
+  const scoped = { ...context, botId: "test-bot" };
+  try {
+    server.setEnabled(true);
+    const environment = await client.environment({ id: "host", botId: "test-bot", kind: "desktop", providerRef: root }, scoped);
+    expect(environment).toMatchObject({ chunkedWrites: true });
+    expect(environment).not.toHaveProperty("nativeEngines");
+    expect(nativeEngineState).not.toHaveBeenCalled();
+    expect(nativeEngines).not.toHaveBeenCalled();
+    expect(await client.nativeEngineState(scoped)).toMatchObject({ engines: ["codex"] });
+    expect(nativeEngineState).toHaveBeenCalledOnce();
+  } finally {
+    await server.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  }
+});
+
 it("signs the PC's CLIs in only with local consent and passes on only a checked answer", async () => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "mycellios-host-account-")));
   const nativeEngineAccount = vi.fn().mockResolvedValue({ status: "device", userCode: "ABCD-1234", verificationUrl: "https://auth.example.test/device" });

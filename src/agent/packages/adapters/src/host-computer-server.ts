@@ -483,12 +483,14 @@ export async function startHostComputerServer(options: {
     }
     switch (input.method) {
       case "environment": {
-        const engineState = await options.agentRuntime?.nativeEngineState?.();
+        // A turn only needs the shell, paths and consents; the engine reads are for the picker.
+        const wantsEngines = input.engines !== false;
+        const engineState = wantsEngines ? await options.agentRuntime?.nativeEngineState?.() : undefined;
         yield {
           ...(await provider.environment()),
           chunkedWrites: true,
           ...(agentHost ? { desktopToolModels: 1 as const } : {}),
-          nativeEngines: engineState?.engines ?? await options.agentRuntime?.nativeEngines?.(),
+          ...(wantsEngines ? { nativeEngines: engineState?.engines ?? await options.agentRuntime?.nativeEngines?.() } : {}),
           ...(engineState?.signedOut.length ? { signedOutEngines: engineState.signedOut } : {}),
           ...(engineState?.signedIn?.length ? { signedInEngines: engineState.signedIn } : {}),
           ...(engineState?.models && Object.keys(engineState.models).length ? { nativeModels: engineState.models } : {}),

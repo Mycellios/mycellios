@@ -66,8 +66,16 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
       "snapshot",
       "stop",
       "destroy",
-      "environment",
     ]),
+  }),
+  z.object({
+    ...base,
+    method: z.literal("environment"),
+    /**
+     * false: the caller needs only the computer's shell, paths and consents, not its CLI
+     * engines, whose sign-in and model reads take seconds. Older hosts ignore it.
+     */
+    engines: z.literal(false).optional(),
   }),
   z.object({
     ...base,

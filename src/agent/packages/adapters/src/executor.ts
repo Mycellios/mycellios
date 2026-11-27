@@ -4041,6 +4041,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         return;
       }
       let attempt: { id: string };
+      // When this attempt began its setup, to report how long the turn waited before its engine ran.
+      let preparationStartedAt = performance.now();
       // Resumed attempts keep the first start, so lateness reflects when the run began.
       const executionStartedAt = current.startedAt ?? new Date();
       try {
@@ -4057,6 +4059,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         getLogger().info("run.execution_started", {
           ...(await readRunTimingFields(deps.prisma, runId)),
         });
+        preparationStartedAt = performance.now();
         attempt = await deps.prisma.attempt.create({
           data: { runId, fence, status: "running" },
         });
@@ -4700,6 +4703,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
           throw error;
         });
         const computerKind = provisionKind ?? storedComputer.kind;
+        // The PC's answer (shell, home, consents) is a relay round trip. Ask now, while the rest
+        // of the turn is prepared, instead of waiting for it in line. A group turn asks later,
+        // once its shared folders are known, since they travel with the request.
+        const readHostEnvironment = () => computerKind === "desktop" && !memberRun
+          ? Promise.resolve(deps.sandbox.environment?.(
+              {
+                id: storedComputer.providerRef ?? storedComputer.id,
+                botId: storedComputer.homeKey,
+                kind: "desktop",
+                providerRef: storedComputer.providerRef ?? "",
+              },
+              { ...context, signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]) },
+            )).catch(() => undefined)
+          : Promise.resolve(undefined);
+        const earlyHostEnvironment = thread.groupId ? undefined : readHostEnvironment();
         const computerAvailable = !memberRun && !(context.isolatedWorkspace && ["desktop", "none"].includes(deps.sandbox.describe().id)) && admittedComputerAvailable(
           deps.sandbox.describe().id,
           provisionKind,
@@ -4903,23 +4921,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             )
           : { folders: [], context: undefined };
         context.groupFolders = groupFolders.context;
-        const hostEnvironment =
-          computerKind === "desktop" && !memberRun
-            ? await deps.sandbox
-                .environment?.(
-                  {
-                    id: storedComputer.providerRef ?? storedComputer.id,
-                    botId: storedComputer.homeKey,
-                    kind: "desktop",
-                    providerRef: storedComputer.providerRef ?? "",
-                  },
-                  {
-                    ...context,
-                    signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]),
-                  },
-                )
-                .catch(() => undefined)
-            : undefined;
+        const hostEnvironment = await (earlyHostEnvironment ?? readHostEnvironment());
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
         // App control needs the owner's separate consent on the connected PC (reported by
         // its environment). Never offer it to unattended, channel or isolated work: snapshots
@@ -9547,6 +9549,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         try {
           if (checkpointLoadError) throw checkpointLoadError;
+          // Setup before the engine starts: history, tools, model key and the computer's answer.
+          getLogger().info("run.prepared", { "run.prepare_ms": Math.round(performance.now() - preparationStartedAt) });
           const runtimeEvents = deps.runtime.run(
             {
               botId: bot.id,
