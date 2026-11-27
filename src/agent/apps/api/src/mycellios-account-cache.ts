@@ -25,15 +25,48 @@ export function createMycelliosAccountCache({ now = Date.now, ttlMs = TTL_MS, ma
  * seconds for its long AntSeed list, and every open of the picker asked again. A minute
  * per owner keeps the menu quick; the catalog never authorizes a model, the run does.
  */
-export function createMycelliosModelsCache<T>({ now = Date.now, ttlMs = 60_000, maxOwners = MAX_OWNERS } = {}) {
+export function createMycelliosModelsCache<T>({
+  now = Date.now,
+  ttlMs = 60_000,
+  maxOwners = MAX_OWNERS,
+  staleMs = MODELS_STALE_MS,
+} = {}) {
   // An empty catalog is polled again soon, so it is shared by concurrent callers but not kept.
-  return createOwnerReadCache<T>({ now, ttlMs, maxOwners, keep: value => !Array.isArray(value) || value.length > 0 });
+  return createOwnerReadCache<T>({ now, ttlMs, maxOwners, staleMs, keep: value => !Array.isArray(value) || value.length > 0 });
 }
 
-function createOwnerReadCache<T>({ now, ttlMs, maxOwners, keep = () => true }: {
+/**
+ * A coordinator release or restart leaves it unreachable for a few minutes. The picker then
+ * keeps the owner's last good catalog instead of an error: it only lists models, and every
+ * run still checks the model, price and balance with the coordinator itself.
+ */
+const MODELS_STALE_MS = 6 * 60 * 60_000;
+
+function createOwnerReadCache<T>({ now, ttlMs, maxOwners, keep = () => true, staleMs }: {
   now: () => number; ttlMs: number; maxOwners: number; keep?: (value: T) => boolean;
+  /** When set, a failed read returns the owner's last kept value younger than this. */
+  staleMs?: number;
 }) {
   const flights = new Map<string, Flight<T>>();
+  const lastGood = new Map<string, { value: T; at: number }>();
+  const readOrLastGood = async (key: string, read: () => Promise<T>): Promise<T> => {
+    try {
+      const value = await read();
+      if (staleMs !== undefined && keep(value)) {
+        lastGood.delete(key);
+        lastGood.set(key, { value, at: now() });
+        for (const oldest of lastGood.keys()) {
+          if (lastGood.size <= maxOwners) break;
+          lastGood.delete(oldest);
+        }
+      }
+      return value;
+    } catch (error) {
+      const last = staleMs === undefined ? undefined : lastGood.get(key);
+      if (last && now() - last.at <= staleMs!) return last.value;
+      throw error;
+    }
+  };
   return (
     owner: { userId: string; baseUrl: string; apiKey?: string; credentialId?: string },
     read: () => Promise<T>,
@@ -46,7 +79,7 @@ function createOwnerReadCache<T>({ now, ttlMs, maxOwners, keep = () => true }: {
     let flight = flights.get(key);
     if (refresh || !flight || (flight.expiresAt !== undefined && flight.expiresAt <= now())) {
       // The shared read is bounded by its own deadline, not by the first caller's signal.
-      const current: Flight<T> = { value: read() };
+      const current: Flight<T> = { value: readOrLastGood(key, read) };
       current.value.then(
         (value) => {
           if (flights.get(key) !== current) return;

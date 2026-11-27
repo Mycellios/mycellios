@@ -27,6 +27,11 @@ export function errorText(error: unknown, fallback = t`Something went wrong. Try
   if (message === "A folder cannot be moved into itself or one of its subfolders.") return t`A folder cannot be moved into itself or one of its subfolders.`;
   if (message === "Folder name already used") return t`Folder name already used`;
   if (message === "A group can have up to 8 folders.") return t`A group can have up to 8 folders.`;
+  // The coordinator was unreachable (usually a restart for a release): nothing changed.
+  if (message === "Mycellios credits are temporarily unavailable. Your balance has not been changed.")
+    return t`Mycellios is not answering right now, usually for a minute while it updates. Nothing was changed. Try again shortly.`;
+  if (message === "Mycellios models are temporarily unavailable. Try again.")
+    return t`Mycellios models are not available right now. Try again shortly.`;
   return (
     voiceAccountErrorText(error) ??
     userErrorMessage(error, {

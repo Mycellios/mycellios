@@ -110,7 +110,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     placeholderData: () => readCachedMycelliosCatalog(catalogScope),
     enabled: (open || Boolean((bot.modelId ?? me?.defaultModel)?.startsWith("mycellios/"))) && Boolean(me && mycelliosConnection),
     staleTime: 60_000,
-    retry: false,
+    // A coordinator restart lasts minutes: try again a few times before saying anything.
+    retry: 3,
+    retryDelay: attempt => Math.min(2_000 * 2 ** attempt, 15_000),
     refetchInterval: query => query.state.data?.length === 0 ? 5_000 : false,
   });
   const catalog = [
@@ -335,7 +337,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           {(["codex", "claude"] as const).some(engine => NATIVE_PROVIDERS[engine] === (lastProvider ?? currentProvider) && !engineModels(engine).length)
             && enginesQuery.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
           {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isFetching ?<p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
-          {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isError ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}
+          {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.isError && !mycelliosCatalog.data?.length ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}
           {mycelliosConnection && (lastProvider ?? currentProvider) === "Mycellios" && mycelliosCatalog.data?.length === 0 ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`No Mycellios agent models are available right now. Retrying automatically.`}</p> : null}
           {!recovery && (!lastProvider || lastProvider === currentProvider) && levels.length ? <label className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-sm">{t`Effort`}
             <OptionSelect
