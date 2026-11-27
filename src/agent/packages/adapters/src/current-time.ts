@@ -28,6 +28,16 @@ export function formatCurrentTimeInstruction(
   ].join(" ");
 }
 
+/**
+ * One plain line for small models on the person's PC: the long anchor above makes them open
+ * their answers by restating the date.
+ */
+export function formatCurrentTimeNote(now: Date = new Date(), timeZone?: string | null): string {
+  const local = timeZone ? localDateTime(now, timeZone) : undefined;
+  return local ? `(Now: ${local}, ${timeZone}. Mention it only if asked.)`
+    : `(Now: ${weekdayIn(now, "UTC")}, ${now.toISOString().slice(0, 16).replace("T", " ")} UTC. Mention it only if asked.)`;
+}
+
 function weekdayIn(now: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone }).format(now);
 }

@@ -13,7 +13,7 @@ import {
 } from "@mycellios/adapters";
 import type { Actor, Me, NativeEngineModelInfo } from "@mycellios/contracts";
 import {
-  attachmentMaxBytes, canonicalPiProviderId, NativeEngineInstallableSchema, NativeEngineInstallProgressSchema,
+  attachmentMaxBytes, canonicalPiProviderId, isDeviceModelId, isDeviceModelProvider, NativeEngineInstallableSchema, NativeEngineInstallProgressSchema,
   NativeEngineModelSchema, NativeEngineUpdateSchema, usableModelId,
 } from "@mycellios/contracts";
 import type { z } from "zod";
@@ -176,6 +176,8 @@ export async function threadNeedsModel(
   const provider = bot?.modelProvider && canonicalPiProviderId(bot.modelProvider);
   const modelId = usableModelId(bot?.modelId);
   if (!provider || !modelId) return true;
+  // A model on the Mico's own PC needs no connection: Desktop serves it.
+  if (isDeviceModelProvider(provider)) return !isDeviceModelId(modelId);
   if (
     deps.billing?.modelCreditsEnabled &&
     provider === canonicalPiProviderId(deps.env.defaultProvider) &&

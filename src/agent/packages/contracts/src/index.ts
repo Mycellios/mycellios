@@ -17,6 +17,7 @@ export * from "./builtin-tools.js";
 export * from "./client-build.js";
 export * from "./cloudflare-ai-gateway.js";
 export * from "./desktop.js";
+export * from "./device-models.js";
 export * from "./domain.js";
 export * from "./events.js";
 export * from "./history.js";

@@ -12,6 +12,7 @@ import { nativeEngineInstalls, nativeEngineStoreRoot } from "./native-engine-sto
 import type { NativeEngineUpdateOptions } from "./native-engine-updates.js";
 import { NativeEngineUpdates } from "./native-engine-updates.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
+import { DeviceModelRuntime, type DeviceModelResolver } from "./device-model-runtime.js";
 import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 import { NATIVE_PROCESS_LIMIT, NativeProcessSlots } from "./native-process-slots.js";
 
@@ -20,7 +21,11 @@ const STORE_ENGINES = ["codex", "claude", "opencode"] as const;
 export type DesktopEngineStoreOptions = NativeEngineUpdateOptions & {
   /** Read the CLIs' vendor channels and the blocklist at startup and daily (the app; tests call check). */
   checkUpdates?: boolean;
+  /** This PC's local model servers (specs/local-models/spec.md); absent, such turns fail clearly. */
+  deviceModels?: DeviceModelResolver;
 };
+/** Light mode sends at most this many tool schemas up front; the rest stay behind search/load. */
+const DEVICE_MODEL_EAGER_TOOL_SCHEMAS = 12;
 /**
  * One owned native engine; account/server scopes and uncertain starts survive a restart.
  * `processSlots` bounds the CLI processes this PC runs for turns at once: every run shares it.
@@ -47,7 +52,9 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
     warm.unref?.();
   }
   const makeRuntime = createRuntime ?? ((dataDir, authorized, slots) => new NativeAgentRuntime({
-    dataDir, fallback: new PiAgentRuntime(), hostAccess: authorized, processSlots: slots, storeRoot, engineUpdates: updates,
+    dataDir,
+    fallback: new DeviceModelRuntime(new PiAgentRuntime(), new PiAgentRuntime({ maxEagerToolSchemas: DEVICE_MODEL_EAGER_TOOL_SCHEMAS, light: true }), store.deviceModels),
+    hostAccess: authorized, processSlots: slots, storeRoot, engineUpdates: updates,
   }));
   let current: { scope: string; runtime: AgentRuntime } | undefined;
   const releaseIdleNativeProcesses = async () => {

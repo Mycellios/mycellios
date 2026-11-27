@@ -42,6 +42,7 @@ import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary
 import { InstructionSettings } from "../../components/InstructionSettings";
 import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 import { botProfilePatch } from "../../lib/bot-profile-patch";
+import { isDeviceModelChoice, useLocalModels } from "../../lib/local-models";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { lazyComponent } from "../../lib/preload-recovery";
 import { useSpaceQueries } from "../../lib/query";
@@ -377,9 +378,17 @@ export function BotSettings({
     setSavedAdvanced(JSON.stringify(next));
   }, [bot]);
 
-  const connectedOptions = connectedModelChoices(networkModels.credentials, catalog)
-    .sort((left, right) => Number(right.providerLabel === "Mycellios") - Number(left.providerLabel === "Mycellios"));
   const storedModel = modelKey ? parseModelOptionKey(modelKey) : null;
+  // A model on this PC has no connection: name it from Desktop's list (specs/local-models).
+  const deviceModel = isDeviceModelChoice(storedModel?.provider) ? storedModel : null;
+  const localModels = useLocalModels(Boolean(deviceModel)).status?.models;
+  const connectedOptions = [...connectedModelChoices(networkModels.credentials, catalog)
+    .sort((left, right) => Number(right.providerLabel === "Mycellios") - Number(left.providerLabel === "Mycellios")),
+    ...(deviceModel ? [(() => {
+      const name = localModels?.find((model) => model.id === deviceModel.modelId)?.name ?? deviceModel.modelId;
+      return { key: modelOptionKey(deviceModel.provider, deviceModel.modelId), provider: deviceModel.provider, modelId: deviceModel.modelId,
+        label: `${name} (${t`On your PC`})`, providerLabel: t`On your PC`, modelLabel: name };
+    })()] : [])];
   const selectedModel = storedModel
     ? {
         provider: storedModel.provider,

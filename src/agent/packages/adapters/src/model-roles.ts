@@ -1,3 +1,4 @@
+import { isDeviceModelProvider } from "@mycellios/contracts";
 import type { AgentRunRequest, SecretStore } from "@mycellios/adapter-kit";
 import type {
   ModelRole,
@@ -111,8 +112,9 @@ export function selectConfiguredModel(input: {
   const { override: bot, overrideCredential, main } = input;
   const hasOverride = Boolean(bot?.modelProvider && usableModelId(bot.modelId));
   // A model runs on its own connection, or on the deployment's for its funded provider.
+  // A model on the Mico's own PC needs neither (Desktop serves it).
   const runnable = (provider: string | null | undefined, credential: ModelCredential) =>
-    Boolean(credential || (provider && provider === input.hostedProvider));
+    Boolean(credential || (provider && provider === input.hostedProvider) || isDeviceModelProvider(provider));
   // The override provider, model and credential must win together.
   const useOverride = hasOverride && runnable(bot?.modelProvider, overrideCredential);
   const useMain = !useOverride && main !== null && runnable(main.provider, main.credential);

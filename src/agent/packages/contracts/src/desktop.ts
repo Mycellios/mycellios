@@ -20,6 +20,61 @@ export interface LocalVoiceStatus extends LocalVoiceModelStatus {
   models?: Record<LocalVoiceModelKind, LocalVoiceModelStatus>;
 }
 
+/** How well a local model runs on this PC: measured once it has run, estimated before. */
+export type LocalModelFit = "fast" | "slower" | "very-slow" | "too-large";
+export type LocalModelJobPhase = "engine" | "download" | "verify" | "load" | "measure";
+export interface LocalModelSpeed {
+  /** Prompt tokens read per second. */
+  prefill: number;
+  /** Tokens written per second. */
+  generation: number;
+  measured: boolean;
+}
+export interface LocalModelInfo {
+  id: string;
+  name: string;
+  publisher: string;
+  license: string;
+  source: string;
+  bytes: number;
+  contextWindow: number;
+  installed: boolean;
+  fit: LocalModelFit;
+  speed: LocalModelSpeed;
+}
+export interface LocalModelsStatus {
+  /** False on platforms without a pinned engine build. */
+  supported: boolean;
+  /** False until the engine has read this PC's devices; the hardware below is then a guess. */
+  inspected: boolean;
+  hardware: {
+    gpu?: { name: string; memoryMiB: number; kind: "discrete" | "integrated" | "apple" };
+    memoryMiB: number;
+    tier: "strong" | "integrated" | "weak";
+  };
+  /** The fastest model that meets the speed floor here; absent when none does. */
+  recommended?: string;
+  /** A larger model that still runs acceptably, offered as "Smarter, slower". */
+  smarter?: string;
+  models: LocalModelInfo[];
+  job?: { modelId: string; phase: LocalModelJobPhase; downloaded: number; total: number; error?: string };
+  /** The model currently loaded in memory. */
+  loaded?: string;
+}
+export interface LocalModelsBridge {
+  status: () => Promise<LocalModelsStatus>;
+  /** Fetch the small verified engine so it can read this PC's devices before recommending. */
+  inspect: () => Promise<void>;
+  /** Download, verify, load and measure a model; resolves when it is ready. */
+  install: (modelId: string) => Promise<void>;
+  cancel: () => Promise<void>;
+  remove: (modelId: string) => Promise<void>;
+  /** Free the memory the loaded model holds; it loads again on the next turn. */
+  unload: () => Promise<void>;
+  /** Load an installed model ahead of use, so the first answer of an opened chat starts at once. */
+  warm?: (modelId: string) => Promise<void>;
+}
+
 /**
  * `unsupported` covers an unpackaged build and a repository with no published releases, which is
  * the normal state for a fork. It is not an error the user needs to act on. Automatic checks stay
@@ -169,6 +224,8 @@ export interface MycelliosDesktop {
     speak: (input: { text: string; language: string; speed: number }) => Promise<{ samples?: Float32Array; sampleRate?: number }>;
     stop: () => Promise<void>;
   };
+  /** Models that run on this PC (specs/local-models/spec.md). */
+  localModels?: LocalModelsBridge;
 
   videoEdit?: import("./video-edit.js").VideoEditBridge;
   appsStudio?: import("./app-studio.js").AppsStudioBridge;

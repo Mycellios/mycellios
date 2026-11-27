@@ -50,6 +50,15 @@ const desktopBridge = {
     speak: input => ipcRenderer.invoke("desktop.localVoice.speak", input),
     stop: () => ipcRenderer.invoke("desktop.localVoice.stop"),
   },
+  localModels: {
+    status: () => ipcRenderer.invoke("desktop.localModels.status"),
+    inspect: () => ipcRenderer.invoke("desktop.localModels.inspect"),
+    install: modelId => ipcRenderer.invoke("desktop.localModels.install", modelId),
+    cancel: () => ipcRenderer.invoke("desktop.localModels.cancel"),
+    remove: modelId => ipcRenderer.invoke("desktop.localModels.remove", modelId),
+    unload: () => ipcRenderer.invoke("desktop.localModels.unload"),
+    warm: modelId => ipcRenderer.invoke("desktop.localModels.warm", modelId),
+  },
 
   nativeWindowFrame: process.platform !== "darwin",
   projectRunner: {

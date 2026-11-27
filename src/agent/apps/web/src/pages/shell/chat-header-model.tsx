@@ -5,7 +5,7 @@ import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptio
 import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@mycellios/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Cpu } from "lucide-react";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { useSpaceQueries, writeSaved } from "../../lib/query";
 import { useSpaceRpc } from "../../lib/space-rpc";
@@ -18,6 +18,8 @@ import { ProviderLogo } from "../../components/ProviderLogo";
 import { MycelliosProvider } from "../model-settings/mycellios-provider";
 import { NativeEngineAccount } from "./native-engine-account";
 import { NativeEngineInstall, NativeEngineUpdateOffer } from "./native-engine-install";
+import { LocalModelsPanel } from "./local-models-panel";
+import { isDeviceModelChoice, localModelsBridge, useLocalModels } from "../../lib/local-models";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
@@ -120,6 +122,19 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     ...(mycelliosCatalog.data ?? []),
   ];
   const general = generalChatModel(me, catalog);
+  // Models on this PC (specs/local-models/spec.md): offered in Desktop for a Mico that runs here.
+  const deviceSelected = isDeviceModelChoice(bot.modelProvider) && Boolean(bot.modelId);
+  const onYourPc = t`On your PC`;
+  // The Mico's own choice ("Your PC") decides; the engines report only knows a bound computer.
+  const deviceOffered = Boolean(localModelsBridge()) &&
+    (deviceSelected || bot.computerMode === "dedicated" || enginesQuery.data?.computer === "desktop");
+  const local = useLocalModels(deviceOffered && (open || deviceSelected));
+  // Opening the chat loads the model and its saved prompt, so the first answer starts at once.
+  const warmModelId = deviceSelected && !(bot.agentEngine && bot.agentEngine !== "pi") ? bot.modelId : null;
+  useEffect(() => {
+    if (warmModelId) void localModelsBridge()?.warm?.(warmModelId).catch(() => undefined);
+  }, [warmModelId]);
+  const deviceName = (modelId: string) => local.status?.models.find(model => model.id === modelId)?.name ?? modelId;
   const nativeEngine = bot.agentEngine && bot.agentEngine !== "pi" ? bot.agentEngine : null;
   const nativeName = nativeEngine ? NATIVE_PROVIDERS[nativeEngine] : undefined;
   const override = bot.modelProvider && bot.modelId
@@ -135,6 +150,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     : bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
   const sources = new Map<string, { provider: string }>();
   sources.set("Mycellios", { provider: OPENAI_COMPATIBLE_PROVIDER_ID });
+  if (deviceOffered) sources.set(onYourPc, { provider: "device" });
   const connectionLabels = new Set<string>();
   const namedCredentials = credentials.map(connection => {
     const name = connectionName(connection);
@@ -167,7 +183,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   });
   const defaultKey = general ? modelOptionKey(general.provider, resolveSelectableModelId(catalog, general.provider, general.modelId)) : "";
   // A saved first-party model identifies Mycellios even before discovery returns.
-  const currentProvider = nativeName ?? (model?.startsWith("mycellios/") || credential && isMycelliosBaseUrl(credential.baseUrl)
+  const currentProvider = nativeName ?? (deviceSelected ? onYourPc : undefined) ?? (model?.startsWith("mycellios/") || credential && isMycelliosBaseUrl(credential.baseUrl)
     ? "Mycellios" : connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? entry?.providerName ?? provider);
   const engineState = enginesQuery.data;
   // A CLI missing on the owner's PC keeps its provider, with Install (older Desktops cannot install).
@@ -220,8 +236,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
       !connected.some(entry => entry.key === choice.key));
     return unavailable ? { ...choice, title: choice.modelId?.startsWith("mycellios/") ? choice.modelId.split("/").at(-1) : choice.modelId,
       providerLabel: "Mycellios", unavailable: true } : choice;
-  }), ...nativeChoices];
-  const label = recovery ? t`Change model` : (catalogEngine ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? connected.find(choice => choice.key === (value || defaultKey))?.title ?? entry?.label ?? (model?.startsWith("mycellios/") ? model.split("/").at(-1) : model) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
+  }), ...nativeChoices, ...(deviceSelected ? [{
+    key: modelOptionKey("device", bot.modelId!), provider: "device", providerLabel: onYourPc,
+    label: `${deviceName(bot.modelId!)} (${onYourPc})`, title: deviceName(bot.modelId!),
+  }] : [])];
+  const label = recovery ? t`Change model` : deviceSelected && !nativeEngine ? deviceName(bot.modelId!) : (catalogEngine ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? connected.find(choice => choice.key === (value || defaultKey))?.title ?? entry?.label ?? (model?.startsWith("mycellios/") ? model.split("/").at(-1) : model) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
   const headerEffort = ThinkingLevelSchema.safeParse(catalogEngine ? bot.nativeConfig?.thinkingLevel ?? nativeModel?.defaultThinkingLevel : nativeEngine ? undefined : bot.thinkingLevel);
   const effortLabel = headerEffort.success && headerEffort.data !== "off" ? thinkingLevelLabel(headerEffort.data) : null;
   const queryError = credentialsQuery.error ?? catalogQuery.error;
@@ -329,7 +348,10 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 onProviderChange={setLastProvider}
                 catalogProviders={!recovery ? personalCatalogs.map(source => source.label) : undefined}
                 onExplore={name => { setLastProvider(name); setExploring(name); setError(null); }}
-                providerContent={name => name === "Mycellios" && !mycelliosConnection ? <ul><MycelliosProvider embedded onConnected={async () => {
+                providerContent={name => name === onYourPc && deviceOffered ? <LocalModelsPanel disabled={saving}
+                  value={deviceSelected ? bot.modelId : null}
+                  onUse={modelId => save(() => onSave({ agentEngine: "pi", nativeConfig: null, modelProvider: "device", modelId, thinkingLevel: null }))} />
+                  : name === "Mycellios" && !mycelliosConnection ? <ul><MycelliosProvider embedded onConnected={async () => {
                   await Promise.all([credentialsQuery.refetch(), catalogQuery.refetch(), queryClient.invalidateQueries({queryKey:queries.me.queryKey()})]);
                 }} /></ul> : null}
                 mycelliosCatalogReady={mycelliosCatalog.isSuccess}

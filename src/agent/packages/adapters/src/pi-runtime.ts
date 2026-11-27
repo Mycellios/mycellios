@@ -53,7 +53,9 @@ import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
   ComputerModeSchema,
   canonicalPiProviderId,
+  DEVICE_MODEL_OFFLINE_ERROR,
   FLEET_TOOL_NAMES,
+  isDeviceModelProvider,
   isOpenAiCompatibleProvider,
   usableModelId,
 } from "@mycellios/contracts";
@@ -294,6 +296,12 @@ export interface PiAgentRuntimeOptions {
    * to PI_MAX_EAGER_TOOL_SCHEMAS or the built-in compact core.
    */
   maxEagerToolSchemas?: number;
+  /**
+   * Light mode for small models on the person's PC (specs/local-models/spec.md): no long
+   * conversation style, no "say what you will do first" reminders (small models answer with
+   * that line instead of the answer) and no work-plan loop, so the prompt stays short.
+   */
+  light?: boolean;
   /** Sanitized per-call selection telemetry; never includes prompt or credentials. */
   onContextDecision?: (
     decision: RuntimeContextDecision & {
@@ -310,8 +318,10 @@ export class PiAgentRuntime implements AgentRuntime {
   private readonly modelCallObserver?: ModelCallObserver;
   private readonly onContextDecision?: PiAgentRuntimeOptions["onContextDecision"];
   private readonly maxEagerToolSchemas: number;
+  private readonly light: boolean;
 
   constructor(options: PiAgentRuntimeOptions = {}) {
+    this.light = options.light === true;
     this.modelFetch = options.modelFetch;
     this.modelCallObserver = options.modelCallObserver;
     this.onContextDecision = options.onContextDecision;
@@ -370,9 +380,9 @@ export class PiAgentRuntime implements AgentRuntime {
     controller: AbortController,
     context?: Partial<AdapterContext>,
   ): AsyncGenerator<AgentRuntimeEvent, void> {
-    const continuity = new WorkContinuation(workContinuationEnabled(request));
+    const continuity = new WorkContinuation(!this.light && workContinuationEnabled(request));
     const setupStartedAt = Date.now();
-    request = withWorkContinuation(request, continuity);
+    if (!this.light) request = withWorkContinuation(request, continuity);
     const signal = context?.signal
       ? AbortSignal.any([controller.signal, context.signal])
       : controller.signal;
@@ -476,7 +486,7 @@ export class PiAgentRuntime implements AgentRuntime {
         // Internal summaries already have explicit instructions and a tightly
         // measured input budget. User-facing style must not consume that reserve.
         const withTone = request.usageOperationKind === "compaction"
-          ? baseSystemPrompt : withConversationStyle(baseSystemPrompt);
+          ? baseSystemPrompt : this.light ? `${baseSystemPrompt}\n\n${LIGHT_STYLE}` : withConversationStyle(baseSystemPrompt);
         const systemPrompt =
           toolDefs.some((tool) => tool.name === "edit_file") && !withTone.includes("File changes:")
             ? `${withTone}\n\n${FILE_EDIT_GUIDANCE}`
@@ -1266,7 +1276,7 @@ export class PiAgentRuntime implements AgentRuntime {
                 ),
             });
             // The reference app pattern: repeat the natural style's first line in front of each user turn.
-            const reminder = request.allowSilentEmpty || request.script
+            const reminder = this.light || request.allowSilentEmpty || request.script
               || request.usageOperationKind === "compaction" ? null : turnStyleReminder(systemPrompt);
             await agent.prompt(reminder ? `${reminder}\n\n${initialPrompt}` : initialPrompt, images?.length ? images : undefined);
           }
@@ -1456,6 +1466,8 @@ export function resolveRuntimeModel(modelConfig: AgentRunRequest["model"]): {
   /** Live credential store; OAuth refreshes swap the credential mid-run. */
   credentials: PiRuntimeCredentialStore | undefined;
 } {
+  // Only Desktop resolves a model on the person's PC (device-model-runtime.ts).
+  if (isDeviceModelProvider(modelConfig.provider)) throw new Error(DEVICE_MODEL_OFFLINE_ERROR);
   if (modelConfig.desktopTransport) {
     const model = modelWithProviderRequestBudget(modelConfig.desktopTransport.model as unknown as Model<Api>);
     return { provider: model.provider, modelId: model.id, models: desktopModelCatalog(catalogModels(), modelConfig), model, apiKey: "account-scoped-transport", credentials: undefined };
@@ -1674,6 +1686,10 @@ export function normalizeAgentToolName(name: string): string {
  */
 const ACTIVITY_DETAIL_LIMIT = 90;
 const THINKING_ACTIVITY_LIMIT = 160;
+
+/** The whole conversation style for a small local model: short, and about the answer itself. */
+const LIGHT_STYLE =
+  "Reply in the user's language. Answer the question itself, directly and briefly; do not announce what you are going to do. Use a tool only when the request needs files, commands or the web.";
 
 const LIVE_TURN_NARRATION =
   "Before the first tool call, write one short sentence in the user's language saying what you are about to do. Write another sentence only when the plan changes, something fails, or you need the user. Do not narrate every tool call, and do not send a sentence only to say you are still working.";

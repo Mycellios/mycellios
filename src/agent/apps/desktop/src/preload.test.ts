@@ -132,6 +132,7 @@ describe("desktop preload bridge", () => {
       "companions",
       "computer",
       "development",
+      "localModels",
       "localScripts",
       "localVoice",
       "nativeWindowFrame",
@@ -174,6 +175,12 @@ describe("desktop preload bridge", () => {
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.speak", { text: "Hola", language: "es", speed: 1 });
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.stop");
 
+    expect(Object.keys(bridge.localModels!).sort()).toEqual(["cancel", "inspect", "install", "remove", "status", "unload", "warm"]);
+    await bridge.localModels!.install("qwen3.5-2b");
+    await bridge.localModels!.remove("qwen3.5-2b");
+    expect(invoke).toHaveBeenCalledWith("desktop.localModels.install", "qwen3.5-2b");
+    expect(invoke).toHaveBeenCalledWith("desktop.localModels.remove", "qwen3.5-2b");
+
     expect(Object.keys(bridge.badge!)).toEqual(["set"]);
     await bridge.badge!.set(7);
     expect(invoke).toHaveBeenCalledWith("desktop.badge.set", 7);
@@ -198,6 +205,8 @@ describe("desktop preload bridge", () => {
       "desktop.localVoice.transcribe",
       "desktop.localVoice.speak",
       "desktop.localVoice.stop",
+      "desktop.localModels.install",
+      "desktop.localModels.remove",
       "desktop.badge.set",
       "desktop.oauth.open",
       "desktop.oauth.cancel",
