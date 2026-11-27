@@ -4043,6 +4043,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
       let attempt: { id: string };
       // When this attempt began its setup, to report how long the turn waited before its engine ran.
       let preparationStartedAt = performance.now();
+      // Milliseconds since setup began at each stage, logged with run.prepared to see where a
+      // slow turn waited.
+      const preparationMarks: string[] = [];
+      const markPrepared = (stage: string) => {
+        preparationMarks.push(`${stage}:${Math.round(performance.now() - preparationStartedAt)}`);
+      };
       // Resumed attempts keep the first start, so lateness reflects when the run began.
       const executionStartedAt = current.startedAt ?? new Date();
       try {
@@ -4249,25 +4255,92 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
           loadLoginPasswordRedactions(deps.prisma, deps.secretStore, run),
         ]);
-        const historySearchBeforeSeq =
+        markPrepared("loaded");
+        // The reads below do not depend on one another: start them together instead of one
+        // after another, and take each result where it was used before.
+        const modelChoice = runModelChoice(run, leaseTarget);
+        const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
+        const historySearchBeforeSeqPromise = startedEarly(() =>
           contextStrategy !== "current" && run.sourceMessageId
-            ? (messages.find((message) => message.id === run.sourceMessageId)?.seq ??
-              (
-                await deps.prisma.message.findUnique({
-                  where: { id: run.sourceMessageId, threadId: thread.id },
-                  select: { seq: true },
-                })
-              )?.seq ??
-              thread.nextMessageSeq)
-            : thread.nextMessageSeq;
+            ? (async () =>
+                messages.find((message) => message.id === run.sourceMessageId)?.seq ??
+                (
+                  await deps.prisma.message.findUnique({
+                    where: { id: run.sourceMessageId!, threadId: thread.id },
+                    select: { seq: true },
+                  })
+                )?.seq ??
+                thread.nextMessageSeq)()
+            : Promise.resolve(thread.nextMessageSeq),
+        );
         // A location card's position or place waits encrypted with the run, never in the task:
         // only the model prompt of this run's attempts receives it, and the tool activity kept
         // in the chat hides it.
-        const runLocation = isLocationAnswerPrompt(task.prompt)
-          ? await loadRunLocation(deps.prisma, deps.secretStore, run)
-          : null;
+        const runLocationPromise = startedEarly(() =>
+          isLocationAnswerPrompt(task.prompt)
+            ? loadRunLocation(deps.prisma, deps.secretStore, run)
+            : Promise.resolve(null),
+        );
+        const agentEnvironmentPromise = startedEarly(() => decryptAgentEnvironment(agentSecretRows, deps.secretStore));
+        const overrideCredentialPromise = startedEarly(() =>
+          turnModel?.credentialId
+            ? findConnectedModelCredential(deps.prisma, deps.secretStore, run,
+                turnModel.provider, turnModel.modelId, { credentialId: turnModel.credentialId })
+            : !turnModel && hasModelOverride && modelChoice.modelProvider
+            ? findConnectedModelCredential(
+                deps.prisma,
+                deps.secretStore,
+                run,
+                modelChoice.modelProvider,
+                modelChoice.modelId,
+              )
+            : Promise.resolve(null),
+        );
+        const composioRows = storedConnections.filter(
+          (connection) => connection.connectorId === "composio",
+        );
+        const liveSlugsPromise = startedEarly(() =>
+          needsLivePluginSync(composioRows)
+            ? loadLivePluginSlugs(deps.listConnectedPluginSlugs, run.userId).then(async (listing) => {
+                if (!listing.ok) return [] as string[];
+                await persistLivePluginConnections(deps.prisma, run, composioRows, listing.slugs).catch(
+                  () => undefined,
+                );
+                return listing.slugs;
+              })
+            : Promise.resolve([] as string[]),
+        );
+        const ownedThreadPromise = startedEarly(() => (async () => {
+          const ownedRoutine = await isOwnedRoutineThread(deps.prisma, run, thread);
+          const ownedWorkflow = !ownedRoutine && await isOwnedWorkflowThread(deps.prisma, run, thread);
+          const externalWebhook = run.trigger === "webhook" ||
+            (ownedWorkflow && await isSignedWorkflowThread(deps.prisma, run, thread));
+          return { ownedRoutine, ownedWorkflow, externalWebhook };
+        })());
+        // Personal memory (specs/mcp-memory) is read only in the owner's own runs of their own
+        // Mico, outside messaging channels and group threads. Grants are checked per run.
+        const personalMemoryPromise = startedEarly(() =>
+          deps.personalMemory &&
+          !restrictedRun &&
+          !thread.groupId &&
+          bot.userId === run.userId
+            ? deps.personalMemory
+                .resolve({ spaceId: run.spaceId, userId: run.userId, botId: bot.id })
+                .catch((error: unknown) => {
+                  getLogger().error("personal memory resolve failed", {
+                    error: personalMemoryErrorMessage(error),
+                  });
+                  return null;
+                })
+            : Promise.resolve(null),
+        );
+        const localMemoryScopePromise = startedEarly(() =>
+          resolveLocalMemoryScope(deps.prisma, run.spaceId, bot.memoryScope, configuredMemory?.defaultScope),
+        );
+        const historySearchBeforeSeq = await historySearchBeforeSeqPromise;
+        const runLocation = await runLocationPromise;
         if (runLocation) locationRedactions.push(...locationRedactionPatterns(runLocation));
-        const agentEnvironment = await decryptAgentEnvironment(agentSecretRows, deps.secretStore);
+        const agentEnvironment = await agentEnvironmentPromise;
         runSecrets.push(...Object.values(agentEnvironment));
         // Encoded forms too: read_file redacts with these values before any shell command runs.
         runSecrets.push(...commandCredentialRedactions(initialBotCommandEnvironment));
@@ -4281,49 +4354,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ...initialBotCommandEnvironment,
             });
         // modelPinned distinguishes the captured choice from an attempt's recorded model.
-        const modelChoice = runModelChoice(run, leaseTarget);
-        const hasModelOverride = Boolean(modelChoice.modelProvider && modelChoice.modelId);
-        const overrideCredential =
-          turnModel?.credentialId
-            ? await findConnectedModelCredential(deps.prisma, deps.secretStore, run,
-                turnModel.provider, turnModel.modelId, { credentialId: turnModel.credentialId })
-            : !turnModel && hasModelOverride && modelChoice.modelProvider
-            ? await findConnectedModelCredential(
-                deps.prisma,
-                deps.secretStore,
-                run,
-                modelChoice.modelProvider,
-                modelChoice.modelId,
-              )
-            : null;
+        const overrideCredential = await overrideCredentialPromise;
         runAbortController = new AbortController();
         if (!leaseValid) runAbortController.abort();
         if (deps.shutdownSignal?.aborted) runAbortController.abort(deps.shutdownSignal.reason);
         const onShutdown = () => runAbortController?.abort(deps.shutdownSignal?.reason);
         deps.shutdownSignal?.addEventListener("abort", onShutdown);
         detachShutdown = () => deps.shutdownSignal?.removeEventListener("abort", onShutdown);
-        const composioRows = storedConnections.filter(
-          (connection) => connection.connectorId === "composio",
-        );
-        let liveSlugs: string[] = [];
-        if (needsLivePluginSync(composioRows)) {
-          const listing = await loadLivePluginSlugs(deps.listConnectedPluginSlugs, run.userId);
-          if (listing.ok) {
-            liveSlugs = listing.slugs;
-            await persistLivePluginConnections(deps.prisma, run, composioRows, listing.slugs).catch(
-              () => undefined,
-            );
-          }
-        }
-        const connectedComposio = mergeConnectedPlugins(composioRows, liveSlugs);
+        const connectedComposio = mergeConnectedPlugins(composioRows, await liveSlugsPromise);
         const connectedPlugins = selectRunConnections(
           storedConnections,
           connectedComposio.map((connection) => connection.provider),
         );
-        const ownedRoutine = await isOwnedRoutineThread(deps.prisma, run, thread);
-        const ownedWorkflow = !ownedRoutine && await isOwnedWorkflowThread(deps.prisma, run, thread);
-        const externalWebhook = run.trigger === "webhook" ||
-          (ownedWorkflow && await isSignedWorkflowThread(deps.prisma, run, thread));
+        const { ownedRoutine, ownedWorkflow, externalWebhook } = await ownedThreadPromise;
         const context = {
           operationId: runId,
           projectSessionId: ownedRoutine || ownedWorkflow ? undefined : nativeWorkProjectSession(thread, task),
@@ -4350,26 +4393,72 @@ export function createRunExecutor(deps: ExecutorDeps) {
             "This local project requires This PC. Select This PC explicitly before continuing; an isolated computer cannot access local project files.");
           return;
         }
+        markPrepared("context");
+        // Reads the rest of the setup needs later, none depending on another or on the model
+        // choice: the PC's answer (a relay round trip) and the database rows start now, and
+        // each is taken where it was read before, so a turn waits for the slowest of them only.
+        const provisionKindPromise = startedEarly(() =>
+          memberRun ? Promise.resolve(undefined) : Promise.resolve(deps.sandbox.provisionKind?.(context)),
+        );
+        const groupContextPromise = startedEarly(() =>
+          thread.groupId
+            ? loadGroupContext(deps.prisma, thread.groupId, { id: bot.id, name: bot.name })
+            : Promise.resolve(undefined),
+        );
+        const hasMessagingIdentityPromise = startedEarly(() =>
+          deps.messaging ? deps.messaging.hasIdentity(bot.id) : Promise.resolve(false),
+        );
+        const memberNamePromise = startedEarly(() =>
+          memberRun
+            ? deps.prisma.user
+                .findUnique({ where: { id: memberUserId ?? "" }, select: { name: true } })
+                .then((row) => row?.name ?? "")
+            : Promise.resolve(""),
+        );
+        const sourceMessagePromise = startedEarly(() =>
+          (run.trigger === "user" || run.trigger === "follow_up") && run.sourceMessageId
+            ? deps.prisma.message.findUnique({
+                where: { id: run.sourceMessageId },
+                select: { clientNonce: true, role: true, blocks: true, threadId: true, browserSessionKey: true },
+              })
+            : Promise.resolve(null),
+        );
+        const firstBranchTurnPromise = startedEarly(() =>
+          thread.startedBy === "branch" && thread.taskBotId === run.botId
+            ? deps.prisma.run
+                .count({
+                  where: { threadId: thread.id, id: { not: run.id }, trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] } },
+                })
+                .then((count) => count === 0)
+            : Promise.resolve(false),
+        );
+        const routineIsolatedBrowserPromise = startedEarly(() =>
+          run.trigger === "routine" && run.routineId && ownedRoutine
+            ? deps.prisma.routine
+                .findFirst({
+                  where: { id: run.routineId, spaceId: run.spaceId, userId: run.userId, botId: run.botId, isolatedBrowser: true },
+                  select: { id: true },
+                })
+                .then(Boolean)
+            : Promise.resolve(false),
+        );
+        const agentTasksAllowedPromise = startedEarly(() =>
+          agentTaskToolsAllowed(deps.prisma, run, thread, {
+            messagingChannelRun: restrictedRun,
+            backgroundRun: isBackgroundRunTrigger(run.trigger),
+          }),
+        );
+        const micoOwnerPromise = startedEarly(() =>
+          deps.prisma.user.findUniqueOrThrow({ where: { id: run.userId }, select: { micoDefaults: true } }),
+        );
+        const answerFieldsPromise = startedEarly(() =>
+          ownedWorkflow ? workflowAnswerFields(deps.prisma, run, thread) : Promise.resolve(undefined),
+        );
         const memoryScope = configuredMemory
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
-        // Personal memory (specs/mcp-memory) is read only in the owner's own runs of their own
-        // Mico, outside messaging channels and group threads. Grants are checked per run.
-        const personalMemory =
-          deps.personalMemory &&
-          !restrictedRun &&
-          !thread.groupId &&
-          bot.userId === run.userId
-            ? await deps.personalMemory
-                .resolve({ spaceId: run.spaceId, userId: run.userId, botId: bot.id })
-                .catch((error: unknown) => {
-                  getLogger().error("personal memory resolve failed", {
-                    error: personalMemoryErrorMessage(error),
-                  });
-                  return null;
-                })
-            : null;
+        const personalMemory = await personalMemoryPromise;
         // An external webhook's text could choose what gets saved, so those runs only read.
         const personalWriteTarget =
           personalMemory && !externalWebhook && !workflowCorrection ? personalMemory.writeTarget : null;
@@ -4377,7 +4466,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const personalMemoryIds = new Set<string>();
         // Shadow measurement of the candidate local memory ranker: ids and counts only.
         const memoryShadow = { candidate: null as string[] | null, read: new Set<string>(), searches: 0 };
-        const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
+        const localMemoryScope = await localMemoryScopePromise;
 
         await deps.events.append({
           spaceId: run.spaceId,
@@ -4518,6 +4607,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           recallPromise,
           personalRecallPromise,
         ]);
+        markPrepared("recall");
         for (const hit of personalRecalled?.hits ?? []) personalMemoryIds.add(hit.id);
         recordRunMemoryRecall(deps.prisma, { runId: run.id, spaceId: run.spaceId, userId: run.userId }, memoryRecallIds);
         const personalMemoryContext = personalRecalled
@@ -4639,6 +4729,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           return;
         }
         runSecrets.push(...resolved.redact);
+        markPrepared("model");
         // The owner pays a member's turns in Credits, admitted against the member's daily
         // allowance by ordinary holds. A model on the owner's own key or sign-in has no hold to
         // admit against, so it never serves a member (specs/space-members, phase 1).
@@ -4698,10 +4789,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         // A relay that gives no answer only holds back a Mico whose computer is the PC. A member's
         // turn never uses the computer, so it does not ask.
-        const provisionKind = memberRun ? undefined : await deps.sandbox.provisionKind?.(context).catch((error: unknown) => {
+        const provisionKind = await provisionKindPromise.catch((error: unknown) => {
           if (error instanceof DesktopUnreachableError && storedComputer.kind !== "desktop") return undefined;
           throw error;
         });
+        markPrepared("computer");
         const computerKind = provisionKind ?? storedComputer.kind;
         // The PC's answer (shell, home, consents) is a relay round trip. Ask now, while the rest
         // of the turn is prepared, instead of waiting for it in line. A group turn asks later,
@@ -4813,25 +4905,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           resolved.acceptsImages,
         );
         const acceptsImages = deps.runtime.describe().capabilities.scripted || modelSeesImages;
-        const groupContext = thread.groupId
-          ? await loadGroupContext(deps.prisma, thread.groupId, {
-              id: bot.id,
-              name: bot.name,
-            })
-          : undefined;
-        const hasMessagingIdentity = deps.messaging
-          ? await deps.messaging.hasIdentity(bot.id)
-          : false;
+        const groupContext = await groupContextPromise;
+        const hasMessagingIdentity = await hasMessagingIdentityPromise;
         // A member's conversation is never mirrored to the owner's messaging app.
         const messagingContext = memberRun
-          ? spaceMemberPrivacyBlock(
-              (
-                await deps.prisma.user.findUnique({
-                  where: { id: memberUserId ?? "" },
-                  select: { name: true },
-                })
-              )?.name ?? "",
-            )
+          ? spaceMemberPrivacyBlock(await memberNamePromise)
           : hasMessagingIdentity
             ? [messagingDmSurfaceNote(), messagingChannelRun ? messagingChannelPrivacyBlock() : null]
                 .filter(Boolean)
@@ -4853,13 +4931,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ));
           }
         }
-        const sourceMessage =
-          (run.trigger === "user" || run.trigger === "follow_up") && run.sourceMessageId
-            ? await deps.prisma.message.findUnique({
-                where: { id: run.sourceMessageId },
-                select: { clientNonce: true, role: true, blocks: true, threadId: true, browserSessionKey: true },
-              })
-            : null;
+        const sourceMessage = await sourceMessagePromise;
         // Calls carry no schema flag: the sending client encodes them in the clientNonce.
         const sourceClientNonce = sourceMessage?.clientNonce ?? null;
         // A follow-up can be queued by a bot (group handoffs); only the user's own counts. A
@@ -4877,7 +4949,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // own admitted thread only. Never import a different Mico/task or channel.
         const routineHandoff = run.trigger === "routine" && run.routineId && !messagingChannelRun &&
           thread.taskKey === `routine:${run.routineId}` && thread.taskBotId === run.botId &&
-          !thread.groupId && !thread.externalConversationId && await isOwnedRoutineThread(deps.prisma, run, thread)
+          !thread.groupId && !thread.externalConversationId && ownedRoutine
           ? renderRoutineHandoff({
               routineContextStartSeq: thread.contextStartSeq,
               routineMessages: [...messages].reverse().filter(message => message.runId !== run.id).map(message => ({
@@ -4887,20 +4959,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }) : undefined;
         // The first turn of a branch hears that its history is a copy and that files were not
         // rolled back. Later turns already have that turn in their history.
-        const branchHandoff = thread.startedBy === "branch" && thread.taskBotId === run.botId &&
-          !(await deps.prisma.run.count({
-            where: { threadId: thread.id, id: { not: run.id }, trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] } },
-          }))
-          ? BRANCH_HANDOFF_NOTE : undefined;
+        const branchHandoff = (await firstBranchTurnPromise) ? BRANCH_HANDOFF_NOTE : undefined;
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
         const routineBrowser = run.trigger === "routine" && Boolean(run.routineId) && ownedRoutine &&
           computerKind === "docker" && storedComputer.scope === "isolated" &&
           !messagingChannelRun && !thread.groupId && !heldForTakeover &&
           browser.describe().id === "computer" && Boolean(deps.sandbox.pageBrowser) &&
-          Boolean(await deps.prisma.routine.findFirst({
-            where: { id: run.routineId!, spaceId: run.spaceId, userId: run.userId, botId: run.botId, isolatedBrowser: true },
-            select: { id: true },
-          }));
+          (await routineIsolatedBrowserPromise);
         const pageBrowserAllowed =
           (routineBrowser || (!routineConversation && !isolatedProjectRun && graphical)) &&
           browser.describe().capabilities.page && !heldForTakeover;
@@ -4922,6 +4987,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           : { folders: [], context: undefined };
         context.groupFolders = groupFolders.context;
         const hostEnvironment = await (earlyHostEnvironment ?? readHostEnvironment());
+        markPrepared("host");
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
         // App control needs the owner's separate consent on the connected PC (reported by
         // its environment). Never offer it to unattended, channel or isolated work: snapshots
@@ -4972,10 +5038,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if (!workflowToolsAllowed) for (const name of WORKFLOW_TOOL_NAMES) disabledBuiltinTools.add(name);
         if (thread.taskBotId) disabledBuiltinTools.add("call_user");
         // Tasks belong to the Mico's own main chat and routine conversations only.
-        const agentTasksAllowed = await agentTaskToolsAllowed(deps.prisma, run, thread, {
-          messagingChannelRun: restrictedRun,
-          backgroundRun: isBackgroundRunTrigger(run.trigger),
-        });
+        const agentTasksAllowed = await agentTasksAllowedPromise;
         if (!agentTasksAllowed) for (const name of AGENT_TASK_TOOL_NAMES) disabledBuiltinTools.add(name);
         // History reaches the Mico's other conversations only from its main chat or an ordinary
         // side conversation; a routine thread reads just the tasks it opened. A member's turn
@@ -5007,7 +5070,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if (!computerAvailable) {
           for (const name of COMPUTER_REQUIRED_TOOL_NAMES) disabledBuiltinTools.add(name);
         }
-        const micoOwner = await deps.prisma.user.findUniqueOrThrow({ where: { id: run.userId }, select: { micoDefaults: true } });
+        const micoOwner = await micoOwnerPromise;
         const ownerDefaults = readMicoDefaults(micoOwner.micoDefaults);
         let desktopToolGrant: AgentRunRequest["desktopToolGrant"];
         if (
@@ -5036,7 +5099,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
         const savedPlanWait = ownerDefaults.planAutoStartSeconds;
         const planWaitSeconds = savedPlanWait === undefined ? DEFAULT_PLAN_AUTO_START_SECONDS : savedPlanWait;
-        const answerFields = ownedWorkflow ? await workflowAnswerFields(deps.prisma, run, thread) : undefined;
+        const answerFields = await answerFieldsPromise;
         const builtins = [
           ...(answerFields?.length && !disabledBuiltinTools.has(workflowAnswerEffect) ? [workflowAnswerTool(answerFields)] : []),
           ...(canCreateWebhookRoutine && !disabledBuiltinTools.has("schedule_create")
@@ -9360,6 +9423,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               (request) => redactSecrets(JSON.stringify(request), runSecrets),
               { exposedToolNames: new Set(tools.map((tool) => tool.name)) },
             );
+        markPrepared("tools");
         const replyContext = await loadReplyContext(deps.prisma, thread.id, run.sourceMessageId);
         let userTimeZone: string | null | undefined;
         try {
@@ -9550,7 +9614,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         try {
           if (checkpointLoadError) throw checkpointLoadError;
           // Setup before the engine starts: history, tools, model key and the computer's answer.
-          getLogger().info("run.prepared", { "run.prepare_ms": Math.round(performance.now() - preparationStartedAt) });
+          getLogger().info("run.prepared", {
+            "run.prepare_ms": Math.round(performance.now() - preparationStartedAt),
+            "run.prepare_stages": preparationMarks.join(" "),
+          });
           const runtimeEvents = deps.runtime.run(
             {
               botId: bot.id,
@@ -12521,6 +12588,13 @@ async function modelCreditBillingEnabled(deps: ExecutorDeps): Promise<boolean> {
       })
     )?.modelCreditsEnabled === true
   );
+}
+
+/** Starts a read whose result is taken later; a failure surfaces where it is awaited. */
+function startedEarly<T>(start: () => Promise<T>): Promise<T> {
+  const promise = (async () => start())();
+  promise.catch(() => undefined);
+  return promise;
 }
 
 async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMaterial>) {

@@ -1005,7 +1005,14 @@
   computer kind is known (groups after their shared folders), in parallel with the rest of
   its setup, and with `engines: false`: the PC then skips its CLI engine reads, which only
   nativeEngineState (the picker) needs. `run.prepared` logs `run.prepare_ms`, the setup time
-  before the engine starts. Verify host-computer tests. Verify desktop-model-batch, desktop-model-stream,
+  before the engine starts, and `run.prepare_stages` (ms since setup began at loaded, context,
+  recall, model, computer, host and tools). Setup reads that do not depend on one another
+  start together through `startedEarly` (a thunk, so a failure surfaces only where its result
+  is awaited and a run that ends earlier ignores it); never start one before the checks it
+  depends on. API and worker reuse a live MCP session's tool list for MCP_TOOL_LIST_TTL_MS
+  (30 minutes; 0 asks every turn), as the reference app does: the session is still
+  revalidated first, so a new revision, rotated credential or relaunched process lists again.
+  specs/turn-preparation/spec.md holds the measured plan. Verify host-computer tests. Verify desktop-model-batch, desktop-model-stream,
   desktop-agent-runtime and the Desktop/API relay tests.
   Phase 4 of specs/local-engine-default/spec.md gives only explicitly requested,
   recoverable owned Desktop shell commands the ephemeral loopback model token.

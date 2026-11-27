@@ -250,6 +250,68 @@ describe("MCP connector session cache", () => {
     }
   });
 
+  it("reuses a live session's tool list until it expires or the credential rotates", async () => {
+    vi.useFakeTimers();
+    const fake = infisicalFake();
+    const store = new InfisicalSecretStore({ ...fake.options, cacheTtlMs: 100 });
+    const context = {
+      operationId: "test",
+      traceId: "test",
+      spaceId: "w1",
+      userId: "u1",
+      botId: "bot-1",
+      signal: new AbortController().signal,
+    };
+    await store.start();
+    const record = await store.put(
+      JSON.stringify({ headers: { Authorization: "Bearer initial" } }),
+      context,
+    );
+    const assignment = { ...ASSIGNMENT, server: { ...SERVER, secretId: record.id } };
+    const prisma = {
+      botMcpServer: {
+        findMany: vi.fn(async () => [assignment]),
+        findFirst: vi.fn(async () => assignment),
+      },
+      secret: { findFirst: vi.fn(async () => ({ id: record.id, ciphertext: record.ref })) },
+    };
+    const state = { failNext: false, initializations: 0 };
+    const server = mcpFetch(state);
+    let lists = 0;
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.method === "POST" && (await request.clone().text()).includes('"tools/list"')) lists += 1;
+      return server(request);
+    });
+    const connector = new McpConnector(prisma as never, store, {
+      network: TEST_NETWORK,
+      toolListTtlMs: 60_000,
+    });
+    try {
+      const first = await connector.discoverTools(context);
+      expect(lists).toBe(1);
+      expect(await connector.discoverTools(context)).toEqual(first);
+      expect(lists).toBe(1);
+      // Past the window the server is asked again.
+      await vi.advanceTimersByTimeAsync(60_000);
+      await connector.discoverTools(context);
+      expect(lists).toBe(2);
+      // A rotated credential replaces the session, whose list starts empty.
+      fake.values.set(
+        record.ref.split(":").at(-1)!,
+        JSON.stringify({ headers: { Authorization: "Bearer rotated" } }),
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      await connector.discoverTools(context);
+      expect(state.initializations).toBe(2);
+      expect(lists).toBe(3);
+    } finally {
+      await connector.close();
+      await store.close();
+      vi.useRealTimers();
+    }
+  });
+
   it("detects rotation after digest eviction and evicts deleted credentials", async () => {
     vi.useFakeTimers();
     const fake = infisicalFake();
