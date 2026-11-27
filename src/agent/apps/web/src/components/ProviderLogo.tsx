@@ -1,4 +1,4 @@
-import { Circle, SlidersHorizontal } from "lucide-react";
+import { Circle, Laptop, SlidersHorizontal } from "lucide-react";
 import { appPath } from "../lib/app-path";
 
 const PROVIDER_LOGOS: ReadonlyArray<readonly [RegExp, string]> = [
@@ -19,6 +19,7 @@ function providerLogo(name: string, providerId?: string): string {
   const label = name.toLowerCase();
   const id = (providerId ?? "").toLowerCase();
   if (label === "mycellios") return "mycellios";
+  if (id === "device") return "device";
   if (/openai[-_ ]?compatible|\bomniroute\b/u.test(label)) return "custom";
   const logo = PROVIDER_LOGOS.find(([pattern]) => pattern.test(`${label} ${id}`))?.[1];
   if (logo) return logo;
@@ -31,6 +32,7 @@ export function ProviderLogo({ name, providerId }: { name: string; providerId?: 
   if (logo === "mycellios") {
     return <img src={appPath("/mycellios/app-icon-v2-192.png")} alt="" aria-hidden className="size-5 rounded-sm" />;
   }
+  if (logo === "device") return <Laptop aria-hidden className="size-5 text-muted-foreground" strokeWidth={1.75} />;
   if (logo === "custom") return <SlidersHorizontal aria-hidden className="size-5 text-muted-foreground" />;
   if (logo === "openai") {
     return (

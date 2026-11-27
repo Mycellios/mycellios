@@ -10,6 +10,7 @@ import { isPersonRequestedRoutineRun, missedRoutineOccurrences, ROUTINE_FAILURE_
 import { type HistoryAccess, runHistoryTool, runPinMessageTool } from "./history-tools.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
 import { planCardTool } from "./plan-card.js";
+import { BUILTIN_TOOL_NAMES, DEVICE_MODEL_CONTEXT_WINDOW, DEVICE_MODEL_MAX_TOKENS, DEVICE_MODEL_TOOL_NAMES, isDeviceModelId, isDeviceModelProvider } from "@mycellios/contracts";
 import { DEFAULT_PLAN_AUTO_START_SECONDS, effectiveMicoSettings, isMycelliosBaseUrl, isTaskConversation, readMicoDefaults, SHARED_MICO_PAYER_ERROR } from "@mycellios/contracts";
 import { readMycelliosModelLimits } from "./mycellios-model-limits.js";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
@@ -3317,6 +3318,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
     /** The connection a role row is pinned to. */
     credentialId?: string,
   ): Promise<AgentRunRequest["model"]> => {
+    // A model on the Mico's own PC: no connection, key or Credits. Desktop serves it and
+    // the turn can only run there (desktop-agent-runtime refuses every server route).
+    if (isDeviceModelProvider(provider)) {
+      if (!isDeviceModelId(modelId)) throw new Error("Unknown model for that provider");
+      return { provider, id: modelId, contextWindow: DEVICE_MODEL_CONTEXT_WINDOW, maxTokens: DEVICE_MODEL_MAX_TOKENS, thinkingLevel: null };
+    }
     const hostedProvider = (await modelCreditBillingEnabled(deps))
       ? resolveDeploymentModel().provider
       : undefined;
@@ -3940,8 +3947,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         {
           agentEngine, dataDir: deps.dataDir,
           // The Mico's own Pi model, else the account's main model, can stand in for its PC's CLI.
-          piFallback: async () => Boolean(leaseTarget.modelProvider && leaseTarget.modelId) ||
-            Boolean(await resolveMemberMainModel(deps, run).catch(() => null)),
+          // A saved model on the PC cannot answer from the server: keep the offline message.
+          piFallback: async () => !isDeviceModelProvider(leaseTarget.modelProvider) && (Boolean(leaseTarget.modelProvider && leaseTarget.modelId) ||
+            Boolean(await resolveMemberMainModel(deps, run).catch(() => null))),
         },
       ).catch((error: unknown) => {
         if (error instanceof ComputerLimitError || error instanceof DesktopUnreachableError ||
@@ -4999,6 +5007,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const hostEnvironment = await (earlyHostEnvironment ?? readHostEnvironment());
         markPrepared("host");
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+        // Light mode (specs/local-models/spec.md): a model on the person's PC gets only the
+        // everyday tools, which also leaves out the instructions written for the others.
+        if (isDeviceModelProvider(runModelProvider)) {
+          for (const name of BUILTIN_TOOL_NAMES) if (!DEVICE_MODEL_TOOL_NAMES.has(name)) disabledBuiltinTools.add(name);
+        }
         // App control needs the owner's separate consent on the connected PC (reported by
         // its environment). Never offer it to unattended, channel or isolated work: snapshots
         // carry the owner's private window content.
@@ -12610,6 +12623,10 @@ function startedEarly<T>(start: () => Promise<T>): Promise<T> {
 
 async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMaterial>) {
   const [deps, userId, spaceId, , provider] = args;
+  // Served by Desktop on the person's PC: no key, no payer, nothing to bill.
+  if (isDeviceModelProvider(provider)) {
+    return { apiKey: undefined, redact: [], callObserver: undefined, contextWindow: DEVICE_MODEL_CONTEXT_WINDOW, maxTokens: DEVICE_MODEL_MAX_TOKENS } as unknown as Awaited<ReturnType<typeof resolveModelKeyMaterial>> & { callObserver: undefined };
+  }
   if (userId.startsWith("ed_") && (!(await eventDemoSessionActive(deps.prisma, userId))
     || !args[3]))
     throw new Error("Temporary event access is unavailable. No model was called.");

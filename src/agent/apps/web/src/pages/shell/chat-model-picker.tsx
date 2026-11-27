@@ -82,7 +82,8 @@ export function ChatModelPicker({
   const activeProvider = provider && providers.includes(provider) ? provider : providers[0];
   /** Agent programs on the Mico's PC are offered as native-<engine> providers. */
   const nativeProviders = new Set(choices.filter(choice => choice.provider?.startsWith("native-") && choice.providerLabel).map(choice => choice.providerLabel!));
-  const isNativeProvider = (name: string) => nativeProviders.has(name) || providerIds?.[name]?.startsWith("native-") === true;
+  // Models served on this PC sit with its agent programs.
+  const isNativeProvider = (name: string) => nativeProviders.has(name) || providerIds?.[name]?.startsWith("native-") === true || providerIds?.[name] === "device";
   const unavailableKeys = new Map(choices.filter(choice => choice.unavailable).map(choice => [choice.key, choice.unavailableLabel] as const));
   const inheritedProvider = choices.find(choice => choice.key === defaultKey)?.providerLabel;
   const grouped = useMemo(() => groupModelChoices(

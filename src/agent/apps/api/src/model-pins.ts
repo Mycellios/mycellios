@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/server";
 import type { CodexLiveCatalog, parseModelSecret } from "@mycellios/adapters";
 import { findConnectedModelCredential, validateConnectedModelChoice } from "@mycellios/adapters";
 import type { Actor } from "@mycellios/contracts";
-import { OPENAI_COMPATIBLE_PROVIDER_ID, usableModelId } from "@mycellios/contracts";
+import { isDeviceModelProvider, OPENAI_COMPATIBLE_PROVIDER_ID, usableModelId } from "@mycellios/contracts";
 import { modelRoleTarget, runAsSystem } from "@mycellios/db";
 import type { RouterDeps } from "./router.js";
 
@@ -142,6 +142,9 @@ export async function assertRoutineModel(
   codexCatalog: CodexLiveCatalog,
 ) {
   if (!model.modelProvider || !model.modelId) return;
+  // Routines run on a server workspace, where a model on the person's PC is unreachable.
+  if (isDeviceModelProvider(model.modelProvider))
+    throw new ORPCError("BAD_REQUEST", { message: "Routines run on the server and cannot use a model on your PC" });
   const message = await validateConnectedModelChoice(
     deps.prisma,
     deps.secrets,

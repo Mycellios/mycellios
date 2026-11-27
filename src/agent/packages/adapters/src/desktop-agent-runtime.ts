@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@mycellios/adapter-kit";
+import { DEVICE_MODEL_OFFLINE_ERROR, isDeviceModelProvider } from "@mycellios/contracts";
 import { DESKTOP_OWNER_UNRESOLVED_ERROR, DESKTOP_RUN_INTERRUPTED_ERROR, isUncertainDesktopRun } from "@mycellios/core";
 import { getLogger } from "@mycellios/logging";
 import { sendWhenPcHasRoom } from "./desktop-callback-wait.js";
@@ -154,11 +155,17 @@ export class DesktopAgentRuntime implements AgentRuntime {
     const context = { ...partial, botId: request.botId, runId: request.runId } as AdapterContext;
     // The approval judge is a server authority, not another Desktop task waiting for
     // a runtime slot held by the very operation it is deciding whether to admit.
-    if (request.usageOperationKind === "setup" && !request.tools.length || request.script) { yield* this.options.fallback.run(request, context); return; }
     const isNative = Boolean(request.agentEngine && request.agentEngine !== "pi");
+    // A model on the person's PC exists only there: never hand its turn to the server.
+    const deviceModel = !isNative && isDeviceModelProvider(request.model.provider);
+    if (request.usageOperationKind === "setup" && !request.tools.length || request.script) {
+      if (deviceModel) throw Error(DEVICE_MODEL_OFFLINE_ERROR);
+      yield* this.options.fallback.run(request, context); return;
+    }
     const isolatedServerRun = context.isolatedWorkspace && !isNative;
     const nativeServerRun = isNative && context.desktopWorkspace === false;
     if (context.cloudWorkspace || isolatedServerRun || nativeServerRun) {
+      if (deviceModel) throw Error(DEVICE_MODEL_OFFLINE_ERROR);
       yield* this.options.fallback.run({
         ...request,
         instructions: context.cloudWorkspace
@@ -174,6 +181,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
       // Online PCs that cannot tell which one owns this Mico are not an offline PC:
       // never guess one and never move the turn to the server.
       if (route.unresolved) throw Error(DESKTOP_OWNER_UNRESOLVED_ERROR);
+      if (deviceModel) throw Error(DEVICE_MODEL_OFFLINE_ERROR);
       // The executor also supplies resumeToolResult on fresh turns. Only an
       // actual checkpoint or project binding requires the original Desktop.
       if ((route.preferred || context.desktopWorkspace) && (context.projectSessionId || request.resumeFromCheckpoint || request.turnCheckpoint)) {
@@ -223,7 +231,9 @@ export class DesktopAgentRuntime implements AgentRuntime {
       onUsage: async () => undefined,
       // A native engine runs its own model from its local configuration; handing it
       // the account model made every native run fail as unavailable.
-      model: nativeEngine ? request.model : desktopModelAccess(request.model, signal, cleanup, accounting),
+      // A model on the PC carries no key or endpoint: Desktop resolves it to its own
+      // loopback server. Every other Pi model stays behind the cloud model boundary.
+      model: nativeEngine || deviceModel ? request.model : desktopModelAccess(request.model, signal, cleanup, accounting),
       ...(request.resolveModel ? { resolveModel: async (provider: string, id: string) => nativeEngine ? request.resolveModel!(provider, id) : desktopModelAccess(await request.resolveModel!(provider, id), signal, cleanup, accounting) } : {}),
       ...(request.resolveFallbackModel ? { resolveFallbackModel: async (provider: string, id: string, connection?: string) => nativeEngine ? request.resolveFallbackModel!(provider, id, connection) : desktopModelAccess(await request.resolveFallbackModel!(provider, id, connection), signal, cleanup, accounting) } : {}),
       // Both are fire-and-forget on the PC, so a Desktop that understands notifications sends

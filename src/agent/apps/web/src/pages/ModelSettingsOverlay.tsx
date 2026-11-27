@@ -45,6 +45,7 @@ import { OpenCodeProvider } from "./model-settings/open-code-provider";
 import type { ProviderIntegration } from "./model-settings/provider-detail";
 import { ProviderDiscovery, ProviderRuntimeDetails, useProviderRuntimes } from "./model-settings/provider-runtime";
 import { PromptCacheField } from "./model-settings/prompt-cache";
+import { LocalModelsSettings } from "./model-settings/local-models-settings";
 import { ConnectionNameField, ProvidersSection } from "./model-settings/providers-section";
 import type { ConnectableProvider } from "./model-settings/role-model-picker";
 import { SpaceBotsModelNotice } from "./model-settings/space-bots-model";
@@ -495,6 +496,7 @@ export function ModelSettingsOverlay({
               panelAt={connectionAt?.slice("providers:".length) ?? null}
             />
           )}
+          {scope === "account" ? <div className="mt-6"><LocalModelsSettings /></div> : null}
           {providersOnly && scope === "account" ? (
             <Disclosure summary={t`Advanced`}>
             <ProviderDiscovery host={host} disabled={busy} onSelect={(url, id) => openConnection(

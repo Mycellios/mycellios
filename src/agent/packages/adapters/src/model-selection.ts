@@ -1,6 +1,7 @@
 import type { SecretStore } from "@mycellios/adapter-kit";
 import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
 import type { Actor } from "@mycellios/contracts";
+import { isDeviceModelId, isDeviceModelProvider } from "@mycellios/contracts";
 import {
   canonicalPiProviderId,
   isMycelliosBaseUrl,
@@ -578,6 +579,12 @@ export async function validateBotModelChange(
   const scope = { userId: input.userId, spaceId: input.spaceId };
   const { provider, model } = input;
   const changing = provider !== input.current?.provider || model !== input.current?.model;
+  // A model on the Mico's own PC has no connection or Credits: Desktop serves it.
+  if (changing && isDeviceModelProvider(provider)) {
+    return isDeviceModelId(model)
+      ? { ok: true, provider, model, thinkingLevel: null }
+      : { ok: false, error: "Unknown model for that provider" };
+  }
   if (changing && provider && model) {
     const hosted =
       deps.hostedProvider === provider &&
@@ -751,6 +758,7 @@ export async function validateConnectedModelChoice(
   modelId: string,
   resolution: ConnectedModelResolution = {},
 ) {
+  if (isDeviceModelProvider(provider)) return isDeviceModelId(modelId) ? undefined : "Unknown model for that provider";
   if (
     resolution.hostedProvider === provider &&
     (await hasHostedModelCredits(prisma, actor, provider))
@@ -869,6 +877,7 @@ export function pinnedModelCredentialError(
   credential: { defaultModel: string | null } | null,
 ): string | undefined {
   if (!choice.modelProvider || !usableModelId(choice.modelId)) return undefined;
+  if (isDeviceModelProvider(choice.modelProvider)) return isDeviceModelId(choice.modelId) ? undefined : "Unknown model for that provider";
   if (!credential) return PINNED_PROVIDER_NOT_CONNECTED;
   // The enabled list lives in the secret, so the run path checks openai-compatible ids.
   if (isOpenAiCompatibleProvider(choice.modelProvider)) return undefined;

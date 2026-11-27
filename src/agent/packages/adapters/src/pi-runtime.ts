@@ -53,7 +53,9 @@ import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
   ComputerModeSchema,
   canonicalPiProviderId,
+  DEVICE_MODEL_OFFLINE_ERROR,
   FLEET_TOOL_NAMES,
+  isDeviceModelProvider,
   isOpenAiCompatibleProvider,
   usableModelId,
 } from "@mycellios/contracts";
@@ -1456,6 +1458,8 @@ export function resolveRuntimeModel(modelConfig: AgentRunRequest["model"]): {
   /** Live credential store; OAuth refreshes swap the credential mid-run. */
   credentials: PiRuntimeCredentialStore | undefined;
 } {
+  // Only Desktop resolves a model on the person's PC (device-model-runtime.ts).
+  if (isDeviceModelProvider(modelConfig.provider)) throw new Error(DEVICE_MODEL_OFFLINE_ERROR);
   if (modelConfig.desktopTransport) {
     const model = modelWithProviderRequestBudget(modelConfig.desktopTransport.model as unknown as Model<Api>);
     return { provider: model.provider, modelId: model.id, models: desktopModelCatalog(catalogModels(), modelConfig), model, apiKey: "account-scoped-transport", credentials: undefined };

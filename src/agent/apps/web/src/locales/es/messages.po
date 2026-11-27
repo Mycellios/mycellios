@@ -16620,3 +16620,115 @@ msgstr "¿Trabaja en otro PC tuyo?"
 
 msgid "Move to this PC"
 msgstr "Pasar a este PC"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Slower"
+msgstr "Más lento"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Very slow"
+msgstr "Muy lento"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Doesn't fit"
+msgstr "No cabe"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Preparing this PC…"
+msgstr "Preparando este PC…"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Downloading {0}…"
+msgstr "Descargando {0}…"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Checking the download…"
+msgstr "Comprobando la descarga…"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Loading the model…"
+msgstr "Cargando el modelo…"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Measuring its speed on this PC…"
+msgstr "Midiendo su velocidad en este PC…"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "This only happens once."
+msgstr "Esto solo pasa una vez."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Checking your PC…"
+msgstr "Revisando tu PC…"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Models on your PC are not available for this computer yet."
+msgstr "Los modelos en tu PC aún no están disponibles para este ordenador."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Models on this PC"
+msgstr "Modelos en este PC"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Use a model on your PC"
+msgstr "Usar un modelo en tu PC"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Free and private: it runs on this PC without Credits, and your messages never leave it."
+msgstr "Gratis y privado: funciona en este PC sin Créditos y tus mensajes nunca salen de él."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Answers right away, about {0} words per second on this PC."
+msgstr "Responde al momento, unas {0} palabras por segundo en este PC."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Use it"
+msgstr "Usarlo"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Install and use"
+msgstr "Instalar y usar"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "This PC is too slow for models that answer quickly. The free models in Mycellios work better here."
+msgstr "Este PC es demasiado lento para modelos que respondan rápido. Aquí funcionan mejor los modelos gratis de Mycellios."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Smarter but slower: about {0} words per second on this PC."
+msgstr "Más listo pero más lento: unas {0} palabras por segundo en este PC."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Smarter, slower"
+msgstr "Más listo, más lento"
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Installation cancelled."
+msgstr "Instalación cancelada."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "The model could not be installed. Try again to resume the download."
+msgstr "No se pudo instalar el modelo. Vuelve a intentarlo para continuar la descarga."
+
+#: src/pages/shell/local-models-panel.tsx
+msgid "Add another model"
+msgstr "Añadir otro modelo"
+
+#: src/pages/shell/chat-header-model.tsx
+msgid "On your PC"
+msgstr "En tu PC"
+
+#: src/pages/model-settings/local-models-settings.tsx
+msgid "{0} installed, {1} on disk. They run here, free and private."
+msgstr "{0} instalados, {1} en disco. Funcionan aquí, gratis y en privado."
+
+#: src/pages/model-settings/local-models-settings.tsx
+msgid "None yet. Choose \"On your PC\" in a Mico's model menu to install one with a single click."
+msgstr "Aún ninguno. Elige «En tu PC» en el menú de modelo de un Mico para instalar uno con un clic."
+
+#: src/pages/model-settings/local-models-settings.tsx
+msgid "{0} · about {1} words per second, measured on this PC"
+msgstr "{0} · unas {1} palabras por segundo, medido en este PC"
+
+#: src/pages/model-settings/local-models-settings.tsx
+msgid "Free memory"
+msgstr "Liberar memoria"

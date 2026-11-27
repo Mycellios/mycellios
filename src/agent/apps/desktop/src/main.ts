@@ -1,6 +1,7 @@
 import { ServerDirectory } from "./server-directory.js";
 import { registerServerDirectoryIpc } from "./server-directory-ipc.js";
 import { LocalVoice, requireVoiceModelKind } from "./local-voice.js";
+import { LocalModels } from "./local-models.js";
 import { AppBehavior } from "./app-behavior.js";
 import { UpdatePreferences } from "./update-preferences.js";
 import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
@@ -1606,8 +1607,12 @@ app.whenReady().then(async () => {
   });
   // A CLI sign-in the person starts from Mycellios opens its page in their own browser. Managed CLIs
   // check their vendor channel and the blocklist from main at startup and daily (no account data).
+  // Models that run on this PC (specs/local-models/spec.md); nothing loads until asked.
+  const localModels = new LocalModels(path.join(userDataDir, "local-models"));
+  app.once("before-quit", () => { void localModels.unload(); });
   const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope(), undefined,
-    { openExternal: (url) => shell.openExternal(url) }, undefined, { checkUpdates: true });
+    { openExternal: (url) => shell.openExternal(url) }, undefined,
+    { checkUpdates: true, deviceModels: (modelId) => localModels.endpoint(modelId) });
   const nativeRoot = app.isPackaged
     ? path.join(process.resourcesPath, "local-server")
     : path.join(app.getAppPath(), "local-server");
@@ -1921,6 +1926,15 @@ app.whenReady().then(async () => {
     return localVoice.run(voiceOwner(event), { text: input.text, language: input.language, speed: input.speed });
   });
   ipcMain.handle("desktop.localVoice.stop", event => localVoice.stop(voiceOwner(event)));
+  const localModelsCaller = (event: Electron.IpcMainInvokeEvent) => {
+    if (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) throw new Error("Untrusted local models caller");
+  };
+  ipcMain.handle("desktop.localModels.status", event => { localModelsCaller(event); return localModels.status(); });
+  ipcMain.handle("desktop.localModels.inspect", event => { localModelsCaller(event); return localModels.inspect(); });
+  ipcMain.handle("desktop.localModels.install", (event, modelId: unknown) => { localModelsCaller(event); return localModels.install(modelId); });
+  ipcMain.handle("desktop.localModels.cancel", event => { localModelsCaller(event); return localModels.cancel(); });
+  ipcMain.handle("desktop.localModels.remove", (event, modelId: unknown) => { localModelsCaller(event); return localModels.remove(modelId); });
+  ipcMain.handle("desktop.localModels.unload", event => { localModelsCaller(event); return localModels.unload(); });
   const getCloudComputer = () => {
     if (!hostComputer || !mainWindow) throw new Error("Local computer unavailable");
     const base = projectServer();
