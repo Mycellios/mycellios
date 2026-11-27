@@ -13,6 +13,10 @@ param(
 # SHA256.Create(), ...). Use cmdlets, string methods and Windows executables only;
 # fast-install.test.mjs runs every case in both language modes.
 $ErrorActionPreference='Stop'
+# New-Guid, ConvertTo-Json and the other utility cmdlets come from Windows PowerShell's own
+# module folder. Command discovery can miss them when the module path was inherited from
+# another PowerShell (a PowerShell 7 terminal or CI step): load them from $PSHOME explicitly.
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1')
 $exeName='Mycellios Desktop.exe'
 $appRunning='Close Mycellios normally before updating'
 # Settled recovery copies (a committed update, or one already rolled back) only serve a manual
