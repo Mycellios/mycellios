@@ -1748,6 +1748,14 @@ describe("dockerComputerToolInstruction", () => {
     expect(dockerComputerToolInstruction("e2b")).toBeUndefined();
   });
 
+  it("tells a server computer it is not the person's device and names the real routes", () => {
+    const instruction = dockerComputerToolInstruction("docker");
+    expect(instruction).toContain("runs on a Mycellios server, not on the person's device");
+    expect(instruction).toContain("Mycellios Desktop on that PC with this Mico set to This PC");
+    expect(instruction).toContain("read pages but not act in them");
+    expect(instruction).toContain("never ask for a password in chat");
+  });
+
   it("documents gh CLI device-flow login without token injection", () => {
     const instruction = dockerComputerToolInstruction("docker");
     expect(instruction).toContain("gh auth login");

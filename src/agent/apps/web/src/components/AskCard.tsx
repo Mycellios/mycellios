@@ -6,6 +6,7 @@ import { BOT_INSTRUCTIONS_MAX_LENGTH, commandVariableName } from "@mycellios/con
 import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@mycellios/core";
 import { Button, Input, Textarea } from "@mycellios/ui-web";
 import { useState } from "react";
+import { AnsweredQuestion } from "./AnsweredQuestion";
 import { rpc } from "../lib/rpc";
 import { LocationAskCard } from "./LocationAskCard";
 import { PlanCard } from "./PlanCard";
@@ -15,6 +16,22 @@ import { errorText } from "../lib/user-error";
 import { BuiCard } from "./ai/primitives";
 
 export type AskBlock = Extract<ThreadMessage["blocks"][number], { kind: "ask" }>;
+
+/**
+ * True when a saved ask renders as the person's own reply (AnsweredQuestion): an
+ * answered ordinary question, not an approval, credential, plan, location or
+ * instruction update, which keep their explicit status cards.
+ */
+export function isPersonAnsweredAsk(block: AskBlock): boolean {
+  return (
+    block.status === "answered" &&
+    !block.location &&
+    !block.plan &&
+    !block.instructionUpdate &&
+    !isSecretAskBlock(block) &&
+    !isApprovalAskBlock(block)
+  );
+}
 
 function formatAnsweredState(
   answer: string | undefined,
@@ -158,27 +175,19 @@ export function AskCard({
 
   if (answered && !secretInput && !approvalActions && !block.instructionUpdate) {
     return (
-      <div
-        data-testid="answered-question-card"
-        className="w-full min-w-0 max-w-md rounded-2xl bg-card px-4 py-3"
-      >
-        <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground">
-          {displayedAnswer ? selectedAskActionLabel(displayedAnswer, askActions) : t`Answered`}
-        </p>
-        <details className="mt-2 text-sm text-muted-foreground">
-          <summary className="w-fit cursor-pointer rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-            <Trans>View question</Trans>
-          </summary>
-          <div className="mt-2 break-words">
+      <AnsweredQuestion
+        answer={displayedAnswer ? selectedAskActionLabel(displayedAnswer, askActions) : t`Answered`}
+        question={
+          <>
             <ChatMarkdown>{block.text}</ChatMarkdown>
-          </div>
-          {block.detail ? (
-            <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words font-sans">
-              {block.detail}
-            </pre>
-          ) : null}
-        </details>
-      </div>
+            {block.detail ? (
+              <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words font-sans text-muted-foreground">
+                {block.detail}
+              </pre>
+            ) : null}
+          </>
+        }
+      />
     );
   }
 
