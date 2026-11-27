@@ -27,6 +27,18 @@ function unsupportedValue(value: unknown, path: string): Error {
 /** Model-chosen keys stay out of messages unless they are plain identifiers. */
 const keyPath = (path: string, key: string) => NAME.test(key) ? `${path}.${key}` : `${path}[?]`;
 
+/** Functions offered one-way by code that does not hold the session's DesktopAgentRpc. */
+const oneWayFunctions = new WeakSet<object>();
+
+/**
+ * Marks `fn` as a notification for whichever DesktopAgentRpc carries it, as
+ * DesktopAgentRpc.notify does for its own session. A caller that understands it sends no reply.
+ */
+export function oneWay<T extends (...args: never[]) => unknown>(fn: T): T {
+  oneWayFunctions.add(fn);
+  return fn;
+}
+
 export class DesktopAgentRpc {
   private targets = new Map<string, (...args: unknown[]) => unknown>();
   private pending = new Map<string, { resolve(value: unknown): void; reject(error: unknown): void }>();
@@ -51,8 +63,12 @@ export class DesktopAgentRpc {
   /** Binds an object method to its object, keeping a notification a notification. */
   private bound(fn: (...args: unknown[]) => unknown, self: object) {
     const bound = fn.bind(self);
-    if (this.notifications.has(fn)) this.notifications.add(bound);
+    if (this.isNotification(fn)) this.notifications.add(bound);
     return bound;
+  }
+
+  private isNotification(fn: object) {
+    return this.notifications.has(fn) || oneWayFunctions.has(fn);
   }
 
   encode(value: unknown): AgentWire {
@@ -68,7 +84,7 @@ export class DesktopAgentRpc {
         this.targets.set(id, typeof v === "function" ? v as (...args: unknown[]) => unknown : () => v);
         // Prevent an asynchronously rejected shell completion from becoming unhandled before use.
         if (v instanceof Promise) void v.catch(() => undefined);
-        if (typeof v === "function" && this.notifications.has(v)) {
+        if (typeof v === "function" && this.isNotification(v)) {
           this.notifyTargets.add(id);
           return { kind: "function", value: id, mode: "notify" };
         }

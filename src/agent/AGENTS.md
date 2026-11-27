@@ -972,7 +972,11 @@
   DesktopAgentRpc.notify (onCheckpoint, onToolCompleted) travel one-way, with no reply
   operation, when the PC understands `mode: "notify"`; a failed checkpoint still fails
   the run, and older peers keep their replies. A model stream that reached done is not
-  cancelled (specs/desktop-agent-channel/spec.md). The Desktop relay sends every
+  cancelled (specs/desktop-agent-channel/spec.md). A PC that offers a oneWay `push` sink
+  to open() gets every later batch sent to it, numbered from 1 and one at a time, and
+  answers no reads; it orders and bounds them (pushedBatches), and older peers keep
+  reading. A broken pushed stream is released and ends with `{ failed: true }`.
+  Verify desktop-model-push too. The Desktop relay sends every
   complete line buffered during a result POST in the next one (RESULT_FRAME_BYTES)
   with the stream end joined to the last lines, and the API rechecks all of a PC's
   bound Micos with one ownedBots read. Verify desktop-model-batch, desktop-model-stream,

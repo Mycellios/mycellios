@@ -2,6 +2,7 @@ import type { AgentRunModel } from "@mycellios/adapter-kit";
 import type { Api, AssistantMessage, Context, Model, Models, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
+import { oneWay } from "./desktop-agent-rpc.js";
 
 /** Room left for the call envelope under the bridge's one-frame limit. */
 const CONTEXT_FRAME_BUDGET = HOST_COMPUTER_MAX_BYTES - 512 * 1024;
@@ -31,6 +32,43 @@ export function fitDesktopModelContext(context: Context, budget = CONTEXT_FRAME_
   return { ...context, messages };
 }
 
+type Batch = { events: unknown[]; done: boolean; result?: unknown };
+/** Batches the server may send ahead of the reader; it sends one at a time, so this is ample. */
+const PUSHED_BATCH_LIMIT = 64;
+
+/**
+ * The PC's sink for a pushed model stream: a one-way callback that keeps batches by number and
+ * hands them out in order. A number out of range, repeated or already read is a protocol error.
+ */
+export function pushedBatches(signal?: AbortSignal) {
+  const held = new Map<number, Batch | { failed: true }>();
+  let expected = 1;
+  let wake: (() => void) | undefined;
+  const push = oneWay((seq: number, batch: Batch | { failed: true }) => {
+    if (!Number.isSafeInteger(seq) || seq < expected || held.has(seq) || seq >= expected + PUSHED_BATCH_LIMIT ||
+      !batch || typeof batch !== "object") throw Error("Invalid Desktop model batch");
+    held.set(seq, batch);
+    wake?.();
+  });
+  signal?.addEventListener("abort", () => wake?.(), { once: true });
+  const next = async (): Promise<Batch> => {
+    while (!held.has(expected)) {
+      signal?.throwIfAborted();
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+        if (signal?.aborted) resolve();
+      });
+      wake = undefined;
+    }
+    const batch = held.get(expected)!;
+    held.delete(expected);
+    expected += 1;
+    if ("failed" in batch || !Array.isArray(batch.events) || typeof batch.done !== "boolean") throw Error("The account model stream failed");
+    return batch;
+  };
+  return { push, next };
+}
+
 /** Metadata and a run-scoped stream, never a provider token or refresh credential. */
 export function desktopModelCatalog(base: Models, config: AgentRunModel): Models {
   const transport = config.desktopTransport!;
@@ -53,12 +91,14 @@ export function desktopModelCatalog(base: Models, config: AgentRunModel): Models
             if (["apiKey", "headers", "fetch", "signal", "onResponse", "onPayload"].includes(key) || typeof value === "function" || value === undefined) continue;
             safe[key] = value;
           }
-          remote = await transport.open(fitDesktopModelContext(context), safe, { firstBatch: true });
+          const inbox = pushedBatches(options?.signal);
+          remote = await transport.open(fitDesktopModelContext(context), safe, { firstBatch: true, push: inbox.push });
           options?.signal?.throwIfAborted();
-          // An older server ignores firstBatch and sends no first events.
+          // An older server ignores firstBatch and push: it sends no first events and answers reads.
           let first = remote.first;
+          const next = remote.pushed ? inbox.next : remote.read;
           for (;;) {
-            const batch = first ?? await remote.read(); options?.signal?.throwIfAborted();
+            const batch = first ?? await next(); options?.signal?.throwIfAborted();
             first = undefined;
             for (const event of batch.events) output.push(event as Parameters<typeof output.push>[0]);
             if (batch.done) { completed = true; output.end(batch.result as AssistantMessage); break; }
