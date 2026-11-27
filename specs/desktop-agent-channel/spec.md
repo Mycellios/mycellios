@@ -1,6 +1,6 @@
 # Desktop agent channel
 
-Status: phase 1 in progress. Owner decision: start with the persistent channel (2026-11-27).
+Status: phase 1 merged; phase 2 in progress. Owner decision: start with the persistent channel (2026-11-27).
 
 ## Problem
 
@@ -72,6 +72,14 @@ reads, so batches overlap within the binding's control lane. The PC consumes the
 acknowledges progress inside its existing result stream; it falls back to reads with an older
 worker. Target: one operation per batch instead of a call plus a reply, with no wait between
 batches.
+
+As built: the PC passes `push`, a function marked `oneWay`, in `open`'s accept argument. A
+worker that supports it answers `pushed: true` and sends each later batch as a one-way call
+`push(seq, batch)`, numbered from 1. It awaits each send, which returns once the PC took the
+message, so one batch is in flight while the next one gathers. The PC keeps at most 64 numbers
+ahead, refuses repeated or already read numbers, and hands batches out in order. A stream that
+breaks on the worker is released and ends with `push(n, { failed: true })`. An older PC passes no
+`push` and an older worker answers no `pushed`; both keep reads.
 
 ### Phase 3: one downstream per agent session
 

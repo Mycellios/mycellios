@@ -528,11 +528,18 @@ export interface AgentRunModel {
     /**
      * `accept.firstBatch` asks the cloud to answer with the first events already read,
      * saving one relay round trip per model call. Older servers ignore it and omit `first`.
+     * `accept.push` is a one-way PC callback: a server that supports it sends every later batch
+     * there, numbered from 1, instead of waiting for reads, and answers `pushed: true`; a failed
+     * stream ends with `{ failed: true }`. Older servers ignore it and the PC reads as before.
      */
-    open(context: unknown, options: Record<string, unknown>, accept?: { firstBatch?: boolean }): Promise<{
+    open(context: unknown, options: Record<string, unknown>, accept?: {
+      firstBatch?: boolean;
+      push?: (seq: number, batch: { events: unknown[]; done: boolean; result?: unknown } | { failed: true }) => unknown;
+    }): Promise<{
       read(): Promise<{ events: unknown[]; done: boolean; result?: unknown }>;
       cancel(): Promise<void>;
       first?: { events: unknown[]; done: boolean; result?: unknown };
+      pushed?: true;
     }>;
   };
   /** Server-side spending authorization, carried with the resolved credential. */

@@ -2,7 +2,7 @@ import type { Context } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vitest";
 // Only the frame limit is needed; each test passes its own budget.
 vi.mock("./host-computer-protocol.js", () => ({ HOST_COMPUTER_MAX_BYTES: 12 * 1024 * 1024 }));
-const { OMITTED_IMAGE_TEXT, desktopModelCatalog, fitDesktopModelContext } = await import("./desktop-model-stream.js");
+const { OMITTED_IMAGE_TEXT, desktopModelCatalog, fitDesktopModelContext, pushedBatches } = await import("./desktop-model-stream.js");
 
 const image = (kb: number) => ({ type: "image" as const, mimeType: "image/png", data: "A".repeat(kb * 1024) });
 const text = (value: string) => ({ type: "text" as const, text: value });
@@ -51,7 +51,8 @@ describe("fitDesktopModelContext", () => {
 describe("desktopModelCatalog", () => {
   const final = { role: "assistant", content: [{ type: "text", text: "Hi" }], stopReason: "stop" };
   const delta = { type: "text_delta", contentIndex: 0, delta: "Hi" };
-  async function stream(open: (context: unknown, options: Record<string, unknown>, accept?: { firstBatch?: boolean }) => Promise<unknown>) {
+  type Push = (seq: number, batch: unknown) => void;
+  async function stream(open: (context: unknown, options: Record<string, unknown>, accept?: { firstBatch?: boolean; push?: Push }) => Promise<unknown>) {
     const catalog = desktopModelCatalog({} as never, { provider: "p", id: "m", desktopTransport: { model: { id: "m", api: "openai-completions", provider: "p" }, open: open as never } });
     const output = catalog.streamSimple({} as never, { messages: [] } as Context, {});
     const events: unknown[] = [];
@@ -66,7 +67,7 @@ describe("desktopModelCatalog", () => {
       accepted = accept;
       return { read, cancel: async () => undefined, first: { events: [delta], done: true, result: final } };
     });
-    expect(accepted).toEqual({ firstBatch: true });
+    expect(accepted).toMatchObject({ firstBatch: true, push: expect.any(Function) });
     expect(read).not.toHaveBeenCalled();
     expect(events).toEqual([delta]);
     expect(result).toEqual(final);
@@ -94,5 +95,49 @@ describe("desktopModelCatalog", () => {
     const { result } = await stream(async () => ({ read, cancel, first: { events: [delta], done: false } }));
     expect(cancel).toHaveBeenCalledTimes(1);
     expect((result as { stopReason?: string }).stopReason).toBe("error");
+  });
+
+  it("takes batches the server pushes, in order, without reading or cancelling", async () => {
+    const read = vi.fn(), cancel = vi.fn(async () => undefined);
+    const later = { type: "text_delta", contentIndex: 0, delta: " there" };
+    const { events, result } = await stream(async (_context, _options, accept) => {
+      // The second batch overtakes the first; the PC still hands them out in order.
+      setTimeout(() => { accept!.push!(2, { events: [], done: true, result: final }); accept!.push!(1, { events: [later], done: false }); }, 0);
+      return { read, cancel, pushed: true, first: { events: [delta], done: false } };
+    });
+    expect(read).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    expect(events).toEqual([delta, later]);
+    expect(result).toEqual(final);
+  });
+
+  it("ends with an error and releases the stream when the server reports it failed", async () => {
+    const cancel = vi.fn(async () => undefined);
+    const { result } = await stream(async (_context, _options, accept) => {
+      setTimeout(() => accept!.push!(1, { failed: true }), 0);
+      return { read: vi.fn(), cancel, pushed: true };
+    });
+    expect((result as { stopReason?: string }).stopReason).toBe("error");
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("pushedBatches", () => {
+  it("refuses a batch number that is repeated, already read or far ahead", async () => {
+    const inbox = pushedBatches();
+    expect(() => inbox.push(0, { events: [], done: false })).toThrow("Invalid Desktop model batch");
+    inbox.push(1, { events: [], done: false });
+    expect(() => inbox.push(1, { events: [], done: false })).toThrow("Invalid Desktop model batch");
+    expect(() => inbox.push(1000, { events: [], done: false })).toThrow("Invalid Desktop model batch");
+    await inbox.next();
+    expect(() => inbox.push(1, { events: [], done: false })).toThrow("Invalid Desktop model batch");
+  });
+
+  it("stops waiting when the run is aborted", async () => {
+    const controller = new AbortController();
+    const inbox = pushedBatches(controller.signal);
+    const waiting = inbox.next();
+    controller.abort();
+    await expect(waiting).rejects.toThrow();
   });
 });

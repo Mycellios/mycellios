@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
+import { DesktopAgentRpc, oneWay } from "./desktop-agent-rpc.js";
 
 const rpc = () => new DesktopAgentRpc(() => undefined);
 
@@ -77,4 +77,20 @@ it("refuses one-way calls to ordinary functions and reports a failed notificatio
   expect(toPc).toEqual([]);
   expect(() => rpc().decode({ kind: "promise", value: plain, mode: "notify" })).toThrow("Invalid Desktop runtime value");
   expect(() => rpc().decode({ kind: "function", value: plain, mode: "other" })).toThrow("Invalid Desktop runtime value");
+});
+
+it("sends a function marked oneWay as a notification from any session", async () => {
+  const toWorker: unknown[] = [];
+  const toPc: unknown[] = [];
+  const pc = new DesktopAgentRpc(message => { toWorker.push(message); });
+  const worker = new DesktopAgentRpc(message => { toPc.push(message); });
+  const received: number[] = [];
+  const wire = pc.encode({ push: oneWay((seq: number) => { received.push(seq); }) });
+  expect(JSON.stringify(wire)).toContain('"mode":"notify"');
+  const { push } = worker.decode(JSON.parse(JSON.stringify(wire))) as { push: (seq: number) => Promise<void> };
+  await push(1);
+  expect(toPc).toEqual([expect.objectContaining({ kind: "call", notify: true })]);
+  await pc.accept(toPc[0]);
+  expect(received).toEqual([1]);
+  expect(toWorker).toEqual([]);
 });
