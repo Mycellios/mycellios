@@ -5,7 +5,7 @@ import { Button } from "@mycellios/ui-web";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { messages as spanish } from "../../src/locales/es/messages.po";
-import { ComputerModeDescription, ComputerModePicker } from "../../src/pages/shell/bot-panel";
+import { ComputerModeNote, ComputerModePicker } from "../../src/pages/shell/bot-panel";
 import { ComputerOverlay } from "../../src/pages/shell/computer-overlay";
 import "../../src/styles.css";
 
@@ -35,7 +35,7 @@ function Fixture() {
     <section className="@container mx-auto max-w-xl">
       <h1 className="mb-4 text-lg">{locale === "es" ? "Ordenador" : "Computer"}</h1>
       <ComputerModePicker value={mode} desktopAvailable={false} onChange={next => { calls.push(`mode:${next}`); setMode(next); }} />
-      <ComputerModeDescription mode={mode} />
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground"><ComputerModeNote mode={mode} desktopAvailable={false} /></p>
       <Button className="mt-6" onClick={() => { calls.push("preview"); setOpen(true); }}>Open synthetic screen</Button>
     </section>
     {open ? <ComputerOverlay bot={bot} computer={computer} computerViewport={null}
