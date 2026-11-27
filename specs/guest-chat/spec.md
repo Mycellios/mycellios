@@ -257,8 +257,10 @@ schema change.
   replayed. `freeRefusalRetries(options)` lets a caller only lower the AntSeed free
   retry budget; guest turns pass 0.
 - Agent web: `lib/guest-chat.ts`, `pages/guest/GuestEntry.tsx` and `GuestChat.tsx`.
-  The signed-out `/` route shows guest chat only for an ordinary tab with no query
-  string; otherwise the existing welcome page. The Dev proxy forwards only the guest
+  The signed-out `/` and `/app` routes show guest chat only for an ordinary tab with no
+  query string; otherwise the existing welcome page or sign-in redirect. Hosted Agent
+  redirects `/agent` and `/agent/` to `/agent/app` at the front proxy, so `/app` is the
+  entry visitors actually reach in production. The Dev proxy forwards only the guest
   cookie on guest paths (`event-demo-proxy.ts`). The existing one-time language
   question still comes first on a first visit.
 - Landing copy is unchanged ("Open in browser"); "Try it free, no sign-up" can follow

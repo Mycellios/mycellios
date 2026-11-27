@@ -178,7 +178,8 @@
   companion-renderer, window-icon and floating-chats tests.
 
 - Guest chat (specs/guest-chat/spec.md at the repository root) replaces the signed-out
-  welcome page only on the bare `/` route of an ordinary browser tab when the coordinator's
+  welcome page on the bare `/` route, and the sign-in redirect on the bare `/app` route
+  (hosted `/agent` redirects there), of an ordinary browser tab when the coordinator's
   `/mobile/v1/guest/config` reports it enabled; deep links, Desktop, the Android host,
   native WebViews and installed PWAs keep sign-in. `GuestEntry`/`GuestChat` never mount
   Shell, RPC, realtime or push. Text only: no files, tools, model picker or saved

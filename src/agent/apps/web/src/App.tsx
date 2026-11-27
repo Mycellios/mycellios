@@ -237,6 +237,10 @@ function SessionApp() {
                   <SubscriptionGate fallback={<PageLoading />}>
                     <Outlet />
                   </SubscriptionGate>
+                ) : pathname === "/app" ? (
+                  // Hosted Agent sends its bare entry (/agent) to /app: a signed-out visitor
+                  // there may chat as a guest; GuestEntry falls back to sign-in otherwise.
+                  <GuestEntry fallback={<Navigate to={signInNext ? `/sign-in?next=${signInNext}` : "/sign-in"} replace />} />
                 ) : (
                   <Navigate to={signInNext ? `/sign-in?next=${signInNext}` : "/sign-in"} replace />
                 )

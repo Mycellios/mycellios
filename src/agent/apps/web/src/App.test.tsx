@@ -57,6 +57,7 @@ vi.mock("./pages/Board", () => {
   capability.boardLoaded();
   return { BoardPage: () => <div>Board page</div> };
 });
+vi.mock("./pages/guest/GuestEntry", () => ({ GuestEntry: () => <div>Guest entry</div> }));
 vi.mock("./pages/IntegrationSetup", () => ({ IntegrationSetupPage: () => null }));
 vi.mock("./pages/McpOAuthCallback", () => ({ McpOAuthCallbackPage: () => null }));
 
@@ -121,6 +122,34 @@ it("loads the board chunk only after bootstrap enables the route", async () => {
     expect(capability.boardLoaded).toHaveBeenCalledOnce();
     expect(container.textContent).toBe("Board page");
   } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it("offers guest entry on the bare /app a hosted /agent redirects to, never on deeper routes", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  capability.session = { isPending: false, data: null, error: null };
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const render = async (path: string) => {
+    await act(async () => {
+      root.render(<MemoryRouter key={path} initialEntries={[path]}><App /></MemoryRouter>);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  };
+  try {
+    await render("/app");
+    expect(container.textContent).toBe("Guest entry");
+    await render("/");
+    expect(container.textContent).toBe("Guest entry");
+    await render("/app/bot-1");
+    expect(container.textContent).toBe("Auth in");
+    capability.session = signedIn;
+    await render("/app");
+    expect(container.textContent).toBe("Shell");
+  } finally {
+    capability.session = null;
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
