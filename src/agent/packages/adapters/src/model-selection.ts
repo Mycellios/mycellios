@@ -3,10 +3,12 @@ import { SecretStoreUnavailableError } from "@mycellios/adapter-kit";
 import type { Actor } from "@mycellios/contracts";
 import {
   canonicalPiProviderId,
+  isMycelliosBaseUrl,
   isOpenAiCompatibleProvider,
   selectCompatibleModelCredential,
   usableModelId,
 } from "@mycellios/contracts";
+import { mycelliosCatalogServes } from "./mycellios-model-limits.js";
 import type { PrismaClient } from "@mycellios/db";
 import { chooseModelCredential, findModelCredential, findModelCredentialById } from "@mycellios/db";
 import { resolveDeploymentModel } from "./deployment-model.js";
@@ -505,12 +507,20 @@ export async function findConnectedModelCredential(
       : loadModelSecret(prisma, secretStore, actor.userId, credential.secretId);
   const id = usableModelId(modelId);
   if (!selected || !isOpenAiCompatibleProvider(provider) || !id) return selected;
-  if (selected.defaultModel === id) return selected;
   const secret = await readSecret(selected);
+  // A Mycellios connection keeps enabled ids after its live catalog stops serving them.
+  // Such a stale id must not outrank another connection that really runs the model:
+  // running it here would fall back to the connection-wide window and fail every turn.
+  const staleMycellios = (value: Awaited<ReturnType<typeof readSecret>>) =>
+    value?.kind === "openai_compatible" && isMycelliosBaseUrl(value.baseUrl) && value.apiKey
+      ? mycelliosCatalogServes(value.baseUrl, value.apiKey, id).then((serves) => serves === false)
+      : Promise.resolve(false);
+  const selectedStale = await staleMycellios(secret);
+  if (selected.defaultModel === id && !selectedStale) return selected;
   const preferred = {
     credential: selected,
-    enabledModelIds: secret?.kind === "openai_compatible" ? secret.enabledModelIds : [],
-    defaultModel: selected.defaultModel,
+    enabledModelIds: selectedStale ? [] : secret?.kind === "openai_compatible" ? secret.enabledModelIds : [],
+    defaultModel: selectedStale ? null : selected.defaultModel,
   };
   if (preferred.enabledModelIds?.includes(id)) return selected;
   const credentials = await prisma.userModelCredential.findMany({
@@ -521,10 +531,11 @@ export async function findConnectedModelCredential(
   for (const credential of credentials) {
     if (credential.id === selected.id) continue;
     const candidate = await readSecret(credential);
+    const enabled = candidate?.kind === "openai_compatible" ? candidate.enabledModelIds : [];
     candidates.push({
       credential: { ...credential, defaultModel: null, thinkingLevel: null },
       defaultModel: null,
-      enabledModelIds: candidate?.kind === "openai_compatible" ? candidate.enabledModelIds : [],
+      enabledModelIds: enabled?.includes(id) && (await staleMycellios(candidate)) ? [] : enabled,
     });
   }
   return selectCompatibleModelCredential(preferred, candidates, id)?.credential ?? selected;

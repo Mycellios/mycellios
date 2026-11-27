@@ -33,6 +33,7 @@ import {
   decideOAuthAuthorization,
   getOAuthAuthorization,
   OAuthConsentError,
+  restartExpiredAuthorization,
 } from "./oauth-consent";
 
 const sessionRejected = (error: unknown) => error instanceof OAuthConsentError && error.sessionRejected;
@@ -43,6 +44,7 @@ export function OAuthConsent() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [details, setDetails] = useState<OAuthAuthorization | null>(null);
   const [error, setError] = useState("");
+  const [expired, setExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [resume, setResume] = useState(0);
@@ -135,14 +137,28 @@ export function OAuthConsent() {
         if (!isFirstPartyReturn(next, clients)) throw new Error();
         if (active) location.replace(next);
       } else setDetails(d);
-    })().catch(() => {
-      if (active)
+    })().catch((error) => {
+      if (!active) return;
+      if (error instanceof OAuthConsentError && error.authorizationGone) {
+        // Ask Agent for a new authorization instead of a dead end; the guard
+        // falls back to the explicit button if that one is refused too.
+        if (restartExpiredAuthorization()) return;
+        setExpired(true);
         setError(
           text(
             "This sign-in request has expired. Open Mycellios again.",
             "Este acceso ha caducado. Vuelve a entrar en Mycellios.",
           ),
         );
+        return;
+      }
+      setExpired(false);
+      setError(
+        text(
+          "Could not reach Mycellios sign-in. Please try again.",
+          "No se ha podido conectar con el acceso de Mycellios. Inténtalo de nuevo.",
+        ),
+      );
     });
     return () => {
       active = false;
@@ -187,11 +203,11 @@ export function OAuthConsent() {
         alert={error || undefined}
         slowHint={launchText(locale, "slow")}
         retryLabel={
-          error && session ? text("Sign in again", "Volver a entrar") : launchText(locale, "retry")
+          expired && session ? text("Sign in again", "Volver a entrar") : launchText(locale, "retry")
         }
-        retryHref={error && session ? "/agent/sign-in" : undefined}
+        retryHref={expired && session ? "/agent/sign-in" : undefined}
         onRetry={
-          error && session
+          expired && session
             ? undefined
             : () => {
                 setError("");

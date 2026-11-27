@@ -118,6 +118,18 @@ describe("ChatModelPicker", () => {
     expect(network).toEqual(networkBefore);
   });
 
+  it("puts the recommended free model first among the free ones", () => {
+    const model = (id: string) => ({ key: `openai-compatible::${id}`, label: `${id} (Mycellios)`, title: id, provider: "openai-compatible", providerLabel: "Mycellios", modelId: id });
+    const list = [model("alpha"), model("beta"), model("mycellios-free")];
+    const origins = Object.fromEntries(list.map(choice => [choice.key, "antseed" as const]));
+    act(() => root.render(<ChatModelPicker id="model" inline choices={list} value={list[0]!.key} onChange={onChange} modelOrigins={origins}
+      freeModels={new Set(list.map(choice => choice.key))} recommendedModels={new Set([list[2]!.key])} />));
+    // The empty network group stays visible first; the free group follows it.
+    const [, free] = [...container.querySelectorAll("[cmdk-group]")].map(group =>
+      [...group.querySelectorAll('[role="option"]')].map(node => node.getAttribute("aria-label")));
+    expect(free).toEqual(["mycellios-free (Mycellios)", "alpha (Mycellios)", "beta (Mycellios)"]);
+  });
+
   it("uses the themed menu for a short list and preserves the inherited option", async () => {
     render(choices(9), "openrouter::vendor/model-1");
     const trigger = container.querySelector<HTMLButtonElement>("button#model")!;

@@ -65,7 +65,7 @@ describe("coordinator evidence authority", () => {
     });
     expect(deployment.tokensPerSecond).toBeGreaterThan(0);
     expect((await scheduler.listAvailableModels())).toEqual([
-      { id: "qwen-test", replicas: 1, pipelines: 0 },
+      expect.objectContaining({ id: "qwen-test", replicas: 1, pipelines: 0, contextLimit: expect.any(Number) }),
     ]);
 
     await deliver(hub, state, "evidence.canary.complete", {

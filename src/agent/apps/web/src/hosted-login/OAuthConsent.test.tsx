@@ -16,7 +16,7 @@ import {
   validAuthSession,
 } from "./auth";
 import { OAuthConsent } from "./OAuthConsent";
-import { getOAuthAuthorization, OAuthConsentError } from "./oauth-consent";
+import { getOAuthAuthorization, OAuthConsentError, restartExpiredAuthorization } from "./oauth-consent";
 
 vi.mock("./auth", async (original) => ({
   ...(await original<typeof import("./auth")>()),
@@ -38,6 +38,7 @@ vi.mock("./oauth-consent", async (original) => ({
   ...(await original<typeof import("./oauth-consent")>()),
   getOAuthAuthorization: vi.fn(),
   decideOAuthAuthorization: vi.fn(),
+  restartExpiredAuthorization: vi.fn(() => true),
 }));
 
 const config = {
@@ -312,14 +313,29 @@ it("keeps the saved session when the authority cannot be reached", async () => {
   vi.mocked(getOAuthAuthorization).mockRejectedValueOnce(new OAuthConsentError(401)).mockRejectedValueOnce(new TypeError("fetch failed"));
   await act(async () => root.render(<OAuthConsent />));
   expect(localStorage.getItem("mycellios.auth.session")).not.toBeNull();
-  expect(host.textContent).toContain("This sign-in request has expired.");
+  expect(host.textContent).toContain("Could not reach Mycellios sign-in.");
+  expect(host.textContent).not.toContain("expired");
+  expect(restartExpiredAuthorization).not.toHaveBeenCalled();
+  vi.mocked(getOAuthAuthorization).mockResolvedValue(pending);
+  await click("Retry");
+  expect(host.querySelector("h1")?.textContent).toBe("Authorize access");
 });
 
-it("still restarts an expired authorization from the agent", async () => {
+it("starts a fresh sign-in by itself when the authorization has expired", async () => {
   vi.mocked(restoreAuthSession).mockResolvedValue(session);
   vi.mocked(getOAuthAuthorization).mockRejectedValue(new OAuthConsentError(404));
   await act(async () => root.render(<OAuthConsent />));
   expect(getOAuthAuthorization).toHaveBeenCalledTimes(1);
+  expect(restartExpiredAuthorization).toHaveBeenCalledTimes(1);
+  expect(host.querySelector("[role='alert']")).toBeNull();
+});
+
+it("offers the explicit restart when a fresh sign-in was just tried", async () => {
+  vi.mocked(restartExpiredAuthorization).mockReturnValueOnce(false);
+  vi.mocked(restoreAuthSession).mockResolvedValue(session);
+  vi.mocked(getOAuthAuthorization).mockRejectedValue(new OAuthConsentError(400));
+  await act(async () => root.render(<OAuthConsent />));
+  expect(host.querySelector("[role='alert']")?.textContent).toContain("This sign-in request has expired.");
   expect(host.querySelector('a[href="/agent/sign-in"]')?.textContent).toBe("Sign in again");
 });
 

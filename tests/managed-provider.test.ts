@@ -98,6 +98,15 @@ describe("managed private upstream adapter", () => {
     expect(catalog.data).toHaveLength(2);expect(catalog.data.every(row=>row.owned_by==="mycellios")).toBe(true);
     expect(catalog.data.map(row=>row.processing)).toEqual(["network","external"]);
   });
+  it("marks the decision replica as a tool-less decision service, not chat capacity",async()=>{
+    const {mycelliosModelCatalog}=await import("../src/coordinator/model-credit-pricing.js");
+    const ledger={resolvePricingPolicy:vi.fn().mockResolvedValue({inputMicrounitsPerToken:1,outputMicrounitsPerToken:2})} as unknown as EconomicLedger;
+    const catalog=await mycelliosModelCatalog([{id:"jev",replicas:0,pipelines:1,contextLimit:256},{id:"network-text",replicas:1,pipelines:0,contextLimit:6144},{id:"unknown-window",replicas:1,pipelines:0}],ledger,null);
+    expect(catalog.data[0]).toMatchObject({id:"jev",task:"decision",supports_tools:false,context_length:256});
+    expect(catalog.data[1]).toMatchObject({id:"network-text",context_length:6144});
+    expect(catalog.data[1]).not.toHaveProperty("task");
+    expect(catalog.data[2]).not.toHaveProperty("context_length");
+  });
   async function fixture(rows: unknown[] = [model]) {
     const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ data: rows }));
     const provider = new ManagedOpenRouter("private-shared-key", [model.id], transport,0);

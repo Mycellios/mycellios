@@ -1,6 +1,7 @@
 import type { EconomicLedger } from "../economy/economic-ledger.js";
 import type { ManagedModel,ManagedCatalogDiscovery } from "../contracts/managed-provider.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
+import { DECISION_MODEL } from "../contracts/decision.js";
 import type { BrowserInference } from "./browser-inference.js";
 import { markedUpUnitPrice } from "../economy/managed-pricing.js";
 
@@ -24,13 +25,19 @@ export async function nativeCreditMetadata(ledger: EconomicLedger,
     output: credits(Math.max(...priced.map(p => p.outputMicrounitsPerToken))) } };
 }
 
-export async function mycelliosModelCatalog(models: Array<{ id: string; replicas: number; pipelines: number }>,
+export async function mycelliosModelCatalog(models: Array<{ id: string; replicas: number; pipelines: number; contextLimit?: number }>,
   ledger: EconomicLedger, managed: { catalog(): Promise<ManagedModel[]>;inventory?():Promise<ManagedCatalogDiscovery[]> } | null,
   browser?: Pick<BrowserInference, "models">) {
   const native = await Promise.all(models.map(async model => ({
     id: model.id, object: "model", created: 0, owned_by: "mycellios",
     ...await nativeCreditMetadata(ledger, model), x_replicas: model.replicas, x_pipelines: model.pipelines,
+    // The smallest window an eligible route serves, so clients can budget and skip models
+    // whose window cannot hold their prompt instead of failing every request.
+    ...(model.contextLimit ? { context_length: model.contextLimit } : {}),
     ...(model.id === TRANSCRIPTION_MODEL ? { task: "transcription", max_audio_seconds: 30 } : {}),
+    // The decision replica answers one bounded question (tiny window, no tools): it is
+    // not chat capacity, so agent clients must not offer it as a conversational model.
+    ...(model.id === DECISION_MODEL ? { task: "decision", supports_tools: false } : {}),
   })));
   const external = managed ? (await managed.catalog()).map(model => ({ ...model, task: "chat", available: true, creditEligible: true })) : [];
   const known=new Set(external.map(m=>m.id));

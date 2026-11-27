@@ -28,6 +28,15 @@ describe("Mycellios account chat catalog", () => {
     expect((await readMycelliosChatModels("owned-key", { fetch: transport })).map(m => m.id)).toEqual(["native-chat"]);
     expect(transport).toHaveBeenCalledTimes(2);
   });
+  it("leaves out decision services and windows too small for a Mico turn", async () => {
+    const transport = vi.fn(async () => Response.json({ data: [
+      { id: "jev", processing: "network", task: "decision", supports_tools: false, context_length: 256, x_replicas: 0, x_pipelines: 1 },
+      { id: "tiny-chat", processing: "network", context_length: 4096, x_replicas: 1, x_pipelines: 0 },
+      { id: "legacy-jev", processing: "network", x_replicas: 1, x_pipelines: 0, context_length: 256 },
+      { id: "native-chat", processing: "network", context_length: 32768, x_replicas: 1, x_pipelines: 0 },
+    ] }));
+    expect((await readMycelliosChatModels("owned-key", { fetch: transport })).map(m => m.id)).toEqual(["native-chat"]);
+  });
   it("does not refresh or enable services excluded by their cost contract", async () => {
     const transport = vi.fn(async () => Response.json({ data: [
       { id: "mycellios/managed/antseed/unqualified", processing: "external", available: false, reason: "cost_contract_not_qualified" },
