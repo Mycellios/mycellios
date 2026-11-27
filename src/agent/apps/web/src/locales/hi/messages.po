@@ -7508,3 +7508,23 @@ msgstr "GitHub पर एक स्टार ज़्यादा लोगो�
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "GitHub पर स्टार दें"
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "निदान रिपोर्ट कॉपी करें"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "संस्करण और कनेक्शन, बिना व्यक्तिगत डेटा के"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "निदान रिपोर्ट तैयार की जा रही है…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "निदान रिपोर्ट कॉपी हो गई। इसे सहायता को भेजे संदेश में चिपकाएँ।"
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "निदान रिपोर्ट कॉपी नहीं हो सकी।"

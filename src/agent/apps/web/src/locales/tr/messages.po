@@ -7507,3 +7507,23 @@ msgstr "GitHub'daki bir yıldız daha fazla kişinin Mycellios'u bulmasına yard
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "GitHub'da yıldız ver"
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "Tanılama raporunu kopyala"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "Sürümler ve bağlantı, kişisel veri olmadan"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "Tanılama raporu hazırlanıyor…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "Tanılama raporu kopyalandı. Destek ekibine göndereceğin mesaja yapıştır."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "Tanılama raporu kopyalanamadı."

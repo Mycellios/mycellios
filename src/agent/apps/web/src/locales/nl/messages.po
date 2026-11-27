@@ -7508,3 +7508,23 @@ msgstr "Een ster op GitHub helpt meer mensen Mycellios te vinden."
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "Ster geven op GitHub"
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "Diagnoserapport kopiëren"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "Versies en verbinding, zonder persoonlijke gegevens"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "Diagnoserapport voorbereiden…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "Diagnoserapport gekopieerd. Plak het in je bericht aan support."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "Kon het diagnoserapport niet kopiëren."

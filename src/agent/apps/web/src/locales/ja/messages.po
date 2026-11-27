@@ -7508,3 +7508,23 @@ msgstr "GitHub でスターを付けると、より多くの人が Mycellios を
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "GitHub でスターを付ける"
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "診断レポートをコピー"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "バージョンと接続情報（個人データは含みません）"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "診断レポートを準備しています…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "診断レポートをコピーしました。サポートへのメッセージに貼り付けてください。"
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "診断レポートをコピーできませんでした。"

@@ -7507,3 +7507,23 @@ msgstr "GitHub 별 하나가 더 많은 사람이 Mycellios를 찾도록 도와�
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "GitHub에서 별 주기"
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "진단 보고서 복사"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "버전 및 연결 정보, 개인 데이터 제외"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "진단 보고서를 준비하는 중…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "진단 보고서를 복사했습니다. 지원팀에 보낼 메시지에 붙여 넣으세요."
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "진단 보고서를 복사하지 못했습니다."

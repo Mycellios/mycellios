@@ -7507,3 +7507,23 @@ msgstr "在 GitHub 上点个星，能帮助更多人发现 Mycellios。"
 #: src/components/GitHubStarPrompt.tsx
 msgid "Star on GitHub"
 msgstr "在 GitHub 上加星"
+
+#: src/components/HelpMenu.tsx
+msgid "Copy diagnostic report"
+msgstr "复制诊断报告"
+
+#: src/components/HelpMenu.tsx
+msgid "Versions and connection, without personal data"
+msgstr "版本和连接信息，不含个人数据"
+
+#: src/components/HelpMenu.tsx
+msgid "Preparing the diagnostic report…"
+msgstr "正在准备诊断报告…"
+
+#: src/components/HelpMenu.tsx
+msgid "Diagnostic report copied. Paste it into your message to support."
+msgstr "诊断报告已复制。请粘贴到发给支持团队的消息中。"
+
+#: src/components/HelpMenu.tsx
+msgid "Could not copy the diagnostic report."
+msgstr "无法复制诊断报告。"
