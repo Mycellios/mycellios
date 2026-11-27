@@ -364,20 +364,25 @@ export class ManagedAntseedGateway {
     if (row.keyId !== job.keyId || typeof row.tag !== "string" || !/^gw_[a-f0-9-]{36}$/.test(row.tag)
       || (job.tag !== undefined && row.tag !== job.tag) || row.sellerPeerId !== job.offer.seller
       || row.model !== (job.offer.service ?? "deepseek-v4-flash") || row.method !== "POST" || row.path !== "/v1/chat/completions") throw new Error("antseed_receipt_mismatch");
-    if (row.costPending || !row.finishedAt || row.status !== 200 || row.spent === null) return null;
+    // The gateway records a request a free seller served as servedFree with no spend at all
+    // (spent null). Only for an exact-zero offer does that count as an explicit zero invoice;
+    // a priced offer still needs its signed amount.
+    const servedFreeWithoutSpend = row.spent === null && row.servedFree === true && job.offer.free === true;
+    if (row.costPending || !row.finishedAt || row.status !== 200 || (row.spent === null && !servedFreeWithoutSpend)) return null;
     const prompt = job.response.usage.prompt_tokens, output = job.response.usage.completion_tokens;
     const counts = [row.inputTokens, row.cachedInputTokens, row.outputTokens];
     // The gateway normalizes OpenAI prompt_tokens into total inputTokens;
     // cachedInputTokens is a subset, not an additional billable token count.
     if (!counts.every(n => Number.isSafeInteger(n) && n >= 0) || row.cachedInputTokens > row.inputTokens
       || row.inputTokens !== prompt || row.outputTokens !== output) return null;
-    if (typeof row.spent !== "string") throw new Error("antseed_receipt_invalid");
-    const cost = usdAtoms(row.spent);
+    const spent = servedFreeWithoutSpend ? "0" : row.spent;
+    if (typeof spent !== "string") throw new Error("antseed_receipt_invalid");
+    const cost = usdAtoms(spent);
     // Return the authoritative invoice even for an overcharge. ManagedPurchases
     // must persist its safety stop and retain the hold, not lose that evidence.
     if (cost === 0n && row.servedFree !== true) return null;
     // The gateway's costPending flag alone is insufficient: require the complete signed token coverage above.
     return {response: job.response, receiptId: "antseed-gateway:" + job.keyId + ":" + row.tag,
-      usd: row.spent, inputTokens: prompt, outputTokens: output};
+      usd: spent, inputTokens: prompt, outputTokens: output};
   }
 }

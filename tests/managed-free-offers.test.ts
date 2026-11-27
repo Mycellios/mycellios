@@ -113,7 +113,7 @@ function refusingSidecar(data: unknown[]) {
 }
 
 /** The gateway-key equivalent: free sellers answer with their own signed zero-cost ledger row. */
-function refusingGateway(data: unknown[]) {
+function refusingGateway(data: unknown[], rowPatch: Record<string, unknown> = {}) {
   const refused = new Set<string>(), chats: string[] = [], rows = new Map<string, Record<string, unknown>>();
   const transport = vi.fn<typeof fetch>(async (url, init) => {
     const u = new URL(String(url));
@@ -132,7 +132,7 @@ function refusingGateway(data: unknown[]) {
     const nonce = new Headers(init.headers).get("x-antseed-end-user")!, tag = "gw_" + randomUUID();
     rows.set(nonce, { tag, keyId: "key-fixture", endUser: nonce, model: service, sellerPeerId: seller, method: "POST",
       path: "/v1/chat/completions", finishedAt: Date.now(), status: 200, inputTokens: 3, cachedInputTokens: 0, outputTokens: 2,
-      spent: "0", servedFree: true });
+      spent: "0", servedFree: true, ...rowPatch });
     return Response.json({ id: "chat", choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: "Hi" } }],
       usage: { prompt_tokens: 3, completion_tokens: 2 } }, { headers: { "x-antseed-peer-id": seller, "x-antseed-gateway-tag": tag } });
   });
@@ -186,6 +186,21 @@ describe("free AntSeed offers", () => {
     refused.add(forge); refused.add(other);
     await expect(adapter.execute(adapter.quote(free as never), undefined, async () => {})).rejects.toThrow();
     expect(chats).toHaveLength(3);
+  });
+
+  it("settles a free seller's servedFree gateway row that records no spend as an explicit zero invoice", async () => {
+    const glm = network()[0]!;
+    // Production gateways record free-served requests with spent: null; this used to leave every
+    // free answer uncertain forever.
+    const served = refusingGateway([glm], { spent: null, servedFree: true });
+    await served.adapter.refresh();
+    const result = await served.adapter.execute(served.adapter.quote(chat("glm-flash")), undefined, async () => {});
+    expect(result).toMatchObject({ usd: "0", inputTokens: 3, outputTokens: 2 });
+    // Without the servedFree flag, absent spend is never treated as free.
+    const unflagged = refusingGateway([glm], { spent: null, servedFree: false });
+    await unflagged.adapter.refresh();
+    await expect(unflagged.adapter.execute(unflagged.adapter.quote(chat("glm-flash")), undefined, async () => {}))
+      .rejects.toThrow("antseed_receipt_pending");
   });
 
   it("lets guest requests rest a refusing seller without draining reserve free sellers", async () => {
