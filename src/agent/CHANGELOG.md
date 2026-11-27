@@ -6,6 +6,119 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-27
+
+### Added
+
+- Help → Copy diagnostic report copies a short report with the app and server versions, how fast the
+  server answers right now, the platform and the language, so you can paste it into a message to
+  support. It holds no account, Mico or conversation data and is never sent anywhere by itself.
+- In the Chrome extension, Micos can now click, type and scroll in your pages when you turn on "Let
+  Micos click and type" in the side panel. It is off by default and separate from sharing tabs. A tab
+  a Mico uses joins a colored tab group with its name, glows with that color and shows a cursor, and
+  the Mico stops when you use the tab. The extension always asks you before a Mico types into a
+  password or code field, enters payment details, signs in or keeps a download, whatever approval
+  mode you use, and a download that starts while a Mico acts is held until you decide.
+  Mycellios, the Chrome Web Store and password managers are never opened or touched.
+- In the Chrome extension, Appearance has a Dictation microphone button that opens a tab where you
+  allow the microphone once, because Chrome cannot ask for it inside the side panel.
+- A Memory page in the side rail shows every note your Micos keep in this space, grouped by
+  General and by Mico. Open a note to read it, edit it or create a new one, and link notes by
+  writing `[[note name]]`. Each note lists the notes that link to it and shows its own
+  connections beside it.
+- The Memory page has a graph view of how your notes connect, with each Mico in its own colour.
+  Notes with many links draw larger; links to notes that do not exist yet appear as hollow
+  dots you can click to create them.
+- "Memory in context" in a Mico reply's More menu lists the memory notes that reply had
+  available, and opens any of them on the Memory page.
+- Show under each Mico reply how many memory notes it had in context. Select it to see the notes.
+- Show on each memory note the conversations where it was learned, and open them from there.
+- Show the notes Micos keep for each task conversation on the Memory page, under the conversation's title.
+- Export your memory as Markdown files in a ZIP, and import Markdown files or such a ZIP. Import never replaces a note that already exists.
+- In the Chrome extension, clicks and typing by a Mico now work like yours on sites that ignore
+  automated events: turning on "Let Micos click and type" also asks Chrome for its debugger, and
+  Chrome shows a bar while a Mico works in a tab.
+- A Mico can look at one of your shared tabs as a picture, without its own overlay, when it needs
+  to see the layout, a chart or an image. It asks before a new site, like reading does.
+- Servers can let visitors try Mico in an ordinary browser tab without creating an account. When
+  the server turns on guest chat, the signed-out Agent page opens a text-only chat on the free model
+  with a small message limit, a visible privacy notice and Create account / Sign in buttons. The
+  conversation stays only in that tab. Desktop, the Android app and installed web apps still ask
+  you to sign in, and guest chat stays off until the server enables it.
+- Realtime calls: when the server offers them, turn on Settings → Voice → Realtime calls to
+  talk with a Mico that answers as you speak and that you can interrupt. They use your own
+  OpenAI voice key, which OpenAI charges. The Mico still does the work with its own tools and
+  approvals. If the realtime voice cannot start, the call continues with the standard voice.
+- During a call, the Mico tells you when work in another conversation finishes, fails or
+  needs your answer.
+
+### Changed
+
+- The model picker lists Claude Code and Codex models straight away: your PC reads them when the app starts, answers with the last list while it checks again, and the list is requested as soon as you point at the model button.
+- "Loading models…" now appears only under the provider whose models are actually loading.
+- "Needs you" at the top of the sidebar now shows the question each Mico asked and how long it
+  has waited, instead of only "Waiting for your answer".
+- A Mico's question no longer expires. You still get one reminder after 4 hours, and you can
+  answer days later: the Mico continues from where it asked. Approvals, password requests and
+  screen takeovers still stop after 24 hours.
+- Replies from account models reach a Mico running on your PC sooner: the server sends each part of the answer as soon as it is ready instead of waiting for the PC to ask for it.
+- A Mico's Computer settings are simpler: one "Works on" choice (This PC, Server just this Mico,
+  or Server shared) with a short note saying what it can reach, and a "Notes it reads" choice
+  for memory. Both save as soon as you change them, without a Save button. "Use this PC" now
+  explains that it moves the Mico from another of your PCs.
+- A conversation a Mico opened for itself no longer takes one of its 8 slots while it only waits
+  for your answer to a question, so the Mico can keep starting new work. A Mico can keep at most
+  32 such conversations open in all.
+- Sidebar search results are grouped by kind (Micos, Groups, Messages, Files, Links, Routines)
+  with a count, one line each: the Mico's face or an icon, the name and what it is about, with
+  your search marked. Results no longer repeat the name or show "CONVERSATION" and "FILE"
+  labels, and files say whose they are instead of their type and size.
+- A Mico running on your PC hears from the server sooner: messages for its work arrive on one connection that stays open, instead of a new request for each message.
+- Messages between the server and a Mico working on your PC no longer repeat the account check for every message of a run that was already checked when it started, so they pass through faster.
+- Micos link related memory notes as [[note name]] and keep distinct topics in their own notes, so the memory graph shows how notes connect.
+- Memory exports open as an Obsidian vault: each note starts with properties for its owner, whether it is always included, its date and its conversation. Importing the export again removes them.
+
+### Fixed
+
+- Your answer to a Mico's question now shows as your own message, on your side of the chat, with
+  the question under "View question". Before, it looked like something the Mico had said.
+- When you ask a Mico on a Mycellios server computer to work on your own PC or browser, it now
+  says it cannot reach them and points to Mycellios Desktop or Chrome tab sharing, instead of
+  asking for your address and sign-in.
+- Micos that work on your PC wait less between steps: a finished model reply no longer sends an
+  extra cancel to the server, and checkpoint and tool-completion notices no longer wait for a reply.
+  This removes about one server round trip per model call and two per tool call.
+- A chat whose latest messages are mostly folded routine runs now loads its earlier messages by
+  itself until the window is full, instead of waiting for "Load earlier messages" page after page.
+- Changing a Mico's computer no longer fails with "Internal server error" when its folder was made
+  on another PC. The connected PC has nothing to save, so the switch keeps the last saved copy and
+  goes ahead.
+- Moving a Mico off This PC while Mycellios Desktop cannot hand over its files now says to check that Desktop is open and connected, instead of showing "Internal server error".
+- The model picker keeps your last Mycellios model list while Mycellios restarts for an update,
+  and tries again by itself before showing an error. Before, it showed "Could not load the
+  catalog" for a few minutes after each update.
+- When Mycellios is not answering, choosing a model explains it in your language instead of an
+  English message about credits.
+- When a Mycellios update restarts the server while a Mico is working on your PC, the chat now says so
+  instead of asking you to check your PC. You still review what the Mico already did before continuing.
+- The Windows installer no longer fails a first installation on PCs where PowerShell scripts are
+  restricted (common on work laptops). With nothing installed yet, it installs without the update
+  safety copy, which only matters when replacing an existing version.
+- Running the Windows installer while Mycellios is still open now asks you to close it first, instead
+  of saying the update could not be prepared. Nothing was changed in either case.
+- The Windows installer can now update Mycellios on PCs whose security policy restricts
+  PowerShell scripts (common on work laptops), keeping the safety copy that restores the previous
+  version if an update fails. On those PCs, update by downloading the installer: the in-app
+  Restart cannot run there and offers the download link instead.
+- Stopping tab sharing, or turning off clicking and typing, now answers any question the panel was
+  still asking with "no" instead of leaving it open.
+- Approving a request by voice during a call works again, in Spanish and English: a clear
+  yes allows it once and a clear no denies it. Anything else is not taken as an answer, and
+  "always allow" stays on screen.
+- Calls no longer send room noise to transcription or freeze after an empty transcript.
+- Transcription with an OpenAI voice key spells your Micos' names correctly, and a
+  transcript that only repeats those names is ignored.
+
 ## [0.38.0] - 2026-11-27
 
 ### Added
