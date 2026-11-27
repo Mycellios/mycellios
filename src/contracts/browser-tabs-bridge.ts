@@ -161,7 +161,7 @@ function parseAction(value: unknown): BrowserAction {
     ...(ref !== undefined ? { ref } : {}),
     ...(input.text !== undefined ? { text: input.text as string } : {}),
     ...(input.key !== undefined ? { key: input.key as string } : {}),
-    ...(input.direction !== undefined ? { direction: input.direction as BrowserAction["direction"] } : {}),
+    ...(input.direction !== undefined ? { direction: input.direction as (typeof BROWSER_SCROLL_DIRECTIONS)[number] } : {}),
   };
 }
 
