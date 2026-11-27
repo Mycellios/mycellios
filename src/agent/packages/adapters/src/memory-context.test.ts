@@ -1,6 +1,6 @@
 import type { AdapterContext, MemorySnapshot, MemoryStore } from "@mycellios/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
-import { loadAgentMemoryContext, recordRunMemoryRecall, resolveLocalMemoryScope } from "./memory-context.js";
+import { loadAgentMemoryContext, memoryRecallShadowFields, recordRunMemoryRecall, resolveLocalMemoryScope } from "./memory-context.js";
 
 const context: AdapterContext = {
   operationId: "run-1",
@@ -161,4 +161,48 @@ it("records recalled notes best effort and never throws", async () => {
   expect(() => recordRunMemoryRecall({}, { runId: "r", spaceId: "s", userId: "u" }, ["a"])).not.toThrow();
   recordRunMemoryRecall({ runMemoryRecall: { upsert } }, { runId: "r2", spaceId: "s", userId: "u" }, []);
   expect(upsert).toHaveBeenCalledTimes(1);
+});
+
+it("measures the candidate ranker in shadow without changing what the Mico receives", async () => {
+  const notes = [
+    { id: "dogs", path: "mascotas.md", content: "Tiene dos perros: Coco y Lola.", revision: 1, updatedAt: "2026-01-01" },
+    { id: "work", path: "trabajo.md", content: "Trabaja en una panadería.", revision: 1, updatedAt: "2026-01-02" },
+  ];
+  const read = vi.fn(async ({ scope }: { scope: string }) => ({ documents: scope === "bot" ? notes : [] }));
+  const options = { query: "¿cómo se llama mi perro?" };
+  const plain = await loadAgentMemoryContext({ read } as never, "bot-1", context, undefined, options);
+  const onShadow = vi.fn();
+  const onIncluded = vi.fn();
+  const shadowed = await loadAgentMemoryContext({ read } as never, "bot-1", context, undefined, {
+    ...options,
+    previousQuery: "trabajo",
+    onIncluded,
+    onShadow,
+  });
+  // The baseline misses the singular "perro"; the candidate finds it, and the block is unchanged.
+  expect(shadowed).toBe(plain);
+  expect(onIncluded).toHaveBeenCalledWith([]);
+  expect(onShadow).toHaveBeenCalledWith(["dogs", "work"]);
+  const candidate = await loadAgentMemoryContext({ read } as never, "bot-1", context, undefined, { ...options, ranker: "candidate" });
+  expect(candidate).toContain("Coco y Lola");
+
+  const throwing = await loadAgentMemoryContext({ read } as never, "bot-1", context, undefined, {
+    ...options,
+    onShadow: () => {
+      throw new Error("measurement failed");
+    },
+  });
+  expect(throwing).toBe(plain);
+});
+
+it("summarises shadow recall as counts only", () => {
+  expect(memoryRecallShadowFields(["a", "b"], ["b", "c", "d"], new Set(["c", "e"]), 2)).toEqual({
+    "memory.baseline_notes": 2,
+    "memory.candidate_notes": 3,
+    "memory.shared_notes": 1,
+    "memory.searches": 2,
+    "memory.read_notes": 2,
+    "memory.read_in_baseline": 0,
+    "memory.read_in_candidate": 1,
+  });
 });

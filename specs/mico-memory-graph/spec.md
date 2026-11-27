@@ -6,7 +6,9 @@ local and full graph, task notes, "Learned in"), "Memory in context" recall
 receipts with a count on each reply, and a simple form of section 6 (Markdown
 ZIP export and import). Sections 1, 2, 3 (server links) and 7 are not
 implemented. The only change to what a Mico receives is the linking guidance in
-the memory tool descriptions.
+the memory tool descriptions. A candidate recall ranker (part of sections 1 and
+3, section 8) runs in shadow: it is measured offline and in production, and Micos
+still receive the baseline ranker's notes.
 
 Implementation notes for the delivered part:
 
@@ -221,6 +223,48 @@ new running cost for the operator.
 - A synthetic golden set in tests: fixture notes plus queries with expected
   documents. CI reports hit@1, hit@5 and the empty-result rate for the ranker
   before and after each change. No real user data.
+
+Delivered as a benchmark and a shadow comparison:
+
+- `scripts/memory-recall-bench/dataset.ts`: 5 fictional vaults (72 notes, a
+  54–60 line `MEMORY.md` each, linked topic notes, general and essential
+  notes) and 122 cases split into dev (68) and holdout (54), tagged direct,
+  inflection, accents, followup, linked, buried, synonym, english, chitchat and
+  multi. It was written by a separate agent that did not see the ranking code.
+  Each case lists the literal facts an answer needs.
+- `evaluate.ts` renders the real `<durable_memory>` block with each ranker
+  and counts the facts that reach it, unneeded searchable notes and bytes.
+  `npx tsx scripts/memory-recall-bench/run.ts [--split dev|holdout] [--cases]`
+  prints the comparison. `memory-recall-bench.test.ts` keeps the candidate at or
+  above the baseline and its measured floors. Tune on dev only.
+- Candidate ranker (`packages/core/src/memory-recall.ts`, still lexical and
+  in-process): ES/EN light stemming, BM25 over lines (with their heading) plus a
+  path boost, notes matching the current message ranked before those matching
+  only the previous user message, up to two notes linked as `[[name]]` from
+  the first three matches, multi-passage excerpts instead of the window around
+  the first matching word, and a minimum score (1.25, chosen on dev) once a
+  vault has 8 or more notes.
+- First measurement, before any tuning (complete cases baseline → candidate):
+  dev 41/58 → 55/58 (facts 73.0% → 95.2%), holdout 32/45 → 39/45 (74.5% →
+  88.2%). With the minimum score: dev unchanged, chit-chat that received notes
+  7/10 → 5/10; holdout 39/45 (facts 86.3%; one multi-note fact lost), chit-chat
+  4/9 → 3/9. Average block 2,934 → 1,657 bytes (dev) and 2,664 → 1,575
+  (holdout). Followup 3/10 → 10/10, linked 6/13 → 12/13, buried 19/26 → 25/26,
+  synonym 9/17 → 11/17 (synonyms stay a lexical limit). Holdout cases that
+  lose a fact against the baseline: one multi-note case (one of two facts, below
+  the minimum score) and one English buried synonym case. On 500 synthetic 20-line notes the
+  candidate takes about 60 ms against the baseline's 390 ms.
+- Production shadow: before each reply the executor also renders the
+  candidate block, keeps only its note ids and passes the previous user
+  message. After a completed run it logs `memory.recall_shadow` with counts
+  only (baseline/candidate notes, shared notes, `search_local_memory` calls,
+  notes read with `read_local_memory` and how many each ranker had placed).
+  A failure in the shadow path is ignored.
+- Switch criterion, set before reading production data: at least 7 days and
+  200 shadow runs; among runs that read a note, the candidate had placed it at
+  least as often as the baseline; mean candidate notes at most one above the
+  baseline; benchmark guard green. Then `ranker: "candidate"` becomes the
+  default in a separate change with its own changelog entry.
 
 ## Phases
 

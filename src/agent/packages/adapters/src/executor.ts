@@ -390,7 +390,7 @@ import {
 import { createMediaGenerationProvider } from "./media-generation-factory.js";
 import { generateMediaFromTool } from "./media-generation-tools.js";
 import { selectRunMediaGeneration } from "./native-image-generation.js";
-import { loadAgentMemoryContext, recordRunMemoryRecall, resolveLocalMemoryScope } from "./memory-context.js";
+import { loadAgentMemoryContext, memoryRecallShadowFields, recordRunMemoryRecall, resolveLocalMemoryScope } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import type { PersonalMemoryResolver } from "./personal-memory.js";
 import {
@@ -4372,6 +4372,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           personalMemory && !externalWebhook && !workflowCorrection ? personalMemory.writeTarget : null;
         // Ids recalled from personal memory in this run, so forget_memory reaches the same memory.
         const personalMemoryIds = new Set<string>();
+        // Shadow measurement of the candidate local memory ranker: ids and counts only.
+        const memoryShadow = { candidate: null as string[] | null, read: new Set<string>(), searches: 0 };
         const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
 
         await deps.events.append({
@@ -4480,6 +4482,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 .catch(() => null)
             : Promise.resolve(null);
         let memoryRecallIds: string[] = [];
+        const previousUserMessage = history
+          .filter((message) => message.role === "user" && message.id !== currentTurnMessage?.id && message.content !== task.prompt)
+          .at(-1)
+          ?.content.slice(0, 2_000);
         const [
           discovered,
           currentTurnImages,
@@ -4493,7 +4499,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           restrictedRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared", onIncluded:(ids)=>{memoryRecallIds=ids;}}),
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared", onIncluded:(ids)=>{memoryRecallIds=ids;}, ...(previousUserMessage?{previousQuery:previousUserMessage}:{}), onShadow:(ids)=>{memoryShadow.candidate=ids;}}),
           restrictedRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
@@ -7510,11 +7516,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               { runId, owner: workerId, fence }, JSON.parse(redactSecrets(JSON.stringify(args), runSecrets)));
           }
           if(messagingChannelRun && ["search_local_memory","read_local_memory"].includes(name))return finish({error:"Personal memories are not available in messaging channels"});
+          if (name === "search_local_memory") memoryShadow.searches += 1;
           if (name === "search_local_memory") return finish(await deps.memory.search({scope:"all",botId:bot.id,taskThreadId:thread.id,includeGeneral:localMemoryScope==="shared",query:String(args.query??""),limit:5},context));
           if (name === "read_local_memory") {
             const doc=await deps.prisma.memoryDocument.findFirst({where:{id:String(args.id??""),spaceId:run.spaceId,userId:run.userId,
               OR:[{scope:"bot",botId:bot.id},...(localMemoryScope==="shared"?[{scope:"user",botId:null}]:[])],
               AND:[{OR:[{taskThreadId:null},{taskThreadId:thread.id}]}]}});
+            if (doc) memoryShadow.read.add(doc.id);
             return finish(doc?{id:doc.id,path:doc.path,revision:doc.revision,scope:doc.taskThreadId?"task":doc.scope==="user"?"general":"mico",untrusted:true,content:redactSecrets(doc.content.slice(0,8000),runSecrets)}:{error:"Memory unavailable in this conversation"});
           }
           if (name === "remember") {
@@ -10339,6 +10347,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           });
           if (!completed) return;
           stopHeartbeatAfterCompletion();
+          if (memoryShadow.candidate) {
+            getLogger().info(
+              "memory.recall_shadow",
+              memoryRecallShadowFields(memoryRecallIds, memoryShadow.candidate, memoryShadow.read, memoryShadow.searches),
+            );
+          }
           // Never rotate while this run is live. The reset rechecks policy and locks the
           // same thread as Send, refuses queued work and invalidates old checkpoints.
           try {
