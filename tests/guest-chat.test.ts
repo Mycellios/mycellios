@@ -25,7 +25,7 @@ describe("guest chat configuration", () => {
     const parsed = readGuestChatConfig({ MYCELLIOS_GUEST_CHAT_ENABLED: "true",
       MYCELLIOS_GUEST_CHAT_CONFIG_JSON: JSON.stringify({ publicOrigin: "https://guest.invalid", secret }) })!;
     expect(parsed).toMatchObject({ model: "mycellios/managed/free", messagesPerSession: 12, sessionHours: 24, historyMessages: 24,
-      historyBytes: 98_304, messageChars: 4000, maxOutputTokens: 800, sessionsPerPrefixHour: 5, messagesPerPrefixDay: 40,
+      historyBytes: 98_304, messageChars: 4000, maxOutputTokens: 2048, sessionsPerPrefixHour: 5, messagesPerPrefixDay: 40,
       messagesPerDay: 2000, concurrentTurns: 16 });
     for (const bad of [{ publicOrigin: "http://guest.invalid" }, { publicOrigin: "https://guest.invalid/agent" },
       { secret: "short" }, { model: "mycellios/managed/antseed/paid" }, { messagesPerSession: 0 }, { maxOutputTokens: 100_000 },

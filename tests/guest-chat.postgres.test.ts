@@ -99,7 +99,7 @@ describe.skipIf(!url)("registration-free guest chat on isolated PostgreSQL, fict
     expect(provider.execute).toHaveBeenCalledTimes(1);
     expect(provider.execute.mock.calls[0]![3]).toBeUndefined();
     const quoted = provider.quote.mock.calls[0] as unknown as [{ model: string; max_tokens: number; messages: Array<{ role: string; content: string }> }];
-    expect(quoted[0]).toMatchObject({ model: "mycellios/managed/free", max_tokens: 800 });
+    expect(quoted[0]).toMatchObject({ model: "mycellios/managed/free", max_tokens: 2048 });
     expect(quoted[0].messages[0]).toEqual({ role: "system", content: GUEST_SYSTEM_PROMPT });
 
     const purchases = await db.raw.prepare("SELECT account_id,maximum_usd,state FROM economic_managed_purchases").all();
