@@ -195,6 +195,11 @@ export function planChecks(files, availableAgentTests) {
       if (files.some(file => (file.startsWith('src/agent/') || file === primaryAccountBeta) && pattern.test(file)))
         add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);
     }
+    // Rollback keeps the migrated schema: new migrations must leave main's release working.
+    if (files.some(file => /^src\/agent\/(?:packages\/db\/prisma\/migrations\/|packages\/db\/src\/migration-compat\.ts$|scripts\/verify-migration-compat-db\.ts$)/.test(file)))
+      add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-migration-compat-db.ts'], 'new migrations keep the previous release working on its schema (isolated PostgreSQL)');
+    if (files.some(file => /^src\/agent\/(?:packages\/db\/src\/migration-compat\.ts|scripts\/verify-migration-compat-db\.ts)$/.test(file)))
+      add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-migration-compat-db.ts', '--replay-latest'], 'migration compatibility check replayed on the newest real migration (isolated PostgreSQL)');
     if (files.some(file => /desktop[-_]tool[-_]credits|packages\/db\/src\/model-credits\./.test(file)))
       add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-desktop-tool-credits-db.ts'], 'Desktop tool spend ceiling and wallet admission on isolated PostgreSQL');
     if (files.some(file => file.startsWith('src/agent/') && /local-memory|packages\/memory\/src|20261115180000/.test(file)))
@@ -235,7 +240,7 @@ export function runCI() {
       // Removed sources still select their surface's types, but cannot be syntax-checked.
       if (/^(syntax|test): /.test(command.label) && !existsSync(command.args.at(-1))) continue;
       console.log(`\nChecking ${command.label}`);
-      const result = spawnSync(command.bin, command.args, { cwd: command.cwd, stdio: 'inherit', env: { ...process.env, CI: 'true' } });
+      const result = spawnSync(command.bin, command.args, { cwd: command.cwd, stdio: 'inherit', env: { ...process.env, CI: 'true', CI_BASE_SHA: base } });
       receipt.checks.push({ ...command, status: result.status === 0 && !result.error ? 'passed' : 'failed' });
       save();
       if (result.status !== 0 || result.error) throw result.error || new Error(`${command.label} exited ${result.status}`);

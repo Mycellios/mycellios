@@ -131,6 +131,12 @@ test('mobile notification migration runs actual isolated database qualification'
     assert.ok(planChecks([file]).some(c => c.args.includes('scripts/verify-migration-history-db.ts')), file);
   assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-migration-history-db.ts')));
 });
+
+test('any new or changed migration is checked against the previous release schema', () => {
+  for (const file of ['src/agent/packages/db/prisma/migrations/20261128120000_example/migration.sql', 'src/agent/packages/db/src/migration-compat.ts', 'src/agent/scripts/verify-migration-compat-db.ts'])
+    assert.ok(planChecks([file]).some(c => c.args.includes('scripts/verify-migration-compat-db.ts')), file);
+  assert.ok(!planChecks(['src/agent/packages/db/src/messages.ts']).some(c => c.args.includes('scripts/verify-migration-compat-db.ts')));
+});
 test('Agent test files share the existing two-worker budget without serializing discovery', () => {
   const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx', 'src/agent/apps/web/src/pages/shell/composer.test.tsx']);
   for (const check of plan.filter(c => c.label === 'Agent changed tests' || c.label === 'Agent affected tests')) {
