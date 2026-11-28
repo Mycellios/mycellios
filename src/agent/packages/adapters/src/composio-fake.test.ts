@@ -1,6 +1,6 @@
 import type { ConnectedAccountStatus } from "@composio/core";
 import type { AdapterContext, ConnectorEvent } from "@mycellios/adapter-kit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ComposioConnector, createConnectorStack } from "./composio-connector.js";
 import { FakeComposioClient } from "./composio-fake.js";
 
@@ -385,5 +385,76 @@ describe("Composio connected-account lifecycle", () => {
     fake.connect("user-2", "gmail", "EXPIRED");
 
     await expect(connector.listReconnectRefs(context())).resolves.toEqual(ids.slice(2));
+  });
+});
+
+describe("ComposioConnector tool reuse", () => {
+  type Loader = { loadTools: () => Promise<unknown> };
+
+  it("reuses a turn's tool list, refreshes it behind a later turn and follows connection changes", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = new FakeComposioClient();
+      const connector = new ComposioConnector({ client: fake, toolsReuseMs: 60_000 });
+      const load = vi.spyOn(connector as unknown as Loader, "loadTools");
+      const gmail = context([connection("GMAIL")]);
+
+      const first = await connector.discoverTools(gmail);
+      expect(load).toHaveBeenCalledTimes(1);
+      await expect(connector.discoverTools(gmail)).resolves.toEqual(first);
+      expect(load).toHaveBeenCalledTimes(1);
+
+      // Past the window the turn still gets the list, and a new one is fetched behind it.
+      await vi.advanceTimersByTimeAsync(60_000);
+      await expect(connector.discoverTools(gmail)).resolves.toEqual(first);
+      expect(load).toHaveBeenCalledTimes(2);
+      await load.mock.results[1]!.value;
+
+      // Another set of connections is its own list.
+      const both = await connector.discoverTools(
+        context([connection("GMAIL"), connection("SLACK")]),
+      );
+      expect(load).toHaveBeenCalledTimes(3);
+      expect(both.map((tool) => tool.name)).toContain("SLACK_EMULATED_ACTION");
+
+      // Twice the window without a turn: the next one waits for Composio again.
+      await vi.advanceTimersByTimeAsync(120_000);
+      await connector.discoverTools(gmail);
+      expect(load).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drops a list whose refresh failed, so the next turn asks Composio itself", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = new FakeComposioClient();
+      const connector = new ComposioConnector({ client: fake, toolsReuseMs: 60_000 });
+      const gmail = context([connection("GMAIL")]);
+      await connector.discoverTools(gmail);
+      const load = vi
+        .spyOn(connector as unknown as Loader, "loadTools")
+        .mockRejectedValueOnce(new Error("composio down"));
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      await connector.discoverTools(gmail);
+      expect(load).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(0);
+      await connector.discoverTools(gmail);
+      expect(load).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("asks Composio on every turn without a reuse window", async () => {
+    const fake = new FakeComposioClient();
+    const connector = new ComposioConnector({ client: fake });
+    const load = vi.spyOn(connector as unknown as Loader, "loadTools");
+    const gmail = context([connection("GMAIL")]);
+    await connector.discoverTools(gmail);
+    await connector.discoverTools(gmail);
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });
