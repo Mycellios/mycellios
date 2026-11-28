@@ -7,7 +7,9 @@ import path from "node:path";
 import EmbeddedPostgres from "embedded-postgres";
 import {
   blockingViolations,
+  type CompatViolation,
   isContractMigration,
+  rewritesData,
   migrationHistoryViolations,
   type SchemaShape,
   schemaBreaksPreviousRelease,
@@ -117,7 +119,27 @@ async function snapshot(sql: ReturnType<EmbeddedPostgres["getPgClient"]>): Promi
        FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid JOIN pg_namespace n ON n.oid = t.typnamespace
       GROUP BY n.nspname, t.typname`,
   );
+  const userSchemas = "n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'";
+  const constraints = await sql.query<{ table: string; name: string; kind: string }>(
+    `SELECT n.nspname || '.' || r.relname AS table, c.conname AS name, c.contype::text AS kind
+       FROM pg_constraint c JOIN pg_class r ON r.oid = c.conrelid JOIN pg_namespace n ON n.oid = r.relnamespace
+      WHERE c.contype IN ('c', 'u', 'x', 'f') AND ${userSchemas}`,
+  );
+  const uniqueIndexes = await sql.query<{ table: string; name: string }>(
+    `SELECT n.nspname || '.' || r.relname AS table, i.relname AS name
+       FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid JOIN pg_class r ON r.oid = x.indrelid
+       JOIN pg_namespace n ON n.oid = r.relnamespace
+      WHERE x.indisunique AND NOT x.indisprimary AND ${userSchemas}`,
+  );
+  const triggers = await sql.query<{ table: string; name: string }>(
+    `SELECT n.nspname || '.' || r.relname AS table, t.tgname AS name
+       FROM pg_trigger t JOIN pg_class r ON r.oid = t.tgrelid JOIN pg_namespace n ON n.oid = r.relnamespace
+      WHERE NOT t.tgisinternal AND ${userSchemas}`,
+  );
   return {
+    constraints: constraints.rows,
+    uniqueIndexes: uniqueIndexes.rows,
+    triggers: triggers.rows,
     columns: columns.rows.map((row) => ({
       table: `${row.table_schema}.${row.table_name}`,
       column: row.column_name,
@@ -158,9 +180,12 @@ try {
     }
     const before = await snapshot(sql);
     let contract = false;
+    const rewrites: CompatViolation[] = [];
     for (const name of added) {
       const text = await readFile(path.join(directory, name, "migration.sql"), "utf8");
       contract ||= isContractMigration(text);
+      if (rewritesData(text))
+        rewrites.push({ kind: "data_rewrite", object: name, detail: "UPDATE/DELETE/TRUNCATE/INSERT…SELECT changes rows the previous release reads" });
       try {
         await sql.query(text);
       } catch (error) {
@@ -169,7 +194,7 @@ try {
       await record(name, text);
     }
     const after = await snapshot(sql);
-    const violations = schemaBreaksPreviousRelease(before, after);
+    const violations = [...schemaBreaksPreviousRelease(before, after), ...rewrites];
     const blocking = blockingViolations(violations, contract);
     for (const violation of violations)
       console.log(`${blocking.includes(violation) ? "BLOCKS" : "contract"} ${violation.kind} ${violation.object}: ${violation.detail}`);
