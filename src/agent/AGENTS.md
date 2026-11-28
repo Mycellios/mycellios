@@ -1553,12 +1553,12 @@
   migration change: main's migrations, then the new ones, on a disposable PostgreSQL, refusing
   removed tables/columns/enum labels, type changes, columns made required and new required
   columns without a default (`packages/db/src/migration-compat.ts`). New CHECK, unique,
-  exclusion or foreign key constraints, unique indexes and triggers on existing tables, and
-  data rewrites (UPDATE, DELETE, TRUNCATE, INSERT…SELECT) also need the contract marker:
+  exclusion or foreign key constraints, unique indexes, triggers, added/removed/rewritten
+  row-level security policies and newly enabled or forced row security on existing tables,
+  and data rewrites (UPDATE, DELETE, TRUNCATE, INSERT…SELECT) also need the contract marker:
   Nucleus takes a snapshot before applying a marked migration. A contract migration carries
   the line `-- mycellios-migration: contract` and ships only after the release that stopped
-  using the object; it still cannot add a required column without a default. Not covered:
-  new row-level security policies on existing tables, which still need review.
+  using the object; it still cannot add a required column without a default.
 
 - Mobile dependency updates must match the installed Expo SDK's
   `bundledNativeModules.json` and the proposed lockfile's peer requirements;

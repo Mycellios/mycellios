@@ -94,6 +94,40 @@ describe("constraints, unique indexes and triggers", () => {
   });
 });
 
+describe("row-level security", () => {
+  it("needs the contract marker for policy changes and new row security on existing tables", () => {
+    const before: SchemaShape = {
+      ...base,
+      policies: [{ table: "public.bots", name: "bots_owner", definition: "PERMISSIVE | ALL | public | owner" }],
+      rowSecurity: [{ table: "public.bots", mode: "enabled" }],
+    };
+    const after: SchemaShape = {
+      ...before,
+      columns: [...base.columns, column("public.pins", "id", { nullable: false })],
+      policies: [
+        { table: "public.bots", name: "bots_owner", definition: "PERMISSIVE | ALL | public | owner AND space" },
+        { table: "public.runs", name: "runs_owner", definition: "PERMISSIVE | ALL | public | owner" },
+        { table: "public.pins", name: "pins_owner", definition: "PERMISSIVE | ALL | public | owner" },
+      ],
+      rowSecurity: [
+        { table: "public.bots", mode: "enabled" },
+        { table: "public.bots", mode: "forced" },
+        { table: "public.runs", mode: "enabled" },
+        { table: "public.pins", mode: "enabled" },
+      ],
+    };
+    const violations = schemaBreaksPreviousRelease(before, after);
+    expect(violations.map((v) => `${v.kind} ${v.object} ${v.detail.split(";")[0]}`)).toEqual([
+      "policy_changed public.bots.bots_owner rewritten",
+      "policy_changed public.runs.runs_owner added",
+      "row_security_enabled public.bots row-level security now forced",
+      "row_security_enabled public.runs row-level security now enabled",
+    ]);
+    expect(blockingViolations(violations, true)).toEqual([]);
+    expect(schemaBreaksPreviousRelease(before, before)).toEqual([]);
+  });
+});
+
 describe("rewritesData", () => {
   it("finds row changes, not keywords inside other statements or comments", () => {
     expect(rewritesData(`UPDATE "bots" SET "kind" = 'mico';`)).toBe(true);
