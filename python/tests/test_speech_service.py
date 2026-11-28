@@ -1,3 +1,4 @@
+import http.client
 import json
 import threading
 import unittest
@@ -56,6 +57,20 @@ def request(port, path, body=None, headers=None):
         return error.code, json.loads(error.read())
 
 
+def declared_size(port, path, size):
+    """Declares an oversized body without sending it: the service must refuse from the header alone."""
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.putrequest("POST", path)
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Content-Length", str(size))
+        connection.endheaders()
+        response = connection.getresponse()
+        return response.status, json.loads(response.read())
+    finally:
+        connection.close()
+
+
 class SpeechServiceTests(unittest.TestCase):
     def setUp(self):
         self.whisper = service.WhisperSlot(FakeWhisper())
@@ -104,10 +119,10 @@ class SpeechServiceTests(unittest.TestCase):
         self.assertEqual(request(self.legacy_whisper, "/transcribe", {"audio": "bad"}),
                          (422, {"error": "invalid_audio_or_transcript"}))
         self.assertEqual(request(self.legacy_whisper, "/transcribe", b"{}", {"Content-Type": "text/plain"})[0], 413)
-        self.assertEqual(request(self.legacy_whisper, "/transcribe", b"x" * 1_300_001)[0], 413)
+        self.assertEqual(declared_size(self.legacy_whisper, "/transcribe", 1_300_001)[0], 413)
         self.assertEqual(request(self.legacy_kokoro, "/synthesize", {"text": "x", "extra": 1}),
                          (400, {"error": "invalid_or_oversized_speech"}))
-        self.assertEqual(request(self.legacy_kokoro, "/synthesize", b"x" * 4097)[0], 400)
+        self.assertEqual(declared_size(self.legacy_kokoro, "/synthesize", 4097)[0], 400)
         self.assertEqual(request(self.legacy_kokoro, "/synthesize", {"text": "boom"}),
                          (503, {"error": "speech_generation_failed"}))
 
