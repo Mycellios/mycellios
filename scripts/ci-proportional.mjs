@@ -37,7 +37,9 @@ const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', '
 // The two-host TCP link probe and its test use only Python's standard library.
 const linkProbePython = new Set(['python/distributed_runtime/link_probe.py', 'python/tests/test_link_probe.py']);
 // The unified speech service routes to the existing engines; its test uses fake engines and the standard library.
-const speechServicePython = new Set(['python/distributed_runtime/speech_service.py', 'python/tests/test_speech_service.py']);
+// The qualified CUDA Kokoro core is hosted byte-identically; the same test pins its hash.
+const speechServicePython = new Set(['python/distributed_runtime/speech_service.py', 'python/tests/test_speech_service.py',
+  'python/distributed_runtime/kokoro_cuda_core.py']);
 // Stage artifact cache and its loopback seed source: CPU tests from the hash-locked runtime wheels.
 const stageSeedPython = new Set(['python/distributed_runtime/stage_artifact_cache.py', 'python/distributed_runtime/stage_seed_source.py',
   'python/tests/test_stage_artifact_cache.py', 'python/tests/test_stage_seed_source.py']);

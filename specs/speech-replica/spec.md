@@ -94,18 +94,63 @@ advertising.
    port, so workers keep their adapter configs. It imports the existing
    source-pinned engines unchanged (`transcription_engine.py` keeps the hash its
    launcher and qualification check). A model whose GPU reservation lapses is
-   unloaded and fails closed while the others keep serving; the service exits
-   when nothing is loaded. Configured by `MYCELLIOS_SPEECH_SERVICE_CONFIG`
-   (`{"port": 8895, "models": {"mycellios-whisper-small": {"legacyPort": 8892,
-   "gpuConfig", "artifacts", "modelPath"}, "mycellios-kokoro-es": {"legacyPort":
-   8890}}}`).
+   unloaded and fails closed while the others keep serving. Configured by
+   `MYCELLIOS_SPEECH_SERVICE_CONFIG` (`{"port": 8895, "models":
+   {"mycellios-whisper-small": {"legacyPort": 8892, "gpuConfig", "artifacts",
+   "modelPath"}, "mycellios-kokoro-es": {"legacyPort": 8890}}}`; CUDA Kokoro
+   adds `"gpuConfig"` and `"core"`).
 0c. Done: `deploy/speech-start.ps1` starts one service process plus each
    model's existing worker, from `speech-launcher.json`. It pins every imported
    source by SHA-256, keeps the transcription private-qualification gate,
    refuses occupied ports, waits for each model's pinned artifact identity,
    discards service stdout (node-owner-privacy D6) and bounds total memory.
+0d. Done: lease resilience and CUDA Kokoro, after both per-model replicas on a
+   Wi-Fi node restarted thousands of times: one timeline read slower than the
+   guard's 3 s timeout killed the process, which then reloaded its model.
+   - The pinned `replica_gpu_guard.py` is unchanged. The service gives it a
+     fetch with an 8 s timeout and up to three attempts (0.5 s and 1 s
+     backoff), still HTTPS-only, without redirects and capped at 1 MiB, and
+     passes engines a `LeaseKeeper` in place of the guard. Transport failures
+     (timeouts, resets, HTTP 5xx/429) keep serving only inside the last
+     confirmed lease: confirmed at most 25 s ago (below the coordinator's
+     default 30 s release gap) and expiring more than the guard's 20 s margin
+     from now. Owner policy is still checked on every call; any other answer
+     (paused or draining owner, closed schedule, invalid identity or expiry,
+     missing reservation, HTTP 4xx, redirect) unloads at once.
+   - Models load on demand: the process never exits because of a reservation.
+     An unloaded model releases its GPU memory (it waits for running requests,
+     then collects and empties the CUDA cache), answers 503 with its usual
+     error code, and is retried with backoff (5 s doubling to 60 s) until a
+     committed reservation is confirmed again. `/health` reports
+     `loaded: false` meanwhile.
+   - CUDA Kokoro hosts the qualified core `kokoro_cuda_core.py` byte-identically
+     (SHA-256 `cb695aae…`, the `gpuCoreSourceSha256` its reservation canary pins)
+     with every invariant of the former hand-deployed wrapper: one device with
+     the configured name, a 768 MiB allocator limit inside the 2048 MiB
+     reservation, fp32 weights with TF32 off, an unbilled startup canary with
+     RMS above 50 on every load, a lease check before each synthesis and the
+     same API on port 8890 (`/health` with execution evidence, `/metrics`,
+     `Server-Timing`, error codes). Its `wrapperSourceSha256` is now the hash of
+     `speech_service.py`. Neither the worker, the adapter nor the coordinator
+     reads that field: native qualification binds worker, deployment,
+     activation, model digest, build source and physical node
+     (`src/coordinator/native-qualification-watch.ts`) and the reservation guard
+     checks the core hash, so switching needs no new reservation canary.
+   - One process has one CUDA allocator: each engine's
+     `set_per_process_memory_fraction` call is attributed to the model being
+     loaded and the process fraction is the sum of the loaded models' bounded
+     shares (Whisper 1536 MiB + Kokoro 768 MiB inside their two 2048 MiB
+     reservations). Peak-memory evidence is process-wide.
+   - The launcher starts each worker the first time its model reports ready,
+     pins worker entries (`entrySha256`), passes `MYCELLIOS_*` worker
+     environment (the transcription worker needs its GPU config path) and only
+     restarts when a process actually exits.
+   - The node's pinned `transcription_engine.py` (`b5b4cc02…`) is the
+     repository file with CRLF line endings, so both expose the same
+     constructor and evidence; deploy the node's own copy to keep its hash.
    Pending: install and qualify it on a real node (replacing the two per-model
    launchers there), then the `speech` adapter kind for the unified API.
+   Physical CUDA checks of this step have not run in CI.
 1. Measure sherpa-onnx against `faster-whisper` with `large-v3-turbo` on the
    same NVIDIA GPU (speed, Spanish/English word error rate) and record it.
 2. Ship the speech environment and replica with Whisper (current
