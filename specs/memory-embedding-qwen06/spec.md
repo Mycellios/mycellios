@@ -355,7 +355,7 @@ standalone worker path above still works unchanged.
   connected, online workers owned by `ownerAccountId` qualify. The snapshot
   (`/internal/v1/workers`, network token) now includes each worker's
   `ownerAccountId`. Every candidate still runs the same three-sample canary
-  (cosine ≥ 0.9995), with the existing three-attempts-a-day cap and backoff.
+  (cosine ≥ 0.9995), with the shared daily attempt cap and growing backoff.
 
 ### Node
 

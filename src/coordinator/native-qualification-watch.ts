@@ -31,13 +31,22 @@ const memoryEmbeddingPolicy = z.object({
 export const nativeQualificationAllowlistSchema = z.object({ targets: z.array(target).max(4).default([]),
   memoryEmbedding: memoryEmbeddingPolicy.optional() }).strict();
 type Target = z.infer<typeof target>;
-const attemptSchema = z.object({ count: z.number().int().min(0).max(3), since: z.number().int().nonnegative(), next: z.number().int().nonnegative() }).strict();
+/**
+ * A failing replica is retried often enough that a new contributor whose first attempt
+ * hit a transient problem (reconnect, warm-up, busy GPU) is not locked out for a day:
+ * up to NATIVE_QUALIFICATION_DAILY_ATTEMPTS a rolling day, 2 minutes after the first
+ * failure and doubling to at most 30 minutes, so a broken node cannot spin in a loop.
+ */
+export const NATIVE_QUALIFICATION_DAILY_ATTEMPTS = 24;
+const firstBackoffMs = 2 * 60_000, maximumBackoffMs = 30 * 60_000;
+const attemptSchema = z.object({ count: z.number().int().min(0).max(NATIVE_QUALIFICATION_DAILY_ATTEMPTS), since: z.number().int().nonnegative(), next: z.number().int().nonnegative() }).strict();
 const journalSchema = z.object({ schema: z.literal("mycellios-native-qualification-attempts/1"),
   attempts: z.array(attemptSchema.extend({ workerId: z.string().min(1).max(256) }).strict()).max(20) }).strict();
 export function reserveNativeQualificationAttempt(prior: z.infer<typeof attemptSchema> | undefined, now: number): z.infer<typeof attemptSchema> | null {
-  if (prior && now - prior.since < 86_400_000 && (prior.count >= 3 || now < prior.next)) return null;
+  if (prior && now - prior.since < 86_400_000 && (prior.count >= NATIVE_QUALIFICATION_DAILY_ATTEMPTS || now < prior.next)) return null;
   const state = prior && now - prior.since < 86_400_000 ? prior : { count: 0, since: now, next: 0 };
-  return { count: state.count + 1, since: state.since, next: now + 15 * 60_000 };
+  const backoff = Math.min(maximumBackoffMs, firstBackoffMs * 2 ** Math.min(state.count, 10));
+  return { count: state.count + 1, since: state.since, next: now + backoff };
 }
 /**
  * The daily cap and backoff bound failed and uncertain attempts. A confirmed qualification clears
