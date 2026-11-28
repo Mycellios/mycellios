@@ -55,7 +55,7 @@ const headNames = (await readdir(directory, { withFileTypes: true }))
   .sort();
 const changed = [
   ...new Set(
-    git(["diff", "--name-only", base, "--", relative])
+    git(["-C", root, "diff", "--name-only", base, "--", relative])
       .split("\n")
       .filter(Boolean)
       .map((file) => file.slice(relative.length + 1).split("/")[0]!)
