@@ -65,6 +65,11 @@ test('Kokoro engine changes run its CPU unit tests', () => {
   assert.deepEqual(uncoveredNativeFiles(files), []);
   assert.ok(planChecks(files).some(c => c.args.includes('test_kokoro_engine.py')));
 });
+test('the unified speech service runs its loopback test', () => {
+  const files = ['python/distributed_runtime/speech_service.py', 'python/tests/test_speech_service.py'];
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  assert.ok(planChecks(files).some(c => c.args.includes('test_speech_service.py')));
+});
 test('the stdlib two-host link probe runs its loopback test', () => {
   const files = ['python/distributed_runtime/link_probe.py', 'python/tests/test_link_probe.py'];
   assert.deepEqual(uncoveredNativeFiles(files), []);

@@ -87,6 +87,20 @@ advertising.
    Deployments keep their existing `transcription`/`kokoro` adapter kinds,
    runtime identities and error codes, so live nodes need no change or
    requalification. A single `speech` kind follows with the unified service.
+0b. Done: `python/distributed_runtime/speech_service.py` hosts the configured
+   models in one process. It serves the unified API on its own loopback port
+   (`GET /health` with loaded models, `GET /models/<id>/health`,
+   `POST /models/<id>/<task>`), and each model's previous API on its previous
+   port, so workers keep their adapter configs. It imports the existing
+   source-pinned engines unchanged (`transcription_engine.py` keeps the hash its
+   launcher and qualification check). A model whose GPU reservation lapses is
+   unloaded and fails closed while the others keep serving; the service exits
+   when nothing is loaded. Configured by `MYCELLIOS_SPEECH_SERVICE_CONFIG`
+   (`{"port": 8895, "models": {"mycellios-whisper-small": {"legacyPort": 8892,
+   "gpuConfig", "artifacts", "modelPath"}, "mycellios-kokoro-es": {"legacyPort":
+   8890}}}`). Pending: a launcher that replaces the two per-model launchers on
+   a node, its qualification on real hardware, and the `speech` adapter kind
+   that talks to the unified API.
 1. Measure sherpa-onnx against `faster-whisper` with `large-v3-turbo` on the
    same NVIDIA GPU (speed, Spanish/English word error rate) and record it.
 2. Ship the speech environment and replica with Whisper (current
