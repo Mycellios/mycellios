@@ -4,6 +4,7 @@ import {
   API_KEY_PREFIX,
   ApiAccessError,
   ApiAccessManager,
+  LIVE_USAGE_WINDOW_MS,
 } from "../src/coordinator/api-access.js";
 import { MeshDatabase } from "../src/storage/database.js";
 
@@ -101,6 +102,31 @@ describe("API access accounting", () => {
       inputTokens: 4,
       outputTokens: 6,
     }));
+  });
+
+  it("does not let leaked pending reservations hold concurrency slots forever", async () => {
+    const leak = async (id: string, createdAt: number, jobId: string | null) => {
+      (await database.raw.prepare(
+        `INSERT INTO api_usage(id, user_id, api_key_id, job_id, session_id, model, reserved_tokens,
+           input_tokens, output_tokens, status, error_code, created_at, completed_at)
+         VALUES (?, 'user-1', NULL, ?, NULL, 'real-model', 0, 0, 0, 'pending', NULL, ?, NULL)`,
+      ).run(id, jobId, createdAt));
+    };
+    (await access.getOrCreateAccount("user-1"));
+    // Older than any admitted request can live, with or without a job.
+    (await leak("use-old", Date.now() - LIVE_USAGE_WINDOW_MS - 1_000, null));
+    // Recent, but its job already reached a terminal state.
+    (await database.raw.prepare(
+      `INSERT INTO jobs(id, session_id, model, workload_class, status, deadline_at, created_at, updated_at)
+       VALUES ('job-done', 'session-1', 'real-model', 'interactive', 'completed', ?, ?, ?)`,
+    ).run(Date.now(), Date.now(), Date.now()));
+    (await leak("use-done", Date.now() - 120_000, "job-done"));
+
+    const live = (await access.beginUsage("user-1", null, request));
+    await expect(access.beginUsage("user-1", null, request)).rejects.toMatchObject({
+      code: "concurrency_limit_exceeded", statusCode: 429,
+    });
+    (await access.failUsage(live.id, "worker_failed"));
   });
 
   it("refunds a failed request and enforces concurrency, rate and balance limits", async () => {

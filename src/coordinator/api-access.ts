@@ -8,6 +8,8 @@ import { estimateInputTokens } from "../core/request.js";
 import type { MeshDatabase } from "../storage/database.js";
 
 export const API_KEY_PREFIX = "myc_live_";
+/** Longest a request can stay admitted: the 1 h maximum deadline plus capacity waits, with margin. */
+export const LIVE_USAGE_WINDOW_MS = 2 * 60 * 60_000;
 
 export interface ApiAccessLimits {
   starterTokens: number;
@@ -306,9 +308,16 @@ export class ApiAccessManager {
           Math.max(1, Math.ceil((resetAt - now) / 1_000)),
         );
       }
+      // Only reservations that can still be running hold a concurrency slot. A
+      // pending row whose job already ended, or older than any request can
+      // live, is a leaked reservation; counting it would block the account
+      // permanently once leaks reach its limit.
       const pending = (await this.database.raw.prepare(
-        "SELECT COUNT(*) AS count FROM api_usage WHERE user_id = ? AND status = 'pending'",
-      ).get(userId)) as { count: number };
+        `SELECT COUNT(*) AS count FROM api_usage u
+         WHERE u.user_id = ? AND u.status = 'pending' AND u.created_at >= ?
+           AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.id = u.job_id
+             AND j.status IN ('completed', 'failed', 'cancelled', 'expired'))`,
+      ).get(userId, now - LIVE_USAGE_WINDOW_MS)) as { count: number };
       if (Number(pending.count) >= limits.maxConcurrent) {
         throw new ApiAccessError(
           "concurrency_limit_exceeded",
