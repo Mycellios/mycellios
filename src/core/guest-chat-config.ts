@@ -16,7 +16,8 @@ export const guestChatConfigSchema = z.object({
   historyMessages: z.number().int().min(2).max(200).default(24),
   historyBytes: z.number().int().min(4096).max(131_072).default(98_304),
   messageChars: z.number().int().min(200).max(8000).default(4000),
-  maxOutputTokens: z.number().int().min(64).max(2048).default(800),
+  // Room for a complete answer, including a small working app; free routes cost nothing per token.
+  maxOutputTokens: z.number().int().min(64).max(2048).default(2048),
   sessionsPerPrefixHour: z.number().int().min(1).max(100).default(5),
   messagesPerPrefixDay: z.number().int().min(1).max(1000).default(40),
   messagesPerDay: z.number().int().min(1).max(100_000).default(2000),

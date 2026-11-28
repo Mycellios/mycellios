@@ -154,7 +154,7 @@ scoped-cookie pattern. It adds no Agent tenant data.
 | Session lifetime | 24 hours |
 | History sent per turn | last 8 messages, at most 24 KiB of text |
 | Single message size | 4,000 characters |
-| Output tokens per answer | 800 |
+| Output tokens per answer | 2,048 (room for a small complete app) |
 | New sessions per network prefix (/24 IPv4, /64 IPv6) per hour | 5 |
 | Guest messages per network prefix per UTC day | 40 |
 | Global guest messages per UTC day | 2,000 |
