@@ -17,9 +17,16 @@ export type ColumnShape = {
   filled: boolean;
 };
 
+/** A named object attached to a table: a constraint, a unique index or a trigger. */
+export type TableObject = { table: string; name: string };
+
 export type SchemaShape = {
   columns: ColumnShape[];
   enums: { name: string; labels: string[] }[];
+  /** CHECK (c), UNIQUE (u), exclusion (x) and foreign key (f) constraints. */
+  constraints?: (TableObject & { kind: string })[];
+  uniqueIndexes?: TableObject[];
+  triggers?: TableObject[];
 };
 
 export type CompatViolationKind =
@@ -28,14 +35,21 @@ export type CompatViolationKind =
   | "type_changed"
   | "now_required"
   | "enum_label_removed"
-  | "required_without_default";
+  | "required_without_default"
+  | "constraint_added"
+  | "unique_index_added"
+  | "trigger_added"
+  | "data_rewrite";
 
 export type CompatViolation = { kind: CompatViolationKind; object: string; detail: string };
 
 /**
  * A migration may contract (drop or tighten what the previous release no longer reads or
- * writes) only when it says so on its own line. It still may not add a column the previous
- * release would have to fill.
+ * writes) only when it says so on its own line. New constraints, unique indexes and triggers
+ * on existing tables, and data rewrites, can reject or change the previous release's writes
+ * in ways the catalog cannot judge, so they need the marker too: it makes the deploy take a
+ * snapshot first. A marked migration still may not add a column the previous release would
+ * have to fill.
  */
 export const CONTRACT_MIGRATION_MARKER = "-- mycellios-migration: contract";
 
@@ -45,7 +59,19 @@ const CONTRACT_ALLOWED: ReadonlySet<CompatViolationKind> = new Set([
   "type_changed",
   "now_required",
   "enum_label_removed",
+  "constraint_added",
+  "unique_index_added",
+  "trigger_added",
+  "data_rewrite",
 ]);
+
+const CONSTRAINT_KINDS: Record<string, string> = { c: "CHECK", u: "UNIQUE", x: "exclusion", f: "foreign key" };
+
+/** UPDATE, DELETE, TRUNCATE or INSERT ... SELECT statements, outside comments. */
+export function rewritesData(sql: string): boolean {
+  const code = sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
+  return /(?:^|;)\s*(?:UPDATE\s|DELETE\s+FROM\s|TRUNCATE\s|INSERT\s+INTO\s[^;]*\bSELECT\b)/i.test(code);
+}
 
 export function isContractMigration(sql: string): boolean {
   return sql.split(/\r?\n/).some((line) => line.trim() === CONTRACT_MIGRATION_MARKER);
@@ -93,6 +119,23 @@ export function schemaBreaksPreviousRelease(base: SchemaShape, head: SchemaShape
         violations.push({ kind: "enum_label_removed", object: `${entry.name}.${label}`, detail: "the previous release may still write it" });
     }
   }
+  // Objects added to tables the previous release already writes (new tables are free).
+  const added = <T extends TableObject>(before: T[] | undefined, after: T[] | undefined): T[] => {
+    const seen = new Set((before ?? []).map((item) => `${item.table}.${item.name}`));
+    return (after ?? [])
+      .filter((item) => baseTables.has(item.table) && !seen.has(`${item.table}.${item.name}`))
+      .sort((a, b) => `${a.table}.${a.name}`.localeCompare(`${b.table}.${b.name}`));
+  };
+  for (const item of added(base.constraints, head.constraints))
+    violations.push({
+      kind: "constraint_added",
+      object: `${item.table}.${item.name}`,
+      detail: `new ${CONSTRAINT_KINDS[item.kind] ?? item.kind} constraint may reject the previous release's writes`,
+    });
+  for (const item of added(base.uniqueIndexes, head.uniqueIndexes))
+    violations.push({ kind: "unique_index_added", object: `${item.table}.${item.name}`, detail: "may reject the previous release's writes" });
+  for (const item of added(base.triggers, head.triggers))
+    violations.push({ kind: "trigger_added", object: `${item.table}.${item.name}`, detail: "runs on the previous release's writes" });
   return violations;
 }
 

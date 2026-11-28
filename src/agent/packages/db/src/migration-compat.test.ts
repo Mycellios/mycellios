@@ -5,6 +5,7 @@ import {
   CONTRACT_MIGRATION_MARKER,
   isContractMigration,
   migrationHistoryViolations,
+  rewritesData,
   type SchemaShape,
   schemaBreaksPreviousRelease,
 } from "./migration-compat.js";
@@ -60,6 +61,46 @@ describe("schemaBreaksPreviousRelease", () => {
     const violations = schemaBreaksPreviousRelease(base, head);
     expect(blockingViolations(violations, false)).toHaveLength(violations.length);
     expect(blockingViolations(violations, true).map((v) => v.kind)).toEqual(["required_without_default"]);
+  });
+});
+
+describe("constraints, unique indexes and triggers", () => {
+  it("need the contract marker only on tables the previous release already writes", () => {
+    const head: SchemaShape = {
+      ...base,
+      columns: [...base.columns, column("public.pins", "id", { nullable: false })],
+      constraints: [
+        { table: "public.bots", name: "bots_name_check", kind: "c" },
+        { table: "public.pins", name: "pins_bot_fkey", kind: "f" },
+      ],
+      uniqueIndexes: [
+        { table: "public.runs", name: "runs_one_active" },
+        { table: "public.pins", name: "pins_unique" },
+      ],
+      triggers: [{ table: "public.bots", name: "bots_touch" }],
+    };
+    const violations = schemaBreaksPreviousRelease(base, head);
+    expect(violations.map((v) => `${v.kind} ${v.object}`)).toEqual([
+      "constraint_added public.bots.bots_name_check",
+      "unique_index_added public.runs.runs_one_active",
+      "trigger_added public.bots.bots_touch",
+    ]);
+    expect(blockingViolations(violations, true)).toEqual([]);
+  });
+
+  it("ignores ones that already existed", () => {
+    const existing = { ...base, constraints: [{ table: "public.bots", name: "bots_name_check", kind: "c" }] };
+    expect(schemaBreaksPreviousRelease(existing, existing)).toEqual([]);
+  });
+});
+
+describe("rewritesData", () => {
+  it("finds row changes, not keywords inside other statements or comments", () => {
+    expect(rewritesData(`UPDATE "bots" SET "kind" = 'mico';`)).toBe(true);
+    expect(rewritesData(`CREATE TABLE a (id int);\nDELETE FROM "runs" WHERE false;`)).toBe(true);
+    expect(rewritesData(`INSERT INTO "b" ("id") SELECT "id" FROM "a";`)).toBe(true);
+    expect(rewritesData(`ALTER TABLE "a" ADD CONSTRAINT f FOREIGN KEY ("b") REFERENCES "b"("id") ON DELETE CASCADE ON UPDATE CASCADE;`)).toBe(false);
+    expect(rewritesData(`-- UPDATE "bots" later\nINSERT INTO "settings" ("id") VALUES ('x');`)).toBe(false);
   });
 });
 
