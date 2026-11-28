@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { MICO_MIN_CONTEXT_TOKENS } from "@mycellios/contracts";
 import type { ChatModelChoice } from "@mycellios/core";
 import type { PopoverContent } from "@mycellios/ui-web/components/ui/popover";
 import type { ComponentProps, ReactNode } from "react";
@@ -203,6 +204,82 @@ describe("ChatModelPicker", () => {
     expect(marked[0]?.getAttribute("aria-describedby")).toBe(
       trigger.getAttribute("aria-describedby"),
     );
+  });
+
+  describe("small context warning", () => {
+    const SMALL = 'span[data-small-context]';
+    const withWindows = (count: number, windows: Record<string, number | undefined>) =>
+      choices(count).map((choice) =>
+        choice.modelId && choice.modelId in windows
+          ? { ...choice, contextWindow: windows[choice.modelId] }
+          : choice,
+      );
+    const open = () => act(() => container.querySelector<HTMLButtonElement>("button#model")!.click());
+    const marked = () =>
+      options().filter((option) => option.querySelector(SMALL)).map((option) => option.textContent);
+
+    it("marks only models whose reported window is below the Mico minimum, in a long list", () => {
+      render(
+        withWindows(11, {
+          "vendor/model-1": 8_192,
+          "vendor/model-2": MICO_MIN_CONTEXT_TOKENS - 1,
+          "vendor/model-3": MICO_MIN_CONTEXT_TOKENS,
+          "vendor/model-4": 200_000,
+        }),
+        "openrouter::vendor/model-4",
+      );
+      open();
+      // Model 5 onwards report nothing: an unknown window is never warned about.
+      expect(marked()).toEqual(["Model 1Small context", "Model 2Small context"]);
+    });
+
+    it("explains the warning to assistive technology and leaves the selection alone", async () => {
+      render(withWindows(11, { "vendor/model-1": 16_384 }), "openrouter::vendor/model-2");
+      open();
+      const row = options().find((option) => option.querySelector(SMALL))!;
+      const hint = document.getElementById(row.getAttribute("aria-describedby") ?? "");
+      expect(hint?.textContent).toContain("Micos need about 32k tokens of context");
+      expect(row.querySelector(SMALL)?.getAttribute("title")).toContain("32k tokens");
+      expect(row.getAttribute("aria-disabled")).not.toBe("true");
+      expect(onChange).not.toHaveBeenCalled();
+      // It informs only: the model stays selectable.
+      await act(async () => (row as HTMLElement).click());
+      expect(onChange).toHaveBeenCalledExactlyOnceWith("openrouter::vendor/model-1");
+    });
+
+    it("joins the image and context notes on one row", () => {
+      const list = withWindows(11, { "vendor/model-1": 4_096 }).map((choice) =>
+        choice.modelId === "vendor/model-1" ? { ...choice, images: false } : choice,
+      );
+      render(list, "openrouter::vendor/model-2");
+      open();
+      const row = options().find((option) => option.querySelector(SMALL))!;
+      const ids = (row.getAttribute("aria-describedby") ?? "").split(" ");
+      expect(ids).toHaveLength(2);
+      expect(ids.map((id) => document.getElementById(id)?.textContent)).toEqual([
+        "Can't read images",
+        expect.stringContaining("Small context"),
+      ]);
+    });
+
+    it("marks the selected model on a short list and leaves other models unmarked", () => {
+      render(withWindows(2, { "vendor/model-1": 8_192, "vendor/model-2": 65_536 }), "openrouter::vendor/model-1");
+      const select = container.querySelector("button#model")!;
+      expect(select.querySelector(SMALL)).not.toBeNull();
+      expect(document.getElementById(select.getAttribute("aria-describedby") ?? "")?.textContent)
+        .toContain("Small context");
+
+      render(withWindows(2, { "vendor/model-1": 8_192, "vendor/model-2": 65_536 }), "openrouter::vendor/model-2");
+      expect(select.querySelector(SMALL)).toBeNull();
+      expect(select.hasAttribute("aria-describedby")).toBe(false);
+    });
+
+    it("shows no warning and no hidden note when no window is known", () => {
+      render(choices(11), "openrouter::vendor/model-1");
+      open();
+      expect(document.querySelector(SMALL)).toBeNull();
+      expect(document.body.textContent).not.toContain("32k tokens");
+    });
   });
 
   it("searches a long list by name or id and picks from it", () => {

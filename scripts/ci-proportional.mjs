@@ -36,12 +36,14 @@ const kokoroPython = new Set(['python/distributed_runtime/kokoro_engine.py', 'py
 const speculationTests = ['test_speculation.py', 'test_macro_wave_adapter.py', 'test_engine.py', 'test_draft_model.py', 'test_server.py', 'test_draft_quality_runtime_benchmark.py', 'test_session_reuse.py', 'test_recovery.py'];
 // The two-host TCP link probe and its test use only Python's standard library.
 const linkProbePython = new Set(['python/distributed_runtime/link_probe.py', 'python/tests/test_link_probe.py']);
+// The unified speech service routes to the existing engines; its test uses fake engines and the standard library.
+const speechServicePython = new Set(['python/distributed_runtime/speech_service.py', 'python/tests/test_speech_service.py']);
 // Stage artifact cache and its loopback seed source: CPU tests from the hash-locked runtime wheels.
 const stageSeedPython = new Set(['python/distributed_runtime/stage_artifact_cache.py', 'python/distributed_runtime/stage_seed_source.py',
   'python/tests/test_stage_artifact_cache.py', 'python/tests/test_stage_seed_source.py']);
 const stageSeedTests = ['test_stage_seed_source.py', 'test_stage_artifact_cache.py'];
 const pageBrowserFile = file => /^src\/agent\/infra\/sandboxes\/computer\/(?:[^/]+-page-browser|test_page_browser\.py)$/.test(file);
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !linkProbePython.has(f) && !stageSeedPython.has(f) && !pageBrowserFile(f));
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !linkProbePython.has(f) && !speechServicePython.has(f) && !stageSeedPython.has(f) && !pageBrowserFile(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -86,6 +88,9 @@ export function planChecks(files, availableAgentTests) {
   }
   if (files.some(f => linkProbePython.has(f))) {
     add('python', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_link_probe.py'], 'two-host TCP link probe (loopback only)');
+  }
+  if (files.some(f => speechServicePython.has(f))) {
+    add('python', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_speech_service.py'], 'unified speech service routing (fake engines, loopback only)');
   }
   if (files.some(f => memoryEmbeddingPython.has(f))) {
     add('python', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.', '-p', 'test_qwen06_*.py'], 'memory-embedding replica and forwarder boundaries (no model or GPU)');

@@ -11,6 +11,15 @@
   in the main list and search shows everything. Verify models-dev, model-listing,
   models-dev-runtime, pi-codex-catalog and chat-model-picker tests.
 
+- The chat model picker warns "Small context" beside a model whose catalog
+  `contextWindow` is below `MICO_MIN_CONTEXT_TOKENS` (32,000: a Mico's own prompt of
+  instructions plus about 70 tools measured ~27,700 tokens). The window is optional
+  and reported only by the source that knows it (Pi registry for hosted providers,
+  models.dev for the provider's own entry, the account's Codex catalog, the
+  coordinator's `context_length`); never guess one, and an unknown window shows no
+  warning. It only informs: do not block, hide, reorder or change saved models for it.
+  Verify chat-model-picker, mico-context, model-providers and mycellios-model-catalog tests.
+
 - Cadencia is a trusted first-party Hifa Store app, not a published HTML bundle.
   Keep imported media, DSP workers, auditioning and codecs browser-local. Limit
   clips to five minutes/250 MiB; preserve source audio rate and one compacted
@@ -1033,8 +1042,18 @@
   start together through `startedEarly` (a thunk, so a failure surfaces only where its result
   is awaited and a run that ends earlier ignores it); never start one before the checks it
   depends on. API and worker reuse a live MCP session's tool list for MCP_TOOL_LIST_TTL_MS
-  (30 minutes; 0 asks every turn), as the reference app does: the session is still
-  revalidated first, so a new revision, rotated credential or relaunched process lists again.
+  (30 minutes; 0 asks every turn), as the reference app does. A new revision, credential
+  record or expiring token waits for the server; otherwise the turn gets the list at once
+  (up to twice the window) and the session check (secret digest) and a past-window
+  tools/list run behind it, so a rotated credential or changed list reaches the next turn;
+  a failed check drops the list. Tool calls still revalidate first. The worker likewise
+  reuses Composio's tool list per user and connections (DEFAULT_COMPOSIO_TOOLS_REUSE_MS,
+  refreshed behind later turns, same 2x bound); execute always rechecks accounts.
+  `connector.tools_discovered` and `mcp.tools_discovered` log per-provider/server times.
+  After a restart the worker discovers the tools of the (at most 30) Micos that ran in the
+  last day, three at a time in the background (`warmToolSessions`, `worker.tools_warmed`),
+  so the first scheduled turns find sessions open instead of connecting cold (14-20 s);
+  a failure or shutdown leaves that Mico to its first turn.
   specs/turn-preparation/spec.md holds the measured plan. Verify host-computer tests. Verify desktop-model-batch, desktop-model-stream,
   desktop-agent-runtime and the Desktop/API relay tests.
   Phase 4 of specs/local-engine-default/spec.md gives only explicitly requested,

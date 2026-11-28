@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { isSmallMicoContext } from "@mycellios/contracts";
 import type { ChatModelChoice } from "@mycellios/core";
 import { groupModelChoices, MODEL_SEARCH_THRESHOLD } from "@mycellios/core";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@mycellios/ui-web";
 import { Check, ChevronDownIcon, Circle, Monitor, Plus } from "lucide-react";
 import { useId, useMemo, useState, type ReactNode } from "react";
+import { SmallContextHint, SmallContextMark } from "../../components/SmallContextMark";
 import { TextOnlyMark } from "../../components/TextOnlyMark";
 import { ProviderLogo } from "../../components/ProviderLogo";
 
@@ -72,6 +74,7 @@ export function ChatModelPicker({
 }) {
   const { t } = useLingui();
   const imagesHintId = useId();
+  const contextHintId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [olderOpen, setOlderOpen] = useState<ReadonlySet<string>>(() => new Set());
@@ -109,17 +112,25 @@ export function ChatModelPicker({
   const selected = choices.find((choice) => choice.key === value) ?? choices[0];
   const textOnly = selected?.images === false;
   const imagesHint = <span id={imagesHintId} hidden>{t`Can't read images`}</span>;
+  // The small-context note exists only while some choice needs it. It informs and never blocks.
+  const smallContext = (choice: ChatModelChoice | undefined) => isSmallMicoContext(choice?.contextWindow);
+  const contextHint = choices.some(smallContext) ? <SmallContextHint id={contextHintId} /> : null;
+  const describedBy = (choice: ChatModelChoice | undefined) =>
+    [choice?.images === false ? imagesHintId : null, smallContext(choice) ? contextHintId : null]
+      .filter(Boolean).join(" ") || undefined;
 
   if (!inline && choices.length <= MODEL_SEARCH_THRESHOLD) {
     return (
       <Select value={value} onValueChange={(key) => { if (key !== null) onChange(key); }}>
         {imagesHint}
+        {contextHint}
         <SelectTrigger
           id={id}
           className="mt-2 w-full"
-          aria-describedby={textOnly ? imagesHintId : undefined}
+          aria-describedby={describedBy(selected)}
         >
           <SelectValue>{selected?.label}</SelectValue>
+          {smallContext(selected) ? <SmallContextMark /> : null}
           {textOnly ? <span className="text-muted-foreground"><TextOnlyMark /></span> : null}
         </SelectTrigger>
         <SelectContent align="start" alignItemWithTrigger={false}>
@@ -193,7 +204,7 @@ export function ChatModelPicker({
                 className={inline
                   ? "min-h-7 gap-2 rounded-md px-2.5 py-1 text-sm [&>svg:last-child]:hidden"
                   : undefined}
-                aria-describedby={choice.images === false ? imagesHintId : undefined}
+                aria-describedby={describedBy(choice)}
                 onSelect={() => {
                   onChange(choice.key);
                   openChange(false);
@@ -211,6 +222,7 @@ export function ChatModelPicker({
                 {choice.listing === "new" ? (
                   <span className="shrink-0 rounded-full bg-accent px-1.5 text-[11px] text-muted-foreground">{t`New`}</span>
                 ) : null}
+                {smallContext(choice) ? <SmallContextMark /> : null}
                 {unavailableKeys.has(choice.key) ? <span className="shrink-0 text-xs text-muted-foreground">{unavailableKeys.get(choice.key) ?? t`Unavailable`}</span> : null}
                 {choice.images === false ? (
                   <span className="shrink-0 text-muted-foreground">
@@ -249,6 +261,7 @@ export function ChatModelPicker({
     return (
       <div className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)]">
         {imagesHint}
+        {contextHint}
         {providers.length || onManage ? (
           <div className="flex w-11 flex-col items-center gap-1 border-e border-border bg-muted/30 px-1 py-2" role="group" aria-label={t`Providers`}>
             {/* Connections first, then the agent programs installed on this PC (Claude Code, Codex,
@@ -296,13 +309,15 @@ export function ChatModelPicker({
   return (
     <Popover open={open} onOpenChange={openChange}>
       {imagesHint}
+      {contextHint}
       <PopoverTrigger
         id={id}
-        aria-describedby={textOnly ? imagesHintId : undefined}
+        aria-describedby={describedBy(selected)}
         className="mt-2 flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent pr-2.5 pl-2.5 text-start text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
       >
         <span className="min-w-0 truncate">{selected?.label}</span>
         <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+          {smallContext(selected) ? <SmallContextMark /> : null}
           {textOnly ? <TextOnlyMark /> : null}
           <ChevronDownIcon className="size-4" aria-hidden="true" />
         </span>

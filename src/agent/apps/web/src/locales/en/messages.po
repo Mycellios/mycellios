@@ -16373,3 +16373,15 @@ msgstr "Mico is taking longer than usual. Try again; your message will not be se
 #: src/lib/guest-rpc.ts
 msgid "The connection was interrupted. Try again; your message will not be sent twice."
 msgstr "The connection was interrupted. Try again; your message will not be sent twice."
+
+#: src/components/SmallContextMark.tsx
+msgid "Micos need about 32k tokens of context, so this model may not work well."
+msgstr "Micos need about 32k tokens of context, so this model may not work well."
+
+#: src/components/SmallContextMark.tsx
+msgid "Small context"
+msgstr "Small context"
+
+#: src/components/SmallContextMark.tsx
+msgid "Small context: Micos need about 32k tokens of context, so this model may not work well."
+msgstr "Small context: Micos need about 32k tokens of context, so this model may not work well."

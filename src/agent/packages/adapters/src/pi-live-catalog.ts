@@ -8,11 +8,17 @@ import type { PrismaClient } from "@mycellios/db";
 import type { ModelsDevSnapshot } from "./models-dev.js";
 import type { ModelCredentialAuthKind } from "./pi-catalog-availability.js";
 import { LiveCatalogCache, liveModelCatalogEnabled } from "./pi-live-cache.js";
-import { isChatModelId, liveModelSibling, modelsDevService } from "./pi-live-model.js";
+import {
+  isChatModelId,
+  liveModelSibling,
+  modelsDevContextWindow,
+  modelsDevService,
+} from "./pi-live-model.js";
 import type { PiCatalogEntry } from "./pi-models.js";
 import {
   catalogModelLabel,
   catalogProviderProbeBaseUrl,
+  contextWindowField,
   isRecommendedCatalogModel,
   listPiCatalog,
   probeCatalogProviderModels,
@@ -70,8 +76,11 @@ export function liveCatalogEntry(provider: string, id: string): PiCatalogEntry |
   const entry = listPiCatalog().find((entry) => entry.provider === provider);
   const model = liveModelSibling(siblingModels, provider, id);
   if (!entry || !model) return undefined;
+  // The first bundled model's window says nothing about this one: keep only a reported figure.
+  const { contextWindow: _bundledWindow, ...base } = entry;
   return {
-    ...entry,
+    ...base,
+    ...contextWindowField(modelsDevContextWindow(provider, id)),
     id,
     recommended: isRecommendedCatalogModel(provider, id),
     // models.dev names the model when it lists it; otherwise the id is all there is.

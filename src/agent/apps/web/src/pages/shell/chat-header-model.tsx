@@ -170,6 +170,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     .concat(mycelliosConnection ? (mycelliosCatalog.data ?? []).map(entry => ({
       key: modelOptionKey(entry.provider, entry.id), provider: entry.provider, modelId: entry.id,
       label: entry.label, providerLabel: "Mycellios", modelLabel: entry.label, images: entry.images,
+      ...(entry.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
     })) : []).map(choice => {
     const connection = credentialForModel(namedCredentials, choice.provider, choice.modelId)
       ?? namedCredentials.find(entry => entry.provider === choice.provider && entry.label === choice.providerLabel)

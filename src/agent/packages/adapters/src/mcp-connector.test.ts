@@ -292,19 +292,27 @@ describe("MCP connector session cache", () => {
       expect(lists).toBe(1);
       expect(await connector.discoverTools(context)).toEqual(first);
       expect(lists).toBe(1);
-      // Past the window the server is asked again.
+      // Past the window the run still gets the list it has, and the server is asked again
+      // behind it.
       await vi.advanceTimersByTimeAsync(60_000);
-      await connector.discoverTools(context);
-      expect(lists).toBe(2);
-      // A rotated credential replaces the session, whose list starts empty.
+      expect(await connector.discoverTools(context)).toEqual(first);
+      await vi.waitFor(() => expect(lists).toBe(2));
+      // A rotated credential replaces the session behind the run that noticed it, and the
+      // new session lists its tools.
       fake.values.set(
         record.ref.split(":").at(-1)!,
         JSON.stringify({ headers: { Authorization: "Bearer rotated" } }),
       );
       await vi.advanceTimersByTimeAsync(100);
       await connector.discoverTools(context);
-      expect(state.initializations).toBe(2);
-      expect(lists).toBe(3);
+      await vi.waitFor(() => {
+        expect(state.initializations).toBe(2);
+        expect(lists).toBe(3);
+      });
+      // Twice the window without a run: the next one waits for the server again.
+      await vi.advanceTimersByTimeAsync(120_000);
+      await connector.discoverTools(context);
+      expect(lists).toBe(4);
     } finally {
       await connector.close();
       await store.close();

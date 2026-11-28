@@ -1,6 +1,10 @@
 import { createOpenAiCompatibleFetch, isChatModelId } from "@mycellios/adapters";
 import type { ModelCatalogEntry } from "@mycellios/contracts";
-import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@mycellios/contracts";
+import {
+  knownModelContextWindow,
+  OPENAI_COMPATIBLE_PROVIDER_ID,
+  productBrand,
+} from "@mycellios/contracts";
 import { readBoundedJsonResponse } from "@mycellios/core";
 
 const MIN_MICO_CONTEXT_TOKENS = 8_192;
@@ -117,6 +121,10 @@ export async function readMycelliosChatModels(
       ...(pricing ? { mycelliosProcessing: row.processing as "external" | "network", mycelliosPricing: pricing }
         : row.processing === "network" ? { mycelliosProcessing: "network" as const } : {}),
       live: true,
+      // The coordinator's own figure for the route; absent or malformed means unknown.
+      ...(knownModelContextWindow(row.context_length) !== undefined
+        ? { contextWindow: row.context_length as number }
+        : {}),
       ...(row.recommended === true ? { recommended: true } : {}),
       ...(options.credentialId ? { credentialIds: [options.credentialId] } : {}),
     });

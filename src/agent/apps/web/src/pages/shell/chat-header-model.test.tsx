@@ -42,7 +42,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
 vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onChange, initialProvider, onProviderChange }: { choices: (ChatModelChoice & { unavailable?: boolean; unavailableLabel?: string })[]; value: string; onChange: (key: string) => void; initialProvider?: string | null; onProviderChange?: (provider: string) => void }) =>
   <div data-picker-provider={initialProvider}>{[...new Set(choices.map(choice => choice.providerLabel))].map(name =>
-    <button key={`provider-${name}`} data-provider={name} aria-label={name} onClick={() => onProviderChange?.(name!)} />)}{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-selected={choice.key === value} data-unavailable={choice.unavailableLabel} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
+    <button key={`provider-${name}`} data-provider={name} aria-label={name} onClick={() => onProviderChange?.(name!)} />)}{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-context-window={choice.contextWindow} data-selected={choice.key === value} data-unavailable={choice.unavailableLabel} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
 }));
 vi.mock("@mycellios/ui-web", () => ({
   Popover: ({ children, onOpenChange }: { children: ReactNode; onOpenChange: (open: boolean) => void }) => <div><button data-open onClick={() => onOpenChange(true)}>Open</button>{children}</div>,
@@ -158,6 +158,23 @@ it("lists the live Mycellios catalog instead of saved enabled IDs without changi
   await render("pi");
   expect(container.querySelector('[data-choice="openai-compatible::mycellios/managed/antseed/another-model"]')).not.toBeNull();
   expect(save).not.toHaveBeenCalled();
+});
+it("hands each catalog model's reported context window to the picker without inventing one", async () => {
+  fixtures.credentials.push({ id: "myc", provider: "openai-compatible", label: "Mycellios", baseUrl: "https://www.mycellios.com/v1", modelId: "mycellios/managed/antseed/small", hasKey: true } as ModelCredential);
+  const listed = (id: string, contextWindow?: number) => ({ provider: "openai-compatible", providerName: "Mycellios", id: `mycellios/managed/antseed/${id}`, label: id, billing: "Uses your Mycellios credits", ...(contextWindow ? { contextWindow } : {}) });
+  fixtures.mycelliosCatalog = [listed("small", 16_384), listed("roomy", 131_072), listed("silent")];
+  const personal = fixtures.catalog[0] as ModelCatalogEntry & { contextWindow?: number };
+  personal.contextWindow = 8_192;
+  try {
+    await render("pi");
+    const windowOf = (key: string) => container.querySelector<HTMLButtonElement>(`[data-choice="${key}"]`)?.getAttribute("data-context-window");
+    expect(windowOf("openai-compatible::mycellios/managed/antseed/small")).toBe("16384");
+    expect(windowOf("openai-compatible::mycellios/managed/antseed/roomy")).toBe("131072");
+    expect(windowOf("openai-compatible::mycellios/managed/antseed/silent")).toBeNull();
+    expect(windowOf("opencode-go::gpt-6-luna")).toBe("8192");
+    // Showing the warning never selects, saves or switches anything.
+    expect(save).not.toHaveBeenCalled();
+  } finally { delete personal.contextWindow; }
 });
 it.each([false, true])("keeps a readable Mycellios header before and after discovery (Mico override: %s)", async (override) => {
   const modelId = "mycellios/managed/antseed/deepseek-v4-flash";

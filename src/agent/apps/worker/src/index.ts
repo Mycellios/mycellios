@@ -3,13 +3,18 @@ import { modelsDevCatalog, tailnetServiceFromEnv } from "@mycellios/adapters";
 import { reconcileTaskReminders, reconcileThreadDeletions, WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@mycellios/adapter-kit";
-import { ComposioConnector, IntegrationProviderSettings } from "@mycellios/adapters";
+import {
+  ComposioConnector,
+  DEFAULT_COMPOSIO_TOOLS_REUSE_MS,
+  IntegrationProviderSettings,
+} from "@mycellios/adapters";
 import { phoneCallSettings } from "@mycellios/core";
 import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { desktopRelayKey, desktopAgentSelection, desktopRelayTransport } from "../../../packages/adapters/src/desktop-relay.js";
 import { browserTabsClient, browserTabsKey } from "../../../packages/adapters/src/browser-tabs-relay.js";
 import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { startWorkerHealth } from "./health.js";
+import { warmToolSessions } from "./warm-tools.js";
 import { createWorkerSecretStore } from "./secret-store.js";
 
 loadRootEnv();
@@ -232,7 +237,10 @@ async function main() {
     resolveEncryptionKey(process.env),
     {
       composio: isComposioEnabled(process.env.COMPOSIO_API_KEY)
-        ? new ComposioConnector({ apiKey: process.env.COMPOSIO_API_KEY })
+        ? new ComposioConnector({
+            apiKey: process.env.COMPOSIO_API_KEY,
+            toolsReuseMs: DEFAULT_COMPOSIO_TOOLS_REUSE_MS,
+          })
         : undefined,
       pipedream,
     },
@@ -463,6 +471,8 @@ async function main() {
   webPush.start();
   reconciler.start();
   stopHealth = startWorkerHealth(reconciler.lastCompletedAt);
+  // Open the tool sessions of recently active Micos before their first turn arrives.
+  void warmToolSessions({ prisma, connector: stack.connector }, { signal: shutdown.signal });
 
   // The timer is unref'd, so it never keeps a stopping worker alive.
   startEventLoopDelayReport(logger);
