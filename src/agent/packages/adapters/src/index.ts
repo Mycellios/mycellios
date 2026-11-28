@@ -195,3 +195,4 @@ export * from "./task-reminders.js";
 export { reconcileLocalMemoryReviews, scheduleLocalMemoryReview } from "./local-memory-review.js";
 export { idleCompactionThread, manualCompactionStart, MANUAL_COMPACTION_RECENT_MESSAGES } from "./history-compaction.js";
 export { isMissingPcWorkspaceError, PC_WORKSPACE_MISSING } from "./workspace-transfer.js";
+export { connectedContext } from "./connection-context.js";

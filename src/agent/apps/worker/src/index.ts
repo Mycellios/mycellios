@@ -14,6 +14,7 @@ import { desktopRelayKey, desktopAgentSelection, desktopRelayTransport } from ".
 import { browserTabsClient, browserTabsKey } from "../../../packages/adapters/src/browser-tabs-relay.js";
 import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { startWorkerHealth } from "./health.js";
+import { warmToolSessions } from "./warm-tools.js";
 import { createWorkerSecretStore } from "./secret-store.js";
 
 loadRootEnv();
@@ -470,6 +471,8 @@ async function main() {
   webPush.start();
   reconciler.start();
   stopHealth = startWorkerHealth(reconciler.lastCompletedAt);
+  // Open the tool sessions of recently active Micos before their first turn arrives.
+  void warmToolSessions({ prisma, connector: stack.connector }, { signal: shutdown.signal });
 
   // The timer is unref'd, so it never keeps a stopping worker alive.
   startEventLoopDelayReport(logger);
