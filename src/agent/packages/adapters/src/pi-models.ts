@@ -6,6 +6,7 @@ import {
   assertHeaderSafeApiKey,
   canonicalPiProviderId,
   isOpenAiCompatibleProvider,
+  knownModelContextWindow,
 } from "@mycellios/contracts";
 import { LOCAL_PROVIDER_ID, registerLocalProvider } from "./pi-local-provider.js";
 import { applyPiModelCompatibility } from "./pi-model-compat.js";
@@ -40,6 +41,8 @@ export type PiCatalogEntry = {
   live?: true;
   /** How the model picker shows it: `new` for a recent release, `older` folded. */
   listing?: "new" | "older";
+  /** The registry's context window in tokens; left out where the source does not know it. */
+  contextWindow?: number;
 };
 
 /**
@@ -247,6 +250,12 @@ function pinnedCatalogProbeBaseUrl(
   return [...urls][0] ?? null;
 }
 
+/** `{ contextWindow }` for a usable figure, otherwise nothing: an unknown window is never guessed. */
+export function contextWindowField(value: unknown): { contextWindow?: number } {
+  const contextWindow = knownModelContextWindow(value);
+  return contextWindow === undefined ? {} : { contextWindow };
+}
+
 export function listPiCatalog(): PiCatalogEntry[] {
   cachedCatalog ??= buildPiCatalog();
   return cachedCatalog;
@@ -314,6 +323,11 @@ function buildPiCatalog(): PiCatalogEntry[] {
         ...(isOpenAiCompatibleProvider(provider.id)
           ? { placeholder: true }
           : { images: model.input.includes("image") }),
+        // A custom endpoint's window is its connection's setting, and the local provider's is
+        // an operator default: only the registry's own figure for a hosted model is reported.
+        ...(!isOpenAiCompatibleProvider(provider.id) && provider.id !== LOCAL_PROVIDER_ID
+          ? contextWindowField(model.contextWindow)
+          : {}),
         ...(probeBaseUrl ? { catalogProbe: true } : {}),
       });
     }

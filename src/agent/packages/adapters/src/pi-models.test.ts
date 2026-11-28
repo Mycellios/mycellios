@@ -1,4 +1,4 @@
-import { MODEL_KEY_FORMAT_ERROR } from "@mycellios/contracts";
+import { isOpenAiCompatibleProvider, MODEL_KEY_FORMAT_ERROR } from "@mycellios/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultCatalogModelId } from "./model-selection.js";
 import { modelAcceptsImageInput } from "./model-vision.js";
@@ -234,6 +234,21 @@ describe("Pi model catalog", () => {
       expect(
         listPiCatalog().filter((entry) => entry.provider === provider && entry.recommended),
       ).toHaveLength(1);
+    }
+  });
+
+  it("reports the registry's context window for hosted models and none for custom endpoints", () => {
+    const catalog = listPiCatalog();
+    const hosted = catalog.filter((entry) => entry.provider === "anthropic");
+    expect(hosted.length).toBeGreaterThan(0);
+    for (const entry of hosted) {
+      expect(Number.isInteger(entry.contextWindow) && (entry.contextWindow ?? 0) > 0, entry.id).toBe(true);
+    }
+    // A custom endpoint's window is its connection's setting and the local one an operator default.
+    for (const entry of catalog.filter(
+      (entry) => isOpenAiCompatibleProvider(entry.provider) || entry.provider === "local",
+    )) {
+      expect(entry, `${entry.provider}:${entry.id}`).not.toHaveProperty("contextWindow");
     }
   });
 

@@ -1108,6 +1108,26 @@ describe("applyCodexLiveCatalog", () => {
     expect(spark?.billing).toBeTruthy();
   });
 
+  it("reports the account's own context window and none for a live-only slug it does not size", () => {
+    const merged = applyCodexLiveCatalog(
+      base,
+      oauthAuth,
+      liveFor({
+        "secret-a": [
+          liveModel(LUNA, { contextWindow: 123_456 }),
+          liveModel("gpt-7-codex-new"),
+          liveModel("gpt-7-codex-sized", { contextWindow: 24_000 }),
+        ],
+      }),
+    );
+    const find = (id: string) =>
+      merged.find((entry) => entry.provider === CHATGPT_OAUTH_PROVIDER && entry.id === id);
+    expect(find(LUNA)?.contextWindow).toBe(123_456);
+    expect(find("gpt-7-codex-sized")?.contextWindow).toBe(24_000);
+    // A new slug never borrows a bundled sibling's window.
+    expect(find("gpt-7-codex-new")).not.toHaveProperty("contextWindow");
+  });
+
   it("drops OAuth-governed models the live catalog does not list", () => {
     const merged = applyCodexLiveCatalog(
       base,

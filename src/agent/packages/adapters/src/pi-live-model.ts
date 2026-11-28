@@ -38,7 +38,21 @@ export function modelsDevEntry(
   return service ? snapshot?.model(service, id) : undefined;
 }
 
-const OPENAI_APIS = ["openai-completions", "openai-responses", "openai-codex-responses"];
+/**
+ * The context window models.dev lists for this provider's own model, or none. A provider whose
+ * models.dev entries live under another service (ChatGPT sign-in) runs the model on its own
+ * backend with its own limits, so the other service's figure is not reported for it.
+ */
+export function modelsDevContextWindow(
+  provider: string,
+  id: string,
+  snapshot: ModelsDevSnapshot | undefined = modelsDevCatalog.current(),
+): number | undefined {
+  if (MODELS_DEV_SERVICE[provider]) return undefined;
+  return modelsDevEntry(provider, id, snapshot)?.contextWindow;
+}
+
+const OPENAI_APIS =["openai-completions", "openai-responses", "openai-codex-responses"];
 
 function safeBaseUrl(baseUrl: string): boolean {
   try {

@@ -4,6 +4,7 @@ import { modelsDevCatalog, parseModelsDev } from "./models-dev.js";
 import { listAvailablePiCatalog } from "./pi-catalog-availability.js";
 import { applyModelsDevCatalog, liveCatalogEntry } from "./pi-live-catalog.js";
 import { liveModelSibling, modelsDevListsModel } from "./pi-live-model.js";
+import { listPiCatalog } from "./pi-models.js";
 
 const models = builtinModels();
 
@@ -103,6 +104,17 @@ describe("models.dev models that the bundled Pi list lacks", () => {
     expect(applyModelsDevCatalog(base, { ...auth, managedProvider: "anthropic" }, snapshot)).toEqual(
       base,
     );
+  });
+
+  it("reports models.dev's context window for the provider's own model and never guesses one", () => {
+    modelsDevCatalog.install(snapshot);
+    expect(liveCatalogEntry("anthropic", "claude-fable-9")?.contextWindow).toBe(2_000_000);
+    // ChatGPT sign-in runs on its own backend, so OpenAI's API figure is not reported for it.
+    expect(liveCatalogEntry("openai-codex", "gpt-6.2-sol")).not.toHaveProperty("contextWindow");
+    // A sibling's bundled window says nothing about a model nobody described.
+    modelsDevCatalog.install(undefined);
+    expect(listPiCatalog().find((entry) => entry.provider === "openai-codex")?.contextWindow).toBeGreaterThan(0);
+    expect(liveCatalogEntry("openai-codex", "gpt-future-chat")).not.toHaveProperty("contextWindow");
   });
 
   it("gives a ChatGPT account's live model its models.dev name", () => {

@@ -1423,6 +1423,34 @@ export const DEFAULT_MODEL_CONTEXT_WINDOW = 262_144;
 
 /** Largest context window exposed by model settings. */
 export const MAX_MODEL_CONTEXT_WINDOW = 2_147_483_647;
+
+/**
+ * Smallest context window, in tokens, that a Mico can work with. Measured in production: a
+ * Mico's own prompt (its instructions plus about 70 tools, without the task) is about 27,700
+ * tokens, so a model with less than roughly 32,000 tokens of context cannot run one well, or at
+ * all. The chat model picker warns about smaller models without blocking them.
+ */
+export const MICO_MIN_CONTEXT_TOKENS = 32_000;
+
+/** A positive whole number of tokens within the supported range; anything else is not known. */
+export function knownModelContextWindow(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value > 0 &&
+    value <= MAX_MODEL_CONTEXT_WINDOW
+    ? value
+    : undefined;
+}
+
+/**
+ * Whether a model's context window is known and too small for a Mico. An unknown window never
+ * counts as small, so the picker only warns on a figure its source actually reported.
+ */
+export function isSmallMicoContext(contextWindow: number | null | undefined): boolean {
+  const known = knownModelContextWindow(contextWindow);
+  return known !== undefined && known < MICO_MIN_CONTEXT_TOKENS;
+}
+
 /** Parse the optional per-connection image limit entered in model settings. */
 export function parseModelMaxImagesPerPrompt(
   value: string,
@@ -1728,8 +1756,13 @@ export const ModelCatalogEntrySchema = z.object({
    * main list, `older` folded under Older models. Omitted for the main list and by older servers.
    */
   listing: z.enum(["new", "older"]).optional(),
+  /**
+   * The model's context window in tokens, when its source reports one. Omitted otherwise and by
+   * older servers; a missing value is unknown, never small.
+   */
+  contextWindow: z.number().int().positive().max(MAX_MODEL_CONTEXT_WINDOW).optional(),
 });
-export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntrySchema>;
+export type ModelCatalogEntry= z.infer<typeof ModelCatalogEntrySchema>;
 
 export const VoiceCatalogEntrySchema = z.object({
   id: z.string(),

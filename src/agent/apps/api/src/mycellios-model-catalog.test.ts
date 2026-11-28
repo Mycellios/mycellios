@@ -37,6 +37,19 @@ describe("Mycellios account chat catalog", () => {
     ] }));
     expect((await readMycelliosChatModels("owned-key", { fetch: transport })).map(m => m.id)).toEqual(["native-chat"]);
   });
+  it("reports the coordinator's context window only when it is a usable figure", async () => {
+    const transport = vi.fn(async () => Response.json({ data: [
+      { id: "small-chat", processing: "network", context_length: 16384, x_replicas: 1, x_pipelines: 0 },
+      { id: "roomy-chat", processing: "network", context_length: 131072, x_replicas: 1, x_pipelines: 0 },
+      { id: "silent-chat", processing: "network", x_replicas: 1, x_pipelines: 0 },
+      { id: "odd-chat", processing: "network", context_length: 12345.5, x_replicas: 1, x_pipelines: 0 },
+    ] }));
+    const byId = new Map((await readMycelliosChatModels("owned-key", { fetch: transport })).map(m => [m.id, m]));
+    expect(byId.get("small-chat")?.contextWindow).toBe(16384);
+    expect(byId.get("roomy-chat")?.contextWindow).toBe(131072);
+    expect(byId.get("silent-chat")).not.toHaveProperty("contextWindow");
+    expect(byId.get("odd-chat")).not.toHaveProperty("contextWindow");
+  });
   it("does not refresh or enable services excluded by their cost contract", async () => {
     const transport = vi.fn(async () => Response.json({ data: [
       { id: "mycellios/managed/antseed/unqualified", processing: "external", available: false, reason: "cost_contract_not_qualified" },

@@ -11,6 +11,15 @@
   in the main list and search shows everything. Verify models-dev, model-listing,
   models-dev-runtime, pi-codex-catalog and chat-model-picker tests.
 
+- The chat model picker warns "Small context" beside a model whose catalog
+  `contextWindow` is below `MICO_MIN_CONTEXT_TOKENS` (32,000: a Mico's own prompt of
+  instructions plus about 70 tools measured ~27,700 tokens). The window is optional
+  and reported only by the source that knows it (Pi registry for hosted providers,
+  models.dev for the provider's own entry, the account's Codex catalog, the
+  coordinator's `context_length`); never guess one, and an unknown window shows no
+  warning. It only informs: do not block, hide, reorder or change saved models for it.
+  Verify chat-model-picker, mico-context, model-providers and mycellios-model-catalog tests.
+
 - Cadencia is a trusted first-party Hifa Store app, not a published HTML bundle.
   Keep imported media, DSP workers, auditioning and codecs browser-local. Limit
   clips to five minutes/250 MiB; preserve source audio rate and one compacted
