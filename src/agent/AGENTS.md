@@ -1043,6 +1043,10 @@
   reuses Composio's tool list per user and connections (DEFAULT_COMPOSIO_TOOLS_REUSE_MS,
   refreshed behind later turns, same 2x bound); execute always rechecks accounts.
   `connector.tools_discovered` and `mcp.tools_discovered` log per-provider/server times.
+  After a restart the worker discovers the tools of the (at most 30) Micos that ran in the
+  last day, three at a time in the background (`warmToolSessions`, `worker.tools_warmed`),
+  so the first scheduled turns find sessions open instead of connecting cold (14-20 s);
+  a failure or shutdown leaves that Mico to its first turn.
   specs/turn-preparation/spec.md holds the measured plan. Verify host-computer tests. Verify desktop-model-batch, desktop-model-stream,
   desktop-agent-runtime and the Desktop/API relay tests.
   Phase 4 of specs/local-engine-default/spec.md gives only explicitly requested,
