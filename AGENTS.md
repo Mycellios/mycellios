@@ -393,6 +393,11 @@ These rules apply to the complete repository.
   and earlier arm64 catalogs compatible; both Mac builds use the all-Mac opt-in.
   The download page opts into `?include=macos-all`; retain the three-platform
   `macos-arm64` opt-in and byte-identical legacy two-platform default catalog.
+- Coordinator schema statements (DDL) live only under the `schemaPaths` of
+  `config/ddl-locations.json`, which must equal the coordinator `migrationPaths` in
+  Nucleus: Nucleus skips the pre-deploy database copy when a release changes none of
+  them. CI runs `scripts/verify-ddl-locations.mjs` on every change; add a schema path
+  there and in Nucleus together, and list test fixtures under `ignoredPaths`.
 - The coordinator's PostgreSQL schema is applied by the migration owner; its runtime
   role has no CREATE on `mycellios`. Never run DDL at coordinator startup on
   PostgreSQL. Export new tables as owner SQL (like `eventDemoSchemaSql` and
