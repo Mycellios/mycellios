@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-28
+
+### Added
+
+- The model picker now marks models with a small context window, so you can tell before choosing one that a Mico may not work well with it. A Mico needs about 32,000 tokens of context. The mark only informs; you can still choose the model.
+- Guests now see the full Agent workspace instead of a separate chat page. Everything that
+  needs an account stays visible but locked, and opens a short offer to create a free account.
+- An empty guest chat suggests four things a Mico does on its own: work on a schedule, team up
+  with other Micos, watch for a change and build something.
+- The Mico rests under its last reply in a conversation.
+
+### Fixed
+
+- Guest chat now opens from the hosted Agent link. Opening Agent without an account went
+  straight to sign-in, even on servers that turned guest chat on.
+- Micos start answering a few seconds sooner: they reuse the tools they already know from connected apps and MCP servers, and check them for changes in the background.
+- Micos on a Claude connection reply sooner after a pause: the shared start of the conversation now stays cached for an hour instead of five minutes.
+- The first replies after an update no longer wait for every connected app and tool server to start up: Micos that were active recently get theirs ready in the background.
+- A guest answer interrupted by a reload or a lost connection now continues by itself, and a
+  failed answer always shows an error with Retry instead of leaving the message unanswered.
+- Guest Mico keeps the whole conversation, not only the last few messages.
+
 ## [0.41.0] - 2026-11-27
 
 ### Added
