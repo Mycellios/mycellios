@@ -79,6 +79,8 @@ export function planChecks(files, availableAgentTests) {
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
   // Private names (people, companies, retired products) never return; see the script.
   add('.', 'node', ['scripts/verify-private-terms.mjs'], 'private terms');
+  // Nucleus skips the pre-deploy database copy unless these paths change; DDL elsewhere would bypass it.
+  add('.', 'node', ['scripts/verify-ddl-locations.mjs'], 'coordinator schema only in declared paths');
   if (files.some(pageBrowserFile)) {
     add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'src/agent/infra/sandboxes/computer', '-p', 'test_page_browser.py'], 'conversation browser tab protocol');
   }

@@ -1,0 +1,19 @@
+{
+  "description": "Where the coordinator's database schema (DDL) may live. Nucleus skips the pre-deploy database copy only when a release changes none of these paths (its coordinator migrationPaths), so this list and that policy must stay equal: add a path here and tell Nucleus in the same change. Agent's schema lives in Prisma migrations under src/agent and has its own checks.",
+  "schemaPaths": [
+    "deploy/",
+    "src/coordinator/node-auto-update.ts",
+    "src/coordinator/release-admission.ts",
+    "src/economy/",
+    "src/storage/"
+  ],
+  "ignoredPaths": [
+    "src/agent/",
+    "tests/",
+    "scripts/verify-guest-chat-ui.ts",
+    "scripts/qualify-browser-inference-local.mts",
+    "scripts/qualify-event-demo-browser.mts",
+    "scripts/verify-ddl-locations.mjs",
+    "scripts/verify-ddl-locations.test.mjs"
+  ]
+}
