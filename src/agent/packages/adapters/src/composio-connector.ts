@@ -340,8 +340,13 @@ export function planLiveConnectionSync(
   return { connectIds, revokeIds };
 }
 
-/** Worker default for {@link ComposioConnector}'s `toolsReuseMs`. */
-export const DEFAULT_COMPOSIO_TOOLS_REUSE_MS = 5 * 60_000;
+/**
+ * Worker default for {@link ComposioConnector}'s `toolsReuseMs`. Half an hour, like the MCP
+ * lists: routines run every 30 minutes, so a shorter window expired before each one and they
+ * all waited 2-5 s for Composio (measured in production after the first version used five
+ * minutes). A connection change still starts a new list at once.
+ */
+export const DEFAULT_COMPOSIO_TOOLS_REUSE_MS = 30 * 60_000;
 /** Distinct (user, connections) tool lists one process keeps. */
 const MAX_DISCOVERED_TOOL_LISTS = 500;
 
