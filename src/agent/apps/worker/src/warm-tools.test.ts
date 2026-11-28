@@ -7,7 +7,7 @@ function setup(
   micos: Array<{ botId: string; spaceId: string; userId: string }>,
   connections: Record<string, Array<Record<string, unknown>>> = {},
 ) {
-  const groupBy = vi.fn(async () => micos);
+  const groupBy = vi.fn(async (_args?: unknown) => micos);
   const findMany = vi.fn(async ({ where }: { where: { userId: string } }) => connections[where.userId] ?? []);
   const discoverTools = vi.fn(async () => []);
   return {
@@ -15,7 +15,7 @@ function setup(
     findMany,
     discoverTools,
     deps: {
-      prisma: { run: { groupBy }, connection: { findMany } } as never,
+      prisma: { run: { findMany: groupBy }, connection: { findMany } } as never,
       connector: { discoverTools },
     },
   };
@@ -39,7 +39,8 @@ describe("warming tool sessions after a restart", () => {
     expect(groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { createdAt: { gte: new Date(NOW - WARM_TOOLS_RECENT_MS) } },
-        take: WARM_TOOLS_MAX_MICOS,
+        orderBy: { createdAt: "desc" },
+        take: WARM_TOOLS_MAX_MICOS * 10,
       }),
     );
     expect(discoverTools).toHaveBeenCalledTimes(2);
@@ -50,6 +51,19 @@ describe("warming tool sessions after a restart", () => {
     expect(first.connectedConnections).toEqual([
       expect.objectContaining({ id: "c1", connectorId: "composio", externalId: "gmail", providerRef: "ca_1" }),
     ]);
+  });
+
+  it("opens each recent Mico once and no more than the limit", async () => {
+    const runs = [
+      ...Array.from({ length: 5 }, () => ({ botId: "busy", spaceId: "s", userId: "u" })),
+      ...Array.from({ length: WARM_TOOLS_MAX_MICOS + 10 }, (_, i) => ({ botId: `b${i}`, spaceId: "s", userId: "u" })),
+    ];
+    const { deps, discoverTools } = setup(runs);
+    await warmToolSessions(deps, { now: NOW });
+    expect(discoverTools).toHaveBeenCalledTimes(WARM_TOOLS_MAX_MICOS);
+    const bots = (discoverTools.mock.calls as unknown as Array<[{ botId: string }]>).map(([context]) => context.botId);
+    expect(new Set(bots).size).toBe(WARM_TOOLS_MAX_MICOS);
+    expect(bots[0]).toBe("busy");
   });
 
   it("goes on after a Mico whose tools cannot be discovered", async () => {

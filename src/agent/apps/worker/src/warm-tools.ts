@@ -28,15 +28,23 @@ export async function warmToolSessions(
   const logger = getLogger();
   const startedAt = Date.now();
   const since = new Date((options.now ?? startedAt) - WARM_TOOLS_RECENT_MS);
-  let micos: Array<{ botId: string; spaceId: string; userId: string }>;
+  let micos: Array<{ botId: string; spaceId: string; userId: string }> = [];
   try {
-    micos = await deps.prisma.run.groupBy({
-      by: ["botId", "spaceId", "userId"],
+    // The newest runs, a bounded read; the same Mico often ran several times, so keep each once.
+    const recent = await deps.prisma.run.findMany({
       where: { createdAt: { gte: since } },
-      _max: { createdAt: true },
-      orderBy: { _max: { createdAt: "desc" } },
-      take: WARM_TOOLS_MAX_MICOS,
+      orderBy: { createdAt: "desc" },
+      select: { botId: true, spaceId: true, userId: true },
+      take: WARM_TOOLS_MAX_MICOS * 10,
     });
+    const seen = new Set<string>();
+    micos = [];
+    for (const run of recent) {
+      if (seen.has(run.botId)) continue;
+      seen.add(run.botId);
+      micos.push(run);
+      if (micos.length >= WARM_TOOLS_MAX_MICOS) break;
+    }
   } catch {
     logger.warn("worker.tools_warm_skipped", { reason: "recent Micos could not be read" });
     return { warmed: 0, failed: 0 };
