@@ -98,9 +98,14 @@ advertising.
    when nothing is loaded. Configured by `MYCELLIOS_SPEECH_SERVICE_CONFIG`
    (`{"port": 8895, "models": {"mycellios-whisper-small": {"legacyPort": 8892,
    "gpuConfig", "artifacts", "modelPath"}, "mycellios-kokoro-es": {"legacyPort":
-   8890}}}`). Pending: a launcher that replaces the two per-model launchers on
-   a node, its qualification on real hardware, and the `speech` adapter kind
-   that talks to the unified API.
+   8890}}}`).
+0c. Done: `deploy/speech-start.ps1` starts one service process plus each
+   model's existing worker, from `speech-launcher.json`. It pins every imported
+   source by SHA-256, keeps the transcription private-qualification gate,
+   refuses occupied ports, waits for each model's pinned artifact identity,
+   discards service stdout (node-owner-privacy D6) and bounds total memory.
+   Pending: install and qualify it on a real node (replacing the two per-model
+   launchers there), then the `speech` adapter kind for the unified API.
 1. Measure sherpa-onnx against `faster-whisper` with `large-v3-turbo` on the
    same NVIDIA GPU (speed, Spanish/English word error rate) and record it.
 2. Ship the speech environment and replica with Whisper (current
