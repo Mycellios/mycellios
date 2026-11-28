@@ -15,6 +15,7 @@ export {
 } from "./activation-retry.js";
 import { eventAgentAccess } from "./event-demo-agent-access.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
+import { registerLongFormTranscriptionRoutes } from "./long-form-transcription.js";
 import { completedParts, createInferenceSettlement, pieceSummary, withPieceReceipts } from "./settle-completed-inference.js";
 import { beginContributionUsage } from "./contribution-funding.js";
 import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
@@ -1618,6 +1619,7 @@ export async function createCoordinator(
   registerNativeReplicaQualifications(app, { adminToken: config.modelAdminToken, networkToken: config.networkToken,
     hub, store, service, attachReceipt: attachExecutionReceipt });
   registerNodeReplicaRoutes(app, { database, service, sessionPrincipal: (request) => workerSessionPrincipals.get(request) });
+  registerLongFormTranscriptionRoutes(app, { requireCredential: apiAccessEnabled });
   const studioInference: StudioInference = options.studioInference ?? (async (request) => {
     const chat: ChatCompletionRequest = {
       model: request.model,
