@@ -35,7 +35,7 @@ function baseRevision(): string {
   // --replay-latest checks the newest migration already on this branch against the schema
   // before it, so a change to this check itself runs the whole path on real migrations.
   if (process.argv.includes("--replay-latest")) {
-    const latest = git(["log", "-n", "1", "--diff-filter=A", "--format=%H", "--", `${relative}/*/migration.sql`]).trim();
+    const latest = git(["-C", root, "log", "-n", "1", "--diff-filter=A", "--format=%H", "--", `${relative}/*/migration.sql`]).trim();
     return git(["rev-parse", "--verify", `${latest}^`]).trim();
   }
   const requested = process.env.CI_BASE_SHA || process.argv[2];
