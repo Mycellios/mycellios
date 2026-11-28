@@ -27,7 +27,9 @@ const git = (args: string[]) => execFileSync("git", args, { encoding: "utf8", ma
 const root = git(["rev-parse", "--show-toplevel"]).trim();
 const relative = "src/agent/packages/db/prisma/migrations";
 const directory = path.join(root, relative);
-const named = (name: string) => /^\d{14}_/.test(name);
+// Every migration folder, including the early 0001_ and suffixed ones such as
+// 20260828090002a_; Prisma applies them in name order.
+const named = (name: string) => /^\d/.test(name);
 
 function baseRevision(): string {
   // --replay-latest checks the newest migration already on this branch against the schema
@@ -42,9 +44,9 @@ function baseRevision(): string {
 }
 
 const base = baseRevision();
-const baseNames = git(["ls-tree", "--name-only", `${base}:${relative}`])
+const baseNames = git(["-C", root, "ls-tree", "--name-only", base, "--", `${relative}/`])
   .split("\n")
-  .map((line) => line.trim())
+  .map((line) => path.posix.basename(line.trim()))
   .filter(named)
   .sort();
 const headNames = (await readdir(directory, { withFileTypes: true }))
