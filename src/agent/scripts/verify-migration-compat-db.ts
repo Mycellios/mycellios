@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdtemp, readdir, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -135,13 +135,26 @@ try {
   const sql = database.getPgClient();
   await sql.connect();
   try {
-    // Prisma runs each migration.sql as one script, in folder order; so does this.
+    // Prisma runs each migration.sql as one script, in folder order, and records it in its
+    // history table, which some migrations read; this does the same.
+    await sql.query(`CREATE TABLE "_prisma_migrations" (
+      "id" varchar(36) PRIMARY KEY, "checksum" varchar(64) NOT NULL, "finished_at" timestamptz,
+      "migration_name" varchar(255) NOT NULL, "logs" text, "rolled_back_at" timestamptz,
+      "started_at" timestamptz NOT NULL DEFAULT now(), "applied_steps_count" integer NOT NULL DEFAULT 0)`);
+    const record = (name: string, text: string) =>
+      sql.query(
+        `INSERT INTO "_prisma_migrations" (id, checksum, migration_name, finished_at, applied_steps_count)
+         VALUES (gen_random_uuid()::text, $1, $2, now(), 1)`,
+        [createHash("sha256").update(text).digest("hex"), name],
+      );
     for (const name of baseNames) {
+      const text = git(["show", `${base}:${relative}/${name}/migration.sql`]);
       try {
-        await sql.query(git(["show", `${base}:${relative}/${name}/migration.sql`]));
+        await sql.query(text);
       } catch (error) {
         throw new Error(`base migration ${name} failed: ${(error as Error).message}`);
       }
+      await record(name, text);
     }
     const before = await snapshot(sql);
     let contract = false;
@@ -153,6 +166,7 @@ try {
       } catch (error) {
         throw new Error(`new migration ${name} failed on main's schema: ${(error as Error).message}`);
       }
+      await record(name, text);
     }
     const after = await snapshot(sql);
     const violations = schemaBreaksPreviousRelease(before, after);
