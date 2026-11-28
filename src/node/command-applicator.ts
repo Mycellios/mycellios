@@ -30,6 +30,17 @@ export class NodeCommandApplicator {
     await this.reconcileDrain(true);
   }
 
+  /**
+   * Ends the drain restored for a component update once that update is healthy.
+   * Clearing only the persisted flag would leave the agent drained forever: the
+   * agent keeps reporting `draining`, gets no performance profile and offers no
+   * capacity, and desired-state reconciliation sees nothing left to change.
+   */
+  async completeComponentActivation(): Promise<void> {
+    await this.reconcileDrain(false);
+    await this.reconcileContribution(true, false);
+  }
+
   async reconcileContribution(enabled: boolean, draining: boolean): Promise<void> {
     // Reconciliation may remove permission, but cannot undo a locally persisted
     // pause. A fresh resume command (or explicit native control) persists true

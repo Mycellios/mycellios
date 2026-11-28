@@ -57,6 +57,19 @@ describe("NodeCommandApplicator", () => {
     expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(true);
   });
 
+  it("releases the restored update drain once the new components are healthy", async () => {
+    const fixture = await setup();
+    // An update persists the drain and restarts; the next start restores it on the agent.
+    await fixture.control.setDraining(true);
+    await fixture.applicator.restoreDrain();
+    expect(fixture.agent.beginRuntimeUpdateDrain).toHaveBeenCalledTimes(1);
+
+    await fixture.applicator.completeComponentActivation();
+    expect(fixture.release).toHaveBeenCalledTimes(1);
+    expect(await fixture.control.load()).toMatchObject({ contributionEnabled: true, draining: false });
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(true);
+  });
+
   it("persists desired limits atomically and reports the required restart", async () => {
     const fixture = await setup();
     const output = await fixture.applicator.apply(application(command("set-limits", {
