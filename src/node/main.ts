@@ -268,8 +268,7 @@ try {
   if (pendingComponentActivation && componentLifecycle) {
     await componentLifecycle.markActivationHealthy();
     pendingComponentActivation = false;
-    await controlStore.setDraining(false);
-    await commandApplicator.reconcileContribution(true, false);
+    await commandApplicator.completeComponentActivation();
   }
   const controlSession = agent.nodeControlSession;
   if (controlSession) {
