@@ -27,7 +27,7 @@
 #                                "core": "<CUDA only: qualified kokoro_cuda_core.py>" } } },
 #   "workers": [ { "name": "kokoro", "model": "mycellios-kokoro-es", "root": "<replica folder>",
 #                  "entry": "app\\dist\\worker\\main.js", "entrySha256": "<sha256>",
-#                  "workingDirectory": "app", "enrollment": true,
+#                  "workingDirectory": "app", "enrollment": true, "config": "<optional, default worker.json>",
 #                  "environment": { "MYCELLIOS_TRANSCRIPTION_GPU_CONFIG": "<only names starting MYCELLIOS_>" } } ]
 # }
 $ErrorActionPreference='Stop'
@@ -62,6 +62,7 @@ if($kokoro -and $kokoro.gpuConfig){
 
 foreach($worker in @($cfg.workers)){
   if($models -notcontains $worker.model){throw ('Speech worker has no configured model: '+$worker.name)}
+  if($worker.config -and ($worker.config -match '(^|[\\/])\.\.([\\/]|$)' -or [IO.Path]::IsPathRooted($worker.config) -or -not (Test-Path -LiteralPath (Join-Path $worker.root $worker.config) -PathType Leaf))){throw ('Speech worker config refused: '+$worker.name)}
   if($worker.entrySha256 -and (Get-Sha256 (Join-Path $worker.root $worker.entry)) -ne $worker.entrySha256){throw ('Speech worker entry changed: '+$worker.name)}
   if($worker.environment){foreach($name in $worker.environment.PSObject.Properties.Name){if($name -cnotmatch '^MYCELLIOS_[A-Z0-9_]+$'){throw ('Speech worker environment name refused: '+$name)}}}
 }
@@ -110,7 +111,7 @@ try {
         $ready=($health.status -eq 'ready' -and $health.artifact_identity -eq $cfg.service.models.($worker.model).artifactIdentity)
       }catch{}
       if(-not $ready){continue}  # Waits for its reservation; the service keeps polling it.
-      $env:GPU_MESH_WORKER_CONFIG=Join-Path $worker.root 'worker.json'
+      $env:GPU_MESH_WORKER_CONFIG=Join-Path $worker.root $(if($worker.config){$worker.config}else{'worker.json'})
       $env:GPU_MESH_COORDINATOR='https://www.mycellios.com/'
       $env:MYCELLIOS_WORKER_CREDENTIAL_PATH=Join-Path $worker.root 'State\admission.json'
       if($worker.enrollment){$env:MYCELLIOS_WORKER_ENROLLMENT_PATH=Join-Path $worker.root 'State\enrollment.json'}else{Remove-Item Env:MYCELLIOS_WORKER_ENROLLMENT_PATH -ErrorAction SilentlyContinue}
