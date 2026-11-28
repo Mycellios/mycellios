@@ -16801,3 +16801,19 @@ msgstr "Poco contexto"
 #: src/components/SmallContextMark.tsx
 msgid "Small context: Micos need about 32k tokens of context, so this model may not work well."
 msgstr "Poco contexto: los Micos necesitan unos 32k tokens de contexto, así que este modelo puede no funcionar bien."
+
+#: src/pages/guest/GuestNotice.tsx
+msgid "Continue exactly where you stopped."
+msgstr "Continúa exactamente donde lo dejaste."
+
+#: src/pages/guest/GuestNotice.tsx
+msgid "This answer reached the length limit and stopped before the end."
+msgstr "Esta respuesta llegó al límite de longitud y se cortó antes de terminar."
+
+#: src/pages/guest/GuestNotice.tsx
+msgid "Want your Mico to do this by itself? With a free account it builds and publishes, works on a schedule and keeps watching."
+msgstr "¿Quieres que tu Mico lo haga solo? Con una cuenta gratis lo construye y lo publica, trabaja con horario y sigue vigilando."
+
+#: src/pages/guest/GuestNotice.tsx
+msgid "Get it running · Create free account"
+msgstr "Ponlo en marcha · Crear cuenta gratis"

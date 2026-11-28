@@ -7,7 +7,7 @@ import {
 } from "./guest-chat";
 import {
   GUEST_BOT_ID, GUEST_SPACE_ID, GUEST_THREAD_ID, GUEST_USER_ID,
-  GuestAccountRequiredError, guestLimits, promptGuestAccount, setGuestRemaining,
+  GuestAccountRequiredError, guestLimits, promptGuestAccount, setGuestRemaining, setGuestTruncatedMessage,
 } from "./guest-mode";
 
 /**
@@ -26,6 +26,9 @@ let history: GuestMessage[] = [];
 /** When each message was written, beside the transcript; older tabs fall back to the load time. */
 let times: string[] = [];
 const TIMES_KEY = "mycellios:guest:times";
+/** Index of the latest answer when the model stopped it at the length limit, -1 otherwise. */
+let truncatedAt = -1;
+const TRUNCATED_KEY = "mycellios:guest:truncated";
 let pending: GuestPending | null = null;
 let status: GuestStatus | null = null;
 let statusRead: Promise<GuestStatus | null> | null = null;
@@ -47,6 +50,8 @@ function load() {
   } catch { /* Times are only presentation. */ }
   const now = new Date().toISOString();
   times = history.map((_, index) => times[index] ?? now);
+  try { truncatedAt = Number(sessionStorage.getItem(TRUNCATED_KEY) ?? -1); } catch { truncatedAt = -1; }
+  publishTruncated();
   eventSeq = history.length;
 }
 
@@ -55,6 +60,14 @@ function save() {
   while (times.length < history.length) times.push(new Date().toISOString());
   times = times.slice(-history.length || 0);
   try { sessionStorage.setItem(TIMES_KEY, JSON.stringify(times)); } catch { /* Times are only presentation. */ }
+  try { sessionStorage.setItem(TRUNCATED_KEY, String(truncatedAt)); } catch { /* Only presentation. */ }
+  publishTruncated();
+}
+
+/** The shell offers "Continue" only under the latest answer, and only when it was cut off. */
+function publishTruncated() {
+  const latest = history.length - 1;
+  setGuestTruncatedMessage(truncatedAt === latest && history[latest]?.role === "assistant" ? `guest-message-${latest}` : null);
 }
 
 /** The sidebar preview is plain text, like the server's. */
@@ -303,6 +316,7 @@ async function runTurn(input: GuestPending, runId: string) {
       result = await attemptTurn(input, runId, controller.signal);
     }
     history = [...history, { role: "assistant", content: result.content }];
+    truncatedAt = result.truncated ? history.length - 1 : -1;
     pending = null;
     save();
     const message = messageOf(history.at(-1)!, history.length - 1);

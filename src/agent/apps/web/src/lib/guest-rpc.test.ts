@@ -70,6 +70,24 @@ describe("guest data layer", () => {
     expect(api.chat.mock.calls[1]![0].messages.map((m: { content: string }) => m.content)).toEqual(["Hola Mico", "Hola", "¿Y ahora?"]);
   });
 
+  it("marks only the latest answer the model cut off, across a reload, and clears it on the next turn", async () => {
+    const { rpc, mode } = await load();
+    api.chat.mockResolvedValue({ status: "completed", content: "<html><body>", truncated: true, remaining: 11 });
+    await rpc.guestCall(["threads", "send"], { botId: "guest-mico", text: "Hazme una app" });
+    await events(rpc, event => event.type === "run.completed");
+    expect(mode.guestTruncatedMessage()).toBe("guest-message-1");
+    // A reload keeps the notice under the same answer.
+    const again = await load();
+    expect(again.mode.guestTruncatedMessage()).toBeNull();
+    await again.rpc.guestCall(["threads", "get"], {});
+    expect(again.mode.guestTruncatedMessage()).toBe("guest-message-1");
+    api.chat.mockResolvedValue({ status: "completed", content: "</body></html>", remaining: 10 });
+    await again.rpc.guestCall(["threads", "send"], { botId: "guest-mico", text: "Continúa" });
+    expect(again.mode.guestTruncatedMessage()).toBeNull();
+    await events(again.rpc, event => event.type === "run.completed", 2);
+    expect(again.mode.guestTruncatedMessage()).toBeNull();
+  });
+
   it("keeps a failure visible after the shell rereads, and retries with the same key", async () => {
     const { rpc, chat } = await load();
     api.chat.mockRejectedValue(new chat.GuestChatRequestError("guest_connection_lost"));

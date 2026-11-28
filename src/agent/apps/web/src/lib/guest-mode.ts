@@ -62,6 +62,24 @@ export function useGuestRemaining(): number | null {
   }, () => remaining, () => null);
 }
 
+/** The guest answer the model stopped at its length limit, if it is the latest one; null otherwise. */
+let truncatedMessage: string | null = null;
+const truncatedListeners = new Set<() => void>();
+export function setGuestTruncatedMessage(messageId: string | null): void {
+  if (truncatedMessage === messageId) return;
+  truncatedMessage = messageId;
+  for (const listener of truncatedListeners) listener();
+}
+export function guestTruncatedMessage(): string | null {
+  return truncatedMessage;
+}
+export function useGuestTruncatedMessage(): string | null {
+  return useSyncExternalStore(listener => {
+    truncatedListeners.add(listener);
+    return () => { truncatedListeners.delete(listener); };
+  }, () => truncatedMessage, () => null);
+}
+
 /** Raised by the guest data layer for anything that needs an account. */
 export class GuestAccountRequiredError extends Error {
   readonly code = "GUEST_ACCOUNT_REQUIRED";

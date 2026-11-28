@@ -78,16 +78,23 @@ scoped-cookie pattern. It adds no Agent tenant data.
   roles `user`/`assistant`, no tool calls, no images, no attachments, no model field.
   The model is always the configured free model (`mycellios/managed/free`). The
   server owns the system instructions (a short, friendly Mico persona that says it
-  is in guest mode and cannot use tools) and the output token ceiling.
+  is in guest mode and cannot use tools) and the output token ceiling. The
+  instructions list what a Mico with an account really does (routines, waits, web,
+  its computer, apps published in Mycellios, teams, notifications, memory), forbid
+  recommending outside hosting, databases, schedulers or automation services, and
+  keep code to one compact self-contained HTML file. The final `result` event carries
+  `truncated: true` when the model stopped at the output limit (`finish_reason`
+  `length`); the shell then shows a notice with Continue under that answer. Under the
+  latest answer the shell always draws its own account offer ("Get it running ·
+  Create free account"), so it never depends on the model writing one.
 - Execution reuses the managed free path in `managed-provider.ts` with a synthetic
   account namespace `guest:<session id>`. Implementation must confirm the
   zero-priced path needs no wallet row, and must add none. Purchases are recorded as
   today with `maximum_usd='0'`, so the existing safety stop and receipts apply.
 - Guest traffic never takes a priced offer and never falls back to another
-  provider. On an explicit 429 allowance refusal the seller rests as usual, but a
-  guest request does not retry on another exact-zero route
-  (`FREE_REFUSAL_RETRIES` is 0 for guests), so guests do not drain the reserves that
-  registered accounts rely on.
+  provider. On an explicit 429 allowance refusal the seller rests as usual and, like
+  an account, the guest request retries on another exact-zero route
+  (`FREE_REFUSAL_RETRIES`), moving down to the next strongest free model.
 - Before each guest turn, admission checks: kill switch, session expiry, per-session
   message count, per-network-prefix counters, global guest daily budget, global
   guest concurrency, the provider safety stop and free-pool headroom. Refusals are
