@@ -65,18 +65,28 @@ with tarfile.open(sys.argv[1]) as saved:
     history = [entry for entry in config["history"] if not entry.get("empty_layer")]
     rows, total, per_commit, code = [], [0, 0], [0, 0], False
     for layer, entry in zip(manifest["Layers"], history):
-        stream, compressor, packed, unpacked = saved.extractfile(layer), zlib.compressobj(6, zlib.DEFLATED, 31), 0, 0
-        while chunk := stream.read(1 << 20):
-            unpacked += len(chunk)
-            packed += len(compressor.compress(chunk))
-        packed += len(compressor.flush())
+        # The containerd image store saves layers gzipped as pushed; the classic store saves tars.
+        stream, packed, unpacked = saved.extractfile(layer), 0, 0
+        head = stream.read(2)
+        stored = head == b"\x1f\x8b"
+        codec = zlib.decompressobj(31) if stored else zlib.compressobj(6, zlib.DEFLATED, 31)
+        chunk = head
+        while chunk:
+            if stored:
+                packed += len(chunk)
+                unpacked += len(codec.decompress(chunk))
+            else:
+                unpacked += len(chunk)
+                packed += len(codec.compress(chunk))
+            chunk = stream.read(1 << 20)
+        packed += 0 if stored else len(codec.flush())
         step = entry.get("created_by", "").replace(" # buildkit", "")
         code = code or step.startswith("COPY --chmod=755 . /repo/")
         for bucket in [total] + ([per_commit] if code else []):
             bucket[0] += packed
             bucket[1] += unpacked
         rows.append(f"{packed / 2**20:10.1f} {unpacked / 2**20:10.1f}  {step[:110]}")
-print(f"{'gzip MB':>10} {'unpacked MB':>10}  step")
+print(f"{'gzip MB':>10} {'unpacked MB':>11}  step")
 print("\n".join(rows))
 print(f"Image: {total[0] / 2**20:.1f} MB compressed, {total[1] / 2**20:.1f} MB unpacked, {len(rows)} layers.")
 print(f"Replaced by a code-only commit: {per_commit[0] / 2**20:.1f} MB compressed, {per_commit[1] / 2**20:.1f} MB unpacked.")
