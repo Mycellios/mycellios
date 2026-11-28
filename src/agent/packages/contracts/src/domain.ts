@@ -1762,7 +1762,7 @@ export const ModelCatalogEntrySchema = z.object({
    */
   contextWindow: z.number().int().positive().max(MAX_MODEL_CONTEXT_WINDOW).optional(),
 });
-export type ModelCatalogEntry= z.infer<typeof ModelCatalogEntrySchema>;
+export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntrySchema>;
 
 export const VoiceCatalogEntrySchema = z.object({
   id: z.string(),

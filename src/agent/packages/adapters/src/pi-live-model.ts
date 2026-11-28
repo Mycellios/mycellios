@@ -52,7 +52,7 @@ export function modelsDevContextWindow(
   return modelsDevEntry(provider, id, snapshot)?.contextWindow;
 }
 
-const OPENAI_APIS =["openai-completions", "openai-responses", "openai-codex-responses"];
+const OPENAI_APIS = ["openai-completions", "openai-responses", "openai-codex-responses"];
 
 function safeBaseUrl(baseUrl: string): boolean {
   try {
