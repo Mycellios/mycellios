@@ -361,6 +361,8 @@ export class McpConnector implements ConnectorProvider {
   >();
   /** Session keys whose npx package is being installed right now. */
   private readonly installing = new Set<string>();
+  /** Background checks of a reused tool list, one per session key (see refreshListing). */
+  private readonly refreshes = new Map<string, Promise<void>>();
   private reaper?: ReturnType<typeof setInterval>;
   private resolvedPackagesRoot?: string;
   private readonly inFlight = new WeakMap<McpSession, number>();
@@ -481,7 +483,17 @@ export class McpConnector implements ConnectorProvider {
           // has no list yet and asks the server again.
           const ttl = this.options.toolListTtlMs ?? 0;
           let reused = false;
-          const listed = await withDeadline(
+          // A list this session already has goes to the run at once. The session checks
+          // (credential digest, which reads the secret store) and, past the window, a new
+          // tools/list run behind it, so a rotated credential or a changed list reaches the
+          // next turn. Running a tool still checks the session before every call.
+          const ready = this.reusableListing(key, server, ttl);
+          if (ready) {
+            entry = ready;
+            reused = true;
+            this.refreshListing(server, context, key, ttl);
+          }
+          const listed = ready?.listed ?? await withDeadline(
             this.withSession(server, context, async (session) => {
               entry = this.sessions.get(key);
               const current = entry?.session === session ? entry : undefined;
@@ -858,11 +870,63 @@ export class McpConnector implements ConnectorProvider {
     }
   }
 
+  /**
+   * The live session's tool list when a run may use it without waiting: same revision and
+   * credential record, a token that is not about to be replaced, and a list no older than
+   * twice the reuse window (older lists, or none, wait for the server as before).
+   */
+  private reusableListing(key: string, server: McpServer, ttl: number): SessionEntry | undefined {
+    const entry = this.sessions.get(key);
+    if (!entry?.listed || ttl <= 0 || entry.revision !== server.revision) return undefined;
+    if ((server.secretId ?? undefined) !== entry.recordId) return undefined;
+    const now = Date.now();
+    if (
+      entry.accessTokenExpiresAt !== undefined &&
+      now >= entry.accessTokenExpiresAt - TOKEN_REFRESH_SKEW_MS
+    )
+      return undefined;
+    return now - entry.listed.at < ttl * 2 ? entry : undefined;
+  }
+
+  /**
+   * Check a reused session after its list went to a run: the usual session checks evict a
+   * rotated or deleted credential (and connect again), and a list past the reuse window, or
+   * missing on a new session, is asked for again. A failure drops the list, so the next run
+   * waits for the server and reports it as before.
+   */
+  private refreshListing(server: McpServer, context: AdapterContext, key: string, ttl: number): void {
+    if (this.refreshes.has(key)) return;
+    const signal = AbortSignal.timeout(
+      this.options.discoveryTimeoutMs || DEFAULT_MCP_DISCOVERY_TIMEOUT_MS,
+    );
+    const refresh = this.withSession(server, { ...context, signal }, async (session) => {
+      const current = this.sessions.get(key);
+      if (current?.session !== session) return;
+      if (current.listed && Date.now() - current.listed.at < ttl) return;
+      const result = await session.listTools({ signal });
+      current.listed = { at: Date.now(), tools: result.tools };
+      void this.recordHealth(server.id, {
+        status: "ok",
+        message: null,
+        toolCount: result.tools.length,
+      });
+    })
+      .catch(() => {
+        const current = this.sessions.get(key);
+        if (current) current.listed = undefined;
+      })
+      .finally(() => {
+        if (this.refreshes.get(key) === refresh) this.refreshes.delete(key);
+      });
+    this.refreshes.set(key, refresh);
+  }
+
   async close(): Promise<void> {
     this.unsubscribe();
     if (this.reaper) clearInterval(this.reaper);
     this.reaper = undefined;
     await Promise.allSettled([...this.probes.values()]);
+    await Promise.allSettled([...this.refreshes.values()]);
     await Promise.allSettled([...this.connecting.values()].map(({ promise }) => promise));
     await Promise.all([...this.sessions.values()].map((entry) => closeEntry(entry)));
     this.sessions.clear();

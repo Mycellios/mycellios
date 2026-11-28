@@ -340,6 +340,21 @@ export function planLiveConnectionSync(
   return { connectIds, revokeIds };
 }
 
+/** Worker default for {@link ComposioConnector}'s `toolsReuseMs`. */
+export const DEFAULT_COMPOSIO_TOOLS_REUSE_MS = 5 * 60_000;
+/** Distinct (user, connections) tool lists one process keeps. */
+const MAX_DISCOVERED_TOOL_LISTS = 500;
+
+type DiscoveredTools = { at: number; tools: ConnectorTool[] };
+
+/** What decides a session's tools: each Composio connection and the account it pins. */
+function discoveryKey(userId: string, connections: ConnectedConnector[]): string {
+  const refs = connections
+    .map((connection) => `${composioSlugKey(connection.externalId)}=${connection.providerRef?.trim() ?? ""}`)
+    .sort();
+  return JSON.stringify([userId, ...refs]);
+}
+
 export class ComposioConnector implements ComposioProvider {
   readonly describeConnection = createComposioIdentityReader(() => this.sdk());
   private client: ComposioClient | undefined;
@@ -347,9 +362,19 @@ export class ComposioConnector implements ComposioProvider {
   /** An injected client has its own catalog, so it must not share the process-wide cache. */
   private readonly directoryCache: typeof composioToolkitDirectory;
 
-  constructor(options: { apiKey?: string; client?: ComposioClient } = {}) {
+  /**
+   * How long a turn reuses the tool list it got for the same user and connections; within
+   * twice this, an older list still goes to the turn while a new one is fetched behind it.
+   * Absent or 0 asks Composio every time. Running a tool always checks the accounts.
+   */
+  private readonly toolsReuseMs: number;
+  private readonly discovered = new Map<string, DiscoveredTools>();
+  private readonly discovering = new Map<string, Promise<void>>();
+
+  constructor(options: { apiKey?: string; client?: ComposioClient; toolsReuseMs?: number } = {}) {
     this.apiKey = options.apiKey;
     this.client = options.client;
+    this.toolsReuseMs = options.toolsReuseMs ?? 0;
     this.directoryCache = options.client ? createToolkitDirectoryCache() : composioToolkitDirectory;
   }
   private readonly catalogSessions = new Map<string, string>();
@@ -523,9 +548,48 @@ export class ComposioConnector implements ComposioProvider {
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
     const connections = connectedComposioConnections(context);
     if (connections.length === 0) return [];
-    const { session } = await this.sessionForExecute(context.userId, connections);
+    if (this.toolsReuseMs <= 0) return this.loadTools(context.userId, connections);
+    const key = discoveryKey(context.userId, connections);
+    const cached = this.discovered.get(key);
+    const age = cached ? Date.now() - cached.at : Infinity;
+    if (cached && age < this.toolsReuseMs * 2) {
+      if (age >= this.toolsReuseMs) this.refreshTools(key, context.userId, connections);
+      return cached.tools;
+    }
+    const tools = await this.loadTools(context.userId, connections);
+    this.rememberTools(key, tools);
+    return tools;
+  }
+
+  private async loadTools(userId: string, connections: ConnectedConnector[]): Promise<ConnectorTool[]> {
+    const { session } = await this.sessionForExecute(userId, connections);
     if (!session) return [];
     return asConnectorTools(await session.tools());
+  }
+
+  private rememberTools(key: string, tools: ConnectorTool[]): void {
+    this.discovered.delete(key);
+    this.discovered.set(key, { at: Date.now(), tools });
+    for (const oldest of this.discovered.keys()) {
+      if (this.discovered.size <= MAX_DISCOVERED_TOOL_LISTS) break;
+      this.discovered.delete(oldest);
+    }
+  }
+
+  /** Fetch a newer list behind a turn that got the older one; a failure drops the old list. */
+  private refreshTools(key: string, userId: string, connections: ConnectedConnector[]): void {
+    if (this.discovering.has(key)) return;
+    const refresh = this.loadTools(userId, connections)
+      .then(
+        (tools) => this.rememberTools(key, tools),
+        () => {
+          this.discovered.delete(key);
+        },
+      )
+      .finally(() => {
+        if (this.discovering.get(key) === refresh) this.discovering.delete(key);
+      });
+    this.discovering.set(key, refresh);
   }
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {

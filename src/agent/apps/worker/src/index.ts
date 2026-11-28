@@ -3,7 +3,11 @@ import { modelsDevCatalog, tailnetServiceFromEnv } from "@mycellios/adapters";
 import { reconcileTaskReminders, reconcileThreadDeletions, WebPushService, webPushConfig, notificationChannels } from "@mycellios/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@mycellios/adapter-kit";
-import { ComposioConnector, IntegrationProviderSettings } from "@mycellios/adapters";
+import {
+  ComposioConnector,
+  DEFAULT_COMPOSIO_TOOLS_REUSE_MS,
+  IntegrationProviderSettings,
+} from "@mycellios/adapters";
 import { phoneCallSettings } from "@mycellios/core";
 import { loadRootEnv } from "@mycellios/core/node/load-root-env";
 import { desktopRelayKey, desktopAgentSelection, desktopRelayTransport } from "../../../packages/adapters/src/desktop-relay.js";
@@ -232,7 +236,10 @@ async function main() {
     resolveEncryptionKey(process.env),
     {
       composio: isComposioEnabled(process.env.COMPOSIO_API_KEY)
-        ? new ComposioConnector({ apiKey: process.env.COMPOSIO_API_KEY })
+        ? new ComposioConnector({
+            apiKey: process.env.COMPOSIO_API_KEY,
+            toolsReuseMs: DEFAULT_COMPOSIO_TOOLS_REUSE_MS,
+          })
         : undefined,
       pipedream,
     },
