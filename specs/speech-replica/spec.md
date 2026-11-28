@@ -82,6 +82,11 @@ advertising.
 
 ## Migration
 
+0. Done: `src/contracts/speech-catalog.ts` lists Whisper and Kokoro, and
+   `src/adapters/speech-replica.ts` serves both through one adapter class.
+   Deployments keep their existing `transcription`/`kokoro` adapter kinds,
+   runtime identities and error codes, so live nodes need no change or
+   requalification. A single `speech` kind follows with the unified service.
 1. Measure sherpa-onnx against `faster-whisper` with `large-v3-turbo` on the
    same NVIDIA GPU (speed, Spanish/English word error rate) and record it.
 2. Ship the speech environment and replica with Whisper (current
