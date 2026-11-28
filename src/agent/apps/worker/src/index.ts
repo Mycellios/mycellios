@@ -244,6 +244,9 @@ async function main() {
         : undefined,
       pipedream,
     },
+    undefined,
+    // Credentials saved in settings build their own adapter; it reuses tool lists like the env one.
+    { composioToolsReuseMs: DEFAULT_COMPOSIO_TOOLS_REUSE_MS },
   );
   const stack = createConnectorStack(undefined, [
     new InstalledConnectorProvider(prisma, secrets, {}, allowPrivateEndpoint),
