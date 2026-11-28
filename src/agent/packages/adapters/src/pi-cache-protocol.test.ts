@@ -274,6 +274,24 @@ describe("installed Pi cache protocol controls", () => {
       requestedPiCacheWriteRetention({ ...model, api: "anthropic-messages" }, "short"),
     ).toBeUndefined();
   });
+  it("keeps a one-hour prefix by default only on Anthropic's own API", async () => {
+    const own = { ...model, provider: "anthropic", api: "anthropic-messages" as const };
+    expect(resolvePiCacheRetention(own, undefined)).toBe("long");
+    // The reservation and settlement price the one-hour write, as for an explicit choice.
+    expect(requestedPiCacheWriteRetention(own, resolvePiCacheRetention(own, undefined))).toBe("1h");
+    expect(JSON.stringify(await outgoing(anthropicMessagesApi(), own, "long"))).toContain(
+      '"ttl":"1h"',
+    );
+    // A saved choice still wins, and endpoints that only speak the protocol keep the short default.
+    expect(resolvePiCacheRetention(own, "short")).toBe("short");
+    expect(resolvePiCacheRetention(own, "none")).toBe("none");
+    expect(
+      resolvePiCacheRetention({ ...own, compat: { supportsLongCacheRetention: false } }, undefined),
+    ).toBe("short");
+    expect(resolvePiCacheRetention({ ...own, provider: "compatible-proxy" }, undefined)).toBe(
+      "short",
+    );
+  });
   it("accepts audited controls and leaves omitted capabilities on the adapter default", () => {
     expect(resolvePiCacheRetention(model, undefined)).toBe("short");
     expect(resolvePiCacheRetention({ ...model, api: "openai-completions" }, "short")).toBe("short");
