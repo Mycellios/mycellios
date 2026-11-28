@@ -134,11 +134,12 @@ These rules apply to the complete repository.
   revision and roll back (nucleus `specs/mycellios-continuous-deploy`). The first
   target is the coordinator only: its `/health` must keep returning `revision`
   (baked from the `DEPLOY_REVISION` build arg) and its critical routes are `/`
-  (landing) and `/downloads/` (308 to the installers); keep both under 400. Agent
-  is not deployed by Nucleus yet: its public `/health` is a constant `{ ok: true }`
-  by design (revision only on `/internal/health`, 404 behind the proxy) and its
-  own `updater` still writes its compose, so do not route Agent through Nucleus
-  until both are resolved. `ci.yml`
+  (landing) and `/downloads/` (308 to the installers); keep both under 400. Nucleus
+  also deploys Agent (web, API and worker) from the agent image. Its revision is the
+  `revision` of `/ready` (`/agent/ready` behind the proxy), baked from `GIT_SHA`; its
+  public `/health` stays a constant `{ ok: true }` by design. Agent migrations must
+  stay compatible with the serving revision: Nucleus boots both revisions on a
+  restored copy before promoting (nucleus `specs/mycellios-continuous-deploy`). `ci.yml`
   stays read-only. Off until the NUCLEUS_DEPLOY_URL variable is set; never use
   self-hosted runners on this public repository or the retired server/Dokploy routes.
   Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
