@@ -288,6 +288,7 @@ export class ApiAccessManager {
   ): Promise<ApiUsageReservation> {
     if (contributionFunded && !this.contributionFundingEnabled)
       throw new ApiAccessError("unsupported_funding_mode", "Contribution funding is unavailable.", 503);
+    (await this.finalizeLeakedUsage(userId));
     return (await this.database.transaction(async () => {
       const account = (await this.getOrCreateAccount(userId));
       const now = Date.now();
@@ -434,6 +435,37 @@ export class ApiAccessManager {
       ).run(errorCode.slice(0, 120), now, usageId));
       return accountFromRow((await this.accountRow(usage.user_id))!);
     }));
+  }
+
+  /**
+   * Closes an account's token-funded reservations that outlived any request
+   * (LIVE_USAGE_WINDOW_MS) without being finalized, e.g. after a settlement
+   * error between job completion and completeUsage. A completed job is billed
+   * from its recorded token counts, exactly as the request path would; any
+   * other outcome (failed, cancelled, expired or never attached) refunds the
+   * reservation. Contribution-funded and managed rows keep their own
+   * credit-hold recovery and are never touched here; live jobs are left alone.
+   */
+  async finalizeLeakedUsage(userId: string, now = Date.now()): Promise<number> {
+    const rows = (await this.database.raw.prepare(
+      `SELECT u.id, j.status AS job_status, j.input_tokens, j.output_tokens
+       FROM api_usage u LEFT JOIN jobs j ON j.id = u.job_id
+       WHERE u.user_id = ? AND u.status = 'pending' AND u.created_at < ?
+         ${this.contributionFundingEnabled ? "AND NOT EXISTS (SELECT 1 FROM api_contribution_funded_usage f WHERE f.usage_id = u.id)" : ""}
+         AND (j.id IS NULL OR j.status IN ('completed', 'failed', 'cancelled', 'expired'))
+       ORDER BY u.created_at ASC
+       LIMIT 50`,
+    ).all(userId, now - LIVE_USAGE_WINDOW_MS)) as unknown as Array<{
+      id: string; job_status: string | null; input_tokens: number | null; output_tokens: number | null;
+    }>;
+    for (const row of rows) {
+      if (row.job_status === "completed") {
+        (await this.completeUsage(row.id, Number(row.input_tokens ?? 0), Number(row.output_tokens ?? 0)));
+      } else {
+        (await this.failUsage(row.id, row.job_status ? `usage_finalization_lost_${row.job_status}` : "usage_finalization_lost"));
+      }
+    }
+    return rows.length;
   }
 
   /** Startup-only settlement after job recovery; never refunds or changes limits. */

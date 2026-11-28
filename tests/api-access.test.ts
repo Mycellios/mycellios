@@ -129,6 +129,46 @@ describe("API access accounting", () => {
     (await access.failUsage(live.id, "worker_failed"));
   });
 
+  it("finalizes leaked token reservations from their job outcome and spares funded or live rows", async () => {
+    access = new ApiAccessManager(database, {
+      starterTokens: 100, requestsPerMinute: 2, maxConcurrent: 1, maxActiveKeys: 2,
+    }, {}, true);
+    (await access.getOrCreateAccount("user-1"));
+    const old = Date.now() - LIVE_USAGE_WINDOW_MS - 1_000;
+    const job = async (id: string, status: string, input: number, output: number) => (await database.raw.prepare(
+      `INSERT INTO jobs(id, session_id, model, workload_class, status, deadline_at, created_at, updated_at, input_tokens, output_tokens)
+       VALUES (?, 'session-1', 'real-model', 'interactive', ?, ?, ?, ?, ?, ?)`,
+    ).run(id, status, old, old, old, input, output));
+    const leak = async (id: string, jobId: string | null, createdAt = old) => (await database.raw.prepare(
+      `INSERT INTO api_usage(id, user_id, api_key_id, job_id, session_id, model, reserved_tokens,
+         input_tokens, output_tokens, status, error_code, created_at, completed_at)
+       VALUES (?, 'user-1', NULL, ?, NULL, 'real-model', 10, 0, 0, 'pending', NULL, ?, NULL)`,
+    ).run(id, jobId, createdAt));
+    (await database.raw.prepare("UPDATE api_accounts SET token_balance = 60 WHERE user_id = 'user-1'").run());
+    (await job("job-ok", "completed", 3, 4));
+    (await job("job-bad", "failed", 0, 0));
+    (await job("job-live", "running", 0, 0));
+    (await leak("use-ok", "job-ok"));
+    (await leak("use-bad", "job-bad"));
+    (await leak("use-nojob", null));
+    (await leak("use-live", "job-live"));
+    (await leak("use-recent", null, Date.now() - 60_000));
+    (await leak("use-funded", null));
+    (await database.raw.exec("CREATE TABLE IF NOT EXISTS api_contribution_funded_usage (usage_id TEXT PRIMARY KEY)"));
+    (await database.raw.prepare("INSERT INTO api_contribution_funded_usage(usage_id) VALUES ('use-funded')").run());
+
+    expect(await access.finalizeLeakedUsage("user-1")).toBe(3);
+    const status = async (id: string) => (await database.raw.prepare(
+      "SELECT status, error_code, input_tokens, output_tokens FROM api_usage WHERE id = ?").get(id));
+    expect(await status("use-ok")).toMatchObject({ status: "completed", input_tokens: 3, output_tokens: 4 });
+    expect(await status("use-bad")).toMatchObject({ status: "failed", error_code: "usage_finalization_lost_failed" });
+    expect(await status("use-nojob")).toMatchObject({ status: "failed", error_code: "usage_finalization_lost" });
+    for (const id of ["use-live", "use-recent", "use-funded"]) expect(await status(id)).toMatchObject({ status: "pending" });
+    // 60 + (10 - 7) refund for the completed job + 10 + 10 refunds for the others.
+    expect((await access.getOrCreateAccount("user-1")).tokenBalance).toBe(83);
+    expect(await access.finalizeLeakedUsage("user-1")).toBe(0);
+  });
+
   it("refunds a failed request and enforces concurrency, rate and balance limits", async () => {
     const first = (await access.beginUsage("user-1", null, request));
     await expect((async () => (await access.beginUsage("user-1", null, request)))()).rejects.toThrowError(
