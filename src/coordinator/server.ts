@@ -167,6 +167,7 @@ import {
   DevelopmentLabStoreError,
 } from "./development-lab-store.js";
 import { WorkerHub } from "./worker-hub.js";
+import { registerReleaseWorkStatus } from "./release-work-status.js";
 import { ActivationCheckpointTransferAuthority } from "./activation-checkpoint-transfer.js";
 import { ActivationCheckpointStore } from "../distribution/activation-checkpoint-store.js";
 import { ExecutionReceiptStore } from "./execution-receipt-store.js";
@@ -361,6 +362,7 @@ export async function createCoordinator(
     automaticActivationRetryDelaysMs?: readonly number[];
     buildIdentity?: NativeBuildIdentity | null;
     runtimeMetadata?: NativeRuntimeBuildMetadata;
+    releaseAdmissionRevision?: string;
     benchmarkStorageRoot?: string;
     releaseTransactionRoot?: string;
     releaseChunkBodyLimitBytes?: number;
@@ -401,6 +403,12 @@ export async function createCoordinator(
   }
   const runtimeVersion = runtimeMetadata.version;
   const runtimeRevision = runtimeMetadata.revision;
+  const admissionRevision = options.releaseAdmissionRevision;
+  if (admissionRevision !== undefined
+      && (!/^[a-f0-9]{40}$/.test(admissionRevision) || admissionRevision !== runtimeRevision
+        || config.storageBackend !== "postgres")) {
+    throw new Error("coordinator_release_admission_binding_invalid");
+  }
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
   const background = new AsyncTaskScope((task, error) => app.log.error({ task, error }, "coordinator background task failed"));
   registerCanonicalLandingHostRedirect(app);
@@ -660,7 +668,7 @@ export async function createCoordinator(
   );
   if (config.storageBackend === "postgres" && !config.databaseUrl) throw new Error("mycellios_postgres_database_url_required");
   const database = config.storageBackend === "postgres"
-    ? await MeshDatabase.openPostgres(config.databaseUrl!, config.databaseSchema)
+    ? await MeshDatabase.openPostgres(config.databaseUrl!, config.databaseSchema, admissionRevision)
     : await MeshDatabase.open(config.databasePath);
   if (
     !isCoordinatorLoopbackHost(config.host)
@@ -1582,10 +1590,15 @@ export async function createCoordinator(
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }
   const service = (await MeshService.create(store, scheduler, hub, config.requestTimeoutMs, { modelRequestTimeoutsMs: config.modelRequestTimeoutsMs,
+    preserveAdmittedJobs: admissionRevision !== undefined,
     leaseRejectionHold: process.env.MYCELLIOS_LEASE_REJECTION_HOLD === "1" }));
   service.on("lease_rejection_anomaly", (anomaly) => app.log.warn({ event: "lease_rejection_anomaly", ...anomaly },
     "A worker rejected an anomalous share of offers after receiving their content"));
-  await apiAccess.reconcileRestartedZeroTokenUsage();
+  if (admissionRevision === undefined) await apiAccess.reconcileRestartedZeroTokenUsage();
+  else registerReleaseWorkStatus(app, admissionRevision, isTrustedLocalRequest, () => ({
+    mesh: service.releaseWorkStatus(), transport: hub.releaseTransportStatus(),
+    mobile: mobileHub.releaseWorkStatus(),
+  }));
   const attachExecutionReceipt = async (
     event: Extract<JobStreamEvent, { type: "completed" }>,
     modelId: string,

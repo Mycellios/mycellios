@@ -17,6 +17,7 @@ export class BrowserTextHub {
   private tokenizer: Gpt2Tokenizer | null = null;
   private reference: BrowserTextReference | null = null;
   private readonly pending = new Map<string, Pending>();
+  get pendingCount(): number { return this.pending.size; }
   private referenceBusy = false;
   constructor(private readonly transport: {
     peers(): Peer[]; acquire(id: string): boolean; release(id: string): void;

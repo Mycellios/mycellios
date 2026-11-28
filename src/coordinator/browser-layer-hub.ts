@@ -86,6 +86,7 @@ export class BrowserLayerHub {
   private readonly residentBackend = new Map<string, "webgpu" | "cpu">();
   private readonly requests = new Map<string, RequestOwner>();
   private readonly pending = new Map<string, Pending>();
+  get pendingCount(): number { return this.pending.size; }
   private readonly loading = new Map<string, Promise<BrowserLayerPeer>>();
   private readonly executing = new Set<string>();
   private readonly artifactDirectory: string;

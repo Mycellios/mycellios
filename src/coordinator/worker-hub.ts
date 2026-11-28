@@ -331,6 +331,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   beforeDisconnect(observer: WorkerDisconnectObserver): () => void { return this.workerEvents.beforeDisconnect(observer); }
 
   connectedWorkerIds(): ReadonlySet<string> { return connectedWorkerIdentifiers(this.connections); }
+  releaseTransportStatus() {
+    return { connectedWorkers: this.connectedWorkerIds().size, runtimeStreams: this.runtimeStreams.size,
+      activationRestores: this.pendingActivationCheckpointRestoreCompletions.size };
+  }
   workerNetworkAddress(workerId: string): string | null { return this.connections.get(workerId)?.networkAddress ?? null; }
   workerSealingKey(workerId: string): string | null { return this.connections.get(workerId)?.sealingPublicKey ?? null; }
 

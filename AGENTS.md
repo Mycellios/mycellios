@@ -516,6 +516,31 @@ These rules apply to the complete repository.
 - Worker maintenance does not close HTTP job admission. An empty jobs query is
   not a global drain; coordinator replacement requires a common admission
   barrier and a handoff that preserves active calls and original deadlines.
+- The isolated coordinator release probe runs from
+  `dist/coordinator/release-standby-main.js` on a private candidate address.
+  Only `/internal/release/standby/ready` returns its exact revision and database
+  readiness. Public health, application routes and worker upgrades reject
+  traffic. This probe never opens SQLite, starts job recovery or authorizes a
+  route switch. Run `tests/coordinator-release-standby.test.ts` on changes.
+- In a coordinated PostgreSQL handoff, the controller may set
+  `MYCELLIOS_RELEASE_ADMISSION_REVISION` to the exact baked image revision.
+  Establish the shared admission barrier first. The setting identifies new job
+  inserts and preserves jobs and unsettled usage during startup. Do not enable
+  it for ordinary crash recovery or use it by itself to run two live coordinators.
+  Validate both generations with `tests/release-admission.postgres.test.ts`.
+- Use `dist/coordinator/release-admission-main.js` from an isolated operator
+  container with `MYCELLIOS_RELEASE_OWNER_URL_FILE` mounted privately.
+  The command binds mutations to the exact baked revision. Never mount the
+  owner credential in a serving or standby coordinator.
+- The handoff runtime reports process-local job and transport counts at
+  `/internal/release/work` over unforwarded loopback. This observation does not
+  certify a global drain. The controller must also verify admission ownership,
+  database work and traffic routing before retiring the source.
+- The overlapping inference case in `tests/e2e.test.ts` uses independent
+  signed workers for the two coordinators. With the disposable PostgreSQL CI
+  fixture it also transfers and reverses database admission during active work.
+  The scoped CI exercise supplies dedicated worker capacity and sends inference
+  over the pinned Docker ingress kit during both route changes.
 - The optional embedding ingress proxy protects only its configured HTTP route,
   not direct/internal callers. Build its pinned capsule with
   `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image

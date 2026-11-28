@@ -92,13 +92,11 @@ export class MeshDatabase {
     } catch (error) { await raw.close().catch(() => undefined); throw error; }
   }
 
-  static async openPostgres(url: string, schema = "mycellios"): Promise<MeshDatabase> {
-    const raw = new PostgresDriver(url, schema);
+  static async openPostgres(url: string, schema = "mycellios", admissionRevision?: string): Promise<MeshDatabase> {
+    const raw = new PostgresDriver(url, schema, admissionRevision);
     const database = new MeshDatabase(raw);
     try {
-      const row = await raw.prepare("SELECT version FROM schema_meta LIMIT 1").get();
-      if (!row || Number(row.version) !== SCHEMA_VERSION) throw new Error("Application database schema requires migration");
-      await raw.prepare("SELECT usage_id FROM api_operator_funded_usage LIMIT 1").all();
+      await raw.verifyApplicationSchema(SCHEMA_VERSION);
       return database;
     } catch (error) { await raw.close().catch(() => undefined); throw error; }
   }

@@ -743,6 +743,13 @@ export class MobileComputeHub {
     return this.listWorkers().filter((worker) => worker.connected).length;
   }
 
+  releaseWorkStatus() {
+    const workers = [...this.workers.values()];
+    return { matrixTasks: workers.filter(worker => worker.pendingTask).length,
+      expertTasks: workers.filter(worker => worker.pendingExpertTask).length,
+      fundedWorkers: this.fundedBusy.size, layerTasks: this.layerHub.pendingCount, textTasks: this.textHub.pendingCount };
+  }
+
   /** Read-only telemetry. Benchmarks and a merely connected socket are not inference. */
   isFundedInferenceActive(workerId: string): boolean {
     return this.fundedBusy.has(workerId);
