@@ -3,7 +3,7 @@ import { Button } from "@mycellios/ui-web";
 import { AppWindow, BellRing, CalendarClock, Users } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GUEST_BOT_ID, guestLimits, useGuestRemaining } from "../../lib/guest-mode";
+import { GUEST_BOT_ID, guestLimits, useGuestRemaining, useGuestTruncatedMessage } from "../../lib/guest-mode";
 import { rpc } from "../../lib/rpc";
 
 /** Shown above the guest conversation: what guest mode is and what not to share. */
@@ -35,6 +35,42 @@ export function GuestSidebarCard() {
         <Button size="sm" variant="ghost" onClick={() => navigate("/sign-in")}><Trans>Sign in</Trans></Button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Under the latest guest answer, drawn by the page rather than the model so it is always there:
+ * a way to let the visitor's own Mico do the work and, when the model stopped the answer at its
+ * length limit, a notice with a button that asks Mico to go on.
+ */
+export function GuestAnswerFooter({ lastMessageId, idle }: { lastMessageId?: string; idle: boolean }) {
+  const { t } = useLingui();
+  const navigate = useNavigate();
+  const truncated = useGuestTruncatedMessage();
+  const [continuing, setContinuing] = useState<string | null>(null);
+  if (!idle || !lastMessageId) return null;
+  const cut = truncated === lastMessageId;
+  const goOn = () => {
+    if (continuing === lastMessageId) return;
+    setContinuing(lastMessageId);
+    rpc.threads.send({ botId: GUEST_BOT_ID, text: t`Continue exactly where you stopped.`, clientNonce: crypto.randomUUID() })
+      .catch(() => setContinuing(null));
+  };
+  return (
+    <div data-guest-allowed data-guest-answer-footer className="flex flex-col gap-2 px-1 pb-6">
+      {cut ? (
+        <div data-guest-truncated role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <span className="min-w-0 flex-1">{t`This answer reached the length limit and stopped before the end.`}</span>
+          <Button size="sm" variant="secondary" disabled={continuing === lastMessageId} onClick={goOn}>{t`Continue`}</Button>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-3 py-2.5">
+        <span className="min-w-[14rem] flex-1 text-[13px] leading-snug text-muted-foreground">
+          {t`Want your Mico to do this by itself? With a free account it builds and publishes, works on a schedule and keeps watching.`}
+        </span>
+        <Button size="sm" onClick={() => navigate("/sign-up")}>{t`Get it running · Create free account`}</Button>
+      </div>
+    </div>
   );
 }
 

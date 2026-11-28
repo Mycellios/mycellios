@@ -11,7 +11,7 @@ export type GuestConfig = { enabled: false } | {
   enabled: true; limits: GuestLimits; challenge: { token: string; difficulty: number; expiresAt: number };
 };
 export type GuestStatus = { remaining: number; limit: number; expiresAt: number };
-export type GuestResult = { status: "completed" | "pending"; content?: string; remaining: number };
+export type GuestResult = { status: "completed" | "pending"; content?: string; truncated?: boolean; remaining: number };
 export type GuestPending = { key: string; messages: GuestMessage[] };
 
 export class GuestChatRequestError extends Error {

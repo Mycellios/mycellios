@@ -134,6 +134,14 @@ describe.skipIf(!url)("registration-free guest chat on isolated PostgreSQL, fict
     for (const secret of ["medical", "Hola invitado", cookie.split("=")[1]!, "203.0.113.7"]) expect(logged).not.toContain(secret);
   });
 
+  it("tells the visitor when the model stopped an answer at the output limit", async () => {
+    provider.execute.mockImplementationOnce(async () => ({ receiptId: "test-receipt-" + randomUUID(), usd: "0", inputTokens: 12, outputTokens: 2048,
+      response: { id: "test-only", model: "mycellios/managed/free",
+        choices: [{ index: 0, message: { role: "assistant", content: "<html><body>" }, finish_reason: "length" }] } }));
+    const stream = events((await turn(cookieOf(await enter()))).body);
+    expect(stream.at(-1)).toEqual({ type: "result", result: { status: "completed", content: "<html><body>", truncated: true, remaining: 11 } });
+  });
+
   it("requires the exact origin, its own cookie and a text-only body; never accepts ordinary account cookies", async () => {
     const nonce = randomBytes(32).toString("base64url");
     expect((await enter(nonce, {})).statusCode).toBe(403);

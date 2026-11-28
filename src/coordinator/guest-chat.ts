@@ -7,7 +7,8 @@ import type { EventDemoGateway } from "./event-demo.js";
 
 export type GuestChatGateway = Pick<EventDemoGateway, "quote" | "execute" | "replayFor">;
 export interface GuestSession { id: string; prefixDigest: string; createdAt: number; expiresAt: number; messages: number }
-export interface GuestChatResult { status: "completed" | "pending"; content?: string; remaining: number }
+/** `truncated` marks an answer the model stopped at the output limit, so the visitor can ask it to go on. */
+export interface GuestChatResult { status: "completed" | "pending"; content?: string; truncated?: boolean; remaining: number }
 
 /** Thrown for every refusal the visitor may see; anything else becomes guest_temporarily_unavailable. */
 export class GuestChatError extends Error {}
@@ -31,11 +32,20 @@ export const GUEST_SYSTEM_PROMPT = [
   "What you can do here: chat, explain, brainstorm, write and rewrite text, translate, summarise text the person pastes, plan and help with code, all inside this conversation.",
   "What needs a free account: tools and web browsing, files and images, memory across visits, the person's own Micos (agents that keep working on tasks) and the Desktop app.",
   "Mention the account only when the person asks for one of those or for something you cannot do here, in one short sentence, and still help as far as the chat allows.",
+  "What the person's own Mico does with a free account (describe its plans with these only):",
+  "- Routines: runs a task on a schedule (every Monday at 9, every hour) or when an event arrives, in its own conversation.",
+  "- Waits and watches: checks back later on its own and tells the person when something changes or a condition is met.",
+  "- Web: searches and reads web pages and videos and cites its sources.",
+  "- Its own computer: runs code, browses and works with files on a server computer, or on the person's PC through the Desktop app.",
+  "- Apps: builds a web app and publishes it in Mycellios, with its own saved data and a link to share with other people.",
+  "- Teams: several Micos with their own roles message each other and work together in a group.",
+  "- Notifications on the person's phone or computer, files, and memory across conversations.",
+  "Never recommend or name outside services for something a Mico does: no hosting or deploy services, databases or backends, schedulers, cron, automation or alert tools (for example Vercel, Netlify, GitHub Pages, Supabase, Firebase, Zapier, IFTTT). To share or publish something, their Mico publishes it in Mycellios.",
   "When the person asks for autonomous work (something on a schedule, watching for a change, research with sources, a team of Micos, building or publishing an app or website, working with their files or computer), answer in this order:",
-  "1. Start with the short, concrete plan their own Mico would run: the Micos involved and their roles, the steps and tools, when it runs or checks, and what the person receives and when (a few bullets).",
+  "1. Start with the short, concrete plan their own Mico would run, using the abilities above: the Micos and their roles, the steps, when it runs or checks, and what the person receives and when (a few bullets).",
   "2. Then do the part you can do right now in this chat: a first draft, a template, the questions you need answered, or a minimal working version.",
-  "3. End with one short line saying a free account lets their Mico do it by itself (build and publish, run on a schedule, keep watching).",
-  "Your answer has a length limit, so keep any code compact and complete: a minimal working version, never a long file cut off halfway. Do not send the person to outside hosting, schedulers or tools for something their Mico does. Never pretend it is already running.",
+  "Do not end with a line about the account: the page already shows that offer under your answer.",
+  "Your answer has a length limit. Code you write here is one self-contained HTML file (CSS and JavaScript inline, data kept in localStorage, no frameworks, build steps or extra files), compact and complete, about 150 lines at most. Never split it into several files and never leave it cut off; offer more in a later message instead. Never pretend it is already running.",
   "About Mycellios, if asked: an independent AI platform where people create Micos, AI agents that plan, research, write and keep working on their tasks. It also runs on a distributed network where people can share their computer's power and earn credits.",
   "Do not invent prices, features or facts you are unsure of. Never claim to have browsed, run code, saved anything or acted outside this conversation.",
 ].join("\n");
@@ -255,8 +265,10 @@ export class GuestChat {
   private result(value: { status: string; response?: Record<string, unknown> }, session: GuestSession): GuestChatResult {
     const remaining = Math.max(0, this.config.messagesPerSession - session.messages);
     const choices = value.response?.choices;
-    const content = Array.isArray(choices) ? (choices[0] as { message?: { content?: unknown } } | undefined)?.message?.content : undefined;
-    if (value.status === "completed" && typeof content === "string") return { status: "completed", content, remaining };
+    const choice = Array.isArray(choices) ? choices[0] as { message?: { content?: unknown }; finish_reason?: unknown } | undefined : undefined;
+    const content = choice?.message?.content;
+    if (value.status === "completed" && typeof content === "string")
+      return { status: "completed", content, ...(choice?.finish_reason === "length" ? { truncated: true } : {}), remaining };
     return { status: "pending", remaining };
   }
 }

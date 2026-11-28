@@ -1,6 +1,6 @@
 import { accountNotificationAllowed, accountNotificationSettings } from "../lib/account-notifications";
 import { useGuestMode } from "../lib/guest-mode";
-import { GuestSidebarCard, GuestStarters, GuestTranscriptNotice } from "./guest/GuestNotice";
+import { GuestAnswerFooter, GuestSidebarCard, GuestStarters, GuestTranscriptNotice } from "./guest/GuestNotice";
 import { prioritizeChatHistory } from "../lib/chat-read-priority";
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
@@ -5307,7 +5307,10 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
             <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><SendToGroupContext.Provider value={sendToGroup}><MemoryRecallGate enabled={!inGroup && Boolean(active)} botName={active?.name} onOpenNote={openMemoryNote}><Transcript
               headerTabs={false}
               banner={guestMode ? <GuestTranscriptNotice /> : conversationBanner}
-              footer={guestMode && !activeSnapshot?.messages.length ? <GuestStarters /> : transcriptFooter}
+              footer={!guestMode ? transcriptFooter : !activeSnapshot?.messages.length ? <GuestStarters /> : (
+                <GuestAnswerFooter lastMessageId={activeSnapshot.messages.at(-1)?.role === "bot" ? activeSnapshot.messages.at(-1)?.id : undefined}
+                  idle={!activeSnapshot.run || ["completed", "failed", "cancelled"].includes(activeSnapshot.run.status)} />
+              )}
               onMarkRead={markReadFromBanner}
               conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}
