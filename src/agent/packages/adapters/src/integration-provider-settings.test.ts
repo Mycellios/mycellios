@@ -62,6 +62,27 @@ describe("integration provider settings", () => {
       apiKey: "fake-replacement-key",
     });
   });
+  it("gives the Composio adapter built from stored credentials the tool list reuse window", async () => {
+    const f = fixture();
+    const settings = new IntegrationProviderSettings(
+      f.prisma as unknown as PrismaClient,
+      f.secrets,
+      "test-identity",
+      {},
+      undefined,
+      { composioToolsReuseMs: 123_000 },
+    );
+    f.rows.set("composio", {
+      id: "composio",
+      ciphertext: (
+        await f.secrets.put(JSON.stringify({ provider: "composio", apiKey: "fake-stored-key" }), context, {
+          recordId: "integration-provider:composio",
+        })
+      ).ciphertext,
+    });
+    const provider = (await settings.resolve("composio")) as unknown as { toolsReuseMs: number };
+    expect(provider.toolsReuseMs).toBe(123_000);
+  });
   it("preserves working settings and hides provider error details on failed verification", async () => {
     const f = fixture();
     await f.settings.save({ provider: "composio", apiKey: "fake-working-key" }, context);
