@@ -37,7 +37,7 @@ const app = Fastify({ logger: false });
 try {
   await sql.unsafe(`CREATE SCHEMA ${schema}`);
   const source = readFileSync(join(root, "src/storage/database.ts"), "utf8");
-  for (const table of ["economic_contribution_evidence", "economic_accounts", "pricing_policies", "economic_settlements",
+  for (const table of ["workers", "jobs", "economic_contribution_evidence", "economic_accounts", "pricing_policies", "economic_settlements",
     "economic_ledger_entries", "economic_settlement_receipts", "node_ownership", "economic_node_reputation", "api_accounts", "api_keys", "api_usage"]) {
     const ddl = source.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n      \\);`))?.[0]; assert.ok(ddl);
     await sql.unsafe(`SET search_path TO ${schema}; ` + ddl.replace(/\bINTEGER\b/g, "BIGINT"));

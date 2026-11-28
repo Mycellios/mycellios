@@ -225,6 +225,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             size="icon"
             className="app-no-drag rk-rail-button"
             aria-label={t`Micos`}
+            data-guest-allowed
             aria-current={(props.onApps && props.apps) || props.marketplace || pages.some((page) => page.current) ? undefined : "page"}
             onClick={props.onChats}
           >

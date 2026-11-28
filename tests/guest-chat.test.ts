@@ -24,8 +24,8 @@ describe("guest chat configuration", () => {
     expect(() => readGuestChatConfig({ MYCELLIOS_GUEST_CHAT_ENABLED: "true" })).toThrow();
     const parsed = readGuestChatConfig({ MYCELLIOS_GUEST_CHAT_ENABLED: "true",
       MYCELLIOS_GUEST_CHAT_CONFIG_JSON: JSON.stringify({ publicOrigin: "https://guest.invalid", secret }) })!;
-    expect(parsed).toMatchObject({ model: "mycellios/managed/free", messagesPerSession: 12, sessionHours: 24, historyMessages: 8,
-      historyBytes: 24_576, messageChars: 4000, maxOutputTokens: 800, sessionsPerPrefixHour: 5, messagesPerPrefixDay: 40,
+    expect(parsed).toMatchObject({ model: "mycellios/managed/free", messagesPerSession: 12, sessionHours: 24, historyMessages: 24,
+      historyBytes: 98_304, messageChars: 4000, maxOutputTokens: 800, sessionsPerPrefixHour: 5, messagesPerPrefixDay: 40,
       messagesPerDay: 2000, concurrentTurns: 16 });
     for (const bad of [{ publicOrigin: "http://guest.invalid" }, { publicOrigin: "https://guest.invalid/agent" },
       { secret: "short" }, { model: "mycellios/managed/antseed/paid" }, { messagesPerSession: 0 }, { maxOutputTokens: 100_000 },
@@ -55,6 +55,10 @@ describe("guest chat helpers", () => {
     const input = guestChatInputSchema(config());
     const ok = { key: uuid, messages: [{ role: "user", content: "Hola" }] };
     expect(input.safeParse(ok).success).toBe(true);
+    // The whole session travels with each turn: 12 longest messages and 11 full answers (800 tokens).
+    const session = Array.from({ length: 23 }, (_, i) => i % 2 === 0
+      ? { role: "user", content: "x".repeat(4000) } : { role: "assistant", content: "y".repeat(3200) });
+    expect(input.safeParse({ key: uuid, messages: session }).success).toBe(true);
     for (const bad of [
       { ...ok, model: "mycellios/managed/antseed/paid" },
       { ...ok, tools: [{ type: "function", function: { name: "x" } }] },
@@ -63,8 +67,8 @@ describe("guest chat helpers", () => {
       { ...ok, messages: [{ role: "user", content: "x", tool_calls: [] }] },
       { ...ok, messages: [{ role: "assistant", content: "only an answer" }] },
       { ...ok, messages: [{ role: "user", content: "x".repeat(4001) }] },
-      { ...ok, messages: Array.from({ length: 9 }, () => ok.messages[0]) },
-      { ...ok, messages: [{ role: "assistant", content: "y".repeat(15_000) }, { role: "assistant", content: "y".repeat(15_000) }, ok.messages[0]] },
+      { ...ok, messages: Array.from({ length: 25 }, () => ok.messages[0]) },
+      { ...ok, messages: [...Array.from({ length: 7 }, () => ({ role: "assistant", content: "y".repeat(15_000) })), ok.messages[0]] },
       { ...ok, key: "not-a-uuid" },
     ]) expect(input.safeParse(bad).success).toBe(false);
   });

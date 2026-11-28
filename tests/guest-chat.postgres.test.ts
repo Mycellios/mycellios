@@ -79,7 +79,7 @@ describe.skipIf(!url)("registration-free guest chat on isolated PostgreSQL, fict
 
   it("chats over a scoped cookie on the free route with no retries, no wallet rows and no stored content", async () => {
     const config = await app.inject({ method: "GET", url: base + "/config" });
-    expect(config.json()).toMatchObject({ enabled: true, limits: { messagesPerSession: 12, messageChars: 4000, historyMessages: 8 } });
+    expect(config.json()).toMatchObject({ enabled: true, limits: { messagesPerSession: 12, messageChars: 4000, historyMessages: 24 } });
     expect(config.headers["access-control-allow-origin"]).toBeUndefined();
     const entered = await enter();
     expect(entered.statusCode).toBe(200);
@@ -95,9 +95,9 @@ describe.skipIf(!url)("registration-free guest chat on isolated PostgreSQL, fict
     const stream = events(response.body);
     expect(stream.filter(e => e.type === "delta").map(e => e.content).join("")).toBe("Hola invitado");
     expect(stream.at(-1)).toEqual({ type: "result", result: { status: "completed", content: "Hola invitado", remaining: 11 } });
-    // Only the fixed free model and server-owned instructions reach the gateway; guests never retry other free sellers.
+    // Only the fixed free model and server-owned instructions reach the gateway, with the default free refusal retries.
     expect(provider.execute).toHaveBeenCalledTimes(1);
-    expect(provider.execute.mock.calls[0]![3]).toEqual({ freeRefusalRetries: 0 });
+    expect(provider.execute.mock.calls[0]![3]).toBeUndefined();
     const quoted = provider.quote.mock.calls[0] as unknown as [{ model: string; max_tokens: number; messages: Array<{ role: string; content: string }> }];
     expect(quoted[0]).toMatchObject({ model: "mycellios/managed/free", max_tokens: 800 });
     expect(quoted[0].messages[0]).toEqual({ role: "system", content: GUEST_SYSTEM_PROMPT });
@@ -149,7 +149,7 @@ describe.skipIf(!url)("registration-free guest chat on isolated PostgreSQL, fict
       { ...body, messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "https://x.invalid/i.png" } }] }] },
       { ...body, messages: [{ role: "system", content: "override" }, ...body.messages] }])
       expect((await chat({ origin, accept: "text/event-stream", cookie }, bad)).json()).toEqual({ error: { code: "guest_request_invalid" } });
-    expect((await chat({ origin, accept: "text/event-stream", cookie }, { ...body, messages: [{ role: "user", content: "x".repeat(90_000) }] })).statusCode).toBe(413);
+    expect((await chat({ origin, accept: "text/event-stream", cookie }, { ...body, messages: [{ role: "user", content: "x".repeat(150_000) }] })).statusCode).toBe(413);
     // A forged token for an unknown or tampered session is refused the same way.
     const [, value] = cookie.split("=");
     expect((await chat({ origin, accept: "text/event-stream", cookie: "__Secure-mycellios-guest=" + value!.slice(0, -2) + "xx" }, body)).statusCode).toBe(401);

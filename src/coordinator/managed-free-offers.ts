@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { ManagedModel } from "../contracts/managed-provider.js";
 import { MANAGED_FREE_TEXT_MAX_REQUEST_BYTES } from "../contracts/managed-provider.js";
 import { markedUpUnitPrice } from "../economy/managed-pricing.js";
@@ -152,23 +151,19 @@ export function freeRoutePool<T extends FreeRoute>(offers: Iterable<T>, probes: 
     return result?.ok && result.latencyMs <= MAX_POOL_LATENCY_MS;
   });
   const pool = passed.length ? passed : free.filter(offer => !probes.result(offer.signals!.key));
-  const score = (offer: T) => freeScore(offer.signals!, probes.result(offer.signals!.key)) ?? [];
+  // Unprobed stand-ins rank by the same published signals, without a measured speed.
+  const score = (offer: T) => freeScore(offer.signals!, probes.result(offer.signals!.key))
+    ?? [offer.signals!.reference, 0, offer.signals!.allowance, offer.signals!.reputation];
   return pool.sort((a, b) => compareFreeScores(score(a), score(b)) || a.public.id.localeCompare(b.public.id));
 }
 /**
- * Spreads conversations over the pool. The choice depends only on the opening of the
- * conversation and each route's own model id (rendezvous hashing), so a quote and its execution
- * agree and a conversation keeps its model while that model stays in the pool: routes joining or
- * leaving move only the conversations they gain or lose, never the rest.
+ * Every request goes to the strongest route in the pool (the pool is ordered strongest first),
+ * so quotes and executions agree and a conversation stays on the best free model available. When
+ * that model's sellers refuse or run out of free allowance they rest and leave the pool, and the
+ * next request, or the same one through a refusal retry, moves down to the next strongest model.
  */
-export function pickFreeRoute<T extends { public: { id: string } }>(pool: readonly T[], request: { messages?: unknown }): T | undefined {
-  const opening = JSON.stringify(Array.isArray(request.messages) ? request.messages.slice(0, 2) : []);
-  let best: T | undefined, bestWeight = -1n;
-  for (const route of pool) {
-    const weight = createHash("sha256").update(opening).update("\0").update(route.public.id).digest().readBigUInt64BE(0);
-    if (weight > bestWeight || (weight === bestWeight && best && route.public.id < best.public.id)) { best = route; bestWeight = weight; }
-  }
-  return best;
+export function pickFreeRoute<T extends { public: { id: string } }>(pool: readonly T[], _request?: { messages?: unknown }): T | undefined {
+  return pool[0];
 }
 /** The stable, recommended free model. Its limits fit every route it may use. */
 export function freeRouteModel(pool: readonly unknown[], fundingCostBasisPoints: number): ManagedModel | null {

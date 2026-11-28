@@ -28,7 +28,7 @@ These rules apply to the complete repository.
   `MYCELLIOS_GUEST_CHAT_ENABLED=true` and `guestChatSchemaSql` exist; without them
   `GET /mobile/v1/guest/config` reports disabled. Guests get text only on the exact-zero
   `mycellios/managed/free` route under a `guest:<session>` account: no tools, Credits,
-  grants, API keys or Agent rows, never a priced quote, and `freeRefusalRetries: 0`.
+  grants, API keys or Agent rows, never a priced quote; refusal retries stay on exact-zero routes.
   Keep the HttpOnly SameSite=Strict cookie scoped to `/mobile/v1/guest`, the exact
   Origin on writes, no CORS, the signed proof of work per session and the session,
   prefix (HMAC digest, never the raw address) and global limits in one transaction.
@@ -625,12 +625,13 @@ These rules apply to the complete repository.
   tests too. Keep models without an enforceable upstream cost contract disabled.
   Exact-zero AntSeed offers are the free route: skip stakers-only sellers, assume a
   bounded window when undeclared, start accounts on the stable recommended
-  `mycellios/managed/free` model that spreads conversations over routes passing the
-  coordinator's own zero-priced tool-call probe, ranked by market signals (never a
-  hardcoded model), rest exhausted or staked-only sellers, keep
-  the per-account free daily cap and never fall back to a priced offer. Conversations
-  map to pool routes by rendezvous hashing, so pool changes move only the affected
-  conversations. Each free model keeps a few reserve free sellers; an explicit 429
+  `mycellios/managed/free` model over routes passing the coordinator's own zero-priced
+  tool-call probe, ranked strongest first by market signals (never a hardcoded model),
+  rest exhausted or staked-only sellers, keep
+  the per-account free daily cap and never fall back to a priced offer. Every request
+  uses the strongest route in the pool (pickFreeRoute); when its sellers refuse or run
+  out it leaves the pool and requests move down to the next strongest model. Guest chat
+  uses the same order and retries. Each free model keeps a few reserve free sellers; an explicit 429
   allowance refusal rests the seller, promotes a reserve and may quote the same
   request again on another exact-zero route (FREE_REFUSAL_RETRIES), never on a
   priced one and never after any other failure. AntSeed is

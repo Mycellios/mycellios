@@ -931,6 +931,11 @@ export const Transcript = memo(function Transcript({
           <p role="status" data-testid="working-elsewhere" className="px-1 py-2 text-xs text-muted-foreground">
             {t`Working in another conversation…`}
           </p>
+        ) : conversationBot && !pendingMessages.length && shownMessages.at(-1)?.role === "bot" ? (
+          // The same Mico that worked on the turn rests under its last reply.
+          <div data-testid="mico-resting" aria-hidden="true" className="rk-chat-live-row flex px-1 pb-2 pt-0.5">
+            <ThinkingAvatar members={[{ botId: conversationBot.id, color: conversationBot.color, status: "idle" }]} size={24} />
+          </div>
         ) : null}
         {footer}
         </div>
@@ -960,6 +965,7 @@ export const Transcript = memo(function Transcript({
         variant="floating"
         size="icon-lg"
         aria-label={t`Jump to latest`}
+        data-guest-allowed
         aria-hidden={atEnd}
         tabIndex={atEnd ? -1 : 0}
         onClick={jumpToLatest}

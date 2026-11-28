@@ -11,8 +11,10 @@ export const guestChatConfigSchema = z.object({
   model: z.literal("mycellios/managed/free").default("mycellios/managed/free"),
   messagesPerSession: z.number().int().min(1).max(100).default(12),
   sessionHours: z.number().int().min(1).max(72).default(24),
-  historyMessages: z.number().int().min(2).max(20).default(8),
-  historyBytes: z.number().int().min(4096).max(65_536).default(24_576),
+  // The whole guest conversation travels with every turn: 12 messages and their answers fit both
+  // bounds, and 96 KiB (~27k tokens) stays inside the smallest assumed free model window (32k).
+  historyMessages: z.number().int().min(2).max(200).default(24),
+  historyBytes: z.number().int().min(4096).max(131_072).default(98_304),
   messageChars: z.number().int().min(200).max(8000).default(4000),
   maxOutputTokens: z.number().int().min(64).max(2048).default(800),
   sessionsPerPrefixHour: z.number().int().min(1).max(100).default(5),

@@ -3,6 +3,7 @@ import { eventAgentContext, eventAgentSpace, withEventAgentHeaders } from "./eve
 import { startupFetch } from "./startup-fetch";
 import { runWithChatReadPriority } from "./chat-read-priority";
 import { getGeneralPreferences } from "./general-preferences";
+import { guestModeActive } from "./guest-mode";
 import { shouldRestoreSavedSpace } from "./startup-space";
 import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -167,6 +168,8 @@ if (import.meta.env.DEV) RECURSIVE_CLIENT_UNWRAP_KEYS.add("name");
 const displayLink = {
   call: async (...args: Parameters<typeof link.call>) => {
     const [path, input, options] = args;
+    // A guest has no Agent account: the guest data layer answers locally and never calls the API.
+    if (guestModeActive()) return (await import("./guest-rpc")).guestCall(path, input, options);
     const result = await link.call(path, input, options);
     if (path.join("/") === "threads/subscribe") {
       return (async function* () {

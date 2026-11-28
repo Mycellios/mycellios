@@ -179,7 +179,7 @@ export function SidebarHeader({
         </PopoverContent> : null}
       </Popover></div> : null}
       <div className={`relative flex shrink-0 items-center gap-0.5 ${mini ? "flex-col" : "ms-auto"}`}>
-        {!mini ? <div className="hidden items-center md:flex">
+        {!mini ? <div className="hidden items-center md:flex" data-guest-allowed>
           <IconTooltip label={t`Back`}><Button variant="ghost" size="icon-sm" className="app-no-drag size-7" aria-label={t`Back`} disabled={!history.canBack} onClick={history.back}><ArrowLeft size={15} /></Button></IconTooltip>
           <IconTooltip label={t`Forward`}><Button variant="ghost" size="icon-sm" className="app-no-drag size-7" aria-label={t`Forward`} disabled={!history.canForward} onClick={history.forward}><ArrowRight size={15} /></Button></IconTooltip>
         </div> : null}
@@ -225,6 +225,7 @@ export function SidebarHeader({
             size="icon-sm"
             className="app-no-drag hidden h-7 w-7 items-center justify-center rounded-full text-muted-foreground/70 hover:text-foreground/75 md:inline-flex"
             aria-label={toggleLabel}
+            data-guest-allowed
             data-testid={mini ? "restore-bots-sidebar" : "minimize-bots-sidebar"}
             onClick={() => setBotsSidebarCollapsedPref(!mini)}
           >
@@ -237,7 +238,7 @@ export function SidebarHeader({
         </IconTooltip>
         {mini || mobile || !search ? createMenu : null}
         {mobileMenu}
-        {mobile && onOpenNavigation ? <Button variant="ghost" size="icon" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><X aria-hidden /></Button> : null}
+        {mobile && onOpenNavigation ? <Button variant="ghost" size="icon" data-guest-allowed aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><X aria-hidden /></Button> : null}
       </div>
     </div>
     {search && !mini && !mobile ? <div data-testid="sidebar-search-row" className="mx-2.5 my-2.5 flex shrink-0 items-center gap-1.5">{search}{createMenu}</div> : null}

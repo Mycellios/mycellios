@@ -1,4 +1,6 @@
 import { accountNotificationAllowed, accountNotificationSettings } from "../lib/account-notifications";
+import { useGuestMode } from "../lib/guest-mode";
+import { GuestSidebarCard, GuestStarters, GuestTranscriptNotice } from "./guest/GuestNotice";
 import { prioritizeChatHistory } from "../lib/chat-read-priority";
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
@@ -475,6 +477,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const responseStyle = useSavedResponseStyle(rpc);
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const guestMode = useGuestMode();
   const floatingChat = desktopBridge()?.chatWindow?.kind === "floating";
   const pushPublicKey = useWebPushPresence(userId);
   const chatHistory = useChatHistory();
@@ -4871,6 +4874,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
   const chromeCardMico = active ?? bots[0];
   const sidebarCredits = (
     <>
+    {guestMode ? <GuestSidebarCard /> : null}
     <ChromeExtensionCard mico={chromeCardMico ? { id: chromeCardMico.id, color: chromeCardMico.color } : undefined} />
     <div className="mx-3 mt-1 flex shrink-0 flex-col gap-1 border-t border-border py-2">
       <div className="w-full px-2"><MycelliosCredits key={userId} ownerId={userId ?? ""} onConnect={() => openSettings("models")} /></div>
@@ -5165,6 +5169,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           {!miniSidebar ? <><WebUpdateSlot /><DesktopSidebarUpdate /></> : null}
           {miniSidebar ? <SidebarContribution mini /> : sidebarCredits}
         </> : mobileSidebarOpen ? <><WebUpdateSlot /><DesktopSidebarUpdate /></> : null}
+        {isMobileSidebar && guestMode ? <GuestSidebarCard /> : null}
         {isMobileSidebar ? sidebarSearch : null}
       </Sidebar> : null}
 
@@ -5208,6 +5213,7 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
                 variant="floating"
                 size="icon-lg"
                 aria-label={t`Open navigation`}
+                data-guest-allowed
                 onClick={() => setMobileSidebarOpen(true)}
                 className="app-no-drag size-12 shrink-0 rounded-full md:hidden"
               >
@@ -5300,8 +5306,8 @@ function SpaceShell({ taskScope, newConversation = false, spaceId: initialSpaceI
           ) : (
             <ResponseStyleContext.Provider value={responseStyle}><MessagePinsContext.Provider value={messagePins.actions}><SendToGroupContext.Provider value={sendToGroup}><MemoryRecallGate enabled={!inGroup && Boolean(active)} botName={active?.name} onOpenNote={openMemoryNote}><Transcript
               headerTabs={false}
-              banner={conversationBanner}
-              footer={transcriptFooter}
+              banner={guestMode ? <GuestTranscriptNotice /> : conversationBanner}
+              footer={guestMode && !activeSnapshot?.messages.length ? <GuestStarters /> : transcriptFooter}
               onMarkRead={markReadFromBanner}
               conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}

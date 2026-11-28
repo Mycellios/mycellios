@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { translateRunError } from "../../lib/run-error";
+import { useGuestMode } from "../../lib/guest-mode";
 
 export function ComposerError({
   sendError,
@@ -37,6 +38,7 @@ export function ComposerError({
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const { t } = useLingui();
+  const guestMode = useGuestMode();
   const runErrorRef = useRef<HTMLDivElement>(null);
   const [copyState,setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   useEffect(()=>setCopyState("idle"),[runError,runErrorId]);
@@ -134,11 +136,13 @@ export function ComposerError({
             </button>
           </>
         ) : null}
-        {modelAction}
+        {/* Guests have one free model: changing it needs an account. */}
+        {guestMode ? null : modelAction}
         {!interrupted && !(recovery === "computer" && recoveryAction) && !sendError && runError && runErrorId && onRetryError ? (
           <button
             type="button"
             data-testid="composer-error-retry"
+            data-guest-allowed
             disabled={retrying}
             onClick={onRetryError}
             className="ml-2 font-medium underline underline-offset-2 hover:text-foreground disabled:cursor-wait disabled:opacity-60"
@@ -148,7 +152,7 @@ export function ComposerError({
         ) : null}
         {!sendError && runError && !missingModel ? (
           <details key={runError} className="mt-1">
-            <summary className="w-fit cursor-pointer">{t`Details`}</summary>
+            <summary data-guest-allowed className="w-fit cursor-pointer">{t`Details`}</summary>
             <pre className="mt-2 whitespace-pre-wrap break-words text-xs">
               {normalizedRunError?.details}
             </pre>
@@ -166,6 +170,7 @@ export function ComposerError({
         type="button"
         aria-label={t`Dismiss error`}
         data-testid="composer-error-dismiss"
+        data-guest-allowed
         onClick={() => {
           onDismissError();
           window.requestAnimationFrame(() => textareaRef.current?.focus());

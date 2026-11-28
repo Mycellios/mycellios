@@ -89,7 +89,7 @@ export function mountGuestChat(app: FastifyInstance, service: GuestChat | undefi
     return service!.status(session);
   }));
   app.get(GUEST_CHAT_BASE + "/session", handle(async request => service!.status(await service!.authenticate(token(request)))));
-  app.post(GUEST_CHAT_BASE + "/chat", { bodyLimit: 81_920 }, handle(async (request, reply) => {
+  app.post(GUEST_CHAT_BASE + "/chat", { bodyLimit: 147_456 }, handle(async (request, reply) => {
     if (request.headers.accept !== "text/event-stream") throw new GuestChatError("guest_request_invalid");
     const session = await service!.authenticate(token(request));
     // Refusals before the stream opens keep their HTTP status, so the visitor sees a clear reason.

@@ -941,6 +941,7 @@ export const Composer = memo(function Composer({
             />
           ))}
           <textarea
+            data-guest-allowed
             ref={textareaRef}
             value={voiceDraft}
             readOnly={voice.state !== null}
@@ -1034,7 +1035,7 @@ export const Composer = memo(function Composer({
             <ComposerVoiceButton voice={voice} disabled={disabled || sending || onCall || reviewedVoice.stage !== "closed"} />
           )}
           {!voice.state ? running && busyMessages && !canSend ? (
-            <Button type="button" variant="ghost" size="icon" aria-label={t`Stop`}
+            <Button type="button" variant="ghost" size="icon" aria-label={t`Stop`} data-guest-allowed
               title={t`Stop`} disabled={sending} onClick={() => void onStop()}
               className="rk-chat-control size-10 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background md:size-7">
               <Square size={12} strokeWidth={0} fill="currentColor" aria-hidden />
@@ -1050,7 +1051,7 @@ export const Composer = memo(function Composer({
               {voiceConversationActive ? <X size={16} aria-hidden /> : <AudioLines size={16} aria-hidden />}
             </Button>
           ) : (
-            <Button type="button" size="icon"
+            <Button type="button" size="icon" data-guest-allowed
               aria-label={busyMessages ? delivery === "queue" ? t`Add to queue` : t`Update current task` : t`Send`}
               title={busyMessages ? delivery === "queue" ? t`Send when this task finishes` : t`Update current task` : t`Send`}
               disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
