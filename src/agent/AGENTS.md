@@ -1546,6 +1546,17 @@
   and API work-controls tests plus scripts/verify-resilient-work-db.ts through the
   shared scheduler. Keep production and existing user accounts out of these fixtures.
 
+- Deploys roll back by image and keep the migrated schema, so every Prisma migration must
+  leave the previous release working: expand first (new tables, nullable or defaulted
+  columns, added enum labels), contract in a later release. Applied migrations are never
+  edited, removed or backdated. CI runs `scripts/verify-migration-compat-db.ts` for any
+  migration change: main's migrations, then the new ones, on a disposable PostgreSQL, refusing
+  removed tables/columns/enum labels, type changes, columns made required and new required
+  columns without a default (`packages/db/src/migration-compat.ts`). A contract migration
+  carries the line `-- mycellios-migration: contract` and ships only after the release that
+  stopped using the object; it still cannot add a required column without a default. Not
+  covered: new CHECK/unique constraints, triggers and data rewrites, which still need review.
+
 - Mobile dependency updates must match the installed Expo SDK's
   `bundledNativeModules.json` and the proposed lockfile's peer requirements;
   an isolated Router major update is not an SDK migration. Mermaid's API route
